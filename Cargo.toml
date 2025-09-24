@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/*",
+    "py-epimodel"
+]
+default-members = [
+  "crates/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = [
+    "Rafael J. Villanueva Micó <rjvillan@imm.upv.es>"
+    "Carlos Andreu Vilarroig <caranvi1@upv.es>"
+    "David Martínez Rodríguez <damarro3@upv.es>"
+]
+edition = "2024"
+homepage = "https://github.com/MUNQU/epimodel"
+license = "MIT"
+repository = "https://github.com/MUNQU/epimodel"
+
+[workspace.dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+pyo3 = { version = "0.25.1", features = ["extension-module"] }
