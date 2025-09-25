@@ -1,0 +1,9 @@
+site_name: epimodel Documentation
+site_description: Documentation of epimodel library
+theme:
+  name: material
+plugins:
+  - search
+  - mkdocstrings
+nav:
+  - User Guide: user_guide.md
