@@ -15,8 +15,8 @@ class Transition(BaseModel):
         The origin compartments.
     target : list[str]
         The destination compartments.
-    rate : str | None
-        The mathematical formula for the flow between compartments (ODE).
+    rate : float | str | None
+        Value or mathematical formula for the flow between compartments (ODE).
     condition : Condition | None
         Logical restrictions for the transition.
     """

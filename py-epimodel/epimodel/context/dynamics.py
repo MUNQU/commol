@@ -12,10 +12,10 @@ class Dynamics(BaseModel):
 
     Attributes
     ----------
-    type : Literal["DifferenceEquations"]
+    typology : Literal["DifferenceEquations"]
         The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
     """
-    type: Literal[ModelTypes.DIFFERENCE_EQUATIONS]
+    typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS]
     transitions: list[Transition]
