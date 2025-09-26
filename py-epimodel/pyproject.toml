@@ -1,47 +1,32 @@
-[project]
-name = "epimodel"
-description = "A high-performance mathematical epidemiology library in Rust and Python."
-readme = "README.md"
-license = { file = "LICENSE" }
-requires-python = ">=3.9.0"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Rust",
-    "Topic :: Scientific/Engineering :: Mathematics",
-]
-dynamic = ["version"]
-
-[project.urls]
-Homepage = "https://github.com/MUNQU/epimodel"
-Repository = "https://github.com/MUNQU/epimodel"
-
 [build-system]
-requires = ["maturin>=1.9.1,<1.10.0"]
+requires = ["maturin>=1.9.1,<1.10.0", "poetry-core>=1.0.0"]
 build-backend = "maturin"
 
-[project.dependencies]
+[project]
+name = "epimodel"
+version = "0.0.1"
+description = "A high-performance mathematical epidemiology library in Rust and Python."
+license = { text = "MIT" }
+requires-python = ">=3.11.0"
+authors = [
+    { name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es" },
+    { name = "Carlos Andreu Vilarroig", email = "caranvi1@upv.es" },
+    { name = "David Martínez Rodríguez", email = "damarro3@upv.es" },
+]
 dependencies = [
-    "pydantic>=2.11.7,<2.12.0",
-    "numpy>=2.3.0,<2.4.0",
+    "pydantic>=2.0,<3.0",
+    "numpy>=2.0,<3.0",
 ]
 
 [project.optional-dependencies]
-test = [
-    "pytest>=8.4.1,<8.5.0",
-    "pytest-cov>=6.2.1,<6.3.0"
+dev = [
+    "pytest>=8.4,<9.0",
+    "pytest-cov>=6.2,<7.0",
+    "ruff>=0.12,<0.13",
+    "mypy>=1.10,<2.0",
+    "black>=25.1,<26.0",
+    "pre-commit>=3.8,<4.0",
 ]
-lint = [
-    "ruff>=0.12.4,<0.13.0",
-    "mypy>=0.17.0,<0.18.0",
-    "black>=25.1.0,<26.0.0",
-    "pre-commit>=4.2.0,<4.3.0"
-]
-dev = ["epimodel[test,lint]"]
 
 [tool.ruff]
 line-length = 88
