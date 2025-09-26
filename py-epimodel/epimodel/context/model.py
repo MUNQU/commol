@@ -7,7 +7,7 @@ from .parameter import Parameter
 from .population import Population
 
 
-class EpidemiologicalModel(BaseModel):
+class Model(BaseModel):
     """
     Root class of epidemiological model.
 
