@@ -11,8 +11,8 @@ default-members = [
 [workspace.package]
 version = "0.1.0"
 authors = [
-    "Rafael J. Villanueva Micó <rjvillan@imm.upv.es>"
-    "Carlos Andreu Vilarroig <caranvi1@upv.es>"
+    "Rafael J. Villanueva Micó <rjvillan@imm.upv.es>", 
+    "Carlos Andreu Vilarroig <caranvi1@upv.es>", 
     "David Martínez Rodríguez <damarro3@upv.es>"
 ]
 edition = "2024"

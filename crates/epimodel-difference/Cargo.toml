@@ -7,3 +7,6 @@ homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
 description = "Mathematical epidemiology modelling with difference equations"
+
+[dependencies]
+epimodel-core = { path = "../epimodel-core" }
