@@ -49,7 +49,7 @@ no_llvm_build
 /mingw-build/
 /build
 /build-rust-analyzer/
-/dist/
+*/dist/
 /unicode-downloads
 /target
 /library/target
@@ -102,3 +102,9 @@ flake.lock
 /default.nix
 
 .python-version
+
+# Ignore compiled Python extension modules (PyO3, Cython, C extensions, etc.)
+*.so
+*.pyd
+*.dll
+*.dylib

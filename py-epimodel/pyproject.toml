@@ -1,32 +1,36 @@
-[build-system]
-requires = ["maturin>=1.9.1,<1.10.0", "poetry-core>=1.0.0"]
-build-backend = "maturin"
-
-[project]
+[tool.poetry]
 name = "epimodel"
 version = "0.0.1"
 description = "A high-performance mathematical epidemiology library in Rust and Python."
-license = { text = "MIT" }
-requires-python = ">=3.11.0"
 authors = [
-    { name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es" },
-    { name = "Carlos Andreu Vilarroig", email = "caranvi1@upv.es" },
-    { name = "David Martínez Rodríguez", email = "damarro3@upv.es" },
+    "Rafael J. Villanueva Micó <rjvillan@imm.upv.es>",
+    "Carlos Andreu Vilarroig <caranvi1@upv.es>",
+    "David Martínez Rodríguez <damarro3@upv.es>",
 ]
-dependencies = [
-    "pydantic>=2.0,<3.0",
-    "numpy>=2.0,<3.0",
-]
+license = "MIT"
+packages = [{include = "epimodel"}]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.4,<9.0",
-    "pytest-cov>=6.2,<7.0",
-    "ruff>=0.12,<0.13",
-    "mypy>=1.10,<2.0",
-    "black>=25.1,<26.0",
-    "pre-commit>=3.8,<4.0",
-]
+[tool.poetry.dependencies]
+python = ">=3.11.0"
+pydantic = ">=2.0,<3.0"
+numpy = ">=2.0,<3.0"
+cffi = ">=2.0,<3.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.4,<9.0"
+pytest-cov = ">=6.2,<7.0"
+ruff = ">=0.12,<0.13"
+mypy = ">=1.10,<2.0"
+black = ">=25.1,<26.0"
+pre-commit = ">=3.8,<4.0"
+maturin = ">=1.9.1,<1.10.0"
+
+[build-system]
+requires = ["maturin>=1.9.1,<1.10.0"]
+build-backend = "maturin"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 88

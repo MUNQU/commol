@@ -1,0 +1,13 @@
+[package]
+name = "py-epimodel"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "epimodel_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+epimodel-core = { path = "../crates/epimodel-core", features = ["python"] }
+epimodel-difference = { path = "../crates/epimodel-difference", features = ["python"] }

@@ -15,10 +15,11 @@ from epimodel.constants import ModelTypes, LogicOperators
 
 class RuleDict(TypedDict):
     """Type definition for rule dictionary used in create_condition method."""
+
     variable: str
     operator: Literal[
-        LogicOperators.EQ, 
-        LogicOperators.NEQ, 
+        LogicOperators.EQ,
+        LogicOperators.NEQ,
         LogicOperators.GT,
         LogicOperators.GET,
         LogicOperators.LT,
@@ -30,12 +31,12 @@ class RuleDict(TypedDict):
 class ModelBuilder:
     """
     A programmatic interface for building epidemiological models.
-    
+
     This class provides a fluent API for constructing Model instances by progressively
-    adding disease states, stratifications, transitions, parameters, and 
-    initial conditions. It includes validation methods to ensure model consistency 
+    adding disease states, stratifications, transitions, parameters, and
+    initial conditions. It includes validation methods to ensure model consistency
     before building.
-    
+
     Attributes
     ----------
     _name : str
@@ -55,16 +56,16 @@ class ModelBuilder:
     _initial_conditions : InitialConditions | None
         Initial population conditions.
     """
-    
+
     def __init__(
-        self, 
-        name: str, 
-        description: str| None = None, 
-        version: str| None = None,
+        self,
+        name: str,
+        description: str | None = None,
+        version: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
-        
+
         Parameters
         ----------
         name : str
@@ -75,31 +76,31 @@ class ModelBuilder:
             The version number of the model.
         """
         self._name: str = name
-        self._description: str| None = description
-        self._version: str| None = version
-        
+        self._description: str | None = description
+        self._version: str | None = version
+
         self._disease_states: list[DiseaseState] = []
         self._stratifications: list[Stratification] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
-    
+
     def add_disease_state(self, id: str, name: str) -> Self:
         """
         Add a disease state to the model.
-        
+
         Parameters
         ----------
         id : str
             Unique identifier for the disease state.
         name : str
             Human-readable name for the disease state.
-            
+
         Returns
         -------
         ModelBuilder
             Self for method chaining.
-            
+
         Raises
         ------
         ValueError
@@ -107,50 +108,50 @@ class ModelBuilder:
         """
         if any(state.id == id for state in self._disease_states):
             raise ValueError(f"Disease state with id '{id}' already exists")
-        
+
         self._disease_states.append(DiseaseState(id=id, name=name))
         return self
-    
+
     def add_stratification(self, id: str, categories: list[str]) -> Self:
         """
         Add a population stratification to the model.
-        
+
         Parameters
         ----------
         id : str
             Unique identifier for the stratification.
         categories : list[str]
             list of category identifiers within this stratification.
-            
+
         Returns
         -------
         ModelBuilder
             Self for method chaining.
-            
+
         Raises
         ------
         ValueError
-            If a stratification with the same id already exists or if categories are 
+            If a stratification with the same id already exists or if categories are
             empty.
         """
         if any(strat.id == id for strat in self._stratifications):
             raise ValueError(f"Stratification with id '{id}' already exists")
-        
+
         if not categories:
             raise ValueError("Categories cannot be empty")
-        
+
         self._stratifications.append(Stratification(id=id, categories=categories))
         return self
-    
+
     def add_parameter(
-        self, 
-        id: str, 
-        value: float, 
+        self,
+        id: str,
+        value: float,
         description: str | None = None,
     ) -> Self:
         """
         Add a global parameter to the model.
-        
+
         Parameters
         ----------
         id : str
@@ -159,12 +160,12 @@ class ModelBuilder:
             Numerical value of the parameter.
         description : str | None, default=None
             Human-readable description of the parameter.
-            
+
         Returns
         -------
         ModelBuilder
             Self for method chaining.
-            
+
         Raises
         ------
         ValueError
@@ -172,23 +173,21 @@ class ModelBuilder:
         """
         if any(param.id == id for param in self._parameters):
             raise ValueError(f"Parameter with id '{id}' already exists")
-        
-        self._parameters.append(
-            Parameter(id=id, value=value, description=description)
-        )
+
+        self._parameters.append(Parameter(id=id, value=value, description=description))
         return self
-    
+
     def add_transition(
         self,
         id: str,
         source: list[str],
         target: list[str],
         rate: str | None = None,
-        condition: Condition| None = None
+        condition: Condition | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
-        
+
         Parameters
         ----------
         id : str
@@ -201,12 +200,12 @@ class ModelBuilder:
             Mathematical formula for the transition rate.
         condition : Condition| None, default=None
             Logical conditions that must be met for the transition.
-            
+
         Returns
         -------
         ModelBuilder
             Self for method chaining.
-            
+
         Raises
         ------
         ValueError
@@ -214,24 +213,22 @@ class ModelBuilder:
         """
         if any(trans.id == id for trans in self._transitions):
             raise ValueError(f"Transition with id '{id}' already exists")
-        
-        self._transitions.append(Transition(
-            id=id,
-            source=source,
-            target=target,
-            rate=rate,
-            condition=condition
-        ))
+
+        self._transitions.append(
+            Transition(
+                id=id, source=source, target=target, rate=rate, condition=condition
+            )
+        )
         return self
-    
+
     def create_condition(
         self,
         logic: Literal[LogicOperators.AND, LogicOperators.OR],
-        rules: list[RuleDict]
+        rules: list[RuleDict],
     ) -> Condition:
         """
         Create a condition object for use in transitions.
-        
+
         Parameters
         ----------
         logic : Literal["and", "or"]
@@ -257,39 +254,41 @@ class ModelBuilder:
         """
         rule_objects: list[Rule] = []
         for rule_dict in rules:
-            rule_objects.append(Rule(
-                variable=rule_dict["variable"],
-                operator=rule_dict["operator"],
-                value=rule_dict["value"]
-            ))
-        
+            rule_objects.append(
+                Rule(
+                    variable=rule_dict["variable"],
+                    operator=rule_dict["operator"],
+                    value=rule_dict["value"],
+                )
+            )
+
         return Condition(logic=logic, rules=rule_objects)
-    
+
     def set_initial_conditions(
         self,
         population_size: int,
         disease_state_fractions: dict[str, float],
-        stratification_fractions: dict[str, dict[str, float]] | None = None
+        stratification_fractions: dict[str, dict[str, float]] | None = None,
     ) -> Self:
         """
         Set the initial conditions for the model.
-        
+
         Parameters
         ----------
         population_size : int
             Total population size.
         disease_state_fractions : dict[str, float]
-            Fractions of population in each disease state. Keys are state ids, 
+            Fractions of population in each disease state. Keys are state ids,
             values are fractions.
         stratification_fractions : dict[str, dict[str, float]] | None, default=None
-            Fractions for each stratification category. Outer keys are stratification 
+            Fractions for each stratification category. Outer keys are stratification
             ids, inner keys are category ids, values are fractions.
-            
+
         Returns
         -------
         ModelBuilder
             Self for method chaining.
-            
+
         Raises
         ------
         ValueError
@@ -301,14 +300,14 @@ class ModelBuilder:
         self._initial_conditions = InitialConditions(
             population_size=population_size,
             disease_state_fraction=disease_state_fractions,
-            stratification_fractions=stratification_fractions or {}
+            stratification_fractions=stratification_fractions or {},
         )
         return self
-    
+
     def validate_completeness(self) -> None:
         """
         Validate that all required components have been added to the model.
-        
+
         Raises
         ------
         ValueError
@@ -316,17 +315,17 @@ class ModelBuilder:
         """
         if not self._disease_states:
             raise ValueError("At least one disease state must be defined")
-        
+
         if not self._transitions:
             raise ValueError("At least one transition must be defined")
-        
+
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
-    
+
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
         """
         Get a summary of the current model builder state.
-        
+
         Returns
         -------
         dict[str, dict[str, str | int | list[str] | None]]
@@ -344,13 +343,13 @@ class ModelBuilder:
             "transition_ids": [trans.id for trans in self._transitions],
             "parameters_count": len(self._parameters),
             "parameter_ids": [param.id for param in self._parameters],
-            "has_initial_conditions": self._initial_conditions is not None
+            "has_initial_conditions": self._initial_conditions is not None,
         }
-    
+
     def clone(self) -> Self:
         """
         Create a deep copy of this ModelBuilder.
-        
+
         Returns
         -------
         ModelBuilder
@@ -366,11 +365,11 @@ class ModelBuilder:
         new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
 
         return new_builder
-    
+
     def reset(self) -> Self:
         """
         Reset the builder to empty state while keeping name, description, and version.
-        
+
         Returns
         -------
         ModelBuilder
@@ -382,27 +381,25 @@ class ModelBuilder:
         self._parameters.clear()
         self._initial_conditions = None
         return self
-    
+
     def build(
-        self, 
-        typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS],
-        validate: bool = True
+        self, typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS], validate: bool = True
     ) -> Model:
         """
         Build and return the final Model instance.
-        
+
         Parameters
         ----------
         typology : Literal["DifferenceEquations"]
             Type of the model.
         validate : bool, default=True
             Whether to perform validation before building the model.
-            
+
         Returns
         -------
         Model
             The constructed epidemiological model.
-            
+
         Raises
         ------
         ValueError
@@ -410,28 +407,74 @@ class ModelBuilder:
         """
         if validate:
             self.validate_completeness()
-            
+
         assert self._initial_conditions is not None, (
             "Internal error: Initial conditions should have been validated."
         )
-        
+
         population = Population(
             disease_states=self._disease_states,
             stratifications=self._stratifications,
             transitions=self._transitions,
-            initial_conditions=self._initial_conditions
+            initial_conditions=self._initial_conditions,
         )
-        
-        dynamics = Dynamics(
-            typology=typology,
-            transitions=self._transitions
-        )
-        
+
+        dynamics = Dynamics(typology=typology, transitions=self._transitions)
+
         return Model(
             name=self._name,
             description=self._description,
             version=self._version,
             population=population,
             parameters=self._parameters,
-            dynamics=dynamics
+            dynamics=dynamics,
         )
+
+    def build_engine(
+        self,
+        typology: Literal[
+            ModelTypes.DIFFERENCE_EQUATIONS
+        ] = ModelTypes.DIFFERENCE_EQUATIONS,
+        validate: bool = True,
+    ) -> object:
+        """
+        Builds the model and returns a runnable Rust-powered simulation engine.
+
+        1. Builds and validates the Pydantic model.
+        2. Serializes the model to JSON.
+        3. Passes the JSON to the Rust layer to construct the core model object.
+        4. Initializes the engine with the Rust model.
+
+        Parameters
+        ----------
+        typology : Literal["DifferenceEquations"]
+            Type of the model.
+        validate : bool, default=True
+            Whether to perform validation before building the model.
+
+        Returns
+        -------
+        object
+            An instance of the Rust model class, ready for simulation.
+        """
+        pydantic_model = self.build(typology=typology, validate=validate)
+        model_json = pydantic_model.model_dump_json()
+
+        try:
+            import epimodel_rs
+        except ImportError:
+            raise ImportError(
+                "Rust extension not available. Please compile the project."
+            )
+
+        RustModel = epimodel_rs.core.Model
+
+        engines = {
+            ModelTypes.DIFFERENCE_EQUATIONS: 
+                epimodel_rs.difference.DifferenceEquations
+        }
+
+        rust_model_instance = RustModel.from_json(model_json)
+        engine = engines[typology](rust_model_instance)
+
+        return engine

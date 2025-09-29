@@ -17,5 +17,6 @@ class Dynamics(BaseModel):
     transitions : List[Transition]
         A list of rules for state changes.
     """
+
     typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS]
     transitions: list[Transition]
