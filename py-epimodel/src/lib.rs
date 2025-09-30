@@ -1,7 +1,6 @@
 use pyo3::prelude::*;
 
 /// Core data structures for epidemiological models.
-#[pymodule]
 fn core_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<epimodel_core::Model>()?;
     m.add_class::<epimodel_core::Population>()?;
@@ -20,7 +19,6 @@ fn core_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// Difference equation solver.
-#[pymodule]
 fn difference_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<epimodel_difference::DifferenceEquations>()?;
     Ok(())

@@ -1,5 +1,5 @@
 import copy
-from typing import Literal, Self, TypedDict
+from typing import TYPE_CHECKING, Literal, Self, TypedDict
 
 from epimodel.context.condition import Condition, Rule
 from epimodel.context.disease_state import DiseaseState
@@ -11,6 +11,9 @@ from epimodel.context.population import Population
 from epimodel.context.stratification import Stratification
 from epimodel.context.transition import Transition
 from epimodel.constants import ModelTypes, LogicOperators
+
+if TYPE_CHECKING:
+    from epimodel_rs import DifferenceEquationsProtocol
 
 
 class RuleDict(TypedDict):
@@ -436,7 +439,7 @@ class ModelBuilder:
             ModelTypes.DIFFERENCE_EQUATIONS
         ] = ModelTypes.DIFFERENCE_EQUATIONS,
         validate: bool = True,
-    ) -> object:
+    ) -> "DifferenceEquationsProtocol":
         """
         Builds the model and returns a runnable Rust-powered simulation engine.
 
@@ -454,7 +457,7 @@ class ModelBuilder:
 
         Returns
         -------
-        object
+        DifferenceEquationsProtocol
             An instance of the Rust model class, ready for simulation.
         """
         pydantic_model = self.build(typology=typology, validate=validate)
@@ -470,8 +473,7 @@ class ModelBuilder:
         RustModel = epimodel_rs.core.Model
 
         engines = {
-            ModelTypes.DIFFERENCE_EQUATIONS: 
-                epimodel_rs.difference.DifferenceEquations
+            ModelTypes.DIFFERENCE_EQUATIONS: epimodel_rs.difference.DifferenceEquations
         }
 
         rust_model_instance = RustModel.from_json(model_json)
