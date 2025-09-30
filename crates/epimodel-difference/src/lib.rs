@@ -109,11 +109,18 @@ impl DifferenceEquations {
         self.population.clone()
     }
 
+    #[cfg(feature = "python")]
+    #[getter]
+    pub fn compartments(&self) -> Vec<String> {
+        self.compartments.clone()
+    }
+
     pub fn step(&mut self) {
         let mut flows = vec![0.0; self.compartments.len()];
 
         for transition in &self.transitions {
-            // For this basic version, we assume a simple rate and a single source/target disease state.
+            // For this basic version, we assume a simple rate and a single source/target disease
+            // state.
             if let Some(rate_id) = &transition.rate {
                 if !transition.source.is_empty() && !transition.target.is_empty() {
                     let rate = self.parameters.get(rate_id).unwrap_or(&0.0);
@@ -125,7 +132,8 @@ impl DifferenceEquations {
                             let source_idx = i;
                             let source_pop = self.population[source_idx];
 
-                            // Construct the target compartment name by replacing the disease state part.
+                            // Construct the target compartment name by replacing the disease state
+                            // part.
                             let target_comp_name =
                                 comp_name.replacen(source_disease_state, target_disease_state, 1);
                             if let Some(target_idx) = self.compartment_map.get(&target_comp_name) {
@@ -147,17 +155,17 @@ impl DifferenceEquations {
 
     pub fn run(&mut self, num_steps: u32) -> Vec<Vec<f64>> {
         // Pre-allocate memory for efficiency
-        let mut history = Vec::with_capacity(num_steps as usize + 1);
+        let mut steps = Vec::with_capacity(num_steps as usize + 1);
 
         // Store initial state (t=0)
-        history.push(self.population.clone());
+        steps.push(self.population.clone());
 
         for _ in 0..num_steps {
             self.step();
-            history.push(self.population.clone());
+            steps.push(self.population.clone());
         }
 
-        history
+        steps
     }
 }
 

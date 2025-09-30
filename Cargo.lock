@@ -9,6 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "epimodel"
+version = "0.1.0"
+dependencies = [
+ "epimodel-core",
+ "epimodel-difference",
+ "pyo3",
+]
+
+[[package]]
 name = "epimodel-core"
 version = "0.1.0"
 dependencies = [
@@ -91,15 +100,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "py-epimodel"
-version = "0.1.0"
-dependencies = [
- "epimodel-core",
- "epimodel-difference",
- "pyo3",
 ]
 
 [[package]]

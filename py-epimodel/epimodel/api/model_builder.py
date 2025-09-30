@@ -1,5 +1,6 @@
 import copy
-from typing import TYPE_CHECKING, Literal, Self, TypedDict
+import logging
+from typing import Literal, Self, TypedDict
 
 from epimodel.context.condition import Condition, Rule
 from epimodel.context.disease_state import DiseaseState
@@ -12,8 +13,8 @@ from epimodel.context.stratification import Stratification
 from epimodel.context.transition import Transition
 from epimodel.constants import ModelTypes, LogicOperators
 
-if TYPE_CHECKING:
-    from epimodel_rs import DifferenceEquationsProtocol
+
+logger = logging.getLogger(__name__)
 
 
 class RuleDict(TypedDict):
@@ -87,6 +88,11 @@ class ModelBuilder:
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
+        
+        logging.info((
+            f"Initialized ModelBuilder: name='{self._name}', "
+            f"version='{self._version or 'N/A'}'"
+        ))
 
     def add_disease_state(self, id: str, name: str) -> Self:
         """
@@ -113,6 +119,7 @@ class ModelBuilder:
             raise ValueError(f"Disease state with id '{id}' already exists")
 
         self._disease_states.append(DiseaseState(id=id, name=name))
+        logging.info(f"Added disease state: id='{id}', name='{name}'")
         return self
 
     def add_stratification(self, id: str, categories: list[str]) -> Self:
@@ -144,6 +151,7 @@ class ModelBuilder:
             raise ValueError("Categories cannot be empty")
 
         self._stratifications.append(Stratification(id=id, categories=categories))
+        logging.info(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_parameter(
@@ -178,6 +186,7 @@ class ModelBuilder:
             raise ValueError(f"Parameter with id '{id}' already exists")
 
         self._parameters.append(Parameter(id=id, value=value, description=description))
+        logging.info(f"Added parameter: id='{id}', value={value}")
         return self
 
     def add_transition(
@@ -222,6 +231,10 @@ class ModelBuilder:
                 id=id, source=source, target=target, rate=rate, condition=condition
             )
         )
+        logging.info((
+            f"Added transition: id='{id}', source={source}, target={target}, "
+            f"rate='{rate}'"
+        ))
         return self
 
     def create_condition(
@@ -305,6 +318,10 @@ class ModelBuilder:
             disease_state_fraction=disease_state_fractions,
             stratification_fractions=stratification_fractions or {},
         )
+        logging.info((
+            f"Set initial conditions: population_size={population_size}, "
+            f"states={list(disease_state_fractions.keys())}"
+        ))
         return self
 
     def validate_completeness(self) -> None:
@@ -316,14 +333,14 @@ class ModelBuilder:
         ValueError
             If any required components are missing.
         """
+        logging.info("Starting model completeness validation...")
         if not self._disease_states:
             raise ValueError("At least one disease state must be defined")
-
         if not self._transitions:
             raise ValueError("At least one transition must be defined")
-
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
+        logging.info("Model completeness validation successful.")
 
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
         """
@@ -423,8 +440,8 @@ class ModelBuilder:
         )
 
         dynamics = Dynamics(typology=typology, transitions=self._transitions)
-
-        return Model(
+        
+        model = Model(
             name=self._name,
             description=self._description,
             version=self._version,
@@ -432,51 +449,9 @@ class ModelBuilder:
             parameters=self._parameters,
             dynamics=dynamics,
         )
+        
+        logging.info(
+            f"Model '{self._name}' successfully built with typology '{typology}'."
+        )
 
-    def build_engine(
-        self,
-        typology: Literal[
-            ModelTypes.DIFFERENCE_EQUATIONS
-        ] = ModelTypes.DIFFERENCE_EQUATIONS,
-        validate: bool = True,
-    ) -> "DifferenceEquationsProtocol":
-        """
-        Builds the model and returns a runnable Rust-powered simulation engine.
-
-        1. Builds and validates the Pydantic model.
-        2. Serializes the model to JSON.
-        3. Passes the JSON to the Rust layer to construct the core model object.
-        4. Initializes the engine with the Rust model.
-
-        Parameters
-        ----------
-        typology : Literal["DifferenceEquations"]
-            Type of the model.
-        validate : bool, default=True
-            Whether to perform validation before building the model.
-
-        Returns
-        -------
-        DifferenceEquationsProtocol
-            An instance of the Rust model class, ready for simulation.
-        """
-        pydantic_model = self.build(typology=typology, validate=validate)
-        model_json = pydantic_model.model_dump_json()
-
-        try:
-            import epimodel_rs
-        except ImportError:
-            raise ImportError(
-                "Rust extension not available. Please compile the project."
-            )
-
-        RustModel = epimodel_rs.core.Model
-
-        engines = {
-            ModelTypes.DIFFERENCE_EQUATIONS: epimodel_rs.difference.DifferenceEquations
-        }
-
-        rust_model_instance = RustModel.from_json(model_json)
-        engine = engines[typology](rust_model_instance)
-
-        return engine
+        return model
