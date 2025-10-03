@@ -15,6 +15,8 @@ fn core_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<epimodel_core::ModelTypes>()?;
     m.add_class::<epimodel_core::VariablePrefixes>()?;
     m.add_class::<epimodel_core::Dynamics>()?;
+    m.add_class::<epimodel_core::MathExpression>()?;
+    m.add_class::<epimodel_core::RateMathExpression>()?;
     Ok(())
 }
 

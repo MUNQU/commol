@@ -162,8 +162,16 @@ rate="0.1 * sqrt(I)"                         # Square root
 rate="max(0, beta - 0.001 * step)"           # Maximum function
 ```
 
-### Available Functions
-- Variables: `pi`, `e`
+### Available Variables and Functions
+
+**Special Variables:**
+- `N` - Total population (automatically calculated as sum of all compartments)
+- `step` - Current simulation step number (also available as `t`)
+- `t` - Alias for `step` (for convenience in time-dependent formulas)
+- `pi` - Mathematical constant π (3.14159...)
+- `e` - Mathematical constant e (2.71828...)
+
+**Mathematical Functions:**
 - Trigonometric: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
 - Exponential/Logarithmic: `exp`, `log`, `ln`, `log2`, `log10`
 - Power/Root: `sqrt`, `pow`
@@ -172,19 +180,22 @@ rate="max(0, beta - 0.001 * step)"           # Maximum function
 - Other: `abs`, `sinh`, `cosh`, `tanh`
 
 ### Population Expression
-Use the `N` variable for refering to the total population of the model.
+Use the `N` variable for referring to the total population of the model.
 ```python
 "beta * S * I / N"
 ```
 
 ### Time-Dependent Expressions
-Use the `step` variable for time-dependent rates:
+Use the `step` variable (or its alias `t`) for time-dependent rates:
 ```python
-# Seasonal transmission
+# Seasonal transmission (using step)
 rate="beta * (1 + 0.2 * sin(2 * 3.14159 * step / 365))"
 
-# Declining effectiveness over time
-rate="gamma * exp(-0.01 * step)"
+# Declining effectiveness over time (using t alias)
+rate="gamma * exp(-0.01 * t)"
+
+# Both are equivalent - use whichever is more natural
+rate="beta * (1 + 0.3 * sin(t * 2 * 3.14159 / 365))"
 ```
 
 ### Healthcare Saturation
@@ -197,14 +208,14 @@ rate="gamma * (1.0 - I / (2.0 * N))"
 ## Advanced Features
 
 ### Formula Transitions
-Use the dedicated method for complex mathematical expressions:
+Use `add_transition` with mathematical expressions in the `rate` parameter:
 
 ```python
-builder.add_formula_transition(
+builder.add_transition(
     id="seasonal_infection",
     source=["S"],
     target=["I"],
-    formula="beta * S * I / N * (1 + 0.3 * sin(step * 2 * 3.14159 / 365))"
+    rate="beta * S * I / N * (1 + 0.3 * sin(step * 2 * 3.14159 / 365))"
 )
 ```
 

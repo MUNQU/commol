@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use pyo3::{prelude::*, types::PyType};
 
+pub mod math_expression;
+pub use math_expression::{MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression};
+
 #[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LogicOperator {
@@ -117,13 +120,131 @@ pub struct Stratification {
 }
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Transition {
     pub id: String,
     pub source: Vec<String>,
     pub target: Vec<String>,
-    pub rate: Option<String>,
+    pub rate: Option<RateMathExpression>,
     pub condition: Option<Condition>,
+}
+
+impl Serialize for Transition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Transition", 5)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("source", &self.source)?;
+        state.serialize_field("target", &self.target)?;
+
+        // Serialize rate as string for backward compatibility
+        let rate_str = self.rate.as_ref().map(|r| match r {
+            RateMathExpression::Parameter(p) => p.clone(),
+            RateMathExpression::Formula(f) => f.formula.clone(),
+            RateMathExpression::Constant(c) => c.to_string(),
+        });
+        state.serialize_field("rate", &rate_str)?;
+
+        state.serialize_field("condition", &self.condition)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Transition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Id,
+            Source,
+            Target,
+            Rate,
+            Condition,
+        }
+
+        struct TransitionVisitor;
+
+        impl<'de> Visitor<'de> for TransitionVisitor {
+            type Value = Transition;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Transition")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Transition, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut id = None;
+                let mut source = None;
+                let mut target = None;
+                let mut rate = None;
+                let mut condition = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Id => {
+                            if id.is_some() {
+                                return Err(de::Error::duplicate_field("id"));
+                            }
+                            id = Some(map.next_value()?);
+                        }
+                        Field::Source => {
+                            if source.is_some() {
+                                return Err(de::Error::duplicate_field("source"));
+                            }
+                            source = Some(map.next_value()?);
+                        }
+                        Field::Target => {
+                            if target.is_some() {
+                                return Err(de::Error::duplicate_field("target"));
+                            }
+                            target = Some(map.next_value()?);
+                        }
+                        Field::Rate => {
+                            if rate.is_some() {
+                                return Err(de::Error::duplicate_field("rate"));
+                            }
+                            let rate_str: Option<String> = map.next_value()?;
+                            rate = Some(rate_str.map(RateMathExpression::from_string));
+                        }
+                        Field::Condition => {
+                            if condition.is_some() {
+                                return Err(de::Error::duplicate_field("condition"));
+                            }
+                            condition = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let id = id.ok_or_else(|| de::Error::missing_field("id"))?;
+                let source = source.ok_or_else(|| de::Error::missing_field("source"))?;
+                let target = target.ok_or_else(|| de::Error::missing_field("target"))?;
+                let rate = rate.ok_or_else(|| de::Error::missing_field("rate"))?;
+                let condition = condition.ok_or_else(|| de::Error::missing_field("condition"))?;
+
+                Ok(Transition {
+                    id,
+                    source,
+                    target,
+                    rate,
+                    condition,
+                })
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["id", "source", "target", "rate", "condition"];
+        deserializer.deserialize_struct("Transition", FIELDS, TransitionVisitor)
+    }
 }
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]

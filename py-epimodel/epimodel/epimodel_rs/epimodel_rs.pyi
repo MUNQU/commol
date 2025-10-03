@@ -23,7 +23,7 @@ class TransitionProtocol(Protocol):
     id: str
     source: list[str]
     target: list[str]
-    rate: str | None
+    rate: RateMathExpressionProtocol | None
     condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
@@ -53,7 +53,6 @@ class RustModelProtocol(Protocol):
     population: PopulationProtocol
     parameters: list[ParameterProtocol]
     dynamics: DynamicsProtocol
-
     @staticmethod
     def from_json(json_string: str) -> RustModelProtocol: ...
 
@@ -65,6 +64,27 @@ class DifferenceEquationsProtocol(Protocol):
     def population(self) -> list[float]: ...
     @property
     def compartments(self) -> list[str]: ...
+
+class DifferenceModule(Protocol):
+    DifferenceEquations: type[DifferenceEquationsProtocol]
+
+class MathExpressionProtocol(Protocol):
+    formula: str
+
+    def __init__(self, formula: str) -> None: ...
+    def py_validate(self) -> None: ...
+    def py_get_variables(self) -> list[str]: ...
+
+class RateMathExpressionProtocol(Protocol):
+    @staticmethod
+    def from_string_py(s: str) -> RateMathExpressionProtocol: ...
+    @staticmethod
+    def parameter(name: str) -> RateMathExpressionProtocol: ...
+    @staticmethod
+    def formula(formula: str) -> RateMathExpressionProtocol: ...
+    @staticmethod
+    def constant(value: float) -> RateMathExpressionProtocol: ...
+    def py_get_variables(self) -> list[str]: ...
 
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
@@ -80,9 +100,8 @@ class CoreModule(Protocol):
     ModelTypes: type[ModelTypes]
     VariablePrefixes: type[VariablePrefixes]
     Dynamics: type[DynamicsProtocol]
-
-class DifferenceModule(Protocol):
-    DifferenceEquations: type[DifferenceEquationsProtocol]
+    MathExpression: type[MathExpressionProtocol]
+    RateMathExpression: type[RateMathExpressionProtocol]
 
 class RustEpiModelModule(Protocol):
     core: CoreModule

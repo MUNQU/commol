@@ -88,11 +88,13 @@ class ModelBuilder:
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
-        
-        logging.info((
-            f"Initialized ModelBuilder: name='{self._name}', "
-            f"version='{self._version or 'N/A'}'"
-        ))
+
+        logging.info(
+            (
+                f"Initialized ModelBuilder: name='{self._name}', "
+                f"version='{self._version or 'N/A'}'"
+            )
+        )
 
     def add_disease_state(self, id: str, name: str) -> Self:
         """
@@ -194,7 +196,7 @@ class ModelBuilder:
         id: str,
         source: list[str],
         target: list[str],
-        rate: str | None = None,
+        rate: str | float | None = None,
         condition: Condition | None = None,
     ) -> Self:
         """
@@ -208,8 +210,24 @@ class ModelBuilder:
             List of source state/category identifiers.
         target : list[str]
             List of target state/category identifiers.
-        rate : float | str | None, default=None
-            Mathematical formula for the transition rate.
+        rate : str | float | None, default=None
+            Mathematical formula, parameter reference, or constant value for the
+            transition rate.
+            Can be:
+            - A parameter reference (e.g., "beta")
+            - A constant value (e.g., "0.5" or 0.5)
+            - A mathematical formula (e.g., "beta * S * I / N")
+
+            Special variables available in formulas:
+            - N: Total population (automatically calculated)
+            - step or t: Current simulation step (both are equivalent)
+            - pi, e: Mathematical constants
+
+            Examples:
+            - "beta * S * I / N" (frequency-dependent transmission)
+            - "gamma" (simple parameter reference)
+            - "0.1 * sin(t / 365.0)" (seasonal variation using t)
+            - "0.1 * sin(step / 365.0)" (seasonal variation using step)
         condition : Condition| None, default=None
             Logical conditions that must be met for the transition.
 
@@ -221,20 +239,60 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If a transition with the same id already exists.
+            If a transition with the same id already exists or if security/syntax
+            validation fails.
+        SyntaxError
+            If the rate formula has invalid syntax.
         """
         if any(trans.id == id for trans in self._transitions):
             raise ValueError(f"Transition with id '{id}' already exists")
+
+        # Validate rate security and syntax if it's a string formula
+        if isinstance(rate, str) and rate.strip():
+            # Validate formula syntax using Rust MathExpression
+            try:
+                from epimodel.epimodel_rs.epimodel_rs import core
+
+                expr = core.MathExpression(rate)
+                expr.py_validate()
+
+                # Extract and validate variables used in the expression
+                variables = expr.py_get_variables()
+                self._validate_formula_variables(rate, variables)
+            except SyntaxError:
+                raise
+            except ValueError:
+                raise
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Convert Rust evalexpr errors to Python exceptions
+                if any(
+                    keyword in error_msg
+                    for keyword in [
+                        "unexpected",
+                        "expected",
+                        "syntax",
+                        "token",
+                        "incomplete",
+                    ]
+                ):
+                    raise SyntaxError(f"Invalid mathematical expression '{rate}': {e}")
+                else:
+                    raise ValueError(f"Invalid formula '{rate}': {e}")
+        elif isinstance(rate, int) or isinstance(rate, float):
+            rate = str(rate)
 
         self._transitions.append(
             Transition(
                 id=id, source=source, target=target, rate=rate, condition=condition
             )
         )
-        logging.info((
-            f"Added transition: id='{id}', source={source}, target={target}, "
-            f"rate='{rate}'"
-        ))
+        logging.info(
+            (
+                f"Added transition: id='{id}', source={source}, target={target}, "
+                f"rate='{rate}'"
+            )
+        )
         return self
 
     def create_condition(
@@ -263,10 +321,13 @@ class ModelBuilder:
 
         Examples
         --------
-        >>> condition = builder.create_condition("and", [
-        ...     {"variable": "states:I", "operator": "gt", "value": 0},
-        ...     {"variable": "strati:age", "operator": "eq", "value": "adult"}
-        ... ])
+        >>> condition = builder.create_condition(
+        ...     "and",
+        ...     [
+        ...         {"variable": "states:I", "operator": "gt", "value": 0},
+        ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
+        ...     ],
+        ... )
         """
         rule_objects: list[Rule] = []
         for rule_dict in rules:
@@ -318,11 +379,57 @@ class ModelBuilder:
             disease_state_fraction=disease_state_fractions,
             stratification_fractions=stratification_fractions or {},
         )
-        logging.info((
-            f"Set initial conditions: population_size={population_size}, "
-            f"states={list(disease_state_fractions.keys())}"
-        ))
+        logging.info(
+            (
+                f"Set initial conditions: population_size={population_size}, "
+                f"states={list(disease_state_fractions.keys())}"
+            )
+        )
         return self
+
+    def _validate_formula_variables(self, formula: str, variables: list[str]) -> None:
+        """
+        Validate that all variables in a formula are defined.
+
+        Parameters
+        ----------
+        formula : str
+            The formula being validated (for error messages).
+        variables : list[str]
+            List of variable identifiers found in the formula.
+
+        Raises
+        ------
+        ValueError
+            If any variable is not defined as a parameter or disease state.
+        """
+        # Special variables that are always available in rate formulas
+        special_vars = {"N", "step", "pi", "e", "t"}
+
+        param_ids = {param.id for param in self._parameters}
+        state_ids = {state.id for state in self._disease_states}
+        strat_ids: set[str] = set()
+        for strat in self._stratifications:
+            strat_ids.update(strat.categories)
+
+        valid_identifiers = param_ids | state_ids | strat_ids | special_vars
+
+        undefined_vars: list[str] = []
+        for var in variables:
+            if var not in valid_identifiers:
+                undefined_vars.append(var)
+
+        if undefined_vars:
+            raise ValueError(
+                (
+                    f"Undefined variables in formula '{formula}': "
+                    f"{', '.join(undefined_vars)}. "
+                    f"Available parameters: "
+                    f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
+                    f"Available disease states: "
+                    f"{', '.join(sorted(state_ids)) if state_ids else 'none'}."
+                )
+            )
 
     def validate_completeness(self) -> None:
         """
@@ -440,7 +547,7 @@ class ModelBuilder:
         )
 
         dynamics = Dynamics(typology=typology, transitions=self._transitions)
-        
+
         model = Model(
             name=self._name,
             description=self._description,
@@ -449,7 +556,7 @@ class ModelBuilder:
             parameters=self._parameters,
             dynamics=dynamics,
         )
-        
+
         logging.info(
             f"Model '{self._name}' successfully built with typology '{typology}'."
         )

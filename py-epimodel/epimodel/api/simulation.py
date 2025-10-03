@@ -37,9 +37,9 @@ class Simulation:
         self.model_definition: Model = model
         self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
 
-        self.compartments: list[str] = self._engine.compartments
+        self._compartments: list[str] = self._engine.compartments
         logging.info(
-            f"Simulation engine ready. Total compartments: {len(self.compartments)}"
+            f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
 
     def _initialize_engine(self) -> "DifferenceEquationsProtocol":
@@ -69,7 +69,7 @@ class Simulation:
             )
         )
 
-    def run_raw(self, num_steps: int) -> list[list[float]]:
+    def _run_raw(self, num_steps: int) -> list[list[float]]:
         """
         Runs the simulation and returns the raw, high-performance output.
         This is the fastest method, returning a list of lists of floats.
@@ -114,7 +114,7 @@ class Simulation:
         dict[str, list[float]] | list[list[float]]
             The simulation results in the specified format.
         """
-        raw_results = self.run_raw(num_steps)
+        raw_results = self._run_raw(num_steps)
         if output_format == "list_of_lists":
             logging.info("Returning results in 'list_of_lists' format.")
             return raw_results
@@ -122,11 +122,11 @@ class Simulation:
         elif output_format == "dict_of_lists":
             logging.info("Transposing raw results to 'dict_of_lists' format.")
             if not raw_results:
-                return {c: [] for c in self.compartments}
+                return {c: [] for c in self._compartments}
             transposed_results = zip(*raw_results)
             return {
                 compartment: list(values)
-                for compartment, values in zip(self.compartments, transposed_results)
+                for compartment, values in zip(self._compartments, transposed_results)
             }
 
         else:

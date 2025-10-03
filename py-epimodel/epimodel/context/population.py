@@ -77,7 +77,9 @@ class Population(BaseModel):
                 f"stratification ids. Missing ids: {missing}, Extra ids: {extra}."
             ))
 
-        for (strat_id, fractions) in initial_conditions.stratification_fractions.items():
+        for (strat_id, fractions) in (
+            initial_conditions.stratification_fractions.items()
+        ):
             strat_instance = strat_map[strat_id]
             
             categories_expected = set(strat_instance.categories)
