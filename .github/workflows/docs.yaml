@@ -43,8 +43,9 @@ jobs:
           poetry install --extras docs
 
       - name: Build documentation
+        working-directory: .
         run: |
-          cd ..
+          cd py-epimodel
           poetry run mkdocs build --strict
 
       - name: Upload documentation artifacts
