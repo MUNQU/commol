@@ -40,7 +40,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --with docs
+          poetry install --extras docs
 
       - name: Build documentation
         run: |
@@ -85,7 +85,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./py-epimodel
         run: |
-          poetry install --with docs
+          poetry install --extras docs
 
       - name: Configure Git
         run: |
