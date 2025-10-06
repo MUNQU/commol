@@ -35,7 +35,6 @@ EpiModel uses the following open-source libraries:
 ### Python Dependencies
 
 - **Pydantic** - MIT License
-- **NumPy** - BSD License
 - **cffi** - MIT License
 
 ### Rust Dependencies

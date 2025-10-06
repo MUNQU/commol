@@ -227,6 +227,35 @@ This runs:
 - MyPy type checking
 - Trailing whitespace removal
 - End-of-file fixing
+- Poetry lock file validation
+- Ensures `poetry.lock` stays in sync with `pyproject.toml`
+
+### Keeping poetry.lock in Sync
+
+**Important**: Always ensure `poetry.lock` is synchronized with `pyproject.toml` before committing.
+
+#### Automatic (Recommended)
+Pre-commit hooks handle this automatically:
+```bash
+cd py-epimodel
+poetry run pre-commit install  # One-time setup
+
+# Now git commit automatically updates poetry.lock if needed
+git add pyproject.toml
+git commit -m "chore: update dependencies"
+```
+
+#### Manual
+If not using pre-commit hooks:
+```bash
+cd py-epimodel
+poetry check  # Check if lock file is in sync
+poetry lock   # Update lock file without changing versions
+git add poetry.lock
+git commit -m "chore: update poetry.lock"
+```
+
+**Why this matters**: Out-of-sync lock files cause CI/CD pipeline failures. The pre-commit hook prevents this automatically.
 
 ### Debugging Rust from Python
 

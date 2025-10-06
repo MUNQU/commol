@@ -108,3 +108,6 @@ flake.lock
 *.pyd
 *.dll
 *.dylib
+
+## MkDocs
+site/

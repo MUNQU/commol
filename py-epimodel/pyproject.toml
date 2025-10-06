@@ -1,35 +1,49 @@
-[tool.poetry]
+[project]
 name = "epimodel"
 version = "0.0.1"
 description = "A high-performance mathematical epidemiology library in Rust and Python."
 authors = [
-    "Rafael J. Villanueva Micó <rjvillan@imm.upv.es>",
-    "Carlos Andreu Vilarroig <caranvi1@upv.es>",
-    "David Martínez Rodríguez <damarro3@upv.es>",
+    {name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es"},
+    {name = "Carlos Andreu Vilarroig", email = "caranvi1@upv.es"},
+    {name = "David Martínez Rodríguez", email = "damarro3@upv.es"},
 ]
 license = "MIT"
+readme = "README.md"
+requires-python = ">=3.11.0"
+
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "cffi>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4,<9.0",
+    "pytest-cov>=6.2,<7.0",
+    "ruff>=0.12,<0.13",
+    "mypy>=1.10,<2.0",
+    "pre-commit>=3.8,<4.0",
+    "maturin>=1.9.1,<1.10.0",
+]
+docs = [
+    "mkdocs>=1.6,<2.0",
+    "mkdocs-material>=9.5,<10.0",
+    "mkdocstrings[python]>=0.26,<1.0",
+    "mkdocs-autorefs>=1.2,<2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MUNQU/epimodel"
+Documentation = "https://munqu.github.io/epimodel"
+Repository = "https://github.com/MUNQU/epimodel"
+"Bug Tracker" = "https://github.com/MUNQU/epimodel/issues"
+
+# Poetry-specific configuration
+[tool.poetry]
 packages = [{include = "epimodel"}]
+requires-poetry = ">=2.2"
 
-[tool.poetry.dependencies]
-python = ">=3.11.0"
-pydantic = ">=2.0,<3.0"
-numpy = ">=2.0,<3.0"
-cffi = ">=2.0,<3.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = ">=8.4,<9.0"
-pytest-cov = ">=6.2,<7.0"
-ruff = ">=0.12,<0.13"
-mypy = ">=1.10,<2.0"
-pre-commit = ">=3.8,<4.0"
-maturin = ">=1.9.1,<1.10.0"
-
-[tool.poetry.group.docs.dependencies]
-mkdocs = ">=1.6,<2.0"
-mkdocs-material = ">=9.5,<10.0"
-mkdocstrings = {extras = ["python"], version = ">=0.26,<1.0"}
-mkdocs-autorefs = ">=1.2,<2.0"
-
+# Build system
 [build-system]
 requires = ["maturin>=1.9.1,<1.10.0"]
 build-backend = "maturin"
@@ -37,6 +51,7 @@ build-backend = "maturin"
 [tool.maturin]
 python-source = "epimodel"
 
+# Testing configuration
 [tool.pytest]
 log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
@@ -45,6 +60,7 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 pythonpath = ["."]
 addopts = "--log-cli-level=WARN"
 
+# Linting and formatting
 [tool.ruff]
 exclude = [
     ".bzr",
@@ -90,6 +106,7 @@ indent-style = "space"
 docstring-code-format = true
 skip-magic-trailing-comma = false
 
+# Type checking
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
