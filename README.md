@@ -70,7 +70,7 @@ print(f"Final infected: {results['I'][-1]:.0f}")
 
 ## Documentation
 
-📚 **[Full Documentation](https://munqu.github.io/epimodel)**
+**[Full Documentation](https://munqu.github.io/epimodel)**
 
 - [Installation Guide](https://munqu.github.io/epimodel/getting-started/installation/) - Setup and installation
 - [Quick Start](https://munqu.github.io/epimodel/getting-started/quickstart/) - Build your first model
@@ -140,6 +140,6 @@ If you use EpiModel in your research, please cite:
 
 ## Support
 
-- 📖 Documentation: https://munqu.github.io/epimodel
-- 🐛 Issue Tracker: https://github.com/MUNQU/epimodel/issues
-- 💬 Discussions: https://github.com/MUNQU/epimodel/discussions
+- Documentation: https://munqu.github.io/epimodel
+- Issue Tracker: https://github.com/MUNQU/epimodel/issues
+- Discussions: https://github.com/MUNQU/epimodel/discussions

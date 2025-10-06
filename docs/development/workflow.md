@@ -155,10 +155,10 @@ When you create a PR, automated checks run:
 
 **PR Requirements**:
 
-- ✅ All CI checks must pass
-- ✅ At least one approving review
-- ✅ No merge conflicts with target branch
-- ✅ Code coverage should be >95%
+- All CI checks must pass
+- At least one approving review
+- No merge conflicts with target branch
+- Code coverage should be >95%
 
 ### 7. Merging to Develop
 

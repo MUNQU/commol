@@ -48,6 +48,8 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             signature_crossrefs: true
+            filters:
+              - "!^_[^_]"
 
 markdown_extensions:
   - pymdownx.highlight: # Code highlighting
