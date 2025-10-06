@@ -24,6 +24,12 @@ mypy = ">=1.10,<2.0"
 pre-commit = ">=3.8,<4.0"
 maturin = ">=1.9.1,<1.10.0"
 
+[tool.poetry.group.docs.dependencies]
+mkdocs = ">=1.6,<2.0"
+mkdocs-material = ">=9.5,<10.0"
+mkdocstrings = {extras = ["python"], version = ">=0.26,<1.0"}
+mkdocs-autorefs = ">=1.2,<2.0"
+
 [build-system]
 requires = ["maturin>=1.9.1,<1.10.0"]
 build-backend = "maturin"

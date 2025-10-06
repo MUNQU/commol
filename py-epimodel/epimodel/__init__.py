@@ -16,15 +16,13 @@ except ImportError as e:
 
 RUST_AVAILABLE = epimodel_rs is not None
 
-from epimodel.api import ModelBuilder, ModelLoader  # noqa: E402
+from epimodel.api import ModelBuilder, ModelLoader, Simulation  # noqa: E402
 
 
 def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO]:
     logger = logging.getLogger(__name__)
     handler: logging.StreamHandler[TextIO] = logging.StreamHandler()
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False
@@ -34,7 +32,8 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 __all__ = [
     "ModelBuilder",
     "ModelLoader",
-    "constants", 
+    "Simulation",
+    "constants",
     "context",
     "epimodel_rs",
     "RUST_AVAILABLE",
