@@ -2,9 +2,9 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: write
@@ -73,14 +73,6 @@ jobs:
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('py-epimodel/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
 
       - name: Install dependencies
         working-directory: ./py-epimodel
