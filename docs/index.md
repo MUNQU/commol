@@ -82,7 +82,6 @@ Learn how to build and run epidemiological models:
 Complete API documentation for all public interfaces:
 
 - [Model Builder](api/model-builder.md) - ModelBuilder class documentation
-- [Models](api/models.md) - Model and population structures
 - [Simulation](api/simulation.md) - Simulation runner
 - [Constants](api/constants.md) - Model types and enumerations
 
