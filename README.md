@@ -2,6 +2,8 @@
 
 A high-performance mathematical epidemiology library for modeling infectious disease spread using difference equations. EpiModel provides a clean Python API backed by a fast Rust engine for numerical computations.
 
+> ⚠️ **Alpha Stage Warning**: EpiModel is currently in alpha development. The API is not yet stable and may change between versions without backward compatibility guarantees. Use in production at your own risk.
+
 ## Features
 
 - **Intuitive Model Building**: Fluent API for constructing epidemiological models
@@ -14,38 +16,42 @@ A high-performance mathematical epidemiology library for modeling infectious dis
 ## Installation
 
 ```bash
-# Install from source (requires Rust toolchain)
+# Install from PyPI (once published)
 pip install epimodel
+
+# Or install from source
+git clone https://github.com/MUNQU/epimodel.git
+cd epimodel/py-epimodel
+pip install maturin
+maturin develop --release
 ```
 
 ## Quick Start
-
-Here's a simple SIR (Susceptible-Infected-Recovered) model:
 
 ```python
 from epimodel import ModelBuilder, Simulation
 from epimodel.constants import ModelTypes
 
-# Build the model using the fluent API
+# Build a simple SIR model
 model = (
     ModelBuilder(name="Basic SIR", version="1.0")
     .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected") 
+    .add_disease_state(id="I", name="Infected")
     .add_disease_state(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)  # Transmission rate
-    .add_parameter(id="gamma", value=0.1)  # Recovery rate
-    .add_parameter(id="N", value=1000.0)  # Population size
+    .add_parameter(id="beta", value=0.3)
+    .add_parameter(id="gamma", value=0.1)
+    .add_parameter(id="N", value=1000.0)
     .add_transition(
         id="infection",
         source=["S"],
         target=["I"],
-        rate="beta * S * I / N"  # Mathematical formula
+        rate="beta * S * I / N"
     )
     .add_transition(
         id="recovery",
         source=["I"],
         target=["R"],
-        rate="gamma"  # Parameter reference
+        rate="gamma"
     )
     .set_initial_conditions(
         population_size=1000,
@@ -54,368 +60,86 @@ model = (
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
 
-# Run the simulation
+# Run simulation
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 
-# Access results
-print(f"Susceptible over time: {results['S']}")
-print(f"Infected over time: {results['I']}")
-print(f"Recovered over time: {results['R']}")
+# Display results
+print(f"Final infected: {results['I'][-1]:.0f}")
 ```
 
-## Core Concepts
+## Documentation
 
-### Disease States
+📚 **[Full Documentation](https://munqu.github.io/epimodel)**
 
-Disease states represent different stages of infection (e.g., Susceptible, Infected, Recovered):
+- [Installation Guide](https://munqu.github.io/epimodel/getting-started/installation/) - Setup and installation
+- [Quick Start](https://munqu.github.io/epimodel/getting-started/quickstart/) - Build your first model
+- [User Guide](https://munqu.github.io/epimodel/guide/core-concepts/) - Core concepts and tutorials
+- [API Reference](https://munqu.github.io/epimodel/api/model-builder/) - Complete API documentation
+- [Examples](https://munqu.github.io/epimodel/guide/examples/) - SIR, SEIR, and advanced models
 
-```python
-builder.add_disease_state(id="S", name="Susceptible")
-builder.add_disease_state(id="E", name="Exposed")
-builder.add_disease_state(id="I", name="Infected")
-builder.add_disease_state(id="R", name="Recovered")
+## Development
+
+For contributors and developers:
+
+- [Development Workflow](https://munqu.github.io/epimodel/development/workflow/) - Setup, branching, CI/CD
+- [Contributing Guidelines](https://munqu.github.io/epimodel/development/contributing/) - How to contribute
+- [Release Process](https://munqu.github.io/epimodel/development/release/) - Version management
+
+### Local Development
+
+```bash
+# Clone repository
+git clone https://github.com/MUNQU/epimodel.git
+cd epimodel
+
+# Install Python dependencies
+cd py-epimodel
+poetry install --with dev,docs
+
+# Build Rust workspace
+cd ..
+cargo build --workspace
+
+# Build Python extension
+cd py-epimodel
+maturin develop --release
+
+# Run tests
+poetry run pytest
+cd ..
+cargo test --workspace
+
+# Build documentation locally
+cd py-epimodel
+poetry run mkdocs serve
 ```
 
-### Stratifications
+## License
 
-Stratifications allow modeling of population subgroups:
+EpiModel is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-```python
-# Age stratification
-builder.add_stratification(
-    id="age_group",
-    categories=["young", "adult", "elderly"]
-)
+## Authors
 
-# Set initial conditions for stratifications
-builder.set_initial_conditions(
-    population_size=10000,
-    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
-    stratification_fractions={
-        "age_group": {
-            "young": 0.3,
-            "adult": 0.5, 
-            "elderly": 0.2
-        }
-    }
-)
+- Rafael J. Villanueva Micó - [rjvillan@imm.upv.es](mailto:rjvillan@imm.upv.es)
+- Carlos Andreu Vilarroig - [caranvi1@upv.es](mailto:caranvi1@upv.es)
+- David Martínez Rodríguez - [damarro3@upv.es](mailto:damarro3@upv.es)
+
+## Citation
+
+If you use EpiModel in your research, please cite:
+
+```bibtex
+@software{epimodel2025,
+  title = {EpiModel: A High-Performance Epidemiological Modeling Library},
+  author = {Villanueva Micó, Rafael J. and Andreu Vilarroig, Carlos and Martínez Rodríguez, David},
+  year = {2025},
+  url = {https://github.com/MUNQU/epimodel}
+}
 ```
 
-### Parameters
+## Support
 
-Parameters are global constants used in transition rate formulas:
-
-```python
-builder.add_parameter(id="beta", value=0.3, description="Transmission rate")
-builder.add_parameter(id="gamma", value=0.1, description="Recovery rate")
-builder.add_parameter(id="N", value=1000.0, description="Total population")
-```
-
-### Transitions
-
-Transitions define how populations move between states:
-
-```python
-# Simple parameter-based rate
-builder.add_transition(
-    id="recovery",
-    source=["I"],
-    target=["R"], 
-    rate="gamma"
-)
-
-# Mathematical formula
-builder.add_transition(
-    id="infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * S * I / N"
-)
-
-# Constant rate
-builder.add_transition(
-    id="birth",
-    source=["R"],
-    target=["S"],
-    rate="0.001"  # 0.1% daily birth rate
-)
-```
-
-## Mathematical Expressions
-
-EpiModel supports rich mathematical expressions in transition rates:
-
-### Basic Operations
-```python
-rate="beta * S * I"           # Multiplication
-rate="gamma + delta"          # Addition  
-rate="alpha / N"              # Division
-rate="(beta + gamma) * I"     # Parentheses
-```
-
-### Mathematical Functions
-```python
-rate="beta * sin(2 * 3.14159 * step / 365)"  # Seasonal variation
-rate="gamma * exp(-0.01 * step)"             # Exponential decay
-rate="0.1 * sqrt(I)"                         # Square root
-rate="max(0, beta - 0.001 * step)"           # Maximum function
-```
-
-### Available Variables and Functions
-
-**Special Variables:**
-- `N` - Total population (automatically calculated as sum of all compartments)
-- `step` - Current simulation step number (also available as `t`)
-- `t` - Alias for `step` (for convenience in time-dependent formulas)
-- `pi` - Mathematical constant π (3.14159...)
-- `e` - Mathematical constant e (2.71828...)
-
-**Mathematical Functions:**
-- Trigonometric: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
-- Exponential/Logarithmic: `exp`, `log`, `ln`, `log2`, `log10`
-- Power/Root: `sqrt`, `pow`
-- Rounding: `floor`, `ceil`, `round`
-- Comparison: `max`, `min`
-- Other: `abs`, `sinh`, `cosh`, `tanh`
-
-### Population Expression
-Use the `N` variable for referring to the total population of the model.
-```python
-"beta * S * I / N"
-```
-
-### Time-Dependent Expressions
-Use the `step` variable (or its alias `t`) for time-dependent rates:
-```python
-# Seasonal transmission (using step)
-rate="beta * (1 + 0.2 * sin(2 * 3.14159 * step / 365))"
-
-# Declining effectiveness over time (using t alias)
-rate="gamma * exp(-0.01 * t)"
-
-# Both are equivalent - use whichever is more natural
-rate="beta * (1 + 0.3 * sin(t * 2 * 3.14159 / 365))"
-```
-
-### Healthcare Saturation
-Model healthcare system capacity:
-```python
-# Recovery rate decreases as infections increase
-rate="gamma * (1.0 - I / (2.0 * N))"
-```
-
-## Advanced Features
-
-### Formula Transitions
-Use `add_transition` with mathematical expressions in the `rate` parameter:
-
-```python
-builder.add_transition(
-    id="seasonal_infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * S * I / N * (1 + 0.3 * sin(step * 2 * 3.14159 / 365))"
-)
-```
-
-### Constant Rate Transitions
-For simple constant rates:
-
-```python
-builder.add_constant_rate_transition(
-    id="natural_death",
-    source=["S", "I", "R"],  # Can affect multiple compartments
-    target=[],  # Empty target means removal from system
-    rate=0.000027  # Daily natural death rate
-)
-```
-
-### Conditional Transitions
-Add conditions to transitions (advanced feature):
-
-```python
-condition = builder.create_condition(
-    logic="and",
-    rules=[
-        {"variable": "state:I", "operator": "gt", "value": 100},
-        {"variable": "step", "operator": "gt", "value": 30}
-    ]
-)
-
-builder.add_transition(
-    id="lockdown_effect",
-    source=["S"],
-    target=["S"],  # No state change, just rate modification
-    rate="0.5 * beta",  # Reduced transmission
-    condition=condition
-)
-```
-
-## Loading Models from Files
-
-Load pre-defined models from JSON:
-
-```python
-from epimodel import ModelLoader
-
-model = ModelLoader.from_json("path/to/model.json")
-simulation = Simulation(model)
-results = simulation.run(num_steps=365)
-```
-
-## Simulation and Results
-
-### Running Simulations
-
-```python
-simulation = Simulation(model)
-
-# Run for specific number of steps
-results = simulation.run(num_steps=100)
-```
-
-### Output Formats
-
-**Dictionary of Lists (default)**:
-```python
-results = simulation.run(num_steps=100, output_format="dict_of_lists")
-# Results: {"S": [990, 980, ...], "I": [10, 20, ...], "R": [0, 0, ...]}
-
-# Easy plotting
-import matplotlib.pyplot as plt
-plt.plot(results["S"], label="Susceptible")
-plt.plot(results["I"], label="Infected") 
-plt.plot(results["R"], label="Recovered")
-plt.legend()
-```
-
-**List of Lists**:
-```python
-results = simulation.run(num_steps=100, output_format="list_of_lists")
-# Results: [[990, 10, 0], [980, 20, 0], ...]
-
-# Access specific time points
-initial_state = results[0]    # [990, 10, 0]
-final_state = results[-1]     # [340, 50, 610]
-```
-
-## Model Validation
-
-EpiModel provides comprehensive validation:
-
-```python
-# Validation happens automatically during build()
-try:
-    model = builder.build(ModelTypes.DIFFERENCE_EQUATIONS)
-except ValueError as e:
-    print(f"Validation error: {e}")
-```
-
-### Common Validation Checks
-- Disease state fractions must sum to 1.0
-- Stratification fractions must sum to 1.0 for each stratification
-- Transition sources/targets must reference valid states
-- Mathematical expressions must be syntactically correct
-- Security validation prevents code injection
-
-## Security Features
-
-EpiModel includes built-in security validation for mathematical expressions:
-
-```python
-# Safe expressions
-rate="beta * S * I"  # ✓ Valid
-rate="sin(step)"     # ✓ Valid
-
-# Dangerous expressions (automatically rejected)
-rate="__import__('os').system('rm -rf /')"  # ✗ Blocked
-rate="eval('malicious_code')"               # ✗ Blocked
-```
-
-## Performance Tips
-
-1. **Batch Processing**: Run longer simulations rather than many short ones
-2. **Simple Expressions**: Complex mathematical expressions are slower than parameter references
-
-## Model Structure
-
-A complete model consists of:
-
-```python
-model = Model(
-    name="Model Name",
-    description="Optional description", 
-    version="1.0.0",
-    population=Population(
-        disease_states=[...],
-        stratifications=[...],
-        transitions=[...],
-        initial_conditions=InitialConditions(...)
-    ),
-    parameters=[...],
-    dynamics=Dynamics(
-        typology=ModelTypes.DIFFERENCE_EQUATIONS,
-        transitions=[...]
-    )
-)
-```
-
-## Examples
-
-### SEIR Model
-```python
-model = (
-    ModelBuilder(name="SEIR Model")
-    .add_disease_state("S", "Susceptible")
-    .add_disease_state("E", "Exposed") 
-    .add_disease_state("I", "Infected")
-    .add_disease_state("R", "Recovered")
-    .add_parameter("beta", 0.4)     # Transmission rate
-    .add_parameter("sigma", 0.2)    # Incubation rate (1/incubation_period)
-    .add_parameter("gamma", 0.1)    # Recovery rate (1/infectious_period)
-    .add_parameter("N", 1000.0)
-    .add_transition("exposure", ["S"], ["E"], "beta * S * I / N")
-    .add_transition("infection", ["E"], ["I"], "sigma")
-    .add_transition("recovery", ["I"], ["R"], "gamma")
-    .set_initial_conditions(
-        population_size=1000,
-        disease_state_fractions={"S": 0.999, "E": 0.0, "I": 0.001, "R": 0.0}
-    )
-    .build(ModelTypes.DIFFERENCE_EQUATIONS)
-)
-```
-
-### Age-Stratified Model
-```python
-model = (
-    ModelBuilder(name="Age-Stratified SIR")
-    .add_disease_state("S", "Susceptible")
-    .add_disease_state("I", "Infected")
-    .add_disease_state("R", "Recovered")
-    .add_stratification("age", ["child", "adult", "elderly"])
-    .add_parameter("beta_cc", 0.3)  # Child-to-child transmission
-    .add_parameter("beta_ca", 0.2)  # Child-to-adult transmission
-    .add_parameter("beta_aa", 0.25) # Adult-to-adult transmission
-    .add_parameter("gamma", 0.1)
-    .add_parameter("N", 10000.0)
-    # Add age-specific transitions...
-    .set_initial_conditions(
-        population_size=10000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
-        stratification_fractions={
-            "age": {"child": 0.2, "adult": 0.6, "elderly": 0.2}
-        }
-    )
-    .build(ModelTypes.DIFFERENCE_EQUATIONS)
-)
-```
-
-## Contributing
-
-EpiModel is built with Rust and Python. To contribute:
-
-1. Install Rust toolchain
-2. Install Python development dependencies
-3. Build the project: `maturin develop --release`
-4. Run tests: `pytest`
+- 📖 Documentation: https://munqu.github.io/epimodel
+- 🐛 Issue Tracker: https://github.com/MUNQU/epimodel/issues
+- 💬 Discussions: https://github.com/MUNQU/epimodel/discussions
