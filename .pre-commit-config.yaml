@@ -5,3 +5,12 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: https://github.com/python-poetry/poetry
+    rev: "2.2.0"
+    hooks:
+      - id: poetry-check
+        files: ^py-epimodel/pyproject\.toml$
+        args: ["-C", "py-epimodel"]
+      - id: poetry-lock
+        files: ^py-epimodel/pyproject\.toml$
+        args: ["-C", "py-epimodel"]

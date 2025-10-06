@@ -136,8 +136,6 @@ urban_keys = [key for key in results.keys() if "_urban" in key]
 #### Sum Across One Stratification
 
 ```python
-import numpy as np
-
 # Total infected across all age groups
 total_infected = np.array(results["I_young"]) + np.array(results["I_old"])
 
