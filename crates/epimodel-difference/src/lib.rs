@@ -43,17 +43,20 @@ impl DifferenceEquations {
         }
 
         // Initialize population distribution
+        let disease_state_fraction_map: HashMap<String, f64> = model
+            .population
+            .initial_conditions
+            .disease_state_fractions
+            .iter()
+            .map(|dsf| (dsf.disease_state.clone(), dsf.fraction))
+            .collect();
+
         let mut pop_dist: HashMap<String, f64> = model
             .population
             .disease_states
             .iter()
             .map(|ds| {
-                let fraction = model
-                    .population
-                    .initial_conditions
-                    .disease_state_fraction
-                    .get(&ds.id)
-                    .unwrap_or(&0.0);
+                let fraction = disease_state_fraction_map.get(&ds.id).unwrap_or(&0.0);
                 (
                     ds.id.clone(),
                     model.population.initial_conditions.population_size as f64 * fraction,
@@ -248,7 +251,6 @@ fn epimodel_difference(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use epimodel_core::*;
-    use std::collections::HashMap;
 
     fn create_test_sir_model() -> Model {
         let disease_states = vec![
@@ -303,14 +305,24 @@ mod tests {
             },
         ];
 
-        let mut disease_state_fraction = HashMap::new();
-        disease_state_fraction.insert("S".to_string(), 0.99);
-        disease_state_fraction.insert("I".to_string(), 0.01);
-        disease_state_fraction.insert("R".to_string(), 0.0);
+        let disease_state_fractions = vec![
+            DiseaseStateFraction {
+                disease_state: "S".to_string(),
+                fraction: 0.99,
+            },
+            DiseaseStateFraction {
+                disease_state: "I".to_string(),
+                fraction: 0.01,
+            },
+            DiseaseStateFraction {
+                disease_state: "R".to_string(),
+                fraction: 0.0,
+            },
+        ];
 
         let initial_conditions = InitialConditions {
             population_size: 1000,
-            disease_state_fraction,
+            disease_state_fractions,
             stratification_fractions: vec![],
         };
 

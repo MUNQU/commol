@@ -46,7 +46,11 @@ builder.add_stratification(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},
+        {"disease_state": "I", "fraction": 0.01},
+        {"disease_state": "R", "fraction": 0.0}
+    ],
     stratification_fractions=[
         {
             "stratification": "age_group",
@@ -137,11 +141,11 @@ Initial conditions define the starting state of your model:
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions={
-        "S": 0.99,   # 99% susceptible
-        "I": 0.01,   # 1% infected
-        "R": 0.0     # 0% recovered
-    }
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},  # 99% susceptible
+        {"disease_state": "I", "fraction": 0.01},  # 1% infected
+        {"disease_state": "R", "fraction": 0.0}    # 0% recovered
+    ]
 )
 ```
 

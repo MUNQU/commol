@@ -37,7 +37,12 @@ class Population(BaseModel):
 
         disease_states_map = {state.id: state for state in self.disease_states}
 
-        actual_state = set(initial_conditions.disease_state_fraction.keys())
+        disease_state_fractions_dict = {
+            dsf.disease_state: dsf.fraction
+            for dsf in initial_conditions.disease_state_fractions
+        }
+
+        actual_state = set(disease_state_fractions_dict.keys())
         expected_state = set(disease_states_map.keys())
 
         if actual_state != expected_state:
@@ -50,7 +55,7 @@ class Population(BaseModel):
                 )
             )
 
-        states_sum_fractions = sum(initial_conditions.disease_state_fraction.values())
+        states_sum_fractions = sum(disease_state_fractions_dict.values())
         if not math.isclose(states_sum_fractions, 1.0, abs_tol=1e-6):
             raise ValueError(
                 (

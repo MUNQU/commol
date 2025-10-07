@@ -6,6 +6,7 @@ from epimodel.context.condition import Condition, Rule
 from epimodel.context.disease_state import DiseaseState
 from epimodel.context.dynamics import Dynamics
 from epimodel.context.initial_conditions import (
+    DiseaseStateFraction,
     InitialConditions,
     StratificationFraction,
     StratificationFractions,
@@ -34,6 +35,13 @@ class RuleDict(TypedDict):
         LogicOperators.LET,
     ]
     value: str | int | float | bool
+
+
+class DiseaseStateFractionDict(TypedDict):
+    """Type definition for a single disease state fraction."""
+
+    disease_state: str
+    fraction: float
 
 
 class StratificationFractionDict(TypedDict):
@@ -362,7 +370,7 @@ class ModelBuilder:
     def set_initial_conditions(
         self,
         population_size: int,
-        disease_state_fractions: dict[str, float],
+        disease_state_fractions: list[DiseaseStateFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
     ) -> Self:
         """
@@ -372,9 +380,17 @@ class ModelBuilder:
         ----------
         population_size : int
             Total population size.
-        disease_state_fractions : dict[str, float]
-            Fractions of population in each disease state. Keys are state ids,
-            values are fractions.
+        disease_state_fractions : list[DiseaseStateFractionDict]
+            List of disease state fractions. Each item is a dictionary with:
+            - "disease_state": str (disease state id)
+            - "fraction": float (fractional size)
+
+            Example:
+            [
+                {"disease_state": "S", "fraction": 0.99},
+                {"disease_state": "I", "fraction": 0.01},
+                {"disease_state": "R", "fraction": 0.0}
+            ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
             List of stratification fractions. Each item is a dictionary with:
@@ -406,6 +422,15 @@ class ModelBuilder:
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
 
+        disease_state_fractions_list: list[DiseaseStateFraction] = []
+        for ds_dict in disease_state_fractions:
+            disease_state_fractions_list.append(
+                DiseaseStateFraction(
+                    disease_state=ds_dict["disease_state"],
+                    fraction=ds_dict["fraction"],
+                )
+            )
+
         strat_fractions_list: list[StratificationFractions] = []
         if stratification_fractions:
             for strat_dict in stratification_fractions:
@@ -426,13 +451,14 @@ class ModelBuilder:
 
         self._initial_conditions = InitialConditions(
             population_size=population_size,
-            disease_state_fraction=disease_state_fractions,
+            disease_state_fractions=disease_state_fractions_list,
             stratification_fractions=strat_fractions_list,
         )
+        state_ids = [ds["disease_state"] for ds in disease_state_fractions]
         logging.info(
             (
                 f"Set initial conditions: population_size={population_size}, "
-                f"states={list(disease_state_fractions.keys())}"
+                f"states={state_ids}"
             )
         )
         return self

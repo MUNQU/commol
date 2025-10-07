@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use pyo3::{prelude::*, types::PyType};
@@ -266,6 +264,13 @@ pub struct Parameter {
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DiseaseStateFraction {
+    pub disease_state: String,
+    pub fraction: f64,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StratificationFraction {
     pub category: String,
     pub fraction: f64,
@@ -282,7 +287,7 @@ pub struct StratificationFractions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
-    pub disease_state_fraction: HashMap<String, f64>,
+    pub disease_state_fractions: Vec<DiseaseStateFraction>,
     pub stratification_fractions: Vec<StratificationFractions>,
 }
 
