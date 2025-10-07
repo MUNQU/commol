@@ -5,14 +5,18 @@ EpiModel follows [Semantic Versioning](https://semver.org/) (SemVer) for version
 ## Version Guidelines
 
 ### MAJOR version (X.0.0)
+
 Incremented for incompatible API changes:
+
 - Breaking changes to public API
 - Removal of deprecated features
 - Major architectural changes affecting backwards compatibility
 - Example: Changing method signatures, removing public methods
 
 ### MINOR version (0.X.0)
+
 Incremented for backwards-compatible new features:
+
 - New functionality added
 - New disease states, stratifications, or transition types
 - Performance improvements without API changes
@@ -20,7 +24,9 @@ Incremented for backwards-compatible new features:
 - Example: Adding new mathematical functions, new model types
 
 ### PATCH version (0.0.X)
+
 Incremented for backwards-compatible bug fixes:
+
 - Bug fixes that don't change the API
 - Documentation improvements
 - Internal refactoring
@@ -34,6 +40,7 @@ Incremented for backwards-compatible bug fixes:
 #### 1.1 Update Version Numbers
 
 Edit the following files:
+
 - `py-epimodel/pyproject.toml` - Update `version` field
 - `Cargo.toml` - Update `[workspace.package]` version
 
@@ -55,17 +62,21 @@ Document all changes under the new version:
 ## [1.2.3] - 2024-12-15
 
 ### Added
+
 - New mathematical functions for transition rates
 - Support for multi-compartment transitions
 
 ### Changed
+
 - Improved simulation performance by 20%
 
 ### Fixed
+
 - Fixed population conservation bug in stratified models
 - Corrected type hints in Simulation class
 
 ### Security
+
 - Updated dependencies to patch vulnerabilities
 ```
 
@@ -115,20 +126,25 @@ git push origin vX.Y.Z
 ## What's New in X.Y.Z
 
 ### New Features
+
 - Feature 1 description
 - Feature 2 description
 
-###  Bug Fixes
+### Bug Fixes
+
 - Fix 1 description
 - Fix 2 description
 
 ### Documentation
+
 - Documentation improvements
 
 ### Performance
+
 - Performance improvements
 
 ## Breaking Changes (for major versions)
+
 - List breaking changes
 - Migration guide
 
@@ -137,6 +153,7 @@ git push origin vX.Y.Z
 pip install epimodel==X.Y.Z
 
 ## Full Changelog
+
 See [CHANGELOG.md](https://github.com/MUNQU/epimodel/blob/main/CHANGELOG.md)
 ```
 
@@ -151,6 +168,7 @@ Once the release is published, the GitHub Actions workflow automatically:
 3. **Publishes to PyPI** using trusted publishing
 
 Monitor progress:
+
 - Go to [Actions tab](https://github.com/MUNQU/epimodel/actions)
 - Watch the "Release to PyPI" workflow
 
@@ -193,7 +211,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -217,6 +239,7 @@ git push origin develop
 For testing before official release:
 
 ### Alpha Releases
+
 ```bash
 # Version: X.Y.Z-alpha.N
 git tag -a v1.3.0-alpha.1 -m "Alpha release for testing"
@@ -224,6 +247,7 @@ git push origin v1.3.0-alpha.1
 ```
 
 ### Beta Releases
+
 ```bash
 # Version: X.Y.Z-beta.N
 git tag -a v1.3.0-beta.1 -m "Beta release for testing"
@@ -231,6 +255,7 @@ git push origin v1.3.0-beta.1
 ```
 
 ### Release Candidates
+
 ```bash
 # Version: X.Y.Z-rc.N
 git tag -a v1.3.0-rc.1 -m "Release candidate"

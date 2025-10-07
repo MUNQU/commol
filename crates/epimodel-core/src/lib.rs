@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use pyo3::{prelude::*, types::PyType};
 
 pub mod math_expression;
-pub use math_expression::{MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression};
+pub use math_expression::{
+    MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression,
+};
 
 #[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -264,10 +264,31 @@ pub struct Parameter {
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DiseaseStateFraction {
+    pub disease_state: String,
+    pub fraction: f64,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratificationFraction {
+    pub category: String,
+    pub fraction: f64,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratificationFractions {
+    pub stratification: String,
+    pub fractions: Vec<StratificationFraction>,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
-    pub disease_state_fraction: HashMap<String, f64>,
-    pub stratification_fractions: HashMap<String, HashMap<String, f64>>,
+    pub disease_state_fractions: Vec<DiseaseStateFraction>,
+    pub stratification_fractions: Vec<StratificationFractions>,
 }
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]

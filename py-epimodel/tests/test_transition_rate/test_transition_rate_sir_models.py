@@ -19,7 +19,11 @@ class TestBasicSIRRateFormulas:
             .add_disease_state(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
 
@@ -36,7 +40,7 @@ class TestBasicSIRRateFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -60,7 +64,7 @@ class TestBasicSIRRateFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -84,7 +88,7 @@ class TestBasicSIRRateFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -111,7 +115,7 @@ class TestBasicSIRRateFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -131,7 +135,11 @@ class TestStepVaryingRates:
             .add_disease_state(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
 
@@ -159,7 +167,7 @@ class TestStepVaryingRates:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -187,7 +195,7 @@ class TestStepVaryingRates:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -220,7 +228,7 @@ class TestStepVaryingRates:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -240,7 +248,11 @@ class TestComplexMathematicalFormulas:
             .add_disease_state(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
 
@@ -269,7 +281,7 @@ class TestComplexMathematicalFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -300,7 +312,7 @@ class TestComplexMathematicalFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -332,7 +344,7 @@ class TestComplexMathematicalFormulas:
 
             model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
             simulation = Simulation(model)
-            results = simulation.run(10)
+            _ = simulation.run(10)
 
             # TODO: Check epidemiological dynamics (valid with only one output type)
 
@@ -352,7 +364,11 @@ class TestMathematicalEdgeCases:
             .add_disease_state(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
 
@@ -549,7 +565,11 @@ class TestRateFormulaErrorHandling:
                 )
                 .set_initial_conditions(
                     population_size=1000,
-                    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                    disease_state_fractions=[
+                        {"disease_state": "S", "fraction": 0.99},
+                        {"disease_state": "I", "fraction": 0.01},
+                        {"disease_state": "R", "fraction": 0.0},
+                    ],
                 )
             )
 
@@ -591,7 +611,11 @@ class TestRateFormulaErrorHandling:
                 )
                 .set_initial_conditions(
                     population_size=1000,
-                    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                    disease_state_fractions=[
+                        {"disease_state": "S", "fraction": 0.99},
+                        {"disease_state": "I", "fraction": 0.01},
+                        {"disease_state": "R", "fraction": 0.0},
+                    ],
                 )
             )
 
@@ -621,7 +645,11 @@ class TestMathematicalFunctionComprehensive:
             .add_parameter(id="offset", value=10)
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
 

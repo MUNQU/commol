@@ -23,7 +23,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -64,7 +68,12 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.999, "E": 0.0, "I": 0.001, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.999},
+            {"disease_state": "E", "fraction": 0.0},
+            {"disease_state": "I", "fraction": 0.001},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -96,7 +105,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -135,14 +148,21 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma_adult")
     .set_initial_conditions(
         population_size=10000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
-        stratification_fractions={
-            "age": {
-                "child": 0.25,
-                "adult": 0.55,
-                "elderly": 0.20
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ],
+        stratification_fractions=[
+            {
+                "stratification": "age",
+                "fractions": [
+                    {"category": "child", "fraction": 0.25},
+                    {"category": "adult", "fraction": 0.55},
+                    {"category": "elderly", "fraction": 0.20}
+                ]
             }
-        }
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -191,7 +211,11 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -212,7 +236,11 @@ model_no_vax = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -268,7 +296,11 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.95, "I": 0.05, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.95},
+            {"disease_state": "I", "fraction": 0.05},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
@@ -305,7 +337,11 @@ model = (
     .add_transition(id="waning", source=["R"], target=["S"], rate="omega")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )

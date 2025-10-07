@@ -9,32 +9,31 @@ class TestModelBuilder:
         Test that a simple model can be built using the ModelBuilder.
         """
         builder = (
-            ModelBuilder(name="TestModel", version="0.1.0") 
+            ModelBuilder(name="TestModel", version="0.1.0")
             .add_disease_state(id="S", name="Susceptible")
             .add_disease_state(id="I", name="Infected")
             .add_disease_state(id="R", name="Recovered")
             .add_parameter(id="beta", value=0.1)
             .add_parameter(id="gamma", value=0.05)
             .add_transition(
-                id="infection", 
-                source=["S", "I"], 
-                target=["I", "I"], 
+                id="infection",
+                source=["S", "I"],
+                target=["I", "I"],
                 rate="beta * S * I",
             )
-            .add_transition(
-                id="recovery", 
-                source=["I"], 
-                target=["R"], 
-                rate="gamma * I"
-            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
-    
+
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
-    
+
         assert isinstance(model, Model)
         assert model.name == "TestModel"
         assert model.version == "0.1.0"

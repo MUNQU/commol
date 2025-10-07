@@ -15,13 +15,13 @@ builder.add_disease_state(id="R", name="Recovered")
 
 ### Common Disease States
 
-| ID | Name | Description |
-|----|------|-------------|
-| S | Susceptible | Individuals who can become infected |
-| E | Exposed | Infected but not yet infectious |
-| I | Infected | Actively infected and infectious |
-| R | Recovered | No longer infectious, immune |
-| D | Dead | Deceased from disease |
+| ID  | Name        | Description                         |
+| --- | ----------- | ----------------------------------- |
+| S   | Susceptible | Individuals who can become infected |
+| E   | Exposed     | Infected but not yet infectious     |
+| I   | Infected    | Actively infected and infectious    |
+| R   | Recovered   | No longer infectious, immune        |
+| D   | Dead        | Deceased from disease               |
 
 ## Stratifications
 
@@ -46,14 +46,21 @@ builder.add_stratification(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
-    stratification_fractions={
-        "age_group": {
-            "young": 0.3,
-            "adult": 0.5,
-            "elderly": 0.2
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},
+        {"disease_state": "I", "fraction": 0.01},
+        {"disease_state": "R", "fraction": 0.0}
+    ],
+    stratification_fractions=[
+        {
+            "stratification": "age_group",
+            "fractions": [
+                {"category": "young", "fraction": 0.3},
+                {"category": "adult", "fraction": 0.5},
+                {"category": "elderly", "fraction": 0.2}
+            ]
         }
-    }
+    ]
 )
 ```
 
@@ -79,13 +86,13 @@ builder.add_parameter(
 
 ### Common Parameters
 
-| Parameter | Meaning | Typical Range |
-|-----------|---------|---------------|
-| `beta` | Transmission rate | 0.1 - 1.0 |
-| `gamma` | Recovery rate | 0.05 - 0.5 |
-| `sigma` | Incubation rate (1/incubation_period) | 0.1 - 0.5 |
-| `mu` | Birth/death rate | 0.0001 - 0.001 |
-| `R0` | Basic reproduction number | 1.0 - 10.0 |
+| Parameter | Meaning                               | Typical Range  |
+| --------- | ------------------------------------- | -------------- |
+| `beta`    | Transmission rate                     | 0.1 - 1.0      |
+| `gamma`   | Recovery rate                         | 0.05 - 0.5     |
+| `sigma`   | Incubation rate (1/incubation_period) | 0.1 - 0.5      |
+| `mu`      | Birth/death rate                      | 0.0001 - 0.001 |
+| `R0`      | Basic reproduction number             | 1.0 - 10.0     |
 
 ## Transitions
 
@@ -134,11 +141,11 @@ Initial conditions define the starting state of your model:
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions={
-        "S": 0.99,   # 99% susceptible
-        "I": 0.01,   # 1% infected
-        "R": 0.0     # 0% recovered
-    }
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},  # 99% susceptible
+        {"disease_state": "I", "fraction": 0.01},  # 1% infected
+        {"disease_state": "R", "fraction": 0.0}    # 0% recovered
+    ]
 )
 ```
 

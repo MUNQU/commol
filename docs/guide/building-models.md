@@ -167,11 +167,11 @@ builder.add_transition(
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions={
-        "S": 0.99,
-        "I": 0.01,
-        "R": 0.0
-    }
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},
+        {"disease_state": "I", "fraction": 0.01},
+        {"disease_state": "R", "fraction": 0.0}
+    ]
 )
 ```
 
@@ -180,22 +180,28 @@ builder.set_initial_conditions(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions={
-        "S": 0.99,
-        "I": 0.01,
-        "R": 0.0
-    },
-    stratification_fractions={
-        "age_group": {
-            "young": 0.3,
-            "adult": 0.5,
-            "elderly": 0.2
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},
+        {"disease_state": "I", "fraction": 0.01},
+        {"disease_state": "R", "fraction": 0.0}
+    ],
+    stratification_fractions=[
+        {
+            "stratification": "age_group",
+            "fractions": [
+                {"category": "young", "fraction": 0.3},
+                {"category": "adult", "fraction": 0.5},
+                {"category": "elderly", "fraction": 0.2}
+            ]
         },
-        "risk": {
-            "low": 0.8,
-            "high": 0.2
+        {
+            "stratification": "risk",
+            "fractions": [
+                {"category": "low", "fraction": 0.8},
+                {"category": "high", "fraction": 0.2}
+            ]
         }
-    }
+    ]
 )
 ```
 
@@ -307,7 +313,12 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions={"S": 0.999, "E": 0.0, "I": 0.001, "R": 0.0}
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.999},
+            {"disease_state": "E", "fraction": 0.0},
+            {"disease_state": "I", "fraction": 0.001},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
