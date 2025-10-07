@@ -185,17 +185,23 @@ builder.set_initial_conditions(
         "I": 0.01,
         "R": 0.0
     },
-    stratification_fractions={
-        "age_group": {
-            "young": 0.3,
-            "adult": 0.5,
-            "elderly": 0.2
+    stratification_fractions=[
+        {
+            "stratification": "age_group",
+            "fractions": [
+                {"category": "young", "fraction": 0.3},
+                {"category": "adult", "fraction": 0.5},
+                {"category": "elderly", "fraction": 0.2}
+            ]
         },
-        "risk": {
-            "low": 0.8,
-            "high": 0.2
+        {
+            "stratification": "risk",
+            "fractions": [
+                {"category": "low", "fraction": 0.8},
+                {"category": "high", "fraction": 0.2}
+            ]
         }
-    }
+    ]
 )
 ```
 

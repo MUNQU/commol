@@ -63,19 +63,29 @@ impl DifferenceEquations {
 
         for strat in &model.population.stratifications {
             let mut next_pop_dist = HashMap::new();
-            let strat_fractions = model
+
+            // Find the stratification fractions for this stratification
+            let strat_fractions_opt = model
                 .population
                 .initial_conditions
                 .stratification_fractions
-                .get(&strat.id)
-                .unwrap();
-            for (comp, pop) in &pop_dist {
-                for cat in &strat.categories {
-                    let fraction = strat_fractions.get(cat).unwrap_or(&0.0);
-                    next_pop_dist.insert(format!("{}_{}", comp, cat), pop * fraction);
+                .iter()
+                .find(|sf| sf.stratification == strat.id);
+
+            if let Some(strat_fractions_item) = strat_fractions_opt {
+                let mut strat_fractions = HashMap::new();
+                for frac in &strat_fractions_item.fractions {
+                    strat_fractions.insert(frac.category.clone(), frac.fraction);
                 }
+
+                for (comp, pop) in &pop_dist {
+                    for cat in &strat.categories {
+                        let fraction = strat_fractions.get(cat).unwrap_or(&0.0);
+                        next_pop_dist.insert(format!("{}_{}", comp, cat), pop * fraction);
+                    }
+                }
+                pop_dist = next_pop_dist;
             }
-            pop_dist = next_pop_dist;
         }
 
         let num_compartments = compartments.len();
@@ -301,7 +311,7 @@ mod tests {
         let initial_conditions = InitialConditions {
             population_size: 1000,
             disease_state_fraction,
-            stratification_fractions: HashMap::new(),
+            stratification_fractions: vec![],
         };
 
         let population = Population {

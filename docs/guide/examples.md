@@ -136,13 +136,16 @@ model = (
     .set_initial_conditions(
         population_size=10000,
         disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
-        stratification_fractions={
-            "age": {
-                "child": 0.25,
-                "adult": 0.55,
-                "elderly": 0.20
+        stratification_fractions=[
+            {
+                "stratification": "age",
+                "fractions": [
+                    {"category": "child", "fraction": 0.25},
+                    {"category": "adult", "fraction": 0.55},
+                    {"category": "elderly", "fraction": 0.20}
+                ]
             }
-        }
+        ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )

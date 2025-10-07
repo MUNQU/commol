@@ -5,7 +5,11 @@ from typing import Literal, Self, TypedDict
 from epimodel.context.condition import Condition, Rule
 from epimodel.context.disease_state import DiseaseState
 from epimodel.context.dynamics import Dynamics
-from epimodel.context.initial_conditions import InitialConditions
+from epimodel.context.initial_conditions import (
+    InitialConditions,
+    StratificationFraction,
+    StratificationFractions,
+)
 from epimodel.context.model import Model
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
@@ -30,6 +34,20 @@ class RuleDict(TypedDict):
         LogicOperators.LET,
     ]
     value: str | int | float | bool
+
+
+class StratificationFractionDict(TypedDict):
+    """Type definition for a single stratification category fraction."""
+
+    category: str
+    fraction: float
+
+
+class StratificationFractionsDict(TypedDict):
+    """Type definition for stratification fractions dictionary."""
+
+    stratification: str
+    fractions: list[StratificationFractionDict]
 
 
 class ModelBuilder:
@@ -345,7 +363,7 @@ class ModelBuilder:
         self,
         population_size: int,
         disease_state_fractions: dict[str, float],
-        stratification_fractions: dict[str, dict[str, float]] | None = None,
+        stratification_fractions: list[StratificationFractionsDict] | None = None,
     ) -> Self:
         """
         Set the initial conditions for the model.
@@ -357,9 +375,23 @@ class ModelBuilder:
         disease_state_fractions : dict[str, float]
             Fractions of population in each disease state. Keys are state ids,
             values are fractions.
-        stratification_fractions : dict[str, dict[str, float]] | None, default=None
-            Fractions for each stratification category. Outer keys are stratification
-            ids, inner keys are category ids, values are fractions.
+        stratification_fractions : list[StratificationFractionsDict] | None,
+            default=None
+            List of stratification fractions. Each item is a dictionary with:
+            - "stratification": str (stratification id)
+            - "fractions": list of dicts, each with "category" and "fraction"
+
+            Example:
+            [
+                {
+                    "stratification": "age_group",
+                    "fractions": [
+                        {"category": "young", "fraction": 0.3},
+                        {"category": "adult", "fraction": 0.5},
+                        {"category": "elderly", "fraction": 0.2}
+                    ]
+                }
+            ]
 
         Returns
         -------
@@ -374,10 +406,28 @@ class ModelBuilder:
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
 
+        strat_fractions_list: list[StratificationFractions] = []
+        if stratification_fractions:
+            for strat_dict in stratification_fractions:
+                fractions_list: list[StratificationFraction] = []
+                for frac_dict in strat_dict["fractions"]:
+                    fractions_list.append(
+                        StratificationFraction(
+                            category=frac_dict["category"],
+                            fraction=frac_dict["fraction"],
+                        )
+                    )
+                strat_fractions_list.append(
+                    StratificationFractions(
+                        stratification=strat_dict["stratification"],
+                        fractions=fractions_list,
+                    )
+                )
+
         self._initial_conditions = InitialConditions(
             population_size=population_size,
             disease_state_fraction=disease_state_fractions,
-            stratification_fractions=stratification_fractions or {},
+            stratification_fractions=strat_fractions_list,
         )
         logging.info(
             (
