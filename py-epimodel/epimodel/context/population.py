@@ -3,10 +3,10 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator
 
-from .disease_state import DiseaseState
-from .initial_conditions import InitialConditions
-from .stratification import Stratification
-from .transition import Transition
+from epimodel.context.disease_state import DiseaseState
+from epimodel.context.dynamics import Transition
+from epimodel.context.initial_conditions import InitialConditions
+from epimodel.context.stratification import Stratification
 
 
 class Population(BaseModel):

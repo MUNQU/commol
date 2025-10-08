@@ -2,9 +2,8 @@ import copy
 import logging
 from typing import Literal, Self, TypedDict
 
-from epimodel.context.condition import Condition, Rule
 from epimodel.context.disease_state import DiseaseState
-from epimodel.context.dynamics import Dynamics
+from epimodel.context.dynamics import Condition, Dynamics, Rule, Transition
 from epimodel.context.initial_conditions import (
     DiseaseStateFraction,
     InitialConditions,
@@ -15,7 +14,6 @@ from epimodel.context.model import Model
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
 from epimodel.context.stratification import Stratification
-from epimodel.context.transition import Transition
 from epimodel.constants import ModelTypes, LogicOperators
 
 

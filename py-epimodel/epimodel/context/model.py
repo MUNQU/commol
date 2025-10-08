@@ -3,10 +3,9 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from epimodel.constants import ModelTypes
-from epimodel.context.dynamics import Dynamics
+from epimodel.context.dynamics import Dynamics, Transition
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
-from epimodel.context.transition import Transition
 
 
 class Model(BaseModel):
