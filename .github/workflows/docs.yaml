@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --extras docs
+          poetry install --extras "dev docs"
 
       - name: Build and install package with maturin
         run: |
@@ -94,7 +94,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./py-epimodel
         run: |
-          poetry install --extras docs
+          poetry install --extras "dev docs"
 
       - name: Build and install package with maturin
         working-directory: ./py-epimodel
