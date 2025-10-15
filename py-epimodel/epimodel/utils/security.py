@@ -857,3 +857,36 @@ def validate_expression_security(
     """
     validator = ExpressionSecurityValidator(config)
     validator.validate_expression(expression)
+
+
+def get_expression_variables(expression: str) -> list[str]:
+    """
+    Extracts variable names from a mathematical expression.
+
+    This function identifies sequences of characters that represent variable names,
+    ignoring numbers, operators, and known mathematical functions.
+
+    Parameters
+    ----------
+    expression : str
+        The mathematical expression.
+
+    Returns
+    -------
+    list[str]
+        A list of unique variable names found in the expression.
+    """
+    # Regex to find identifiers (variables)
+    identifier_regex = r"[a-zA-Z_][a-zA-Z0-9_]*"
+
+    # Find all potential identifiers
+    all_identifiers: list[str] = re.findall(identifier_regex, expression)
+
+    # Filter out known safe functions and constants
+    safe_tokens = ExpressionSecurityValidator.SAFE_FUNCTIONS | {"pi", "e"}
+    variables: list[str] = []
+    for var in all_identifiers:
+        if var.lower() not in safe_tokens and not var.isdigit():
+            variables.append(var)
+
+    return list(set(variables))

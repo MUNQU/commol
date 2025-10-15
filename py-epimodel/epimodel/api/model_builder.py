@@ -3,7 +3,14 @@ import logging
 from typing import Literal, Self, TypedDict
 
 from epimodel.context.disease_state import DiseaseState
-from epimodel.context.dynamics import Condition, Dynamics, Rule, Transition
+from epimodel.context.dynamics import (
+    Condition,
+    Dynamics,
+    Rule,
+    StratificationCondition,
+    StratifiedRate,
+    Transition,
+)
 from epimodel.context.initial_conditions import (
     DiseaseStateFraction,
     InitialConditions,
@@ -54,6 +61,20 @@ class StratificationFractionsDict(TypedDict):
 
     stratification: str
     fractions: list[StratificationFractionDict]
+
+
+class StratificationConditionDict(TypedDict):
+    """Type definition for a stratification condition in a stratified rate."""
+
+    stratification: str
+    category: str
+
+
+class StratifiedRateDict(TypedDict):
+    """Type definition for a stratified rate."""
+
+    conditions: list[StratificationConditionDict]
+    rate: str | float
 
 
 class ModelBuilder:
@@ -135,15 +156,7 @@ class ModelBuilder:
         -------
         ModelBuilder
             Self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a disease state with the same id already exists.
         """
-        if any(state.id == id for state in self._disease_states):
-            raise ValueError(f"Disease state with id '{id}' already exists")
-
         self._disease_states.append(DiseaseState(id=id, name=name))
         logging.info(f"Added disease state: id='{id}', name='{name}'")
         return self
@@ -163,19 +176,7 @@ class ModelBuilder:
         -------
         ModelBuilder
             Self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a stratification with the same id already exists or if categories are
-            empty.
         """
-        if any(strat.id == id for strat in self._stratifications):
-            raise ValueError(f"Stratification with id '{id}' already exists")
-
-        if not categories:
-            raise ValueError("Categories cannot be empty")
-
         self._stratifications.append(Stratification(id=id, categories=categories))
         logging.info(f"Added stratification: id='{id}', categories={categories}")
         return self
@@ -202,15 +203,7 @@ class ModelBuilder:
         -------
         ModelBuilder
             Self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a parameter with the same id already exists.
         """
-        if any(param.id == id for param in self._parameters):
-            raise ValueError(f"Parameter with id '{id}' already exists")
-
         self._parameters.append(Parameter(id=id, value=value, description=description))
         logging.info(f"Added parameter: id='{id}', value={value}")
         return self
@@ -221,6 +214,7 @@ class ModelBuilder:
         source: list[str],
         target: list[str],
         rate: str | float | None = None,
+        stratified_rates: list[StratifiedRateDict] | None = None,
         condition: Condition | None = None,
     ) -> Self:
         """
@@ -235,8 +229,8 @@ class ModelBuilder:
         target : list[str]
             List of target state/category identifiers.
         rate : str | float | None, default=None
-            Mathematical formula, parameter reference, or constant value for the
-            transition rate.
+            Default mathematical formula, parameter reference, or constant value for
+            the transition rate. Used when no stratified rate matches.
             Can be:
             - A parameter reference (e.g., "beta")
             - A constant value (e.g., "0.5" or 0.5)
@@ -247,11 +241,11 @@ class ModelBuilder:
             - step or t: Current simulation step (both are equivalent)
             - pi, e: Mathematical constants
 
-            Examples:
-            - "beta * S * I / N" (frequency-dependent transmission)
-            - "gamma" (simple parameter reference)
-            - "0.1 * sin(t / 365.0)" (seasonal variation using t)
-            - "0.1 * sin(step / 365.0)" (seasonal variation using step)
+        stratified_rates : list[dict] | None, default=None
+            List of stratification-specific rates. Each dict must contain:
+            - "conditions": List of dicts with "stratification" and "category" keys
+            - "rate": Rate expression string
+
         condition : Condition| None, default=None
             Logical conditions that must be met for the transition.
 
@@ -259,62 +253,39 @@ class ModelBuilder:
         -------
         ModelBuilder
             Self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a transition with the same id already exists or if security/syntax
-            validation fails.
-        SyntaxError
-            If the rate formula has invalid syntax.
         """
-        if any(trans.id == id for trans in self._transitions):
-            raise ValueError(f"Transition with id '{id}' already exists")
-
-        # Validate rate security and syntax if it's a string formula
-        if isinstance(rate, str) and rate.strip():
-            # Validate formula syntax using Rust MathExpression
-            try:
-                from epimodel.epimodel_rs.epimodel_rs import core
-
-                expr = core.MathExpression(rate)
-                expr.py_validate()
-
-                # Extract and validate variables used in the expression
-                variables = expr.py_get_variables()
-                self._validate_formula_variables(rate, variables)
-            except SyntaxError:
-                raise
-            except ValueError:
-                raise
-            except Exception as e:
-                error_msg = str(e).lower()
-                # Convert Rust evalexpr errors to Python exceptions
-                if any(
-                    keyword in error_msg
-                    for keyword in [
-                        "unexpected",
-                        "expected",
-                        "syntax",
-                        "token",
-                        "incomplete",
-                    ]
-                ):
-                    raise SyntaxError(f"Invalid mathematical expression '{rate}': {e}")
-                else:
-                    raise ValueError(f"Invalid formula '{rate}': {e}")
-        elif isinstance(rate, int) or isinstance(rate, float):
+        # Convert rate to string if numeric
+        if isinstance(rate, int) or isinstance(rate, float):
             rate = str(rate)
+
+        # Convert stratified rates dicts to Pydantic objects
+        stratified_rates_objects: list[StratifiedRate] | None = None
+        if stratified_rates:
+            stratified_rates_objects = []
+            for rate_dict in stratified_rates:
+                conditions = [
+                    StratificationCondition(**cond) for cond in rate_dict["conditions"]
+                ]
+                stratified_rates_objects.append(
+                    StratifiedRate(conditions=conditions, rate=str(rate_dict["rate"]))
+                )
 
         self._transitions.append(
             Transition(
-                id=id, source=source, target=target, rate=rate, condition=condition
+                id=id,
+                source=source,
+                target=target,
+                rate=rate,
+                stratified_rates=stratified_rates_objects,
+                condition=condition,
             )
         )
         logging.info(
             (
                 f"Added transition: id='{id}', source={source}, target={target}, "
-                f"rate='{rate}'"
+                f"rate='{rate}', stratified_rates={
+                    len(stratified_rates_objects) if stratified_rates_objects else 0
+                }"
             )
         )
         return self
@@ -461,68 +432,6 @@ class ModelBuilder:
         )
         return self
 
-    def _validate_formula_variables(self, formula: str, variables: list[str]) -> None:
-        """
-        Validate that all variables in a formula are defined.
-
-        Parameters
-        ----------
-        formula : str
-            The formula being validated (for error messages).
-        variables : list[str]
-            List of variable identifiers found in the formula.
-
-        Raises
-        ------
-        ValueError
-            If any variable is not defined as a parameter or disease state.
-        """
-        # Special variables that are always available in rate formulas
-        special_vars = {"N", "step", "pi", "e", "t"}
-
-        param_ids = {param.id for param in self._parameters}
-        state_ids = {state.id for state in self._disease_states}
-        strat_ids: set[str] = set()
-        for strat in self._stratifications:
-            strat_ids.update(strat.categories)
-
-        valid_identifiers = param_ids | state_ids | strat_ids | special_vars
-
-        undefined_vars: list[str] = []
-        for var in variables:
-            if var not in valid_identifiers:
-                undefined_vars.append(var)
-
-        if undefined_vars:
-            raise ValueError(
-                (
-                    f"Undefined variables in formula '{formula}': "
-                    f"{', '.join(undefined_vars)}. "
-                    f"Available parameters: "
-                    f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
-                    f"Available disease states: "
-                    f"{', '.join(sorted(state_ids)) if state_ids else 'none'}."
-                )
-            )
-
-    def validate_completeness(self) -> None:
-        """
-        Validate that all required components have been added to the model.
-
-        Raises
-        ------
-        ValueError
-            If any required components are missing.
-        """
-        logging.info("Starting model completeness validation...")
-        if not self._disease_states:
-            raise ValueError("At least one disease state must be defined")
-        if not self._transitions:
-            raise ValueError("At least one transition must be defined")
-        if self._initial_conditions is None:
-            raise ValueError("Initial conditions must be set")
-        logging.info("Model completeness validation successful.")
-
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
         """
         Get a summary of the current model builder state.
@@ -583,9 +492,7 @@ class ModelBuilder:
         self._initial_conditions = None
         return self
 
-    def build(
-        self, typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS], validate: bool = True
-    ) -> Model:
+    def build(self, typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS]) -> Model:
         """
         Build and return the final Model instance.
 
@@ -593,8 +500,6 @@ class ModelBuilder:
         ----------
         typology : Literal["DifferenceEquations"]
             Type of the model.
-        validate : bool, default=True
-            Whether to perform validation before building the model.
 
         Returns
         -------
@@ -606,12 +511,8 @@ class ModelBuilder:
         ValueError
             If validation fails or required components are missing.
         """
-        if validate:
-            self.validate_completeness()
-
-        assert self._initial_conditions is not None, (
-            "Internal error: Initial conditions should have been validated."
-        )
+        if self._initial_conditions is None:
+            raise ValueError("Initial conditions must be set")
 
         population = Population(
             disease_states=self._disease_states,

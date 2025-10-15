@@ -1,3 +1,4 @@
+from itertools import product, combinations
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -6,6 +7,7 @@ from epimodel.constants import ModelTypes
 from epimodel.context.dynamics import Dynamics, Transition
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
+from epimodel.utils.security import get_expression_variables
 
 
 class Model(BaseModel):
@@ -38,6 +40,107 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+
+    @model_validator(mode="after")
+    def validate_unique_parameter_ids(self) -> Self:
+        """
+        Validates that parameter IDs are unique.
+        """
+        parameter_ids = [p.id for p in self.parameters]
+        if len(parameter_ids) != len(set(parameter_ids)):
+            duplicates = [
+                item for item in set(parameter_ids) if parameter_ids.count(item) > 1
+            ]
+            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_formula_variables(self) -> Self:
+        """
+        Validate that all variables in rate expressions are defined.
+        This is done by gathering all valid identifiers and checking each
+        transition's rate expressions against them.
+        """
+        valid_identifiers = self._get_valid_identifiers()
+
+        for transition in self.dynamics.transitions:
+            self._validate_transition_rates(transition, valid_identifiers)
+        return self
+
+    def _get_valid_identifiers(self) -> set[str]:
+        """Gathers all valid identifiers for use in rate expressions."""
+        special_vars = {"N", "step", "pi", "e", "t"}
+        param_ids = {param.id for param in self.parameters}
+        state_ids = {state.id for state in self.population.disease_states}
+
+        strat_category_ids: set[str] = {
+            cat for strat in self.population.stratifications for cat in strat.categories
+        }
+
+        subpopulation_n_vars = self._get_subpopulation_n_vars()
+
+        return (
+            param_ids
+            | state_ids
+            | strat_category_ids
+            | special_vars
+            | subpopulation_n_vars
+        )
+
+    def _get_subpopulation_n_vars(self) -> set[str]:
+        """Generates all possible N_{category...} variable names."""
+        if not self.population.stratifications:
+            return set()
+
+        subpopulation_n_vars: set[str] = set()
+        category_groups = [s.categories for s in self.population.stratifications]
+
+        # All possible combinations of categories across different stratifications
+        full_category_combos = product(*category_groups)
+
+        for combo_tuple in full_category_combos:
+            # For each combo, find all non-empty subsets
+            for i in range(1, len(combo_tuple) + 1):
+                for subset in combinations(combo_tuple, i):
+                    var_name = f"N_{'_'.join(subset)}"
+                    subpopulation_n_vars.add(var_name)
+
+        return subpopulation_n_vars
+
+    def _validate_transition_rates(
+        self, transition: Transition, valid_identifiers: set[str]
+    ):
+        """Validates the rate expressions for a single transition."""
+        if transition.rate:
+            self._validate_rate_expression(
+                transition.rate, transition.id, "rate", valid_identifiers
+            )
+
+        if transition.stratified_rates:
+            for sr in transition.stratified_rates:
+                self._validate_rate_expression(
+                    sr.rate, transition.id, "stratified_rate", valid_identifiers
+                )
+
+    def _validate_rate_expression(
+        self, rate: str, transition_id: str, context: str, valid_identifiers: set[str]
+    ):
+        """Validates variables in a single rate expression."""
+        variables = get_expression_variables(rate)
+        undefined_vars = [var for var in variables if var not in valid_identifiers]
+        if undefined_vars:
+            param_ids = {param.id for param in self.parameters}
+            state_ids = {state.id for state in self.population.disease_states}
+            raise ValueError(
+                (
+                    f"Undefined variables in transition '{transition_id}' "
+                    f"{context} '{rate}': {', '.join(undefined_vars)}. "
+                    f"Available parameters: "
+                    f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
+                    f"Available disease states: "
+                    f"{', '.join(sorted(state_ids)) if state_ids else 'none'}."
+                )
+            )
 
     @model_validator(mode="after")
     def validate_transition_ids(self) -> Self:

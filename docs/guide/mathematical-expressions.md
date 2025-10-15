@@ -53,13 +53,13 @@ rate = "0.01 * R"        # Use R population
 
 ### Special Variables
 
-| Variable | Type  | Description                                          |
-| -------- | ----- | ---------------------------------------------------- |
-| `N`      | float | Total population (automatic sum of all compartments) |
-| `step`   | int   | Current simulation step (0, 1, 2, ...)               |
-| `t`      | int   | Alias for `step`                                     |
-| `pi`     | float | Mathematical constant π ≈ 3.14159                    |
-| `e`      | float | Mathematical constant e ≈ 2.71828                    |
+| Variable        | Type  | Description                                                                |
+| --------------- | ----- | -------------------------------------------------------------------------- |
+| `N`             | float | Total population (automatic sum of all compartments)                       |
+| `N_{category}`  | float | Total population for a specific stratification category (e.g., `N_young`)  |
+| `N_{cat1_cat2}` | float | Total population for an intersection of categories (e.g., `N_young_urban`) |
+| `step`          | int   | Current simulation step (0, 1, 2, ...)                                     |
+| `t`             | int   | Alias for `step`                                                           |
 
 **Examples:**
 

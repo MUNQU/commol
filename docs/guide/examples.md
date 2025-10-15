@@ -35,18 +35,6 @@ model = (
 # Simulate
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
-
-# Plot
-plt.figure(figsize=(10, 6))
-plt.plot(results["S"], label="Susceptible", color="blue")
-plt.plot(results["I"], label="Infected", color="red")
-plt.plot(results["R"], label="Recovered", color="green")
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.title("SIR Model")
-plt.legend()
-plt.grid(True)
-plt.show()
 ```
 
 ## Example 2: SEIR Model
@@ -79,7 +67,7 @@ model = (
 )
 
 simulation = Simulation(model)
-results = simulation.run(num_steps=200)
+results = simulation.run(num_steps=100)
 ```
 
 ## Example 3: Seasonal Transmission
@@ -117,19 +105,11 @@ model = (
 # Run for 3 years to see seasonal pattern
 simulation = Simulation(model)
 results = simulation.run(num_steps=365 * 3)
-
-plt.figure(figsize=(12, 6))
-plt.plot(results["I"], color="red")
-plt.xlabel("Time (days)")
-plt.ylabel("Infected Population")
-plt.title("Seasonal Transmission Pattern")
-plt.grid(True)
-plt.show()
 ```
 
 ## Example 4: Age-Stratified Model
 
-Different age groups with varying susceptibility:
+Different age groups with varying recovery rates:
 
 ```python
 model = (
@@ -142,10 +122,31 @@ model = (
     .add_parameter(id="gamma_child", value=0.15)
     .add_parameter(id="gamma_adult", value=0.12)
     .add_parameter(id="gamma_elderly", value=0.08)
-    # Note: In a real age-stratified model, you'd add transitions for each age group
-    # This is a simplified example
-    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
-    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma_adult")
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        stratified_rates=[
+            {
+                "conditions": [{"stratification": "age", "category": "child"}],
+                "rate": "gamma_child"
+            },
+            {
+                "conditions": [{"stratification": "age", "category": "adult"}],
+                "rate": "gamma_adult"
+            },
+            {
+                "conditions": [{"stratification": "age", "category": "elderly"}],
+                "rate": "gamma_elderly"
+            },
+        ]
+    )
     .set_initial_conditions(
         population_size=10000,
         disease_state_fractions=[
@@ -168,23 +169,7 @@ model = (
 )
 
 simulation = Simulation(model)
-results = simulation.run(num_steps=200)
-
-# Plot stratified results
-plt.figure(figsize=(12, 8))
-
-# Plot infected by age group
-for age in ["child", "adult", "elderly"]:
-    key = f"I_{age}"
-    if key in results:
-        plt.plot(results[key], label=f"Infected ({age})")
-
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.title("Age-Stratified Infections")
-plt.legend()
-plt.grid(True)
-plt.show()
+results = simulation.run(num_steps=100)
 ```
 
 ## Example 5: Vaccination Campaign
@@ -222,55 +207,7 @@ model = (
 
 # Compare with and without vaccination
 simulation = Simulation(model)
-results_vax = simulation.run(num_steps=200)
-
-# Model without vaccination
-model_no_vax = (
-    ModelBuilder(name="SIR No Vaccination", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.4)
-    .add_parameter(id="gamma", value=0.1)
-    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
-    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
-    .set_initial_conditions(
-        population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
-        ]
-    )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
-)
-
-simulation_no_vax = Simulation(model_no_vax)
-results_no_vax = simulation_no_vax.run(num_steps=200)
-
-# Compare
-plt.figure(figsize=(12, 5))
-
-plt.subplot(1, 2, 1)
-plt.plot(results_no_vax["I"], label="No Vaccination", color="red")
-plt.plot(results_vax["I"], label="With Vaccination", color="orange")
-plt.xlabel("Time (days)")
-plt.ylabel("Infected")
-plt.title("Impact of Vaccination on Infections")
-plt.legend()
-plt.grid(True)
-
-plt.subplot(1, 2, 2)
-plt.plot(results_no_vax["R"], label="No Vaccination", color="green")
-plt.plot(results_vax["R"], label="With Vaccination", color="lightgreen")
-plt.xlabel("Time (days)")
-plt.ylabel("Recovered/Immune")
-plt.title("Immunity Over Time")
-plt.legend()
-plt.grid(True)
-
-plt.tight_layout()
-plt.show()
+results = simulation.run(num_steps=100)
 ```
 
 ## Example 6: Healthcare Capacity
@@ -306,17 +243,7 @@ model = (
 )
 
 simulation = Simulation(model)
-results = simulation.run(num_steps=150)
-
-plt.figure(figsize=(10, 6))
-plt.plot(results["I"], label="Infected", color="red")
-plt.axhline(y=100, color="black", linestyle="--", label="Hospital Capacity")
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.title("Healthcare Capacity Saturation")
-plt.legend()
-plt.grid(True)
-plt.show()
+results = simulation.run(num_steps=100)
 ```
 
 ## Example 7: Waning Immunity
@@ -349,17 +276,121 @@ model = (
 # Run for longer to see endemic equilibrium
 simulation = Simulation(model)
 results = simulation.run(num_steps=1000)
+```
 
-plt.figure(figsize=(12, 6))
-plt.plot(results["S"], label="Susceptible", color="blue")
-plt.plot(results["I"], label="Infected", color="red")
-plt.plot(results["R"], label="Recovered", color="green")
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.title("SIRS Model with Waning Immunity")
-plt.legend()
-plt.grid(True)
-plt.show()
+## Example 8: Multi-Stratified Model
+
+This example demonstrates a model with multiple stratifications (age and risk) and defines a transition rate for a specific intersection of these stratifications.
+
+```python
+import numpy as np
+
+# Build model
+model = (
+    ModelBuilder(name="Multi-Stratified SIR", version="1.0")
+    .add_disease_state(id="S", name="Susceptible")
+    .add_disease_state(id="I", name="Infected")
+    .add_disease_state(id="R", name="Recovered")
+    .add_stratification(id="age", categories=["young", "old"])
+    .add_stratification(id="risk", categories=["low", "high"])
+    .add_parameter(id="beta_low", value=0.3)
+    .add_parameter(id="beta_high", value=0.6)
+    .add_parameter(id="gamma", value=0.1)
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta_low * S * I / N", # Default rate
+        stratified_rates=[
+            {
+                "conditions": [{"stratification": "risk", "category": "high"}],
+                "rate": "beta_high * S * I / N"
+            }
+        ]
+    )
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
+    .set_initial_conditions(
+        population_size=1000,
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ],
+        stratification_fractions=[
+            {
+                "stratification": "age",
+                "fractions": [
+                    {"category": "young", "fraction": 0.6},
+                    {"category": "old", "fraction": 0.4}
+                ]
+            },
+            {
+                "stratification": "risk",
+                "fractions": [
+                    {"category": "low", "fraction": 0.8},
+                    {"category": "high", "fraction": 0.2}
+                ]
+            }
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Simulate
+simulation = Simulation(model)
+results = simulation.run(num_steps=100)
+```
+
+## Example 9: Subpopulation-Dependent Transmission
+
+This example shows how to model frequency-dependent transmission within a specific subpopulation using the automatically calculated `N_{category}` variable. The infection rate for the `young` category is normalized by the total `young` population (`N_young`), while the `old` category uses the global population `N`.
+
+```python
+# Build model
+model = (
+    ModelBuilder(name="Subpopulation-Dependent SIR", version="1.0")
+    .add_disease_state(id="S", name="Susceptible")
+    .add_disease_state(id="I", name="Infected")
+    .add_disease_state(id="R", name="Recovered")
+    .add_stratification(id="age", categories=["young", "old"])
+    .add_parameter(id="beta", value=0.4)
+    .add_parameter(id="gamma", value=0.1)
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N", # Default rate for old
+        stratified_rates=[
+            {
+                "conditions": [{"stratification": "age", "category": "young"}],
+                "rate": "beta * S * I / N_young" # Rate normalized by subpopulation
+            }
+        ]
+    )
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
+    .set_initial_conditions(
+        population_size=1000,
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ],
+        stratification_fractions=[
+            {
+                "stratification": "age",
+                "fractions": [
+                    {"category": "young", "fraction": 0.5},
+                    {"category": "old", "fraction": 0.5}
+                ]
+            }
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Simulate
+simulation = Simulation(model)
+results = simulation.run(num_steps=100)
 ```
 
 ## Next Steps

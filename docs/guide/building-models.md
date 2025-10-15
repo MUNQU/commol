@@ -160,6 +160,80 @@ builder.add_transition(
 )
 ```
 
+### Stratified Transitions
+
+When a model includes stratifications, you often need different transition rates for different subgroups. The `add_transition` method supports this via the `stratified_rates` parameter.
+
+This parameter takes a list of dictionaries, where each dictionary defines a rate for a specific combination of stratification categories.
+
+#### Single Stratification
+
+Let's define different recovery rates for different age groups.
+
+```python
+builder.add_stratification(id="age", categories=["child", "adult", "elderly"])
+builder.add_parameter(id="gamma_child", value=0.15)
+builder.add_parameter(id="gamma_adult", value=0.1)
+builder.add_parameter(id="gamma_elderly", value=0.08)
+
+builder.add_transition(
+    id="recovery",
+    source=["I"],
+    target=["R"],
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "child"}],
+            "rate": "gamma_child"
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "adult"}],
+            "rate": "gamma_adult"
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "elderly"}],
+            "rate": "gamma_elderly"
+        },
+    ]
+)
+```
+
+#### Multi-Stratification Transitions
+
+To define rates for intersections of multiple stratifications, add multiple conditions to a single rate entry.
+
+For example, let's model different infection rates for high-risk adults in urban areas.
+
+```python
+builder.add_stratification(id="age", categories=["child", "adult"])
+builder.add_stratification(id="risk", categories=["low", "high"])
+builder.add_stratification(id="location", categories=["urban", "rural"])
+
+builder.add_parameter(id="beta_urban_adult_high_risk", value=0.8)
+builder.add_parameter(id="beta_default", value=0.3)
+
+builder.add_transition(
+    id="infection",
+    source=["S"],
+    target=["I"],
+    rate="beta_default * S * I / N",  # Fallback rate
+    stratified_rates=[
+        {
+            "conditions": [
+                {"stratification": "age", "category": "adult"},
+                {"stratification": "risk", "category": "high"},
+                {"stratification": "location", "category": "urban"},
+            ],
+            "rate": "beta_urban_adult_high_risk * S * I / N"
+        }
+    ]
+)
+```
+
+In this example:
+
+- The `rate` parameter acts as a **fallback** for any compartment that doesn't match a specific stratified rate.
+- The `stratified_rates` entry defines a high infection rate that only applies to compartments matching all three conditions (e.g., `S_adult_high_urban`).
+
 ## Setting Initial Conditions
 
 ### Basic Setup
