@@ -1,12 +1,12 @@
 import math
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 
-from .disease_state import DiseaseState
-from .initial_conditions import InitialConditions
-from .stratification import Stratification
-from .transition import Transition
+from epimodel.context.disease_state import DiseaseState
+from epimodel.context.dynamics import Transition
+from epimodel.context.initial_conditions import InitialConditions
+from epimodel.context.stratification import Stratification
 
 
 class Population(BaseModel):
@@ -27,6 +27,40 @@ class Population(BaseModel):
     stratifications: list[Stratification]
     transitions: list[Transition]
     initial_conditions: InitialConditions
+
+    @field_validator("disease_states")
+    @classmethod
+    def validate_disease_states_not_empty(
+        cls, v: list[DiseaseState]
+    ) -> list[DiseaseState]:
+        if not v:
+            raise ValueError("At least one disease state must be defined.")
+        return v
+
+    @model_validator(mode="after")
+    def validate_unique_ids(self) -> Self:
+        """
+        Validates that disease state and stratification IDs are unique.
+        """
+        disease_state_ids = [ds.id for ds in self.disease_states]
+        if len(disease_state_ids) != len(set(disease_state_ids)):
+            duplicates = [
+                item
+                for item in set(disease_state_ids)
+                if disease_state_ids.count(item) > 1
+            ]
+            raise ValueError(f"Duplicate disease state IDs found: {duplicates}")
+
+        stratification_ids = [s.id for s in self.stratifications]
+        if len(stratification_ids) != len(set(stratification_ids)):
+            duplicates = [
+                item
+                for item in set(stratification_ids)
+                if stratification_ids.count(item) > 1
+            ]
+            raise ValueError(f"Duplicate stratification IDs found: {duplicates}")
+
+        return self
 
     @model_validator(mode="after")
     def validate_disease_state_initial_conditions(self) -> Self:
@@ -63,6 +97,43 @@ class Population(BaseModel):
                     f"but got {states_sum_fractions:.7f}."
                 )
             )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_stratified_rates(self) -> Self:
+        """
+        Validates that stratified rates reference existing stratifications and
+        categories.
+        """
+        strat_map = {strat.id: strat for strat in self.stratifications}
+
+        for transition in self.transitions:
+            if transition.stratified_rates:
+                for idx, stratified_rate in enumerate(transition.stratified_rates):
+                    for condition in stratified_rate.conditions:
+                        # Validate stratification exists
+                        if condition.stratification not in strat_map:
+                            raise ValueError(
+                                (
+                                    f"In transition '{transition.id}', stratified rate "
+                                    f"{idx}: Stratification "
+                                    f"'{condition.stratification}' not found. "
+                                    f"Available: {list(strat_map.keys())}"
+                                )
+                            )
+
+                        # Validate category exists
+                        strat = strat_map[condition.stratification]
+                        if condition.category not in strat.categories:
+                            raise ValueError(
+                                (
+                                    f"In transition '{transition.id}', stratified rate "
+                                    f"{idx}: Category '{condition.category}' not found "
+                                    f"in stratification '{condition.stratification}'. "
+                                    f"Available: {strat.categories}"
+                                )
+                            )
 
         return self
 

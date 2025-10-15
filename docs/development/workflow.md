@@ -235,7 +235,9 @@ This runs:
 **Important**: Always ensure `poetry.lock` is synchronized with `pyproject.toml` before committing.
 
 #### Automatic (Recommended)
+
 Pre-commit hooks handle this automatically:
+
 ```bash
 cd py-epimodel
 poetry run pre-commit install  # One-time setup
@@ -246,7 +248,9 @@ git commit -m "chore: update dependencies"
 ```
 
 #### Manual
+
 If not using pre-commit hooks:
+
 ```bash
 cd py-epimodel
 poetry check  # Check if lock file is in sync
@@ -270,7 +274,7 @@ poetry run python -m your_test_script.py
 
 ## Building Documentation
 
-The project uses MkDocs Material for documentation:
+The project uses MkDocs Material for documentation with multi-version support via Mike:
 
 ```bash
 # Install documentation dependencies
@@ -285,6 +289,51 @@ poetry run mkdocs build
 ```
 
 Visit http://127.0.0.1:8000 to view the documentation locally.
+
+### Documentation Versioning
+
+EpiModel maintains two documentation versions:
+
+- **`latest`**: Documentation for the current stable release from the `main` branch
+- **`dev`**: Development documentation from the `develop` branch
+
+#### Automatic Deployment
+
+Documentation is automatically deployed when pushing to tracked branches:
+
+- **Push to `main`**: Deploys to `latest` version
+- **Push to `develop`**: Deploys to `dev` version
+- **Pull requests**: Build and validate documentation without deploying
+
+Users can switch between versions using the version selector in the documentation site.
+
+#### Manual Deployment (if needed)
+
+If you need to manually deploy documentation:
+
+```bash
+# Deploy latest version (from main branch)
+cd py-epimodel
+poetry run mike deploy --push --update-aliases latest
+poetry run mike set-default --push latest
+
+# Deploy dev version (from develop branch)
+cd py-epimodel
+poetry run mike deploy --push dev
+
+# List all deployed versions
+poetry run mike list
+
+# Delete a version
+poetry run mike delete <version-name> --push
+```
+
+#### Version Management Tips
+
+- The version selector appears in the top-right of the documentation site
+- Each version is completely isolated with its own search index
+- Old versions remain accessible even after new deployments
+- Use `mike list` to see all deployed versions and aliases
 
 ## Next Steps
 

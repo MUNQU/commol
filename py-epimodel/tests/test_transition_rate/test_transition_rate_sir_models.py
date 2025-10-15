@@ -528,7 +528,7 @@ class TestRateFormulaErrorHandling:
         for formula in invalid_formulas:
             with pytest.raises((ValueError, SyntaxError)):
                 # This should fail during validation or model building
-                _ = (
+                builder = (
                     ModelBuilder(name="Invalid Formula Test", version="1.0")
                     .add_disease_state(id="S", name="Susceptible")
                     .add_disease_state(id="I", name="Infected")
@@ -541,7 +541,16 @@ class TestRateFormulaErrorHandling:
                         target=["I"],
                         rate=formula,
                     )
+                    .set_initial_conditions(
+                        population_size=1000,
+                        disease_state_fractions=[
+                            {"disease_state": "S", "fraction": 1.0},
+                            {"disease_state": "I", "fraction": 0.0},
+                            {"disease_state": "R", "fraction": 0.0},
+                        ],
+                    )
                 )
+                _ = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 
     def test_undefined_parameters_in_formulas(self):
         """Test handling of undefined parameters in formulas."""

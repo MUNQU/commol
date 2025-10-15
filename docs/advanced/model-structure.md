@@ -53,7 +53,7 @@ heading_level: 3
 
 ## Transitions
 
-::: epimodel.context.transition.Transition
+::: epimodel.context.dynamics.Transition
 options:
 show_root_heading: true
 show_source: true

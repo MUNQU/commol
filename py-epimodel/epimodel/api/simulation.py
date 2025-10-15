@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from epimodel.epimodel_rs.epimodel_rs import (
-        DifferenceEquationsProtocol, 
-        RustModelProtocol
+        DifferenceEquationsProtocol,
+        RustModelProtocol,
     )
 
 

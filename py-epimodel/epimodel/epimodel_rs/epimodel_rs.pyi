@@ -19,11 +19,20 @@ class StratificationProtocol(Protocol):
     id: str
     categories: list[str]
 
+class StratificationConditionProtocol(Protocol):
+    stratification: str
+    category: str
+
+class StratifiedRateProtocol(Protocol):
+    conditions: list[StratificationConditionProtocol]
+    rate: str
+
 class TransitionProtocol(Protocol):
     id: str
     source: list[str]
     target: list[str]
     rate: RateMathExpressionProtocol | None
+    stratified_rates: list[StratifiedRateProtocol] | None
     condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
@@ -99,6 +108,8 @@ class CoreModule(Protocol):
     Population: type[PopulationProtocol]
     DiseaseState: type[DiseaseStateProtocol]
     Stratification: type[StratificationProtocol]
+    StratificationCondition: type[StratificationConditionProtocol]
+    StratifiedRate: type[StratifiedRateProtocol]
     Transition: type[TransitionProtocol]
     Parameter: type[ParameterProtocol]
     InitialConditions: type[InitialConditionsProtocol]

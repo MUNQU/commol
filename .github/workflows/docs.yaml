@@ -2,9 +2,9 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: write
@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Poetry
         run: |
@@ -40,11 +40,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --extras docs
+          poetry install --extras docs --no-root
 
       - name: Build documentation
+        working-directory: .
         run: |
-          poetry run mkdocs build --strict -f ../mkdocs.yaml
+          cd py-epimodel && poetry run mkdocs build --strict -f ../mkdocs.yaml
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
@@ -56,7 +57,7 @@ jobs:
     name: Deploy Documentation
     needs: build-docs
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
 
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +67,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Poetry
         run: |
@@ -84,14 +85,22 @@ jobs:
       - name: Install dependencies
         working-directory: ./py-epimodel
         run: |
-          poetry install --extras docs
+          poetry install --extras docs --no-root
 
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy latest documentation (main branch)
+        if: github.ref == 'refs/heads/main'
         working-directory: ./py-epimodel
         run: |
-          poetry run mkdocs gh-deploy --force -f ../mkdocs.yaml
+          poetry run mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
+          poetry run mike set-default --push latest --config-file ../mkdocs.yaml
+
+      - name: Deploy development documentation (develop branch)
+        if: github.ref == 'refs/heads/develop'
+        working-directory: ./py-epimodel
+        run: |
+          poetry run mike deploy --push dev --config-file ../mkdocs.yaml
