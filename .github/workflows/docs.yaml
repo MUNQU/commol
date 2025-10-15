@@ -38,21 +38,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
       - name: Install dependencies
         run: |
-          poetry install --extras "dev docs"
-
-      - name: Build and install package with maturin
-        run: |
-          poetry run maturin develop --release
-
-      - name: Verify package installation
-        run: |
-          poetry run python -c "import sys; print('Python path:', sys.path)"
-          poetry run python -c "import epimodel; print('epimodel location:', epimodel.__file__)"
+          poetry install --extras docs --no-root
 
       - name: Build documentation
         working-directory: .
@@ -94,18 +82,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
       - name: Install dependencies
         working-directory: ./py-epimodel
         run: |
-          poetry install --extras "dev docs"
-
-      - name: Build and install package with maturin
-        working-directory: ./py-epimodel
-        run: |
-          poetry run maturin develop --release
+          poetry install --extras docs --no-root
 
       - name: Configure Git
         run: |
