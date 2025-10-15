@@ -41,10 +41,13 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install dependencies and build package
+      - name: Install dependencies
         run: |
-          poetry install --extras docs --no-root
-          poetry install
+          poetry install --extras docs
+
+      - name: Build and install package with maturin
+        run: |
+          poetry run maturin develop --release
 
       - name: Build documentation
         run: |
@@ -88,11 +91,15 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install dependencies and build package
+      - name: Install dependencies
         working-directory: ./py-epimodel
         run: |
-          poetry install --extras docs --no-root
-          poetry install
+          poetry install --extras docs
+
+      - name: Build and install package with maturin
+        working-directory: ./py-epimodel
+        run: |
+          poetry run maturin develop --release
 
       - name: Configure Git
         run: |
