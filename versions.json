@@ -2,8 +2,11 @@
   {
     "version": "stable",
     "title": "stable",
-    "aliases": [
-      "latest"
-    ]
+    "aliases": []
+  },
+  {
+    "version": "latest",
+    "title": "latest",
+    "aliases": []
   }
 ]
