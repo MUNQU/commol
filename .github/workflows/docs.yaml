@@ -41,13 +41,10 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install dependencies
+      - name: Install dependencies and build package
         run: |
-          poetry install --extras docs
-
-      - name: Build and install epimodel package
-        run: |
-          poetry run pip install -e .
+          poetry install --extras docs --no-root
+          poetry install
 
       - name: Build documentation
         run: |
@@ -91,15 +88,11 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install dependencies
+      - name: Install dependencies and build package
         working-directory: ./py-epimodel
         run: |
-          poetry install --extras docs
-
-      - name: Build and install epimodel package
-        working-directory: ./py-epimodel
-        run: |
-          poetry run pip install -e .
+          poetry install --extras docs --no-root
+          poetry install
 
       - name: Configure Git
         run: |
