@@ -94,11 +94,13 @@ jobs:
 
       - name: Deploy stable documentation (main branch)
         if: github.ref == 'refs/heads/main'
+        working-directory: ./py-epimodel
         run: |
-          cd py-epimodel && poetry run mike deploy --push --update-aliases stable latest --config-file ../mkdocs.yaml
-          cd py-epimodel && poetry run mike set-default --push latest --config-file ../mkdocs.yaml
+          poetry run mike deploy --push --update-aliases stable latest --config-file ../mkdocs.yaml
+          poetry run mike set-default --push latest --config-file ../mkdocs.yaml
 
       - name: Deploy development documentation (develop branch)
         if: github.ref == 'refs/heads/develop'
+        working-directory: ./py-epimodel
         run: |
-          cd py-epimodel && poetry run mike deploy --push dev --config-file ../mkdocs.yaml
+          poetry run mike deploy --push dev --config-file ../mkdocs.yaml
