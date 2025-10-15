@@ -294,14 +294,14 @@ Visit http://127.0.0.1:8000 to view the documentation locally.
 
 EpiModel maintains two documentation versions:
 
-- **`latest` (stable)**: Documentation for the current stable release from the `main` branch
+- **`latest`**: Documentation for the current stable release from the `main` branch
 - **`dev`**: Development documentation from the `develop` branch
 
 #### Automatic Deployment
 
 Documentation is automatically deployed when pushing to tracked branches:
 
-- **Push to `main`**: Deploys to `stable` and `latest` versions, sets `latest` as default
+- **Push to `main`**: Deploys to `latest` version
 - **Push to `develop`**: Deploys to `dev` version
 - **Pull requests**: Build and validate documentation without deploying
 
@@ -312,9 +312,9 @@ Users can switch between versions using the version selector in the documentatio
 If you need to manually deploy documentation:
 
 ```bash
-# Deploy stable version (from main branch)
+# Deploy latest version (from main branch)
 cd py-epimodel
-poetry run mike deploy --push --update-aliases stable latest
+poetry run mike deploy --push --update-aliases latest
 poetry run mike set-default --push latest
 
 # Deploy dev version (from develop branch)

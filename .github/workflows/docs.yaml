@@ -92,11 +92,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy stable documentation (main branch)
+      - name: Deploy latest documentation (main branch)
         if: github.ref == 'refs/heads/main'
         working-directory: ./py-epimodel
         run: |
-          poetry run mike deploy --push --update-aliases stable latest --config-file ../mkdocs.yaml
+          poetry run mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
           poetry run mike set-default --push latest --config-file ../mkdocs.yaml
 
       - name: Deploy development documentation (develop branch)
