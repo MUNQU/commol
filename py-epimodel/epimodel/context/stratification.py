@@ -14,20 +14,17 @@ class Stratification(BaseModel):
     categories : list[str]
         List of the different stratification groups identifiers.
     """
-    id: str = Field(
-        ..., 
-        description="Identifier of the stratification."
-    )
+
+    id: str = Field(..., description="Identifier of the stratification.")
     categories: list[str] = Field(
-        ...,
-        description="List of the different stratification groups identifiers."
+        ..., description="List of the different stratification groups identifiers."
     )
 
-    @override 
+    @override
     def __hash__(self):
-            return hash(self.id)
+        return hash(self.id)
 
-    @override 
+    @override
     def __eq__(self, other: object):
         return isinstance(other, Stratification) and self.id == other.id
 
@@ -37,26 +34,27 @@ class Stratification(BaseModel):
         Enforces that categories are not empty.
         """
         if not self.categories:
-            raise ValueError((
-                f"Stratification '{self.id}' must have at least one category."
-            ))
+            raise ValueError(
+                (f"Stratification '{self.id}' must have at least one category.")
+            )
         return self
-    
+
     @model_validator(mode="after")
     def validate_categories_uniqueness(self) -> Self:
         """
         Enforces that categories are not repeated.
         """
         categories_set = set(self.categories)
-        
+
         if len(categories_set) != len(self.categories):
             duplicates = [
-                item for item in categories_set 
-                if self.categories.count(item) > 1
+                item for item in categories_set if self.categories.count(item) > 1
             ]
-            raise ValueError((
-                f"Categories for stratification '{self.id}' must not be repeated. "
-                f"Found duplicates: {list(set(duplicates))}."
-            ))
+            raise ValueError(
+                (
+                    f"Categories for stratification '{self.id}' must not be repeated. "
+                    f"Found duplicates: {list(set(duplicates))}."
+                )
+            )
 
         return self
