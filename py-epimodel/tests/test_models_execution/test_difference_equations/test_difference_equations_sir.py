@@ -29,14 +29,15 @@ class TestSIR:
                 rate="infection_rate",
             )
             .add_transition(
-                id="recovery", 
-                source=["I"], 
-                target=["R"], 
-                rate="recovery_rate"
+                id="recovery", source=["I"], target=["R"], rate="recovery_rate"
             )
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0},
+                disease_state_fractions=[
+                    {"disease_state": "S", "fraction": 0.99},
+                    {"disease_state": "I", "fraction": 0.01},
+                    {"disease_state": "R", "fraction": 0.0},
+                ],
             )
         )
         try:
@@ -76,43 +77,43 @@ class TestSIR:
         assert steps_list[0][s_idx] == 990.0
         assert steps_list[0][i_idx] == 10.0
         assert steps_list[0][r_idx] == 0.0
-        
+
         assert math.isclose(steps_list[1][s_idx], 891.0)
         assert math.isclose(steps_list[1][i_idx], 108.5)
         assert math.isclose(steps_list[1][r_idx], 0.5)
-        
-        assert math.isclose(steps_list[2][s_idx], 801.9) 
+
+        assert math.isclose(steps_list[2][s_idx], 801.9)
         assert math.isclose(steps_list[2][i_idx], 192.175)
         assert math.isclose(steps_list[2][r_idx], 5.925)
-        
+
         assert math.isclose(steps_list[3][s_idx], 721.71)
         assert math.isclose(steps_list[3][i_idx], 262.75625)
         assert math.isclose(steps_list[3][r_idx], 15.53375)
-        
+
         assert math.isclose(steps_list[4][s_idx], 649.539)
         assert math.isclose(steps_list[4][i_idx], 321.7894375)
         assert math.isclose(steps_list[4][r_idx], 28.6715625)
-        
+
         assert math.isclose(steps_list[5][s_idx], 584.5851)
         assert math.isclose(steps_list[5][i_idx], 370.6538656)
         assert math.isclose(steps_list[5][r_idx], 44.76103438)
-    
+
         assert math.isclose(steps_list[6][s_idx], 526.12659)
         assert math.isclose(steps_list[6][i_idx], 410.5796823)
         assert math.isclose(steps_list[6][r_idx], 63.29372766)
-        
+
         assert math.isclose(steps_list[7][s_idx], 473.513931)
         assert math.isclose(steps_list[7][i_idx], 442.6633572)
         assert math.isclose(steps_list[7][r_idx], 83.82271177)
-        
+
         assert math.isclose(steps_list[8][s_idx], 426.1625379)
         assert math.isclose(steps_list[8][i_idx], 467.8815825)
         assert math.isclose(steps_list[8][r_idx], 105.9558796)
-        
+
         assert math.isclose(steps_list[9][s_idx], 383.5462841)
         assert math.isclose(steps_list[9][i_idx], 487.1037571)
         assert math.isclose(steps_list[9][r_idx], 129.3499588)
-        
+
         assert math.isclose(steps_list[10][s_idx], 345.1916557)
         assert math.isclose(steps_list[10][i_idx], 501.1031977)
         assert math.isclose(steps_list[10][r_idx], 153.7051466)
@@ -148,43 +149,43 @@ class TestSIR:
         assert steps_dict["S"][0] == 990.0
         assert steps_dict["I"][0] == 10.0
         assert steps_dict["R"][0] == 0.0
-        
+
         assert math.isclose(steps_dict["S"][1], 891.0)
         assert math.isclose(steps_dict["I"][1], 108.5)
         assert math.isclose(steps_dict["R"][1], 0.5)
-        
-        assert math.isclose(steps_dict["S"][2], 801.9) 
+
+        assert math.isclose(steps_dict["S"][2], 801.9)
         assert math.isclose(steps_dict["I"][2], 192.175)
         assert math.isclose(steps_dict["R"][2], 5.925)
-        
+
         assert math.isclose(steps_dict["S"][3], 721.71)
         assert math.isclose(steps_dict["I"][3], 262.75625)
         assert math.isclose(steps_dict["R"][3], 15.53375)
-        
+
         assert math.isclose(steps_dict["S"][4], 649.539)
         assert math.isclose(steps_dict["I"][4], 321.7894375)
         assert math.isclose(steps_dict["R"][4], 28.6715625)
-        
+
         assert math.isclose(steps_dict["S"][5], 584.5851)
         assert math.isclose(steps_dict["I"][5], 370.6538656)
         assert math.isclose(steps_dict["R"][5], 44.76103438)
-    
+
         assert math.isclose(steps_dict["S"][6], 526.12659)
         assert math.isclose(steps_dict["I"][6], 410.5796823)
         assert math.isclose(steps_dict["R"][6], 63.29372766)
-        
+
         assert math.isclose(steps_dict["S"][7], 473.513931)
         assert math.isclose(steps_dict["I"][7], 442.6633572)
         assert math.isclose(steps_dict["R"][7], 83.82271177)
-        
+
         assert math.isclose(steps_dict["S"][8], 426.1625379)
         assert math.isclose(steps_dict["I"][8], 467.8815825)
         assert math.isclose(steps_dict["R"][8], 105.9558796)
-        
+
         assert math.isclose(steps_dict["S"][9], 383.5462841)
         assert math.isclose(steps_dict["I"][9], 487.1037571)
         assert math.isclose(steps_dict["R"][9], 129.3499588)
-        
+
         assert math.isclose(steps_dict["S"][10], 345.1916557)
         assert math.isclose(steps_dict["I"][10], 501.1031977)
         assert math.isclose(steps_dict["R"][10], 153.7051466)

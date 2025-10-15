@@ -1,4 +1,4 @@
-use epimodel_core::{MathExpressionContext, Model, Transition};
+use epimodel_core::{MathExpressionContext, Model, RateMathExpression, StratifiedRate, Transition};
 use std::collections::HashMap;
 
 #[cfg(feature = "python")]
@@ -12,6 +12,7 @@ pub struct DifferenceEquations {
     transitions: Vec<Transition>,
     expression_context: MathExpressionContext,
     current_step: f64,
+    stratifications: Vec<epimodel_core::Stratification>,
 }
 
 impl DifferenceEquations {
@@ -43,17 +44,20 @@ impl DifferenceEquations {
         }
 
         // Initialize population distribution
+        let disease_state_fraction_map: HashMap<String, f64> = model
+            .population
+            .initial_conditions
+            .disease_state_fractions
+            .iter()
+            .map(|dsf| (dsf.disease_state.clone(), dsf.fraction))
+            .collect();
+
         let mut pop_dist: HashMap<String, f64> = model
             .population
             .disease_states
             .iter()
             .map(|ds| {
-                let fraction = model
-                    .population
-                    .initial_conditions
-                    .disease_state_fraction
-                    .get(&ds.id)
-                    .unwrap_or(&0.0);
+                let fraction = disease_state_fraction_map.get(&ds.id).unwrap_or(&0.0);
                 (
                     ds.id.clone(),
                     model.population.initial_conditions.population_size as f64 * fraction,
@@ -63,19 +67,29 @@ impl DifferenceEquations {
 
         for strat in &model.population.stratifications {
             let mut next_pop_dist = HashMap::new();
-            let strat_fractions = model
+
+            // Find the stratification fractions for this stratification
+            let strat_fractions_opt = model
                 .population
                 .initial_conditions
                 .stratification_fractions
-                .get(&strat.id)
-                .unwrap();
-            for (comp, pop) in &pop_dist {
-                for cat in &strat.categories {
-                    let fraction = strat_fractions.get(cat).unwrap_or(&0.0);
-                    next_pop_dist.insert(format!("{}_{}", comp, cat), pop * fraction);
+                .iter()
+                .find(|sf| sf.stratification == strat.id);
+
+            if let Some(strat_fractions_item) = strat_fractions_opt {
+                let mut strat_fractions = HashMap::new();
+                for frac in &strat_fractions_item.fractions {
+                    strat_fractions.insert(frac.category.clone(), frac.fraction);
                 }
+
+                for (comp, pop) in &pop_dist {
+                    for cat in &strat.categories {
+                        let fraction = strat_fractions.get(cat).unwrap_or(&0.0);
+                        next_pop_dist.insert(format!("{}_{}", comp, cat), pop * fraction);
+                    }
+                }
+                pop_dist = next_pop_dist;
             }
-            pop_dist = next_pop_dist;
         }
 
         let num_compartments = compartments.len();
@@ -97,6 +111,9 @@ impl DifferenceEquations {
         let mut expression_context = MathExpressionContext::new();
         expression_context.set_parameters(parameters);
 
+        // Clone stratifications for later use
+        let stratifications = model.population.stratifications.clone();
+
         Self {
             compartments,
             compartment_map,
@@ -104,7 +121,115 @@ impl DifferenceEquations {
             transitions,
             expression_context,
             current_step: 0.0,
+            stratifications,
         }
+    }
+
+    /// Extract stratification categories from a compartment name
+    ///
+    /// Example: "S_young_urban" with disease_state "S" and stratifications ["age", "location"]
+    /// Returns: HashMap { "age" -> "young", "location" -> "urban" }
+    fn extract_stratifications(
+        &self,
+        comp_name: &str,
+        disease_state: &str,
+    ) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        // Remove disease state prefix
+        if !comp_name.starts_with(disease_state) {
+            return result;
+        }
+
+        // Get the stratification part (everything after disease state and first underscore)
+        let strat_part = &comp_name[disease_state.len()..];
+        if strat_part.is_empty() {
+            return result; // No stratifications
+        }
+
+        // Remove leading underscore
+        let strat_part = if strat_part.starts_with('_') {
+            &strat_part[1..]
+        } else {
+            return result; // Invalid format
+        };
+
+        // Split by underscore to get categories
+        let categories: Vec<&str> = strat_part.split('_').collect();
+
+        // Match categories with stratification IDs (in order)
+        for (i, stratification) in self.stratifications.iter().enumerate() {
+            if i < categories.len() {
+                result.insert(stratification.id.clone(), categories[i].to_string());
+            }
+        }
+
+        result
+    }
+
+    /// Get the appropriate rate string for a compartment based on its stratifications
+    /// Returns (rate_string, is_from_stratified_rates)
+    fn get_rate_string_for_compartment(
+        &self,
+        transition: &Transition,
+        strat_values: &HashMap<String, String>,
+    ) -> Option<(String, bool)> {
+        // If no stratified rates defined, use default rate
+        if transition.stratified_rates.is_none() {
+            return transition.rate.as_ref().map(|r| {
+                let rate_str = match r {
+                    RateMathExpression::Parameter(p) => p.clone(),
+                    RateMathExpression::Formula(f) => f.formula.clone(),
+                    RateMathExpression::Constant(c) => c.to_string(),
+                };
+                (rate_str, false)
+            });
+        }
+
+        let stratified_rates = transition.stratified_rates.as_ref().unwrap();
+
+        // Find the best match (most specific)
+        let mut best_match: Option<&StratifiedRate> = None;
+        let mut best_match_count = 0;
+
+        for stratified_rate in stratified_rates {
+            let mut matches = true;
+            let mut match_count = 0;
+
+            // Check if all conditions in this stratified rate match
+            for strat_cond in &stratified_rate.conditions {
+                match strat_values.get(&strat_cond.stratification) {
+                    Some(actual_category) if actual_category == &strat_cond.category => {
+                        match_count += 1;
+                    }
+                    _ => {
+                        matches = false;
+                        break;
+                    }
+                }
+            }
+
+            // If this matches and is more specific than previous best, use it
+            if matches && match_count > best_match_count {
+                best_match = Some(stratified_rate);
+                best_match_count = match_count;
+            }
+        }
+
+        // If we found a match, return the rate string
+        if let Some(matched_rate) = best_match {
+            return Some((matched_rate.rate.clone(), true));
+        }
+
+        // Fall back to default rate
+        transition.rate.as_ref().map(|r| {
+            let rate_str = match r {
+                RateMathExpression::Parameter(p) => p.clone(),
+                RateMathExpression::Formula(f) => f.formula.clone(),
+                RateMathExpression::Constant(c) => c.to_string(),
+            };
+            (rate_str, false)
+        })
     }
 }
 
@@ -146,38 +271,77 @@ impl DifferenceEquations {
                 .set_compartment(comp_name.clone(), self.population[i]);
         }
 
+        let mut subpopulation_totals: HashMap<String, f64> = HashMap::new();
+
+        for (i, comp_name) in self.compartments.iter().enumerate() {
+            let pop_value = self.population[i];
+            let categories: Vec<_> = comp_name.split('_').skip(1).collect();
+
+            if categories.is_empty() {
+                continue;
+            }
+
+            // Iterate through all non-empty subsets of categories for this compartment
+            for i in 1..(1 << categories.len()) {
+                let mut subset = Vec::new();
+                for k in 0..categories.len() {
+                    if (i >> k) & 1 == 1 {
+                        subset.push(categories[k]);
+                    }
+                }
+
+                let combo_name: String = subset.join("_");
+
+                *subpopulation_totals.entry(combo_name).or_insert(0.0) += pop_value;
+            }
+        }
+
+        for (combo_name, total) in subpopulation_totals {
+            let var_name = format!("N_{}", combo_name);
+            self.expression_context.set_parameter(var_name, total);
+        }
+
         for transition in &self.transitions {
-            if let Some(rate_expr) = &transition.rate {
-                if !transition.source.is_empty() && !transition.target.is_empty() {
-                    // Evaluate the rate expression
-                    let rate = match rate_expr.evaluate(&self.expression_context) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            // Return error instead of just warning
-                            return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                                "Failed to evaluate rate for transition '{}': {}",
-                                transition.id, e
-                            )));
-                        }
-                    };
+            if !transition.source.is_empty() && !transition.target.is_empty() {
+                let source_disease_state = &transition.source[0];
+                let target_disease_state = &transition.target[0];
 
-                    let source_disease_state = &transition.source[0];
-                    let target_disease_state = &transition.target[0];
+                // Process each compartment
+                for (i, comp_name) in self.compartments.iter().enumerate() {
+                    if comp_name.starts_with(source_disease_state) {
+                        let source_idx = i;
+                        let source_pop = self.population[source_idx];
 
-                    for (i, comp_name) in self.compartments.iter().enumerate() {
-                        if comp_name.starts_with(source_disease_state) {
-                            let source_idx = i;
-                            let source_pop = self.population[source_idx];
+                        // Construct the target compartment name
+                        let target_comp_name =
+                            comp_name.replacen(source_disease_state, target_disease_state, 1);
 
-                            // Construct the target compartment name by replacing the disease state
-                            // part.
-                            let target_comp_name =
-                                comp_name.replacen(source_disease_state, target_disease_state, 1);
-                            if let Some(target_idx) = self.compartment_map.get(&target_comp_name) {
+                        if let Some(target_idx) = self.compartment_map.get(&target_comp_name) {
+                            // Extract stratifications for this compartment
+                            let strat_values =
+                                self.extract_stratifications(comp_name, source_disease_state);
+
+                            // Get the appropriate rate for this compartment
+                            let rate_result =
+                                self.get_rate_string_for_compartment(&transition, &strat_values);
+
+                            if let Some((rate_str, _is_stratified)) = rate_result {
+                                // Parse and evaluate the rate
+                                let rate_expr = RateMathExpression::from_string(rate_str.clone());
+                                let rate = match rate_expr.evaluate(&self.expression_context) {
+                                    Ok(r) => r,
+                                    Err(e) => {
+                                        return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                                            format!(
+                                                "Failed to evaluate rate for transition '{}' in compartment '{}': {}",
+                                                transition.id, comp_name, e
+                                            ),
+                                        ));
+                                    }
+                                };
+
                                 // Check if rate expression references compartment variables
-                                // If it does, it's an absolute rate (total flow)
-                                // If not, it's a per-capita rate that needs to be multiplied by source pop
-                                let rate_vars = transition.rate.as_ref().unwrap().get_variables();
+                                let rate_vars = rate_expr.get_variables();
                                 let references_compartments = rate_vars
                                     .iter()
                                     .any(|v| self.compartment_map.contains_key(v));
@@ -238,7 +402,6 @@ fn epimodel_difference(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use epimodel_core::*;
-    use std::collections::HashMap;
 
     fn create_test_sir_model() -> Model {
         let disease_states = vec![
@@ -282,6 +445,7 @@ mod tests {
                 rate: Some(RateMathExpression::Formula(MathExpression::new(
                     "beta * S * I / N".to_string(),
                 ))),
+                stratified_rates: None,
                 condition: None,
             },
             Transition {
@@ -289,19 +453,30 @@ mod tests {
                 source: vec!["I".to_string()],
                 target: vec!["R".to_string()],
                 rate: Some(RateMathExpression::Parameter("gamma".to_string())),
+                stratified_rates: None,
                 condition: None,
             },
         ];
 
-        let mut disease_state_fraction = HashMap::new();
-        disease_state_fraction.insert("S".to_string(), 0.99);
-        disease_state_fraction.insert("I".to_string(), 0.01);
-        disease_state_fraction.insert("R".to_string(), 0.0);
+        let disease_state_fractions = vec![
+            DiseaseStateFraction {
+                disease_state: "S".to_string(),
+                fraction: 0.99,
+            },
+            DiseaseStateFraction {
+                disease_state: "I".to_string(),
+                fraction: 0.01,
+            },
+            DiseaseStateFraction {
+                disease_state: "R".to_string(),
+                fraction: 0.0,
+            },
+        ];
 
         let initial_conditions = InitialConditions {
             population_size: 1000,
-            disease_state_fraction,
-            stratification_fractions: HashMap::new(),
+            disease_state_fractions,
+            stratification_fractions: vec![],
         };
 
         let population = Population {

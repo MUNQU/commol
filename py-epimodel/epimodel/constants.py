@@ -22,4 +22,3 @@ class ModelTypes(StrEnum):
 class VariablePrefixes(StrEnum):
     STATE = "state"
     STRAT = "strat"
-

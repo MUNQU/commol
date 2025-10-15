@@ -1,38 +1,86 @@
 from pydantic import BaseModel, Field
 
 
-DistributionFractions = dict[str, float]
+class DiseaseStateFraction(BaseModel):
+    """
+    Fraction for a single disease state.
+
+    Attributes
+    ----------
+    disease_state : str
+        The disease state id.
+    fraction : float
+        The fractional size of this disease state.
+    """
+
+    disease_state: str = Field(..., description="The disease state id.")
+    fraction: float = Field(
+        ..., description="The fractional size of this disease state."
+    )
+
+
+class StratificationFraction(BaseModel):
+    """
+    Fractions for a single stratification category.
+
+    Attributes
+    ----------
+    category : str
+        The stratification category name.
+    fraction : float
+        The fractional size of this category.
+    """
+
+    category: str = Field(..., description="The stratification category name.")
+    fraction: float = Field(..., description="The fractional size of this category.")
+
+
+class StratificationFractions(BaseModel):
+    """
+    Fractions for a stratification.
+
+    Attributes
+    ----------
+    stratification : str
+        The stratification id.
+    fractions : list[StratificationFraction]
+        List of category fractions for this stratification.
+    """
+
+    stratification: str = Field(..., description="The stratification id.")
+    fractions: list[StratificationFraction] = Field(
+        ..., description="List of category fractions for this stratification."
+    )
 
 
 class InitialConditions(BaseModel):
     """
     Initial conditions for a simulation.
-    
+
     Attributes
     ----------
     population_size : int
         Population size.
-    disease_state_fraction : DistributionFractions
-        Fractions for disease states. Keys are disease state ids and values are their 
-        initial fractional size.
-    stratification_fractions : dict[str, DistributionFractions], optional
-        Fractions for stratifications. Keys are stratification ids. Values are 
-        dictionaries whose keys are the stratification categories and whose values are 
-        their initial fractional size.
+    disease_state_fractions : list[DiseaseStateFraction]
+        List of disease state fractions. Each item contains a disease state id and
+        its initial fractional size.
+    stratification_fractions : list[StratificationFractions], optional
+        List of stratification fractions. Each item contains a stratification id and
+        its category fractions.
     """
-    population_size: int = Field(..., description="Population size.")  
-    disease_state_fraction: DistributionFractions = Field(
-        ..., 
+
+    population_size: int = Field(..., description="Population size.")
+    disease_state_fractions: list[DiseaseStateFraction] = Field(
+        ...,
         description=(
-            "Fractions for disease states. Keys are disease state ids and values are "
-            "their initial fractional size."
-        )
+            "List of disease state fractions. Each item contains a disease state id "
+            "and its initial fractional size."
+        ),
     )
-    stratification_fractions: dict[str, DistributionFractions] = Field(
-        default_factory=dict, 
+    stratification_fractions: list[StratificationFractions] = Field(
+        default_factory=list,
         description=(
-            "Fractions for stratifications. Keys are stratification ids. Values are "
-            "dictionaries whose keys are the stratification categories and whose "
-            "values are their initial fractional size."
-        )
+            "List of stratification fractions. Each item contains a stratification id "
+            "and its category fractions."
+        ),
     )

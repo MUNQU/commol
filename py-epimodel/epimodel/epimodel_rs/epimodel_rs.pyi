@@ -19,11 +19,20 @@ class StratificationProtocol(Protocol):
     id: str
     categories: list[str]
 
+class StratificationConditionProtocol(Protocol):
+    stratification: str
+    category: str
+
+class StratifiedRateProtocol(Protocol):
+    conditions: list[StratificationConditionProtocol]
+    rate: str
+
 class TransitionProtocol(Protocol):
     id: str
     source: list[str]
     target: list[str]
     rate: RateMathExpressionProtocol | None
+    stratified_rates: list[StratifiedRateProtocol] | None
     condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
@@ -31,10 +40,18 @@ class ParameterProtocol(Protocol):
     value: float
     description: str | None
 
+class StratificationFractionProtocol(Protocol):
+    category: str
+    fraction: float
+
+class StratificationFractionsProtocol(Protocol):
+    stratification: str
+    fractions: list[StratificationFractionProtocol]
+
 class InitialConditionsProtocol(Protocol):
     population_size: int
     disease_state_fraction: dict[str, float]
-    stratification_fractions: dict[str, dict[str, float]]
+    stratification_fractions: list[StratificationFractionsProtocol]
 
 class PopulationProtocol(Protocol):
     disease_states: list[DiseaseStateProtocol]
@@ -91,9 +108,13 @@ class CoreModule(Protocol):
     Population: type[PopulationProtocol]
     DiseaseState: type[DiseaseStateProtocol]
     Stratification: type[StratificationProtocol]
+    StratificationCondition: type[StratificationConditionProtocol]
+    StratifiedRate: type[StratifiedRateProtocol]
     Transition: type[TransitionProtocol]
     Parameter: type[ParameterProtocol]
     InitialConditions: type[InitialConditionsProtocol]
+    StratificationFraction: type[StratificationFractionProtocol]
+    StratificationFractions: type[StratificationFractionsProtocol]
     Condition: type[ConditionProtocol]
     Rule: type[RuleProtocol]
     LogicOperator: type[LogicOperators]

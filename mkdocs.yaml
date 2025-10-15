@@ -1,9 +1,110 @@
-site_name: epimodel Documentation
-site_description: Documentation of epimodel library
+site_name: EpiModel Documentation
+site_description: A high-performance mathematical epidemiology library for modeling infectious disease spread
+site_author: MUNQU Team
+site_url: https://munqu.github.io/epimodel
+repo_url: https://github.com/MUNQU/epimodel
+repo_name: MUNQU/epimodel
+
 theme:
   name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
 plugins:
-  - search
-  - mkdocstrings
+  - search # Search functionality
+  - autorefs # Auto cross-references (required by mkdocstrings)
+  - mkdocstrings: # API documentation from docstrings
+      handlers:
+        python:
+          paths: [py-epimodel/] # Add the Python package directory to sys.path
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_category_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            filters:
+              - "!^_[^_]"
+
+markdown_extensions:
+  - pymdownx.highlight: # Code highlighting
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.superfences # Fenced code blocks
+  # Admonitions (note/warning/tip boxes)
+  - admonition # Basic admonitions
+  - pymdownx.details # Collapsible admonitions
+  # Content features
+  - tables # Markdown tables
+  - toc: # Table of contents
+      permalink: true # Anchor links to headings
+  - pymdownx.inlinehilite # Inline code highlighting
+  - pymdownx.tabbed: # Tabbed content (for multi-platform examples)
+      alternate_style: true
+  - attr_list # HTML attributes (for styling)
+  - md_in_html # Markdown in HTML blocks
+
 nav:
-  - User Guide: user_guide.md
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+  - User Guide:
+      - Core Concepts: guide/core-concepts.md
+      - Building Models: guide/building-models.md
+      - Mathematical Expressions: guide/mathematical-expressions.md
+      - Running Simulations: guide/simulations.md
+      - Examples: guide/examples.md
+  - API Reference:
+      - Model Builder: api/model-builder.md
+      - Simulation: api/simulation.md
+      - Constants: api/constants.md
+  - Advanced:
+      - Model Structure: advanced/model-structure.md
+  - Development:
+      - Development Workflow: development/workflow.md
+      - Contributing: development/contributing.md
+      - Release Process: development/release.md
+  - About:
+      - License: about/license.md
+      - Changelog: about/changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/MUNQU/epimodel
+    - icon: fontawesome/solid/users
+      link: https://munqu.github.io
+      name: MUNQU Research Team
+  version:
+    provider: mike
+  team:
+    name: MUNQU Research Team
+    url: https://munqu.webs.upv.es

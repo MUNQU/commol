@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use pyo3::{prelude::*, types::PyType};
 
 pub mod math_expression;
-pub use math_expression::{MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression};
+pub use math_expression::{
+    MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression,
+};
 
 #[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -120,12 +120,27 @@ pub struct Stratification {
 }
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratificationCondition {
+    pub stratification: String,
+    pub category: String,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratifiedRate {
+    pub conditions: Vec<StratificationCondition>,
+    pub rate: String,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Debug)]
 pub struct Transition {
     pub id: String,
     pub source: Vec<String>,
     pub target: Vec<String>,
     pub rate: Option<RateMathExpression>,
+    pub stratified_rates: Option<Vec<StratifiedRate>>,
     pub condition: Option<Condition>,
 }
 
@@ -135,7 +150,7 @@ impl Serialize for Transition {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("Transition", 5)?;
+        let mut state = serializer.serialize_struct("Transition", 6)?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("source", &self.source)?;
         state.serialize_field("target", &self.target)?;
@@ -148,6 +163,7 @@ impl Serialize for Transition {
         });
         state.serialize_field("rate", &rate_str)?;
 
+        state.serialize_field("stratified_rates", &self.stratified_rates)?;
         state.serialize_field("condition", &self.condition)?;
         state.end()
     }
@@ -162,12 +178,13 @@ impl<'de> Deserialize<'de> for Transition {
         use std::fmt;
 
         #[derive(Deserialize)]
-        #[serde(field_identifier, rename_all = "lowercase")]
+        #[serde(field_identifier, rename_all = "snake_case")]
         enum Field {
             Id,
             Source,
             Target,
             Rate,
+            StratifiedRates,
             Condition,
         }
 
@@ -188,6 +205,7 @@ impl<'de> Deserialize<'de> for Transition {
                 let mut source = None;
                 let mut target = None;
                 let mut rate = None;
+                let mut stratified_rates = None;
                 let mut condition = None;
 
                 while let Some(key) = map.next_key()? {
@@ -217,6 +235,12 @@ impl<'de> Deserialize<'de> for Transition {
                             let rate_str: Option<String> = map.next_value()?;
                             rate = Some(rate_str.map(RateMathExpression::from_string));
                         }
+                        Field::StratifiedRates => {
+                            if stratified_rates.is_some() {
+                                return Err(de::Error::duplicate_field("stratified_rates"));
+                            }
+                            stratified_rates = Some(map.next_value()?);
+                        }
                         Field::Condition => {
                             if condition.is_some() {
                                 return Err(de::Error::duplicate_field("condition"));
@@ -230,6 +254,8 @@ impl<'de> Deserialize<'de> for Transition {
                 let source = source.ok_or_else(|| de::Error::missing_field("source"))?;
                 let target = target.ok_or_else(|| de::Error::missing_field("target"))?;
                 let rate = rate.ok_or_else(|| de::Error::missing_field("rate"))?;
+                let stratified_rates =
+                    stratified_rates.ok_or_else(|| de::Error::missing_field("stratified_rates"))?;
                 let condition = condition.ok_or_else(|| de::Error::missing_field("condition"))?;
 
                 Ok(Transition {
@@ -237,12 +263,20 @@ impl<'de> Deserialize<'de> for Transition {
                     source,
                     target,
                     rate,
+                    stratified_rates,
                     condition,
                 })
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["id", "source", "target", "rate", "condition"];
+        const FIELDS: &'static [&'static str] = &[
+            "id",
+            "source",
+            "target",
+            "rate",
+            "stratified_rates",
+            "condition",
+        ];
         deserializer.deserialize_struct("Transition", FIELDS, TransitionVisitor)
     }
 }
@@ -264,10 +298,31 @@ pub struct Parameter {
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DiseaseStateFraction {
+    pub disease_state: String,
+    pub fraction: f64,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratificationFraction {
+    pub category: String,
+    pub fraction: f64,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StratificationFractions {
+    pub stratification: String,
+    pub fractions: Vec<StratificationFraction>,
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
-    pub disease_state_fraction: HashMap<String, f64>,
-    pub stratification_fractions: HashMap<String, HashMap<String, f64>>,
+    pub disease_state_fractions: Vec<DiseaseStateFraction>,
+    pub stratification_fractions: Vec<StratificationFractions>,
 }
 
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
