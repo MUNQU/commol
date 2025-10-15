@@ -9,32 +9,35 @@ permissions:
 
 jobs:
   build-wheels:
-    name: Build wheels on ${{ matrix.os }}
+    name: Build wheels on ${{ matrix.os }} with Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install build dependencies
         run: pip install maturin
 
       - name: Build wheels
-        working-directory: ./py-epimodel
-        run: maturin build --release --out ../dist
+        run: maturin build --release --out dist --manifest-path py-epimodel/Cargo.toml
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
+          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/*.whl
 
   build-sdist:
@@ -46,14 +49,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
 
       - name: Install build dependencies
         run: pip install maturin
 
       - name: Build sdist
-        working-directory: ./py-epimodel
-        run: maturin sdist --out ../dist
+        run: maturin sdist --out dist --manifest-path py-epimodel/Cargo.toml
 
       - name: Upload sdist
         uses: actions/upload-artifact@v4
