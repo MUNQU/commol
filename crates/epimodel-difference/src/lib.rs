@@ -388,20 +388,24 @@ impl DifferenceEquations {
     }
 
     #[getter]
+    #[pyo3(name = "population")]
     fn py_population(&self) -> Vec<f64> {
         self.population()
     }
 
     #[getter]
+    #[pyo3(name = "compartments")]
     fn py_compartments(&self) -> Vec<String> {
         self.compartments()
     }
 
+    #[pyo3(name = "step")]
     fn py_step(&mut self) -> PyResult<()> {
         self.step()
             .map_err(pyo3::exceptions::PyRuntimeError::new_err)
     }
 
+    #[pyo3(name = "run")]
     fn py_run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
         self.run(num_steps)
             .map_err(pyo3::exceptions::PyRuntimeError::new_err)
