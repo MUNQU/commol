@@ -49,9 +49,6 @@ jobs:
         run: |
           pip install poetry
 
-      - name: Install maturin
-        run: pip install maturin
-
       - name: Install Python dependencies
         working-directory: ./py-epimodel
         run: |
@@ -60,12 +57,12 @@ jobs:
       - name: Build and install Python package
         working-directory: ./py-epimodel
         run: |
-          maturin develop --release
+          poetry run maturin develop --release
 
       - name: Build wheel
         working-directory: ./py-epimodel
         run: |
-          maturin build --release
+          poetry run maturin build --release
 
       - name: Test Python package
         working-directory: ./py-epimodel
