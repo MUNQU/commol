@@ -52,9 +52,6 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build Rust workspace
-        run: cargo build --release --workspace
-
       - name: Install Python dependencies
         working-directory: ./py-epimodel
         run: |
