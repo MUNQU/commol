@@ -74,7 +74,7 @@ mod python_impls {
         }
     }
 
-    impl<'a, 'py> IntoPyObject<'py> for &'a RuleValue {
+    impl<'py> IntoPyObject<'py> for &RuleValue {
         type Target = PyAny;
         type Output = Bound<'py, Self::Target>;
         type Error = std::convert::Infallible;
@@ -269,7 +269,7 @@ impl<'de> Deserialize<'de> for Transition {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &[
+        const FIELDS: &[&str] = &[
             "id",
             "source",
             "target",

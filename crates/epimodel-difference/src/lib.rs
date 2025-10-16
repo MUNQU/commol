@@ -148,8 +148,8 @@ impl DifferenceEquations {
         }
 
         // Remove leading underscore
-        let strat_part = if strat_part.starts_with('_') {
-            &strat_part[1..]
+        let strat_part = if let Some(stripped) = strat_part.strip_prefix('_') {
+            stripped
         } else {
             return result; // Invalid format
         };
@@ -284,9 +284,9 @@ impl DifferenceEquations {
             // Iterate through all non-empty subsets of categories for this compartment
             for i in 1..(1 << categories.len()) {
                 let mut subset = Vec::new();
-                for k in 0..categories.len() {
+                for (k, category) in categories.iter().enumerate() {
                     if (i >> k) & 1 == 1 {
-                        subset.push(categories[k]);
+                        subset.push(*category);
                     }
                 }
 
@@ -323,7 +323,7 @@ impl DifferenceEquations {
 
                             // Get the appropriate rate for this compartment
                             let rate_result =
-                                self.get_rate_string_for_compartment(&transition, &strat_values);
+                                self.get_rate_string_for_compartment(transition, &strat_values);
 
                             if let Some((rate_str, _is_stratified)) = rate_result {
                                 // Parse and evaluate the rate
@@ -364,8 +364,8 @@ impl DifferenceEquations {
         }
 
         // Apply the calculated flows to the population vector.
-        for i in 0..self.population.len() {
-            self.population[i] += flows[i];
+        for (i, flow) in flows.iter().enumerate().take(self.population.len()) {
+            self.population[i] += flow;
         }
 
         // Increment step
@@ -383,7 +383,7 @@ impl DifferenceEquations {
 
         for _ in 0..num_steps {
             self.step()
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+                .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
             steps.push(self.population.clone());
         }
 
