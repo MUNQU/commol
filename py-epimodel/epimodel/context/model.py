@@ -109,7 +109,7 @@ class Model(BaseModel):
 
     def _validate_transition_rates(
         self, transition: Transition, valid_identifiers: set[str]
-    ):
+    ) -> None:
         """Validates the rate expressions for a single transition."""
         if transition.rate:
             self._validate_rate_expression(
@@ -124,7 +124,7 @@ class Model(BaseModel):
 
     def _validate_rate_expression(
         self, rate: str, transition_id: str, context: str, valid_identifiers: set[str]
-    ):
+    ) -> None:
         """Validates variables in a single rate expression."""
         variables = get_expression_variables(rate)
         undefined_vars = [var for var in variables if var not in valid_identifiers]

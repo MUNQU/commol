@@ -212,7 +212,7 @@ fn preprocess_formula(formula: &str) -> String {
 
         while let Some(pos) = remaining.find(&pattern) {
             // Check if it's already prefixed with "math::"
-            let prefix_start = if pos >= 6 { pos - 6 } else { 0 };
+            let prefix_start = pos.saturating_sub(6);
             let prefix = &remaining[prefix_start..pos];
 
             // Check if this is a valid function boundary (not part of another identifier)
