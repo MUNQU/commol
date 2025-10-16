@@ -233,25 +233,16 @@ impl DifferenceEquations {
     }
 }
 
-#[cfg(feature = "python")]
-#[pymethods]
 impl DifferenceEquations {
-    #[new]
-    pub fn new(model: PyRef<Model>) -> Self {
-        Self::from_model(&model)
-    }
-
-    #[getter]
     pub fn population(&self) -> Vec<f64> {
         self.population.clone()
     }
 
-    #[getter]
     pub fn compartments(&self) -> Vec<String> {
         self.compartments.clone()
     }
 
-    pub fn step(&mut self) -> PyResult<()> {
+    pub fn step(&mut self) -> Result<(), String> {
         let mut flows = vec![0.0; self.compartments.len()];
 
         // Update expression context with current population values
@@ -331,11 +322,9 @@ impl DifferenceEquations {
                                 let rate = match rate_expr.evaluate(&self.expression_context) {
                                     Ok(r) => r,
                                     Err(e) => {
-                                        return Err(pyo3::exceptions::PyRuntimeError::new_err(
-                                            format!(
-                                                "Failed to evaluate rate for transition '{}' in compartment '{}': {}",
-                                                transition.id, comp_name, e
-                                            ),
+                                        return Err(format!(
+                                            "Failed to evaluate rate for transition '{}' in compartment '{}': {}",
+                                            transition.id, comp_name, e
                                         ));
                                     }
                                 };
@@ -374,7 +363,7 @@ impl DifferenceEquations {
         Ok(())
     }
 
-    pub fn run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
+    pub fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
         // Pre-allocate memory for efficiency
         let mut steps = Vec::with_capacity(num_steps as usize + 1);
 
@@ -382,12 +371,40 @@ impl DifferenceEquations {
         steps.push(self.population.clone());
 
         for _ in 0..num_steps {
-            self.step()
-                .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+            self.step()?;
             steps.push(self.population.clone());
         }
 
         Ok(steps)
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl DifferenceEquations {
+    #[new]
+    pub fn new(model: PyRef<Model>) -> Self {
+        Self::from_model(&model)
+    }
+
+    #[getter]
+    fn py_population(&self) -> Vec<f64> {
+        self.population()
+    }
+
+    #[getter]
+    fn py_compartments(&self) -> Vec<String> {
+        self.compartments()
+    }
+
+    fn py_step(&mut self) -> PyResult<()> {
+        self.step()
+            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+    }
+
+    fn py_run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
+        self.run(num_steps)
+            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
     }
 }
 

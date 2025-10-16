@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "python")]
 use pyo3::{prelude::*, types::PyType};
 
 pub mod math_expression;
