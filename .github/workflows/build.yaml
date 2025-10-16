@@ -68,7 +68,7 @@ jobs:
       - name: Test Python package
         working-directory: ./py-epimodel
         run: |
-          poetry run pytest
+          poetry run pytest --override-ini="pythonpath="
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
