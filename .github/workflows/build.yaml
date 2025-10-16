@@ -54,15 +54,16 @@ jobs:
         run: |
           poetry install --extras dev
 
-      - name: Build and install Python package
-        working-directory: ./py-epimodel
-        run: |
-          poetry run maturin develop --release
-
       - name: Build wheel
         working-directory: ./py-epimodel
         run: |
           poetry run maturin build --release
+
+      - name: Install wheel for testing
+        working-directory: ./py-epimodel
+        shell: bash
+        run: |
+          poetry run pip install ../target/wheels/*.whl --force-reinstall
 
       - name: Test Python package
         working-directory: ./py-epimodel
