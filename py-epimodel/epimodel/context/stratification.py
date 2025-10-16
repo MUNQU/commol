@@ -21,11 +21,11 @@ class Stratification(BaseModel):
     )
 
     @override
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.id)
 
     @override
-    def __eq__(self, other: object):
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Stratification) and self.id == other.id
 
     @model_validator(mode="after")

@@ -4,10 +4,14 @@ import logging
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
-from typing import TextIO  # noqa: E402
+from typing import TYPE_CHECKING, TextIO  # noqa: E402
 
 from epimodel import constants, context  # noqa: E402
 
+if TYPE_CHECKING:
+    from types import ModuleType
+
+epimodel_rs: "ModuleType | None"
 try:
     from epimodel import epimodel_rs
 except ImportError as e:
