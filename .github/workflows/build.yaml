@@ -54,21 +54,26 @@ jobs:
         run: |
           poetry install --extras dev
 
+      - name: Build and install for testing
+        working-directory: ./py-epimodel
+        run: |
+          poetry run maturin develop --release
+
+      - name: Run tests
+        working-directory: ./py-epimodel
+        run: |
+          poetry run pytest
+
+      - name: Clean Rust extension before wheel build
+        working-directory: ./py-epimodel
+        shell: bash
+        run: |
+          rm -f epimodel/epimodel_rs/epimodel_rs.*.so epimodel/epimodel_rs/epimodel_rs.*.pyd
+
       - name: Build wheel
         working-directory: ./py-epimodel
         run: |
           poetry run maturin build --release
-
-      - name: Install wheel for testing
-        working-directory: ./py-epimodel
-        shell: bash
-        run: |
-          poetry run pip install ../target/wheels/*.whl --force-reinstall
-
-      - name: Test Python package
-        working-directory: ./py-epimodel
-        run: |
-          poetry run pytest --override-ini="pythonpath="
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
