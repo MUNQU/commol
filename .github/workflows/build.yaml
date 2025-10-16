@@ -55,10 +55,19 @@ jobs:
       - name: Build Rust workspace
         run: cargo build --release --workspace
 
-      - name: Build Python package
+      - name: Install Python dependencies
         working-directory: ./py-epimodel
         run: |
           poetry install --extras dev
+
+      - name: Build and install Python package
+        working-directory: ./py-epimodel
+        run: |
+          maturin develop --release
+
+      - name: Build wheel
+        working-directory: ./py-epimodel
+        run: |
           maturin build --release
 
       - name: Test Python package
