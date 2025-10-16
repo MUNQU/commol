@@ -7,6 +7,7 @@ from epimodel.constants import ModelTypes
 from epimodel.context.dynamics import Dynamics, Transition
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
+from epimodel.context.stratification import Stratification
 from epimodel.utils.security import get_expression_variables
 
 
@@ -239,17 +240,10 @@ class Model(BaseModel):
 
         lines = self._generate_model_header()
 
-        # Check if model has stratifications
-        has_stratifications = len(self.population.stratifications) > 0
-
-        if has_stratifications:
-            # Enhanced output for stratified models
-            lines.extend(self._generate_compact_form())
-            lines.append("")
-            lines.extend(self._generate_expanded_form())
-        else:
-            # Simple output for non-stratified models
-            lines.extend(self._generate_expanded_form())
+        # Always generate both compact and expanded forms
+        lines.extend(self._generate_compact_form())
+        lines.append("")
+        lines.extend(self._generate_expanded_form())
 
         output = "\n".join(lines)
         self._write_output(output, output_file)
@@ -322,18 +316,20 @@ class Model(BaseModel):
         terms: list[str] = []
 
         for inflow in flows["inflows"]:
-            terms.append(f"+ ({inflow})" if inflow else "+ ()")
+            if inflow:  # Only add if not empty
+                terms.append(f"+ ({inflow})")
 
         for outflow in flows["outflows"]:
-            terms.append(f"- ({outflow})" if outflow else "- ()")
+            if outflow:  # Only add if not empty
+                terms.append(f"- ({outflow})")
 
         if not terms:
-            return ""
+            return "0"
 
         result = " ".join(terms)
-        # Remove leading + sign if present
-        if result.startswith("+"):
-            result = result[1:]
+        # Remove leading + sign and space if present
+        if result.startswith("+ "):
+            result = result[2:]
         return result
 
     def _generate_compact_form(self) -> list[str]:
@@ -349,19 +345,71 @@ class Model(BaseModel):
             self._separate_transitions_by_type()
         )
 
+        compartments = self._generate_compartments()
+
         lines.extend(
-            self._format_stratification_transitions_compact(
-                disease_state_ids, stratification_transitions
+            self._format_disease_transitions_compact_stratified(
+                disease_transitions, compartments
             )
         )
         lines.extend(
-            self._format_disease_transitions_compact(
-                disease_state_ids, disease_transitions
+            self._format_stratification_transitions_compact_stratified(
+                stratification_transitions, disease_state_ids
             )
         )
         lines.extend(self._format_total_system_size(disease_state_ids))
 
         return lines
+
+    def _generate_compartments(self) -> list[tuple[str, ...]]:
+        """
+        Generate all compartment combinations from disease states and stratifications.
+        """
+        disease_state_ids = [state.id for state in self.population.disease_states]
+
+        if not self.population.stratifications:
+            return [(state,) for state in disease_state_ids]
+
+        strat_categories = [
+            strat.categories for strat in self.population.stratifications
+        ]
+
+        compartments: list[tuple[str, ...]] = []
+        for disease_state in disease_state_ids:
+            for strat_combo in product(*strat_categories):
+                compartments.append((disease_state,) + strat_combo)
+
+        return compartments
+
+    def _compartment_to_string(self, compartment: tuple[str, ...]) -> str:
+        """Convert compartment tuple to string like 'S_young_urban'."""
+        return "_".join(compartment)
+
+    def _get_rate_for_compartment(
+        self, transition: Transition, compartment: tuple[str, ...]
+    ) -> str | None:
+        """Get the appropriate rate for a compartment, considering stratified rates."""
+        if not transition.stratified_rates or len(compartment) == 1:
+            return transition.rate
+
+        compartment_strat_map: dict[str, str] = {}
+        for i, strat in enumerate(self.population.stratifications):
+            compartment_strat_map[strat.id] = compartment[i + 1]
+
+        for strat_rate in transition.stratified_rates:
+            matches = True
+            for condition in strat_rate.conditions:
+                if (
+                    compartment_strat_map.get(condition.stratification)
+                    != condition.category
+                ):
+                    matches = False
+                    break
+            if matches:
+                return strat_rate.rate
+
+        # No stratified rate matched, use fallback
+        return transition.rate
 
     def _separate_transitions_by_type(
         self,
@@ -517,52 +565,306 @@ class Model(BaseModel):
         lines: list[str] = []
 
         num_disease_states = len(disease_state_ids)
+        if not self.population.stratifications:
+            total_equations = num_disease_states
+            lines.append(
+                (
+                    f"Total System: {total_equations} coupled equations "
+                    f"({num_disease_states} disease states)"
+                )
+            )
+            return lines
+
         num_strat_combinations = 1
+        strat_details: list[str] = []
         for strat in self.population.stratifications:
-            num_strat_combinations *= len(strat.categories)
+            num_cat = len(strat.categories)
+            num_strat_combinations *= num_cat
+            strat_details.append(f"{num_cat} {strat.id}")
+
         total_equations = num_disease_states * num_strat_combinations
 
         lines.append(
             (
                 f"Total System: {total_equations} coupled equations "
-                f"({num_disease_states} disease states × {num_strat_combinations} "
-                f"stratification)"
+                f"({num_disease_states} disease states × {' × '.join(strat_details)})"
             )
         )
 
         return lines
 
-    def _generate_expanded_form(self) -> list[str]:
-        """Generate expanded form with individual equations."""
+    def _format_disease_transitions_compact_stratified(
+        self, disease_transitions: list[Transition], compartments: list[tuple[str, ...]]
+    ) -> list[str]:
+        """Format disease state transitions showing specific compartments and rates."""
         lines: list[str] = []
+
+        if not disease_transitions:
+            return lines
+
+        lines.append("Disease State Transitions:")
+
+        for transition in disease_transitions:
+            source_states = transition.source
+            target_states = transition.target
+
+            source_str = (
+                ", ".join(sorted(set(source_states))) if source_states else "none"
+            )
+            target_str = (
+                ", ".join(sorted(set(target_states))) if target_states else "none"
+            )
+            lines.append(
+                f"{transition.id.capitalize()} ({source_str} -> {target_str}):"
+            )
+
+            for compartment in compartments:
+                disease_state = compartment[0]
+
+                if disease_state in source_states:
+                    source_compartment_str = self._compartment_to_string(compartment)
+
+                    if target_states:
+                        target_disease = target_states[0]
+                        target_compartment_str = source_compartment_str.replace(
+                            disease_state, target_disease, 1
+                        )
+                    else:
+                        target_compartment_str = "none"
+
+                    rate = self._get_rate_for_compartment(transition, compartment)
+
+                    lines.append(
+                        (
+                            f"  {source_compartment_str} -> "
+                            f"{target_compartment_str}: {rate}"
+                        )
+                    )
+
+            lines.append("")
+
+        return lines
+
+    def _build_stratified_for_each_line(
+        self, disease_state_ids: list[str], other_strats: list["Stratification"]
+    ) -> str:
+        if other_strats:
+            other_strats_strs = [
+                f"each {s.id} in {{{', '.join(s.categories)}}}" for s in other_strats
+            ]
+            return (
+                f"For each disease state X in {{{', '.join(disease_state_ids)}}} "
+                f"and {', '.join(other_strats_strs)}:"
+            )
+        return f"For each disease state X in {{{', '.join(disease_state_ids)}}}:"
+
+    def _build_stratified_transition_line(
+        self,
+        trans: Transition,
+        strat_idx: int,
+        combo: tuple[str, ...],
+    ) -> str:
+        src_cat = trans.source[0]
+        tgt_cat = trans.target[0]
+
+        source_parts = [""] * len(self.population.stratifications)
+        target_parts = [""] * len(self.population.stratifications)
+        source_parts[strat_idx] = src_cat
+        target_parts[strat_idx] = tgt_cat
+
+        combo_idx = 0
+        for i in range(len(self.population.stratifications)):
+            if i != strat_idx:
+                source_parts[i] = combo[combo_idx]
+                target_parts[i] = combo[combo_idx]
+                combo_idx += 1
+
+        source_comp = f"X_{'_'.join(source_parts)}"
+        target_comp = f"X_{'_'.join(target_parts)}"
+
+        sample_compartment = ("X",) + tuple(source_parts)
+        rate = self._get_rate_for_compartment(trans, sample_compartment)
+        rate_expr = (
+            f"{rate} * {source_comp}" if rate else f"{trans.rate} * {source_comp}"
+        )
+
+        return f"  {source_comp} -> {target_comp}: {rate_expr}"
+
+    def _format_stratification_transitions_compact_stratified(
+        self,
+        stratification_transitions: list[Transition],
+        disease_state_ids: list[str],
+    ) -> list[str]:
+        """Format stratification transitions showing movements between categories."""
+        lines: list[str] = []
+        strat_by_id = self._group_transitions_by_stratification(
+            stratification_transitions
+        )
+
+        for strat_idx, strat in enumerate(self.population.stratifications):
+            if not strat_by_id.get(strat.id):
+                continue
+
+            transition = strat_by_id[strat.id][0]
+            source_cat = transition.source[0] if transition.source else "none"
+            target_cat = transition.target[0] if transition.target else "none"
+
+            if not source_cat or not target_cat:
+                continue
+
+            lines.append(
+                (
+                    f"{strat.id.capitalize()} Stratification Transitions "
+                    f"({source_cat} -> {target_cat}):"
+                )
+            )
+
+            other_strats = [
+                s
+                for i, s in enumerate(self.population.stratifications)
+                if i != strat_idx
+            ]
+
+            lines.append(
+                self._build_stratified_for_each_line(disease_state_ids, other_strats)
+            )
+
+            for trans in strat_by_id[strat.id]:
+                other_cat_combos = (
+                    list(product(*[s.categories for s in other_strats]))
+                    if other_strats
+                    else [()]
+                )
+
+                for combo in other_cat_combos:
+                    lines.append(
+                        self._build_stratified_transition_line(trans, strat_idx, combo)
+                    )
+
+            lines.append("")
+
+        return lines
+
+    def _generate_expanded_form(self) -> list[str]:
+        """Generate expanded form with individual equations for each compartment."""
+        lines: list[str] = []
+
+        lines.append("=" * 40)
+        lines.append("EXPANDED FORM")
+        lines.append("=" * 40)
 
         has_stratifications = len(self.population.stratifications) > 0
 
         if has_stratifications:
-            lines.append("=" * 40)
-            lines.append("EXPANDED FORM")
-            lines.append("=" * 40)
+            compartments = self._generate_compartments()
+            disease_transitions, stratification_transitions = (
+                self._separate_transitions_by_type()
+            )
+
+            for compartment in compartments:
+                compartment_str = self._compartment_to_string(compartment)
+                equation = self._build_compartment_equation(
+                    compartment, disease_transitions, stratification_transitions
+                )
+                lines.append(f"d{compartment_str}/dt = {equation}")
         else:
-            lines.append("=" * 40)
-            lines.append("EQUATIONS")
-            lines.append("=" * 40)
+            state_ids = self._collect_state_ids()
+            equations = self._build_flow_equations(state_ids)
+            disease_state_ids = [state.id for state in self.population.disease_states]
 
-        state_ids = self._collect_state_ids()
-        equations = self._build_flow_equations(state_ids)
-
-        # Order: disease states first (in order),
-        # then stratification categories (in order)
-        disease_state_ids = [state.id for state in self.population.disease_states]
-        stratification_category_ids = [
-            cat for strat in self.population.stratifications for cat in strat.categories
-        ]
-        ordered_state_ids = disease_state_ids + stratification_category_ids
-
-        for state_id in ordered_state_ids:
-            equation = self._format_state_equation(equations[state_id])
-            lines.append(f"d{state_id}/dt = {equation}")
+            for state_id in disease_state_ids:
+                equation = self._format_state_equation(equations[state_id])
+                lines.append(f"d{state_id}/dt = {equation}")
 
         return lines
+
+    def _build_compartment_equation(
+        self,
+        compartment: tuple[str, ...],
+        disease_transitions: list[Transition],
+        stratification_transitions: list[Transition],
+    ) -> str:
+        """Build the complete equation for a specific compartment."""
+        terms: list[str] = []
+        disease_state = compartment[0]
+
+        for transition in disease_transitions:
+            source_count = transition.source.count(disease_state)
+            target_count = transition.target.count(disease_state)
+            net_change = target_count - source_count
+
+            if net_change != 0:
+                rate = self._get_rate_for_compartment(transition, compartment)
+                if rate:
+                    if net_change > 0:
+                        terms.append(f"+ ({rate})")
+                    else:
+                        terms.append(f"- ({rate})")
+
+        for transition in stratification_transitions:
+            flow_term = self._get_stratification_flow_for_compartment(
+                compartment, transition
+            )
+            if flow_term:
+                terms.append(flow_term)
+
+        if not terms:
+            return "0"
+
+        equation = " ".join(terms)
+        if equation.startswith("+ "):
+            return equation[2:]
+        if equation.startswith("+"):
+            return equation[1:]
+        return equation
+
+    def _get_stratification_flow_for_compartment(
+        self, compartment: tuple[str, ...], transition: Transition
+    ) -> str | None:
+        """Calculate stratification flow term for a compartment."""
+        if len(compartment) == 1:
+            return None
+
+        transition_states = set(transition.source) | set(transition.target)
+        target_strat_idx = None
+
+        for i, strat in enumerate(self.population.stratifications):
+            if transition_states.issubset(set(strat.categories)):
+                target_strat_idx = i
+                break
+
+        if target_strat_idx is None:
+            return None
+
+        compartment_category = compartment[target_strat_idx + 1]
+        source_categories = transition.source
+        target_categories = transition.target
+
+        source_count = source_categories.count(compartment_category)
+        target_count = target_categories.count(compartment_category)
+        net_change = target_count - source_count
+
+        if net_change == 0:
+            return None
+
+        rate = self._get_rate_for_compartment(transition, compartment)
+        if not rate:
+            return None
+
+        if net_change < 0:
+            compartment_str = self._compartment_to_string(compartment)
+            return f"- ({rate} * {compartment_str})"
+        else:
+            source_category = source_categories[0] if source_categories else None
+            if source_category:
+                source_compartment = list(compartment)
+                source_compartment[target_strat_idx + 1] = source_category
+                source_compartment_str = self._compartment_to_string(
+                    tuple(source_compartment)
+                )
+                return f"+ ({rate} * {source_compartment_str})"
+
+        return None
 
     def _write_output(self, output: str, output_file: str | None) -> None:
         """Write output to file or console."""
