@@ -14,9 +14,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 epimodel-core = { path = "../epimodel-core" }
-pyo3 = { workspace = true, optional = true }
 evalexpr = "11.0"
-
-[features]
-default = []
-python = ["dep:pyo3", "epimodel-core/python"]

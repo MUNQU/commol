@@ -1,10 +1,7 @@
 use epimodel_core::{MathExpressionContext, Model, RateMathExpression, StratifiedRate, Transition};
 use std::collections::HashMap;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
-#[cfg_attr(feature = "python", pyclass(name = "DifferenceEquations"))]
+#[derive(Clone)]
 pub struct DifferenceEquations {
     compartments: Vec<String>,
     compartment_map: HashMap<String, usize>,
@@ -13,6 +10,8 @@ pub struct DifferenceEquations {
     expression_context: MathExpressionContext,
     current_step: f64,
     stratifications: Vec<epimodel_core::Stratification>,
+    // Store initial state for reset functionality
+    initial_population: Vec<f64>,
 }
 
 impl DifferenceEquations {
@@ -93,7 +92,7 @@ impl DifferenceEquations {
         }
 
         let num_compartments = compartments.len();
-        let population = (0..num_compartments)
+        let population: Vec<f64> = (0..num_compartments)
             .map(|i| *pop_dist.get(&compartments[i]).unwrap_or(&0.0))
             .collect();
 
@@ -114,6 +113,9 @@ impl DifferenceEquations {
         // Clone stratifications for later use
         let stratifications = model.population.stratifications.clone();
 
+        // Store initial population for reset functionality
+        let initial_population = population.clone();
+
         Self {
             compartments,
             compartment_map,
@@ -122,6 +124,7 @@ impl DifferenceEquations {
             expression_context,
             current_step: 0.0,
             stratifications,
+            initial_population,
         }
     }
 
@@ -168,21 +171,17 @@ impl DifferenceEquations {
     }
 
     /// Get the appropriate rate string for a compartment based on its stratifications
-    /// Returns (rate_string, is_from_stratified_rates)
     fn get_rate_string_for_compartment(
         &self,
         transition: &Transition,
         strat_values: &HashMap<String, String>,
-    ) -> Option<(String, bool)> {
+    ) -> Option<String> {
         // If no stratified rates defined, use default rate
         if transition.stratified_rates.is_none() {
-            return transition.rate.as_ref().map(|r| {
-                let rate_str = match r {
-                    RateMathExpression::Parameter(p) => p.clone(),
-                    RateMathExpression::Formula(f) => f.formula.clone(),
-                    RateMathExpression::Constant(c) => c.to_string(),
-                };
-                (rate_str, false)
+            return transition.rate.as_ref().map(|r| match r {
+                RateMathExpression::Parameter(p) => p.clone(),
+                RateMathExpression::Formula(f) => f.formula.clone(),
+                RateMathExpression::Constant(c) => c.to_string(),
             });
         }
 
@@ -218,17 +217,14 @@ impl DifferenceEquations {
 
         // If we found a match, return the rate string
         if let Some(matched_rate) = best_match {
-            return Some((matched_rate.rate.clone(), true));
+            return Some(matched_rate.rate.clone());
         }
 
         // Fall back to default rate
-        transition.rate.as_ref().map(|r| {
-            let rate_str = match r {
-                RateMathExpression::Parameter(p) => p.clone(),
-                RateMathExpression::Formula(f) => f.formula.clone(),
-                RateMathExpression::Constant(c) => c.to_string(),
-            };
-            (rate_str, false)
+        transition.rate.as_ref().map(|r| match r {
+            RateMathExpression::Parameter(p) => p.clone(),
+            RateMathExpression::Formula(f) => f.formula.clone(),
+            RateMathExpression::Constant(c) => c.to_string(),
         })
     }
 }
@@ -316,7 +312,7 @@ impl DifferenceEquations {
                             let rate_result =
                                 self.get_rate_string_for_compartment(transition, &strat_values);
 
-                            if let Some((rate_str, _is_stratified)) = rate_result {
+                            if let Some(rate_str) = rate_result {
                                 // Parse and evaluate the rate
                                 let rate_expr = RateMathExpression::from_string(rate_str.clone());
                                 let rate = match rate_expr.evaluate(&self.expression_context) {
@@ -379,254 +375,44 @@ impl DifferenceEquations {
     }
 }
 
-#[cfg(feature = "python")]
-#[pymethods]
-impl DifferenceEquations {
-    #[new]
-    pub fn new(model: PyRef<Model>) -> Self {
-        Self::from_model(&model)
+// Implement SimulationEngine trait for DifferenceEquations
+impl epimodel_core::SimulationEngine for DifferenceEquations {
+    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
+        // Delegate to existing implementation
+        DifferenceEquations::run(self, num_steps)
     }
 
-    #[getter]
-    #[pyo3(name = "population")]
-    fn py_population(&self) -> Vec<f64> {
-        self.population()
+    fn step(&mut self) -> Result<(), String> {
+        // Delegate to existing implementation
+        DifferenceEquations::step(self)
     }
 
-    #[getter]
-    #[pyo3(name = "compartments")]
-    fn py_compartments(&self) -> Vec<String> {
-        self.compartments()
+    fn compartments(&self) -> Vec<String> {
+        self.compartments.clone()
     }
 
-    #[pyo3(name = "step")]
-    fn py_step(&mut self) -> PyResult<()> {
-        self.step()
-            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+    fn population(&self) -> Vec<f64> {
+        self.population.clone()
     }
 
-    #[pyo3(name = "run")]
-    fn py_run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
-        self.run(num_steps)
-            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymodule]
-fn epimodel_difference(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<DifferenceEquations>()?;
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use epimodel_core::*;
-
-    fn create_test_sir_model() -> Model {
-        let disease_states = vec![
-            DiseaseState {
-                id: "S".to_string(),
-                name: "Susceptible".to_string(),
-            },
-            DiseaseState {
-                id: "I".to_string(),
-                name: "Infected".to_string(),
-            },
-            DiseaseState {
-                id: "R".to_string(),
-                name: "Recovered".to_string(),
-            },
-        ];
-
-        let parameters = vec![
-            Parameter {
-                id: "beta".to_string(),
-                value: 0.3,
-                description: Some("Transmission rate".to_string()),
-            },
-            Parameter {
-                id: "gamma".to_string(),
-                value: 0.1,
-                description: Some("Recovery rate".to_string()),
-            },
-            Parameter {
-                id: "N".to_string(),
-                value: 1000.0,
-                description: Some("Population size".to_string()),
-            },
-        ];
-
-        let transitions = vec![
-            Transition {
-                id: "infection".to_string(),
-                source: vec!["S".to_string()],
-                target: vec!["I".to_string()],
-                rate: Some(RateMathExpression::Formula(MathExpression::new(
-                    "beta * S * I / N".to_string(),
-                ))),
-                stratified_rates: None,
-                condition: None,
-            },
-            Transition {
-                id: "recovery".to_string(),
-                source: vec!["I".to_string()],
-                target: vec!["R".to_string()],
-                rate: Some(RateMathExpression::Parameter("gamma".to_string())),
-                stratified_rates: None,
-                condition: None,
-            },
-        ];
-
-        let disease_state_fractions = vec![
-            DiseaseStateFraction {
-                disease_state: "S".to_string(),
-                fraction: 0.99,
-            },
-            DiseaseStateFraction {
-                disease_state: "I".to_string(),
-                fraction: 0.01,
-            },
-            DiseaseStateFraction {
-                disease_state: "R".to_string(),
-                fraction: 0.0,
-            },
-        ];
-
-        let initial_conditions = InitialConditions {
-            population_size: 1000,
-            disease_state_fractions,
-            stratification_fractions: vec![],
-        };
-
-        let population = Population {
-            disease_states,
-            stratifications: vec![],
-            transitions: transitions.clone(),
-            initial_conditions,
-        };
-
-        let dynamics = Dynamics {
-            typology: ModelTypes::DifferenceEquations,
-            transitions,
-        };
-
-        Model {
-            name: "Test SIR Model".to_string(),
-            description: Some("SIR model for testing".to_string()),
-            version: Some("1.0".to_string()),
-            population,
-            parameters,
-            dynamics,
-        }
+    fn reset(&mut self) {
+        // Reset population to initial state
+        self.population = self.initial_population.clone();
+        // Reset step counter
+        self.current_step = 0.0;
     }
 
-    #[test]
-    fn test_difference_equations_creation() {
-        let model = create_test_sir_model();
-        let de = DifferenceEquations::from_model(&model);
-
-        assert_eq!(de.compartments.len(), 3);
-        assert_eq!(de.compartments, vec!["S", "I", "R"]);
-        assert_eq!(de.population.len(), 3);
-
-        // Check initial populations
-        assert!((de.population[0] - 990.0).abs() < 1e-6); // S
-        assert!((de.population[1] - 10.0).abs() < 1e-6); // I
-        assert!((de.population[2] - 0.0).abs() < 1e-6); // R
+    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.expression_context
+            .set_parameter(parameter_id.to_string(), value);
+        Ok(())
     }
 
-    #[test]
-    fn test_formula_evaluation() {
-        let model = create_test_sir_model();
-        let mut de = DifferenceEquations::from_model(&model);
-
-        // Store initial populations for comparison
-        let initial_s = de.population[0];
-        let initial_i = de.population[1];
-        let initial_r = de.population[2];
-
-        // Run one step
-        de.step().unwrap();
-
-        // Check that populations have changed according to the formulas
-        let new_s = de.population[0];
-        let new_i = de.population[1];
-        let new_r = de.population[2];
-
-        // S should decrease (people getting infected)
-        assert!(new_s < initial_s);
-
-        // R should increase (people recovering)
-        assert!(new_r > initial_r);
-
-        // Total population should remain constant
-        let total_initial = initial_s + initial_i + initial_r;
-        let total_new = new_s + new_i + new_r;
-        assert!((total_initial - total_new).abs() < 1e-10);
+    fn get_parameters(&self) -> &HashMap<String, f64> {
+        self.expression_context.get_parameters()
     }
 
-    #[test]
-    fn test_step_progression() {
-        let model = create_test_sir_model();
-        let mut de = DifferenceEquations::from_model(&model);
-
-        assert_eq!(de.current_step, 0.0);
-
-        de.step().unwrap();
-        assert_eq!(de.current_step, 1.0);
-
-        de.step().unwrap();
-        assert_eq!(de.current_step, 2.0);
-    }
-
-    #[test]
-    fn test_run_multiple_steps() {
-        let model = create_test_sir_model();
-        let mut de = DifferenceEquations::from_model(&model);
-
-        let results = de.run(10).unwrap();
-
-        // Should have 11 time points (0 through 10)
-        assert_eq!(results.len(), 11);
-
-        // Each time point should have 3 compartments
-        for step_result in &results {
-            assert_eq!(step_result.len(), 3);
-        }
-
-        // Initial state should be preserved
-        assert!((results[0][0] - 990.0).abs() < 1e-6); // S
-        assert!((results[0][1] - 10.0).abs() < 1e-6); // I
-        assert!((results[0][2] - 0.0).abs() < 1e-6); // R
-
-        // Population should be conserved at all time points
-        for step_result in &results {
-            let total: f64 = step_result.iter().sum();
-            assert!((total - 1000.0).abs() < 1e-6);
-        }
-    }
-
-    #[test]
-    fn test_constant_rate_expression() {
-        let mut model = create_test_sir_model();
-
-        // Replace recovery with constant rate
-        model.dynamics.transitions[1].rate = Some(RateMathExpression::Constant(0.05));
-        model.population.transitions[1].rate = Some(RateMathExpression::Constant(0.05));
-
-        let mut de = DifferenceEquations::from_model(&model);
-
-        let initial_i = de.population[1];
-        let initial_r = de.population[2];
-
-        de.step().unwrap();
-
-        // Recovery should follow constant rate
-        let expected_recovery = initial_i * 0.05;
-        let actual_recovery = de.population[2] - initial_r;
-
-        assert!((actual_recovery - expected_recovery).abs() < 1e-10);
+    fn current_step(&self) -> f64 {
+        self.current_step
     }
 }

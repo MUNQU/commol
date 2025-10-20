@@ -69,8 +69,12 @@ use evalexpr::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+// Special variable names that are automatically available in all expressions
+const SPECIAL_VAR_N: &str = "N";
+const SPECIAL_VAR_STEP: &str = "step";
+const SPECIAL_VAR_T: &str = "t";
+const SPECIAL_VAR_PI: &str = "pi";
+const SPECIAL_VAR_E: &str = "e";
 
 /// Errors that can occur during expression evaluation
 #[derive(Debug, thiserror::Error)]
@@ -116,52 +120,54 @@ impl MathExpressionContext {
         self.compartments.insert(name, value);
     }
 
-    /// Set multiple compartment values
-    pub fn set_compartments(&mut self, compartments: HashMap<String, f64>) {
-        self.compartments.extend(compartments);
-    }
-
     /// Set the current step
     pub fn set_step(&mut self, step: f64) {
         self.step = step;
     }
 
-    /// Get parameter value
+    /// Get a single parameter value by name
     pub fn get_parameter(&self, name: &str) -> Option<f64> {
         self.parameters.get(name).copied()
     }
 
-    /// Get compartment value
-    pub fn get_compartment(&self, name: &str) -> Option<f64> {
-        self.compartments.get(name).copied()
-    }
-
-    /// Get current step
-    pub fn get_step(&self) -> f64 {
-        self.step
+    /// Get a reference to all parameters
+    pub fn get_parameters(&self) -> &HashMap<String, f64> {
+        &self.parameters
     }
 
     /// Convert to evalexpr context
     fn to_evalexpr_context(&self) -> HashMapContext {
         let mut context = HashMapContext::new();
 
+        // Add user-defined parameters
         for (name, value) in &self.parameters {
             context.set_value(name.clone(), Value::Float(*value)).ok();
         }
 
+        // Add compartment values
         for (name, value) in &self.compartments {
             context.set_value(name.clone(), Value::Float(*value)).ok();
         }
 
+        // Add special variables
+        let total_pop: f64 = self.compartments.values().sum();
         context
-            .set_value("step".to_string(), Value::Float(self.step))
-            .ok();
-
-        context
-            .set_value("pi".to_string(), Value::Float(std::f64::consts::PI))
+            .set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
             .ok();
         context
-            .set_value("e".to_string(), Value::Float(std::f64::consts::E))
+            .set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(self.step))
+            .ok();
+        context
+            .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.step))
+            .ok();
+        context
+            .set_value(
+                SPECIAL_VAR_PI.to_string(),
+                Value::Float(std::f64::consts::PI),
+            )
+            .ok();
+        context
+            .set_value(SPECIAL_VAR_E.to_string(), Value::Float(std::f64::consts::E))
             .ok();
 
         context
@@ -242,11 +248,16 @@ fn preprocess_formula(formula: &str) -> String {
     result
 }
 
-/// Collects all variable identifiers from an AST node.
+/// Collects all variable identifiers from an AST node, excluding special variables.
 fn get_variables_from_node(node: &Node, variables: &mut HashSet<String>) {
     for ident in node.iter_variable_identifiers() {
-        // Exclude built-in constants 'pi' and 'e'
-        if ident != "pi" && ident != "e" {
+        // Exclude special variables that are automatically available
+        if ident != SPECIAL_VAR_PI
+            && ident != SPECIAL_VAR_E
+            && ident != SPECIAL_VAR_N
+            && ident != SPECIAL_VAR_STEP
+            && ident != SPECIAL_VAR_T
+        {
             variables.insert(ident.to_string());
         }
     }
@@ -266,25 +277,48 @@ fn is_single_identifier(node: &Node) -> bool {
 }
 
 /// A mathematical expression that can be evaluated
-#[cfg_attr(feature = "python", pyclass)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// The formula is preprocessed once during construction for optimal performance.
+#[derive(Debug, Clone, Serialize)]
 pub struct MathExpression {
-    /// The mathematical formula as a string
+    /// The original mathematical formula as a string
     pub formula: String,
+    /// Preprocessed formula (cached for performance)
+    #[serde(skip)]
+    preprocessed: String,
+}
+
+// Custom deserialize to ensure preprocessed field is populated
+impl<'de> Deserialize<'de> for MathExpression {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct MathExpressionData {
+            formula: String,
+        }
+
+        let data = MathExpressionData::deserialize(deserializer)?;
+        Ok(MathExpression::new(data.formula))
+    }
 }
 
 impl MathExpression {
-    /// Create a new expression
+    /// Create a new expression (preprocesses the formula once)
     pub fn new(formula: String) -> Self {
-        Self { formula }
+        let preprocessed = preprocess_formula(&formula);
+        Self {
+            formula,
+            preprocessed,
+        }
     }
 
     /// Evaluate the expression with the given context
     pub fn evaluate(&self, context: &MathExpressionContext) -> Result<f64, MathExpressionError> {
         let evalexpr_context = context.to_evalexpr_context();
-        let preprocessed = preprocess_formula(&self.formula);
 
-        match eval_with_context(&preprocessed, &evalexpr_context) {
+        match eval_with_context(&self.preprocessed, &evalexpr_context) {
             Ok(Value::Float(result)) => Ok(result),
             Ok(Value::Int(result)) => Ok(result as f64),
             Ok(_) => Err(MathExpressionError::InvalidExpression(
@@ -296,10 +330,8 @@ impl MathExpression {
 
     /// Validate that the expression is syntactically correct
     pub fn validate(&self) -> Result<(), MathExpressionError> {
-        let preprocessed = preprocess_formula(&self.formula);
-
         // First check if we can build the operator tree
-        let tree = match evalexpr::build_operator_tree(&preprocessed) {
+        let tree = match evalexpr::build_operator_tree(&self.preprocessed) {
             Ok(tree) => tree,
             Err(e) => return Err(MathExpressionError::EvalError(e)),
         };
@@ -339,39 +371,14 @@ impl MathExpression {
     /// Returns an empty vector if the expression is syntactically invalid.
     pub fn get_variables(&self) -> Vec<String> {
         let mut variables = HashSet::new();
-        let preprocessed = preprocess_formula(&self.formula);
-        if let Ok(node) = build_operator_tree(&preprocessed) {
+        if let Ok(node) = build_operator_tree(&self.preprocessed) {
             get_variables_from_node(&node, &mut variables);
         }
         variables.into_iter().collect()
     }
 }
 
-#[cfg(feature = "python")]
-#[pymethods]
-impl MathExpression {
-    #[new]
-    pub fn py_new(formula: String) -> Self {
-        Self::new(formula)
-    }
-
-    #[getter]
-    pub fn formula(&self) -> String {
-        self.formula.clone()
-    }
-
-    pub fn py_validate(&self) -> PyResult<()> {
-        self.validate()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
-    }
-
-    pub fn py_get_variables(&self) -> Vec<String> {
-        self.get_variables()
-    }
-}
-
 /// Represents different types of rate expressions
-#[cfg_attr(feature = "python", pyclass)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RateMathExpression {
@@ -423,33 +430,5 @@ impl RateMathExpression {
             Self::Formula(expr) => expr.get_variables(),
             Self::Constant(_) => vec![],
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl RateMathExpression {
-    #[staticmethod]
-    pub fn from_string_py(s: String) -> Self {
-        Self::from_string(s)
-    }
-
-    #[staticmethod]
-    pub fn parameter(name: String) -> Self {
-        Self::Parameter(name)
-    }
-
-    #[staticmethod]
-    pub fn formula(formula: String) -> Self {
-        Self::Formula(MathExpression::new(formula))
-    }
-
-    #[staticmethod]
-    pub fn constant(value: f64) -> Self {
-        Self::Constant(value)
-    }
-
-    pub fn py_get_variables(&self) -> Vec<String> {
-        self.get_variables()
     }
 }

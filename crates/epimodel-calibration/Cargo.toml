@@ -1,0 +1,32 @@
+[package]
+name = "epimodel-calibration"
+version = "0.1.0"
+edition = "2021"
+authors = ["EpiModel Contributors"]
+description = "Model calibration and parameter estimation for EpiModel"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "epimodel_calibration"
+crate-type = ["rlib"]
+
+[dependencies]
+# Optimization library
+argmin = "0.10"
+argmin-math = "0.4"
+
+# EpiModel dependencies
+epimodel-core = { path = "../epimodel-core" }
+epimodel-difference = { path = "../epimodel-difference" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+# For testing with DifferenceEquations (already in main dependencies now)
+# For floating-point comparisons in tests
+approx = "0.5"
