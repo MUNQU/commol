@@ -1,41 +1,83 @@
+//! # EpiModel Python Bindings
+//!
+//! High-performance mathematical epidemiology library with Python bindings.
+//!
+//! This library provides Python access to the Rust-based EpiModel framework,
+//! following the Polars architecture pattern where Python bindings wrap
+//! pure Rust implementations.
+//!
+//! ## Modules
+//!
+//! - `core`: Core data structures (Model, Population, etc.)
+//! - `difference`: Discrete-time difference equation solver
+//! - `calibration`: Parameter calibration and optimization
+//!
+//! ## Example
+//!
+//! ```python
+//! from epimodel_rs import core, difference
+//!
+//! # Load a model
+//! model = core.Model.from_json_file("sir_model.json")
+//!
+//! # Create solver
+//! solver = difference.DifferenceEquations(model)
+//!
+//! # Run simulation
+//! results = solver.run(100)
+//! ```
+
 use pyo3::prelude::*;
 
-/// Core data structures for epidemiological models.
-fn core_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<epimodel_core::Model>()?;
-    m.add_class::<epimodel_core::Population>()?;
-    m.add_class::<epimodel_core::DiseaseState>()?;
-    m.add_class::<epimodel_core::Stratification>()?;
-    m.add_class::<epimodel_core::Transition>()?;
-    m.add_class::<epimodel_core::Parameter>()?;
-    m.add_class::<epimodel_core::InitialConditions>()?;
-    m.add_class::<epimodel_core::Condition>()?;
-    m.add_class::<epimodel_core::Rule>()?;
-    m.add_class::<epimodel_core::LogicOperator>()?;
-    m.add_class::<epimodel_core::ModelTypes>()?;
-    m.add_class::<epimodel_core::VariablePrefixes>()?;
-    m.add_class::<epimodel_core::Dynamics>()?;
-    m.add_class::<epimodel_core::MathExpression>()?;
-    m.add_class::<epimodel_core::RateMathExpression>()?;
-    Ok(())
-}
-
-/// Difference equation solver.
-fn difference_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<epimodel_difference::DifferenceEquations>()?;
-    Ok(())
-}
+// Module declarations
+mod calibration;
+mod core;
+mod difference;
 
 /// High-performance mathematical epidemiology library.
+///
+/// This module provides Python bindings to the EpiModel Rust library,
+/// enabling high-performance epidemiological modeling with a Pythonic API.
 #[pymodule]
-fn epimodel_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let core_mod = PyModule::new(m.py(), "core")?;
-    core_module(&core_mod)?;
-    m.add_submodule(&core_mod)?;
+fn epimodel_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Core module: fundamental data structures
+    let core_module = PyModule::new(py, "core")?;
+    core_module.add(
+        "__doc__",
+        "Core data structures for epidemiological models.\n\n\
+         Includes Model, Population, DiseaseState, Transition, and related types.",
+    )?;
+    core::register(&core_module)?;
+    m.add_submodule(&core_module)?;
 
-    let difference_mod = PyModule::new(m.py(), "difference")?;
-    difference_module(&difference_mod)?;
-    m.add_submodule(&difference_mod)?;
+    // Difference module: discrete-time solver
+    let difference_module = PyModule::new(py, "difference")?;
+    difference_module.add(
+        "__doc__",
+        "Discrete-time difference equation solver.\n\n\
+         Provides the DifferenceEquations class for simulating epidemiological\n\
+         models using difference equations (discrete time steps).",
+    )?;
+    difference::register(&difference_module)?;
+    m.add_submodule(&difference_module)?;
+
+    // Calibration module: parameter optimization
+    let calibration_module = PyModule::new(py, "calibration")?;
+    calibration_module.add(
+        "__doc__",
+        "Model calibration and parameter optimization.\n\n\
+         Provides tools for calibrating model parameters against observed data\n\
+         using various optimization algorithms (Nelder-Mead, Particle Swarm, etc.).",
+    )?;
+    calibration::register(&calibration_module)?;
+    m.add_submodule(&calibration_module)?;
+
+    // Module-level metadata
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add(
+        "__doc__",
+        "EpiModel: High-performance mathematical epidemiology in Rust with Python bindings.",
+    )?;
 
     Ok(())
 }

@@ -3,4 +3,4 @@ python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install poetry
-poetry install --with dev
+poetry install --extras dev, docs

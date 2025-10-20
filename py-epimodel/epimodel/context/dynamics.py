@@ -163,7 +163,7 @@ class StratifiedRate(BaseModel):
         try:
             validate_expression_security(value)
             if epimodel_rs:
-                epimodel_rs.core.MathExpression(value).py_validate()
+                epimodel_rs.core.MathExpression(value).validate()
         except ValueError as e:
             raise ValueError(f"Validation failed for rate '{value}': {e}")
         return value
@@ -238,7 +238,7 @@ class Transition(BaseModel):
         try:
             validate_expression_security(value)
             if epimodel_rs:
-                epimodel_rs.core.MathExpression(value).py_validate()
+                epimodel_rs.core.MathExpression(value).validate()
         except ValueError as e:
             raise ValueError(f"Validation failed for rate '{value}': {e}")
         return value
