@@ -11,7 +11,7 @@
 //!
 //! - **Model-agnostic**: Works with DifferenceEquations, NetworkModel, or any future model type
 //! - **Multiple algorithms**: Nelder-Mead, L-BFGS, Particle Swarm Optimization
-//! - **Flexible loss functions**: SSE, RMSE, MAE, Poisson likelihood
+//! - **Flexible loss functions**: SSE, RMSE, MAE
 //! - **Type-safe**: Leverages Rust's type system for compile-time guarantees
 //!
 //! ## Example

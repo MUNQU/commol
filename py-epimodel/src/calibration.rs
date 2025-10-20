@@ -125,18 +125,6 @@ impl PyLossConfig {
             inner: epimodel_calibration::LossConfig::WeightedSSE,
         }
     }
-
-    /// Negative log-likelihood (Poisson distribution)
-    #[staticmethod]
-    fn negative_log_likelihood_poisson() -> Self {
-        Self {
-            inner: epimodel_calibration::LossConfig::NegativeLogLikelihoodPoisson,
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("LossConfig({:?})", self.inner)
-    }
 }
 
 /// Nelder-Mead optimization configuration

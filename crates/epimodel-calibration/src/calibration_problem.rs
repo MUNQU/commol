@@ -188,24 +188,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
             }
 
-            LossConfig::NegativeLogLikelihoodPoisson => {
-                let mut nll = 0.0;
-                for obs in &self.observed_data {
-                    let step_idx = obs.time_step as usize;
-                    if step_idx < simulation_results.len() {
-                        let lambda = simulation_results[step_idx][obs.compartment_index];
-                        // Poisson NLL: -log(P(k|λ)) = λ - k*log(λ) + log(k!)
-                        // We ignore the constant term log(k!)
-                        if lambda > 0.0 {
-                            nll += lambda - obs.value * lambda.ln();
-                        } else {
-                            // Penalty for invalid lambda (should be > 0 for Poisson)
-                            nll += 1e10;
-                        }
-                    }
-                }
-                nll
-            }
         }
     }
 

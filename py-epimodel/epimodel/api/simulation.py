@@ -19,9 +19,6 @@ if TYPE_CHECKING:
 class Simulation:
     """
     A Facade for running a simulation from a defined Model.
-
-    This class hides the complexity of initializing the Rust engine and provides
-    high-level methods to run simulations and retrieve results in convenient formats.
     """
 
     def __init__(self, model: Model):
@@ -50,9 +47,7 @@ class Simulation:
         try:
             from epimodel.epimodel_rs.epimodel_rs import core, difference
         except ImportError as e:
-            raise ImportError(
-                "Rust extension not available. Please compile the project."
-            ) from e
+            raise ImportError(f"Error importing Rust extension: {e}") from e
 
         rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
         logging.info("Rust model instance created from JSON.")
@@ -131,3 +126,8 @@ class Simulation:
 
         else:
             assert_never(output_format)
+
+    @property
+    def engine(self) -> "DifferenceEquationsProtocol":
+        """Get the underlying simulation engine."""
+        return self._engine

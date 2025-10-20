@@ -109,10 +109,6 @@ pub enum LossConfig {
 
     /// Weighted sum of squared errors (uses observation weights)
     WeightedSSE,
-
-    /// Negative log-likelihood assuming Poisson distribution
-    /// Useful for count data (e.g., case counts)
-    NegativeLogLikelihoodPoisson,
 }
 
 impl Default for LossConfig {
@@ -128,9 +124,6 @@ impl std::fmt::Display for LossConfig {
             LossConfig::RootMeanSquaredError => write!(f, "Root Mean Squared Error"),
             LossConfig::MeanAbsoluteError => write!(f, "Mean Absolute Error"),
             LossConfig::WeightedSSE => write!(f, "Weighted Sum Squared Error"),
-            LossConfig::NegativeLogLikelihoodPoisson => {
-                write!(f, "Negative Log-Likelihood (Poisson)")
-            }
         }
     }
 }

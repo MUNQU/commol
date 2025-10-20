@@ -85,6 +85,115 @@ class DifferenceEquationsProtocol(Protocol):
 class DifferenceModule(Protocol):
     DifferenceEquations: type[DifferenceEquationsProtocol]
 
+class ObservedDataPointProtocol(Protocol):
+    def __init__(
+        self,
+        step: int,
+        compartment_index: int,
+        value: float,
+        weight: float | None = None,
+    ) -> None: ...
+    @property
+    def time_step(self) -> int: ...
+    @property
+    def compartment_index(self) -> int: ...
+    @property
+    def value(self) -> float: ...
+
+class CalibrationParameterProtocol(Protocol):
+    def __init__(
+        self,
+        id: str,
+        min_bound: float,
+        max_bound: float,
+        initial_guess: float | None = None,
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def min_bound(self) -> float: ...
+    @property
+    def max_bound(self) -> float: ...
+
+class LossConfigProtocol(Protocol):
+    @staticmethod
+    def sum_squared_error() -> LossConfigProtocol: ...
+    @staticmethod
+    def root_mean_squared_error() -> LossConfigProtocol: ...
+    @staticmethod
+    def mean_absolute_error() -> LossConfigProtocol: ...
+    @staticmethod
+    def weighted_sse() -> LossConfigProtocol: ...
+
+class NelderMeadConfigProtocol(Protocol):
+    def __init__(
+        self,
+        max_iterations: int = 1000,
+        sd_tolerance: float = 1e-6,
+        alpha: float | None = None,
+        gamma: float | None = None,
+        rho: float | None = None,
+        sigma: float | None = None,
+        verbose: bool = False,
+    ) -> None: ...
+
+class ParticleSwarmConfigProtocol(Protocol):
+    def __init__(
+        self,
+        num_particles: int = 40,
+        max_iterations: int = 1000,
+        target_cost: float | None = None,
+        inertia_factor: float | None = None,
+        cognitive_factor: float | None = None,
+        social_factor: float | None = None,
+        verbose: bool = False,
+    ) -> None: ...
+
+class OptimizationConfigProtocol(Protocol):
+    @staticmethod
+    def nelder_mead(
+        config: NelderMeadConfigProtocol | None = None,
+    ) -> OptimizationConfigProtocol: ...
+    @staticmethod
+    def particle_swarm(
+        config: ParticleSwarmConfigProtocol | None = None,
+    ) -> OptimizationConfigProtocol: ...
+
+class CalibrationResultProtocol(Protocol):
+    @property
+    def best_parameters(self) -> dict[str, float]: ...
+    @property
+    def best_parameters_list(self) -> list[float]: ...
+    @property
+    def parameter_names(self) -> list[str]: ...
+    @property
+    def final_loss(self) -> float: ...
+    @property
+    def iterations(self) -> int: ...
+    @property
+    def converged(self) -> bool: ...
+    @property
+    def termination_reason(self) -> str: ...
+    def to_dict(self) -> dict[str, object]: ...
+
+class CalibrationModule(Protocol):
+    ObservedDataPoint: type[ObservedDataPointProtocol]
+    CalibrationParameter: type[CalibrationParameterProtocol]
+    LossConfig: type[LossConfigProtocol]
+    NelderMeadConfig: type[NelderMeadConfigProtocol]
+    ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
+    OptimizationConfig: type[OptimizationConfigProtocol]
+    CalibrationResult: type[CalibrationResultProtocol]
+
+    def calibrate(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        loss_config: LossConfigProtocol,
+        optimization_config: OptimizationConfigProtocol,
+    ) -> CalibrationResultProtocol: ...
+
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
     def validate(self) -> None: ...
@@ -124,7 +233,9 @@ class CoreModule(Protocol):
 class RustEpiModelModule(Protocol):
     core: CoreModule
     difference: DifferenceModule
+    calibration: CalibrationModule
 
 core: CoreModule
 difference: DifferenceModule
+calibration: CalibrationModule
 rust_epimodel: RustEpiModelModule
