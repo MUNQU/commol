@@ -48,12 +48,8 @@ class TestCalibrator:
         return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 
     def test_model_calibration(self, model: Model):
-        import time
-
         simulation = Simulation(model)
-        start = time.time()
         results = simulation.run(100, output_format="dict_of_lists")
-        print(f"\nSimulation time: {time.time() - start}")
 
         observed_data = [
             ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
@@ -74,9 +70,7 @@ class TestCalibrator:
             ),
         )
 
-        start = time.time()
         calibrator = Calibrator(simulation, problem).run()
-        print(f"Calibration time: {time.time() - start}")
 
         assert math.isclose(calibrator.best_parameters["beta"], 0.1, abs_tol=1e-5)
         assert math.isclose(calibrator.best_parameters["gamma"], 0.05, abs_tol=1e-5)
