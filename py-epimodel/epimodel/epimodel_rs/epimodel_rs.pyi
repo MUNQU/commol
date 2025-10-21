@@ -89,14 +89,14 @@ class ObservedDataPointProtocol(Protocol):
     def __init__(
         self,
         step: int,
-        compartment_index: int,
+        compartment: str,
         value: float,
         weight: float | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...
     @property
-    def compartment_index(self) -> int: ...
+    def compartment(self) -> str: ...
     @property
     def value(self) -> float: ...
 
@@ -135,18 +135,20 @@ class NelderMeadConfigProtocol(Protocol):
         rho: float | None = None,
         sigma: float | None = None,
         verbose: bool = False,
+        header_interval: int = 100,
     ) -> None: ...
 
 class ParticleSwarmConfigProtocol(Protocol):
     def __init__(
         self,
-        num_particles: int = 40,
+        num_particles: int = 20,
         max_iterations: int = 1000,
         target_cost: float | None = None,
         inertia_factor: float | None = None,
         cognitive_factor: float | None = None,
         social_factor: float | None = None,
         verbose: bool = False,
+        header_interval: int = 100,
     ) -> None: ...
 
 class OptimizationConfigProtocol(Protocol):

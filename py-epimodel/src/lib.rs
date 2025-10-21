@@ -33,6 +33,7 @@ use pyo3::prelude::*;
 mod calibration;
 mod core;
 mod difference;
+pub(crate) mod python_observer;
 
 /// High-performance mathematical epidemiology library.
 ///

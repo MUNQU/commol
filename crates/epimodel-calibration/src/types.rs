@@ -8,8 +8,8 @@ pub struct ObservedDataPoint {
     /// Time step at which this observation was made
     pub time_step: u32,
 
-    /// Index of the compartment being observed (precomputed for efficiency)
-    pub compartment_index: usize,
+    /// Name of the compartment being observed
+    pub compartment: String,
 
     /// Observed value (e.g., number of infected individuals)
     pub value: f64,
@@ -21,20 +21,20 @@ pub struct ObservedDataPoint {
 
 impl ObservedDataPoint {
     /// Create a new observed data point with default weight of 1.0
-    pub fn new(time_step: u32, compartment_index: usize, value: f64) -> Self {
+    pub fn new(time_step: u32, compartment: String, value: f64) -> Self {
         Self {
             time_step,
-            compartment_index,
+            compartment,
             value,
             weight: 1.0,
         }
     }
 
     /// Create a new observed data point with a custom weight
-    pub fn with_weight(time_step: u32, compartment_index: usize, value: f64, weight: f64) -> Self {
+    pub fn with_weight(time_step: u32, compartment: String, value: f64, weight: f64) -> Self {
         Self {
             time_step,
-            compartment_index,
+            compartment,
             value,
             weight,
         }

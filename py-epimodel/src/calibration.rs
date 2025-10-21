@@ -19,30 +19,25 @@ impl PyObservedDataPoint {
     ///
     /// Args:
     ///     step: Step of observation
-    ///     compartment_index: Index of the compartment being observed
+    ///     compartment: Name of the compartment being observed
     ///     value: Observed value
     ///     weight: Optional weight for this observation (default: 1.0)
     #[new]
-    #[pyo3(signature = (step, compartment_index, value, weight=None))]
-    fn new(step: u32, compartment_index: usize, value: f64, weight: Option<f64>) -> Self {
+    #[pyo3(signature = (step, compartment, value, weight=None))]
+    fn new(step: u32, compartment: String, value: f64, weight: Option<f64>) -> Self {
         Self {
             inner: if let Some(w) = weight {
-                epimodel_calibration::ObservedDataPoint::with_weight(
-                    step,
-                    compartment_index,
-                    value,
-                    w,
-                )
+                epimodel_calibration::ObservedDataPoint::with_weight(step, compartment, value, w)
             } else {
-                epimodel_calibration::ObservedDataPoint::new(step, compartment_index, value)
+                epimodel_calibration::ObservedDataPoint::new(step, compartment, value)
             },
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ObservedDataPoint(time_step={}, compartment={}, value={})",
-            self.inner.time_step, self.inner.compartment_index, self.inner.value
+            "ObservedDataPoint(time_step={}, compartment='{}', value={})",
+            self.inner.time_step, self.inner.compartment, self.inner.value
         )
     }
 }
@@ -132,6 +127,7 @@ impl PyLossConfig {
 #[derive(Clone)]
 pub struct PyNelderMeadConfig {
     pub inner: epimodel_calibration::NelderMeadConfig,
+    pub header_interval: u64,
 }
 
 #[pymethods]
@@ -141,13 +137,14 @@ impl PyNelderMeadConfig {
     /// Args:
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     sd_tolerance: Convergence tolerance (default: 1e-6)
-    ///     alpha: Reflection coefficient (default: 1.0)
-    ///     gamma: Expansion coefficient (default: 2.0)
-    ///     rho: Contraction coefficient (default: 0.5)
-    ///     sigma: Shrink coefficient (default: 0.5)
+    ///     alpha: Reflection coefficient (default: None, uses argmin's default)
+    ///     gamma: Expansion coefficient (default: None, uses argmin's default)
+    ///     rho: Contraction coefficient (default: None, uses argmin's default)
+    ///     sigma: Shrink coefficient (default: None, uses argmin's default)
     ///     verbose: Enable verbose output (default: false)
+    ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, alpha=None, gamma=None, rho=None, sigma=None, verbose=false))]
+    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
@@ -156,6 +153,7 @@ impl PyNelderMeadConfig {
         rho: Option<f64>,
         sigma: Option<f64>,
         verbose: bool,
+        header_interval: u64,
     ) -> Self {
         Self {
             inner: epimodel_calibration::NelderMeadConfig {
@@ -167,7 +165,14 @@ impl PyNelderMeadConfig {
                 sigma,
                 verbose,
             },
+            header_interval,
         }
+    }
+
+    /// Get the header interval
+    #[getter]
+    fn header_interval(&self) -> u64 {
+        self.header_interval
     }
 }
 
@@ -176,6 +181,7 @@ impl PyNelderMeadConfig {
 #[derive(Clone)]
 pub struct PyParticleSwarmConfig {
     pub inner: epimodel_calibration::ParticleSwarmConfig,
+    pub header_interval: u64,
 }
 
 #[pymethods]
@@ -183,15 +189,16 @@ impl PyParticleSwarmConfig {
     /// Create Particle Swarm Optimization configuration
     ///
     /// Args:
-    ///     num_particles: Number of particles in the swarm (default: 40)
+    ///     num_particles: Number of particles in the swarm (default: 20)
     ///     max_iterations: Maximum number of iterations (default: 1000)
-    ///     target_cost: Target cost for early stopping (optional)
-    ///     inertia_factor: Inertia weight applied to velocity (default: ~0.721)
-    ///     cognitive_factor: Attraction to personal best (default: ~1.193)
-    ///     social_factor: Attraction to swarm best (default: ~1.193)
+    ///     target_cost: Target cost for early stopping (default: None)
+    ///     inertia_factor: Inertia weight applied to velocity (default: None, uses argmin's default)
+    ///     cognitive_factor: Attraction to personal best (default: None, uses argmin's default)
+    ///     social_factor: Attraction to swarm best (default: None, uses argmin's default)
     ///     verbose: Enable verbose output (default: false)
+    ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (num_particles=40, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, verbose=false))]
+    #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, verbose=false, header_interval=100))]
     fn new(
         num_particles: usize,
         max_iterations: u64,
@@ -200,6 +207,7 @@ impl PyParticleSwarmConfig {
         cognitive_factor: Option<f64>,
         social_factor: Option<f64>,
         verbose: bool,
+        header_interval: u64,
     ) -> Self {
         Self {
             inner: epimodel_calibration::ParticleSwarmConfig {
@@ -211,7 +219,14 @@ impl PyParticleSwarmConfig {
                 social_factor,
                 verbose,
             },
+            header_interval,
         }
+    }
+
+    /// Get the header interval
+    #[getter]
+    fn header_interval(&self) -> u64 {
+        self.header_interval
     }
 }
 
@@ -220,6 +235,7 @@ impl PyParticleSwarmConfig {
 #[derive(Clone)]
 pub struct PyOptimizationConfig {
     pub inner: epimodel_calibration::OptimizationConfig,
+    pub header_interval: u64,
 }
 
 #[pymethods]
@@ -227,24 +243,28 @@ impl PyOptimizationConfig {
     /// Create optimization config with Nelder-Mead algorithm
     #[staticmethod]
     fn nelder_mead(config: Option<PyNelderMeadConfig>) -> Self {
+        let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
         Self {
             inner: epimodel_calibration::OptimizationConfig::NelderMead(
                 config
                     .map(|c| c.inner)
                     .unwrap_or_else(epimodel_calibration::NelderMeadConfig::default),
             ),
+            header_interval,
         }
     }
 
     /// Create optimization config with Particle Swarm algorithm
     #[staticmethod]
     fn particle_swarm(config: Option<PyParticleSwarmConfig>) -> Self {
+        let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
         Self {
             inner: epimodel_calibration::OptimizationConfig::ParticleSwarm(
                 config
                     .map(|c| c.inner)
                     .unwrap_or_else(epimodel_calibration::ParticleSwarmConfig::default),
             ),
+            header_interval,
         }
     }
 }
@@ -354,9 +374,23 @@ fn calibrate(
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
 
-    // Run optimization
-    let result = epimodel_calibration::optimize(problem, optimization_config.inner.clone())
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+    // Check if verbose mode is enabled
+    let verbose = match &optimization_config.inner {
+        epimodel_calibration::OptimizationConfig::NelderMead(config) => config.verbose,
+        epimodel_calibration::OptimizationConfig::ParticleSwarm(config) => config.verbose,
+    };
+
+    // Run optimization with Python observer if verbose, otherwise use standard optimize
+    let result = if verbose {
+        crate::python_observer::optimize_with_python_observer(
+            problem,
+            optimization_config.inner.clone(),
+            optimization_config.header_interval,
+        )
+    } else {
+        epimodel_calibration::optimize(problem, optimization_config.inner.clone())
+    }
+    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
 
     Ok(PyCalibrationResult { inner: result })
 }

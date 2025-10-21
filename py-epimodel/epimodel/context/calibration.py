@@ -50,8 +50,8 @@ class ObservedDataPoint(BaseModel):
     ----------
     step : int
         Time step of the observation
-    compartment_index : int
-        Index of the compartment being observed
+    compartment : str
+        Name of the compartment being observed
     value : float
         Observed value
     weight : float
@@ -59,12 +59,14 @@ class ObservedDataPoint(BaseModel):
     """
 
     step: int = Field(..., ge=0, description="Time step of the observation")
-    compartment_index: int = Field(
-        ..., ge=0, description="Index of the compartment being observed"
+    compartment: str = Field(
+        ..., min_length=1, description="Name of the compartment being observed"
     )
     value: float = Field(..., ge=0.0, description="Observed value")
     weight: float = Field(
-        1.0, gt=0.0, description="Weight for this observation in the loss function"
+        default=1.0,
+        gt=0.0,
+        description="Weight for this observation in the loss function",
     )
 
 
@@ -88,7 +90,7 @@ class CalibrationParameter(BaseModel):
     min_bound: float = Field(..., description="Minimum allowed value")
     max_bound: float = Field(..., description="Maximum allowed value")
     initial_guess: float | None = Field(
-        None, description="Optional starting value for optimization"
+        default=None, description="Optional starting value for optimization"
     )
 
     @model_validator(mode="after")
@@ -128,23 +130,58 @@ class NelderMeadConfig(BaseModel):
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
     alpha : float | None
-        Reflection coefficient (default: 1.0 if None)
+        Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
-        Expansion coefficient (default: 2.0 if None)
+        Expansion coefficient (default: None, uses argmin's default)
     rho : float | None
-        Contraction coefficient (default: 0.5 if None)
+        Contraction coefficient (default: None, uses argmin's default)
     sigma : float | None
-        Shrink coefficient (default: 0.5 if None)
+        Shrink coefficient (default: None, uses argmin's default)
+    verbose : bool
+        Enable verbose output during optimization (default: False)
+    header_interval: int
+        Number of iterations between table header repeats in verbose output
+        (default: 100)
     """
 
-    max_iterations: int = Field(1000, gt=0, description="Maximum number of iterations")
-    sd_tolerance: float = Field(
-        1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+    max_iterations: int = Field(
+        default=1000, gt=0, description="Maximum number of iterations"
     )
-    alpha: float | None = Field(None, gt=0.0, description="Reflection coefficient")
-    gamma: float | None = Field(None, gt=0.0, description="Expansion coefficient")
-    rho: float | None = Field(None, gt=0.0, description="Contraction coefficient")
-    sigma: float | None = Field(None, gt=0.0, description="Shrink coefficient")
+    sd_tolerance: float = Field(
+        default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+    )
+    alpha: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Reflection coefficient (default: None, uses argmin's default)",
+    )
+    gamma: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Expansion coefficient (default: None, uses argmin's default)",
+    )
+    rho: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Contraction coefficient (default: None, uses argmin's default)",
+    )
+    sigma: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Shrink coefficient (default: None, uses argmin's default)",
+    )
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose output during optimization (default: False)",
+    )
+    header_interval: int = Field(
+        default=100,
+        gt=0,
+        description=(
+            "Number of iterations between table header repeats in verbose output "
+            "(default: 100)"
+        ),
+    )
 
 
 class ParticleSwarmConfig(BaseModel):
@@ -163,26 +200,57 @@ class ParticleSwarmConfig(BaseModel):
     target_cost : float | None
         Target cost for early stopping (optional)
     inertia_factor : float | None
-        Inertia weight applied to velocity (default: ~0.721 if None)
+        Inertia weight applied to velocity (default: None, uses argmin's default)
     cognitive_factor : float | None
-        Attraction to personal best (default: ~1.193 if None)
+        Attraction to personal best (default: None, uses argmin's default)
     social_factor : float | None
-        Attraction to swarm best (default: ~1.193 if None)
+        Attraction to swarm best (default: None, uses argmin's default)
+    verbose : bool
+        Enable verbose output during optimization (default: False)
+    header_interval: int
+        Number of iterations between table header repeats in verbose output
+        (default: 100)
     """
 
-    num_particles: int = Field(40, gt=0, description="Number of particles in the swarm")
-    max_iterations: int = Field(1000, gt=0, description="Maximum number of iterations")
+    num_particles: int = Field(
+        default=20, gt=0, description="Number of particles in the swarm"
+    )
+    max_iterations: int = Field(
+        default=1000, gt=0, description="Maximum number of iterations"
+    )
     target_cost: float | None = Field(
-        None, description="Target cost for early stopping"
+        default=None, description="Target cost for early stopping (default: None)"
     )
     inertia_factor: float | None = Field(
-        None, gt=0.0, description="Inertia weight applied to velocity"
+        default=None,
+        gt=0.0,
+        description=(
+            "Inertia weight applied to velocity (default: None, uses argmin's default)"
+        ),
     )
     cognitive_factor: float | None = Field(
-        None, gt=0.0, description="Attraction to personal best"
+        default=None,
+        gt=0.0,
+        description=(
+            "Attraction to personal best (default: None, uses argmin's default)"
+        ),
     )
     social_factor: float | None = Field(
-        None, gt=0.0, description="Attraction to swarm best"
+        default=None,
+        gt=0.0,
+        description="Attraction to swarm best (default: None, uses argmin's default)",
+    )
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose output during optimization (default: False)",
+    )
+    header_interval: int = Field(
+        default=100,
+        gt=0,
+        description=(
+            "Number of iterations between table header repeats in verbose output "
+            "(default: 100)"
+        ),
     )
 
 

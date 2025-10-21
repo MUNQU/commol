@@ -94,7 +94,7 @@ class Calibrator:
         rust_observed_data = [
             rust_calibration.ObservedDataPoint(
                 step=point.step,
-                compartment_index=point.compartment_index,
+                compartment=point.compartment,
                 value=point.value,
                 weight=point.weight,
             )
@@ -189,6 +189,8 @@ class Calibrator:
                 gamma=opt_config.config.gamma,
                 rho=opt_config.config.rho,
                 sigma=opt_config.config.sigma,
+                verbose=opt_config.config.verbose,
+                header_interval=opt_config.config.header_interval,
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
@@ -208,6 +210,8 @@ class Calibrator:
                 inertia_factor=opt_config.config.inertia_factor,
                 cognitive_factor=opt_config.config.cognitive_factor,
                 social_factor=opt_config.config.social_factor,
+                verbose=opt_config.config.verbose,
+                header_interval=opt_config.config.header_interval,
             )
             return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 

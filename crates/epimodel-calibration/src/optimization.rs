@@ -335,9 +335,26 @@ fn optimize_nelder_mead<E: SimulationEngine>(
     let executor =
         Executor::new(problem, solver).configure(|state| state.max_iters(config.max_iterations));
 
-    let result = executor
-        .run()
-        .map_err(|e| format!("Optimization failed: {}", e))?;
+    let result = if config.verbose {
+        use argmin::core::observers::ObserverMode;
+        use argmin_observer_slog::SlogLogger;
+
+        eprintln!("=== Nelder-Mead Optimization (Verbose Mode) ===");
+        eprintln!("Parameters: {:?}", parameter_names);
+        eprintln!("Initial values: {:?}", initial_params);
+        eprintln!("Max iterations: {}", config.max_iterations);
+        eprintln!("SD tolerance: {}", config.sd_tolerance);
+        eprintln!("===============================================");
+
+        executor
+            .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .run()
+            .map_err(|e| format!("Optimization failed: {}", e))?
+    } else {
+        executor
+            .run()
+            .map_err(|e| format!("Optimization failed: {}", e))?
+    };
 
     let state = result.state();
 
@@ -393,9 +410,29 @@ fn optimize_particle_swarm<E: SimulationEngine>(
         state
     });
 
-    let result = executor
-        .run()
-        .map_err(|e| format!("Optimization failed: {}", e))?;
+    let result = if config.verbose {
+        use argmin::core::observers::ObserverMode;
+        use argmin_observer_slog::SlogLogger;
+
+        eprintln!("=== Particle Swarm Optimization (Verbose Mode) ===");
+        eprintln!("Parameters: {:?}", parameter_names);
+        eprintln!("Bounds: {:?}", bounds);
+        eprintln!("Num particles: {}", config.num_particles);
+        eprintln!("Max iterations: {}", config.max_iterations);
+        if let Some(target) = config.target_cost {
+            eprintln!("Target cost: {}", target);
+        }
+        eprintln!("===================================================");
+
+        executor
+            .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .run()
+            .map_err(|e| format!("Optimization failed: {}", e))?
+    } else {
+        executor
+            .run()
+            .map_err(|e| format!("Optimization failed: {}", e))?
+    };
 
     let state = result.state();
 
