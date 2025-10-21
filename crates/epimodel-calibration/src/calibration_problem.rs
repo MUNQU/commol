@@ -39,23 +39,27 @@ use crate::types::{CalibrationParameter, LossConfig, ObservedDataPoint};
 /// ).unwrap();
 /// ```
 pub struct CalibrationProblem<E: SimulationEngine> {
-    /// Template engine (will be cloned for each evaluation)
-    template_engine: E,
+    /// Base engine used as template (cloned for each evaluation)
+    base_engine: E,
 
-    /// Observed data to fit against
+    /// Observed data points to fit against
     observed_data: Vec<ObservedDataPoint>,
 
-    /// Compartment name to index mapping (computed once during construction)
-    compartment_indices: Vec<usize>,
+    /// Indices of observed compartments in the engine's compartment vector
+    observed_compartment_indices: Vec<usize>,
 
-    /// Parameters to calibrate
-    calibration_params: Vec<CalibrationParameter>,
+    /// Parameters to calibrate with their bounds
+    parameters: Vec<CalibrationParameter>,
 
     /// Loss function configuration
     loss_config: LossConfig,
 
     /// Maximum time step in observed data (cached for performance)
     max_time_step: u32,
+
+    /// Pre-allocated buffer for simulation results (reused across evaluations)
+    /// Wrapped in RefCell to allow mutation in cost() method
+    result_buffer: std::cell::RefCell<Vec<Vec<f64>>>,
 
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
@@ -66,21 +70,21 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// # Arguments
     ///
-    /// * `template_engine` - The simulation engine to calibrate (will be cloned for each evaluation)
+    /// * `base_engine` - The simulation engine to calibrate (cloned for each evaluation)
     /// * `observed_data` - Vector of observed data points
-    /// * `calibration_params` - Parameters to calibrate with their bounds
+    /// * `parameters` - Parameters to calibrate with their bounds
     /// * `loss_config` - Loss function to use
     ///
     /// # Returns
     ///
     /// Returns `Ok(CalibrationProblem)` if successful, or an error if:
-    /// - Compartment indices in observed data are invalid
+    /// - Compartment names in observed data are invalid
     /// - No observed data provided
     /// - No calibration parameters provided
     pub fn new(
-        template_engine: E,
+        base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
-        calibration_params: Vec<CalibrationParameter>,
+        parameters: Vec<CalibrationParameter>,
         loss_config: LossConfig,
     ) -> Result<Self, String> {
         // Validate inputs
@@ -88,12 +92,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             return Err("No observed data provided".to_string());
         }
 
-        if calibration_params.is_empty() {
+        if parameters.is_empty() {
             return Err("No calibration parameters provided".to_string());
         }
 
         // Build compartment name to index mapping
-        let compartments = template_engine.compartments();
+        let compartments = base_engine.compartments();
         let compartment_map: std::collections::HashMap<&str, usize> = compartments
             .iter()
             .enumerate()
@@ -101,13 +105,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .collect();
 
         // Validate compartment names and convert to indices
-        let mut compartment_indices = Vec::with_capacity(observed_data.len());
+        let mut observed_compartment_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
             match compartment_map.get(obs.compartment.as_str()) {
-                Some(&idx) => compartment_indices.push(idx),
+                Some(&idx) => observed_compartment_indices.push(idx),
                 None => {
                     return Err(format!(
-                        "Invalid compartment name '{}' (available compartments: {})",
+                        "Invalid compartment name '{}' (available: {})",
                         obs.compartment,
                         compartments.join(", ")
                     ));
@@ -115,48 +119,47 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
-        // Pre-compute maximum time step to avoid recomputing in every cost evaluation
+        // Find maximum time step to avoid recomputing in each cost evaluation
         let max_time_step = observed_data
             .iter()
             .map(|obs| obs.time_step)
             .max()
             .unwrap_or(100);
 
+        // Pre-allocate result buffer for performance
+        let buffer_capacity = (max_time_step + 1) as usize;
+        let result_buffer = Vec::with_capacity(buffer_capacity);
+
         Ok(Self {
-            template_engine,
+            base_engine,
             observed_data,
-            compartment_indices,
-            calibration_params,
+            observed_compartment_indices,
+            parameters,
             loss_config,
             max_time_step,
+            result_buffer: std::cell::RefCell::new(result_buffer),
             _phantom: PhantomData,
         })
     }
 
     /// Get the number of parameters being calibrated
     pub fn num_parameters(&self) -> usize {
-        self.calibration_params.len()
+        self.parameters.len()
     }
 
-    /// Get parameter names
+    /// Get parameter names in order
     pub fn parameter_names(&self) -> Vec<String> {
-        self.calibration_params
-            .iter()
-            .map(|p| p.id.clone())
-            .collect()
+        self.parameters.iter().map(|p| p.id.clone()).collect()
     }
 
-    /// Get initial parameter guesses
+    /// Get initial parameter values
     pub fn initial_parameters(&self) -> Vec<f64> {
-        self.calibration_params
-            .iter()
-            .map(|p| p.get_initial_guess())
-            .collect()
+        self.parameters.iter().map(|p| p.initial_value()).collect()
     }
 
     /// Get parameter bounds as (min, max) tuples
-    pub fn get_parameter_bounds(&self) -> Vec<(f64, f64)> {
-        self.calibration_params
+    pub fn parameter_bounds(&self) -> Vec<(f64, f64)> {
+        self.parameters
             .iter()
             .map(|p| (p.min_bound, p.max_bound))
             .collect()
@@ -164,36 +167,34 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
     /// Calculate loss between simulation results and observed data
     fn calculate_loss(&self, simulation_results: &[Vec<f64>]) -> f64 {
+        let observation_iter = || {
+            self.observed_data
+                .iter()
+                .zip(&self.observed_compartment_indices)
+                .filter_map(|(obs, &compartment_idx)| {
+                    let time_idx = obs.time_step as usize;
+                    simulation_results
+                        .get(time_idx)
+                        .map(|step_data| (obs, step_data[compartment_idx]))
+                })
+        };
+
         match self.loss_config {
-            LossConfig::SumSquaredError | LossConfig::WeightedSSE => {
-                let mut total_error = 0.0;
-                for (obs, &compartment_idx) in
-                    self.observed_data.iter().zip(&self.compartment_indices)
-                {
-                    let step_idx = obs.time_step as usize;
-                    if step_idx < simulation_results.len() {
-                        let predicted = simulation_results[step_idx][compartment_idx];
-                        let error = (obs.value - predicted) * obs.weight;
-                        total_error += error * error;
-                    }
-                }
-                total_error
-            }
+            LossConfig::SumSquaredError | LossConfig::WeightedSSE => observation_iter()
+                .map(|(obs, predicted)| {
+                    let error = (obs.value - predicted) * obs.weight;
+                    error * error
+                })
+                .sum(),
 
             LossConfig::RootMeanSquaredError => {
-                let mut sum_squared_error = 0.0;
-                let mut count = 0;
-                for (obs, &compartment_idx) in
-                    self.observed_data.iter().zip(&self.compartment_indices)
-                {
-                    let step_idx = obs.time_step as usize;
-                    if step_idx < simulation_results.len() {
-                        let predicted = simulation_results[step_idx][compartment_idx];
+                let (sum_squared_error, count) = observation_iter()
+                    .map(|(obs, predicted)| {
                         let error = obs.value - predicted;
-                        sum_squared_error += error * error;
-                        count += 1;
-                    }
-                }
+                        error * error
+                    })
+                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
+
                 if count > 0 {
                     (sum_squared_error / count as f64).sqrt()
                 } else {
@@ -202,18 +203,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
 
             LossConfig::MeanAbsoluteError => {
-                let mut total_error = 0.0;
-                let mut count = 0;
-                for (obs, &compartment_idx) in
-                    self.observed_data.iter().zip(&self.compartment_indices)
-                {
-                    let step_idx = obs.time_step as usize;
-                    if step_idx < simulation_results.len() {
-                        let predicted = simulation_results[step_idx][compartment_idx];
-                        total_error += (obs.value - predicted).abs();
-                        count += 1;
-                    }
-                }
+                let (total_error, count) = observation_iter()
+                    .map(|(obs, predicted)| (obs.value - predicted).abs())
+                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
+
                 if count > 0 {
                     total_error / count as f64
                 } else {
@@ -223,23 +216,21 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
     }
 
-    /// Validate parameter bounds
-    fn validate_params(&self, params: &[f64]) -> Result<(), String> {
-        if params.len() != self.calibration_params.len() {
+    /// Validate that parameter values are within their defined bounds
+    fn validate_parameters(&self, param_values: &[f64]) -> Result<(), String> {
+        if param_values.len() != self.parameters.len() {
             return Err(format!(
                 "Expected {} parameters, got {}",
-                self.calibration_params.len(),
-                params.len()
+                self.parameters.len(),
+                param_values.len()
             ));
         }
 
-        for (i, (param_value, param_config)) in
-            params.iter().zip(&self.calibration_params).enumerate()
-        {
-            if !param_config.is_valid(*param_value) {
+        for (i, (value, param)) in param_values.iter().zip(&self.parameters).enumerate() {
+            if !param.is_within_bounds(*value) {
                 return Err(format!(
-                    "Parameter '{}' (index {}) value {} out of bounds [{}, {}]",
-                    param_config.id, i, param_value, param_config.min_bound, param_config.max_bound
+                    "Parameter '{}' at index {} has value {} outside bounds [{}, {}]",
+                    param.id, i, value, param.min_bound, param.max_bound
                 ));
             }
         }
@@ -248,42 +239,38 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 }
 
-/// Implement argmin's CostFunction trait - COMPLETELY MODEL AGNOSTIC
+/// Implement argmin's CostFunction trait - model-agnostic implementation
 ///
-/// This implementation works with ANY model type that implements SimulationEngine.
+/// This works with any model type that implements SimulationEngine.
 impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
     type Param = Vec<f64>;
     type Output = f64;
 
-    fn cost(&self, params: &Self::Param) -> Result<Self::Output, Error> {
+    fn cost(&self, param_values: &Self::Param) -> Result<Self::Output, Error> {
         // Validate parameter bounds
-        self.validate_params(params).map_err(|e| Error::msg(e))?;
+        self.validate_parameters(param_values).map_err(Error::msg)?;
 
-        // Clone the template engine (works for ANY model type)
-        let mut engine = self.template_engine.clone();
+        // Clone the base engine (works for any model type)
+        let mut engine = self.base_engine.clone();
 
         // Reset engine to initial conditions
         engine.reset();
 
-        // Update parameters
-        for (param_value, param_config) in params.iter().zip(&self.calibration_params) {
-            engine
-                .set_parameter(&param_config.id, *param_value)
-                .map_err(|e| {
-                    Error::msg(format!(
-                        "Failed to set parameter '{}': {}",
-                        param_config.id, e
-                    ))
-                })?;
+        // Update parameters with new values
+        for (value, param) in param_values.iter().zip(&self.parameters) {
+            engine.set_parameter(&param.id, *value).map_err(|e| {
+                Error::msg(format!("Failed to set parameter '{}': {}", param.id, e))
+            })?;
         }
 
-        // Run simulation
-        let results = engine
-            .run(self.max_time_step)
+        // Run simulation using pre-allocated buffer to avoid allocations
+        let mut buffer = self.result_buffer.borrow_mut();
+        engine
+            .run_into_buffer(self.max_time_step, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
 
-        // 5. Calculate loss (model-agnostic)
-        let loss = self.calculate_loss(&results);
+        // Calculate and return loss
+        let loss = self.calculate_loss(&buffer);
 
         Ok(loss)
     }

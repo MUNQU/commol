@@ -123,4 +123,34 @@ pub trait SimulationEngine: Clone {
     ///
     /// Should return 0.0 immediately after construction or `reset()`.
     fn current_step(&self) -> f64;
+
+    /// Run the simulation for a given number of steps, writing results into a pre-allocated buffer.
+    ///
+    /// This is a performance optimization for calibration that avoids repeated allocations.
+    /// The buffer should be pre-allocated with capacity for `num_steps + 1` rows and
+    /// `num_compartments` columns.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_steps` - Number of simulation steps to execute
+    /// * `buffer` - Pre-allocated buffer to write results into. Will be cleared and resized if needed.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if successful, error string otherwise
+    ///
+    /// # Default Implementation
+    ///
+    /// The default implementation calls `run()` and copies the result. Engines should
+    /// override this for better performance.
+    fn run_into_buffer(
+        &mut self,
+        num_steps: u32,
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        let results = self.run(num_steps)?;
+        buffer.clear();
+        buffer.extend(results);
+        Ok(())
+    }
 }

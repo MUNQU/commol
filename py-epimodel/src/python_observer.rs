@@ -212,7 +212,7 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
 
         OptimizationConfig::ParticleSwarm(ps_config) => {
             // Get bounds
-            let bounds = problem.get_parameter_bounds();
+            let bounds = problem.parameter_bounds();
             let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
             let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 

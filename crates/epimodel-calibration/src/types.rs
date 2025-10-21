@@ -83,14 +83,14 @@ impl CalibrationParameter {
         }
     }
 
-    /// Get the initial guess, or midpoint if not specified
-    pub fn get_initial_guess(&self) -> f64 {
+    /// Get the initial value, or midpoint of bounds if not specified
+    pub fn initial_value(&self) -> f64 {
         self.initial_guess
-            .unwrap_or((self.min_bound + self.max_bound) / 2.0)
+            .unwrap_or_else(|| (self.min_bound + self.max_bound) / 2.0)
     }
 
-    /// Validate that a value is within bounds
-    pub fn is_valid(&self, value: f64) -> bool {
+    /// Check if a value is within the parameter bounds
+    pub fn is_within_bounds(&self, value: f64) -> bool {
         value >= self.min_bound && value <= self.max_bound
     }
 }

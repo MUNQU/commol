@@ -8,6 +8,37 @@ use epimodel_core::SimulationEngine;
 use crate::calibration_problem::CalibrationProblem;
 use crate::types::CalibrationResult;
 
+/// Print optimization header for verbose output
+fn print_optimization_header(
+    algorithm: &str,
+    parameter_names: &[String],
+    initial_values: &[f64],
+    max_iterations: u64,
+) {
+    eprintln!("=== {} Optimization (Verbose Mode) ===", algorithm);
+    eprintln!("Parameters: {:?}", parameter_names);
+    eprintln!("Initial values: {:?}", initial_values);
+    eprintln!("Max iterations: {}", max_iterations);
+}
+
+/// Run executor with logging observer
+fn run_with_logging<O, S, I>(
+    executor: Executor<O, S, I>,
+) -> Result<argmin::core::OptimizationResult<O, S, I>, String>
+where
+    O: argmin::core::CostFunction,
+    S: argmin::core::Solver<O, I>,
+    I: argmin::core::State,
+{
+    use argmin::core::observers::ObserverMode;
+    use argmin_observer_slog::SlogLogger;
+
+    executor
+        .add_observer(SlogLogger::term(), ObserverMode::Always)
+        .run()
+        .map_err(|e| format!("Optimization failed: {}", e))
+}
+
 /// Configuration for Nelder-Mead optimization
 #[derive(Debug, Clone)]
 pub struct NelderMeadConfig {
@@ -284,20 +315,17 @@ pub fn optimize<E: SimulationEngine>(
     }
 }
 
-/// Optimize using Nelder-Mead algorithm
-fn optimize_nelder_mead<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    initial_params: Vec<f64>,
-    parameter_names: Vec<String>,
-    config: NelderMeadConfig,
-) -> Result<CalibrationResult, String> {
+/// Build Nelder-Mead solver from configuration
+fn build_nelder_mead_solver(
+    initial_params: &[f64],
+    config: &NelderMeadConfig,
+) -> Result<NelderMead<Vec<f64>, f64>, String> {
     // Create simplex vertices (n+1 vertices for n parameters)
-    let n = initial_params.len();
-    let mut vertices = vec![initial_params.clone()];
+    let mut vertices = vec![initial_params.to_vec()];
 
     // Create n additional vertices by perturbing each parameter
-    for i in 0..n {
-        let mut vertex = initial_params.clone();
+    for i in 0..initial_params.len() {
+        let mut vertex = initial_params.to_vec();
         vertex[i] *= 1.1; // 10% perturbation
         vertices.push(vertex);
     }
@@ -332,24 +360,31 @@ fn optimize_nelder_mead<E: SimulationEngine>(
             .map_err(|e| format!("Failed to set sigma: {}", e))?;
     }
 
+    Ok(solver)
+}
+
+/// Optimize using Nelder-Mead algorithm
+fn optimize_nelder_mead<E: SimulationEngine>(
+    problem: CalibrationProblem<E>,
+    initial_params: Vec<f64>,
+    parameter_names: Vec<String>,
+    config: NelderMeadConfig,
+) -> Result<CalibrationResult, String> {
+    let solver = build_nelder_mead_solver(&initial_params, &config)?;
     let executor =
         Executor::new(problem, solver).configure(|state| state.max_iters(config.max_iterations));
 
     let result = if config.verbose {
-        use argmin::core::observers::ObserverMode;
-        use argmin_observer_slog::SlogLogger;
-
-        eprintln!("=== Nelder-Mead Optimization (Verbose Mode) ===");
-        eprintln!("Parameters: {:?}", parameter_names);
-        eprintln!("Initial values: {:?}", initial_params);
-        eprintln!("Max iterations: {}", config.max_iterations);
+        print_optimization_header(
+            "Nelder-Mead",
+            &parameter_names,
+            &initial_params,
+            config.max_iterations,
+        );
         eprintln!("SD tolerance: {}", config.sd_tolerance);
         eprintln!("===============================================");
 
-        executor
-            .add_observer(SlogLogger::term(), ObserverMode::Always)
-            .run()
-            .map_err(|e| format!("Optimization failed: {}", e))?
+        run_with_logging(executor)?
     } else {
         executor
             .run()
@@ -376,7 +411,7 @@ fn optimize_particle_swarm<E: SimulationEngine>(
     config: ParticleSwarmConfig,
 ) -> Result<CalibrationResult, String> {
     // Get bounds from CalibrationParameter definitions
-    let bounds = problem.get_parameter_bounds();
+    let bounds = problem.parameter_bounds();
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 
@@ -411,23 +446,20 @@ fn optimize_particle_swarm<E: SimulationEngine>(
     });
 
     let result = if config.verbose {
-        use argmin::core::observers::ObserverMode;
-        use argmin_observer_slog::SlogLogger;
-
-        eprintln!("=== Particle Swarm Optimization (Verbose Mode) ===");
-        eprintln!("Parameters: {:?}", parameter_names);
+        print_optimization_header(
+            "Particle Swarm",
+            &parameter_names,
+            &initial_params,
+            config.max_iterations,
+        );
         eprintln!("Bounds: {:?}", bounds);
         eprintln!("Num particles: {}", config.num_particles);
-        eprintln!("Max iterations: {}", config.max_iterations);
         if let Some(target) = config.target_cost {
             eprintln!("Target cost: {}", target);
         }
         eprintln!("===================================================");
 
-        executor
-            .add_observer(SlogLogger::term(), ObserverMode::Always)
-            .run()
-            .map_err(|e| format!("Optimization failed: {}", e))?
+        run_with_logging(executor)?
     } else {
         executor
             .run()
@@ -436,8 +468,7 @@ fn optimize_particle_swarm<E: SimulationEngine>(
 
     let state = result.state();
 
-    // For ParticleSwarm, the state is PopulationState
-    // best_individual is an Option containing the best particle found
+    // For ParticleSwarm, best_individual contains the best particle found
     let (best_params, best_cost) = match &state.best_individual {
         Some(particle) => (particle.position.clone(), particle.cost),
         None => (initial_params.clone(), f64::INFINITY),
