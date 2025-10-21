@@ -2,70 +2,70 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://munqu.github.io/epimodel/dev/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/about/changelog/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/about/license/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/advanced/model-structure/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/api/constants/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/api/model-builder/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/api/simulation/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/development/contributing/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/development/release/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/development/workflow/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/getting-started/installation/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/getting-started/quickstart/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/guide/building-models/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/guide/core-concepts/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/guide/examples/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/guide/mathematical-expressions/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/epimodel/dev/guide/simulations/</loc>
-         <lastmod>2025-10-16</lastmod>
+         <lastmod>2025-10-21</lastmod>
     </url>
 </urlset>
