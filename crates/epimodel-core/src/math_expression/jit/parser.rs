@@ -10,8 +10,8 @@ use evalexpr::{Node, Operator};
 /// Parse a preprocessed formula string into our AST
 pub fn parse_expression(preprocessed: &str) -> Result<Expr, MathExpressionError> {
     // Use evalexpr to parse the expression into its AST
-    let evalexpr_tree = evalexpr::build_operator_tree(preprocessed)
-        .map_err(|e| MathExpressionError::EvalError(e))?;
+    let evalexpr_tree =
+        evalexpr::build_operator_tree(preprocessed).map_err(MathExpressionError::EvalError)?;
 
     // Convert evalexpr's AST to our AST
     convert_node(&evalexpr_tree)
@@ -281,7 +281,7 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
                         grandchild
                             .children()
                             .iter()
-                            .map(|elem| convert_node(elem))
+                            .map(convert_node)
                             .collect::<Result<Vec<_>, _>>()?
                     } else {
                         // Single argument, not in a tuple
@@ -292,7 +292,7 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
                     child
                         .children()
                         .iter()
-                        .map(|elem| convert_node(elem))
+                        .map(convert_node)
                         .collect::<Result<Vec<_>, _>>()?
                 } else {
                     // Single argument, not in a tuple
@@ -305,7 +305,7 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
                 // Multiple direct children - convert each one
                 children
                     .iter()
-                    .map(|child| convert_node(child))
+                    .map(convert_node)
                     .collect::<Result<Vec<_>, _>>()?
             };
 

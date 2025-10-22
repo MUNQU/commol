@@ -13,6 +13,12 @@ pub struct LibmRegistry {
     functions: HashMap<String, FuncId>,
 }
 
+impl Default for LibmRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LibmRegistry {
     /// Create a new libm registry
     pub fn new() -> Self {

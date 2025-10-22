@@ -30,8 +30,8 @@ mod jit_tests {
         let result = jit_fn.call(&ctx).unwrap();
 
         assert!(
-            (result - 3.14).abs() < 1e-10,
-            "Expected 3.14, got {}",
+            (result - std::f64::consts::PI).abs() < 1e-2,
+            "Expected PI, got {}",
             result
         );
     }

@@ -307,9 +307,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         let func_id = self.libm_registry.import_f64_to_f64(self.module, name);
 
         // Get function reference in current function
-        let func_ref = self
-            .module
-            .declare_func_in_func(func_id, &mut self.builder.func);
+        let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
 
         // Generate call
         let call = self.builder.ins().call(func_ref, &[arg]);
@@ -330,9 +328,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         let func_id = self.libm_registry.import_f64_f64_to_f64(self.module, name);
 
         // Get function reference in current function
-        let func_ref = self
-            .module
-            .declare_func_in_func(func_id, &mut self.builder.func);
+        let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
 
         // Generate call
         let call = self.builder.ins().call(func_ref, &[arg1, arg2]);
@@ -356,9 +352,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
             .import_f64_f64_f64_to_f64(self.module, name);
 
         // Get function reference in current function
-        let func_ref = self
-            .module
-            .declare_func_in_func(func_id, &mut self.builder.func);
+        let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
 
         // Generate call
         let call = self.builder.ins().call(func_ref, &[arg1, arg2, arg3]);
