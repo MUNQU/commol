@@ -262,7 +262,7 @@ fn build_subpopulation_mappings(
                 let combination_name = subset.join("_");
                 subpopulation_map
                     .entry(combination_name)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(compartment_index);
             }
         }

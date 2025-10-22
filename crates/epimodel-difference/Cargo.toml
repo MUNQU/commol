@@ -14,4 +14,3 @@ crate-type = ["rlib"]
 
 [dependencies]
 epimodel-core = { path = "../epimodel-core" }
-evalexpr = "11.0"
