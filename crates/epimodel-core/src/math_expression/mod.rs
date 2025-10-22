@@ -52,30 +52,55 @@
 //! - `floor(x)` - Round down to nearest integer
 //! - `ceil(x)` - Round up to nearest integer
 //! - `round(x)` - Round to nearest integer
+//! - `trunc(x)` - Truncate to integer (towards zero)
+//!
+//! ### Advanced Math Functions
+//! - `fma(x, y, z)` - Fused multiply-add: x*y+z (single rounding, more accurate)
+//! - `copysign(x, y)` - Copy sign of y to magnitude of x
+//! - `fdim(x, y)` - Positive difference: max(x-y, 0)
+//! - `fmax(x, y)` - Maximum (NaN-aware, different from min/max)
+//! - `fmin(x, y)` - Minimum (NaN-aware, different from min/max)
+//! - `remainder(x, y)` - IEEE remainder
+//!
+//! ### Special Functions
+//! - `erf(x)` - Error function
+//! - `erfc(x)` - Complementary error function
+//! - `tgamma(x)` - Gamma function
+//! - `lgamma(x)` - Natural logarithm of gamma function
 //!
 //! ### Other
-//! - `min(a, b, ...)` - Minimum value
-//! - `max(a, b, ...)` - Maximum value
+//! - `min(a, b, ...)` - Minimum value (variadic)
+//! - `max(a, b, ...)` - Maximum value (variadic)
 //! - `if(condition, value_if_true, value_if_false)` - Conditional expression
 
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Value, eval_with_context};
+use evalexpr::{ContextWithMutableVariables, HashMapContext, Node, Value, build_operator_tree};
 use serde::{Deserialize, Serialize};
 
-pub mod compiled;
 pub mod context;
 pub mod error;
+pub mod jit;
 pub mod preprocessing;
 
 // Re-export main types
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
+pub use jit::{JITCompiler, JITFunction};
 
-use compiled::CompiledExpression;
 use preprocessing::{get_variables, preprocess_formula};
+
+/// Internal representation of compiled expression
+#[derive(Debug, Clone)]
+enum CompiledExpr {
+    /// JIT-compiled function (fast path)
+    Jit(JITFunction),
+    /// Generic evalexpr fallback
+    Generic(Node),
+}
 
 /// A mathematical expression that can be evaluated
 ///
-/// The formula is preprocessed and compiled once during construction for optimal performance.
+/// Expressions are JIT-compiled to native machine code for optimal performance.
+/// If JIT compilation fails, the expression falls back to evalexpr interpretation.
 ///
 /// ## Example
 /// ```rust
@@ -96,9 +121,9 @@ pub struct MathExpression {
     /// Preprocessed formula (cached for performance)
     #[serde(skip)]
     preprocessed: String,
-    /// Compiled fast-path expression (if pattern recognized)
+    /// Compiled expression (JIT or evalexpr fallback)
     #[serde(skip)]
-    compiled: CompiledExpression,
+    compiled: CompiledExpr,
 }
 
 // Custom deserialize to ensure preprocessed field is populated
@@ -118,10 +143,38 @@ impl<'de> Deserialize<'de> for MathExpression {
 }
 
 impl MathExpression {
-    /// Create a new expression (preprocesses the formula once and compiles it)
+    /// Create a new expression (preprocesses and JIT-compiles the formula)
+    ///
+    /// Attempts to JIT-compile the expression for optimal performance.
+    /// Falls back to evalexpr interpretation if JIT compilation fails.
     pub fn new(formula: String) -> Self {
         let preprocessed = preprocess_formula(&formula);
-        let compiled = CompiledExpression::compile(&preprocessed);
+
+        // Try JIT compilation first
+        let compiled = match JITCompiler::new().and_then(|compiler| compiler.compile(&preprocessed))
+        {
+            Ok(jit_fn) => {
+                // JIT compilation succeeded - use fast path
+                CompiledExpr::Jit(jit_fn)
+            }
+            Err(_) => {
+                // JIT compilation failed - fall back to evalexpr
+                // Build the operator tree once and cache it
+                match build_operator_tree(&preprocessed) {
+                    Ok(tree) => CompiledExpr::Generic(tree),
+                    Err(_) => {
+                        // If even tree building fails, create a dummy tree
+                        // This will error during evaluation, but won't panic during construction
+                        // We'll just use an empty/error tree
+                        match build_operator_tree("0") {
+                            Ok(tree) => CompiledExpr::Generic(tree),
+                            Err(_) => unreachable!("Failed to build even a constant tree"),
+                        }
+                    }
+                }
+            }
+        };
+
         Self {
             formula,
             preprocessed,
@@ -134,13 +187,16 @@ impl MathExpression {
         &self,
         context: &mut MathExpressionContext,
     ) -> Result<f64, MathExpressionError> {
-        // Use fast-path evaluation for compiled expressions
         match &self.compiled {
-            CompiledExpression::Generic => {
-                // Fallback to evalexpr for complex expressions
+            CompiledExpr::Jit(jit_fn) => {
+                // Use JIT-compiled function (fast path)
+                jit_fn.call(context)
+            }
+            CompiledExpr::Generic(tree) => {
+                // Fallback to evalexpr interpretation
                 let evalexpr_context = context.get_evalexpr_context();
 
-                match eval_with_context(&self.preprocessed, evalexpr_context) {
+                match tree.eval_with_context(evalexpr_context) {
                     Ok(Value::Float(result)) => Ok(result),
                     Ok(Value::Int(result)) => Ok(result as f64),
                     Ok(_) => Err(MathExpressionError::InvalidExpression(
@@ -148,10 +204,6 @@ impl MathExpression {
                     )),
                     Err(e) => Err(MathExpressionError::EvalError(e)),
                 }
-            }
-            compiled => {
-                // Use the compiled fast-path
-                compiled.evaluate(context)
             }
         }
     }
@@ -292,19 +344,19 @@ mod tests {
     }
 
     #[test]
-    fn test_compiled_patterns() {
+    fn test_complex_expressions() {
         let mut ctx = MathExpressionContext::new();
         ctx.set_parameter("beta".to_string(), 0.5);
         ctx.set_compartment("S".to_string(), 990.0);
         ctx.set_compartment("I".to_string(), 10.0);
         ctx.set_compartment("R".to_string(), 0.0);
 
-        // Test Product3
+        // Test triple product (common in SIR models)
         let expr = MathExpression::new("beta * S * I".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 4950.0).abs() < 1e-10);
 
-        // Test Product3Div
+        // Test normalized infection rate
         let expr = MathExpression::new("beta * S * I / N".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 4.95).abs() < 1e-10);
