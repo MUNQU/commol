@@ -145,6 +145,7 @@ impl PyNelderMeadConfig {
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
     #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
@@ -199,6 +200,7 @@ impl PyParticleSwarmConfig {
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
     #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, verbose=false, header_interval=100))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         num_particles: usize,
         max_iterations: u64,
@@ -246,9 +248,7 @@ impl PyOptimizationConfig {
         let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
         Self {
             inner: epimodel_calibration::OptimizationConfig::NelderMead(
-                config
-                    .map(|c| c.inner)
-                    .unwrap_or_else(epimodel_calibration::NelderMeadConfig::default),
+                config.map(|c| c.inner).unwrap_or_default(),
             ),
             header_interval,
         }
@@ -260,9 +260,7 @@ impl PyOptimizationConfig {
         let header_interval = config.as_ref().map(|c| c.header_interval).unwrap_or(100);
         Self {
             inner: epimodel_calibration::OptimizationConfig::ParticleSwarm(
-                config
-                    .map(|c| c.inner)
-                    .unwrap_or_else(epimodel_calibration::ParticleSwarmConfig::default),
+                config.map(|c| c.inner).unwrap_or_default(),
             ),
             header_interval,
         }
@@ -372,7 +370,7 @@ fn calibrate(
         parameters,
         loss_config.inner,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
 
     // Check if verbose mode is enabled
     let verbose = match &optimization_config.inner {
@@ -390,7 +388,7 @@ fn calibrate(
     } else {
         epimodel_calibration::optimize(problem, optimization_config.inner.clone())
     }
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
 
     Ok(PyCalibrationResult { inner: result })
 }

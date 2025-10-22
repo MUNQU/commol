@@ -96,25 +96,20 @@ impl CalibrationParameter {
 }
 
 /// Configuration for loss function calculation
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum LossConfig {
-    /// Sum of squared errors: Σ(observed - predicted)²
+    /// Sum of squared errors: sum(observed - predicted) ** 2
+    #[default]
     SumSquaredError,
 
-    /// Root mean squared error: √(Σ(observed - predicted)² / n)
+    /// Root mean squared error: sqrt(sum(observed - predicted) ** 2 / n)
     RootMeanSquaredError,
 
-    /// Mean absolute error: Σ|observed - predicted| / n
+    /// Mean absolute error: sum(abs(observed - predicted)) / n
     MeanAbsoluteError,
 
     /// Weighted sum of squared errors (uses observation weights)
     WeightedSSE,
-}
-
-impl Default for LossConfig {
-    fn default() -> Self {
-        LossConfig::SumSquaredError
-    }
 }
 
 impl std::fmt::Display for LossConfig {

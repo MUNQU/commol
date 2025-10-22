@@ -37,14 +37,14 @@ impl PyDifferenceEquations {
     fn run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
         self.inner
             .run(num_steps)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
     }
 
     /// Execute a single simulation step
     fn step(&mut self) -> PyResult<()> {
         self.inner
             .step()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
     }
 
     /// Get the current population distribution
@@ -80,7 +80,7 @@ impl PyDifferenceEquations {
         use epimodel_core::SimulationEngine;
         self.inner
             .set_parameter(parameter_id, value)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
     }
 
     /// Get all current parameter values

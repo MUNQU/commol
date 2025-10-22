@@ -5,6 +5,10 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
+/// Type alias for stratified rates: Vec<(conditions, rate_expression)>
+/// where conditions is Vec<(stratification_name, category_value)>
+type StratifiedRatesInput = Vec<(Vec<(String, String)>, String)>;
+
 /// Wrapper for epimodel_core::Model
 #[pyclass(name = "Model")]
 pub struct PyModel {
@@ -251,7 +255,7 @@ impl PyTransition {
         source: Vec<String>,
         target: Vec<String>,
         rate: Option<String>,
-        stratified_rates: Option<Vec<(Vec<(String, String)>, String)>>,
+        stratified_rates: Option<StratifiedRatesInput>,
     ) -> Self {
         let rate = rate.map(epimodel_core::RateMathExpression::from_string);
 
