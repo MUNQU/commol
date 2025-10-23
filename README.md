@@ -7,7 +7,8 @@ A high-performance mathematical epidemiology library for modeling infectious dis
 ## Features
 
 - **Intuitive Model Building**: Fluent API for constructing epidemiological models
-- **Mathematical Expressions**: Support for complex mathematical formulas in transition rates
+- **Mathematical Expressions**: Support for complex mathematical formulas in transition rates (sin, cos, exp, log, etc.)
+- **Unit Checking**: Automatic dimensional analysis to catch unit errors before simulation
 - **High Performance**: Rust-powered simulation engine for fast computations
 - **Flexible Architecture**: Support for stratified populations and conditional transitions
 - **Type Safety**: Comprehensive validation using Pydantic models
@@ -70,6 +71,45 @@ results = simulation.run(num_steps=100)
 
 # Display results
 print(f"Final infected: {results['I'][-1]:.0f}")
+```
+
+### With Unit Checking
+
+Add units to parameters for automatic dimensional validation:
+
+```python
+model = (
+    ModelBuilder(name="SIR with Units", version="1.0")
+    .add_disease_state(id="S", name="Susceptible")
+    .add_disease_state(id="I", name="Infected")
+    .add_disease_state(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.5, unit="1/day")  # Rate with units
+    .add_parameter(id="gamma", value=0.1, unit="1/day")
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Validate dimensional consistency
+model.check_unit_consistency()  # Ensures all equations have correct units
 ```
 
 ## Documentation
