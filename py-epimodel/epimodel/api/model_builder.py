@@ -186,6 +186,7 @@ class ModelBuilder:
         id: str,
         value: float,
         description: str | None = None,
+        unit: str | None = None,
     ) -> Self:
         """
         Add a global parameter to the model.
@@ -198,14 +199,19 @@ class ModelBuilder:
             Numerical value of the parameter.
         description : str | None, default=None
             Human-readable description of the parameter.
+        unit : str | None, default=None
+            Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+            Used for unit consistency checking in equations.
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
         """
-        self._parameters.append(Parameter(id=id, value=value, description=description))
-        logging.info(f"Added parameter: id='{id}', value={value}")
+        self._parameters.append(
+            Parameter(id=id, value=value, description=description, unit=unit)
+        )
+        logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
 
     def add_transition(
