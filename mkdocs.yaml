@@ -1,9 +1,9 @@
-site_name: EpiModel Documentation
-site_description: A high-performance mathematical epidemiology library for modeling infectious disease spread
+site_name: Commol Documentation
+site_description: A high-performance compartment modelling library for mathematical modeling
 site_author: MUNQU Team
-site_url: https://munqu.github.io/epimodel
-repo_url: https://github.com/MUNQU/epimodel
-repo_name: MUNQU/epimodel
+site_url: https://munqu.github.io/commol
+repo_url: https://github.com/MUNQU/commol
+repo_name: MUNQU/commol
 
 theme:
   name: material
@@ -38,7 +38,7 @@ plugins:
   - mkdocstrings: # API documentation from docstrings
       handlers:
         python:
-          paths: [py-epimodel/] # Add the Python package directory to sys.path
+          paths: [py-commol/] # Add the Python package directory to sys.path
           options:
             docstring_style: numpy
             show_source: true
@@ -81,10 +81,12 @@ nav:
       - Building Models: guide/building-models.md
       - Mathematical Expressions: guide/mathematical-expressions.md
       - Running Simulations: guide/simulations.md
+      - Model Calibration: guide/calibration.md
       - Examples: guide/examples.md
   - API Reference:
       - Model Builder: api/model-builder.md
       - Simulation: api/simulation.md
+      - Calibrator: api/calibrator.md
       - Constants: api/constants.md
   - Advanced:
       - Model Structure: advanced/model-structure.md
@@ -99,7 +101,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/MUNQU/epimodel
+      link: https://github.com/MUNQU/commol
     - icon: fontawesome/solid/users
       link: https://munqu.github.io
       name: MUNQU Research Team

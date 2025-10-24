@@ -1,0 +1,16 @@
+[package]
+name = "commol-difference"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Mathematical compartment modelling with difference equations"
+
+[lib]
+name = "commol_difference"
+crate-type = ["rlib"]
+
+[dependencies]
+commol-core = { path = "../commol-core" }

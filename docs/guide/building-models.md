@@ -1,13 +1,13 @@
 # Building Models
 
-The `ModelBuilder` class provides a fluent API for constructing epidemiological models.
+The `ModelBuilder` class provides a fluent API for constructing compartment models.
 
 ## ModelBuilder Basics
 
 ### Creating a Builder
 
 ```python
-from epimodel import ModelBuilder
+from commol import ModelBuilder
 
 builder = ModelBuilder(
     name="My Model",
@@ -23,9 +23,9 @@ The builder uses method chaining for a clean, readable API:
 ```python
 model = (
     ModelBuilder(name="SIR Model")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
     .build(ModelTypes.DIFFERENCE_EQUATIONS)
@@ -35,7 +35,7 @@ model = (
 ## Adding Disease States
 
 ```python
-builder.add_disease_state(
+builder.add_bin(
     id="S",                    # Required: Unique identifier
     name="Susceptible",        # Required: Display name
     description="Population susceptible to infection"  # Optional
@@ -80,11 +80,34 @@ builder.add_parameter(
 )
 ```
 
+### Parameters with Units
+
+You can specify units for automatic dimensional analysis and validation:
+
+```python
+builder.add_parameter(
+    id="beta",
+    value=0.5,
+    description="Transmission rate",
+    unit="1/day"  # Rate unit
+)
+
+builder.add_parameter(
+    id="seasonal_amplitude",
+    value=0.2,
+    description="Seasonal variation amplitude",
+    unit="dimensionless"  # Pure number
+)
+```
+
+When **all parameters have units**, the model will automatically validate dimensional consistency. See [Unit Checking](#unit-checking) below.
+
 ### Parameter Guidelines
 
 - Use meaningful IDs (beta, gamma, R0, etc.)
 - Document units and meaning
 - Ensure values are realistic for your model
+- Specify units for automatic validation (recommended)
 
 ## Adding Transitions
 
@@ -241,10 +264,10 @@ In this example:
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0}
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0}
     ]
 )
 ```
@@ -254,10 +277,10 @@ builder.set_initial_conditions(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0}
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0}
     ],
     stratification_fractions=[
         {
@@ -284,7 +307,7 @@ builder.set_initial_conditions(
 Once all components are added, build the model:
 
 ```python
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 ```
@@ -300,6 +323,131 @@ The build process validates:
 - No security issues in formulas
 
 If validation fails, a descriptive error is raised.
+
+## Unit Checking
+
+EpiModel provides automatic dimensional analysis to catch unit errors in your model equations. This validates that rate expressions produce the correct units and that mathematical functions receive dimensionally correct arguments.
+
+### Enabling Unit Checking
+
+Unit checking is enabled when **all parameters have units**:
+
+```python
+# Build model with units
+builder = ModelBuilder(name="SIR with Units", version="1.0")
+
+builder.add_bin("S", "Susceptible")
+builder.add_bin("I", "Infected")
+builder.add_bin("R", "Recovered")
+
+# Specify units for all parameters
+builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta * S * I / N"
+)
+builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+
+builder.set_initial_conditions(
+    population_size=1000,
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0},
+    ],
+)
+
+model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+# Validate dimensional consistency
+model.check_unit_consistency()  # Raises error if units are inconsistent
+```
+
+### Common Units
+
+```python
+# Rate units
+unit="1/day"         # Per-day rates
+unit="1/week"        # Per-week rates
+
+# Population units (automatically assigned to disease states)
+unit="person"        # Population count
+
+# Dimensionless quantities
+unit="dimensionless" # Ratios, fractions, amplitudes
+```
+
+### Mathematical Functions
+
+All standard math functions work with unit checking and validate their arguments:
+
+```python
+# Seasonal forcing (sin requires dimensionless argument)
+builder.add_parameter("beta_avg", 0.5, unit="1/day")
+builder.add_parameter("seasonal_amp", 0.2, unit="dimensionless")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365)) * S * I / N"
+)
+
+# Exponential decay (exp requires dimensionless argument)
+builder.add_parameter("beta_0", 0.5, unit="1/day")
+builder.add_parameter("decay_rate", 0.01, unit="dimensionless")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta_0 * exp(-decay_rate * step) * S * I / N"
+)
+```
+
+**Supported functions**: `sin`, `cos`, `tan`, `exp`, `log`, `sqrt`, `pow`, `min`, `max`, `abs`, and more.
+
+### Automatic Unit Assignment
+
+The system automatically assigns units to:
+
+- **Disease states**: All have units of `person` (S, I, R, etc.)
+- **Population variables**: `N`, `N_young`, `N_urban`, etc. have units of `person`
+- **Time variables**: `t` and `step` are dimensionless
+- **Constants**: `pi` and `e` are dimensionless
+
+### Error Detection
+
+Unit checking catches common errors:
+
+```python
+# Wrong parameter units
+builder.add_parameter("beta", 0.5, unit="day")  # Should be "1/day"!
+# Error: Unit mismatch: equation has unit 'day * person' but expected 'person/day'
+
+# Dimensional argument to math function
+rate="beta * sin(I) * S"  # I has units of person!
+# Error: Cannot convert from 'person' to 'dimensionless'
+
+# Incompatible units in operations
+rate="min(beta, threshold) * S"  # beta is 1/day, threshold is person
+# Error: Cannot compare incompatible units
+```
+
+### Best Practices
+
+1. **Always specify units** for physical quantities
+2. **Use "dimensionless"** for ratios and fractions
+3. **Ensure math function arguments are dimensionless** (divide by appropriate quantities)
+4. **Use consistent time units** throughout your model
+
+### When Unit Checking is Skipped
+
+If any parameter lacks a unit, checking is automatically skipped:
+
+```python
+builder.add_parameter("beta", 0.5)  # No unit
+builder.add_parameter("gamma", 0.1, unit="1/day")
+# Unit checking will be skipped (not all parameters have units)
+```
 
 ## Advanced: Conditional Transitions
 
@@ -330,7 +478,7 @@ builder.add_transition(
 Load pre-defined models from JSON files:
 
 ```python
-from epimodel import ModelLoader
+from commol import ModelLoader
 
 model = ModelLoader.from_json("path/to/model.json")
 ```
@@ -369,16 +517,16 @@ model = ModelLoader.from_json("path/to/model.json")
 ## Complete Example
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build SEIR model
 model = (
     ModelBuilder(name="SEIR Model", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="E", name="Exposed")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="E", name="Exposed")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.4, description="Transmission rate")
     .add_parameter(id="sigma", value=0.2, description="Incubation rate")
     .add_parameter(id="gamma", value=0.1, description="Recovery rate")
@@ -387,11 +535,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.999},
-            {"disease_state": "E", "fraction": 0.0},
-            {"disease_state": "I", "fraction": 0.001},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.999},
+            {"bin": "E", "fraction": 0.0},
+            {"bin": "I", "fraction": 0.001},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

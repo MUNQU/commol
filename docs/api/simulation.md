@@ -1,6 +1,6 @@
 # Simulation API
 
-::: epimodel.api.simulation.Simulation
+::: commol.api.simulation.Simulation
 options:
 show_root_heading: true
 show_source: true

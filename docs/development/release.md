@@ -41,11 +41,11 @@ Incremented for backwards-compatible bug fixes:
 
 Edit the following files:
 
-- `py-epimodel/pyproject.toml` - Update `version` field
+- `py-commol/pyproject.toml` - Update `version` field
 - `Cargo.toml` - Update `[workspace.package]` version
 
 ```toml
-# py-epimodel/pyproject.toml
+# py-commol/pyproject.toml
 [tool.poetry]
 version = "1.2.3"
 
@@ -84,7 +84,7 @@ Document all changes under the new version:
 
 ```bash
 # Python checks
-cd py-epimodel
+cd py-commol
 poetry run ruff check .
 poetry run ruff format .
 poetry run mypy epimodel
@@ -100,7 +100,7 @@ cargo test --workspace
 #### 1.4 Commit Version Changes
 
 ```bash
-git add py-epimodel/pyproject.toml Cargo.toml CHANGELOG.md
+git add py-commol/pyproject.toml Cargo.toml CHANGELOG.md
 git commit -m "chore: bump version to X.Y.Z"
 git push origin main
 ```
@@ -116,7 +116,7 @@ git push origin vX.Y.Z
 
 #### 2.2 Create GitHub Release
 
-1. Go to [Releases page](https://github.com/MUNQU/epimodel/releases)
+1. Go to [Releases page](https://github.com/MUNQU/commol/releases)
 2. Click "Draft a new release"
 3. Select tag: `vX.Y.Z`
 4. Set release title: `Version X.Y.Z`
@@ -154,7 +154,7 @@ pip install epimodel==X.Y.Z
 
 ## Full Changelog
 
-See [CHANGELOG.md](https://github.com/MUNQU/epimodel/blob/main/CHANGELOG.md)
+See [CHANGELOG.md](https://github.com/MUNQU/commol/blob/main/CHANGELOG.md)
 ```
 
 6. Click "Publish release"
@@ -169,7 +169,7 @@ Once the release is published, the GitHub Actions workflow automatically:
 
 Monitor progress:
 
-- Go to [Actions tab](https://github.com/MUNQU/epimodel/actions)
+- Go to [Actions tab](https://github.com/MUNQU/commol/actions)
 - Watch the "Release to PyPI" workflow
 
 ### Step 4: Verify the Release
@@ -189,21 +189,21 @@ source test_env/bin/activate  # or test_env\Scripts\activate on Windows
 pip install epimodel==X.Y.Z
 
 # Verify it works
-python -c "from epimodel import ModelBuilder; print('Success!')"
+python -c "from commol import ModelBuilder; print('Success!')"
 ```
 
 #### 4.3 Test Functionality
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Run a quick test
 model = (
     ModelBuilder(name="Test")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
     .add_parameter(id="N", value=1000.0)
@@ -211,10 +211,10 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

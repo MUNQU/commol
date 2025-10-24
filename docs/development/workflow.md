@@ -20,11 +20,11 @@ curl -sSL https://install.python-poetry.org | python3 -
 ### 2. Clone and Setup
 
 ```bash
-git clone https://github.com/MUNQU/epimodel.git
+git clone https://github.com/MUNQU/commol.git
 cd epimodel
 
 # Install Python dependencies
-cd py-epimodel
+cd py-commol
 poetry install --with dev
 
 # Install pre-commit hooks (optional but recommended)
@@ -38,7 +38,7 @@ poetry run pre-commit install
 cargo build --workspace
 
 # Build Python extension
-cd py-epimodel
+cd py-commol
 maturin develop --release
 ```
 
@@ -73,7 +73,7 @@ git checkout -b feature/your-feature-name
 # Make your changes to the code
 
 # Run quality checks before committing
-cd py-epimodel
+cd py-commol
 poetry run ruff check . --fix         # Auto-fix Python linting issues
 poetry run ruff format .              # Format Python code
 poetry run mypy epimodel              # Type checking
@@ -87,7 +87,7 @@ cargo clippy --all-targets --fix      # Fix Rust linting issues
 
 ```bash
 # Run Python tests
-cd py-epimodel
+cd py-commol
 poetry run pytest -v
 
 # Run Rust tests
@@ -201,13 +201,13 @@ The project uses three main CI/CD pipelines:
 
 ```bash
 # Run all quality checks (Python)
-cd py-epimodel && poetry run ruff check . && poetry run ruff format . && poetry run mypy epimodel && poetry run pytest
+cd py-commol && poetry run ruff check . && poetry run ruff format . && poetry run mypy epimodel && poetry run pytest
 
 # Run all quality checks (Rust)
 cargo fmt --all && cargo clippy --all-targets && cargo test --workspace
 
 # Build and test the Python package locally
-cd py-epimodel
+cd py-commol
 maturin develop --release
 poetry run pytest
 ```
@@ -217,7 +217,7 @@ poetry run pytest
 Install pre-commit hooks to automatically check code before committing:
 
 ```bash
-cd py-epimodel
+cd py-commol
 poetry run pre-commit install
 ```
 
@@ -239,7 +239,7 @@ This runs:
 Pre-commit hooks handle this automatically:
 
 ```bash
-cd py-epimodel
+cd py-commol
 poetry run pre-commit install  # One-time setup
 
 # Now git commit automatically updates poetry.lock if needed
@@ -252,7 +252,7 @@ git commit -m "chore: update dependencies"
 If not using pre-commit hooks:
 
 ```bash
-cd py-epimodel
+cd py-commol
 poetry check  # Check if lock file is in sync
 poetry lock   # Update lock file without changing versions
 git add poetry.lock
@@ -268,7 +268,7 @@ git commit -m "chore: update poetry.lock"
 maturin develop
 
 # Run Python
-cd py-epimodel
+cd py-commol
 poetry run python -m your_test_script.py
 ```
 
@@ -278,7 +278,7 @@ The project uses MkDocs Material for documentation with multi-version support vi
 
 ```bash
 # Install documentation dependencies
-cd py-epimodel
+cd py-commol
 poetry install --with docs
 
 # Serve documentation locally
@@ -313,12 +313,12 @@ If you need to manually deploy documentation:
 
 ```bash
 # Deploy latest version (from main branch)
-cd py-epimodel
+cd py-commol
 poetry run mike deploy --push --update-aliases latest
 poetry run mike set-default --push latest
 
 # Deploy dev version (from develop branch)
-cd py-epimodel
+cd py-commol
 poetry run mike deploy --push dev
 
 # List all deployed versions

@@ -2,11 +2,11 @@
 resolver = "3"
 members = [
     "crates/*",
-    "py-epimodel"
+    "py-commol"
 ]
 default-members = [
   "crates/*",
-  "py-epimodel"
+  "py-commol"
 ]
 
 [workspace.package]
@@ -17,9 +17,9 @@ authors = [
     "David Martínez Rodríguez <damarro3@upv.es>"
 ]
 edition = "2024"
-homepage = "https://github.com/MUNQU/epimodel"
+homepage = "https://github.com/MUNQU/commol"
 license = "MIT"
-repository = "https://github.com/MUNQU/epimodel"
+repository = "https://github.com/MUNQU/commol"
 
 [workspace.dependencies]
 pyo3 = { version = "0.25.1", features = ["extension-module", "serde"] }

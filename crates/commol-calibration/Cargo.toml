@@ -1,0 +1,26 @@
+[package]
+name = "commol-calibration"
+version = "0.1.0"
+edition = "2021"
+authors = ["Commol Contributors"]
+description = "Model calibration and parameter estimation for Commol"
+license = "MIT"
+
+[lib]
+name = "commol_calibration"
+crate-type = ["rlib"]
+
+[dependencies]
+# Optimization library
+argmin = "0.10"
+argmin-math = "0.4"
+argmin-observer-slog = "0.1"
+
+# Commol dependencies
+commol-core = { path = "../commol-core" }
+commol-difference = { path = "../commol-difference" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"

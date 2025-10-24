@@ -8,7 +8,7 @@ Thank you for considering contributing to EpiModel! This document provides guide
 
 Before creating a bug report:
 
-- Check the [issue tracker](https://github.com/MUNQU/epimodel/issues) for existing reports
+- Check the [issue tracker](https://github.com/MUNQU/commol/issues) for existing reports
 - Verify the bug exists in the latest version
 
 When creating a bug report, include:
@@ -48,7 +48,7 @@ Feature suggestions are welcome! Please:
 - Use Ruff for linting and formatting
 
 ```bash
-cd py-epimodel
+cd py-commol
 poetry run ruff check .
 poetry run ruff format .
 poetry run mypy epimodel
@@ -80,7 +80,7 @@ def test_model_builder_creates_valid_sir_model():
     """Test that ModelBuilder creates a valid SIR model."""
     model = (
         ModelBuilder(name="Test SIR")
-        .add_disease_state(id="S", name="Susceptible")
+        .add_bin(id="S", name="Susceptible")
         # ... rest of model
         .build(ModelTypes.DIFFERENCE_EQUATIONS)
     )
@@ -90,7 +90,7 @@ def test_model_builder_creates_valid_sir_model():
 Run tests:
 
 ```bash
-cd py-epimodel
+cd py-commol
 poetry run pytest -v --cov=epimodel
 ```
 
@@ -244,9 +244,9 @@ See [Release Process](release.md) for details on versioning and releases.
 
 ## Getting Help
 
-- **Documentation**: Check the [docs](https://munqu.github.io/epimodel)
-- **Discussions**: Use [GitHub Discussions](https://github.com/MUNQU/epimodel/discussions)
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/MUNQU/epimodel/issues)
+- **Documentation**: Check the [docs](https://munqu.github.io/commol)
+- **Discussions**: Use [GitHub Discussions](https://github.com/MUNQU/commol/discussions)
+- **Issues**: Report bugs via [GitHub Issues](https://github.com/MUNQU/commol/issues)
 
 ## Recognition
 

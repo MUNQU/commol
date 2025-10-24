@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
 
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('py-epimodel/poetry.lock') }}
+          key: ${{ runner.os }}-poetry-${{ hashFiles('py-commol/poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
 
@@ -43,9 +43,8 @@ jobs:
           poetry install --extras docs --no-root
 
       - name: Build documentation
-        working-directory: .
-        run: |
-          cd py-epimodel && poetry run mkdocs build --strict -f ../mkdocs.yaml
+        working-directory: ./py-commol
+        run: poetry run mkdocs build --strict -f ../mkdocs.yaml
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
@@ -78,12 +77,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('py-epimodel/poetry.lock') }}
+          key: ${{ runner.os }}-poetry-${{ hashFiles('py-commol/poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
 
       - name: Install dependencies
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry install --extras docs --no-root
 
@@ -94,13 +93,13 @@ jobs:
 
       - name: Deploy latest documentation (main branch)
         if: github.ref == 'refs/heads/main'
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry run mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
           poetry run mike set-default --push latest --config-file ../mkdocs.yaml
 
       - name: Deploy development documentation (develop branch)
         if: github.ref == 'refs/heads/develop'
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
-          poetry run mike deploy --push dev --config-file ../mkdocs.yaml
+          poetry run mike deploy --push --update-aliases dev --config-file ../mkdocs.yaml
