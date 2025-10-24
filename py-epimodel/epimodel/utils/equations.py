@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 
 import pint
 
@@ -93,7 +94,17 @@ def _parse_equation_unit(
         A pint Quantity representing the unit of the equation.
     """
     # Create a namespace with all variables as pint quantities with value 1
-    namespace: dict[str, pint.Quantity | float] = {}
+    # The namespace also includes math functions which are callables
+    namespace: dict[
+        str,
+        pint.Quantity
+        | float
+        | Callable[[float], float]
+        | Callable[[float, float], float]
+        | Callable[..., float]
+        | type[int]
+        | type[float],
+    ] = {}
 
     # Add variables with their units
     for var, unit_str in variable_units.items():
@@ -152,12 +163,13 @@ def _parse_equation_unit(
 
     # Evaluate the equation
     try:
-        result: object = eval(equation, {"__builtins__": {}}, namespace)
+        result = eval(equation, {"__builtins__": {}}, namespace)
         if isinstance(result, pint.Quantity):
             return result
         elif isinstance(result, (int, float)):
             # If result is a number, it's dimensionless
-            return float(result) * ureg.dimensionless
+            dimensionless_quantity: pint.Quantity = float(result) * ureg.dimensionless
+            return dimensionless_quantity
         else:
             raise ValueError(
                 f"Unexpected result type {type(result)} from equation '{equation}'"
