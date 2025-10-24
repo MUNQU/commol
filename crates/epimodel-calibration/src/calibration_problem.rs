@@ -216,8 +216,22 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
     }
 
-    /// Validate that parameter values are within their defined bounds
-    fn validate_parameters(&self, param_values: &[f64]) -> Result<(), String> {
+    /// Clamp parameter values to their defined bounds
+    ///
+    /// This is necessary because some optimization algorithms (like Nelder-Mead)
+    /// can explore outside the bounds during their search process. By clamping,
+    /// we ensure the simulation always receives valid parameter values while
+    /// still allowing the optimizer to explore the parameter space freely.
+    fn clamp_to_bounds(&self, param_values: &[f64]) -> Vec<f64> {
+        param_values
+            .iter()
+            .zip(&self.parameters)
+            .map(|(value, param)| value.clamp(param.min_bound, param.max_bound))
+            .collect()
+    }
+
+    /// Validate parameter vector length
+    fn validate_parameter_count(&self, param_values: &[f64]) -> Result<(), String> {
         if param_values.len() != self.parameters.len() {
             return Err(format!(
                 "Expected {} parameters, got {}",
@@ -225,16 +239,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 param_values.len()
             ));
         }
-
-        for (i, (value, param)) in param_values.iter().zip(&self.parameters).enumerate() {
-            if !param.is_within_bounds(*value) {
-                return Err(format!(
-                    "Parameter '{}' at index {} has value {} outside bounds [{}, {}]",
-                    param.id, i, value, param.min_bound, param.max_bound
-                ));
-            }
-        }
-
         Ok(())
     }
 }
@@ -247,8 +251,12 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
     type Output = f64;
 
     fn cost(&self, param_values: &Self::Param) -> Result<Self::Output, Error> {
-        // Validate parameter bounds
-        self.validate_parameters(param_values).map_err(Error::msg)?;
+        // Validate parameter count
+        self.validate_parameter_count(param_values)
+            .map_err(Error::msg)?;
+
+        // Clamp parameters to bounds (handles optimizers that explore outside bounds)
+        let clamped_params = self.clamp_to_bounds(param_values);
 
         // Clone the base engine (works for any model type)
         let mut engine = self.base_engine.clone();
@@ -256,8 +264,8 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Update parameters with new values
-        for (value, param) in param_values.iter().zip(&self.parameters) {
+        // Update parameters with clamped values
+        for (value, param) in clamped_params.iter().zip(&self.parameters) {
             engine.set_parameter(&param.id, *value).map_err(|e| {
                 Error::msg(format!("Failed to set parameter '{}': {}", param.id, e))
             })?;
