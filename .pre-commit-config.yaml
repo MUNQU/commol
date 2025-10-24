@@ -9,8 +9,8 @@ repos:
     rev: "2.2.0"
     hooks:
       - id: poetry-check
-        files: ^py-epimodel/pyproject\.toml$
-        args: ["-C", "py-epimodel"]
+        files: ^py-commol/pyproject\.toml$
+        args: ["-C", "py-commol"]
       - id: poetry-lock
-        files: ^py-epimodel/pyproject\.toml$
-        args: ["-C", "py-epimodel"]
+        files: ^py-commol/pyproject\.toml$
+        args: ["-C", "py-commol"]

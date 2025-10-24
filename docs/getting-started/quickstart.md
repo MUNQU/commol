@@ -1,21 +1,21 @@
 # Quick Start
 
-This guide will help you build and run your first epidemiological model with EpiModel.
+This guide will help you build and run your first compartment model with Commol.
 
 ## Your First SIR Model
 
 Let's create a basic SIR (Susceptible-Infected-Recovered) model:
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build the model
 model = (
     ModelBuilder(name="Basic SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)   # Transmission rate
     .add_parameter(id="gamma", value=0.1)  # Recovery rate
     .add_transition(
@@ -32,10 +32,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -56,8 +56,8 @@ print(f"Recovered at day 100: {results['R'][-1]:.0f}")
 ### 1. Import Required Classes
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 ```
 
 - `ModelBuilder`: Fluent API for constructing models
@@ -67,9 +67,9 @@ from epimodel.constants import ModelTypes
 ### 2. Define Disease States
 
 ```python
-.add_disease_state(id="S", name="Susceptible")
-.add_disease_state(id="I", name="Infected")
-.add_disease_state(id="R", name="Recovered")
+.add_bin(id="S", name="Susceptible")
+.add_bin(id="I", name="Infected")
+.add_bin(id="R", name="Recovered")
 ```
 
 Disease states represent compartments in your model.
@@ -101,7 +101,7 @@ Transitions move populations between states using mathematical formulas.
 ```python
 .set_initial_conditions(
     population_size=1000,
-    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+    bin_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
 )
 ```
 
@@ -122,9 +122,9 @@ Improve model safety by adding units to your parameters:
 ```python
 model = (
     ModelBuilder(name="SIR with Units", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.5, unit="1/day")    # Rate per day
     .add_parameter(id="gamma", value=0.1, unit="1/day")   # Rate per day
     .add_transition(
@@ -141,10 +141,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -167,7 +167,7 @@ See the [Unit Checking](../guide/building-models.md#unit-checking) section for d
 Once you have a model, you can calibrate its parameters to match observed data using the `Calibrator` class:
 
 ```python
-from epimodel import (
+from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,

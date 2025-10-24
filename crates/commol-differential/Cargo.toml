@@ -1,0 +1,12 @@
+[package]
+name = "commol-differential"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Mathematical compartment modelling with differential equations"
+
+[dependencies]
+commol-core = { path = "../commol-core" }

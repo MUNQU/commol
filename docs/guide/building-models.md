@@ -1,13 +1,13 @@
 # Building Models
 
-The `ModelBuilder` class provides a fluent API for constructing epidemiological models.
+The `ModelBuilder` class provides a fluent API for constructing compartment models.
 
 ## ModelBuilder Basics
 
 ### Creating a Builder
 
 ```python
-from epimodel import ModelBuilder
+from commol import ModelBuilder
 
 builder = ModelBuilder(
     name="My Model",
@@ -23,9 +23,9 @@ The builder uses method chaining for a clean, readable API:
 ```python
 model = (
     ModelBuilder(name="SIR Model")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
     .build(ModelTypes.DIFFERENCE_EQUATIONS)
@@ -35,7 +35,7 @@ model = (
 ## Adding Disease States
 
 ```python
-builder.add_disease_state(
+builder.add_bin(
     id="S",                    # Required: Unique identifier
     name="Susceptible",        # Required: Display name
     description="Population susceptible to infection"  # Optional
@@ -264,10 +264,10 @@ In this example:
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0}
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0}
     ]
 )
 ```
@@ -277,10 +277,10 @@ builder.set_initial_conditions(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0}
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0}
     ],
     stratification_fractions=[
         {
@@ -307,7 +307,7 @@ builder.set_initial_conditions(
 Once all components are added, build the model:
 
 ```python
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 ```
@@ -336,9 +336,9 @@ Unit checking is enabled when **all parameters have units**:
 # Build model with units
 builder = ModelBuilder(name="SIR with Units", version="1.0")
 
-builder.add_disease_state("S", "Susceptible")
-builder.add_disease_state("I", "Infected")
-builder.add_disease_state("R", "Recovered")
+builder.add_bin("S", "Susceptible")
+builder.add_bin("I", "Infected")
+builder.add_bin("R", "Recovered")
 
 # Specify units for all parameters
 builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
@@ -352,10 +352,10 @@ builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
 
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0},
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0},
     ],
 )
 
@@ -478,7 +478,7 @@ builder.add_transition(
 Load pre-defined models from JSON files:
 
 ```python
-from epimodel import ModelLoader
+from commol import ModelLoader
 
 model = ModelLoader.from_json("path/to/model.json")
 ```
@@ -517,16 +517,16 @@ model = ModelLoader.from_json("path/to/model.json")
 ## Complete Example
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build SEIR model
 model = (
     ModelBuilder(name="SEIR Model", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="E", name="Exposed")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="E", name="Exposed")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.4, description="Transmission rate")
     .add_parameter(id="sigma", value=0.2, description="Incubation rate")
     .add_parameter(id="gamma", value=0.1, description="Recovery rate")
@@ -535,11 +535,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.999},
-            {"disease_state": "E", "fraction": 0.0},
-            {"disease_state": "I", "fraction": 0.001},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.999},
+            {"bin": "E", "fraction": 0.0},
+            {"bin": "I", "fraction": 0.001},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

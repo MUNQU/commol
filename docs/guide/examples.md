@@ -7,26 +7,26 @@ Complete examples demonstrating different modeling scenarios.
 Classic Susceptible-Infected-Recovered model:
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 import matplotlib.pyplot as plt
 
 # Build model
 model = (
     ModelBuilder(name="Basic SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
     .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -44,10 +44,10 @@ Adding an exposed (incubation) period:
 ```python
 model = (
     ModelBuilder(name="SEIR Model", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="E", name="Exposed")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="E", name="Exposed")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.4, description="Transmission rate")
     .add_parameter(id="sigma", value=0.2, description="Incubation rate")
     .add_parameter(id="gamma", value=0.1, description="Recovery rate")
@@ -56,11 +56,11 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.999},
-            {"disease_state": "E", "fraction": 0.0},
-            {"disease_state": "I", "fraction": 0.001},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.999},
+            {"bin": "E", "fraction": 0.0},
+            {"bin": "I", "fraction": 0.001},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -77,9 +77,9 @@ Modeling seasonal variation in transmission:
 ```python
 model = (
     ModelBuilder(name="Seasonal SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta_mean", value=0.3)
     .add_parameter(id="beta_amp", value=0.2)
     .add_parameter(id="gamma", value=0.1)
@@ -93,10 +93,10 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -114,9 +114,9 @@ Different age groups with varying recovery rates:
 ```python
 model = (
     ModelBuilder(name="Age-Stratified SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["child", "adult", "elderly"])
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma_child", value=0.15)
@@ -149,10 +149,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=10000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ],
         stratification_fractions=[
             {
@@ -179,9 +179,9 @@ Adding vaccination to an SIR model:
 ```python
 model = (
     ModelBuilder(name="SIR with Vaccination", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.4)
     .add_parameter(id="gamma", value=0.1)
     .add_parameter(id="vax_rate", value=0.01)  # 1% per day
@@ -196,10 +196,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -217,9 +217,9 @@ Modeling reduced recovery when hospitals are overwhelmed:
 ```python
 model = (
     ModelBuilder(name="SIR with Healthcare Capacity", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.5)
     .add_parameter(id="gamma_max", value=0.15)
     .add_parameter(id="hospital_cap", value=100.0)
@@ -233,10 +233,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.95},
-            {"disease_state": "I", "fraction": 0.05},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.95},
+            {"bin": "I", "fraction": 0.05},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -253,9 +253,9 @@ Recovered individuals gradually become susceptible again:
 ```python
 model = (
     ModelBuilder(name="SIRS Model", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
     .add_parameter(id="omega", value=0.01)  # Waning immunity rate
@@ -264,10 +264,10 @@ model = (
     .add_transition(id="waning", source=["R"], target=["S"], rate="omega")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -288,9 +288,9 @@ import numpy as np
 # Build model
 model = (
     ModelBuilder(name="Multi-Stratified SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["young", "old"])
     .add_stratification(id="risk", categories=["low", "high"])
     .add_parameter(id="beta_low", value=0.3)
@@ -311,10 +311,10 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ],
         stratification_fractions=[
             {
@@ -349,9 +349,9 @@ This example shows how to model frequency-dependent transmission within a specif
 # Build model
 model = (
     ModelBuilder(name="Subpopulation-Dependent SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["young", "old"])
     .add_parameter(id="beta", value=0.4)
     .add_parameter(id="gamma", value=0.1)
@@ -370,10 +370,10 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ],
         stratification_fractions=[
             {
@@ -398,7 +398,7 @@ results = simulation.run(num_steps=100)
 Calibrate model parameters to match observed data:
 
 ```python
-from epimodel import (
+from commol import (
     ModelBuilder,
     Simulation,
     Calibrator,
@@ -411,14 +411,14 @@ from epimodel import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 # Build SIR model with initial parameter guesses
 model = (
     ModelBuilder(name="SIR for Calibration", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)   # Initial guess
     .add_parameter(id="gamma", value=0.1)  # Initial guess
     .add_transition(
@@ -435,10 +435,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

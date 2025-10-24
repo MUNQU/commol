@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
 
     steps:
       - uses: actions/checkout@v4
@@ -45,15 +45,15 @@ jobs:
         run: poetry run ruff format --check .
 
       - name: Run mypy type checking
-        run: poetry run mypy epimodel
+        run: poetry run mypy commol
 
       - name: Run pytest
-        run: poetry run pytest --cov=epimodel --cov-report=xml --cov-report=term
+        run: poetry run pytest --cov=commol --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          file: ./py-epimodel/coverage.xml
+          file: ./py-commol/coverage.xml
           flags: python
           fail_ci_if_error: false
 

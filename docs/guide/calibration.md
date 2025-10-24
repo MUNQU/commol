@@ -21,7 +21,7 @@ The `Calibrator.run()` method returns a `CalibrationResult` object containing th
 Here's a simple calibration of an SIR model's transmission and recovery rates:
 
 ```python
-from epimodel import (
+from commol import (
     ModelBuilder,
     Simulation,
     Calibrator,
@@ -34,14 +34,14 @@ from epimodel import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 # Build the model
 model = (
     ModelBuilder(name="SIR Model", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)   # Initial guess
     .add_parameter(id="gamma", value=0.1)  # Initial guess
     .add_transition(
@@ -58,10 +58,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -177,7 +177,7 @@ $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
 Population-based algorithm inspired by social behavior. Good for global optimization:
 
 ```python
-from epimodel import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
 
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
@@ -205,7 +205,7 @@ optimization_config = OptimizationConfig(
 Derivative-free simplex algorithm. Fast convergence for smooth problems:
 
 ```python
-from epimodel import NelderMeadConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import NelderMeadConfig, OptimizationConfig, OptimizationAlgorithm
 
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.NELDER_MEAD,
@@ -269,9 +269,9 @@ Calibrate parameters specific to age groups or other stratifications:
 # Build age-stratified model
 model = (
     ModelBuilder(name="Age-Stratified SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["young", "old"])
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma_young", value=0.12)
@@ -299,10 +299,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ],
         stratification_fractions=[
             {
@@ -351,9 +351,9 @@ if result.converged:
     # You need to rebuild the model with the new parameter values
     calibrated_model = (
         ModelBuilder(name="Calibrated SIR", version="1.0")
-        .add_disease_state(id="S", name="Susceptible")
-        .add_disease_state(id="I", name="Infected")
-        .add_disease_state(id="R", name="Recovered")
+        .add_bin(id="S", name="Susceptible")
+        .add_bin(id="I", name="Infected")
+        .add_bin(id="R", name="Recovered")
         # Use calibrated parameter values
         .add_parameter(id="beta", value=result.best_parameters["beta"])
         .add_parameter(id="gamma", value=result.best_parameters["gamma"])
@@ -371,10 +371,10 @@ if result.converged:
         )
         .set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0}
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0}
             ]
         )
         .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

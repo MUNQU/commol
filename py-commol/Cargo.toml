@@ -1,0 +1,18 @@
+[package]
+name = "commol"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "commol_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde_json = "1.0"
+commol-core = { path = "../crates/commol-core" }
+commol-difference = { path = "../crates/commol-difference" }
+commol-calibration = { path = "../crates/commol-calibration" }
+
+# Required for custom argmin observer
+argmin = "0.10"
