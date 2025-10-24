@@ -1,6 +1,6 @@
 # Calibrator API
 
-::: epimodel.api.calibrator.Calibrator
+::: commol.api.calibrator.Calibrator
     options:
       show_root_heading: true
       show_source: true
@@ -11,7 +11,7 @@
 
 ### CalibrationProblem
 
-::: epimodel.context.calibration.CalibrationProblem
+::: commol.context.calibration.CalibrationProblem
     options:
       show_root_heading: true
       show_source: false
@@ -20,7 +20,7 @@
 
 ### CalibrationResult
 
-::: epimodel.context.calibration.CalibrationResult
+::: commol.context.calibration.CalibrationResult
     options:
       show_root_heading: true
       show_source: false
@@ -29,7 +29,7 @@
 
 ### CalibrationParameter
 
-::: epimodel.context.calibration.CalibrationParameter
+::: commol.context.calibration.CalibrationParameter
     options:
       show_root_heading: true
       show_source: false
@@ -38,7 +38,7 @@
 
 ### ObservedDataPoint
 
-::: epimodel.context.calibration.ObservedDataPoint
+::: commol.context.calibration.ObservedDataPoint
     options:
       show_root_heading: true
       show_source: false
@@ -47,7 +47,7 @@
 
 ### LossConfig
 
-::: epimodel.context.calibration.LossConfig
+::: commol.context.calibration.LossConfig
     options:
       show_root_heading: true
       show_source: false
@@ -56,7 +56,7 @@
 
 ### OptimizationConfig
 
-::: epimodel.context.calibration.OptimizationConfig
+::: commol.context.calibration.OptimizationConfig
     options:
       show_root_heading: true
       show_source: false
@@ -65,7 +65,7 @@
 
 ### NelderMeadConfig
 
-::: epimodel.context.calibration.NelderMeadConfig
+::: commol.context.calibration.NelderMeadConfig
     options:
       show_root_heading: true
       show_source: false
@@ -74,7 +74,7 @@
 
 ### ParticleSwarmConfig
 
-::: epimodel.context.calibration.ParticleSwarmConfig
+::: commol.context.calibration.ParticleSwarmConfig
     options:
       show_root_heading: true
       show_source: false
@@ -85,7 +85,7 @@
 
 ### LossFunction
 
-::: epimodel.context.calibration.LossFunction
+::: commol.context.calibration.LossFunction
     options:
       show_root_heading: true
       show_source: false
@@ -94,7 +94,7 @@
 
 ### OptimizationAlgorithm
 
-::: epimodel.context.calibration.OptimizationAlgorithm
+::: commol.context.calibration.OptimizationAlgorithm
     options:
       show_root_heading: true
       show_source: false

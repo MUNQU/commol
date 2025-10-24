@@ -13,7 +13,7 @@ This section documents the internal structure of the `Model` class and its compo
 
 ## Model
 
-::: epimodel.context.model.Model
+::: commol.context.model.Model
 options:
 show_root_heading: true
 show_source: true
@@ -21,15 +21,15 @@ heading_level: 3
 
 ## Population
 
-::: epimodel.context.population.Population
+::: commol.context.population.Population
 options:
 show_root_heading: true
 show_source: true
 heading_level: 3
 
-## Disease States
+## Bins
 
-::: epimodel.context.disease_state.DiseaseState
+::: commol.context.bin.Bin
 options:
 show_root_heading: true
 show_source: true
@@ -37,7 +37,7 @@ heading_level: 3
 
 ## Stratifications
 
-::: epimodel.context.stratification.Stratification
+::: commol.context.stratification.Stratification
 options:
 show_root_heading: true
 show_source: true
@@ -45,7 +45,7 @@ heading_level: 3
 
 ## Parameters
 
-::: epimodel.context.parameter.Parameter
+::: commol.context.parameter.Parameter
 options:
 show_root_heading: true
 show_source: true
@@ -53,7 +53,7 @@ heading_level: 3
 
 ## Transitions
 
-::: epimodel.context.dynamics.Transition
+::: commol.context.dynamics.Transition
 options:
 show_root_heading: true
 show_source: true
@@ -61,7 +61,7 @@ heading_level: 3
 
 ## Initial Conditions
 
-::: epimodel.context.initial_conditions.InitialConditions
+::: commol.context.initial_conditions.InitialConditions
 options:
 show_root_heading: true
 show_source: true
@@ -69,7 +69,7 @@ heading_level: 3
 
 ## Dynamics
 
-::: epimodel.context.dynamics.Dynamics
+::: commol.context.dynamics.Dynamics
 options:
 show_root_heading: true
 show_source: true
