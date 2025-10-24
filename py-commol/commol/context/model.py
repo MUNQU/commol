@@ -78,7 +78,7 @@ class Model(BaseModel):
         """Gathers all valid identifiers for use in rate expressions."""
         special_vars = {"N", "step", "pi", "e", "t"}
         param_ids = {param.id for param in self.parameters}
-        state_ids = {state.id for state in self.population.bins}
+        bin_ids = {bin_item.id for bin_item in self.population.bins}
 
         strat_category_ids: set[str] = {
             cat for strat in self.population.stratifications for cat in strat.categories
@@ -88,7 +88,7 @@ class Model(BaseModel):
 
         return (
             param_ids
-            | state_ids
+            | bin_ids
             | strat_category_ids
             | special_vars
             | subpopulation_n_vars
@@ -137,7 +137,7 @@ class Model(BaseModel):
         undefined_vars = [var for var in variables if var not in valid_identifiers]
         if undefined_vars:
             param_ids = {param.id for param in self.parameters}
-            state_ids = {state.id for state in self.population.bins}
+            bin_ids = {bin_item.id for bin_item in self.population.bins}
             raise ValueError(
                 (
                     f"Undefined variables in transition '{transition_id}' "
@@ -145,7 +145,7 @@ class Model(BaseModel):
                     f"Available parameters: "
                     f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
                     f"Available bins: "
-                    f"{', '.join(sorted(state_ids)) if state_ids else 'none'}."
+                    f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
                 )
             )
 
@@ -153,43 +153,43 @@ class Model(BaseModel):
     def validate_transition_ids(self) -> Self:
         """
         Validates that transition ids (source/target) are consistent in type
-        and match the defined DiseaseState IDs or Stratification Categories
+        and match the defined Bin IDs or Stratification Categories
         in the Population instance.
         """
 
-        bin_ids = {state.id for state in self.population.bins}
+        bin_ids = {bin_item.id for bin_item in self.population.bins}
         categories_ids = {
             cat for strat in self.population.stratifications for cat in strat.categories
         }
-        disease_state_and_categories_ids = bin_ids.union(categories_ids)
+        bin_and_categories_ids = bin_ids.union(categories_ids)
 
         for transition in self.dynamics.transitions:
             source = set(transition.source)
             target = set(transition.target)
             transition_ids = source.union(target)
 
-            if not transition_ids.issubset(disease_state_and_categories_ids):
-                invalid_ids = transition_ids - disease_state_and_categories_ids
+            if not transition_ids.issubset(bin_and_categories_ids):
+                invalid_ids = transition_ids - bin_and_categories_ids
                 raise ValueError(
                     (
                         f"Transition '{transition.id}' contains invalid ids: "
-                        f"{invalid_ids}. Ids must be defined in DiseaseState ids "
+                        f"{invalid_ids}. Ids must be defined in Bin ids "
                         f"or Stratification Categories."
                     )
                 )
 
-            is_disease_state_flow = transition_ids.issubset(bin_ids)
+            is_bin_flow = transition_ids.issubset(bin_ids)
             is_stratification_flow = transition_ids.issubset(categories_ids)
 
-            if (not is_disease_state_flow) and (not is_stratification_flow):
-                disease_state_elements = transition_ids.intersection(bin_ids)
+            if (not is_bin_flow) and (not is_stratification_flow):
+                bin_elements = transition_ids.intersection(bin_ids)
                 categories_elements = transition_ids.intersection(categories_ids)
                 raise ValueError(
                     (
                         f"Transition '{transition.id}' mixes id types. "
-                        f"Found DiseaseState ids ({disease_state_elements}) and "
+                        f"Found Bin ids ({bin_elements}) and "
                         f"Stratification Categories ids ({categories_elements}). "
-                        "Transitions must be purely Disease State flow or purely "
+                        "Transitions must be purely Bin flow or purely "
                         f"Stratification flow."
                     )
                 )
@@ -262,7 +262,7 @@ class Model(BaseModel):
         lines.append("=" * 40)
         lines.append(f"Model: {self.name}")
         lines.append(f"Model Type: {self.dynamics.typology}")
-        lines.append(f"Number of Disease States: {len(self.population.bins)}")
+        lines.append(f"Number of Bins: {len(self.population.bins)}")
         lines.append(
             f"Number of Stratifications: {len(self.population.stratifications)}"
         )
@@ -270,8 +270,8 @@ class Model(BaseModel):
         lines.append(f"Number of Transitions: {len(self.dynamics.transitions)}")
 
         # List bins
-        bin_ids = [state.id for state in self.population.bins]
-        lines.append(f"Disease States: {', '.join(bin_ids)}")
+        bin_ids = [bin_item.id for bin_item in self.population.bins]
+        lines.append(f"Bins: {', '.join(bin_ids)}")
 
         # List stratifications
         if self.population.stratifications:
@@ -283,19 +283,19 @@ class Model(BaseModel):
         lines.append("")
         return lines
 
-    def _collect_state_ids(self) -> set[str]:
-        """Collect all state IDs from bins and stratifications."""
-        state_ids = {state.id for state in self.population.bins}
+    def _collect_bin_and_category_ids(self) -> set[str]:
+        """Collect all IDs from bins and stratification categories."""
+        all_ids = {bin_item.id for bin_item in self.population.bins}
         for strat in self.population.stratifications:
-            state_ids.update(strat.categories)
-        return state_ids
+            all_ids.update(strat.categories)
+        return all_ids
 
     def _build_flow_equations(
-        self, state_ids: set[str]
+        self, bin_and_category_ids: set[str]
     ) -> dict[str, dict[str, list[str]]]:
-        """Build a mapping of states to their inflows and outflows."""
+        """Build a mapping of bins and categories to their inflows and outflows."""
         equations: dict[str, dict[str, list[str]]] = {
-            state_id: {"inflows": [], "outflows": []} for state_id in state_ids
+            id_: {"inflows": [], "outflows": []} for id_ in bin_and_category_ids
         }
         for transition in self.dynamics.transitions:
             rate = transition.rate if transition.rate else ""
@@ -317,8 +317,8 @@ class Model(BaseModel):
 
         return equations
 
-    def _format_state_equation(self, flows: dict[str, list[str]]) -> str:
-        """Format the equation for a single state from its flows."""
+    def _format_bin_equation(self, flows: dict[str, list[str]]) -> str:
+        """Format the equation for a single bin or category from its flows."""
         terms: list[str] = []
 
         for inflow in flows["inflows"]:
@@ -346,16 +346,16 @@ class Model(BaseModel):
         lines.append("=" * 40)
         lines.append("")
 
-        bin_ids = [state.id for state in self.population.bins]
-        disease_transitions, stratification_transitions = (
+        bin_ids = [bin_item.id for bin_item in self.population.bins]
+        bin_transitions, stratification_transitions = (
             self._separate_transitions_by_type()
         )
 
         compartments = self._generate_compartments()
 
         lines.extend(
-            self._format_disease_transitions_compact_stratified(
-                disease_transitions, compartments
+            self._format_bin_transitions_compact_stratified(
+                bin_transitions, compartments
             )
         )
         lines.extend(
@@ -381,9 +381,9 @@ class Model(BaseModel):
         ]
 
         compartments: list[tuple[str, ...]] = []
-        for disease_state in bin_ids:
+        for bin_id in bin_ids:
             for strat_combo in product(*strat_categories):
-                compartments.append((disease_state,) + strat_combo)
+                compartments.append((bin_id,) + strat_combo)
 
         return compartments
 
@@ -420,21 +420,21 @@ class Model(BaseModel):
     def _separate_transitions_by_type(
         self,
     ) -> tuple[list[Transition], list[Transition]]:
-        """Separate transitions into disease and stratification types."""
-        bin_ids = [state.id for state in self.population.bins]
-        disease_state_set = set(bin_ids)
+        """Separate transitions into bin and stratification types."""
+        bin_ids = [bin_item.id for bin_item in self.population.bins]
+        bin_id_set = set(bin_ids)
 
-        disease_transitions: list[Transition] = []
+        bin_transitions: list[Transition] = []
         stratification_transitions: list[Transition] = []
 
         for transition in self.dynamics.transitions:
-            transition_states = set(transition.source) | set(transition.target)
-            if transition_states.issubset(disease_state_set):
-                disease_transitions.append(transition)
+            transition_ids = set(transition.source) | set(transition.target)
+            if transition_ids.issubset(bin_id_set):
+                bin_transitions.append(transition)
             else:
                 stratification_transitions.append(transition)
 
-        return disease_transitions, stratification_transitions
+        return bin_transitions, stratification_transitions
 
     def _format_stratification_transitions_compact(
         self, bin_ids: list[str], stratification_transitions: list[Transition]
@@ -505,16 +505,16 @@ class Model(BaseModel):
             result = result[1:]
         return result
 
-    def _format_disease_transitions_compact(
-        self, bin_ids: list[str], disease_transitions: list[Transition]
+    def _format_bin_transitions_compact(
+        self, bin_ids: list[str], bin_transitions: list[Transition]
     ) -> list[str]:
         """Format bin transitions in compact form."""
         lines: list[str] = []
 
-        if not disease_transitions:
+        if not bin_transitions:
             return lines
 
-        lines.append("Disease State Transitions:")
+        lines.append("Bin Transitions:")
 
         if self.population.stratifications:
             all_categories = [
@@ -525,19 +525,19 @@ class Model(BaseModel):
             categories_str = ", ".join(all_categories)
             lines.append(f"For each stratification s in {{{categories_str}}}:")
 
-        for disease_state in bin_ids:
-            equation = self._build_disease_state_equation(
-                disease_state, disease_transitions
+        for bin_id in bin_ids:
+            equation = self._build_bin_equation_from_transitions(
+                bin_id, bin_transitions
             )
             if equation:
                 suffix = "_s" if self.population.stratifications else ""
-                lines.append(f"  d{disease_state}{suffix}/dt: {equation}")
+                lines.append(f"  d{bin_id}{suffix}/dt: {equation}")
 
         lines.append("")
         return lines
 
-    def _build_disease_state_equation(
-        self, disease_state: str, transitions: list[Transition]
+    def _build_bin_equation_from_transitions(
+        self, bin_id: str, transitions: list[Transition]
     ) -> str:
         """Build equation for a bin."""
         inflows: list[str] = []
@@ -547,8 +547,8 @@ class Model(BaseModel):
             if not transition.rate:
                 continue
 
-            source_count = transition.source.count(disease_state)
-            target_count = transition.target.count(disease_state)
+            source_count = transition.source.count(bin_id)
+            target_count = transition.target.count(bin_id)
             net_change = target_count - source_count
 
             if net_change > 0:
@@ -599,41 +599,37 @@ class Model(BaseModel):
 
         return lines
 
-    def _format_disease_transitions_compact_stratified(
-        self, disease_transitions: list[Transition], compartments: list[tuple[str, ...]]
+    def _format_bin_transitions_compact_stratified(
+        self, bin_transitions: list[Transition], compartments: list[tuple[str, ...]]
     ) -> list[str]:
         """Format bin transitions showing specific compartments and rates."""
         lines: list[str] = []
 
-        if not disease_transitions:
+        if not bin_transitions:
             return lines
 
-        lines.append("Disease State Transitions:")
+        lines.append("Bin Transitions:")
 
-        for transition in disease_transitions:
-            source_states = transition.source
-            target_states = transition.target
+        for transition in bin_transitions:
+            source_bins = transition.source
+            target_bins = transition.target
 
-            source_str = (
-                ", ".join(sorted(set(source_states))) if source_states else "none"
-            )
-            target_str = (
-                ", ".join(sorted(set(target_states))) if target_states else "none"
-            )
+            source_str = ", ".join(sorted(set(source_bins))) if source_bins else "none"
+            target_str = ", ".join(sorted(set(target_bins))) if target_bins else "none"
             lines.append(
                 f"{transition.id.capitalize()} ({source_str} -> {target_str}):"
             )
 
             for compartment in compartments:
-                disease_state = compartment[0]
+                bin_id = compartment[0]
 
-                if disease_state in source_states:
+                if bin_id in source_bins:
                     source_compartment_str = self._compartment_to_string(compartment)
 
-                    if target_states:
-                        target_disease = target_states[0]
+                    if target_bins:
+                        target_bin = target_bins[0]
                         target_compartment_str = source_compartment_str.replace(
-                            disease_state, target_disease, 1
+                            bin_id, target_bin, 1
                         )
                     else:
                         target_compartment_str = "none"
@@ -731,9 +727,7 @@ class Model(BaseModel):
                 if i != strat_idx
             ]
 
-            lines.append(
-                self._build_stratified_for_each_line(bin_ids, other_strats)
-            )
+            lines.append(self._build_stratified_for_each_line(bin_ids, other_strats))
 
             for trans in strat_by_id[strat.id]:
                 other_cat_combos = (
@@ -763,40 +757,40 @@ class Model(BaseModel):
 
         if has_stratifications:
             compartments = self._generate_compartments()
-            disease_transitions, stratification_transitions = (
+            bin_transitions, stratification_transitions = (
                 self._separate_transitions_by_type()
             )
 
             for compartment in compartments:
                 compartment_str = self._compartment_to_string(compartment)
                 equation = self._build_compartment_equation(
-                    compartment, disease_transitions, stratification_transitions
+                    compartment, bin_transitions, stratification_transitions
                 )
                 lines.append(f"d{compartment_str}/dt = {equation}")
         else:
-            state_ids = self._collect_state_ids()
-            equations = self._build_flow_equations(state_ids)
-            bin_ids = [state.id for state in self.population.bins]
+            bin_and_category_ids = self._collect_bin_and_category_ids()
+            equations = self._build_flow_equations(bin_and_category_ids)
+            bin_ids = [bin_item.id for bin_item in self.population.bins]
 
-            for state_id in bin_ids:
-                equation = self._format_state_equation(equations[state_id])
-                lines.append(f"d{state_id}/dt = {equation}")
+            for bin_id in bin_ids:
+                equation = self._format_bin_equation(equations[bin_id])
+                lines.append(f"d{bin_id}/dt = {equation}")
 
         return lines
 
     def _build_compartment_equation(
         self,
         compartment: tuple[str, ...],
-        disease_transitions: list[Transition],
+        bin_transitions: list[Transition],
         stratification_transitions: list[Transition],
     ) -> str:
         """Build the complete equation for a specific compartment."""
         terms: list[str] = []
-        disease_state = compartment[0]
+        bin_id = compartment[0]
 
-        for transition in disease_transitions:
-            source_count = transition.source.count(disease_state)
-            target_count = transition.target.count(disease_state)
+        for transition in bin_transitions:
+            source_count = transition.source.count(bin_id)
+            target_count = transition.target.count(bin_id)
             net_change = target_count - source_count
 
             if net_change != 0:

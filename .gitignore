@@ -82,6 +82,8 @@ TAGS.*
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
+venv/
 
 ## Node
 node_modules

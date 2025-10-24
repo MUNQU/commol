@@ -111,25 +111,23 @@ fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>)
 fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
     let total_population = model.population.initial_conditions.population_size as f64;
 
-    // Build disease state fraction map
-    let disease_state_fraction_map: HashMap<String, f64> = model
+    // Build bin fraction map
+    let bin_fraction_map: HashMap<String, f64> = model
         .population
         .initial_conditions
-        .disease_state_fractions
+        .bin_fractions
         .iter()
-        .map(|dsf| (dsf.disease_state.clone(), dsf.fraction))
+        .map(|bf| (bf.bin.clone(), bf.fraction))
         .collect();
 
-    // Initialize with disease states
+    // Initialize with bins
     let mut population_distribution: HashMap<String, f64> = model
         .population
         .bins
         .iter()
-        .map(|disease_state| {
-            let fraction = disease_state_fraction_map
-                .get(&disease_state.id)
-                .unwrap_or(&0.0);
-            (disease_state.id.clone(), total_population * fraction)
+        .map(|bin| {
+            let fraction = bin_fraction_map.get(&bin.id).unwrap_or(&0.0);
+            (bin.id.clone(), total_population * fraction)
         })
         .collect();
 
@@ -185,25 +183,22 @@ fn build_transition_flows(
 
     for transition in &model.dynamics.transitions {
         if !transition.source.is_empty() && !transition.target.is_empty() {
-            let source_disease_state = &transition.source[0];
-            let target_disease_state = &transition.target[0];
+            let source_bin = &transition.source[0];
+            let target_bin = &transition.target[0];
 
             // Process each compartment
             for (i, compartment_name) in compartments.iter().enumerate() {
-                if compartment_name.starts_with(source_disease_state) {
+                if compartment_name.starts_with(source_bin) {
                     let source_index = i;
 
                     // Construct the target compartment name
                     let target_compartment_name =
-                        compartment_name.replacen(source_disease_state, target_disease_state, 1);
+                        compartment_name.replacen(source_bin, target_bin, 1);
 
                     if let Some(&target_index) = compartment_map.get(&target_compartment_name) {
                         // Extract stratifications for this compartment
-                        let stratification_values = extract_stratifications(
-                            compartment_name,
-                            source_disease_state,
-                            stratifications,
-                        );
+                        let stratification_values =
+                            extract_stratifications(compartment_name, source_bin, stratifications);
 
                         // Get the appropriate rate for this compartment
                         if let Some(rate_string) =

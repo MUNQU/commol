@@ -7,16 +7,14 @@ class BinFraction(BaseModel):
 
     Attributes
     ----------
-    disease_state : str
+    bin : str
         The bin id.
     fraction : float
         The fractional size of this bin.
     """
 
-    disease_state: str = Field(..., description="The bin id.")
-    fraction: float = Field(
-        ..., description="The fractional size of this bin."
-    )
+    bin: str = Field(..., description="The bin id.")
+    fraction: float = Field(..., description="The fractional size of this bin.")
 
 
 class StratificationFraction(BaseModel):

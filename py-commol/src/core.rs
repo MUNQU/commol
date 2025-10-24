@@ -163,15 +163,12 @@ impl PyInitialConditions {
     #[new]
     fn new(
         population_size: u64,
-        disease_state_fractions: Vec<(String, f64)>,
+        bin_fractions: Vec<(String, f64)>,
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
     ) -> Self {
-        let disease_state_fractions: Vec<commol_core::BinFraction> = disease_state_fractions
+        let bin_fractions: Vec<commol_core::BinFraction> = bin_fractions
             .into_iter()
-            .map(|(disease_state, fraction)| commol_core::BinFraction {
-                disease_state,
-                fraction,
-            })
+            .map(|(bin, fraction)| commol_core::BinFraction { bin, fraction })
             .collect();
 
         let stratification_fractions = stratification_fractions
@@ -194,7 +191,7 @@ impl PyInitialConditions {
         Self {
             inner: commol_core::InitialConditions {
                 population_size,
-                disease_state_fractions,
+                bin_fractions,
                 stratification_fractions,
             },
         }

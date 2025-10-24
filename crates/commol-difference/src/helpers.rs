@@ -28,7 +28,7 @@ pub(crate) fn rate_to_string(rate: &RateMathExpression) -> String {
 /// # Arguments
 ///
 /// * `compartment_name` - The full compartment name (e.g., "S_young_urban")
-/// * `disease_state` - The disease state prefix (e.g., "S")
+/// * `bin` - The bin prefix (e.g., "S")
 /// * `stratifications` - List of stratifications in the model
 ///
 /// # Returns
@@ -38,23 +38,23 @@ pub(crate) fn rate_to_string(rate: &RateMathExpression) -> String {
 /// # Example
 ///
 /// ```text
-/// Input: "S_young_urban" with disease_state "S" and stratifications ["age", "location"]
+/// Input: "S_young_urban" with bin "S" and stratifications ["age", "location"]
 /// Output: { "age" -> "young", "location" -> "urban" }
 /// ```
 pub(crate) fn extract_stratifications(
     compartment_name: &str,
-    disease_state: &str,
+    bin: &str,
     stratifications: &[Stratification],
 ) -> HashMap<String, String> {
     let mut result = HashMap::new();
 
-    // Remove disease state prefix
-    if !compartment_name.starts_with(disease_state) {
+    // Remove bin prefix
+    if !compartment_name.starts_with(bin) {
         return result;
     }
 
-    // Get the stratification part (everything after disease state and first underscore)
-    let stratification_part = &compartment_name[disease_state.len()..];
+    // Get the stratification part (everything after bin and first underscore)
+    let stratification_part = &compartment_name[bin.len()..];
     if stratification_part.is_empty() {
         return result; // No stratifications
     }

@@ -16,10 +16,10 @@ pub struct Stratification {
     pub categories: Vec<String>,
 }
 
-/// Specifies the fraction of population in a particular disease state
+/// Specifies the fraction of population in a particular bin
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BinFraction {
-    pub disease_state: String,
+    pub bin: String,
     pub fraction: f64,
 }
 
@@ -41,7 +41,7 @@ pub struct StratificationFractions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
-    pub disease_state_fractions: Vec<BinFraction>,
+    pub bin_fractions: Vec<BinFraction>,
     pub stratification_fractions: Vec<StratificationFractions>,
 }
 

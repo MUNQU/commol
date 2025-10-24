@@ -45,7 +45,7 @@ class RuleDict(TypedDict):
 class BinFractionDict(TypedDict):
     """Type definition for a single bin fraction."""
 
-    disease_state: str
+    bin: str
     fraction: float
 
 
@@ -157,7 +157,7 @@ class ModelBuilder:
         ModelBuilder
             Self for method chaining.
         """
-        self._bins.append(DiseaseState(id=id, name=name))
+        self._bins.append(Bin(id=id, name=name))
         logging.info(f"Added bin: id='{id}', name='{name}'")
         return self
 
@@ -398,11 +398,11 @@ class ModelBuilder:
             raise ValueError("Initial conditions have already been set")
 
         bin_fractions_list: list[BinFraction] = []
-        for ds_dict in bin_fractions:
+        for bf_dict in bin_fractions:
             bin_fractions_list.append(
                 BinFraction(
-                    disease_state=ds_dict["disease_state"],
-                    fraction=ds_dict["fraction"],
+                    bin=bf_dict["bin"],
+                    fraction=bf_dict["fraction"],
                 )
             )
 
@@ -429,11 +429,11 @@ class ModelBuilder:
             bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
         )
-        state_ids = [ds["disease_state"] for ds in bin_fractions]
+        bin_ids = [bf["bin"] for bf in bin_fractions]
         logging.info(
             (
                 f"Set initial conditions: population_size={population_size}, "
-                f"states={state_ids}"
+                f"bins={bin_ids}"
             )
         )
         return self

@@ -1,6 +1,17 @@
 import logging
 from typing import TYPE_CHECKING
 
+try:
+    from commol.commol_rs import commol_rs
+
+    rust_core = commol_rs.core
+    rust_difference = commol_rs.difference
+    rust_calibration = commol_rs.calibration
+
+    if TYPE_CHECKING:
+        from commol.commol_rs.commol_rs import calibration as CalibrationModule
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.api.simulation import Simulation
 from commol.context.calibration import (
     CalibrationProblem,
@@ -13,15 +24,6 @@ from commol.context.calibration import (
 
 
 logger = logging.getLogger(__name__)
-
-
-if TYPE_CHECKING:
-    from commol.commol_rs.commol_rs import (
-        CalibrationModule,
-        DifferenceEquationsProtocol,
-        LossConfigProtocol,
-        OptimizationConfigProtocol,
-    )
 
 
 class Calibrator:
@@ -49,7 +51,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine: "DifferenceEquationsProtocol" = simulation.engine
+        self._engine = simulation.engine
 
         logger.info(
             (
@@ -84,11 +86,6 @@ class Calibrator:
                 f"{self.problem.loss_config.function.value} loss function."
             )
         )
-
-        try:
-            from commol.commol_rs.commol_rs import calibration as rust_calibration
-        except ImportError as e:
-            raise ImportError(f"Error importing Rust extension: {e}") from e
 
         # Convert observed data to Rust types
         rust_observed_data = [
@@ -152,7 +149,7 @@ class Calibrator:
 
     def _build_loss_config(
         self, rust_calibration: "CalibrationModule"
-    ) -> "LossConfigProtocol":
+    ) -> "CalibrationModule.LossConfig":
         """Convert Python LossConfig to Rust LossConfig."""
         loss_func = self.problem.loss_config.function
 
@@ -169,7 +166,7 @@ class Calibrator:
 
     def _build_optimization_config(
         self, rust_calibration: "CalibrationModule"
-    ) -> "OptimizationConfigProtocol":
+    ) -> "CalibrationModule.OptimizationConfig":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
         opt_config = self.problem.optimization_config
 

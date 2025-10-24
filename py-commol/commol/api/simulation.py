@@ -2,18 +2,24 @@ import logging
 import time
 from typing import TYPE_CHECKING, Literal, overload, assert_never
 
+try:
+    from commol.commol_rs import commol_rs
+
+    # Import all submodules
+    core = commol_rs.core
+    difference = commol_rs.difference
+
+    if TYPE_CHECKING:
+        from commol.commol_rs.commol_rs import core as CoreModule
+        from commol.commol_rs.commol_rs import difference as DifferenceModule
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
+
 from commol.context.model import Model
 from commol.constants import ModelTypes
 
 
 logger = logging.getLogger(__name__)
-
-
-if TYPE_CHECKING:
-    from commol.commol_rs.commol_rs import (
-        DifferenceEquationsProtocol,
-        RustModelProtocol,
-    )
 
 
 class Simulation:
@@ -32,24 +38,19 @@ class Simulation:
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
+        self._engine: "DifferenceModule.DifferenceEquations" = self._initialize_engine()
 
         self._compartments: list[str] = self._engine.compartments
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
 
-    def _initialize_engine(self) -> "DifferenceEquationsProtocol":
+    def _initialize_engine(self) -> "DifferenceModule.DifferenceEquations":
         """Internal method to set up the Rust backend."""
         logging.info("Preparing model definition for Rust serialization...")
         model_json = self.model_definition.model_dump_json()
 
-        try:
-            from commol.commol_rs.commol_rs import core, difference
-        except ImportError as e:
-            raise ImportError(f"Error importing Rust extension: {e}") from e
-
-        rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
+        rust_model_instance: "CoreModule.Model" = core.Model.from_json(model_json)
         logging.info("Rust model instance created from JSON.")
 
         # This could be extended if you have more engine types
@@ -128,6 +129,6 @@ class Simulation:
             assert_never(output_format)
 
     @property
-    def engine(self) -> "DifferenceEquationsProtocol":
+    def engine(self) -> "DifferenceModule.DifferenceEquations":
         """Get the underlying simulation engine."""
         return self._engine

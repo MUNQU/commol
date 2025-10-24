@@ -2,7 +2,10 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from commol.commol_rs import commol_rs
+try:
+    from commol.commol_rs import commol_rs
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
 from commol.utils.security import validate_expression_security
 
@@ -162,8 +165,7 @@ class StratifiedRate(BaseModel):
         """Perform security and syntax validation on the rate expression."""
         try:
             validate_expression_security(value)
-            if commol_rs:
-                commol_rs.core.MathExpression(value).validate()
+            commol_rs.core.MathExpression(value).validate()
         except ValueError as e:
             raise ValueError(f"Validation failed for rate '{value}': {e}")
         return value
@@ -237,8 +239,7 @@ class Transition(BaseModel):
             return value
         try:
             validate_expression_security(value)
-            if commol_rs:
-                commol_rs.core.MathExpression(value).validate()
+            commol_rs.core.MathExpression(value).validate()
         except ValueError as e:
             raise ValueError(f"Validation failed for rate '{value}': {e}")
         return value

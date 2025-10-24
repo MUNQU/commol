@@ -28,11 +28,9 @@ class Population(BaseModel):
     transitions: list[Transition]
     initial_conditions: InitialConditions
 
-    @field_validator("disease_states")
+    @field_validator("bins")
     @classmethod
-    def validate_bins_not_empty(
-        cls, v: list[Bin]
-    ) -> list[Bin]:
+    def validate_bins_not_empty(cls, v: list[Bin]) -> list[Bin]:
         if not v:
             raise ValueError("At least one bin must be defined.")
         return v
@@ -44,11 +42,7 @@ class Population(BaseModel):
         """
         bin_ids = [ds.id for ds in self.bins]
         if len(bin_ids) != len(set(bin_ids)):
-            duplicates = [
-                item
-                for item in set(bin_ids)
-                if bin_ids.count(item) > 1
-            ]
+            duplicates = [item for item in set(bin_ids) if bin_ids.count(item) > 1]
             raise ValueError(f"Duplicate bin IDs found: {duplicates}")
 
         stratification_ids = [s.id for s in self.stratifications]
@@ -63,25 +57,24 @@ class Population(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_disease_state_initial_conditions(self) -> Self:
+    def validate_bin_initial_conditions(self) -> Self:
         """
-        Validates initial conditions against the defined model Subpopulation.
+        Validates initial conditions against the defined model bins.
         """
         initial_conditions = self.initial_conditions
 
-        bins_map = {state.id: state for state in self.bins}
+        bins_map = {bin_item.id: bin_item for bin_item in self.bins}
 
         bin_fractions_dict = {
-            dsf.disease_state: dsf.fraction
-            for dsf in initial_conditions.bin_fractions
+            bf.bin: bf.fraction for bf in initial_conditions.bin_fractions
         }
 
-        actual_state = set(bin_fractions_dict.keys())
-        expected_state = set(bins_map.keys())
+        actual_bins = set(bin_fractions_dict.keys())
+        expected_bins = set(bins_map.keys())
 
-        if actual_state != expected_state:
-            missing = expected_state - actual_state
-            extra = actual_state - expected_state
+        if actual_bins != expected_bins:
+            missing = expected_bins - actual_bins
+            extra = actual_bins - expected_bins
             raise ValueError(
                 (
                     f"Initial bin fractions keys must exactly match "
@@ -89,13 +82,10 @@ class Population(BaseModel):
                 )
             )
 
-        states_sum_fractions = sum(bin_fractions_dict.values())
-        if not math.isclose(states_sum_fractions, 1.0, abs_tol=1e-6):
+        bins_sum_fractions = sum(bin_fractions_dict.values())
+        if not math.isclose(bins_sum_fractions, 1.0, abs_tol=1e-6):
             raise ValueError(
-                (
-                    f"Bin fractions must sum to 1.0, "
-                    f"but got {states_sum_fractions:.7f}."
-                )
+                (f"Bin fractions must sum to 1.0, but got {bins_sum_fractions:.7f}.")
             )
 
         return self

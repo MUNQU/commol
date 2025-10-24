@@ -37,7 +37,7 @@ class TestModelBuilder:
         assert isinstance(model, Model)
         assert model.name == "TestModel"
         assert model.version == "0.1.0"
-        assert len(model.population.disease_states) == 3
+        assert len(model.population.bins) == 3
         assert len(model.parameters) == 2
         assert len(model.dynamics.transitions) == 2
         assert model.population.initial_conditions.population_size == 1000
