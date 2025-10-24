@@ -41,8 +41,8 @@ impl PyModel {
 
     fn __repr__(&self) -> String {
         format!(
-            "Model(disease_states={}, transitions={})",
-            self.inner.population.disease_states.len(),
+            "Model(bins={}, transitions={})",
+            self.inner.population.bins.len(),
             self.inner.dynamics.transitions.len()
         )
     }
@@ -91,16 +91,16 @@ pub struct PyPopulation {
 #[pymethods]
 impl PyPopulation {
     #[new]
-    #[pyo3(signature = (disease_states, stratifications, initial_conditions, transitions=None))]
+    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None))]
     fn new(
-        disease_states: Vec<PyDiseaseState>,
+        bins: Vec<PyBin>,
         stratifications: Vec<PyStratification>,
         initial_conditions: PyInitialConditions,
         transitions: Option<Vec<PyTransition>>,
     ) -> Self {
         Self {
             inner: commol_core::Population {
-                disease_states: disease_states.into_iter().map(|ds| ds.inner).collect(),
+                bins: bins.into_iter().map(|ds| ds.inner).collect(),
                 stratifications: stratifications.into_iter().map(|s| s.inner).collect(),
                 transitions: transitions
                     .unwrap_or_default()
@@ -113,20 +113,20 @@ impl PyPopulation {
     }
 }
 
-/// Wrapper for commol_core::DiseaseState
-#[pyclass(name = "DiseaseState")]
+/// Wrapper for commol_core::Bin
+#[pyclass(name = "Bin")]
 #[derive(Clone)]
-pub struct PyDiseaseState {
-    pub inner: commol_core::DiseaseState,
+pub struct PyBin {
+    pub inner: commol_core::Bin,
 }
 
 #[pymethods]
-impl PyDiseaseState {
+impl PyBin {
     #[new]
     #[pyo3(signature = (id, name=None))]
     fn new(id: String, name: Option<String>) -> Self {
         Self {
-            inner: commol_core::DiseaseState {
+            inner: commol_core::Bin {
                 id: id.clone(),
                 name: name.unwrap_or(id),
             },
@@ -166,11 +166,11 @@ impl PyInitialConditions {
         disease_state_fractions: Vec<(String, f64)>,
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
     ) -> Self {
-        let disease_state_fractions: Vec<commol_core::DiseaseStateFraction> =
+        let disease_state_fractions: Vec<commol_core::BinFraction> =
             disease_state_fractions
                 .into_iter()
                 .map(
-                    |(disease_state, fraction)| commol_core::DiseaseStateFraction {
+                    |(disease_state, fraction)| commol_core::BinFraction {
                         disease_state,
                         fraction,
                     },
@@ -344,7 +344,7 @@ impl PyMathExpression {
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModel>()?;
     m.add_class::<PyPopulation>()?;
-    m.add_class::<PyDiseaseState>()?;
+    m.add_class::<PyBin>()?;
     m.add_class::<PyStratification>()?;
     m.add_class::<PyInitialConditions>()?;
     m.add_class::<PyDynamics>()?;

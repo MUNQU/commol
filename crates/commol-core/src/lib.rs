@@ -28,7 +28,7 @@ pub use simulation_engine::SimulationEngine;
 
 // Re-export all public types from the types module for convenient access
 pub use types::{
-    Condition, DiseaseState, DiseaseStateFraction, Dynamics, InitialConditions, LogicOperator,
+    Condition, Bin, BinFraction, Dynamics, InitialConditions, LogicOperator,
     Model, ModelTypes, Parameter, Population, Rule, RuleValue, Stratification,
     StratificationCondition, StratificationFraction, StratificationFractions, StratifiedRate,
     Transition, VariablePrefixes,

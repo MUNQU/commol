@@ -14,9 +14,9 @@ class TestModel:
         """
         builder = (
             ModelBuilder(name="SIR Model", version="1.0.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_parameter(id="beta", value=0.3)
             .add_parameter(id="gamma", value=0.1)
             .add_transition(
@@ -28,10 +28,10 @@ class TestModel:
             .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -87,10 +87,10 @@ class TestModel:
         """
         builder = (
             ModelBuilder(name="SEIR Model", version="2.0.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="E", name="Exposed")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="E", name="Exposed")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_parameter(id="beta", value=0.5)
             .add_parameter(id="sigma", value=0.2)
             .add_parameter(id="gamma", value=0.1)
@@ -106,11 +106,11 @@ class TestModel:
             .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.98},
-                    {"disease_state": "E", "fraction": 0.01},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "E", "fraction": 0.01},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -170,9 +170,9 @@ class TestModel:
         """
         builder = (
             ModelBuilder(name="Age-Stratified SIR", version="1.0.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_stratification(id="age", categories=["young", "old"])
             .add_parameter(id="beta", value=0.3)
             .add_parameter(id="gamma", value=0.1)
@@ -189,10 +189,10 @@ class TestModel:
             )
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
                 stratification_fractions=[
                     {
@@ -268,9 +268,9 @@ class TestModel:
         """
         builder = (
             ModelBuilder(name="Test Model", version="1.0.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_parameter(id="gamma", value=0.1)
             .add_transition(
                 id="infection",
@@ -281,10 +281,10 @@ class TestModel:
             .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -342,9 +342,9 @@ class TestModel:
         """
         builder = (
             ModelBuilder(name="Age-Location Stratified SIR", version="1.0.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_stratification(id="age", categories=["young", "old"])
             .add_stratification(id="location", categories=["urban", "rural"])
             # Transmission parameters with age-specific population denominators
@@ -428,10 +428,10 @@ class TestModel:
             )
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
                 stratification_fractions=[
                     {

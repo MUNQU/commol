@@ -201,9 +201,9 @@ from commol.constants import ModelTypes
 # Run a quick test
 model = (
     ModelBuilder(name="Test")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
     .add_parameter(id="N", value=1000.0)
@@ -211,10 +211,10 @@ model = (
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

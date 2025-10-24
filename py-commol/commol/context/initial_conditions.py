@@ -1,21 +1,21 @@
 from pydantic import BaseModel, Field
 
 
-class DiseaseStateFraction(BaseModel):
+class BinFraction(BaseModel):
     """
-    Fraction for a single disease state.
+    Fraction for a single bin.
 
     Attributes
     ----------
     disease_state : str
-        The disease state id.
+        The bin id.
     fraction : float
-        The fractional size of this disease state.
+        The fractional size of this bin.
     """
 
-    disease_state: str = Field(..., description="The disease state id.")
+    disease_state: str = Field(..., description="The bin id.")
     fraction: float = Field(
-        ..., description="The fractional size of this disease state."
+        ..., description="The fractional size of this bin."
     )
 
 
@@ -61,8 +61,8 @@ class InitialConditions(BaseModel):
     ----------
     population_size : int
         Population size.
-    disease_state_fractions : list[DiseaseStateFraction]
-        List of disease state fractions. Each item contains a disease state id and
+    bin_fractions : list[BinFraction]
+        List of bin fractions. Each item contains a bin id and
         its initial fractional size.
     stratification_fractions : list[StratificationFractions], optional
         List of stratification fractions. Each item contains a stratification id and
@@ -70,10 +70,10 @@ class InitialConditions(BaseModel):
     """
 
     population_size: int = Field(..., description="Population size.")
-    disease_state_fractions: list[DiseaseStateFraction] = Field(
+    bin_fractions: list[BinFraction] = Field(
         ...,
         description=(
-            "List of disease state fractions. Each item contains a disease state id "
+            "List of bin fractions. Each item contains a bin id "
             "and its initial fractional size."
         ),
     )

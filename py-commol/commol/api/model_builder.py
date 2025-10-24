@@ -2,7 +2,7 @@ import copy
 import logging
 from typing import Literal, Self, TypedDict
 
-from commol.context.disease_state import DiseaseState
+from commol.context.bin import Bin
 from commol.context.dynamics import (
     Condition,
     Dynamics,
@@ -12,7 +12,7 @@ from commol.context.dynamics import (
     Transition,
 )
 from commol.context.initial_conditions import (
-    DiseaseStateFraction,
+    BinFraction,
     InitialConditions,
     StratificationFraction,
     StratificationFractions,
@@ -42,8 +42,8 @@ class RuleDict(TypedDict):
     value: str | int | float | bool
 
 
-class DiseaseStateFractionDict(TypedDict):
-    """Type definition for a single disease state fraction."""
+class BinFractionDict(TypedDict):
+    """Type definition for a single bin fraction."""
 
     disease_state: str
     fraction: float
@@ -82,7 +82,7 @@ class ModelBuilder:
     A programmatic interface for building compartment models.
 
     This class provides a fluent API for constructing Model instances by progressively
-    adding disease states, stratifications, transitions, parameters, and
+    adding bins, stratifications, transitions, parameters, and
     initial conditions. It includes validation methods to ensure model consistency
     before building.
 
@@ -94,8 +94,8 @@ class ModelBuilder:
         The model description.
     _version : str | None
         The model version.
-    _disease_states : list[DiseaseState]
-        List of disease states in the model.
+    _disease_states : list[Bin]
+        List of bins in the model.
     _stratifications : list[Stratification]
         List of population stratifications.
     _transitions : list[Transition]
@@ -128,7 +128,7 @@ class ModelBuilder:
         self._description: str | None = description
         self._version: str | None = version
 
-        self._disease_states: list[DiseaseState] = []
+        self._bins: list[Bin] = []
         self._stratifications: list[Stratification] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
@@ -141,24 +141,24 @@ class ModelBuilder:
             )
         )
 
-    def add_disease_state(self, id: str, name: str) -> Self:
+    def add_bin(self, id: str, name: str) -> Self:
         """
-        Add a disease state to the model.
+        Add a bin to the model.
 
         Parameters
         ----------
         id : str
-            Unique identifier for the disease state.
+            Unique identifier for the bin.
         name : str
-            Human-readable name for the disease state.
+            Human-readable name for the bin.
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
         """
-        self._disease_states.append(DiseaseState(id=id, name=name))
-        logging.info(f"Added disease state: id='{id}', name='{name}'")
+        self._bins.append(DiseaseState(id=id, name=name))
+        logging.info(f"Added bin: id='{id}', name='{name}'")
         return self
 
     def add_stratification(self, id: str, categories: list[str]) -> Self:
@@ -345,7 +345,7 @@ class ModelBuilder:
     def set_initial_conditions(
         self,
         population_size: int,
-        disease_state_fractions: list[DiseaseStateFractionDict],
+        bin_fractions: list[BinFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
     ) -> Self:
         """
@@ -355,16 +355,16 @@ class ModelBuilder:
         ----------
         population_size : int
             Total population size.
-        disease_state_fractions : list[DiseaseStateFractionDict]
-            List of disease state fractions. Each item is a dictionary with:
-            - "disease_state": str (disease state id)
+        bin_fractions : list[BinFractionDict]
+            List of bin fractions. Each item is a dictionary with:
+            - "bin": str (bin id)
             - "fraction": float (fractional size)
 
             Example:
             [
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0}
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0}
             ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
@@ -397,10 +397,10 @@ class ModelBuilder:
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
 
-        disease_state_fractions_list: list[DiseaseStateFraction] = []
-        for ds_dict in disease_state_fractions:
-            disease_state_fractions_list.append(
-                DiseaseStateFraction(
+        bin_fractions_list: list[BinFraction] = []
+        for ds_dict in bin_fractions:
+            bin_fractions_list.append(
+                BinFraction(
                     disease_state=ds_dict["disease_state"],
                     fraction=ds_dict["fraction"],
                 )
@@ -426,10 +426,10 @@ class ModelBuilder:
 
         self._initial_conditions = InitialConditions(
             population_size=population_size,
-            disease_state_fractions=disease_state_fractions_list,
+            bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
         )
-        state_ids = [ds["disease_state"] for ds in disease_state_fractions]
+        state_ids = [ds["disease_state"] for ds in bin_fractions]
         logging.info(
             (
                 f"Set initial conditions: population_size={population_size}, "
@@ -451,8 +451,8 @@ class ModelBuilder:
             "name": self._name,
             "description": self._description,
             "version": self._version,
-            "disease_states_count": len(self._disease_states),
-            "disease_state_ids": [state.id for state in self._disease_states],
+            "disease_states_count": len(self._bins),
+            "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],
             "transitions_count": len(self._transitions),
@@ -474,7 +474,7 @@ class ModelBuilder:
 
         new_builder = type(self)(self._name, self._description, self._version)
 
-        new_builder._disease_states = copy.deepcopy(self._disease_states)
+        new_builder._disease_states = copy.deepcopy(self._bins)
         new_builder._stratifications = copy.deepcopy(self._stratifications)
         new_builder._transitions = copy.deepcopy(self._transitions)
         new_builder._parameters = copy.deepcopy(self._parameters)
@@ -491,7 +491,7 @@ class ModelBuilder:
         ModelBuilder
             Self for method chaining.
         """
-        self._disease_states.clear()
+        self._bins.clear()
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
@@ -521,7 +521,7 @@ class ModelBuilder:
             raise ValueError("Initial conditions must be set")
 
         population = Population(
-            disease_states=self._disease_states,
+            bins=self._bins,
             stratifications=self._stratifications,
             transitions=self._transitions,
             initial_conditions=self._initial_conditions,

@@ -3,7 +3,7 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator, field_validator
 
-from commol.context.disease_state import DiseaseState
+from commol.context.bin import Bin
 from commol.context.dynamics import Transition
 from commol.context.initial_conditions import InitialConditions
 from commol.context.stratification import Stratification
@@ -15,7 +15,7 @@ class Population(BaseModel):
 
     Attributes
     ----------
-    disease_states : list[DiseaseState]
+    disease_states : list[Bin]
         A list of compartments or states that make up the model.
     stratifications : list[Stratification]
         A list of categorical subdivisions of the population.
@@ -23,33 +23,33 @@ class Population(BaseModel):
         Initial state of the subpopulations and stratifications.
     """
 
-    disease_states: list[DiseaseState]
+    bins: list[Bin]
     stratifications: list[Stratification]
     transitions: list[Transition]
     initial_conditions: InitialConditions
 
     @field_validator("disease_states")
     @classmethod
-    def validate_disease_states_not_empty(
-        cls, v: list[DiseaseState]
-    ) -> list[DiseaseState]:
+    def validate_bins_not_empty(
+        cls, v: list[Bin]
+    ) -> list[Bin]:
         if not v:
-            raise ValueError("At least one disease state must be defined.")
+            raise ValueError("At least one bin must be defined.")
         return v
 
     @model_validator(mode="after")
     def validate_unique_ids(self) -> Self:
         """
-        Validates that disease state and stratification IDs are unique.
+        Validates that bin and stratification IDs are unique.
         """
-        disease_state_ids = [ds.id for ds in self.disease_states]
-        if len(disease_state_ids) != len(set(disease_state_ids)):
+        bin_ids = [ds.id for ds in self.bins]
+        if len(bin_ids) != len(set(bin_ids)):
             duplicates = [
                 item
-                for item in set(disease_state_ids)
-                if disease_state_ids.count(item) > 1
+                for item in set(bin_ids)
+                if bin_ids.count(item) > 1
             ]
-            raise ValueError(f"Duplicate disease state IDs found: {duplicates}")
+            raise ValueError(f"Duplicate bin IDs found: {duplicates}")
 
         stratification_ids = [s.id for s in self.stratifications]
         if len(stratification_ids) != len(set(stratification_ids)):
@@ -69,31 +69,31 @@ class Population(BaseModel):
         """
         initial_conditions = self.initial_conditions
 
-        disease_states_map = {state.id: state for state in self.disease_states}
+        bins_map = {state.id: state for state in self.bins}
 
-        disease_state_fractions_dict = {
+        bin_fractions_dict = {
             dsf.disease_state: dsf.fraction
-            for dsf in initial_conditions.disease_state_fractions
+            for dsf in initial_conditions.bin_fractions
         }
 
-        actual_state = set(disease_state_fractions_dict.keys())
-        expected_state = set(disease_states_map.keys())
+        actual_state = set(bin_fractions_dict.keys())
+        expected_state = set(bins_map.keys())
 
         if actual_state != expected_state:
             missing = expected_state - actual_state
             extra = actual_state - expected_state
             raise ValueError(
                 (
-                    f"Initial disease state fractions keys must exactly match "
-                    f"disease state ids. Missing ids: {missing}, Extra ids: {extra}."
+                    f"Initial bin fractions keys must exactly match "
+                    f"bin ids. Missing ids: {missing}, Extra ids: {extra}."
                 )
             )
 
-        states_sum_fractions = sum(disease_state_fractions_dict.values())
+        states_sum_fractions = sum(bin_fractions_dict.values())
         if not math.isclose(states_sum_fractions, 1.0, abs_tol=1e-6):
             raise ValueError(
                 (
-                    f"Disease state fractions must sum to 1.0, "
+                    f"Bin fractions must sum to 1.0, "
                     f"but got {states_sum_fractions:.7f}."
                 )
             )

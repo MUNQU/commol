@@ -7,10 +7,10 @@ Commol is built around several key concepts that work together to create compart
 Disease states (also called compartments) represent different stages of infection in your population.
 
 ```python
-builder.add_disease_state(id="S", name="Susceptible")
-builder.add_disease_state(id="E", name="Exposed")
-builder.add_disease_state(id="I", name="Infected")
-builder.add_disease_state(id="R", name="Recovered")
+builder.add_bin(id="S", name="Susceptible")
+builder.add_bin(id="E", name="Exposed")
+builder.add_bin(id="I", name="Infected")
+builder.add_bin(id="R", name="Recovered")
 ```
 
 ### Common Disease States
@@ -46,10 +46,10 @@ builder.add_stratification(
 ```python
 builder.set_initial_conditions(
     population_size=10000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},
-        {"disease_state": "I", "fraction": 0.01},
-        {"disease_state": "R", "fraction": 0.0}
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},
+        {"bin": "I", "fraction": 0.01},
+        {"bin": "R", "fraction": 0.0}
     ],
     stratification_fractions=[
         {
@@ -141,10 +141,10 @@ Initial conditions define the starting state of your model:
 ```python
 builder.set_initial_conditions(
     population_size=1000,
-    disease_state_fractions=[
-        {"disease_state": "S", "fraction": 0.99},  # 99% susceptible
-        {"disease_state": "I", "fraction": 0.01},  # 1% infected
-        {"disease_state": "R", "fraction": 0.0}    # 0% recovered
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.99},  # 99% susceptible
+        {"bin": "I", "fraction": 0.01},  # 1% infected
+        {"bin": "R", "fraction": 0.0}    # 0% recovered
     ]
 )
 ```

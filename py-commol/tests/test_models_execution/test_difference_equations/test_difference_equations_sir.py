@@ -17,9 +17,9 @@ class TestSIR:
         """
         builder = (
             ModelBuilder(name="Test SIR", version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_parameter(id="infection_rate", value=0.1)
             .add_parameter(id="recovery_rate", value=0.05)
             .add_transition(
@@ -33,10 +33,10 @@ class TestSIR:
             )
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )

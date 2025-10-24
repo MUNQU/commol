@@ -46,7 +46,7 @@ fn commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     core_module.add(
         "__doc__",
         "Core data structures for compartment models.\n\n\
-         Includes Model, Population, DiseaseState, Transition, and related types.",
+         Includes Model, Population, Bin, Transition, and related types.",
     )?;
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;

@@ -14,15 +14,15 @@ class TestBasicSIRRateFormulas:
         """Create a basic SIR model builder without transitions."""
         return (
             ModelBuilder(name=name, version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -130,15 +130,15 @@ class TestStepVaryingRates:
         """Create a basic SIR model builder."""
         return (
             ModelBuilder(name="Time Varying SIR", version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -243,15 +243,15 @@ class TestComplexMathematicalFormulas:
         """Create a basic SIR model builder."""
         return (
             ModelBuilder(name="Complex Math SIR", version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -359,15 +359,15 @@ class TestMathematicalEdgeCases:
         """Create a basic SIR model builder."""
         return (
             ModelBuilder(name="Edge Case SIR", version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )
@@ -530,9 +530,9 @@ class TestRateFormulaErrorHandling:
                 # This should fail during validation or model building
                 builder = (
                     ModelBuilder(name="Invalid Formula Test", version="1.0")
-                    .add_disease_state(id="S", name="Susceptible")
-                    .add_disease_state(id="I", name="Infected")
-                    .add_disease_state(id="R", name="Recovered")
+                    .add_bin(id="S", name="Susceptible")
+                    .add_bin(id="I", name="Infected")
+                    .add_bin(id="R", name="Recovered")
                     .add_parameter(id="beta", value=0.1)
                     .add_parameter(id="gamma", value=0.05)
                     .add_transition(
@@ -543,10 +543,10 @@ class TestRateFormulaErrorHandling:
                     )
                     .set_initial_conditions(
                         population_size=1000,
-                        disease_state_fractions=[
-                            {"disease_state": "S", "fraction": 1.0},
-                            {"disease_state": "I", "fraction": 0.0},
-                            {"disease_state": "R", "fraction": 0.0},
+                        bin_fractions=[
+                            {"bin": "S", "fraction": 1.0},
+                            {"bin": "I", "fraction": 0.0},
+                            {"bin": "R", "fraction": 0.0},
                         ],
                     )
                 )
@@ -558,9 +558,9 @@ class TestRateFormulaErrorHandling:
         try:
             builder = (
                 ModelBuilder(name="Undefined Param Test", version="1.0")
-                .add_disease_state(id="S", name="Susceptible")
-                .add_disease_state(id="I", name="Infected")
-                .add_disease_state(id="R", name="Recovered")
+                .add_bin(id="S", name="Susceptible")
+                .add_bin(id="I", name="Infected")
+                .add_bin(id="R", name="Recovered")
                 .add_parameter(id="beta", value=0.1)
                 # Note: gamma parameter is NOT defined
                 .add_transition(
@@ -574,10 +574,10 @@ class TestRateFormulaErrorHandling:
                 )
                 .set_initial_conditions(
                     population_size=1000,
-                    disease_state_fractions=[
-                        {"disease_state": "S", "fraction": 0.99},
-                        {"disease_state": "I", "fraction": 0.01},
-                        {"disease_state": "R", "fraction": 0.0},
+                    bin_fractions=[
+                        {"bin": "S", "fraction": 0.99},
+                        {"bin": "I", "fraction": 0.01},
+                        {"bin": "R", "fraction": 0.0},
                     ],
                 )
             )
@@ -603,9 +603,9 @@ class TestRateFormulaErrorHandling:
             # Create a model that might have division by zero issues
             builder = (
                 ModelBuilder(name="Division Test", version="1.0")
-                .add_disease_state(id="S", name="Susceptible")
-                .add_disease_state(id="I", name="Infected")
-                .add_disease_state(id="R", name="Recovered")
+                .add_bin(id="S", name="Susceptible")
+                .add_bin(id="I", name="Infected")
+                .add_bin(id="R", name="Recovered")
                 .add_parameter(id="beta", value=0.1)
                 .add_parameter(id="gamma", value=0.05)
                 .add_transition(
@@ -620,10 +620,10 @@ class TestRateFormulaErrorHandling:
                 )
                 .set_initial_conditions(
                     population_size=1000,
-                    disease_state_fractions=[
-                        {"disease_state": "S", "fraction": 0.99},
-                        {"disease_state": "I", "fraction": 0.01},
-                        {"disease_state": "R", "fraction": 0.0},
+                    bin_fractions=[
+                        {"bin": "S", "fraction": 0.99},
+                        {"bin": "I", "fraction": 0.01},
+                        {"bin": "R", "fraction": 0.0},
                     ],
                 )
             )
@@ -646,18 +646,18 @@ class TestMathematicalFunctionComprehensive:
         """Create base SIR builder for function testing."""
         return (
             ModelBuilder(name="Function Test SIR", version="1.0")
-            .add_disease_state(id="S", name="Susceptible")
-            .add_disease_state(id="I", name="Infected")
-            .add_disease_state(id="R", name="Recovered")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
             .add_parameter(id="base_rate", value=0.1)
             .add_parameter(id="scale", value=100)
             .add_parameter(id="offset", value=10)
             .set_initial_conditions(
                 population_size=1000,
-                disease_state_fractions=[
-                    {"disease_state": "S", "fraction": 0.99},
-                    {"disease_state": "I", "fraction": 0.01},
-                    {"disease_state": "R", "fraction": 0.0},
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
                 ],
             )
         )

@@ -13,9 +13,9 @@ from commol.constants import ModelTypes
 # Build the model
 model = (
     ModelBuilder(name="Basic SIR", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)   # Transmission rate
     .add_parameter(id="gamma", value=0.1)  # Recovery rate
     .add_transition(
@@ -32,10 +32,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -67,9 +67,9 @@ from commol.constants import ModelTypes
 ### 2. Define Disease States
 
 ```python
-.add_disease_state(id="S", name="Susceptible")
-.add_disease_state(id="I", name="Infected")
-.add_disease_state(id="R", name="Recovered")
+.add_bin(id="S", name="Susceptible")
+.add_bin(id="I", name="Infected")
+.add_bin(id="R", name="Recovered")
 ```
 
 Disease states represent compartments in your model.
@@ -101,7 +101,7 @@ Transitions move populations between states using mathematical formulas.
 ```python
 .set_initial_conditions(
     population_size=1000,
-    disease_state_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+    bin_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
 )
 ```
 
@@ -122,9 +122,9 @@ Improve model safety by adding units to your parameters:
 ```python
 model = (
     ModelBuilder(name="SIR with Units", version="1.0")
-    .add_disease_state(id="S", name="Susceptible")
-    .add_disease_state(id="I", name="Infected")
-    .add_disease_state(id="R", name="Recovered")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.5, unit="1/day")    # Rate per day
     .add_parameter(id="gamma", value=0.1, unit="1/day")   # Rate per day
     .add_transition(
@@ -141,10 +141,10 @@ model = (
     )
     .set_initial_conditions(
         population_size=1000,
-        disease_state_fractions=[
-            {"disease_state": "S", "fraction": 0.99},
-            {"disease_state": "I", "fraction": 0.01},
-            {"disease_state": "R", "fraction": 0.0}
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
         ]
     )
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

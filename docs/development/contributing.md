@@ -80,7 +80,7 @@ def test_model_builder_creates_valid_sir_model():
     """Test that ModelBuilder creates a valid SIR model."""
     model = (
         ModelBuilder(name="Test SIR")
-        .add_disease_state(id="S", name="Susceptible")
+        .add_bin(id="S", name="Susceptible")
         # ... rest of model
         .build(ModelTypes.DIFFERENCE_EQUATIONS)
     )

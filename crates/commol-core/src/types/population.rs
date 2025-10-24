@@ -4,7 +4,7 @@ use super::dynamics::Transition;
 
 /// A disease state (compartment) in the model
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DiseaseState {
+pub struct Bin {
     pub id: String,
     pub name: String,
 }
@@ -18,7 +18,7 @@ pub struct Stratification {
 
 /// Specifies the fraction of population in a particular disease state
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DiseaseStateFraction {
+pub struct BinFraction {
     pub disease_state: String,
     pub fraction: f64,
 }
@@ -41,14 +41,14 @@ pub struct StratificationFractions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
-    pub disease_state_fractions: Vec<DiseaseStateFraction>,
+    pub disease_state_fractions: Vec<BinFraction>,
     pub stratification_fractions: Vec<StratificationFractions>,
 }
 
 /// Complete population structure including disease states, stratifications, and initial conditions
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Population {
-    pub disease_states: Vec<DiseaseState>,
+    pub bins: Vec<Bin>,
     pub stratifications: Vec<Stratification>,
     pub transitions: Vec<Transition>,
     pub initial_conditions: InitialConditions,

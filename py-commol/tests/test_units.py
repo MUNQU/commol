@@ -93,9 +93,9 @@ class TestModelUnitConsistency:
         builder = ModelBuilder(name="SIR", version="1.0")
 
         # Add disease states
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters WITH units
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
@@ -108,10 +108,10 @@ class TestModelUnitConsistency:
         # Set initial conditions
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -124,9 +124,9 @@ class TestModelUnitConsistency:
         """Test that unit check is skipped when parameters lack units."""
         builder = ModelBuilder(name="SIR", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters WITHOUT units
         builder.add_parameter("beta", 0.5, "Transmission rate")
@@ -137,10 +137,10 @@ class TestModelUnitConsistency:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -153,9 +153,9 @@ class TestModelUnitConsistency:
         """Test SIR model with inconsistent units raises error."""
         builder = ModelBuilder(name="SIR", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters with WRONG units (beta should be 1/day, not day)
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="day")
@@ -166,10 +166,10 @@ class TestModelUnitConsistency:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -186,9 +186,9 @@ class TestModelUnitConsistency:
         builder = ModelBuilder(name="Stratified SIR", version="1.0")
 
         # Add disease states
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add stratification
         builder.add_stratification("age", ["young", "old"])
@@ -218,10 +218,10 @@ class TestModelUnitConsistency:
         # Set initial conditions
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
             stratification_fractions=[
                 {
@@ -243,9 +243,9 @@ class TestModelUnitConsistency:
         """Test that check is skipped when some parameters lack units."""
         builder = ModelBuilder(name="SIR", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Mix: one parameter with unit, one without
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
@@ -256,10 +256,10 @@ class TestModelUnitConsistency:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -272,8 +272,8 @@ class TestModelUnitConsistency:
         """Test handling of dimensionless parameters."""
         builder = ModelBuilder(name="Test", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
 
         # Dimensionless parameter
         builder.add_parameter(
@@ -290,9 +290,9 @@ class TestModelUnitConsistency:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
             ],
         )
 
@@ -309,10 +309,10 @@ class TestComplexUnits:
         """Test vaccination model with time-dependent coverage."""
         builder = ModelBuilder(name="SIR with Vaccination", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("V", "Vaccinated")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("V", "Vaccinated")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Parameters
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
@@ -326,11 +326,11 @@ class TestComplexUnits:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "V", "fraction": 0.0},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "V", "fraction": 0.0},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -369,9 +369,9 @@ class TestFullModelUnitFailures:
         """Test SIR model fails with wrong beta units."""
         builder = ModelBuilder(name="SIR Wrong Beta", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Wrong units: beta should be 1/day, not day
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="day")
@@ -382,10 +382,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -401,9 +401,9 @@ class TestFullModelUnitFailures:
         """Test SIR model fails when log receives population (dimensional)."""
         builder = ModelBuilder(name="SIR Bad Log", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
         builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
@@ -419,10 +419,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -437,10 +437,10 @@ class TestFullModelUnitFailures:
         """Test SEIR model fails when exp receives dimensional parameter."""
         builder = ModelBuilder(name="SEIR Bad Exp", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("E", "Exposed")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("E", "Exposed")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
         builder.add_parameter("sigma", 0.2, "Incubation rate", unit="1/day")
@@ -459,11 +459,11 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.98},
-                {"disease_state": "E", "fraction": 0.01},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.98},
+                {"bin": "E", "fraction": 0.01},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -478,9 +478,9 @@ class TestFullModelUnitFailures:
         """Test stratified model fails when sqrt receives dimensional quantity."""
         builder = ModelBuilder(name="Stratified Bad Sqrt", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_stratification("age", ["young", "old"])
 
@@ -507,10 +507,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
             stratification_fractions=[
                 {
@@ -534,10 +534,10 @@ class TestFullModelUnitFailures:
         """Test vaccination model fails when pow has dimensional exponent."""
         builder = ModelBuilder(name="Vaccination Bad Pow", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("V", "Vaccinated")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("V", "Vaccinated")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
         builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
@@ -559,11 +559,11 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.98},
-                {"disease_state": "V", "fraction": 0.0},
-                {"disease_state": "I", "fraction": 0.02},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.98},
+                {"bin": "V", "fraction": 0.0},
+                {"bin": "I", "fraction": 0.02},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -578,10 +578,10 @@ class TestFullModelUnitFailures:
         """Test complex seasonal model fails with dimensional sin argument."""
         builder = ModelBuilder(name="Complex Seasonal Bad", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("E", "Exposed")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("E", "Exposed")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta_avg", 0.5, "Average transmission", unit="1/day")
         builder.add_parameter(
@@ -607,11 +607,11 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.97},
-                {"disease_state": "E", "fraction": 0.01},
-                {"disease_state": "I", "fraction": 0.02},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.97},
+                {"bin": "E", "fraction": 0.01},
+                {"bin": "I", "fraction": 0.02},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -626,9 +626,9 @@ class TestFullModelUnitFailures:
         """Test multi-stratified model fails with nested math function errors."""
         builder = ModelBuilder(name="Multi-Strat Bad Nested", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_stratification("age", ["young", "old"])
         builder.add_stratification("location", ["urban", "rural"])
@@ -679,10 +679,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
             stratification_fractions=[
                 {
@@ -713,9 +713,9 @@ class TestFullModelUnitFailures:
         """Test SIRS model fails when atan2 receives incompatible units."""
         builder = ModelBuilder(name="SIRS Bad Atan2", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
         builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
@@ -736,10 +736,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.95},
-                {"disease_state": "I", "fraction": 0.04},
-                {"disease_state": "R", "fraction": 0.01},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.95},
+                {"bin": "I", "fraction": 0.04},
+                {"bin": "R", "fraction": 0.01},
             ],
         )
 
@@ -754,10 +754,10 @@ class TestFullModelUnitFailures:
         """Test complex intervention model fails with min/max unit errors."""
         builder = ModelBuilder(name="Intervention Bad Min Max", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("H", "Hospitalized")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("H", "Hospitalized")
+        builder.add_bin("R", "Recovered")
 
         builder.add_parameter("beta_max", 0.8, "Max transmission", unit="1/day")
         builder.add_parameter("beta_min", 0.2, "Min transmission", unit="1/day")
@@ -782,11 +782,11 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.97},
-                {"disease_state": "I", "fraction": 0.02},
-                {"disease_state": "H", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.97},
+                {"bin": "I", "fraction": 0.02},
+                {"bin": "H", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -801,9 +801,9 @@ class TestFullModelUnitFailures:
         """Test age-structured model fails when floor receives dimensional quantity."""
         builder = ModelBuilder(name="Age Structured Bad Floor", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         builder.add_stratification("age", ["child", "adult", "senior"])
 
@@ -834,10 +834,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
             stratification_fractions=[
                 {
@@ -985,9 +985,9 @@ class TestFullModelUnitFailures:
         """Test SIR model fails when sin receives dimensional argument."""
         builder = ModelBuilder(name="SIR Bad Seasonality", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters with units
         builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
@@ -1005,10 +1005,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -1208,9 +1208,9 @@ class TestFullModelUnitFailures:
         """Test SIR model with exponential decay in transmission rate."""
         builder = ModelBuilder(name="SIR with Decay", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters with units
         builder.add_parameter("beta_0", 0.5, "Initial transmission rate", unit="1/day")
@@ -1228,10 +1228,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 
@@ -1244,9 +1244,9 @@ class TestFullModelUnitFailures:
         """Test SIR model with seasonal forcing using sin."""
         builder = ModelBuilder(name="SIR with Seasonality", version="1.0")
 
-        builder.add_disease_state("S", "Susceptible")
-        builder.add_disease_state("I", "Infected")
-        builder.add_disease_state("R", "Recovered")
+        builder.add_bin("S", "Susceptible")
+        builder.add_bin("I", "Infected")
+        builder.add_bin("R", "Recovered")
 
         # Add parameters with units
         builder.add_parameter(
@@ -1268,10 +1268,10 @@ class TestFullModelUnitFailures:
 
         builder.set_initial_conditions(
             population_size=1000,
-            disease_state_fractions=[
-                {"disease_state": "S", "fraction": 0.99},
-                {"disease_state": "I", "fraction": 0.01},
-                {"disease_state": "R", "fraction": 0.0},
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
             ],
         )
 

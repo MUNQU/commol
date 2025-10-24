@@ -79,7 +79,7 @@ fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>)
     // Start with disease states
     let mut compartments: Vec<String> = model
         .population
-        .disease_states
+        .bins
         .iter()
         .map(|ds| ds.id.clone())
         .collect();
@@ -123,7 +123,7 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
     // Initialize with disease states
     let mut population_distribution: HashMap<String, f64> = model
         .population
-        .disease_states
+        .bins
         .iter()
         .map(|disease_state| {
             let fraction = disease_state_fraction_map

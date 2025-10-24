@@ -72,8 +72,8 @@ When you add stratifications, EpiModel creates compartments by combining disease
 
 ```python
 # Model with one stratification (age)
-.add_disease_state(id="S", name="Susceptible")
-.add_disease_state(id="I", name="Infected")
+.add_bin(id="S", name="Susceptible")
+.add_bin(id="I", name="Infected")
 .add_stratification(id="age", categories=["young", "old"])
 
 # Creates compartments: S_young, S_old, I_young, I_old
@@ -81,7 +81,7 @@ When you add stratifications, EpiModel creates compartments by combining disease
 
 ```python
 # Model with two stratifications (age and location)
-.add_disease_state(id="I", name="Infected")
+.add_bin(id="I", name="Infected")
 .add_stratification(id="age", categories=["child", "adult"])
 .add_stratification(id="location", categories=["urban", "rural"])
 
