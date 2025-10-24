@@ -1,13 +1,13 @@
 [package]
-name = "epimodel-calibration"
+name = "commol-calibration"
 version = "0.1.0"
 edition = "2021"
-authors = ["EpiModel Contributors"]
-description = "Model calibration and parameter estimation for EpiModel"
-license = "MIT OR Apache-2.0"
+authors = ["Commol Contributors"]
+description = "Model calibration and parameter estimation for Commol"
+license = "MIT"
 
 [lib]
-name = "epimodel_calibration"
+name = "commol_calibration"
 crate-type = ["rlib"]
 
 [dependencies]
@@ -16,9 +16,9 @@ argmin = "0.10"
 argmin-math = "0.4"
 argmin-observer-slog = "0.1"
 
-# EpiModel dependencies
-epimodel-core = { path = "../epimodel-core" }
-epimodel-difference = { path = "../epimodel-difference" }
+# Commol dependencies
+commol-core = { path = "../commol-core" }
+commol-difference = { path = "../commol-difference" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

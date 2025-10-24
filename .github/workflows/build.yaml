@@ -50,28 +50,28 @@ jobs:
           pip install poetry
 
       - name: Install Python dependencies
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry install --extras dev
 
       - name: Build and install for testing
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry run maturin develop --release
 
       - name: Run tests
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry run pytest
 
       - name: Clean Rust extension before wheel build
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         shell: bash
         run: |
-          rm -f epimodel/epimodel_rs/epimodel_rs.*.so epimodel/epimodel_rs/epimodel_rs.*.pyd
+          rm -f commol/commol_rs/commol_rs.*.so commol/commol_rs/commol_rs.*.pyd
 
       - name: Build wheel
-        working-directory: ./py-epimodel
+        working-directory: ./py-commol
         run: |
           poetry run maturin build --release
 

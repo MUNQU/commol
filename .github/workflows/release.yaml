@@ -32,7 +32,7 @@ jobs:
         run: pip install maturin
 
       - name: Build wheels
-        run: maturin build --release --out dist --manifest-path py-epimodel/Cargo.toml
+        run: maturin build --release --out dist --manifest-path py-commol/Cargo.toml
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
         run: pip install maturin
 
       - name: Build sdist
-        run: maturin sdist --out dist --manifest-path py-epimodel/Cargo.toml
+        run: maturin sdist --out dist --manifest-path py-commol/Cargo.toml
 
       - name: Upload sdist
         uses: actions/upload-artifact@v4
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/epimodel
+      url: https://pypi.org/p/commol
     permissions:
       id-token: write
 

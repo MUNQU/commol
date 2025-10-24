@@ -1,12 +1,12 @@
-# EpiModel
+# Commol
 
-A high-performance mathematical epidemiology library for modeling infectious disease spread using difference equations. EpiModel provides a clean Python API backed by a fast Rust engine for numerical computations.
+A high-performance compartment modelling library for mathematical modeling using difference equations. Commol provides a clean Python API backed by a fast Rust engine for numerical computations.
 
-> ⚠️ **Alpha Stage Warning**: EpiModel is currently in alpha development. The API is not yet stable and may change between versions without backward compatibility guarantees. Use in production at your own risk.
+> ⚠️ **Alpha Stage Warning**: Commol is currently in alpha development. The API is not yet stable and may change between versions without backward compatibility guarantees. Use in production at your own risk.
 
 ## Features
 
-- **Intuitive Model Building**: Fluent API for constructing epidemiological models
+- **Intuitive Model Building**: Fluent API for constructing compartment models
 - **Mathematical Expressions**: Support for complex mathematical formulas in transition rates (sin, cos, exp, log, etc.)
 - **Unit Checking**: Automatic dimensional analysis to catch unit errors before simulation
 - **High Performance**: Rust-powered simulation engine for fast computations
@@ -18,11 +18,11 @@ A high-performance mathematical epidemiology library for modeling infectious dis
 
 ```bash
 # Install from PyPI (once published)
-pip install epimodel
+pip install commol
 
 # Or install from source
-git clone https://github.com/MUNQU/epimodel.git
-cd epimodel/py-epimodel
+git clone https://github.com/MUNQU/commol.git
+cd commol/py-commol
 pip install maturin
 maturin develop --release
 ```
@@ -30,8 +30,8 @@ maturin develop --release
 ## Quick Start
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build a simple SIR model
 model = (
@@ -117,7 +117,7 @@ model.check_unit_consistency()  # Ensures all equations have correct units
 Fit model parameters to observed data using optimization algorithms:
 
 ```python
-from epimodel import (
+from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
@@ -163,32 +163,32 @@ print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
 
 ## Documentation
 
-**[Full Documentation](https://munqu.github.io/epimodel)**
+**[Full Documentation](https://munqu.github.io/commol)**
 
-- [Installation Guide](https://munqu.github.io/epimodel/getting-started/installation/) - Setup and installation
-- [Quick Start](https://munqu.github.io/epimodel/getting-started/quickstart/) - Build your first model
-- [User Guide](https://munqu.github.io/epimodel/guide/core-concepts/) - Core concepts and tutorials
-- [Model Calibration](https://munqu.github.io/epimodel/guide/calibration/) - Parameter fitting and optimization
-- [API Reference](https://munqu.github.io/epimodel/api/model-builder/) - Complete API documentation
-- [Examples](https://munqu.github.io/epimodel/guide/examples/) - SIR, SEIR, and advanced models
+- [Installation Guide](https://munqu.github.io/commol/getting-started/installation/) - Setup and installation
+- [Quick Start](https://munqu.github.io/commol/getting-started/quickstart/) - Build your first model
+- [User Guide](https://munqu.github.io/commol/guide/core-concepts/) - Core concepts and tutorials
+- [Model Calibration](https://munqu.github.io/commol/guide/calibration/) - Parameter fitting and optimization
+- [API Reference](https://munqu.github.io/commol/api/model-builder/) - Complete API documentation
+- [Examples](https://munqu.github.io/commol/guide/examples/) - SIR, SEIR, and advanced models
 
 ## Development
 
 For contributors and developers:
 
-- [Development Workflow](https://munqu.github.io/epimodel/development/workflow/) - Setup, branching, CI/CD
-- [Contributing Guidelines](https://munqu.github.io/epimodel/development/contributing/) - How to contribute
-- [Release Process](https://munqu.github.io/epimodel/development/release/) - Version management
+- [Development Workflow](https://munqu.github.io/commol/development/workflow/) - Setup, branching, CI/CD
+- [Contributing Guidelines](https://munqu.github.io/commol/development/contributing/) - How to contribute
+- [Release Process](https://munqu.github.io/commol/development/release/) - Version management
 
 ### Local Development
 
 ```bash
 # Clone repository
-git clone https://github.com/MUNQU/epimodel.git
-cd epimodel
+git clone https://github.com/MUNQU/commol.git
+cd commol
 
 # Install Python dependencies
-cd py-epimodel
+cd py-commol
 poetry install --with dev,docs
 
 # Build Rust workspace
@@ -196,7 +196,7 @@ cd ..
 cargo build --workspace
 
 # Build Python extension
-cd py-epimodel
+cd py-commol
 maturin develop --release
 
 # Run tests
@@ -205,13 +205,13 @@ cd ..
 cargo test --workspace
 
 # Build documentation locally
-cd py-epimodel
+cd py-commol
 poetry run mkdocs serve
 ```
 
 ## License
 
-EpiModel is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+Commol is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Authors
 
@@ -221,19 +221,19 @@ EpiModel is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Citation
 
-If you use EpiModel in your research, please cite:
+If you use Commol in your research, please cite:
 
 ```bibtex
-@software{epimodel2025,
-  title = {EpiModel: A High-Performance Epidemiological Modeling Library},
+@software{commol2025,
+  title = {Commol: A High-Performance Compartment Modelling Library},
   author = {Villanueva Micó, Rafael J. and Andreu Vilarroig, Carlos and Martínez Rodríguez, David},
   year = {2025},
-  url = {https://github.com/MUNQU/epimodel}
+  url = {https://github.com/MUNQU/commol}
 }
 ```
 
 ## Support
 
-- Documentation: https://munqu.github.io/epimodel
-- Issue Tracker: https://github.com/MUNQU/epimodel/issues
-- Discussions: https://github.com/MUNQU/epimodel/discussions
+- Documentation: https://munqu.github.io/commol
+- Issue Tracker: https://github.com/MUNQU/commol/issues
+- Discussions: https://github.com/MUNQU/commol/discussions

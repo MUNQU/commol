@@ -1,6 +1,6 @@
 # Core Concepts
 
-EpiModel is built around several key concepts that work together to create epidemiological models.
+Commol is built around several key concepts that work together to create compartment models.
 
 ## Disease States
 
@@ -161,7 +161,7 @@ builder.set_initial_conditions(
 EpiModel currently supports:
 
 ```python
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 ```

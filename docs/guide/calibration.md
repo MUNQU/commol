@@ -21,7 +21,7 @@ The `Calibrator.run()` method returns a `CalibrationResult` object containing th
 Here's a simple calibration of an SIR model's transmission and recovery rates:
 
 ```python
-from epimodel import (
+from commol import (
     ModelBuilder,
     Simulation,
     Calibrator,
@@ -34,7 +34,7 @@ from epimodel import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 # Build the model
 model = (
@@ -177,7 +177,7 @@ $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
 Population-based algorithm inspired by social behavior. Good for global optimization:
 
 ```python
-from epimodel import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
 
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
@@ -205,7 +205,7 @@ optimization_config = OptimizationConfig(
 Derivative-free simplex algorithm. Fast convergence for smooth problems:
 
 ```python
-from epimodel import NelderMeadConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import NelderMeadConfig, OptimizationConfig, OptimizationAlgorithm
 
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.NELDER_MEAD,

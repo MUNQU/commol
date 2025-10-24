@@ -1,7 +1,7 @@
 [project]
-name = "epimodel"
+name = "commol"
 version = "0.0.1"
-description = "A high-performance mathematical epidemiology library in Rust and Python."
+description = "A high-performance compartment modelling library in Rust and Python."
 authors = [
     {name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es"},
     {name = "Carlos Andreu Vilarroig", email = "caranvi1@upv.es"},
@@ -35,14 +35,14 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/MUNQU/epimodel"
-Documentation = "https://munqu.github.io/epimodel"
-Repository = "https://github.com/MUNQU/epimodel"
-"Bug Tracker" = "https://github.com/MUNQU/epimodel/issues"
+Homepage = "https://github.com/MUNQU/commol"
+Documentation = "https://munqu.github.io/commol"
+Repository = "https://github.com/MUNQU/commol"
+"Bug Tracker" = "https://github.com/MUNQU/commol/issues"
 
 # Poetry-specific configuration
 [tool.poetry]
-packages = [{include = "epimodel"}]
+packages = [{include = "commol"}]
 requires-poetry = ">=2.2"
 
 # Build system
@@ -51,7 +51,7 @@ requires = ["maturin>=1.9.1,<1.10.0"]
 build-backend = "maturin"
 
 [tool.maturin]
-python-source = "epimodel"
+python-source = "commol"
 
 # Testing configuration
 [tool.pytest]

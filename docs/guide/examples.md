@@ -7,8 +7,8 @@ Complete examples demonstrating different modeling scenarios.
 Classic Susceptible-Infected-Recovered model:
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 import matplotlib.pyplot as plt
 
 # Build model
@@ -398,7 +398,7 @@ results = simulation.run(num_steps=100)
 Calibrate model parameters to match observed data:
 
 ```python
-from epimodel import (
+from commol import (
     ModelBuilder,
     Simulation,
     Calibrator,
@@ -411,7 +411,7 @@ from epimodel import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 # Build SIR model with initial parameter guesses
 model = (

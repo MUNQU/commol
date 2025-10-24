@@ -1,9 +1,9 @@
-# EpiModel
+# Commol
 
-A high-performance mathematical epidemiology library for modeling infectious disease spread using difference equations. EpiModel provides a clean Python API backed by a fast Rust engine for numerical computations.
+A high-performance compartment modelling library for mathematical modeling using difference equations. Commol provides a clean Python API backed by a fast Rust engine for numerical computations.
 
 !!! warning "Alpha Stage - API Unstable"
-**EpiModel is currently in alpha development.** The API is not yet stable and may change between versions without backward compatibility guarantees.
+**Commol is currently in alpha development.** The API is not yet stable and may change between versions without backward compatibility guarantees.
 
     - Breaking changes may occur in any release
     - Not recommended for production use yet
@@ -13,7 +13,7 @@ A high-performance mathematical epidemiology library for modeling infectious dis
 
 ## Features
 
-- **Intuitive Model Building**: Fluent API for constructing epidemiological models
+- **Intuitive Model Building**: Fluent API for constructing compartment models
 - **Mathematical Expressions**: Support for complex mathematical formulas in transition rates
 - **High Performance**: Rust-powered simulation engine for fast computations
 - **Flexible Architecture**: Support for stratified populations and conditional transitions
@@ -23,8 +23,8 @@ A high-performance mathematical epidemiology library for modeling infectious dis
 ## Quick Example
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build a simple SIR model
 model = (
@@ -65,7 +65,7 @@ results = simulation.run(num_steps=100)
 
 ## Getting Started
 
-- [Installation Guide](getting-started/installation.md) - Install EpiModel
+- [Installation Guide](getting-started/installation.md) - Install Commol
 - [Quick Start](getting-started/quickstart.md) - Build your first model
 - [Core Concepts](guide/core-concepts.md) - Understand the fundamentals
 
@@ -73,7 +73,7 @@ results = simulation.run(num_steps=100)
 
 ### User Guide
 
-Learn how to build and run epidemiological models:
+Learn how to build and run compartment models:
 
 - [Core Concepts](guide/core-concepts.md) - Disease states, stratifications, parameters
 - [Building Models](guide/building-models.md) - Using the ModelBuilder API
@@ -93,7 +93,7 @@ Complete API documentation for all public interfaces:
 
 ### Development
 
-Contributing to EpiModel:
+Contributing to Commol:
 
 - [Development Workflow](development/workflow.md) - Setup, branching, CI/CD
 - [Contributing Guidelines](development/contributing.md) - How to contribute
@@ -101,7 +101,7 @@ Contributing to EpiModel:
 
 ## License
 
-EpiModel is licensed under the MIT License. See [License](about/license.md) for details.
+Commol is licensed under the MIT License. See [License](about/license.md) for details.
 
 ## Authors
 

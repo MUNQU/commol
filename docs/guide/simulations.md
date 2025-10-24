@@ -5,7 +5,7 @@ Once you've built a model, use the `Simulation` class to run it and analyze resu
 ## Basic Simulation
 
 ```python
-from epimodel import Simulation
+from commol import Simulation
 
 # Create simulation from model
 simulation = Simulation(model)

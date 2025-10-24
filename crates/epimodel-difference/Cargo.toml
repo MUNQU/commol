@@ -1,16 +1,16 @@
 [package]
-name = "epimodel-difference"
+name = "commol-difference"
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-description = "Mathematical epidemiology modelling with difference equations"
+description = "Mathematical compartment modelling with difference equations"
 
 [lib]
-name = "epimodel_difference"
+name = "commol_difference"
 crate-type = ["rlib"]
 
 [dependencies]
-epimodel-core = { path = "../epimodel-core" }
+commol-core = { path = "../commol-core" }

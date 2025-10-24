@@ -1,14 +1,14 @@
 # Quick Start
 
-This guide will help you build and run your first epidemiological model with EpiModel.
+This guide will help you build and run your first compartment model with Commol.
 
 ## Your First SIR Model
 
 Let's create a basic SIR (Susceptible-Infected-Recovered) model:
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build the model
 model = (
@@ -56,8 +56,8 @@ print(f"Recovered at day 100: {results['R'][-1]:.0f}")
 ### 1. Import Required Classes
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 ```
 
 - `ModelBuilder`: Fluent API for constructing models
@@ -167,7 +167,7 @@ See the [Unit Checking](../guide/building-models.md#unit-checking) section for d
 Once you have a model, you can calibrate its parameters to match observed data using the `Calibrator` class:
 
 ```python
-from epimodel import (
+from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,

@@ -1,12 +1,12 @@
 [package]
-name = "epimodel-differential"
+name = "commol-differential"
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-description = "Mathematical epidemiology modelling with differential equations"
+description = "Mathematical compartment modelling with differential equations"
 
 [dependencies]
-epimodel-core = { path = "../epimodel-core" }
+commol-core = { path = "../commol-core" }

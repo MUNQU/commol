@@ -1,13 +1,13 @@
 # Building Models
 
-The `ModelBuilder` class provides a fluent API for constructing epidemiological models.
+The `ModelBuilder` class provides a fluent API for constructing compartment models.
 
 ## ModelBuilder Basics
 
 ### Creating a Builder
 
 ```python
-from epimodel import ModelBuilder
+from commol import ModelBuilder
 
 builder = ModelBuilder(
     name="My Model",
@@ -307,7 +307,7 @@ builder.set_initial_conditions(
 Once all components are added, build the model:
 
 ```python
-from epimodel.constants import ModelTypes
+from commol.constants import ModelTypes
 
 model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 ```
@@ -478,7 +478,7 @@ builder.add_transition(
 Load pre-defined models from JSON files:
 
 ```python
-from epimodel import ModelLoader
+from commol import ModelLoader
 
 model = ModelLoader.from_json("path/to/model.json")
 ```
@@ -517,8 +517,8 @@ model = ModelLoader.from_json("path/to/model.json")
 ## Complete Example
 
 ```python
-from epimodel import ModelBuilder, Simulation
-from epimodel.constants import ModelTypes
+from commol import ModelBuilder, Simulation
+from commol.constants import ModelTypes
 
 # Build SEIR model
 model = (

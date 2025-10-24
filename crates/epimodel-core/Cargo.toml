@@ -1,15 +1,15 @@
 [package]
-name = "epimodel-core"
+name = "commol-core"
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-description = "Core data structures for epidemiological models"
+description = "Core data structures for compartment models"
 
 [lib]
-name = "epimodel_core"
+name = "commol_core"
 crate-type = ["rlib"]
 
 [dependencies]
