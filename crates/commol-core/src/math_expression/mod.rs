@@ -73,7 +73,7 @@
 //! - `max(a, b, ...)` - Maximum value (variadic)
 //! - `if(condition, value_if_true, value_if_false)` - Conditional expression
 
-use evalexpr::{build_operator_tree, ContextWithMutableVariables, HashMapContext, Node, Value};
+use evalexpr::{ContextWithMutableVariables, HashMapContext, Node, Value, build_operator_tree};
 use serde::{Deserialize, Serialize};
 
 pub mod context;

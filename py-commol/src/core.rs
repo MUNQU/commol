@@ -166,16 +166,13 @@ impl PyInitialConditions {
         disease_state_fractions: Vec<(String, f64)>,
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
     ) -> Self {
-        let disease_state_fractions: Vec<commol_core::BinFraction> =
-            disease_state_fractions
-                .into_iter()
-                .map(
-                    |(disease_state, fraction)| commol_core::BinFraction {
-                        disease_state,
-                        fraction,
-                    },
-                )
-                .collect();
+        let disease_state_fractions: Vec<commol_core::BinFraction> = disease_state_fractions
+            .into_iter()
+            .map(|(disease_state, fraction)| commol_core::BinFraction {
+                disease_state,
+                fraction,
+            })
+            .collect();
 
         let stratification_fractions = stratification_fractions
             .unwrap_or_default()
@@ -185,12 +182,10 @@ impl PyInitialConditions {
                     stratification,
                     fractions: fractions
                         .into_iter()
-                        .map(
-                            |(category, fraction)| commol_core::StratificationFraction {
-                                category,
-                                fraction,
-                            },
-                        )
+                        .map(|(category, fraction)| commol_core::StratificationFraction {
+                            category,
+                            fraction,
+                        })
                         .collect(),
                 },
             )

@@ -21,6 +21,6 @@ pub use dynamics::{Dynamics, ModelTypes, StratificationCondition, StratifiedRate
 pub use model::Model;
 pub use parameters::{Parameter, VariablePrefixes};
 pub use population::{
-    Bin, BinFraction, InitialConditions, Population, Stratification,
-    StratificationFraction, StratificationFractions,
+    Bin, BinFraction, InitialConditions, Population, Stratification, StratificationFraction,
+    StratificationFractions,
 };
