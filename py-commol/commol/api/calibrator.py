@@ -1,17 +1,22 @@
 import logging
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from commol.commol_rs.commol_rs import (
+        DifferenceEquationsProtocol,
+        LossConfigProtocol,
+        OptimizationConfigProtocol,
+    )
+
 try:
     from commol.commol_rs import commol_rs
 
     rust_core = commol_rs.core
     rust_difference = commol_rs.difference
     rust_calibration = commol_rs.calibration
-
-    if TYPE_CHECKING:
-        from commol.commol_rs.commol_rs import calibration as CalibrationModule
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
+
 from commol.api.simulation import Simulation
 from commol.context.calibration import (
     CalibrationProblem,
@@ -51,7 +56,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine = simulation.engine
+        self._engine: "DifferenceEquationsProtocol" = simulation.engine
 
         logger.info(
             (
@@ -110,10 +115,10 @@ class Calibrator:
         ]
 
         # Convert loss config to Rust type
-        rust_loss_config = self._build_loss_config(rust_calibration)
+        rust_loss_config = self._build_loss_config()
 
         # Convert optimization config to Rust type
-        rust_optimization_config = self._build_optimization_config(rust_calibration)
+        rust_optimization_config = self._build_optimization_config()
 
         logger.info("Converted problem definition to Rust types.")
         logger.info("Running optimization...")
@@ -147,9 +152,7 @@ class Calibrator:
 
         return result
 
-    def _build_loss_config(
-        self, rust_calibration: "CalibrationModule"
-    ) -> "CalibrationModule.LossConfig":
+    def _build_loss_config(self) -> "LossConfigProtocol":
         """Convert Python LossConfig to Rust LossConfig."""
         loss_func = self.problem.loss_config.function
 
@@ -164,9 +167,7 @@ class Calibrator:
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 
-    def _build_optimization_config(
-        self, rust_calibration: "CalibrationModule"
-    ) -> "CalibrationModule.OptimizationConfig":
+    def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
         opt_config = self.problem.optimization_config
 

@@ -474,7 +474,7 @@ class ModelBuilder:
 
         new_builder = type(self)(self._name, self._description, self._version)
 
-        new_builder._disease_states = copy.deepcopy(self._bins)
+        new_builder._bins = copy.deepcopy(self._bins)
         new_builder._stratifications = copy.deepcopy(self._stratifications)
         new_builder._transitions = copy.deepcopy(self._transitions)
         new_builder._parameters = copy.deepcopy(self._parameters)

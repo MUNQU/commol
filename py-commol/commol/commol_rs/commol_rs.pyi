@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from epimodel.constants import LogicOperators, ModelTypes, VariablePrefixes
+from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
 
 class RuleProtocol(Protocol):
     variable: str
