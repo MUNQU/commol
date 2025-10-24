@@ -1,79 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/</loc>
+         <loc>https://munqu.github.io/commol/dev/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/about/changelog/</loc>
+         <loc>https://munqu.github.io/commol/dev/about/changelog/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/about/license/</loc>
+         <loc>https://munqu.github.io/commol/dev/about/license/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/advanced/model-structure/</loc>
+         <loc>https://munqu.github.io/commol/dev/advanced/model-structure/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/api/calibrator/</loc>
+         <loc>https://munqu.github.io/commol/dev/api/calibrator/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/api/constants/</loc>
+         <loc>https://munqu.github.io/commol/dev/api/constants/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/api/model-builder/</loc>
+         <loc>https://munqu.github.io/commol/dev/api/model-builder/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/api/simulation/</loc>
+         <loc>https://munqu.github.io/commol/dev/api/simulation/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/development/contributing/</loc>
+         <loc>https://munqu.github.io/commol/dev/development/contributing/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/development/release/</loc>
+         <loc>https://munqu.github.io/commol/dev/development/release/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/development/workflow/</loc>
+         <loc>https://munqu.github.io/commol/dev/development/workflow/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/getting-started/installation/</loc>
+         <loc>https://munqu.github.io/commol/dev/getting-started/installation/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/getting-started/quickstart/</loc>
+         <loc>https://munqu.github.io/commol/dev/getting-started/quickstart/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/building-models/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/building-models/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/calibration/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/calibration/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/core-concepts/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/core-concepts/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/examples/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/examples/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/mathematical-expressions/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/mathematical-expressions/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/epimodel/dev/guide/simulations/</loc>
+         <loc>https://munqu.github.io/commol/dev/guide/simulations/</loc>
          <lastmod>2025-10-24</lastmod>
     </url>
 </urlset>
