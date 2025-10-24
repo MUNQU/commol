@@ -112,6 +112,55 @@ model = (
 model.check_unit_consistency()  # Ensures all equations have correct units
 ```
 
+### Model Calibration
+
+Fit model parameters to observed data using optimization algorithms:
+
+```python
+from epimodel import (
+    Calibrator,
+    CalibrationProblem,
+    CalibrationParameter,
+    ObservedDataPoint,
+    LossConfig,
+    LossFunction,
+    OptimizationConfig,
+    OptimizationAlgorithm,
+    ParticleSwarmConfig,
+)
+
+# Define observed data from real outbreak
+observed_data = [
+    ObservedDataPoint(step=10, compartment="I", value=45.2),
+    ObservedDataPoint(step=20, compartment="I", value=78.5),
+    ObservedDataPoint(step=30, compartment="I", value=62.3),
+]
+
+# Specify parameters to calibrate with bounds
+parameters = [
+    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+]
+
+# Configure calibration problem
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_config=LossConfig(function=LossFunction.SSE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        config=ParticleSwarmConfig(max_iterations=300),
+    ),
+)
+
+# Run calibration
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
+print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+```
+
 ## Documentation
 
 **[Full Documentation](https://munqu.github.io/epimodel)**
@@ -119,6 +168,7 @@ model.check_unit_consistency()  # Ensures all equations have correct units
 - [Installation Guide](https://munqu.github.io/epimodel/getting-started/installation/) - Setup and installation
 - [Quick Start](https://munqu.github.io/epimodel/getting-started/quickstart/) - Build your first model
 - [User Guide](https://munqu.github.io/epimodel/guide/core-concepts/) - Core concepts and tutorials
+- [Model Calibration](https://munqu.github.io/epimodel/guide/calibration/) - Parameter fitting and optimization
 - [API Reference](https://munqu.github.io/epimodel/api/model-builder/) - Complete API documentation
 - [Examples](https://munqu.github.io/epimodel/guide/examples/) - SIR, SEIR, and advanced models
 

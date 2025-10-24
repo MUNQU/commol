@@ -79,6 +79,7 @@ Learn how to build and run epidemiological models:
 - [Building Models](guide/building-models.md) - Using the ModelBuilder API
 - [Mathematical Expressions](guide/mathematical-expressions.md) - Advanced rate formulas
 - [Running Simulations](guide/simulations.md) - Execute models and analyze results
+- [Model Calibration](guide/calibration.md) - Fit models to observed data
 - [Examples](guide/examples.md) - Complete model examples (SIR, SEIR, stratified)
 
 ### API Reference
@@ -87,6 +88,7 @@ Complete API documentation for all public interfaces:
 
 - [Model Builder](api/model-builder.md) - ModelBuilder class documentation
 - [Simulation](api/simulation.md) - Simulation runner
+- [Calibrator](api/calibrator.md) - Parameter calibration and optimization
 - [Constants](api/constants.md) - Model types and enumerations
 
 ### Development
