@@ -8,6 +8,12 @@ from epimodel.context.dynamics import Dynamics, Transition
 from epimodel.context.parameter import Parameter
 from epimodel.context.population import Population
 from epimodel.context.stratification import Stratification
+from epimodel.utils.equations import (
+    UnitConsistencyError,
+    check_all_parameters_have_units,
+    check_equation_units,
+    get_predefined_variable_units,
+)
 from epimodel.utils.security import get_expression_variables
 
 
@@ -873,3 +879,159 @@ class Model(BaseModel):
                 _ = f.write(output)
         else:
             print(output)
+
+    def check_unit_consistency(self) -> None:
+        """
+        Check unit consistency of all equations in the model.
+
+        This method validates that all transition rates have consistent units.
+        It only performs the check if ALL parameters have units specified.
+        If any parameter lacks a unit, the check is skipped.
+
+        For difference equation models, all rates should have units that result in
+        population change rates (e.g., "person/day" or "1/day" when multiplied by
+        population).
+
+        Raises
+        ------
+        UnitConsistencyError
+            If unit inconsistencies are found in any equation.
+        ValueError
+            If the model type doesn't support unit checking.
+
+        Examples
+        --------
+        >>> model.check_unit_consistency()  # Raises exception if inconsistent
+
+        Notes
+        -----
+        - Disease state variables are assumed to have units of "person"
+        - Predefined variables (N, N_young, etc.) have units of "person"
+        - Time step variables (t, step) are dimensionless
+        - Mathematical constants (pi, e) are dimensionless
+        """
+        # Check if all parameters have units
+        if not check_all_parameters_have_units(self.parameters):
+            # Skip check if not all parameters have units
+            return
+
+        if self.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
+            raise ValueError(
+                f"Unit checking is only supported for DifferenceEquations models. "
+                f"Current model type: {self.dynamics.typology}"
+            )
+
+        # Build variable units mapping
+        variable_units = self._build_variable_units()
+
+        # Check each transition
+        errors: list[str] = []
+        for transition in self.dynamics.transitions:
+            # Check main rate
+            if transition.rate:
+                is_consistent, error_msg = self._check_transition_rate_units(
+                    transition.rate,
+                    transition.id,
+                    variable_units,
+                    transition.source,
+                )
+                if not is_consistent and error_msg:
+                    errors.append(error_msg)
+
+            # Check stratified rates
+            if transition.stratified_rates:
+                for idx, strat_rate in enumerate(transition.stratified_rates):
+                    is_consistent, error_msg = self._check_transition_rate_units(
+                        strat_rate.rate,
+                        f"{transition.id} (stratified rate {idx + 1})",
+                        variable_units,
+                        transition.source,
+                    )
+                    if not is_consistent and error_msg:
+                        errors.append(error_msg)
+
+        if errors:
+            error_message = "Unit consistency check failed:\n" + "\n".join(
+                f"  - {err}" for err in errors
+            )
+            raise UnitConsistencyError(error_message)
+
+    def _build_variable_units(self) -> dict[str, str]:
+        """Build a mapping of all variables to their units."""
+        variable_units: dict[str, str] = {}
+
+        # Add parameter units
+        for param in self.parameters:
+            if param.unit:
+                variable_units[param.id] = param.unit
+
+        # Add disease state units (all are "person")
+        for state in self.population.disease_states:
+            variable_units[state.id] = "person"
+
+        # Add stratification category units (all are "person" for population counts)
+        for strat in self.population.stratifications:
+            for category in strat.categories:
+                variable_units[category] = "person"
+
+        # Add predefined variable units (N, N_young, etc.)
+        predefined_units = get_predefined_variable_units(
+            self.population.stratifications
+        )
+        variable_units.update(predefined_units)
+
+        # Add dimensionless special variables
+        variable_units["step"] = "dimensionless"
+        variable_units["t"] = "dimensionless"
+        variable_units["pi"] = "dimensionless"
+        variable_units["e"] = "dimensionless"
+
+        return variable_units
+
+    def _check_transition_rate_units(
+        self,
+        rate: str,
+        transition_id: str,
+        variable_units: dict[str, str],
+        source_states: list[str],
+    ) -> tuple[bool, str | None]:
+        """
+        Check units for a single transition rate.
+
+        For transitions in difference equations, rates represent the absolute change
+        in population per time step, so they should have units of "person/day"
+        (or person/timestep).
+        """
+        # Get variables used in the rate expression
+        variables = get_expression_variables(rate)
+
+        # Build variable units for this specific rate
+        rate_variable_units = {}
+        for var in variables:
+            if var in variable_units:
+                rate_variable_units[var] = variable_units[var]
+            else:
+                # Variable not found
+                # This should have been caught by earlier validation
+                return (
+                    False,
+                    f"Transition '{transition_id}': Variable '{var}' in rate "
+                    f"'{rate}' has no defined unit",
+                )
+
+        # For difference equations, rates should result in person per time unit
+        # This represents the absolute change in population per time step
+        expected_unit = "person/day"
+
+        # Check unit consistency
+        is_consistent, error_msg = check_equation_units(
+            rate, rate_variable_units, expected_unit
+        )
+
+        if not is_consistent:
+            return (
+                False,
+                f"Transition '{transition_id}': {error_msg}",
+            )
+
+        return (True, None)

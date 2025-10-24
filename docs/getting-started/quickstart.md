@@ -115,6 +115,53 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
+## Adding Unit Checking
+
+Improve model safety by adding units to your parameters:
+
+```python
+model = (
+    ModelBuilder(name="SIR with Units", version="1.0")
+    .add_disease_state(id="S", name="Susceptible")
+    .add_disease_state(id="I", name="Infected")
+    .add_disease_state(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.5, unit="1/day")    # Rate per day
+    .add_parameter(id="gamma", value=0.1, unit="1/day")   # Rate per day
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        disease_state_fractions=[
+            {"disease_state": "S", "fraction": 0.99},
+            {"disease_state": "I", "fraction": 0.01},
+            {"disease_state": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Validate dimensional consistency
+model.check_unit_consistency()
+```
+
+**Benefits**:
+
+- Catches unit errors before simulation (e.g., mixing days and weeks)
+- Validates mathematical functions receive correct dimensional arguments
+- Documents the physical meaning of parameters
+
+See the [Unit Checking](../guide/building-models.md#unit-checking) section for details.
+
 ## Next Steps
 
 Now that you've built your first model, explore:

@@ -80,11 +80,34 @@ builder.add_parameter(
 )
 ```
 
+### Parameters with Units
+
+You can specify units for automatic dimensional analysis and validation:
+
+```python
+builder.add_parameter(
+    id="beta",
+    value=0.5,
+    description="Transmission rate",
+    unit="1/day"  # Rate unit
+)
+
+builder.add_parameter(
+    id="seasonal_amplitude",
+    value=0.2,
+    description="Seasonal variation amplitude",
+    unit="dimensionless"  # Pure number
+)
+```
+
+When **all parameters have units**, the model will automatically validate dimensional consistency. See [Unit Checking](#unit-checking) below.
+
 ### Parameter Guidelines
 
 - Use meaningful IDs (beta, gamma, R0, etc.)
 - Document units and meaning
 - Ensure values are realistic for your model
+- Specify units for automatic validation (recommended)
 
 ## Adding Transitions
 
@@ -300,6 +323,131 @@ The build process validates:
 - No security issues in formulas
 
 If validation fails, a descriptive error is raised.
+
+## Unit Checking
+
+EpiModel provides automatic dimensional analysis to catch unit errors in your model equations. This validates that rate expressions produce the correct units and that mathematical functions receive dimensionally correct arguments.
+
+### Enabling Unit Checking
+
+Unit checking is enabled when **all parameters have units**:
+
+```python
+# Build model with units
+builder = ModelBuilder(name="SIR with Units", version="1.0")
+
+builder.add_disease_state("S", "Susceptible")
+builder.add_disease_state("I", "Infected")
+builder.add_disease_state("R", "Recovered")
+
+# Specify units for all parameters
+builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta * S * I / N"
+)
+builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+
+builder.set_initial_conditions(
+    population_size=1000,
+    disease_state_fractions=[
+        {"disease_state": "S", "fraction": 0.99},
+        {"disease_state": "I", "fraction": 0.01},
+        {"disease_state": "R", "fraction": 0.0},
+    ],
+)
+
+model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+# Validate dimensional consistency
+model.check_unit_consistency()  # Raises error if units are inconsistent
+```
+
+### Common Units
+
+```python
+# Rate units
+unit="1/day"         # Per-day rates
+unit="1/week"        # Per-week rates
+
+# Population units (automatically assigned to disease states)
+unit="person"        # Population count
+
+# Dimensionless quantities
+unit="dimensionless" # Ratios, fractions, amplitudes
+```
+
+### Mathematical Functions
+
+All standard math functions work with unit checking and validate their arguments:
+
+```python
+# Seasonal forcing (sin requires dimensionless argument)
+builder.add_parameter("beta_avg", 0.5, unit="1/day")
+builder.add_parameter("seasonal_amp", 0.2, unit="dimensionless")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365)) * S * I / N"
+)
+
+# Exponential decay (exp requires dimensionless argument)
+builder.add_parameter("beta_0", 0.5, unit="1/day")
+builder.add_parameter("decay_rate", 0.01, unit="dimensionless")
+
+builder.add_transition(
+    "infection", ["S"], ["I"],
+    rate="beta_0 * exp(-decay_rate * step) * S * I / N"
+)
+```
+
+**Supported functions**: `sin`, `cos`, `tan`, `exp`, `log`, `sqrt`, `pow`, `min`, `max`, `abs`, and more.
+
+### Automatic Unit Assignment
+
+The system automatically assigns units to:
+
+- **Disease states**: All have units of `person` (S, I, R, etc.)
+- **Population variables**: `N`, `N_young`, `N_urban`, etc. have units of `person`
+- **Time variables**: `t` and `step` are dimensionless
+- **Constants**: `pi` and `e` are dimensionless
+
+### Error Detection
+
+Unit checking catches common errors:
+
+```python
+# Wrong parameter units
+builder.add_parameter("beta", 0.5, unit="day")  # Should be "1/day"!
+# Error: Unit mismatch: equation has unit 'day * person' but expected 'person/day'
+
+# Dimensional argument to math function
+rate="beta * sin(I) * S"  # I has units of person!
+# Error: Cannot convert from 'person' to 'dimensionless'
+
+# Incompatible units in operations
+rate="min(beta, threshold) * S"  # beta is 1/day, threshold is person
+# Error: Cannot compare incompatible units
+```
+
+### Best Practices
+
+1. **Always specify units** for physical quantities
+2. **Use "dimensionless"** for ratios and fractions
+3. **Ensure math function arguments are dimensionless** (divide by appropriate quantities)
+4. **Use consistent time units** throughout your model
+
+### When Unit Checking is Skipped
+
+If any parameter lacks a unit, checking is automatically skipped:
+
+```python
+builder.add_parameter("beta", 0.5)  # No unit
+builder.add_parameter("gamma", 0.1, unit="1/day")
+# Unit checking will be skipped (not all parameters have units)
+```
 
 ## Advanced: Conditional Transitions
 
