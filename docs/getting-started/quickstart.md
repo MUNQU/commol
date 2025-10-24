@@ -162,6 +162,67 @@ model.check_unit_consistency()
 
 See the [Unit Checking](../guide/building-models.md#unit-checking) section for details.
 
+## Calibrating Model Parameters
+
+Once you have a model, you can calibrate its parameters to match observed data using the `Calibrator` class:
+
+```python
+from epimodel import (
+    Calibrator,
+    CalibrationProblem,
+    CalibrationParameter,
+    ObservedDataPoint,
+    LossConfig,
+    LossFunction,
+    OptimizationConfig,
+    OptimizationAlgorithm,
+    ParticleSwarmConfig,
+)
+
+# Suppose we have observed infected counts at different time steps
+observed_data = [
+    ObservedDataPoint(step=10, compartment="I", value=45.2),
+    ObservedDataPoint(step=20, compartment="I", value=78.5),
+    ObservedDataPoint(step=30, compartment="I", value=62.3),
+    ObservedDataPoint(step=40, compartment="I", value=38.1),
+]
+
+# Define which parameters to calibrate and their bounds
+parameters = [
+    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+]
+
+# Configure the calibration problem
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_config=LossConfig(function=LossFunction.SSE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        config=ParticleSwarmConfig(max_iterations=300, verbose=True),
+    ),
+)
+
+# Run calibration
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+# Display calibrated parameters
+print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
+print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+print(f"Final loss: {result.final_loss:.6f}")
+```
+
+**Key concepts**:
+
+- `ObservedDataPoint`: Real-world measurements to fit against
+- `CalibrationParameter`: Parameters to optimize with bounds
+- `LossFunction`: How to measure fit quality (SSE, RMSE, MAE, etc.)
+- `OptimizationAlgorithm`: Optimization method (Particle Swarm or Nelder-Mead)
+
+See the [Calibration Guide](../guide/calibration.md) for advanced techniques.
+
 ## Next Steps
 
 Now that you've built your first model, explore:
@@ -169,4 +230,5 @@ Now that you've built your first model, explore:
 - [Core Concepts](../guide/core-concepts.md) - Deep dive into EpiModel concepts
 - [Building Models](../guide/building-models.md) - Advanced model construction
 - [Mathematical Expressions](../guide/mathematical-expressions.md) - Complex rate formulas
+- [Model Calibration](../guide/calibration.md) - Comprehensive calibration guide
 - [Examples](../guide/examples.md) - More complete examples
