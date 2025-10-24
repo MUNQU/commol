@@ -1,8 +1,8 @@
-//! # EpiModel Python Bindings
+//! # Commol Python Bindings
 //!
-//! High-performance mathematical epidemiology library with Python bindings.
+//! High-performance compartment modelling library with Python bindings.
 //!
-//! This library provides Python access to the Rust-based EpiModel framework,
+//! This library provides Python access to the Rust-based Commol framework,
 //! following the Polars architecture pattern where Python bindings wrap
 //! pure Rust implementations.
 //!
@@ -15,7 +15,7 @@
 //! ## Example
 //!
 //! ```python
-//! from epimodel_rs import core, difference
+//! from commol_rs import core, difference
 //!
 //! # Load a model
 //! model = core.Model.from_json_file("sir_model.json")
@@ -35,17 +35,17 @@ mod core;
 mod difference;
 pub(crate) mod python_observer;
 
-/// High-performance mathematical epidemiology library.
+/// High-performance compartment modelling library.
 ///
-/// This module provides Python bindings to the EpiModel Rust library,
-/// enabling high-performance epidemiological modeling with a Pythonic API.
+/// This module provides Python bindings to the Commol Rust library,
+/// enabling high-performance compartment modeling with a Pythonic API.
 #[pymodule]
 fn epimodel_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Core module: fundamental data structures
     let core_module = PyModule::new(py, "core")?;
     core_module.add(
         "__doc__",
-        "Core data structures for epidemiological models.\n\n\
+        "Core data structures for compartment models.\n\n\
          Includes Model, Population, DiseaseState, Transition, and related types.",
     )?;
     core::register(&core_module)?;
@@ -56,7 +56,7 @@ fn epimodel_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     difference_module.add(
         "__doc__",
         "Discrete-time difference equation solver.\n\n\
-         Provides the DifferenceEquations class for simulating epidemiological\n\
+         Provides the DifferenceEquations class for simulating compartment\n\
          models using difference equations (discrete time steps).",
     )?;
     difference::register(&difference_module)?;
@@ -77,7 +77,7 @@ fn epimodel_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add(
         "__doc__",
-        "EpiModel: High-performance mathematical epidemiology in Rust with Python bindings.",
+        "Commol: High-performance compartment modelling in Rust with Python bindings.",
     )?;
 
     Ok(())

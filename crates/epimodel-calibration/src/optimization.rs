@@ -239,7 +239,7 @@ impl ParticleSwarmConfig {
 pub enum OptimizationConfig {
     /// Nelder-Mead simplex method (gradient-free)
     /// Good for: 2-10 parameters, non-smooth objectives
-    /// Most reliable for epidemiological models
+    /// Most reliable for compartment models
     NelderMead(NelderMeadConfig),
 
     /// Particle Swarm Optimization (gradient-free, global search)

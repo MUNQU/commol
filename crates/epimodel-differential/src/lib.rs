@@ -1,1 +1,1 @@
-// Mathematical epidemiology modelling with differential equations
+// Mathematical compartment modelling with differential equations

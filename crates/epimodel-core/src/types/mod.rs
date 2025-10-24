@@ -1,7 +1,7 @@
-//! Core data types for epidemiological models
+//! Core data types for compartment models
 //!
 //! This module contains all the data structures used to define and configure
-//! epidemiological models, organized into logical submodules:
+//! compartment models, organized into logical submodules:
 //!
 //! - `conditions`: Logic operators, rules, and conditional expressions
 //! - `parameters`: Model parameters and variable prefixes

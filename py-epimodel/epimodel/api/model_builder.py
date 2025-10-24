@@ -79,7 +79,7 @@ class StratifiedRateDict(TypedDict):
 
 class ModelBuilder:
     """
-    A programmatic interface for building epidemiological models.
+    A programmatic interface for building compartment models.
 
     This class provides a fluent API for constructing Model instances by progressively
     adding disease states, stratifications, transitions, parameters, and
@@ -510,7 +510,7 @@ class ModelBuilder:
         Returns
         -------
         Model
-            The constructed epidemiological model.
+            The constructed compartment model.
 
         Raises
         ------

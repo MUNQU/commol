@@ -23,7 +23,7 @@ pub(crate) struct SubpopulationMapping {
 
 /// Difference equations simulation engine.
 ///
-/// This struct represents a compiled epidemiological model using difference equations
+/// This struct represents a compiled compartment model using difference equations
 /// for discrete-time simulation. It pre-computes transition flows and stratification
 /// mappings for efficient simulation.
 #[derive(Clone)]

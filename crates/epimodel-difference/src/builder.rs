@@ -1,4 +1,4 @@
-//! Model builder for constructing DifferenceEquations from an epidemiological model.
+//! Model builder for constructing DifferenceEquations from a compartment model.
 
 use crate::helpers::{extract_stratifications, get_rate_string_for_compartment};
 use crate::types::{DifferenceEquations, SubpopulationMapping, TransitionFlow};
@@ -16,7 +16,7 @@ impl DifferenceEquations {
     ///
     /// # Arguments
     ///
-    /// * `model` - The epidemiological model to compile
+    /// * `model` - The compartment model to compile
     ///
     /// # Returns
     ///

@@ -5,7 +5,7 @@ from epimodel.context.model import Model
 
 class ModelLoader:
     """
-    Loads an epidemiological model from a file.
+    Loads a compartment model from a file.
 
     This class provides static methods to load a Model instance from various
     file formats, acting as a factory for Model objects.

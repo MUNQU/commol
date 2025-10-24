@@ -7,10 +7,10 @@ from epimodel.context.parameter import Parameter
 from epimodel.context.stratification import Stratification
 
 
-# Initialize unit registry and define custom units for epidemiology
+# Initialize unit registry and define custom units
 ureg = pint.UnitRegistry()
 
-# Define custom epidemiological units
+# Define custom units for population/compartment modeling
 # 'person' is a base unit for counting individuals in a population
 ureg.define("person = [population]")
 ureg.define("individual = person")

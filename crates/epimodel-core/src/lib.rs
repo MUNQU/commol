@@ -1,6 +1,6 @@
-//! # EpiModel Core
+//! # Commol Core
 //!
-//! Core data structures and abstractions for epidemiological modeling.
+//! Core data structures and abstractions for compartment modeling.
 //!
 //! This crate provides:
 //! - Mathematical expression parsing and evaluation
@@ -12,7 +12,7 @@
 //! - [`MathExpression`]: Parse and evaluate mathematical expressions
 //! - [`SimulationEngine`]: Trait for implementing simulation engines
 //! - [`Model`]: Complete model specification including population and dynamics
-//! - [`types`]: All data structures for defining epidemiological models
+//! - [`types`]: All data structures for defining compartment models
 
 pub mod math_expression;
 pub mod simulation_engine;

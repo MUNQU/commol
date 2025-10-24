@@ -1,6 +1,6 @@
-//! Difference equations simulation engine for epidemiological models.
+//! Difference equations simulation engine for compartment models.
 //!
-//! This crate provides a discrete-time simulation engine for epidemiological models
+//! This crate provides a discrete-time simulation engine for compartment models
 //! using difference equations. It is designed for efficient simulation of compartmental
 //! models with support for stratifications and complex rate expressions.
 //!

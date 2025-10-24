@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 /// Wrapper for epimodel_difference::DifferenceEquations
 ///
-/// Discrete-time epidemiological model solver using difference equations.
+/// Discrete-time compartment model solver using difference equations.
 #[pyclass(name = "DifferenceEquations")]
 pub struct PyDifferenceEquations {
     pub(crate) inner: epimodel_difference::DifferenceEquations,
@@ -16,7 +16,7 @@ impl PyDifferenceEquations {
     /// Create a new DifferenceEquations solver from a Model
     ///
     /// Args:
-    ///     model: The epidemiological model to simulate
+    ///     model: The compartment model to simulate
     ///
     /// Returns:
     ///     A new DifferenceEquations instance

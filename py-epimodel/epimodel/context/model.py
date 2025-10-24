@@ -19,7 +19,7 @@ from epimodel.utils.security import get_expression_variables
 
 class Model(BaseModel):
     """
-    Root class of epidemiological model.
+    Root class of compartment model.
 
     Attributes
     ----------

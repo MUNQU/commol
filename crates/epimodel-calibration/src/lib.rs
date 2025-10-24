@@ -1,6 +1,6 @@
-//! # EpiModel Calibration
+//! # Commol Calibration
 //!
-//! Model-agnostic calibration and parameter estimation for epidemiological models.
+//! Model-agnostic calibration and parameter estimation for compartment models.
 //!
 //! This crate provides tools for calibrating any model that implements the
 //! `SimulationEngine` trait from `epimodel-core`. It uses the `argmin` optimization

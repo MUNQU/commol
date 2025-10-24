@@ -42,7 +42,7 @@ class TestBasicSIRRateFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -66,7 +66,7 @@ class TestBasicSIRRateFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -90,7 +90,7 @@ class TestBasicSIRRateFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -117,7 +117,7 @@ class TestBasicSIRRateFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -169,7 +169,7 @@ class TestStepVaryingRates:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -197,7 +197,7 @@ class TestStepVaryingRates:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -230,7 +230,7 @@ class TestStepVaryingRates:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -283,7 +283,7 @@ class TestComplexMathematicalFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -314,7 +314,7 @@ class TestComplexMathematicalFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
@@ -346,7 +346,7 @@ class TestComplexMathematicalFormulas:
             simulation = Simulation(model)
             _ = simulation.run(10)
 
-            # TODO: Check epidemiological dynamics (valid with only one output type)
+            # TODO: Check model dynamics (valid with only one output type)
 
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
