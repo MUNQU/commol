@@ -5,7 +5,11 @@
 
 version: 2
 updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "cargo" # Rust dependencies
+    directory: "/crates" # Location of Rust package manifests
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip" # Python dependencies
+    directory: "/py-commol" # Location of Python package manifests
     schedule:
       interval: "weekly"
