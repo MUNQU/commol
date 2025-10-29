@@ -17,6 +17,26 @@ ureg.define("person = [population]")
 ureg.define("individual = person")
 ureg.define("people = person")
 
+# Define abstract time unit as a base dimension
+# This allows users to specify 'time' as a generic time unit
+ureg.define("time = [time_abstract]")
+
+# Define additional time units that are not in pint's default registry
+# Note: pint already includes many time units (second, minute, hour, day, week, year)
+# and some aliases (s, min, h, d, yr, a). We add commonly used aliases and units.
+
+_units_to_conditionally_add = {
+    "semester": "6 * month",
+    "wk": "week",
+    "mon": "month",
+}
+
+for unit_name, unit_definition in _units_to_conditionally_add.items():
+    try:
+        ureg(unit_name)
+    except pint.UndefinedUnitError:
+        ureg.define(f"{unit_name} = {unit_definition}")
+
 
 class UnitConsistencyError(Exception):
     """Raised when unit consistency check fails."""

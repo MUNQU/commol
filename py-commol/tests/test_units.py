@@ -349,6 +349,47 @@ class TestMathFunctionsInUnitChecking:
         assert is_consistent, f"Error: {error}"
         assert error is None
 
+    def test_abstract_time_unit(self):
+        """Test that abstract 'time' unit works."""
+        variable_units = {"rate": "1/time", "I": "person"}
+        is_consistent, error = check_equation_units(
+            "rate * I", variable_units, "person/time"
+        )
+        assert is_consistent, f"Error: {error}"
+
+    def test_various_time_units(self):
+        """Test various time units (week, month, year, hour, etc.)."""
+        time_units = [
+            "second",
+            "minute",
+            "hour",
+            "day",
+            "week",
+            "month",
+            "fortnight",
+            "year",
+            "semester",
+            "wk",
+            "mon",
+            "yr",
+        ]
+
+        for time_unit in time_units:
+            variable_units = {"rate": f"1/{time_unit}", "I": "person"}
+            is_consistent, error = check_equation_units(
+                "rate * I", variable_units, f"person/{time_unit}"
+            )
+            assert is_consistent, f"Error for unit '{time_unit}': {error}"
+
+    def test_time_unit_conversions(self):
+        """Test that different time units are compatible."""
+        variable_units = {"rate": "1/week", "I": "person"}
+        # Week and day are compatible time units
+        is_consistent, error = check_equation_units(
+            "rate * I", variable_units, "person/day"
+        )
+        assert is_consistent, f"Error: {error}"
+
 
 class TestFullModelUnitFailures:
     """Test that full models with unit errors properly raise exceptions."""
