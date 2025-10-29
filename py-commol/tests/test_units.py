@@ -90,29 +90,27 @@ class TestModelUnitConsistency:
 
     def test_sir_model_with_consistent_units(self):
         """Test SIR model with consistent units."""
-        builder = ModelBuilder(name="SIR", version="1.0")
-
-        # Add disease states
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters WITH units
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # Add transitions
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        # Set initial conditions
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR", version="1.0")
+            # Add disease states
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters WITH units
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # Add transitions
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            # Set initial conditions
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -122,26 +120,24 @@ class TestModelUnitConsistency:
 
     def test_sir_model_without_units_skips_check(self):
         """Test that unit check is skipped when parameters lack units."""
-        builder = ModelBuilder(name="SIR", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters WITHOUT units
-        builder.add_parameter("beta", 0.5, "Transmission rate")
-        builder.add_parameter("gamma", 0.1, "Recovery rate")
-
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters WITHOUT units
+            .add_parameter("beta", 0.5, "Transmission rate")
+            .add_parameter("gamma", 0.1, "Recovery rate")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -151,26 +147,24 @@ class TestModelUnitConsistency:
 
     def test_sir_model_with_inconsistent_units(self):
         """Test SIR model with inconsistent units raises error."""
-        builder = ModelBuilder(name="SIR", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters with WRONG units (beta should be 1/day, not day)
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters with WRONG units (beta should be 1/day, not day)
+            .add_parameter("beta", 0.5, "Transmission rate", unit="day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -183,55 +177,52 @@ class TestModelUnitConsistency:
 
     def test_stratified_model_with_consistent_units(self):
         """Test stratified model with consistent units."""
-        builder = ModelBuilder(name="Stratified SIR", version="1.0")
-
-        # Add disease states
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add stratification
-        builder.add_stratification("age", ["young", "old"])
-
-        # Add parameters with units
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # Add transitions with predefined variables (N_young, N_old)
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            stratified_rates=[
-                {
-                    "conditions": [{"stratification": "age", "category": "young"}],
-                    "rate": "beta * S * I / N_young",
-                },
-                {
-                    "conditions": [{"stratification": "age", "category": "old"}],
-                    "rate": "beta * S * I / N_old",
-                },
-            ],
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        # Set initial conditions
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
-            stratification_fractions=[
-                {
-                    "stratification": "age",
-                    "fractions": [
-                        {"category": "young", "fraction": 0.6},
-                        {"category": "old", "fraction": 0.4},
-                    ],
-                }
-            ],
+        builder = (
+            ModelBuilder(name="Stratified SIR", version="1.0")
+            # Add disease states
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add stratification
+            .add_stratification("age", ["young", "old"])
+            # Add parameters with units
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # Add transitions with predefined variables (N_young, N_old)
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                stratified_rates=[
+                    {
+                        "conditions": [{"stratification": "age", "category": "young"}],
+                        "rate": "beta * S * I / N_young",
+                    },
+                    {
+                        "conditions": [{"stratification": "age", "category": "old"}],
+                        "rate": "beta * S * I / N_old",
+                    },
+                ],
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            # Set initial conditions
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.6},
+                            {"category": "old", "fraction": 0.4},
+                        ],
+                    }
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -241,26 +232,24 @@ class TestModelUnitConsistency:
 
     def test_mixed_units_some_parameters_without_units(self):
         """Test that check is skipped when some parameters lack units."""
-        builder = ModelBuilder(name="SIR", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Mix: one parameter with unit, one without
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate")  # No unit
-
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Mix: one parameter with unit, one without
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate")  # No unit
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -270,30 +259,31 @@ class TestModelUnitConsistency:
 
     def test_dimensionless_parameters(self):
         """Test handling of dimensionless parameters."""
-        builder = ModelBuilder(name="Test", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-
-        # Dimensionless parameter
-        builder.add_parameter(
-            "contact_reduction", 0.5, "Contact reduction factor", unit="dimensionless"
-        )
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta * contact_reduction * S * I / N",
-        )
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-            ],
+        builder = (
+            ModelBuilder(name="Test", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            # Dimensionless parameter
+            .add_parameter(
+                "contact_reduction",
+                0.5,
+                "Contact reduction factor",
+                unit="dimensionless",
+            )
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="beta * contact_reduction * S * I / N",
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -307,31 +297,29 @@ class TestComplexUnits:
 
     def test_vaccination_rate_with_time_dependent_coverage(self):
         """Test vaccination model with time-dependent coverage."""
-        builder = ModelBuilder(name="SIR with Vaccination", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("V", "Vaccinated")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Parameters
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter("vax_rate", 0.01, "Vaccination rate", unit="1/day")
-
-        # Transitions
-        builder.add_transition("vaccination", ["S"], ["V"], rate="vax_rate * S")
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "V", "fraction": 0.0},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR with Vaccination", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("V", "Vaccinated")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Parameters
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter("vax_rate", 0.01, "Vaccination rate", unit="1/day")
+            # Transitions
+            .add_transition("vaccination", ["S"], ["V"], rate="vax_rate * S")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "V", "fraction": 0.0},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -367,26 +355,24 @@ class TestFullModelUnitFailures:
 
     def test_simple_sir_wrong_beta_units(self):
         """Test SIR model fails with wrong beta units."""
-        builder = ModelBuilder(name="SIR Wrong Beta", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Wrong units: beta should be 1/day, not day
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR Wrong Beta", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Wrong units: beta should be 1/day, not day
+            .add_parameter("beta", 0.5, "Transmission rate", unit="day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -399,31 +385,29 @@ class TestFullModelUnitFailures:
 
     def test_sir_with_log_of_population_fails(self):
         """Test SIR model fails when log receives population (dimensional)."""
-        builder = ModelBuilder(name="SIR Bad Log", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # This should fail: log(I) where I has units of person
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta * log(I) * S / N",  # log(I) is invalid!
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR Bad Log", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # This should fail: log(I) where I has units of person
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="beta * log(I) * S / N",  # log(I) is invalid!
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -435,36 +419,34 @@ class TestFullModelUnitFailures:
 
     def test_seir_with_exponential_wrong_units(self):
         """Test SEIR model fails when exp receives dimensional parameter."""
-        builder = ModelBuilder(name="SEIR Bad Exp", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("E", "Exposed")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("sigma", 0.2, "Incubation rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter("decay_time", 10, "Decay time", unit="day")  # Has units!
-
-        # This should fail: exp(decay_time) where decay_time has units of day
-        builder.add_transition(
-            "exposure",
-            ["S"],
-            ["E"],
-            rate="beta * exp(decay_time) * S * I / N",  # exp(decay_time) invalid!
-        )
-        builder.add_transition("infection", ["E"], ["I"], rate="sigma * E")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.98},
-                {"bin": "E", "fraction": 0.01},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SEIR Bad Exp", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("E", "Exposed")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("sigma", 0.2, "Incubation rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter("decay_time", 10, "Decay time", unit="day")  # Has units!
+            # This should fail: exp(decay_time) where decay_time has units of day
+            .add_transition(
+                "exposure",
+                ["S"],
+                ["E"],
+                rate="beta * exp(decay_time) * S * I / N",  # exp(decay_time) invalid!
+            )
+            .add_transition("infection", ["E"], ["I"], rate="sigma * E")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "E", "fraction": 0.01},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -476,51 +458,48 @@ class TestFullModelUnitFailures:
 
     def test_stratified_model_with_sqrt_wrong_units(self):
         """Test stratified model fails when sqrt receives dimensional quantity."""
-        builder = ModelBuilder(name="Stratified Bad Sqrt", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_stratification("age", ["young", "old"])
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # This should fail: sqrt(I) where I has units of person
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            stratified_rates=[
-                {
-                    "conditions": [{"stratification": "age", "category": "young"}],
-                    "rate": "beta * sqrt(I) * S / N_young",  # sqrt(I) invalid!
-                },
-                {
-                    "conditions": [{"stratification": "age", "category": "old"}],
-                    "rate": "beta * 0.5 * sqrt(I) * S / N_old",  # sqrt(I) invalid!
-                },
-            ],
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
-            stratification_fractions=[
-                {
-                    "stratification": "age",
-                    "fractions": [
-                        {"category": "young", "fraction": 0.6},
-                        {"category": "old", "fraction": 0.4},
-                    ],
-                }
-            ],
+        builder = (
+            ModelBuilder(name="Stratified Bad Sqrt", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_stratification("age", ["young", "old"])
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # This should fail: sqrt(I) where I has units of person
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                stratified_rates=[
+                    {
+                        "conditions": [{"stratification": "age", "category": "young"}],
+                        "rate": "beta * sqrt(I) * S / N_young",  # sqrt(I) invalid!
+                    },
+                    {
+                        "conditions": [{"stratification": "age", "category": "old"}],
+                        "rate": "beta * 0.5 * sqrt(I) * S / N_old",  # sqrt(I) invalid!
+                    },
+                ],
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.6},
+                            {"category": "old", "fraction": 0.4},
+                        ],
+                    }
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -532,39 +511,35 @@ class TestFullModelUnitFailures:
 
     def test_vaccination_model_with_pow_wrong_exponent(self):
         """Test vaccination model fails when pow has dimensional exponent."""
-        builder = ModelBuilder(name="Vaccination Bad Pow", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("V", "Vaccinated")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter("vax_rate", 0.01, "Vaccination rate", unit="1/day")
-        builder.add_parameter(
-            "threshold", 100, "Threshold", unit="person"
-        )  # Has units!
-
-        # This should fail: pow(I/N, threshold) where threshold has units
-        builder.add_transition(
-            "vaccination",
-            ["S"],
-            ["V"],
-            # threshold must be dimensionless!
-            rate="vax_rate * pow(I / N, threshold) * S",
-        )
-        builder.add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.98},
-                {"bin": "V", "fraction": 0.0},
-                {"bin": "I", "fraction": 0.02},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="Vaccination Bad Pow", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("V", "Vaccinated")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter("vax_rate", 0.01, "Vaccination rate", unit="1/day")
+            .add_parameter("threshold", 100, "Threshold", unit="person")  # Has units!
+            # This should fail: pow(I/N, threshold) where threshold has units
+            .add_transition(
+                "vaccination",
+                ["S"],
+                ["V"],
+                # threshold must be dimensionless!
+                rate="vax_rate * pow(I / N, threshold) * S",
+            )
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "V", "fraction": 0.0},
+                    {"bin": "I", "fraction": 0.02},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -576,43 +551,41 @@ class TestFullModelUnitFailures:
 
     def test_complex_model_seasonal_wrong_sin_argument(self):
         """Test complex seasonal model fails with dimensional sin argument."""
-        builder = ModelBuilder(name="Complex Seasonal Bad", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("E", "Exposed")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta_avg", 0.5, "Average transmission", unit="1/day")
-        builder.add_parameter(
-            "seasonal_amp", 0.2, "Seasonal amplitude", unit="dimensionless"
-        )
-        builder.add_parameter("period", 365, "Period", unit="day")  # Has units!
-        builder.add_parameter("sigma", 0.2, "Incubation rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # This should fail: sin(2 * pi * step / period) where period has units
-        # Results in sin(dimensionless / day) which is wrong
-        builder.add_transition(
-            "exposure",
-            ["S"],
-            ["E"],
-            rate=(
-                "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / period)) "
-                "* S * I / N"
-            ),
-        )
-        builder.add_transition("infection", ["E"], ["I"], rate="sigma * E")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.97},
-                {"bin": "E", "fraction": 0.01},
-                {"bin": "I", "fraction": 0.02},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="Complex Seasonal Bad", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("E", "Exposed")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta_avg", 0.5, "Average transmission", unit="1/day")
+            .add_parameter(
+                "seasonal_amp", 0.2, "Seasonal amplitude", unit="dimensionless"
+            )
+            .add_parameter("period", 365, "Period", unit="day")  # Has units!
+            .add_parameter("sigma", 0.2, "Incubation rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # This should fail: sin(2 * pi * step / period) where period has units
+            # Results in sin(dimensionless / day) which is wrong
+            .add_transition(
+                "exposure",
+                ["S"],
+                ["E"],
+                rate=(
+                    "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / period)) "
+                    "* S * I / N"
+                ),
+            )
+            .add_transition("infection", ["E"], ["I"], rate="sigma * E")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.97},
+                    {"bin": "E", "fraction": 0.01},
+                    {"bin": "I", "fraction": 0.02},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -624,82 +597,81 @@ class TestFullModelUnitFailures:
 
     def test_multi_stratified_model_with_nested_math_errors(self):
         """Test multi-stratified model fails with nested math function errors."""
-        builder = ModelBuilder(name="Multi-Strat Bad Nested", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_stratification("age", ["young", "old"])
-        builder.add_stratification("location", ["urban", "rural"])
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter(
-            "contact_scale", 50, "Contact scale", unit="person"
-        )  # Has units!
-
-        # This should fail: exp(log(contact_scale)) where contact_scale has units
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            stratified_rates=[
-                {
-                    "conditions": [
-                        {"stratification": "age", "category": "young"},
-                        {"stratification": "location", "category": "urban"},
-                    ],
-                    "rate": "beta * exp(log(contact_scale)) * S * I / N_young_urban",
-                },
-                {
-                    "conditions": [
-                        {"stratification": "age", "category": "young"},
-                        {"stratification": "location", "category": "rural"},
-                    ],
-                    "rate": "beta * 0.5 * S * I / N_young_rural",
-                },
-                {
-                    "conditions": [
-                        {"stratification": "age", "category": "old"},
-                        {"stratification": "location", "category": "urban"},
-                    ],
-                    "rate": "beta * 0.7 * S * I / N_old_urban",
-                },
-                {
-                    "conditions": [
-                        {"stratification": "age", "category": "old"},
-                        {"stratification": "location", "category": "rural"},
-                    ],
-                    "rate": "beta * 0.3 * S * I / N_old_rural",
-                },
-            ],
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
-            stratification_fractions=[
-                {
-                    "stratification": "age",
-                    "fractions": [
-                        {"category": "young", "fraction": 0.6},
-                        {"category": "old", "fraction": 0.4},
-                    ],
-                },
-                {
-                    "stratification": "location",
-                    "fractions": [
-                        {"category": "urban", "fraction": 0.7},
-                        {"category": "rural", "fraction": 0.3},
-                    ],
-                },
-            ],
+        builder = (
+            ModelBuilder(name="Multi-Strat Bad Nested", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_stratification("age", ["young", "old"])
+            .add_stratification("location", ["urban", "rural"])
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter(
+                "contact_scale", 50, "Contact scale", unit="person"
+            )  # Has units!
+            # This should fail: exp(log(contact_scale)) where contact_scale has units
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                stratified_rates=[
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "young"},
+                            {"stratification": "location", "category": "urban"},
+                        ],
+                        "rate": (
+                            "beta * exp(log(contact_scale)) * S * I / N_young_urban"
+                        ),
+                    },
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "young"},
+                            {"stratification": "location", "category": "rural"},
+                        ],
+                        "rate": "beta * 0.5 * S * I / N_young_rural",
+                    },
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "old"},
+                            {"stratification": "location", "category": "urban"},
+                        ],
+                        "rate": "beta * 0.7 * S * I / N_old_urban",
+                    },
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "old"},
+                            {"stratification": "location", "category": "rural"},
+                        ],
+                        "rate": "beta * 0.3 * S * I / N_old_rural",
+                    },
+                ],
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.6},
+                            {"category": "old", "fraction": 0.4},
+                        ],
+                    },
+                    {
+                        "stratification": "location",
+                        "fractions": [
+                            {"category": "urban", "fraction": 0.7},
+                            {"category": "rural", "fraction": 0.3},
+                        ],
+                    },
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -711,36 +683,35 @@ class TestFullModelUnitFailures:
 
     def test_sirs_model_with_atan2_wrong_units(self):
         """Test SIRS model fails when atan2 receives incompatible units."""
-        builder = ModelBuilder(name="SIRS Bad Atan2", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter("waning_rate", 0.01, "Waning immunity rate", unit="1/day")
-        builder.add_parameter(
-            "threshold_time", 30, "Threshold time", unit="day"
-        )  # Has units!
-
-        # This should fail: atan2(I, threshold_time) - incompatible units (person, day)
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta * (1 + 0.1 * atan2(I, threshold_time)) * S * I / N",
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-        builder.add_transition("waning", ["R"], ["S"], rate="waning_rate * R")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.95},
-                {"bin": "I", "fraction": 0.04},
-                {"bin": "R", "fraction": 0.01},
-            ],
+        builder = (
+            ModelBuilder(name="SIRS Bad Atan2", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter("waning_rate", 0.01, "Waning immunity rate", unit="1/day")
+            .add_parameter(
+                "threshold_time", 30, "Threshold time", unit="day"
+            )  # Has units!
+            # This should fail: atan2(I, threshold_time)
+            # - incompatible units (person, day)
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="beta * (1 + 0.1 * atan2(I, threshold_time)) * S * I / N",
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .add_transition("waning", ["R"], ["S"], rate="waning_rate * R")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.95},
+                    {"bin": "I", "fraction": 0.04},
+                    {"bin": "R", "fraction": 0.01},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -752,42 +723,39 @@ class TestFullModelUnitFailures:
 
     def test_complex_intervention_model_with_min_max_errors(self):
         """Test complex intervention model fails with min/max unit errors."""
-        builder = ModelBuilder(name="Intervention Bad Min Max", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("H", "Hospitalized")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_parameter("beta_max", 0.8, "Max transmission", unit="1/day")
-        builder.add_parameter("beta_min", 0.2, "Min transmission", unit="1/day")
-        builder.add_parameter("hosp_rate", 0.05, "Hospitalization rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-        builder.add_parameter(
-            "capacity", 50, "Hospital capacity", unit="person"
-        )  # Has units!
-
-        # This should fail: min(beta_max, capacity) - incompatible units (1/day, person)
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="min(beta_max, capacity) * S * I / N",  # Incompatible units!
-        )
-        builder.add_transition("hospitalization", ["I"], ["H"], rate="hosp_rate * I")
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-        builder.add_transition(
-            "hospital_recovery", ["H"], ["R"], rate="gamma * 0.5 * H"
-        )
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.97},
-                {"bin": "I", "fraction": 0.02},
-                {"bin": "H", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="Intervention Bad Min Max", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("H", "Hospitalized")
+            .add_bin("R", "Recovered")
+            .add_parameter("beta_max", 0.8, "Max transmission", unit="1/day")
+            .add_parameter("beta_min", 0.2, "Min transmission", unit="1/day")
+            .add_parameter("hosp_rate", 0.05, "Hospitalization rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_parameter(
+                "capacity", 50, "Hospital capacity", unit="person"
+            )  # Has units!
+            # This should fail: min(beta_max, capacity)
+            # - incompatible units (1/day, person)
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="min(beta_max, capacity) * S * I / N",  # Incompatible units!
+            )
+            .add_transition("hospitalization", ["I"], ["H"], rate="hosp_rate * I")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .add_transition("hospital_recovery", ["H"], ["R"], rate="gamma * 0.5 * H")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.97},
+                    {"bin": "I", "fraction": 0.02},
+                    {"bin": "H", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -799,56 +767,53 @@ class TestFullModelUnitFailures:
 
     def test_age_structured_with_floor_dimensional_error(self):
         """Test age-structured model fails when floor receives dimensional quantity."""
-        builder = ModelBuilder(name="Age Structured Bad Floor", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        builder.add_stratification("age", ["child", "adult", "senior"])
-
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # This should fail: floor(S) where S has units of person
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            stratified_rates=[
-                {
-                    "conditions": [{"stratification": "age", "category": "child"}],
-                    "rate": "beta * floor(S) * I / N_child",  # floor(S) invalid!
-                },
-                {
-                    "conditions": [{"stratification": "age", "category": "adult"}],
-                    "rate": "beta * S * I / N_adult",
-                },
-                {
-                    "conditions": [{"stratification": "age", "category": "senior"}],
-                    "rate": "beta * 0.6 * S * I / N_senior",
-                },
-            ],
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
-            stratification_fractions=[
-                {
-                    "stratification": "age",
-                    "fractions": [
-                        {"category": "child", "fraction": 0.2},
-                        {"category": "adult", "fraction": 0.5},
-                        {"category": "senior", "fraction": 0.3},
-                    ],
-                }
-            ],
+        builder = (
+            ModelBuilder(name="Age Structured Bad Floor", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_stratification("age", ["child", "adult", "senior"])
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # This should fail: floor(S) where S has units of person
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                stratified_rates=[
+                    {
+                        "conditions": [{"stratification": "age", "category": "child"}],
+                        "rate": "beta * floor(S) * I / N_child",  # floor(S) invalid!
+                    },
+                    {
+                        "conditions": [{"stratification": "age", "category": "adult"}],
+                        "rate": "beta * S * I / N_adult",
+                    },
+                    {
+                        "conditions": [{"stratification": "age", "category": "senior"}],
+                        "rate": "beta * 0.6 * S * I / N_senior",
+                    },
+                ],
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "child", "fraction": 0.2},
+                            {"category": "adult", "fraction": 0.5},
+                            {"category": "senior", "fraction": 0.3},
+                        ],
+                    }
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -983,33 +948,31 @@ class TestFullModelUnitFailures:
 
     def test_sir_model_with_dimensional_sin_argument_fails(self):
         """Test SIR model fails when sin receives dimensional argument."""
-        builder = ModelBuilder(name="SIR Bad Seasonality", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters with units
-        builder.add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
-        builder.add_parameter("time_scale", 365, "Time scale", unit="day")  # Has units!
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # This should fail: sin(time_scale) where time_scale has units of day
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta * (1 + 0.1 * sin(time_scale)) * S * I / N",
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR Bad Seasonality", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters with units
+            .add_parameter("beta", 0.5, "Transmission rate", unit="1/day")
+            .add_parameter("time_scale", 365, "Time scale", unit="day")  # Has units!
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # This should fail: sin(time_scale) where time_scale has units of day
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="beta * (1 + 0.1 * sin(time_scale)) * S * I / N",
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -1206,33 +1169,31 @@ class TestFullModelUnitFailures:
 
     def test_sir_model_with_exponential_decay(self):
         """Test SIR model with exponential decay in transmission rate."""
-        builder = ModelBuilder(name="SIR with Decay", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters with units
-        builder.add_parameter("beta_0", 0.5, "Initial transmission rate", unit="1/day")
-        builder.add_parameter("decay_rate", 0.01, "Decay rate", unit="dimensionless")
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # Add transitions with exponential decay
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta_0 * exp(-decay_rate * step) * S * I / N",
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR with Decay", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters with units
+            .add_parameter("beta_0", 0.5, "Initial transmission rate", unit="1/day")
+            .add_parameter("decay_rate", 0.01, "Decay rate", unit="dimensionless")
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # Add transitions with exponential decay
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate="beta_0 * exp(-decay_rate * step) * S * I / N",
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
@@ -1242,37 +1203,36 @@ class TestFullModelUnitFailures:
 
     def test_sir_model_with_seasonal_forcing(self):
         """Test SIR model with seasonal forcing using sin."""
-        builder = ModelBuilder(name="SIR with Seasonality", version="1.0")
-
-        builder.add_bin("S", "Susceptible")
-        builder.add_bin("I", "Infected")
-        builder.add_bin("R", "Recovered")
-
-        # Add parameters with units
-        builder.add_parameter(
-            "beta_avg", 0.5, "Average transmission rate", unit="1/day"
-        )
-        builder.add_parameter(
-            "seasonal_amp", 0.1, "Seasonal amplitude", unit="dimensionless"
-        )
-        builder.add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
-
-        # Add transitions with seasonal forcing
-        builder.add_transition(
-            "infection",
-            ["S"],
-            ["I"],
-            rate="beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365)) * S * I / N",
-        )
-        builder.add_transition("recovery", ["I"], ["R"], rate="gamma * I")
-
-        builder.set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0},
-            ],
+        builder = (
+            ModelBuilder(name="SIR with Seasonality", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Add parameters with units
+            .add_parameter("beta_avg", 0.5, "Average transmission rate", unit="1/day")
+            .add_parameter(
+                "seasonal_amp", 0.1, "Seasonal amplitude", unit="dimensionless"
+            )
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            # Add transitions with seasonal forcing
+            .add_transition(
+                "infection",
+                ["S"],
+                ["I"],
+                rate=(
+                    "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365)) "
+                    "* S * I / N"
+                ),
+            )
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
         )
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)

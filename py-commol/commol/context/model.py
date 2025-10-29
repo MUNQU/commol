@@ -911,8 +911,10 @@ class Model(BaseModel):
 
         if self.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
             raise ValueError(
-                f"Unit checking is only supported for DifferenceEquations models. "
-                f"Current model type: {self.dynamics.typology}"
+                (
+                    f"Unit checking is only supported for DifferenceEquations models. "
+                    f"Current model type: {self.dynamics.typology}"
+                )
             )
 
         # Build variable units mapping
@@ -927,7 +929,6 @@ class Model(BaseModel):
                     transition.rate,
                     transition.id,
                     variable_units,
-                    transition.source,
                 )
                 if not is_consistent and error_msg:
                     errors.append(error_msg)
@@ -939,7 +940,6 @@ class Model(BaseModel):
                         strat_rate.rate,
                         f"{transition.id} (stratified rate {idx + 1})",
                         variable_units,
-                        transition.source,
                     )
                     if not is_consistent and error_msg:
                         errors.append(error_msg)
@@ -987,7 +987,6 @@ class Model(BaseModel):
         rate: str,
         transition_id: str,
         variable_units: dict[str, str],
-        source_states: list[str],
     ) -> tuple[bool, str | None]:
         """
         Check units for a single transition rate.
@@ -1000,7 +999,7 @@ class Model(BaseModel):
         variables = get_expression_variables(rate)
 
         # Build variable units for this specific rate
-        rate_variable_units = {}
+        rate_variable_units: dict[str, str] = {}
         for var in variables:
             if var in variable_units:
                 rate_variable_units[var] = variable_units[var]
@@ -1009,8 +1008,10 @@ class Model(BaseModel):
                 # This should have been caught by earlier validation
                 return (
                     False,
-                    f"Transition '{transition_id}': Variable '{var}' in rate "
-                    f"'{rate}' has no defined unit",
+                    (
+                        f"Transition '{transition_id}': Variable '{var}' in rate "
+                        f"'{rate}' has no defined unit"
+                    ),
                 )
 
         # For difference equations, rates should result in person per time unit

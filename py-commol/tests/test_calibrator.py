@@ -124,17 +124,21 @@ class TestCalibrator:
             if attempt < max_attempts - 1:
                 # Not the last attempt, will retry
                 print(
-                    f"\nAttempt {attempt + 1} failed. "
-                    f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
-                    f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
-                    f"Retrying..."
+                    (
+                        f"\nAttempt {attempt + 1} failed. "
+                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
+                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
+                        f"Retrying..."
+                    )
                 )
 
         # All attempts failed, show final values and fail
         assert last_result is not None
         pytest.fail(
-            f"Calibration failed after {max_attempts} attempts. "
-            f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-            f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
-            f"(expected 0.05)"
+            (
+                f"Calibration failed after {max_attempts} attempts. "
+                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
+                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
+                f"(expected 0.05)"
+            )
         )

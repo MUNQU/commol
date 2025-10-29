@@ -15,9 +15,10 @@ class Stratification(BaseModel):
         List of the different stratification groups identifiers.
     """
 
-    id: str = Field(..., description="Identifier of the stratification.")
+    id: str = Field(default=..., description="Identifier of the stratification.")
     categories: list[str] = Field(
-        ..., description="List of the different stratification groups identifiers."
+        default=...,
+        description="List of the different stratification groups identifiers.",
     )
 
     @override

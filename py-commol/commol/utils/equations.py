@@ -1,5 +1,6 @@
 import math
 from collections.abc import Callable
+from typing import cast
 
 import pint
 
@@ -163,16 +164,45 @@ def _parse_equation_unit(
 
     # Evaluate the equation
     try:
-        result = eval(equation, {"__builtins__": {}}, namespace)
-        if isinstance(result, pint.Quantity):
-            return result
-        elif isinstance(result, (int, float)):
+        eval_result: object = cast(
+            object, eval(equation, {"__builtins__": {}}, namespace)
+        )
+
+        if isinstance(eval_result, pint.Quantity):
+            return eval_result
+        elif isinstance(eval_result, (int, float)):
             # If result is a number, it's dimensionless
-            dimensionless_quantity: pint.Quantity = float(result) * ureg.dimensionless
-            return dimensionless_quantity
+            numeric_value = float(eval_result)
+            unit_result = ureg.dimensionless
+
+            if isinstance(unit_result, pint.Unit):
+                # Multiply numeric value by Unit to get Quantity
+                quantity_result: object = cast(object, numeric_value * unit_result)
+                # The result should be a Quantity
+                if isinstance(quantity_result, pint.Quantity):
+                    return quantity_result
+                else:
+                    raise ValueError(
+                        (
+                            f"Multiplying float by Unit did not produce "
+                            f"Quantity: {type(quantity_result)}"
+                        )
+                    )
+            else:
+                # ureg.dimensionless might be a Quantity itself
+                quantity_result = cast(object, numeric_value * unit_result)
+                if isinstance(quantity_result, pint.Quantity):
+                    return quantity_result
+                else:
+                    raise ValueError(
+                        (
+                            f"Multiplying float by dimensionless did not "
+                            f"produce Quantity: {type(quantity_result)}"
+                        )
+                    )
         else:
             raise ValueError(
-                f"Unexpected result type {type(result)} from equation '{equation}'"
+                f"Unexpected result type {type(eval_result)} from equation '{equation}'"
             )
     except Exception as e:
         raise ValueError(f"Failed to evaluate equation '{equation}': {str(e)}")

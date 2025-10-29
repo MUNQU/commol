@@ -58,11 +58,11 @@ class ObservedDataPoint(BaseModel):
         Weight for this observation in the loss function (default: 1.0)
     """
 
-    step: int = Field(..., ge=0, description="Time step of the observation")
+    step: int = Field(default=..., ge=0, description="Time step of the observation")
     compartment: str = Field(
-        ..., min_length=1, description="Name of the compartment being observed"
+        default=..., min_length=1, description="Name of the compartment being observed"
     )
-    value: float = Field(..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
         default=1.0,
         gt=0.0,
@@ -86,9 +86,9 @@ class CalibrationParameter(BaseModel):
         Optional starting value for optimization (if None, midpoint is used)
     """
 
-    id: str = Field(..., min_length=1, description="Parameter identifier")
-    min_bound: float = Field(..., description="Minimum allowed value")
-    max_bound: float = Field(..., description="Maximum allowed value")
+    id: str = Field(default=..., min_length=1, description="Parameter identifier")
+    min_bound: float = Field(default=..., description="Minimum allowed value")
+    max_bound: float = Field(default=..., description="Maximum allowed value")
     initial_guess: float | None = Field(
         default=None, description="Optional starting value for optimization"
     )
@@ -265,7 +265,7 @@ class LossConfig(BaseModel):
     """
 
     function: LossFunction = Field(
-        LossFunction.SSE, description="Loss function for measuring fit quality"
+        default=LossFunction.SSE, description="Loss function for measuring fit quality"
     )
 
 
@@ -282,10 +282,10 @@ class OptimizationConfig(BaseModel):
     """
 
     algorithm: OptimizationAlgorithm = Field(
-        ..., description="Optimization algorithm to use"
+        default=..., description="Optimization algorithm to use"
     )
     config: NelderMeadConfig | ParticleSwarmConfig = Field(
-        ..., description="Algorithm-specific configuration"
+        default=..., description="Algorithm-specific configuration"
     )
 
     @model_validator(mode="after")
@@ -337,19 +337,21 @@ class CalibrationResult(BaseModel):
     """
 
     best_parameters: dict[str, float] = Field(
-        ..., description="Calibrated parameter values"
+        default=..., description="Calibrated parameter values"
     )
     parameter_names: list[str] = Field(
-        ..., description="Ordered list of parameter names"
+        default=..., description="Ordered list of parameter names"
     )
     best_parameters_list: list[float] = Field(
-        ..., description="Ordered list of parameter values"
+        default=..., description="Ordered list of parameter values"
     )
-    final_loss: float = Field(..., description="Final loss value")
-    iterations: int = Field(..., ge=0, description="Number of iterations performed")
-    converged: bool = Field(..., description="Whether optimization converged")
+    final_loss: float = Field(default=..., description="Final loss value")
+    iterations: int = Field(
+        default=..., ge=0, description="Number of iterations performed"
+    )
+    converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
-        ..., description="Reason for optimization termination"
+        default=..., description="Reason for optimization termination"
     )
 
     @override
@@ -387,17 +389,17 @@ class CalibrationProblem(BaseModel):
     """
 
     observed_data: list[ObservedDataPoint] = Field(
-        ..., min_length=1, description="Observed data points"
+        default=..., min_length=1, description="Observed data points"
     )
     parameters: list[CalibrationParameter] = Field(
-        ..., min_length=1, description="Parameters to calibrate"
+        default=..., min_length=1, description="Parameters to calibrate"
     )
     loss_config: LossConfig = Field(
         default_factory=lambda: LossConfig(function=LossFunction.SSE),
         description="Loss function configuration",
     )
     optimization_config: OptimizationConfig = Field(
-        ..., description="Optimization algorithm configuration"
+        default=..., description="Optimization algorithm configuration"
     )
 
     @model_validator(mode="after")

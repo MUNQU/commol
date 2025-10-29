@@ -30,7 +30,7 @@ class Rule(BaseModel):
     """
 
     variable: str = Field(
-        ...,
+        default=...,
         description=(
             "Variable to evaluate. Must follow the format '<prefix>:<variable_id>'. "
             "The allowed prefixes are: ['states', 'strati']."
@@ -43,9 +43,9 @@ class Rule(BaseModel):
         LogicOperators.GET,
         LogicOperators.LT,
         LogicOperators.LET,
-    ] = Field(..., description="Comparison operator.")
+    ] = Field(default=..., description="Comparison operator.")
     value: str | int | float | bool = Field(
-        ..., description="Value to which the variable is compared."
+        default=..., description="Value to which the variable is compared."
     )
 
     @model_validator(mode="after")
@@ -95,7 +95,8 @@ class Condition(BaseModel):
     """
 
     logic: Literal[LogicOperators.AND, LogicOperators.OR] = Field(
-        ..., description="How to combine the rules. Allowed operators: ['and', 'or']"
+        default=...,
+        description="How to combine the rules. Allowed operators: ['and', 'or']",
     )
     rules: list[Rule]
 
@@ -112,8 +113,8 @@ class StratificationCondition(BaseModel):
         The category within that stratification (e.g., "young", "urban")
     """
 
-    stratification: str = Field(..., description="ID of the stratification")
-    category: str = Field(..., description="Category within the stratification")
+    stratification: str = Field(default=..., description="ID of the stratification")
+    category: str = Field(default=..., description="Category within the stratification")
 
 
 class StratifiedRate(BaseModel):
@@ -129,9 +130,11 @@ class StratifiedRate(BaseModel):
     """
 
     conditions: list[StratificationCondition] = Field(
-        ..., description="Stratification conditions that must match"
+        default=..., description="Stratification conditions that must match"
     )
-    rate: str = Field(..., description="Rate expression for matching compartments")
+    rate: str = Field(
+        default=..., description="Rate expression for matching compartments"
+    )
 
     @field_validator("conditions")
     @classmethod
@@ -207,9 +210,9 @@ class Transition(BaseModel):
         Logical restrictions for the transition.
     """
 
-    id: str = Field(..., description="Id of the transition.")
-    source: list[str] = Field(..., description="Origin compartments.")
-    target: list[str] = Field(..., description="Destination compartments.")
+    id: str = Field(default=..., description="Id of the transition.")
+    source: list[str] = Field(default=..., description="Origin compartments.")
+    target: list[str] = Field(default=..., description="Destination compartments.")
 
     rate: str | None = Field(
         None,
@@ -222,11 +225,11 @@ class Transition(BaseModel):
     )
 
     stratified_rates: list[StratifiedRate] | None = Field(
-        None, description="List of stratification-specific rates"
+        default=None, description="List of stratification-specific rates"
     )
 
     condition: Condition | None = Field(
-        None, description="Logical restrictions for the transition."
+        default=None, description="Logical restrictions for the transition."
     )
 
     @field_validator("rate", mode="before")
