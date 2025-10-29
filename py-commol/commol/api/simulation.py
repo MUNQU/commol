@@ -36,6 +36,11 @@ class Simulation:
         ----------
         model : Model
             A fully constructed and validated model object.
+
+        Raises
+        ------
+        ValueError
+            If any parameter has a None value (requires calibration).
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
@@ -45,6 +50,33 @@ class Simulation:
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
+
+    def _validate_all_parameters_calibrated(self, model: Model) -> None:
+        """
+        Validates that all parameters have values (are calibrated).
+
+        Parameters
+        ----------
+        model : Model
+            The model to validate.
+
+        Raises
+        ------
+        ValueError
+            If any parameter has a None value.
+        """
+        uncalibrated_params = [
+            param.id for param in model.parameters if param.value is None
+        ]
+        if uncalibrated_params:
+            raise ValueError(
+                (
+                    f"Cannot run Simulation: the following parameters require "
+                    f"calibration (have None values): "
+                    f"{', '.join(uncalibrated_params)}. "
+                    f"Please calibrate these parameters before running a simulation."
+                )
+            )
 
     def _initialize_engine(self) -> "DifferenceEquationsProtocol":
         """Internal method to set up the Rust backend."""
@@ -111,6 +143,7 @@ class Simulation:
         dict[str, list[float]] | list[list[float]]
             The simulation results in the specified format.
         """
+        self._validate_all_parameters_calibrated(self.model_definition)
         raw_results = self._run_raw(num_steps)
         if output_format == "list_of_lists":
             logging.info("Returning results in 'list_of_lists' format.")

@@ -61,6 +61,46 @@ class Model(BaseModel):
             raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
         return self
 
+    def update_parameters(self, parameter_values: dict[str, float]) -> None:
+        """
+        Update parameter values in the model.
+
+        This method is useful after calibration to update parameter values that
+        were previously set to None.
+
+        Parameters
+        ----------
+        parameter_values : dict[str, float]
+            Dictionary mapping parameter IDs to their new values.
+
+        Raises
+        ------
+        ValueError
+            If a parameter ID in the dictionary doesn't exist in the model.
+        """
+        param_dict = {param.id: param for param in self.parameters}
+
+        for param_id, value in parameter_values.items():
+            if param_id not in param_dict:
+                raise ValueError(
+                    (
+                        f"Parameter '{param_id}' not found in model. "
+                        f"Available parameters: {', '.join(param_dict.keys())}"
+                    )
+                )
+            param_dict[param_id].value = value
+
+    def get_uncalibrated_parameters(self) -> list[str]:
+        """
+        Get a list of parameter IDs that have None values (need calibration).
+
+        Returns
+        -------
+        list[str]
+            List of parameter IDs that require calibration.
+        """
+        return [param.id for param in self.parameters if param.value is None]
+
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:
         """

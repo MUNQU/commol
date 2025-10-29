@@ -184,7 +184,7 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float,
+        value: float | None,
         description: str | None = None,
         unit: str | None = None,
     ) -> Self:
@@ -196,7 +196,8 @@ class ModelBuilder:
         id : str
             Unique identifier for the parameter.
         value : float
-            Numerical value of the parameter.
+            Numerical value of the parameter. Can be None to indicate that the
+            parameter needs to be calibrated before use.
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None

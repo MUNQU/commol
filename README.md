@@ -159,6 +159,13 @@ result = calibrator.run()
 
 print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+
+# Update model with calibrated parameters
+model.update_parameters(result.best_parameters)
+
+# Create new simulation with calibrated model
+calibrated_simulation = Simulation(model)
+calibrated_results = calibrated_simulation.run(num_steps=100)
 ```
 
 ## Documentation

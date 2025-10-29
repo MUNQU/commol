@@ -13,8 +13,8 @@ The calibration process involves:
 5. **Running the calibration**: Finding optimal parameter values
 6. **Creating a new model**: Rebuilding your model with the calibrated parameters
 
-!!! note "Calibrator Returns Parameter Values Only"
-The `Calibrator.run()` method returns a `CalibrationResult` object containing the optimized parameter values, but **does not** return or modify your model. To use the calibrated parameters, you must create a new model using `ModelBuilder` with the fitted values.
+!!! note "Updating Model After Calibration"
+The `Calibrator.run()` method returns a `CalibrationResult` object containing the optimized parameter values. To use these calibrated parameters, call `model.update_parameters(result.best_parameters)` to update your model in place, then create a new `Simulation` object.
 
 ## Basic Example
 
@@ -117,6 +117,14 @@ result = calibrator.run()
 print(result)
 print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+
+# Update model with calibrated parameters
+model.update_parameters(result.best_parameters)
+
+# Create new simulation with calibrated model for predictions
+calibrated_simulation = Simulation(model)
+prediction_results = calibrated_simulation.run(num_steps=200)
+print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
 ```
 
 ## Loss Functions
@@ -335,7 +343,7 @@ observed_data = [
 
 ### Using Calibration Results
 
-Once calibrated, you need to create a new model with the fitted parameters to run predictions:
+Once calibrated, update your model with the fitted parameters and create a new simulation:
 
 ```python
 # Run calibration
@@ -347,41 +355,11 @@ if result.converged:
     print(f"Final loss: {result.final_loss:.6f}")
     print(f"Calibrated parameters: {result.best_parameters}")
 
-    # Create a new model with the calibrated parameters
-    # You need to rebuild the model with the new parameter values
-    calibrated_model = (
-        ModelBuilder(name="Calibrated SIR", version="1.0")
-        .add_bin(id="S", name="Susceptible")
-        .add_bin(id="I", name="Infected")
-        .add_bin(id="R", name="Recovered")
-        # Use calibrated parameter values
-        .add_parameter(id="beta", value=result.best_parameters["beta"])
-        .add_parameter(id="gamma", value=result.best_parameters["gamma"])
-        .add_transition(
-            id="infection",
-            source=["S"],
-            target=["I"],
-            rate="beta * S * I / N"
-        )
-        .add_transition(
-            id="recovery",
-            source=["I"],
-            target=["R"],
-            rate="gamma * I"
-        )
-        .set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
-            ]
-        )
-        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
-    )
+    # Update the existing model with calibrated parameters
+    model.update_parameters(result.best_parameters)
 
-    # Run predictions with calibrated model
-    calibrated_simulation = Simulation(calibrated_model)
+    # Create a new simulation with the updated model
+    calibrated_simulation = Simulation(model)
     prediction_results = calibrated_simulation.run(num_steps=200)
 
     print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
@@ -389,7 +367,7 @@ else:
     print(f"Calibration did not converge: {result.termination_reason}")
 ```
 
-**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. You must manually create a new model with the calibrated parameters to use them for predictions.
+**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.update_parameters(result.best_parameters)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
 
 ## Best Practices
 

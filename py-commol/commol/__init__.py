@@ -16,6 +16,7 @@ from commol.context.calibration import (
     OptimizationConfig,
     ParticleSwarmConfig,
 )
+from commol.context.parameter import Parameter
 
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -42,10 +43,11 @@ __all__ = [
     "Model",
     "ModelBuilder",
     "ModelLoader",
-    "Simulation",
     "NelderMeadConfig",
     "ObservedDataPoint",
     "OptimizationAlgorithm",
     "OptimizationConfig",
+    "Parameter",
     "ParticleSwarmConfig",
+    "Simulation",
 ]
