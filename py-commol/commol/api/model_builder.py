@@ -184,7 +184,7 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float | None,
+        value: float | str | None,
         description: str | None = None,
         unit: str | None = None,
     ) -> Self:
@@ -195,9 +195,21 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float
-            Numerical value of the parameter. Can be None to indicate that the
-            parameter needs to be calibrated before use.
+        value : float | str | None
+            Value of the parameter. Can be:
+            - float: A numerical constant value
+            - str: A mathematical formula that can reference other parameters,
+                   special variables (N, N_category, step/t, pi, e), or contain
+                   mathematical expressions (e.g., "beta * 2", "N_young / N")
+            - None: Indicates that the parameter needs to be calibrated before use
+
+            Special variables available in formulas:
+            - N: Total population (automatically calculated)
+            - N_{category}: Population in specific category (e.g., N_young, N_old)
+            - N_{cat1}_{cat2}: Population in category combinations
+            - step or t: Current simulation step
+            - pi, e: Mathematical constants
+
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None

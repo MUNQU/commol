@@ -118,8 +118,8 @@ class TestModelUnitConsistency:
         # Should not raise an exception
         model.check_unit_consistency()
 
-    def test_sir_model_without_units_skips_check(self):
-        """Test that unit check is skipped when parameters lack units."""
+    def test_sir_model_without_units_raises_error(self):
+        """Test that unit check raises error when parameters lack units."""
         builder = (
             ModelBuilder(name="SIR", version="1.0")
             .add_bin("S", "Susceptible")
@@ -142,8 +142,11 @@ class TestModelUnitConsistency:
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 
-        # Should not raise an exception (check is skipped)
-        model.check_unit_consistency()
+        # Should raise error because parameters lack units
+        with pytest.raises(UnitConsistencyError) as exc_info:
+            model.check_unit_consistency()
+
+        assert "missing units" in str(exc_info.value)
 
     def test_sir_model_with_inconsistent_units(self):
         """Test SIR model with inconsistent units raises error."""
@@ -231,7 +234,7 @@ class TestModelUnitConsistency:
         model.check_unit_consistency()
 
     def test_mixed_units_some_parameters_without_units(self):
-        """Test that check is skipped when some parameters lack units."""
+        """Test that check raises error when some parameters lack units."""
         builder = (
             ModelBuilder(name="SIR", version="1.0")
             .add_bin("S", "Susceptible")
@@ -254,8 +257,12 @@ class TestModelUnitConsistency:
 
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 
-        # Should not raise (check is skipped)
-        model.check_unit_consistency()
+        # Should raise error because gamma lacks a unit
+        with pytest.raises(UnitConsistencyError) as exc_info:
+            model.check_unit_consistency()
+
+        assert "gamma" in str(exc_info.value)
+        assert "missing units" in str(exc_info.value)
 
     def test_dimensionless_parameters(self):
         """Test handling of dimensionless parameters."""
@@ -1305,3 +1312,184 @@ class TestFullModelUnitFailures:
         )
         assert is_consistent, f"Error: {error}"
         assert error is None
+
+    def test_formula_parameter_unit_inference(self):
+        """Test that units are correctly inferred for formula parameters."""
+        builder = (
+            ModelBuilder(name="Model with Formula Parameters", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Base parameters with units
+            .add_parameter("beta_base", 0.3, "Base transmission rate", unit="1/day")
+            .add_parameter(
+                "multiplier", 2.0, "Contact multiplier", unit="dimensionless"
+            )
+            # Formula parameter WITHOUT explicit unit - should be inferred
+            .add_parameter(
+                "beta",
+                "beta_base * multiplier",
+                "Effective transmission rate",
+                # No unit specified - should be inferred as "1/day"
+            )
+            .add_parameter("gamma", 0.1, "Recovery rate", unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Unit checking should pass because beta's unit is inferred as "1/day"
+        model.check_unit_consistency()
+
+    def test_formula_parameter_with_N_reference(self):
+        """Test formula parameter referencing N and N_category."""
+        builder = (
+            ModelBuilder(name="Model with N-based Formula", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            .add_stratification("age", ["young", "old"])
+            # Formula parameter using N variables - should infer as dimensionless
+            .add_parameter(
+                "young_fraction",
+                "N_young / N",
+                "Fraction of young population",
+                # No unit - should be inferred as dimensionless
+            )
+            .add_parameter("beta", 0.3, unit="1/day")
+            .add_parameter("gamma", 0.1, unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.3},
+                            {"category": "old", "fraction": 0.7},
+                        ],
+                    }
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model.check_unit_consistency()
+
+    def test_formula_parameter_missing_dependency_units(self):
+        """
+        Test that error is raised when formula parameter references variables without
+        units.
+        """
+        builder = (
+            ModelBuilder(name="Model with Invalid Formula", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # All base parameters have units
+            .add_parameter("beta_base", 0.3, unit="1/day")
+            .add_parameter("multiplier", 2.0, unit="dimensionless")
+            # This parameter has no unit AND references non-existent variable
+            .add_parameter("invalid_param", "nonexistent_var * 2")  # Should fail!
+            .add_parameter("gamma", 0.1, unit="1/day")
+            # Use invalid_param in a transition so it gets checked
+            .add_transition("infection", ["S"], ["I"], rate="invalid_param * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Should raise error because invalid_param has no defined unit
+        # (because it references nonexistent_var which has no unit)
+        with pytest.raises(UnitConsistencyError) as exc_info:
+            model.check_unit_consistency()
+
+        # The error should mention that invalid_param has no defined unit
+        assert "invalid_param" in str(exc_info.value)
+        assert "no defined unit" in str(exc_info.value)
+
+    def test_formula_parameter_chained_dependencies(self):
+        """Test formula parameters with chained dependencies."""
+        builder = (
+            ModelBuilder(name="Model with Chained Formulas", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Base parameter
+            .add_parameter("base_rate", 0.1, unit="1/day")
+            # First level formula
+            .add_parameter("adjusted_rate", "base_rate * 2")  # Should infer 1/day
+            # Second level formula (depends on first level)
+            .add_parameter("final_rate", "adjusted_rate * 3")  # Should infer 1/day
+            .add_parameter("gamma", 0.1, unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="final_rate * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        # Should successfully infer units through the chain
+        model.check_unit_consistency()
+
+    def test_constant_parameter_without_unit_raises_error(self):
+        """
+        Test that constant parameters without units raise an error during unit checking.
+        """
+        builder = (
+            ModelBuilder(name="Model with Missing Unit", version="1.0")
+            .add_bin("S", "Susceptible")
+            .add_bin("I", "Infected")
+            .add_bin("R", "Recovered")
+            # Constant parameter without unit
+            .add_parameter("beta", 0.3)  # Missing unit!
+            .add_parameter("gamma", 0.1, unit="1/day")
+            .add_transition("infection", ["S"], ["I"], rate="beta * S * I / N")
+            .add_transition("recovery", ["I"], ["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Should raise error because beta (constant) has no unit
+        with pytest.raises(UnitConsistencyError) as exc_info:
+            model.check_unit_consistency()
+
+        assert "beta" in str(exc_info.value)
+        assert "missing units" in str(exc_info.value)

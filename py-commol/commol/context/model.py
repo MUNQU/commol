@@ -10,7 +10,6 @@ from commol.context.population import Population
 from commol.context.stratification import Stratification
 from commol.utils.equations import (
     UnitConsistencyError,
-    check_all_parameters_have_units,
     check_equation_units,
     get_predefined_variable_units,
 )
@@ -944,10 +943,25 @@ class Model(BaseModel):
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
-        # Check if all parameters have units
-        if not check_all_parameters_have_units(self.parameters):
-            # Skip check if not all parameters have units
-            return
+        # Check if all non-formula parameters have units
+        # Formula parameters can have their units inferred
+        non_formula_params_missing_units = [
+            p
+            for p in self.parameters
+            if p.unit is None and not isinstance(p.value, str)
+        ]
+
+        if non_formula_params_missing_units:
+            # Raise error if constant parameters are missing units
+            param_names = ", ".join([p.id for p in non_formula_params_missing_units])
+            raise UnitConsistencyError(
+                (
+                    f"Cannot perform unit consistency check. The following constant "
+                    f"parameters are missing units: {param_names}. "
+                    f"Please specify units for all parameters, or use formulas "
+                    f"to allow automatic unit inference."
+                )
+            )
 
         if self.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
             raise ValueError(
@@ -994,7 +1008,17 @@ class Model(BaseModel):
         """Build a mapping of all variables to their units."""
         variable_units: dict[str, str] = {}
 
-        # Add parameter units
+        # Add base units for parameters, bins, and special variables
+        self._add_base_variable_units(variable_units)
+
+        # Infer units for formula parameters
+        self._infer_formula_parameter_units(variable_units)
+
+        return variable_units
+
+    def _add_base_variable_units(self, variable_units: dict[str, str]) -> None:
+        """Add units for parameters, bins, categories, and special variables."""
+        # Add constant parameters and parameters with explicit units
         for param in self.parameters:
             if param.unit:
                 variable_units[param.id] = param.unit
@@ -1020,7 +1044,97 @@ class Model(BaseModel):
         variable_units["pi"] = "dimensionless"
         variable_units["e"] = "dimensionless"
 
-        return variable_units
+    def _infer_formula_parameter_units(self, variable_units: dict[str, str]) -> None:
+        """Infer units for formula parameters through iterative resolution."""
+        max_iterations = 10
+        formula_params_without_units: list[Parameter] = []
+
+        for _ in range(max_iterations):
+            inferred_any = self._try_infer_formula_units(
+                variable_units, formula_params_without_units
+            )
+            if not inferred_any:
+                break
+
+        # Validate that all formula parameters have units
+        self._validate_formula_parameter_units(
+            variable_units, formula_params_without_units
+        )
+
+    def _try_infer_formula_units(
+        self,
+        variable_units: dict[str, str],
+        failed_params: list[Parameter],
+    ) -> bool:
+        """
+        Try to infer units for one iteration. Returns True if any units were inferred.
+        """
+        inferred_any = False
+
+        for param in self.parameters:
+            if param.id in variable_units or not isinstance(param.value, str):
+                continue
+
+            try:
+                if self._infer_single_formula_unit(param, variable_units):
+                    inferred_any = True
+            except Exception:
+                if param not in failed_params:
+                    failed_params.append(param)
+
+        return inferred_any
+
+    def _infer_single_formula_unit(
+        self, param: Parameter, variable_units: dict[str, str]
+    ) -> bool:
+        """Infer unit for a single formula parameter. Returns True if successful."""
+        formula_vars = get_expression_variables(param.value)
+
+        # Check if all variables have units
+        formula_var_units = {}
+        for var in formula_vars:
+            if var in variable_units:
+                formula_var_units[var] = variable_units[var]
+            else:
+                return False  # Not all variables have units yet
+
+        # Infer the unit
+        if formula_var_units:
+            from commol.utils.equations import _parse_equation_unit
+
+            inferred_unit = _parse_equation_unit(param.value, formula_var_units)
+            variable_units[param.id] = str(inferred_unit.units)
+        else:
+            # Formula has no variables (e.g., "2 * 3")
+            variable_units[param.id] = "dimensionless"
+
+        return True
+
+    def _validate_formula_parameter_units(
+        self,
+        variable_units: dict[str, str],
+        failed_params: list[Parameter],
+    ) -> None:
+        """Validate that all formula parameters have units, raise errors if not."""
+        for param in failed_params:
+            if param.id not in variable_units:
+                formula_vars = get_expression_variables(param.value)
+                missing_vars = [v for v in formula_vars if v not in variable_units]
+
+                if missing_vars:
+                    raise UnitConsistencyError(
+                        f"Cannot infer unit for formula parameter '{param.id}'. "
+                        f"Formula '{param.value}' references variables without units: "
+                        f"{', '.join(missing_vars)}. "
+                        f"Please specify units for all referenced parameters or "
+                        f"provide an explicit unit for '{param.id}'."
+                    )
+                else:
+                    raise UnitConsistencyError(
+                        f"Cannot infer unit for formula parameter '{param.id}'. "
+                        f"Formula '{param.value}' could not be parsed. "
+                        f"Please provide an explicit unit for this parameter."
+                    )
 
     def _check_transition_rate_units(
         self,

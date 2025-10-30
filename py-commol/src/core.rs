@@ -292,15 +292,36 @@ pub struct PyParameter {
 #[pymethods]
 impl PyParameter {
     #[new]
-    fn new(id: String, value: f64, description: Option<String>) -> Self {
+    #[pyo3(signature = (id, value, description=None))]
+    fn new(id: String, value: PyParameterValue, description: Option<String>) -> Self {
+        let param_value = match value {
+            PyParameterValue::Constant(v) => commol_core::ParameterValue::Constant(v),
+            PyParameterValue::Formula(f) => commol_core::ParameterValue::Formula(f),
+        };
+
         Self {
             inner: commol_core::Parameter {
                 id,
-                value,
+                value: param_value,
                 description,
             },
         }
     }
+
+    fn __repr__(&self) -> String {
+        let value_str = match &self.inner.value {
+            commol_core::ParameterValue::Constant(v) => format!("{}", v),
+            commol_core::ParameterValue::Formula(f) => format!("'{}'", f),
+        };
+        format!("Parameter(id='{}', value={})", self.inner.id, value_str)
+    }
+}
+
+/// Python-side representation of parameter values
+#[derive(FromPyObject)]
+pub enum PyParameterValue {
+    Constant(f64),
+    Formula(String),
 }
 
 /// Wrapper for commol_core::MathExpression

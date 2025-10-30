@@ -19,7 +19,7 @@ pub mod population;
 pub use conditions::{Condition, LogicOperator, Rule, RuleValue};
 pub use dynamics::{Dynamics, ModelTypes, StratificationCondition, StratifiedRate, Transition};
 pub use model::Model;
-pub use parameters::{Parameter, VariablePrefixes};
+pub use parameters::{Parameter, ParameterValue, VariablePrefixes};
 pub use population::{
     Bin, BinFraction, InitialConditions, Population, Stratification, StratificationFraction,
     StratificationFractions,

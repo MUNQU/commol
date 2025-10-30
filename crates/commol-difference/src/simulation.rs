@@ -60,6 +60,23 @@ impl DifferenceEquations {
                 .set_parameter_str(&mapping.parameter_name, total);
         }
 
+        // Evaluate formula parameters and update context
+        // Note: We need to clone to avoid borrow checker issues
+        let formula_params = self.formula_parameters.clone();
+        for (param_name, rate_expr) in &formula_params {
+            match rate_expr.evaluate(&mut self.expression_context) {
+                Ok(value) => {
+                    self.expression_context.set_parameter_str(param_name, value);
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "Failed to evaluate formula parameter '{}': {}",
+                        param_name, error
+                    ));
+                }
+            }
+        }
+
         // Use pre-computed transition flows - much faster!
         for flow_info in &self.transition_flows {
             let source_population = self.population[flow_info.source_index];
