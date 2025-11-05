@@ -47,11 +47,9 @@ class Parameter(BaseModel):
             return value
         if isinstance(value, (int, float)):
             return float(value)
-        if isinstance(value, str):
-            if not value.strip():
-                raise ValueError("Formula cannot be empty")
-            return value.strip()
-        raise ValueError(f"Invalid parameter value type: {type(value)}")
+        if not value.strip():
+            raise ValueError("Formula cannot be empty")
+        return value.strip()
 
     def is_calibrated(self) -> bool:
         """
