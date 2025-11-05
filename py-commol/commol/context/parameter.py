@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Parameter(BaseModel):
@@ -9,9 +9,13 @@ class Parameter(BaseModel):
     ----------
     id : str
         The identifier of the parameter.
-    value : float | None
-        Numerical value of the parameter. Can be None to indicate that the
-        parameter needs to be calibrated before use.
+    value : float | str | None
+        Value of the parameter. Can be:
+        - float: A numerical constant value
+        - str: A mathematical formula that can reference other parameters,
+               special variables (N, N_category, step/t, pi, e), or contain
+               mathematical expressions
+        - None: Indicates that the parameter needs to be calibrated before use
     description : str | None
         A human-readable description of the parameter.
     unit : str | None
@@ -20,11 +24,11 @@ class Parameter(BaseModel):
     """
 
     id: str = Field(default=..., description="Identifier of the parameter.")
-    value: float | None = Field(
+    value: float | str | None = Field(
         default=...,
         description=(
-            "Numerical value of the parameter. "
-            "Can be None to indicate calibration is required."
+            "Value of the parameter. Can be a float (constant), "
+            "str (formula), or None (requires calibration)."
         ),
     )
     description: str | None = Field(
@@ -34,6 +38,18 @@ class Parameter(BaseModel):
         default=None,
         description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'person').",
     )
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, value: float | str | None) -> float | str | None:
+        """Validate the parameter value."""
+        if value is None:
+            return value
+        if isinstance(value, (int, float)):
+            return float(value)
+        if not value.strip():
+            raise ValueError("Formula cannot be empty")
+        return value.strip()
 
     def is_calibrated(self) -> bool:
         """

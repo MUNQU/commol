@@ -102,6 +102,8 @@ builder.add_parameter(
 
 When **all parameters have units**, the model will automatically validate dimensional consistency. See [Unit Checking](#unit-checking) below.
 
+**Tip:** To mark a parameter as unitless (dimensionless) for unit checking, use `unit="dimensionless"`. This is useful for ratios, fractions, scaling factors, and amplitudes. Dimensionless parameters are also required as arguments to mathematical functions like `sin()`, `cos()`, `exp()`, `sqrt()`, `pow()`, etc.
+
 ### Parameter Guidelines
 
 - Use meaningful IDs (beta, gamma, R0, etc.)

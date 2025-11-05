@@ -33,7 +33,7 @@ _units_to_conditionally_add = {
 
 for unit_name, unit_definition in _units_to_conditionally_add.items():
     try:
-        ureg(unit_name)
+        _ = ureg(unit_name)
     except pint.UndefinedUnitError:
         ureg.define(f"{unit_name} = {unit_definition}")
 
@@ -71,7 +71,7 @@ def check_equation_units(
     """
     try:
         # Parse the equation to build a pint Quantity
-        equation_unit = _parse_equation_unit(equation, variable_units)
+        equation_unit = parse_equation_unit(equation, variable_units)
 
         # Check if result matches expected unit
         expected_quantity = ureg(expected_unit)
@@ -93,9 +93,7 @@ def check_equation_units(
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
 
 
-def _parse_equation_unit(
-    equation: str, variable_units: dict[str, str]
-) -> pint.Quantity:
+def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
     """
     Parse an equation and compute its resulting unit.
 

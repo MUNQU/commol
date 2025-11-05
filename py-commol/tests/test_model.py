@@ -81,6 +81,103 @@ class TestModel:
         )
         assert output == expected_output
 
+    def test_parameter_with_formula_referencing_other_parameters(self):
+        """
+        Test that parameters can use formulas referencing other parameters.
+        """
+        builder = (
+            ModelBuilder(name="SIR with Formula Parameters", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(
+                id="beta_base", value=0.3, description="Base transmission rate"
+            )
+            .add_parameter(
+                id="contact_multiplier", value=2.0, description="Contact multiplier"
+            )
+            .add_parameter(
+                id="beta",
+                value="beta_base * contact_multiplier",  # Formula parameter!
+                description="Effective transmission rate",
+            )
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Check that the parameter was created with a formula
+        beta_param = next(p for p in model.parameters if p.id == "beta")
+        assert isinstance(beta_param.value, str)
+        assert beta_param.value == "beta_base * contact_multiplier"
+
+    def test_parameter_with_formula_referencing_N(self):
+        """
+        Test that parameters can use formulas referencing N and N_category.
+        """
+        builder = (
+            ModelBuilder(name="Model with N-based Parameters", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_stratification("age", ["young", "old"])
+            .add_parameter(
+                id="young_fraction",
+                value="N_young / N",  # Formula using population variables
+                description="Fraction of young population",
+            )
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.3},
+                            {"category": "old", "fraction": 0.7},
+                        ],
+                    }
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Check that the parameter was created with a formula
+        young_fraction_param = next(
+            p for p in model.parameters if p.id == "young_fraction"
+        )
+        assert isinstance(young_fraction_param.value, str)
+        assert young_fraction_param.value == "N_young / N"
+
     def test_print_equations_to_file(self):
         """
         Test that print_equations writes to a file correctly.

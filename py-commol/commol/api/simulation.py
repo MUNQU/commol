@@ -44,6 +44,10 @@ class Simulation:
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
+
+        # Validate that all parameters are calibrated before creating engine
+        self._validate_all_parameters_calibrated(model)
+
         self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
 
         self._compartments: list[str] = self._engine.compartments
