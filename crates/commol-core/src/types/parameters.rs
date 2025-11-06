@@ -104,12 +104,12 @@ impl Parameter {
 
     /// Check if this parameter has a constant value
     pub fn is_constant(&self) -> bool {
-        self.value.as_ref().map_or(false, |v| v.is_constant())
+        self.value.as_ref().is_some_and(|v| v.is_constant())
     }
 
     /// Check if this parameter has a formula
     pub fn is_formula(&self) -> bool {
-        self.value.as_ref().map_or(false, |v| v.is_formula())
+        self.value.as_ref().is_some_and(|v| v.is_formula())
     }
 
     /// Check if this parameter needs calibration (value is None)

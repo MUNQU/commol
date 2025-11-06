@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.commol_rs.commol_rs import (
+        CalibrationParameterTypeProtocol,
         DifferenceEquationsProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
@@ -160,7 +161,9 @@ class Calibrator:
 
         return result
 
-    def _to_rust_parameter_type(self, param_type: CalibrationParameterType):
+    def _to_rust_parameter_type(
+        self, param_type: CalibrationParameterType
+    ) -> "CalibrationParameterTypeProtocol":
         """Convert Python CalibrationParameterType to Rust type."""
         if param_type == CalibrationParameterType.PARAMETER:
             return rust_calibration.CalibrationParameterType.Parameter
