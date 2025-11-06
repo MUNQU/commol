@@ -2,7 +2,7 @@ import copy
 import logging
 from typing import Literal, Self, TypedDict
 
-from commol.constants import LogicOperators
+from commol.constants import LogicOperators, ModelTypes
 from commol.context.bin import Bin
 from commol.context.dynamics import (
     Condition,
@@ -613,7 +613,7 @@ class ModelBuilder:
                 )
             )
 
-        return Condition(logic=logic, rules=rule_objects)
+        return Condition(logic=LogicOperators(logic), rules=rule_objects)
 
     def set_initial_conditions(
         self,
@@ -800,7 +800,9 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(typology=typology, transitions=self._transitions)
+        dynamics = Dynamics(
+            typology=ModelTypes(typology), transitions=self._transitions
+        )
 
         model = Model(
             name=self._name,
