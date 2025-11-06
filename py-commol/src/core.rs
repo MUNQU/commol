@@ -168,7 +168,10 @@ impl PyInitialConditions {
     ) -> Self {
         let bin_fractions: Vec<commol_core::BinFraction> = bin_fractions
             .into_iter()
-            .map(|(bin, fraction)| commol_core::BinFraction { bin, fraction })
+            .map(|(bin, fraction)| commol_core::BinFraction {
+                bin,
+                fraction: Some(fraction),
+            })
             .collect();
 
         let stratification_fractions = stratification_fractions
@@ -302,7 +305,7 @@ impl PyParameter {
         Self {
             inner: commol_core::Parameter {
                 id,
-                value: param_value,
+                value: Some(param_value),
                 description,
             },
         }
@@ -310,8 +313,9 @@ impl PyParameter {
 
     fn __repr__(&self) -> String {
         let value_str = match &self.inner.value {
-            commol_core::ParameterValue::Constant(v) => format!("{}", v),
-            commol_core::ParameterValue::Formula(f) => format!("'{}'", f),
+            Some(commol_core::ParameterValue::Constant(v)) => format!("{}", v),
+            Some(commol_core::ParameterValue::Formula(f)) => format!("'{}'", f),
+            None => "None".to_string(),
         };
         format!("Parameter(id='{}', value={})", self.inner.id, value_str)
     }

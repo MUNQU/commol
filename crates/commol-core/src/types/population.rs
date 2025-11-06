@@ -20,7 +20,8 @@ pub struct Stratification {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BinFraction {
     pub bin: String,
-    pub fraction: f64,
+    /// Fraction value - None indicates the initial condition needs calibration
+    pub fraction: Option<f64>,
 }
 
 /// Specifies the fraction of population in a stratification category

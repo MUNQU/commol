@@ -2,6 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Type of value being calibrated
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CalibrationParameterType {
+    /// Model parameter (e.g., beta, gamma)
+    Parameter,
+    /// Initial population in a compartment (e.g., initial I value)
+    InitialCondition,
+}
+
 /// Represents an observed data point to fit against
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservedDataPoint {
@@ -44,8 +53,11 @@ impl ObservedDataPoint {
 /// Parameter to be calibrated with its bounds
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationParameter {
-    /// Parameter identifier (must match model parameter ID)
+    /// Parameter identifier (parameter ID for parameters, bin ID for initial conditions)
     pub id: String,
+
+    /// Type of value being calibrated
+    pub parameter_type: CalibrationParameterType,
 
     /// Minimum allowed value
     pub min_bound: f64,
@@ -58,10 +70,11 @@ pub struct CalibrationParameter {
 }
 
 impl CalibrationParameter {
-    /// Create a new calibration parameter
+    /// Create a new calibration parameter (defaults to Parameter type)
     pub fn new(id: String, min_bound: f64, max_bound: f64) -> Self {
         Self {
             id,
+            parameter_type: CalibrationParameterType::Parameter,
             min_bound,
             max_bound,
             initial_guess: None,
@@ -77,6 +90,40 @@ impl CalibrationParameter {
     ) -> Self {
         Self {
             id,
+            parameter_type: CalibrationParameterType::Parameter,
+            min_bound,
+            max_bound,
+            initial_guess: Some(initial_guess),
+        }
+    }
+
+    /// Create a new calibration parameter with explicit type
+    pub fn with_type(
+        id: String,
+        parameter_type: CalibrationParameterType,
+        min_bound: f64,
+        max_bound: f64,
+    ) -> Self {
+        Self {
+            id,
+            parameter_type,
+            min_bound,
+            max_bound,
+            initial_guess: None,
+        }
+    }
+
+    /// Create a new calibration parameter with type and initial guess
+    pub fn with_type_and_guess(
+        id: String,
+        parameter_type: CalibrationParameterType,
+        min_bound: f64,
+        max_bound: f64,
+        initial_guess: f64,
+    ) -> Self {
+        Self {
+            id,
+            parameter_type,
             min_bound,
             max_bound,
             initial_guess: Some(initial_guess),

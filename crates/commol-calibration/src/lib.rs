@@ -71,4 +71,7 @@ pub use calibration_problem::CalibrationProblem;
 pub use optimization::{
     optimize, NelderMeadConfig, OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
 };
-pub use types::{CalibrationParameter, CalibrationResult, LossConfig, ObservedDataPoint};
+pub use types::{
+    CalibrationParameter, CalibrationParameterType, CalibrationResult, LossConfig,
+    ObservedDataPoint,
+};

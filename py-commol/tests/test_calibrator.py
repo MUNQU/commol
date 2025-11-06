@@ -4,6 +4,7 @@ import pytest
 
 from commol import (
     CalibrationParameter,
+    CalibrationParameterType,
     CalibrationProblem,
     Calibrator,
     LossConfig,
@@ -61,8 +62,18 @@ class TestCalibrator:
             for i in range(100)
         ]
         parameters = [
-            CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-            CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
         ]
 
         problem = CalibrationProblem(
@@ -92,8 +103,18 @@ class TestCalibrator:
             for i in range(100)
         ]
         parameters = [
-            CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-            CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
         ]
 
         problem = CalibrationProblem(
@@ -160,7 +181,7 @@ class TestCalibrator:
         assert calibrated_param.is_calibrated()
 
     def test_simulation_fails_with_uncalibrated_parameters(self):
-        """Test that Simulation raises ValueError with uncalibrated parameters."""
+        """Test that Simulation.run() raises ValueError with uncalibrated parameters."""
         builder = (
             ModelBuilder(name="Test SIR", version="1.0")
             .add_bin(id="S", name="Susceptible")
@@ -186,15 +207,15 @@ class TestCalibrator:
         )
         model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 
-        # Attempting to create a Simulation should fail
+        # Creating a Simulation should succeed
+        simulation = Simulation(model)
+
+        # But attempting to run the simulation should fail
         with pytest.raises(ValueError) as exc_info:
-            _ = Simulation(model)
+            _ = simulation.run(100)
 
         error_message = str(exc_info.value)
-        assert (
-            "Cannot run Simulation" in error_message
-            or "Cannot create Simulation" in error_message
-        )
+        assert "Cannot run Simulation" in error_message
         assert "beta" in error_message
         assert "calibration" in error_message.lower() or "None" in error_message
 
@@ -339,9 +360,10 @@ class TestCalibrator:
             typology=ModelTypes.DIFFERENCE_EQUATIONS
         )
 
-        # Verify we cannot create a simulation yet
+        # Verify we can create a simulation, but cannot run it yet
+        simulation_uncalibrated = Simulation(model_uncalibrated)
         with pytest.raises(ValueError):
-            _ = Simulation(model_uncalibrated)
+            _ = simulation_uncalibrated.run(100)
 
         # Step 2: Create a temporary model with known values to generate observed data
         builder_known = (
@@ -372,8 +394,8 @@ class TestCalibrator:
         results = simulation_known.run(100, output_format="dict_of_lists")
 
         # Step 3: Prepare calibration using the uncalibrated model
-        # First, update with initial guesses for calibration
-        model_uncalibrated.update_parameters({"beta": 0.2, "gamma": 0.1})
+        # First, update with None value for calibration
+        model_uncalibrated.update_parameters({"beta": None, "gamma": None})
 
         # Now we can create a simulation for calibration
         simulation_for_calibration = Simulation(model_uncalibrated)
@@ -384,8 +406,18 @@ class TestCalibrator:
         ]
 
         parameters = [
-            CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-            CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
         ]
 
         problem = CalibrationProblem(
@@ -415,3 +447,259 @@ class TestCalibrator:
         # Verify the simulation runs successfully
         assert "I" in final_results
         assert len(final_results["I"]) == 101  # 100 steps + initial state
+
+    def test_calibrate_initial_condition(self):
+        """
+        Test calibrating initial conditions while keeping parameters fixed.
+        """
+        # Create a model with known parameters and known initial conditions
+        true_model = (
+            ModelBuilder(name="SIR True", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "I", "fraction": 0.02},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Generate observed data
+        true_simulation = Simulation(true_model)
+        true_results = true_simulation.run(50, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=true_results["I"][i])
+            for i in range(0, 50, 5)
+        ]
+
+        # Create test model with wrong initial I value
+        test_model = (
+            ModelBuilder(name="SIR Test", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "I", "fraction": None},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Create simulation - None values are allowed for calibration
+        simulation = Simulation(test_model)
+
+        # Calibrate initial I population
+        parameters = [
+            CalibrationParameter(
+                id="I",
+                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                min_bound=0.0,
+                max_bound=0.1,
+                initial_guess=0.01,  # Starting point for optimization
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(
+                    max_iterations=5000,
+                    sd_tolerance=1e-9,  # Stricter convergence criterion
+                    verbose=False,
+                ),
+            ),
+        )
+
+        calibrator = Calibrator(simulation, problem)
+        result = calibrator.run()
+
+        # After calibration, update model with calibrated values
+        test_model.update_initial_conditions(result.best_parameters)
+
+        assert result.converged
+        assert math.isclose(result.best_parameters["I"], 0.02)
+
+    def test_calibrate_parameter_and_initial_condition_together(self):
+        """
+        Test calibrating both a parameter and an initial condition simultaneously.
+        """
+        # Generate observed data
+        true_model = (
+            ModelBuilder(name="SIR True", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "I", "fraction": 0.02},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        true_simulation = Simulation(true_model)
+        true_results = true_simulation.run(50, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=true_results["I"][i])
+            for i in range(0, 50, 5)
+        ]
+
+        # Create test model with wrong beta and initial I
+        test_model = (
+            ModelBuilder(name="SIR Test", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=None, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.98},
+                    {"bin": "I", "fraction": None},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Create simulation - None values are allowed for calibration
+        simulation = Simulation(test_model)
+
+        # Calibrate both beta and initial I
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+                initial_guess=0.2,  # Starting point for beta
+            ),
+            CalibrationParameter(
+                id="I",
+                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                min_bound=0.0,
+                max_bound=0.1,  # Fraction range
+                initial_guess=0.01,  # Starting point for I
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=1000, verbose=False),
+            ),
+        )
+
+        calibrator = Calibrator(simulation, problem)
+        result = calibrator.run()
+
+        # After calibration, update model with calibrated values
+        test_model.update_parameters({"beta": result.best_parameters["beta"]})
+        test_model.update_initial_conditions({"I": result.best_parameters["I"]})
+
+        # Should recover both values
+        assert result.converged
+        assert math.isclose(result.best_parameters["beta"], 0.3, rel_tol=0.05)
+        assert math.isclose(result.best_parameters["I"], 0.02, rel_tol=0.05)
+
+    def test_invalid_bin_id_for_initial_condition_raises_error(self):
+        """Test that using an invalid bin ID for initial condition raises an error."""
+        model = (
+            ModelBuilder(name="SIR", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection", source=["S"], target=["I"], rate="beta * S * I / N"
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        observed_data = [ObservedDataPoint(step=10, compartment="I", value=50.0)]
+
+        # Try to calibrate a bin that doesn't exist
+        parameters = [
+            CalibrationParameter(
+                id="X",  # Invalid bin ID
+                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                min_bound=0.0,
+                max_bound=100.0,
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=100),
+            ),
+        )
+
+        simulation = Simulation(model)
+
+        # Should raise ValueError during calibrator initialization
+        with pytest.raises(ValueError, match="not found in model bins"):
+            _ = Calibrator(simulation, problem)

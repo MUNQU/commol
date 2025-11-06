@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from itertools import product, combinations
 from typing import Self
 
@@ -60,16 +61,13 @@ class Model(BaseModel):
             raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
         return self
 
-    def update_parameters(self, parameter_values: dict[str, float]) -> None:
+    def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
         """
         Update parameter values in the model.
 
-        This method is useful after calibration to update parameter values that
-        were previously set to None.
-
         Parameters
         ----------
-        parameter_values : dict[str, float]
+        parameter_values : Mapping[str, float | None]
             Dictionary mapping parameter IDs to their new values.
 
         Raises
@@ -99,6 +97,35 @@ class Model(BaseModel):
             List of parameter IDs that require calibration.
         """
         return [param.id for param in self.parameters if param.value is None]
+
+    def get_uncalibrated_initial_conditions(self) -> list[str]:
+        """
+        Get a list of bin IDs that have None fractions (need calibration).
+
+        Returns
+        -------
+        list[str]
+            List of bin IDs with uncalibrated initial conditions.
+        """
+        return self.population.initial_conditions.get_uncalibrated_bins()
+
+    def update_initial_conditions(
+        self, bin_fractions: Mapping[str, float | None]
+    ) -> None:
+        """
+        Update initial condition fractions for specified bins.
+
+        Parameters
+        ----------
+        bin_fractions : Mapping[str, float | None]
+            Dictionary mapping bin IDs to their new fraction values.
+
+        Raises
+        ------
+        ValueError
+            If a bin ID in the dictionary doesn't exist in the model.
+        """
+        self.population.initial_conditions.update_bin_fractions(bin_fractions)
 
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:

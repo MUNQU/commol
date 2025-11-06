@@ -228,4 +228,35 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         // Delegate to optimized implementation
         DifferenceEquations::run_into_buffer(self, num_steps, buffer)
     }
+
+    fn set_initial_condition(
+        &mut self,
+        compartment_index: usize,
+        value: f64,
+    ) -> Result<(), String> {
+        // Validate compartment index
+        if compartment_index >= self.initial_population.len() {
+            return Err(format!(
+                "Invalid compartment index: {}. Model has {} compartments.",
+                compartment_index,
+                self.initial_population.len()
+            ));
+        }
+
+        // Validate value (non-negative population)
+        if value < 0.0 {
+            return Err(format!(
+                "Initial condition value must be non-negative, got: {}",
+                value
+            ));
+        }
+
+        // Update initial population
+        self.initial_population[compartment_index] = value;
+
+        // Also update current population to reflect the change
+        self.population[compartment_index] = value;
+
+        Ok(())
+    }
 }

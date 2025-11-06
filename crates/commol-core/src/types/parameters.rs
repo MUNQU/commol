@@ -69,7 +69,8 @@ impl From<&str> for ParameterValue {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Parameter {
     pub id: String,
-    pub value: ParameterValue,
+    /// Parameter value - None indicates the parameter needs calibration
+    pub value: Option<ParameterValue>,
     pub description: Option<String>,
 }
 
@@ -78,7 +79,7 @@ impl Parameter {
     pub fn new_constant(id: String, value: f64, description: Option<String>) -> Self {
         Self {
             id,
-            value: ParameterValue::Constant(value),
+            value: Some(ParameterValue::Constant(value)),
             description,
         }
     }
@@ -87,18 +88,32 @@ impl Parameter {
     pub fn new_formula(id: String, formula: String, description: Option<String>) -> Self {
         Self {
             id,
-            value: ParameterValue::Formula(formula),
+            value: Some(ParameterValue::Formula(formula)),
+            description,
+        }
+    }
+
+    /// Create a new parameter with None value (needs calibration)
+    pub fn new_uncalibrated(id: String, description: Option<String>) -> Self {
+        Self {
+            id,
+            value: None,
             description,
         }
     }
 
     /// Check if this parameter has a constant value
     pub fn is_constant(&self) -> bool {
-        self.value.is_constant()
+        self.value.as_ref().map_or(false, |v| v.is_constant())
     }
 
     /// Check if this parameter has a formula
     pub fn is_formula(&self) -> bool {
-        self.value.is_formula()
+        self.value.as_ref().map_or(false, |v| v.is_formula())
+    }
+
+    /// Check if this parameter needs calibration (value is None)
+    pub fn needs_calibration(&self) -> bool {
+        self.value.is_none()
     }
 }

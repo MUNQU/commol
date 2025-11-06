@@ -100,16 +100,23 @@ class ObservedDataPointProtocol(Protocol):
     @property
     def value(self) -> float: ...
 
+class CalibrationParameterTypeProtocol(Protocol):
+    Parameter: "CalibrationParameterTypeProtocol"
+    InitialCondition: "CalibrationParameterTypeProtocol"
+
 class CalibrationParameterProtocol(Protocol):
     def __init__(
         self,
         id: str,
+        parameter_type: CalibrationParameterTypeProtocol,
         min_bound: float,
         max_bound: float,
         initial_guess: float | None = None,
     ) -> None: ...
     @property
     def id(self) -> str: ...
+    @property
+    def parameter_type(self) -> CalibrationParameterTypeProtocol: ...
     @property
     def min_bound(self) -> float: ...
     @property
@@ -180,6 +187,7 @@ class CalibrationResultProtocol(Protocol):
 
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
+    CalibrationParameterType: type[CalibrationParameterTypeProtocol]
     CalibrationParameter: type[CalibrationParameterProtocol]
     LossConfig: type[LossConfigProtocol]
     NelderMeadConfig: type[NelderMeadConfigProtocol]
@@ -194,6 +202,7 @@ class CalibrationModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
+        initial_population_size: int,
     ) -> CalibrationResultProtocol: ...
 
 class MathExpressionProtocol(Protocol):
