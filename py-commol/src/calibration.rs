@@ -6,6 +6,27 @@ use std::collections::HashMap;
 
 use crate::difference::PyDifferenceEquations;
 
+/// Type of value being calibrated
+#[pyclass(name = "CalibrationParameterType")]
+#[derive(Clone, Copy)]
+pub enum PyCalibrationParameterType {
+    Parameter,
+    InitialCondition,
+}
+
+impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParameterType {
+    fn from(py_type: PyCalibrationParameterType) -> Self {
+        match py_type {
+            PyCalibrationParameterType::Parameter => {
+                commol_calibration::CalibrationParameterType::Parameter
+            }
+            PyCalibrationParameterType::InitialCondition => {
+                commol_calibration::CalibrationParameterType::InitialCondition
+            }
+        }
+    }
+}
+
 /// Observed data point for calibration
 #[pyclass(name = "ObservedDataPoint")]
 #[derive(Clone)]
@@ -54,28 +75,44 @@ impl PyCalibrationParameter {
     /// Create a new calibration parameter
     ///
     /// Args:
-    ///     id: Parameter identifier (must match model parameter ID)
+    ///     id: Parameter identifier (parameter ID for parameters, bin ID for initial conditions)
+    ///     parameter_type: Type of value being calibrated
     ///     min_bound: Minimum allowed value
     ///     max_bound: Maximum allowed value
     ///     initial_guess: Optional starting value for optimization
     #[new]
-    #[pyo3(signature = (id, min_bound, max_bound, initial_guess=None))]
-    fn new(id: String, min_bound: f64, max_bound: f64, initial_guess: Option<f64>) -> Self {
+    #[pyo3(signature = (id, parameter_type, min_bound, max_bound, initial_guess=None))]
+    fn new(
+        id: String,
+        parameter_type: PyCalibrationParameterType,
+        min_bound: f64,
+        max_bound: f64,
+        initial_guess: Option<f64>,
+    ) -> Self {
         Self {
             inner: if let Some(guess) = initial_guess {
-                commol_calibration::CalibrationParameter::with_initial_guess(
-                    id, min_bound, max_bound, guess,
+                commol_calibration::CalibrationParameter::with_type_and_guess(
+                    id,
+                    parameter_type.into(),
+                    min_bound,
+                    max_bound,
+                    guess,
                 )
             } else {
-                commol_calibration::CalibrationParameter::new(id, min_bound, max_bound)
+                commol_calibration::CalibrationParameter::with_type(
+                    id,
+                    parameter_type.into(),
+                    min_bound,
+                    max_bound,
+                )
             },
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "CalibrationParameter(id='{}', bounds=[{}, {}])",
-            self.inner.id, self.inner.min_bound, self.inner.max_bound
+            "CalibrationParameter(id='{}', type={:?}, bounds=[{}, {}])",
+            self.inner.id, self.inner.parameter_type, self.inner.min_bound, self.inner.max_bound
         )
     }
 }
@@ -355,6 +392,7 @@ fn calibrate(
     parameters: Vec<PyCalibrationParameter>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
+    initial_population_size: u64,
 ) -> PyResult<PyCalibrationResult> {
     // Extract inner Rust types
     let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
@@ -369,6 +407,7 @@ fn calibrate(
         observed_data,
         parameters,
         loss_config.inner,
+        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
 
@@ -395,6 +434,7 @@ fn calibrate(
 
 /// Register calibration module with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyCalibrationParameterType>()?;
     m.add_class::<PyObservedDataPoint>()?;
     m.add_class::<PyCalibrationParameter>()?;
     m.add_class::<PyLossConfig>()?;

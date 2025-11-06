@@ -4,6 +4,22 @@ from enum import Enum
 from pydantic import BaseModel, Field, model_validator
 
 
+class CalibrationParameterType(str, Enum):
+    """
+    Type of value being calibrated.
+
+    Attributes
+    ----------
+    PARAMETER : str
+        Model parameter
+    INITIAL_CONDITION : str
+        Initial population in a compartment
+    """
+
+    PARAMETER = "parameter"
+    INITIAL_CONDITION = "initial_condition"
+
+
 class LossFunction(str, Enum):
     """
     Available loss functions for calibration.
@@ -72,12 +88,14 @@ class ObservedDataPoint(BaseModel):
 
 class CalibrationParameter(BaseModel):
     """
-    Defines a parameter to be calibrated with its bounds.
+    Defines a parameter or initial condition to be calibrated with its bounds.
 
     Attributes
     ----------
     id : str
-        Parameter identifier (must match a model parameter ID)
+        Identifier (parameter ID for parameters, bin ID for initial conditions)
+    parameter_type : CalibrationParameterType
+        Type of value being calibrated (default: PARAMETER)
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
@@ -86,7 +104,13 @@ class CalibrationParameter(BaseModel):
         Optional starting value for optimization (if None, midpoint is used)
     """
 
-    id: str = Field(default=..., min_length=1, description="Parameter identifier")
+    id: str = Field(
+        default=..., min_length=1, description="Parameter or bin identifier"
+    )
+    parameter_type: CalibrationParameterType = Field(
+        default=...,
+        description="Type of value being calibrated",
+    )
     min_bound: float = Field(default=..., description="Minimum allowed value")
     max_bound: float = Field(default=..., description="Maximum allowed value")
     initial_guess: float | None = Field(

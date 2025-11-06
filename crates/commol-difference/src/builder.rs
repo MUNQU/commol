@@ -35,13 +35,17 @@ impl DifferenceEquations {
 
         for p in &model.parameters {
             match &p.value {
-                commol_core::ParameterValue::Constant(val) => {
+                Some(commol_core::ParameterValue::Constant(val)) => {
                     constant_parameters.insert(p.id.clone(), *val);
                 }
-                commol_core::ParameterValue::Formula(formula) => {
+                Some(commol_core::ParameterValue::Formula(formula)) => {
                     // Parse formula once and store for later evaluation
                     let rate_expr = RateMathExpression::from_string(formula.clone());
                     formula_parameters.push((p.id.clone(), rate_expr));
+                }
+                None => {
+                    // Parameter needs calibration - skip it for now
+                    // During calibration, set_parameter() will provide the value
                 }
             }
         }
@@ -124,7 +128,9 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
     let total_population = model.population.initial_conditions.population_size as f64;
 
     // Build bin fraction map
-    let bin_fraction_map: HashMap<String, f64> = model
+    // Note: None fractions indicate calibration is needed
+    // We store them as Option to distinguish from 0.0
+    let bin_fraction_map: HashMap<String, Option<f64>> = model
         .population
         .initial_conditions
         .bin_fractions
@@ -138,7 +144,10 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
         .bins
         .iter()
         .map(|bin| {
-            let fraction = bin_fraction_map.get(&bin.id).unwrap_or(&0.0);
+            let fraction = bin_fraction_map
+                .get(&bin.id)
+                .and_then(|f| *f)
+                .unwrap_or(0.0);
             (bin.id.clone(), total_population * fraction)
         })
         .collect();

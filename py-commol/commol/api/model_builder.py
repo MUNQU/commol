@@ -46,7 +46,7 @@ class BinFractionDict(TypedDict):
     """Type definition for a single bin fraction."""
 
     bin: str
-    fraction: float
+    fraction: float | None
 
 
 class StratificationFractionDict(TypedDict):

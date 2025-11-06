@@ -82,11 +82,18 @@ class Population(BaseModel):
                 )
             )
 
-        bins_sum_fractions = sum(bin_fractions_dict.values())
-        if not math.isclose(bins_sum_fractions, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                (f"Bin fractions must sum to 1.0, but got {bins_sum_fractions:.7f}.")
-            )
+        # Only validate sum if all fractions are calibrated (not None)
+        # The InitialConditions validator handles the None case
+        if all(frac is not None for frac in bin_fractions_dict.values()):
+            # Filter out None values before summing (type checker requirement)
+            calibrated_fractions = [
+                f for f in bin_fractions_dict.values() if f is not None
+            ]
+            bins_sum_fractions = sum(calibrated_fractions)
+            if not math.isclose(bins_sum_fractions, 1.0, abs_tol=1e-6):
+                raise ValueError(
+                    f"Bin fractions must sum to 1.0, but got {bins_sum_fractions:.7f}."
+                )
 
         return self
 

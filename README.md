@@ -114,19 +114,54 @@ model.check_unit_consistency()  # Ensures all equations have correct units
 
 ### Model Calibration
 
-Fit model parameters to observed data using optimization algorithms:
+Fit model parameters to observed data using optimization algorithms. Parameters to be calibrated should be set to `None`:
 
 ```python
 from commol import (
+    ModelBuilder,
+    Simulation,
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
+    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
     LossFunction,
     OptimizationConfig,
     OptimizationAlgorithm,
     ParticleSwarmConfig,
+)
+from commol.constants import ModelTypes
+
+# Build model with unknown parameters
+model = (
+    ModelBuilder(name="SIR Model", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
 
 # Define observed data from real outbreak
@@ -136,10 +171,24 @@ observed_data = [
     ObservedDataPoint(step=30, compartment="I", value=62.3),
 ]
 
-# Specify parameters to calibrate with bounds
+# Simulation can be created with None values for calibration
+simulation = Simulation(model)
+
+# Specify parameters to calibrate with bounds and initial guesses
 parameters = [
-    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-    CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+        initial_guess=0.3  # Starting point
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+    ),
 ]
 
 # Configure calibration problem

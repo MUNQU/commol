@@ -164,13 +164,16 @@ See the [Unit Checking](../guide/building-models.md#unit-checking) section for d
 
 ## Calibrating Model Parameters
 
-Once you have a model, you can calibrate its parameters to match observed data using the `Calibrator` class:
+When parameters are unknown, set them to `None` and calibrate them to match observed data:
 
 ```python
 from commol import (
+    ModelBuilder,
+    Simulation,
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
+    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
     LossFunction,
@@ -178,8 +181,30 @@ from commol import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
+from commol.constants import ModelTypes
 
-# Suppose we have observed infected counts at different time steps
+# Build model with unknown parameters
+calibration_model = (
+    ModelBuilder(name="SIR Calibration", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Observed infected counts at different time steps
 observed_data = [
     ObservedDataPoint(step=10, compartment="I", value=45.2),
     ObservedDataPoint(step=20, compartment="I", value=78.5),
@@ -187,10 +212,25 @@ observed_data = [
     ObservedDataPoint(step=40, compartment="I", value=38.1),
 ]
 
-# Define which parameters to calibrate and their bounds
+# Create simulation (allowed with None values for calibration)
+cal_simulation = Simulation(calibration_model)
+
+# Define parameters to calibrate with bounds and initial guesses
 parameters = [
-    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-    CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+        initial_guess=0.3
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+        initial_guess=0.1
+    ),
 ]
 
 # Configure the calibration problem
@@ -200,18 +240,25 @@ problem = CalibrationProblem(
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=300, verbose=True),
+        config=ParticleSwarmConfig(max_iterations=300, verbose=False),
     ),
 )
 
 # Run calibration
-calibrator = Calibrator(simulation, problem)
+calibrator = Calibrator(cal_simulation, problem)
 result = calibrator.run()
 
-# Display calibrated parameters
+# Display and apply calibrated parameters
 print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
 print(f"Final loss: {result.final_loss:.6f}")
+
+# Update model with calibrated values
+calibration_model.update_parameters(result.best_parameters)
+
+# Now run simulation with calibrated model
+final_sim = Simulation(calibration_model)
+final_results = final_sim.run(num_steps=100)
 ```
 
 **Key concepts**:

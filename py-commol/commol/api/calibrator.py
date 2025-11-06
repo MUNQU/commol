@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.commol_rs.commol_rs import (
+        CalibrationParameterTypeProtocol,
         DifferenceEquationsProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
@@ -19,6 +20,7 @@ except ImportError as e:
 
 from commol.api.simulation import Simulation
 from commol.context.calibration import (
+    CalibrationParameterType,
     CalibrationProblem,
     CalibrationResult,
     LossFunction,
@@ -26,7 +28,6 @@ from commol.context.calibration import (
     OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,9 @@ class Calibrator:
                 f"and {len(problem.observed_data)} observed data points."
             )
         )
+
+        # Validate calibration parameters against model
+        self._validate_calibration_parameters()
 
     def run(self) -> CalibrationResult:
         """
@@ -107,6 +111,7 @@ class Calibrator:
         rust_parameters = [
             rust_calibration.CalibrationParameter(
                 id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
                 min_bound=param.min_bound,
                 max_bound=param.max_bound,
                 initial_guess=param.initial_guess,
@@ -123,6 +128,9 @@ class Calibrator:
         logger.info("Converted problem definition to Rust types.")
         logger.info("Running optimization...")
 
+        # Get initial population size for initial condition fraction conversion
+        initial_population_size = self._get_initial_population_size()
+
         # Call the Rust calibrate function
         rust_result = rust_calibration.calibrate(
             self._engine,
@@ -130,6 +138,7 @@ class Calibrator:
             rust_parameters,
             rust_loss_config,
             rust_optimization_config,
+            initial_population_size,
         )
 
         # Convert result back to Python CalibrationResult
@@ -151,6 +160,17 @@ class Calibrator:
         )
 
         return result
+
+    def _to_rust_parameter_type(
+        self, param_type: CalibrationParameterType
+    ) -> "CalibrationParameterTypeProtocol":
+        """Convert Python CalibrationParameterType to Rust type."""
+        if param_type == CalibrationParameterType.PARAMETER:
+            return rust_calibration.CalibrationParameterType.Parameter
+        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
+            return rust_calibration.CalibrationParameterType.InitialCondition
+        else:
+            raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
         """Convert Python LossConfig to Rust LossConfig."""
@@ -232,3 +252,67 @@ class Calibrator:
     def parameter_names(self) -> list[str]:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
+
+    def _validate_calibration_parameters(self) -> None:
+        """
+        Validate that all calibration parameters exist in the model.
+
+        Raises
+        ------
+        ValueError
+            If a parameter ID doesn't exist in the model or if a bin ID is invalid.
+        """
+        model = self.simulation.model_definition
+        model_param_ids = {p.id for p in model.parameters}
+        model_bin_ids = {b.id for b in model.population.bins}
+
+        for param in self.problem.parameters:
+            if param.parameter_type == CalibrationParameterType.PARAMETER:
+                if param.id not in model_param_ids:
+                    raise ValueError(
+                        f"Calibration parameter '{param.id}' not found in model "
+                        f"parameters. Available parameters: "
+                        f"{sorted(model_param_ids)}"
+                    )
+            elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
+                if param.id not in model_bin_ids:
+                    raise ValueError(
+                        f"Calibration initial condition '{param.id}' not found in "
+                        f"model bins. Available bins: {sorted(model_bin_ids)}"
+                    )
+            else:
+                raise ValueError(
+                    f"Unknown calibration parameter type: {param.parameter_type}"
+                )
+
+    def _get_compartment_index(self, bin_id: str) -> int:
+        """
+        Get the index of a bin/compartment by its ID.
+
+        Parameters
+        ----------
+        bin_id : str
+            The bin identifier
+
+        Returns
+        -------
+        int
+            The index of the compartment in the population vector
+
+        Raises
+        ------
+        ValueError
+            If the bin_id is not found
+        """
+        bins = self.simulation.model_definition.population.bins
+        for idx, bin_obj in enumerate(bins):
+            if bin_obj.id == bin_id:
+                return idx
+        raise ValueError(f"Bin '{bin_id}' not found in model")
+
+    def _get_initial_population_size(self) -> int:
+        """Get the initial population size from the model."""
+        initial_conditions = (
+            self.simulation.model_definition.population.initial_conditions
+        )
+        return initial_conditions.population_size

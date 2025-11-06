@@ -153,4 +153,36 @@ pub trait SimulationEngine: Clone {
         buffer.extend(results);
         Ok(())
     }
+
+    /// Set the initial condition for a specific compartment.
+    ///
+    /// This method allows modifying the initial population value for a compartment,
+    /// which is useful for calibration workflows where initial conditions need to be
+    /// optimized alongside parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `compartment_index` - The index of the compartment (matching the order from `compartments()`)
+    /// * `value` - The new initial population value
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if successful, or an error message if the compartment index is invalid
+    /// or the value is invalid (e.g., negative).
+    ///
+    /// # Note
+    ///
+    /// This method updates the stored initial conditions. The current population state
+    /// is also updated to reflect the new initial value. After calling this method,
+    /// `reset()` will restore the population to these new initial conditions.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // For an SIR model with compartments ["S", "I", "R"]
+    /// engine.set_initial_condition(1, 10.0)?;  // Set initial I to 10
+    /// engine.reset();  // Reset to new initial conditions
+    /// ```
+    fn set_initial_condition(&mut self, compartment_index: usize, value: f64)
+    -> Result<(), String>;
 }

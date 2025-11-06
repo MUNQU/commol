@@ -4,7 +4,7 @@ use argmin::core::{CostFunction, Error};
 use commol_core::SimulationEngine;
 use std::marker::PhantomData;
 
-use crate::types::{CalibrationParameter, LossConfig, ObservedDataPoint};
+use crate::types::{CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint};
 
 /// Generic calibration problem that works with any SimulationEngine implementation.
 ///
@@ -51,6 +51,10 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
 
+    /// Compartment indices for initial condition parameters (parallel to parameters vec)
+    /// None for Parameter type, Some(index) for InitialCondition type
+    parameter_compartment_indices: Vec<Option<usize>>,
+
     /// Loss function configuration
     loss_config: LossConfig,
 
@@ -60,6 +64,10 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Pre-allocated buffer for simulation results (reused across evaluations)
     /// Wrapped in RefCell to allow mutation in cost() method
     result_buffer: std::cell::RefCell<Vec<Vec<f64>>>,
+
+    /// Initial population size for converting fractions to absolute values
+    /// From the model's defined initial_population_size
+    initial_population_size: f64,
 
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
@@ -86,6 +94,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         observed_data: Vec<ObservedDataPoint>,
         parameters: Vec<CalibrationParameter>,
         loss_config: LossConfig,
+        initial_population_size: u64,
     ) -> Result<Self, String> {
         // Validate inputs
         if observed_data.is_empty() {
@@ -119,6 +128,31 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
+        // Build compartment indices for calibration parameters
+        let mut parameter_compartment_indices = Vec::with_capacity(parameters.len());
+        for param in &parameters {
+            match param.parameter_type {
+                CalibrationParameterType::Parameter => {
+                    // No compartment index needed for regular parameters
+                    parameter_compartment_indices.push(None);
+                }
+                CalibrationParameterType::InitialCondition => {
+                    // Look up compartment index by bin ID
+                    match compartment_map.get(param.id.as_str()) {
+                        Some(&idx) => parameter_compartment_indices.push(Some(idx)),
+                        None => {
+                            return Err(format!(
+                                "Invalid bin ID '{}' for initial condition calibration
+                                (available: {})",
+                                param.id,
+                                compartments.join(", ")
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
         // Find maximum time step to avoid recomputing in each cost evaluation
         let max_time_step = observed_data
             .iter()
@@ -135,9 +169,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_data,
             observed_compartment_indices,
             parameters,
+            parameter_compartment_indices,
             loss_config,
             max_time_step,
             result_buffer: std::cell::RefCell::new(result_buffer),
+            initial_population_size: initial_population_size as f64,
             _phantom: PhantomData,
         })
     }
@@ -264,11 +300,35 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Update parameters with clamped values
-        for (value, param) in clamped_params.iter().zip(&self.parameters) {
-            engine.set_parameter(&param.id, *value).map_err(|e| {
-                Error::msg(format!("Failed to set parameter '{}': {}", param.id, e))
-            })?;
+        // Update parameters and initial conditions with clamped values
+        for ((value, param), compartment_idx) in clamped_params
+            .iter()
+            .zip(&self.parameters)
+            .zip(&self.parameter_compartment_indices)
+        {
+            match param.parameter_type {
+                CalibrationParameterType::Parameter => {
+                    // Set model parameter
+                    engine.set_parameter(&param.id, *value).map_err(|e| {
+                        Error::msg(format!("Failed to set parameter '{}': {}", param.id, e))
+                    })?;
+                }
+                CalibrationParameterType::InitialCondition => {
+                    // Set initial condition for compartment
+                    // Note: value is a fraction (0.0 to 1.0), convert to absolute population
+                    let idx =
+                        compartment_idx.expect("InitialCondition must have compartment index");
+                    let absolute_population = *value * self.initial_population_size;
+                    engine
+                        .set_initial_condition(idx, absolute_population)
+                        .map_err(|e| {
+                            Error::msg(format!(
+                                "Failed to set initial condition for '{}': {}",
+                                param.id, e
+                            ))
+                        })?;
+                }
+            }
         }
 
         // Run simulation using pre-allocated buffer to avoid allocations

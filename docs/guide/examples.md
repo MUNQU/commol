@@ -404,6 +404,7 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
+    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
     LossFunction,
@@ -413,14 +414,14 @@ from commol import (
 )
 from commol.constants import ModelTypes
 
-# Build SIR model with initial parameter guesses
+# Build SIR model with parameters to be calibrated
 model = (
     ModelBuilder(name="SIR for Calibration", version="1.0")
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)   # Initial guess
-    .add_parameter(id="gamma", value=0.1)  # Initial guess
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
     .add_transition(
         id="infection",
         source=["S"],
@@ -455,16 +456,21 @@ observed_data = [
     ObservedDataPoint(step=60, compartment="I", value=8.2),
 ]
 
-# Define parameters to calibrate
+# Create simulation (can be created with None values for calibration)
+simulation = Simulation(model)
+
+# Define parameters to calibrate with initial guesses
 parameters = [
     CalibrationParameter(
         id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
         id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
@@ -487,7 +493,6 @@ problem = CalibrationProblem(
 )
 
 # Run calibration
-simulation = Simulation(model)
 calibrator = Calibrator(simulation, problem)
 result = calibrator.run()
 
@@ -499,6 +504,13 @@ print(f"Final loss: {result.final_loss:.6f}")
 print(f"Calibrated beta: {result.best_parameters['beta']:.6f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.6f}")
 print(f"Termination reason: {result.termination_reason}")
+
+# Update model with calibrated parameters
+model.update_parameters(result.best_parameters)
+
+# Now create a new simulation with calibrated model
+calibrated_simulation = Simulation(model)
+results = calibrated_simulation.run(num_steps=100)
 ```
 
 ## Next Steps
