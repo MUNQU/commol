@@ -60,6 +60,7 @@ rate = "0.01 * R"        # Use R population
 | `N_{cat1_cat2}` | float | Total population for an intersection of categories (e.g., `N_young_urban`) |
 | `step`          | int   | Current simulation step (0, 1, 2, ...)                                     |
 | `t`             | int   | Alias for `step`                                                           |
+| `$compartment`  | str   | Placeholder that expands to each source compartment name (see below)       |
 
 **Examples:**
 
@@ -68,6 +69,83 @@ rate = "beta * I / N"              # Frequency-dependent transmission
 rate = "beta * sin(2 * pi * t)"    # Periodic variation
 rate = "gamma * exp(-0.01 * step)" # Exponential decay over time
 ```
+
+### The `$compartment` Placeholder
+
+The `$compartment` special variable is a **template placeholder** that automatically expands multi-compartment transitions into individual per-compartment transitions:
+
+```python
+# Instead of writing repetitive code:
+.add_transition("death_S", ["S"], [], rate="d * S")
+.add_transition("death_I", ["I"], [], rate="d * I")
+.add_transition("death_R", ["R"], [], rate="d * R")
+
+# Use $compartment to write it once:
+.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d * $compartment"  # Automatically expands
+)
+```
+
+**How it works:**
+
+1. System detects `$compartment` in the rate formula
+2. Creates one transition per source compartment
+3. Replaces `$compartment` with the actual compartment name in each formula
+
+**Generated transitions:**
+
+- `death__S`: `rate = "d * S"`
+- `death__I`: `rate = "d * I"`
+- `death__R`: `rate = "d * R"`
+
+**Multiple occurrences in complex formulas:**
+
+```python
+rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
+
+# Expands to:
+# death__S: "d * S * (1 + 0.1 * S / N)"
+# death__I: "d * I * (1 + 0.1 * I / N)"
+# death__R: "d * R * (1 + 0.1 * R / N)"
+```
+
+**With stratified rates:**
+
+```python
+.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d_base * $compartment",
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "d_young * $compartment"
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "d_old * $compartment"
+        }
+    ]
+)
+```
+
+**When to use:**
+
+- Per-capita rates that apply to multiple compartments (deaths, emigration)
+- Treatment transitions from multiple disease states to recovery
+- Any time you need the same formula pattern applied to different compartments
+
+**When NOT to use:**
+
+- Standard multi-compartment interactions (use regular syntax)
+- Single source compartment (use compartment name directly)
+- Different formulas for different compartments (write separate transitions)
+
+See [Building Models - Using $compartment Placeholder](building-models.md#using-compartment-placeholder-for-per-compartment-rates) for more details.
 
 ### Parameter References
 

@@ -73,6 +73,87 @@ results = simulation.run(num_steps=100)
 print(f"Final infected: {results['I'][-1]:.0f}")
 ```
 
+### Using $compartment Placeholder for Multiple Transitions
+
+When you need to apply the same transition to multiple compartments (like death rates), use the `$compartment` placeholder instead of writing repetitive code:
+
+```python
+model = (
+    ModelBuilder(name="SLIR with Deaths", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="L", name="Latent")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.3, unit="1/day")
+    .add_parameter(id="gamma", value=0.2, unit="1/day")
+    .add_parameter(id="delta", value=0.1, unit="1/day")
+    .add_parameter(id="d", value=0.01, unit="1/day")  # Death rate
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["L"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="progression",
+        source=["L"],
+        target=["I"],
+        rate="gamma * L"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="delta * I"
+    )
+    # Single transition automatically expands to 4 separate death transitions
+    .add_transition(
+        id="death",
+        source=["S", "L", "I", "R"],
+        target=[],
+        rate="d * $compartment"  # Expands to: d*S, d*L, d*I, d*R
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "L", "fraction": 0.005},
+            {"bin": "I", "fraction": 0.005},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+```
+
+**The `$compartment` placeholder:**
+
+- Automatically expands to multiple transitions (one per source compartment)
+- Replaces `$compartment` with the actual compartment name in the rate formula
+- Works with stratified rates for age-structured or location-based models
+- Reduces code duplication and improves maintainability
+
+**Example with stratified rates:**
+
+```python
+.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d_base * $compartment",  # Fallback rate
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "d_young * $compartment"  # Lower death rate for young
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "d_old * $compartment"  # Higher death rate for old
+        }
+    ]
+)
+```
+
 ### With Unit Checking
 
 Add units to parameters for automatic dimensional validation:
