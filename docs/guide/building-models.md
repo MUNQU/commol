@@ -185,6 +185,121 @@ builder.add_transition(
 )
 ```
 
+### Using `$compartment` Placeholder for Per-Compartment Rates
+
+When applying the same type of transition to multiple compartments with per-compartment rates (like per-capita death rates), use the `$compartment` placeholder to avoid repetitive code:
+
+```python
+# Instead of writing 4 separate transitions:
+# .add_transition("death_S", ["S"], [], rate="d * S")
+# .add_transition("death_L", ["L"], [], rate="d * L")
+# .add_transition("death_I", ["I"], [], rate="d * I")
+# .add_transition("death_R", ["R"], [], rate="d * R")
+
+# Write one transition that automatically expands:
+builder.add_transition(
+    id="death",
+    source=["S", "L", "I", "R"],
+    target=[],
+    rate="d * $compartment"  # $compartment gets replaced with S, L, I, R
+)
+```
+
+**How it works:**
+
+- The system detects `$compartment` in the rate formula
+- Automatically creates one transition per source compartment
+- Replaces `$compartment` with the actual compartment name in each transition
+- Generated transition IDs use the pattern: `{id}__{compartment}` (e.g., `death__S`, `death__L`)
+
+**Complex formulas with multiple occurrences:**
+
+```python
+builder.add_transition(
+    id="nonlinear_death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d * $compartment * (1 + 0.1 * $compartment / N)"
+)
+# Expands to:
+# death__S: rate = "d * S * (1 + 0.1 * S / N)"
+# death__I: rate = "d * I * (1 + 0.1 * I / N)"
+# death__R: rate = "d * R * (1 + 0.1 * R / N)"
+```
+
+**With single target (transfers):**
+
+```python
+builder.add_transition(
+    id="treatment",
+    source=["I_mild", "I_severe"],
+    target=["R"],  # All recover to same compartment
+    rate="treatment_rate * $compartment"
+)
+```
+
+**With stratified rates:**
+
+```python
+builder.add_stratification(id="age", categories=["young", "old"])
+
+builder.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d_base * $compartment",  # Fallback rate
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "d_young * $compartment"  # Lower death rate for young
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "d_old * $compartment"  # Higher death rate for old
+        }
+    ]
+)
+# Expands to death__S, death__I, death__R, each with their own stratified rates
+```
+
+**Restrictions:**
+
+- Only valid with multiple source compartments (2 or more)
+- Target must be empty `[]` or contain exactly one compartment
+- Cannot be used if you want different targets for different sources
+
+**Comparison with standard multi-source transitions:**
+
+Standard multi-source transitions (without `$compartment`) create a **single** transition that affects all sources simultaneously:
+
+```python
+# This creates ONE transition
+.add_transition(
+    id="interaction",
+    source=["S", "I"],
+    target=["I", "I"],
+    rate="beta * S * I"
+)
+# Resulting equations:
+# dS/dt = ... - (beta*S*I)
+# dI/dt = ... - (beta*S*I) + 2*(beta*S*I) = ... + (beta*S*I)
+```
+
+With `$compartment`, you create **multiple independent** transitions:
+
+```python
+# This creates TWO separate transitions
+.add_transition(
+    id="death",
+    source=["S", "I"],
+    target=[],
+    rate="d * $compartment"
+)
+# Resulting equations:
+# dS/dt = ... - (d*S)
+# dI/dt = ... - (d*I)
+```
+
 ### Stratified Transitions
 
 When a model includes stratifications, you often need different transition rates for different subgroups. The `add_transition` method supports this via the `stratified_rates` parameter.
