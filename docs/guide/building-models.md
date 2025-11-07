@@ -12,9 +12,24 @@ from commol import ModelBuilder
 builder = ModelBuilder(
     name="My Model",
     version="1.0",
-    description="Optional description"
+    description="Optional description",
+    bin_unit="person"  # Optional: default unit for all bins
 )
 ```
+
+#### Parameters
+
+- **`name`** (required): Unique identifier for your model
+- **`version`** (optional): Version string for tracking model changes
+- **`description`** (optional): Human-readable description of the model
+- **`bin_unit`** (optional): Default unit for all bins (disease states). When specified, this enables:
+  - Automatic unit assignment to bins, predefined population variables (`N`, `N_young`, etc.), and stratification categories
+  - Unit checking via `model.check_unit_consistency()`
+  - Unit annotations in `model.print_equations()` output
+
+  Common values: `"person"`, `"individual"`, or any custom population unit.
+
+  **Note**: Individual bins can override this with their own `unit` parameter in `add_bin()`.
 
 ### Chaining Methods
 
