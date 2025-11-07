@@ -1,7 +1,9 @@
-import tempfile
 import sys
+import tempfile
 from io import StringIO
 from pathlib import Path
+
+import pytest
 
 from commol.api.model_builder import ModelBuilder
 from commol.constants import ModelTypes
@@ -638,5 +640,296 @@ class TestModel:
             "- (migration_rate_old * R_old_urban)\n"
             "dR_old_rural/dt = (0.1 * I) + (aging_rate * R_young_rural) "
             "+ (migration_rate_old * R_old_urban)\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_compact_with_complete_units(self):
+        """
+        Test that print_equations shows units when all parameters and bins have units.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0", bin_unit="person")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S", "I"],
+                target=["I", "I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations()
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Model\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 2\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (I, S -> I):\n"
+            "  S -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
+            "  I -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  I -> R: gamma(1/day) * I(person) [person / day]\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "dS/dt = - (beta * S * I / N)\n"
+            "dI/dt = (beta * S * I / N) - (gamma * I)\n"
+            "dR/dt = (gamma * I)\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_compact_without_units(self):
+        """
+        Test that print_equations does not show units when no units are specified.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S", "I"],
+                target=["I", "I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations()
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Model\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 2\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (I, S -> I):\n"
+            "  S -> I: beta * S * I / N\n"
+            "  I -> I: beta * S * I / N\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  I -> R: gamma * I\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "dS/dt = - (beta * S * I / N)\n"
+            "dI/dt = (beta * S * I / N) - (gamma * I)\n"
+            "dR/dt = (gamma * I)\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_compact_with_partial_units(self):
+        """
+        Test that print_equations raises an error when only some parameters have units.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0", bin_unit="person")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1)  # No unit
+            .add_transition(
+                id="infection",
+                source=["S", "I"],
+                target=["I", "I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Should raise ValueError for partial units
+        with pytest.raises(ValueError, match="Some parameters have units but not all"):
+            model.print_equations()
+
+    def test_print_equations_compact_with_bin_unit_only(self):
+        """
+        Test that print_equations does not show units when only bin_unit is specified
+        but parameters don't have units.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0", bin_unit="person")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S", "I"],
+                target=["I", "I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        # Should raise ValueError for partial units (bins have units but params don't)
+        with pytest.raises(ValueError, match="Some parameters have units but not all"):
+            model.print_equations()
+
+    def test_print_equations_compact_with_different_bin_units(self):
+        """
+        Test that print_equations works with any bin units.
+        """
+        builder = (
+            ModelBuilder(name="Chemical Reaction", version="1.0.0", bin_unit="mol")
+            .add_bin(id="A", name="Reactant A")
+            .add_bin(id="B", name="Reactant B")
+            .add_bin(id="C", name="Product C")
+            .add_parameter(id="k1", value=0.5, unit="1/s")
+            .add_parameter(id="k2", value=0.2, unit="1/s")
+            .add_transition(
+                id="forward",
+                source=["A", "B"],
+                target=["C", "C"],
+                rate="k1 * A * B",
+            )
+            .add_transition(id="backward", source=["C"], target=["A"], rate="k2 * C")
+            .set_initial_conditions(
+                population_size=100,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 0.4},
+                    {"bin": "B", "fraction": 0.4},
+                    {"bin": "C", "fraction": 0.2},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations()
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: Chemical Reaction\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 2\n"
+            "Number of Transitions: 2\n"
+            "Bins: A, B, C\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Forward (A, B -> C):\n"
+            "  A -> C: k1(1/s) * A(mol) * B(mol) [mole ** 2 / second]\n"
+            "  B -> C: k1(1/s) * A(mol) * B(mol) [mole ** 2 / second]\n"
+            "\n"
+            "Backward (C -> A):\n"
+            "  C -> A: k2(1/s) * C(mol) [mole / second]\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "dA/dt = (k2 * C) - (k1 * A * B)\n"
+            "dB/dt = - (k1 * A * B)\n"
+            "dC/dt = (k1 * A * B) - (k2 * C)\n"
         )
         assert output == expected_output

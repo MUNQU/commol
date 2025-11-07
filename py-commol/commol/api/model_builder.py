@@ -110,6 +110,7 @@ class ModelBuilder:
         name: str,
         description: str | None = None,
         version: str | None = None,
+        bin_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -122,10 +123,16 @@ class ModelBuilder:
             A human-readable description of the model's purpose and function.
         version : str | None, default=None
             The version number of the model.
+        bin_unit : str | None, default=None
+            The default unit for all bins.
+            Individual bins can override this with their own unit parameter.
+            Units are optional but required for model.print_equations() and
+            model.check_unit_consistency().
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
+        self._bin_unit: str | None = bin_unit
 
         self._bins: list[Bin] = []
         self._stratifications: list[Stratification] = []
@@ -140,7 +147,7 @@ class ModelBuilder:
             )
         )
 
-    def add_bin(self, id: str, name: str) -> Self:
+    def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
         """
         Add a bin to the model.
 
@@ -150,14 +157,18 @@ class ModelBuilder:
             Unique identifier for the bin.
         name : str
             Human-readable name for the bin.
+        unit : str | None, default=None
+            Unit of measurement for this bin. If None, uses the model-level bin_unit.
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
         """
-        self._bins.append(Bin(id=id, name=name))
-        logging.info(f"Added bin: id='{id}', name='{name}'")
+        # Use bin-specific unit, or fall back to model-level bin_unit
+        final_unit = unit if unit is not None else self._bin_unit
+        self._bins.append(Bin(id=id, name=name, unit=final_unit))
+        logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_stratification(self, id: str, categories: list[str]) -> Self:

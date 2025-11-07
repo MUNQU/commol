@@ -62,7 +62,7 @@ class TestUnitUtilities:
         strats = [
             Stratification(id="age", categories=["young", "old"]),
         ]
-        units = get_predefined_variable_units(strats)
+        units = get_predefined_variable_units(strats, bin_unit="person")
 
         assert units["N"] == "person"
         assert units["N_young"] == "person"
@@ -76,7 +76,7 @@ class TestUnitUtilities:
             Stratification(id="age", categories=["young", "old"]),
             Stratification(id="location", categories=["urban", "rural"]),
         ]
-        units = get_predefined_variable_units(strats)
+        units = get_predefined_variable_units(strats, bin_unit="person")
 
         assert units["N"] == "person"
         assert units["N_young"] == "person"
@@ -91,7 +91,7 @@ class TestModelUnitConsistency:
     def test_sir_model_with_consistent_units(self):
         """Test SIR model with consistent units."""
         builder = (
-            ModelBuilder(name="SIR", version="1.0")
+            ModelBuilder(name="SIR", version="1.0", bin_unit="person")
             # Add disease states
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
@@ -181,7 +181,7 @@ class TestModelUnitConsistency:
     def test_stratified_model_with_consistent_units(self):
         """Test stratified model with consistent units."""
         builder = (
-            ModelBuilder(name="Stratified SIR", version="1.0")
+            ModelBuilder(name="Stratified SIR", version="1.0", bin_unit="person")
             # Add disease states
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
@@ -267,7 +267,7 @@ class TestModelUnitConsistency:
     def test_dimensionless_parameters(self):
         """Test handling of dimensionless parameters."""
         builder = (
-            ModelBuilder(name="Test", version="1.0")
+            ModelBuilder(name="Test", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             # Dimensionless parameter
@@ -305,7 +305,7 @@ class TestComplexUnits:
     def test_vaccination_rate_with_time_dependent_coverage(self):
         """Test vaccination model with time-dependent coverage."""
         builder = (
-            ModelBuilder(name="SIR with Vaccination", version="1.0")
+            ModelBuilder(name="SIR with Vaccination", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("V", "Vaccinated")
             .add_bin("I", "Infected")
@@ -1218,7 +1218,7 @@ class TestFullModelUnitFailures:
     def test_sir_model_with_exponential_decay(self):
         """Test SIR model with exponential decay in transmission rate."""
         builder = (
-            ModelBuilder(name="SIR with Decay", version="1.0")
+            ModelBuilder(name="SIR with Decay", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1252,7 +1252,7 @@ class TestFullModelUnitFailures:
     def test_sir_model_with_seasonal_forcing(self):
         """Test SIR model with seasonal forcing using sin."""
         builder = (
-            ModelBuilder(name="SIR with Seasonality", version="1.0")
+            ModelBuilder(name="SIR with Seasonality", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1316,7 +1316,9 @@ class TestFullModelUnitFailures:
     def test_formula_parameter_unit_inference(self):
         """Test that units are correctly inferred for formula parameters."""
         builder = (
-            ModelBuilder(name="Model with Formula Parameters", version="1.0")
+            ModelBuilder(
+                name="Model with Formula Parameters", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1353,7 +1355,9 @@ class TestFullModelUnitFailures:
     def test_formula_parameter_with_N_reference(self):
         """Test formula parameter referencing N and N_category."""
         builder = (
-            ModelBuilder(name="Model with N-based Formula", version="1.0")
+            ModelBuilder(
+                name="Model with N-based Formula", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1434,7 +1438,9 @@ class TestFullModelUnitFailures:
     def test_formula_parameter_chained_dependencies(self):
         """Test formula parameters with chained dependencies."""
         builder = (
-            ModelBuilder(name="Model with Chained Formulas", version="1.0")
+            ModelBuilder(
+                name="Model with Chained Formulas", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")

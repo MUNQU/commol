@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from itertools import product, combinations
+from itertools import combinations, product
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -676,6 +676,12 @@ class Model(BaseModel):
 
         lines.append("Bin Transitions:")
 
+        # Check if we have complete units for annotation
+        show_units = self._has_all_units()
+
+        # Cache variable units for efficiency when formatting multiple rates
+        variable_units = self._build_variable_units() if show_units else None
+
         for transition in bin_transitions:
             source_bins = transition.source
             target_bins = transition.target
@@ -686,28 +692,49 @@ class Model(BaseModel):
                 f"{transition.id.capitalize()} ({source_str} -> {target_str}):"
             )
 
-            for compartment in compartments:
-                bin_id = compartment[0]
-
-                if bin_id in source_bins:
-                    source_compartment_str = self._compartment_to_string(compartment)
-
-                    if target_bins:
-                        target_bin = target_bins[0]
-                        target_compartment_str = source_compartment_str.replace(
-                            bin_id, target_bin, 1
+            # Handle influx transitions (empty source)
+            if not source_bins and target_bins:
+                for compartment in compartments:
+                    bin_id = compartment[0]
+                    if bin_id in target_bins:
+                        target_compartment_str = self._compartment_to_string(
+                            compartment
                         )
-                    else:
-                        target_compartment_str = "none"
+                        rate = self._get_rate_for_compartment(transition, compartment)
+                        rate_with_unit = self._format_rate_with_unit(
+                            rate, variable_units, show_units
+                        )
 
-                    rate = self._get_rate_for_compartment(transition, compartment)
+                        lines.append(
+                            f"  none -> {target_compartment_str}: {rate_with_unit}"
+                        )
+            # Handle normal transitions (source to target)
+            else:
+                for compartment in compartments:
+                    bin_id = compartment[0]
 
-                    lines.append(
-                        (
+                    if bin_id in source_bins:
+                        source_compartment_str = self._compartment_to_string(
+                            compartment
+                        )
+
+                        if target_bins:
+                            target_bin = target_bins[0]
+                            target_compartment_str = source_compartment_str.replace(
+                                bin_id, target_bin, 1
+                            )
+                        else:
+                            target_compartment_str = "none"
+
+                        rate = self._get_rate_for_compartment(transition, compartment)
+                        rate_with_unit = self._format_rate_with_unit(
+                            rate, variable_units, show_units
+                        )
+
+                        lines.append(
                             f"  {source_compartment_str} -> "
-                            f"{target_compartment_str}: {rate}"
+                            f"{target_compartment_str}: {rate_with_unit}"
                         )
-                    )
 
             lines.append("")
 
@@ -731,7 +758,31 @@ class Model(BaseModel):
         trans: Transition,
         strat_idx: int,
         combo: tuple[str, ...],
+        variable_units: dict[str, str] | None = None,
+        show_units: bool = True,
     ) -> str:
+        """
+        Build a transition line for stratification transitions.
+
+        Parameters
+        ----------
+        trans : Transition
+            The transition to format.
+        strat_idx : int
+            Index of the stratification being transitioned.
+        combo : tuple[str, ...]
+            Combination of categories for other stratifications.
+        variable_units : dict[str, str] | None
+            Pre-computed variable units for efficiency.
+        show_units : bool, default=True
+            If True, annotate variables and show final unit.
+            If False, return the plain rate expression.
+
+        Returns
+        -------
+        str
+            Formatted transition line with unit annotation.
+        """
         src_cat = trans.source[0]
         tgt_cat = trans.target[0]
 
@@ -752,11 +803,39 @@ class Model(BaseModel):
 
         sample_compartment = ("X",) + tuple(source_parts)
         rate = self._get_rate_for_compartment(trans, sample_compartment)
-        rate_expr = (
-            f"{rate} * {source_comp}" if rate else f"{trans.rate} * {source_comp}"
-        )
 
-        return f"  {source_comp} -> {target_comp}: {rate_expr}"
+        # Build the rate expression with variable annotations
+        if show_units and rate and self.population.bins:
+            # Replace X with the first bin id to get a concrete compartment for
+            # annotation
+            first_bin_id = self.population.bins[0].id
+            concrete_compartment = (first_bin_id,) + tuple(source_parts)
+            concrete_comp_str = self._compartment_to_string(concrete_compartment)
+            full_rate_expr = f"{rate} * {concrete_comp_str}"
+
+            # Annotate the concrete expression with units
+            annotated_expr = self._annotate_rate_variables(
+                full_rate_expr, variable_units
+            )
+
+            # Replace the concrete compartment back with X (generic bin placeholder)
+            # Handle both simple case and stratified case
+            bin_unit = self.population.bins[0].unit
+            annotated_expr = annotated_expr.replace(
+                f"{concrete_comp_str}({bin_unit})", f"{source_comp}({bin_unit})"
+            )
+
+            # Get final unit
+            unit = self._get_rate_unit(full_rate_expr, variable_units)
+            unit_str = f" [{unit}]" if unit else ""
+
+            return f"  {source_comp} -> {target_comp}: {annotated_expr}{unit_str}"
+        else:
+            # Fallback without annotations
+            rate_expr = (
+                f"{rate} * {source_comp}" if rate else f"{trans.rate} * {source_comp}"
+            )
+            return f"  {source_comp} -> {target_comp}: {rate_expr}"
 
     def _format_stratification_transitions_compact_stratified(
         self,
@@ -768,6 +847,12 @@ class Model(BaseModel):
         strat_by_id = self._group_transitions_by_stratification(
             stratification_transitions
         )
+
+        # Check if we have complete units for annotation
+        show_units = self._has_all_units()
+
+        # Cache variable units for efficiency when formatting multiple rates
+        variable_units = self._build_variable_units() if show_units else None
 
         for strat_idx, strat in enumerate(self.population.stratifications):
             if not strat_by_id.get(strat.id):
@@ -804,7 +889,9 @@ class Model(BaseModel):
 
                 for combo in other_cat_combos:
                     lines.append(
-                        self._build_stratified_transition_line(trans, strat_idx, combo)
+                        self._build_stratified_transition_line(
+                            trans, strat_idx, combo, variable_units, show_units
+                        )
                     )
 
             lines.append("")
@@ -940,7 +1027,7 @@ class Model(BaseModel):
         else:
             print(output)
 
-    def check_unit_consistency(self) -> None:
+    def check_unit_consistency(self, verbose: bool = False) -> None:
         """
         Check unit consistency of all equations in the model.
 
@@ -952,16 +1039,17 @@ class Model(BaseModel):
         population change rates (e.g., "person/day" or "1/day" when multiplied by
         population).
 
+        Parameters
+        ----------
+        verbose : bool, default=False
+            If True, prints a success message when all units are consistent.
+
         Raises
         ------
         UnitConsistencyError
             If unit inconsistencies are found in any equation.
         ValueError
             If the model type doesn't support unit checking.
-
-        Examples
-        --------
-        >>> model.check_unit_consistency()  # Raises exception if inconsistent
 
         Notes
         -----
@@ -970,8 +1058,35 @@ class Model(BaseModel):
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
+        self._validate_unit_check_preconditions()
+
+        # Build variable units mapping
+        variable_units = self._build_variable_units()
+
+        # Check each transition and collect errors
+        errors = self._collect_unit_errors(variable_units)
+
+        if errors:
+            error_message = "Unit consistency check failed:\n" + "\n".join(
+                f"  - {err}" for err in errors
+            )
+            raise UnitConsistencyError(error_message)
+
+        if verbose:
+            print("Unit consistency check passed successfully.")
+
+    def _validate_unit_check_preconditions(self) -> None:
+        """
+        Validate preconditions for unit consistency checking.
+
+        Raises
+        ------
+        UnitConsistencyError
+            If constant parameters are missing units.
+        ValueError
+            If the model type doesn't support unit checking.
+        """
         # Check if all non-formula parameters have units
-        # Formula parameters can have their units inferred
         non_formula_params_missing_units = [
             p
             for p in self.parameters
@@ -979,7 +1094,6 @@ class Model(BaseModel):
         ]
 
         if non_formula_params_missing_units:
-            # Raise error if constant parameters are missing units
             param_names = ", ".join([p.id for p in non_formula_params_missing_units])
             raise UnitConsistencyError(
                 (
@@ -998,11 +1112,22 @@ class Model(BaseModel):
                 )
             )
 
-        # Build variable units mapping
-        variable_units = self._build_variable_units()
+    def _collect_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
+        """
+        Collect unit consistency errors from all transitions.
 
-        # Check each transition
+        Parameters
+        ----------
+        variable_units : dict[str, str]
+            Mapping of variable names to their units.
+
+        Returns
+        -------
+        list[str]
+            List of error messages for inconsistent units.
+        """
         errors: list[str] = []
+
         for transition in self.dynamics.transitions:
             # Check main rate
             if transition.rate:
@@ -1025,11 +1150,7 @@ class Model(BaseModel):
                     if not is_consistent and error_msg:
                         errors.append(error_msg)
 
-        if errors:
-            error_message = "Unit consistency check failed:\n" + "\n".join(
-                f"  - {err}" for err in errors
-            )
-            raise UnitConsistencyError(error_message)
+        return errors
 
     def _build_variable_units(self) -> dict[str, str]:
         """Build a mapping of all variables to their units."""
@@ -1045,27 +1166,60 @@ class Model(BaseModel):
 
     def _add_base_variable_units(self, variable_units: dict[str, str]) -> None:
         """Add units for parameters, bins, categories, and special variables."""
-        # Add constant parameters and parameters with explicit units
+        self._add_parameter_units(variable_units)
+        self._add_bin_units(variable_units)
+        self._add_stratification_category_units(variable_units)
+        self._add_compartment_units(variable_units)
+        self._add_predefined_variable_units(variable_units)
+        self._add_special_variable_units(variable_units)
+
+    def _add_parameter_units(self, variable_units: dict[str, str]) -> None:
+        """Add units for parameters with explicit units."""
         for param in self.parameters:
             if param.unit:
                 variable_units[param.id] = param.unit
 
-        # Add bin units (all are "person")
+    def _add_bin_units(self, variable_units: dict[str, str]) -> None:
+        """Add units for bins."""
         for state in self.population.bins:
-            variable_units[state.id] = "person"
+            if state.unit:
+                variable_units[state.id] = state.unit
 
-        # Add stratification category units (all are "person" for population counts)
+    def _add_stratification_category_units(
+        self, variable_units: dict[str, str]
+    ) -> None:
+        """Add units for stratification categories (inherit from bins)."""
+        if not self.population.bins or not self.population.bins[0].unit:
+            return
+
+        bin_unit = self.population.bins[0].unit
         for strat in self.population.stratifications:
             for category in strat.categories:
-                variable_units[category] = "person"
+                variable_units[category] = bin_unit
 
-        # Add predefined variable units (N, N_young, etc.)
+    def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
+        """Add units for compartment combinations (e.g., S_young, I_old)."""
+        if not self.population.stratifications:
+            return
+
+        compartments = self._generate_compartments()
+        for compartment in compartments:
+            compartment_str = self._compartment_to_string(compartment)
+            bin_id = compartment[0]
+            bin_obj = next((b for b in self.population.bins if b.id == bin_id), None)
+            if bin_obj and bin_obj.unit:
+                variable_units[compartment_str] = bin_obj.unit
+
+    def _add_predefined_variable_units(self, variable_units: dict[str, str]) -> None:
+        """Add units for predefined variables (N, N_young, etc.)."""
+        bin_unit = self.population.bins[0].unit if self.population.bins else None
         predefined_units = get_predefined_variable_units(
-            self.population.stratifications
+            self.population.stratifications, bin_unit
         )
         variable_units.update(predefined_units)
 
-        # Add dimensionless special variables
+    def _add_special_variable_units(self, variable_units: dict[str, str]) -> None:
+        """Add dimensionless special variables (t, step, pi, e)."""
         variable_units["step"] = "dimensionless"
         variable_units["t"] = "dimensionless"
         variable_units["pi"] = "dimensionless"
@@ -1227,3 +1381,173 @@ class Model(BaseModel):
             )
 
         return (True, None)
+
+    def _get_rate_unit(
+        self, rate: str, variable_units: dict[str, str] | None = None
+    ) -> str | None:
+        """
+        Calculate the unit for a transition rate expression.
+
+        Parameters
+        ----------
+        rate : str
+            The rate expression to analyze.
+        variable_units : dict[str, str] | None
+            Pre-computed variable units mapping. If None, will be computed.
+            Providing this parameter improves performance when calling this
+            method multiple times.
+
+        Returns
+        -------
+        str | None
+            The unit of the rate expression, or None if units cannot be determined.
+        """
+        try:
+            # Use provided variable units or build them
+            if variable_units is None:
+                variable_units = self._build_variable_units()
+
+            # Get variables used in the rate expression
+            variables = get_expression_variables(rate)
+
+            # Build variable units for this specific rate
+            rate_variable_units: dict[str, str] = {}
+            for var in variables:
+                if var in variable_units:
+                    rate_variable_units[var] = variable_units[var]
+                else:
+                    # Variable not found, cannot determine unit
+                    return None
+
+            # Parse the equation to get its unit
+            from commol.utils.equations import parse_equation_unit
+
+            equation_unit = parse_equation_unit(rate, rate_variable_units)
+            return str(equation_unit.units)
+
+        except Exception:
+            # If any error occurs, return None
+            return None
+
+    def _annotate_rate_variables(
+        self, rate: str, variable_units: dict[str, str] | None = None
+    ) -> str:
+        """
+        Annotate variables in a rate expression with their units in parentheses.
+
+        Parameters
+        ----------
+        rate : str
+            The rate expression to annotate.
+        variable_units : dict[str, str] | None
+            Pre-computed variable units mapping for efficiency.
+
+        Returns
+        -------
+        str
+            The rate expression with variables annotated with their units,
+            e.g., "beta(1/day) * S(person) * I(person) / N(person)".
+            If units cannot be determined, returns the original rate.
+        """
+        if not rate:
+            return rate
+
+        try:
+            # Use provided variable units or build them
+            if variable_units is None:
+                variable_units = self._build_variable_units()
+
+            # Get variables used in the rate expression
+            variables = get_expression_variables(rate)
+
+            # Build a mapping of variable -> annotated version
+            annotated_rate = rate
+            # Sort by length descending to avoid partial replacements
+            # (e.g., replace "beta_young" before "beta")
+            for var in sorted(variables, key=len, reverse=True):
+                if var in variable_units:
+                    unit = variable_units[var]
+                    # Replace the variable with annotated version
+                    # Use word boundaries to avoid partial matches
+                    import re
+
+                    pattern = r"\b" + re.escape(var) + r"\b"
+                    replacement = f"{var}({unit})"
+                    annotated_rate = re.sub(pattern, replacement, annotated_rate)
+
+            return annotated_rate
+
+        except Exception:
+            # If any error occurs, return original rate
+            return rate
+
+    def _has_all_units(self) -> bool:
+        """
+        Check if all units are defined. Raises error if partial units.
+
+        Returns
+        -------
+        bool
+            True if all units defined, False if no units defined.
+
+        Raises
+        ------
+        ValueError
+            If units are partially defined.
+        """
+        has_any_bin_unit = any(b.unit for b in self.population.bins)
+        has_any_param_unit = any(
+            p.unit for p in self.parameters if not isinstance(p.value, str)
+        )
+
+        if not has_any_bin_unit and not has_any_param_unit:
+            return False
+
+        # If any units exist, all must be defined
+        if not all(b.unit for b in self.population.bins):
+            raise ValueError("Some bins have units but not all")
+        if any(p.unit is None for p in self.parameters if not isinstance(p.value, str)):
+            raise ValueError("Some parameters have units but not all")
+
+        return True
+
+    def _format_rate_with_unit(
+        self,
+        rate: str | None,
+        variable_units: dict[str, str] | None = None,
+        show_units: bool = True,
+    ) -> str:
+        """
+        Format a rate expression with variable units and final unit annotation.
+
+        Parameters
+        ----------
+        rate : str | None
+            The rate expression to format.
+        variable_units : dict[str, str] | None
+            Pre-computed variable units mapping for efficiency.
+        show_units : bool, default=True
+            If True, annotate variables and show final unit.
+            If False, return the plain rate expression.
+
+        Returns
+        -------
+        str
+            The formatted rate string with variables annotated and final unit,
+            e.g., "beta(1/day) * S(person) * I(person) / N(person) [person / day]".
+            Returns "None" if rate is None.
+        """
+        if not rate:
+            return "None"
+
+        if not show_units:
+            return rate
+
+        # Annotate variables with their units
+        annotated_rate = self._annotate_rate_variables(rate, variable_units)
+
+        # Add final unit
+        unit = self._get_rate_unit(rate, variable_units)
+        unit_suffix = f" [{unit}]" if unit else ""
+
+        return f"{annotated_rate}{unit_suffix}"

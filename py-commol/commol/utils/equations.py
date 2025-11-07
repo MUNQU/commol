@@ -7,7 +7,6 @@ import pint
 from commol.context.parameter import Parameter
 from commol.context.stratification import Stratification
 
-
 # Initialize unit registry and define custom units
 ureg = pint.UnitRegistry()
 
@@ -228,16 +227,18 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
 
 def get_predefined_variable_units(
     stratifications: list[Stratification],
+    bin_unit: str | None = None,
 ) -> dict[str, str]:
     """
     Get units for predefined variables like N, N_young, etc.
-
-    All population-related variables have units of "person".
 
     Parameters
     ----------
     stratifications : list
         List of stratification objects with categories.
+    bin_unit : str | None
+        The unit for bins. If None, predefined variables will not be added to the
+        units mapping.
 
     Returns
     -------
@@ -246,18 +247,22 @@ def get_predefined_variable_units(
     """
     predefined_units: dict[str, str] = {}
 
+    # Only add predefined variables if bin_unit is specified
+    if bin_unit is None:
+        return predefined_units
+
     # Total population N
-    predefined_units["N"] = "person"
+    predefined_units["N"] = bin_unit
 
     # Add N_{category} for each category in stratifications
     for strat in stratifications:
         for category in strat.categories:
-            predefined_units[f"N_{category}"] = "person"
+            predefined_units[f"N_{category}"] = bin_unit
 
     # Add N_{category1}_{category2} for combinations
     # This handles cases like N_young_urban, etc.
     if len(stratifications) > 1:
-        from itertools import product, combinations
+        from itertools import combinations, product
 
         category_groups = [s.categories for s in stratifications]
 
@@ -269,7 +274,7 @@ def get_predefined_variable_units(
             for i in range(1, len(combo_tuple) + 1):
                 for subset in combinations(combo_tuple, i):
                     var_name = f"N_{'_'.join(subset)}"
-                    predefined_units[var_name] = "person"
+                    predefined_units[var_name] = bin_unit
 
     return predefined_units
 

@@ -12,9 +12,24 @@ from commol import ModelBuilder
 builder = ModelBuilder(
     name="My Model",
     version="1.0",
-    description="Optional description"
+    description="Optional description",
+    bin_unit="person"  # Optional: default unit for all bins
 )
 ```
+
+#### Parameters
+
+- **`name`** (required): Unique identifier for your model
+- **`version`** (optional): Version string for tracking model changes
+- **`description`** (optional): Human-readable description of the model
+- **`bin_unit`** (optional): Default unit for all bins (disease states). When specified, this enables:
+  - Automatic unit assignment to bins, predefined population variables (`N`, `N_young`, etc.), and stratification categories
+  - Unit checking via `model.check_unit_consistency()`
+  - Unit annotations in `model.print_equations()` output
+
+  Common values: `"person"`, `"individual"`, or any custom population unit.
+
+  **Note**: Individual bins can override this with their own `unit` parameter in `add_bin()`.
 
 ### Chaining Methods
 
@@ -556,15 +571,56 @@ rate="min(beta, threshold) * S"  # beta is 1/day, threshold is person
 3. **Ensure math function arguments are dimensionless** (divide by appropriate quantities)
 4. **Use consistent time units** throughout your model
 
-### When Unit Checking is Skipped
+### Unit Display in Equations
 
-If any parameter lacks a unit, checking is automatically skipped:
+When you print equations using `model.print_equations()`, unit annotations are displayed based on unit completeness:
 
 ```python
-builder.add_parameter("beta", 0.5)  # No unit
-builder.add_parameter("gamma", 0.1, unit="1/day")
-# Unit checking will be skipped (not all parameters have units)
+# Model with complete units - shows annotations
+model = (
+    ModelBuilder(name="SIR", bin_unit="person")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_parameter(id="beta", value=0.5, unit="1/day")
+    .add_parameter(id="gamma", value=0.1, unit="1/day")
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .build()
+)
+
+model.print_equations()
+# Output:
+#   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
+
+# Model without units - no annotations
+model = (
+    ModelBuilder(name="SIR")
+    .add_bin(id="S", name="Susceptible")
+    .add_parameter(id="beta", value=0.5)
+    .build()
+)
+
+model.print_equations()
+# Output:
+#   S -> I: beta * S * I / N
 ```
+
+### Partial Unit Definitions
+
+**Important**: You must define units for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError`:
+
+```python
+# This will raise an error!
+model = (
+    ModelBuilder(name="SIR", bin_unit="person")
+    .add_parameter(id="beta", value=0.5, unit="1/day")  # Has unit
+    .add_parameter(id="gamma", value=0.1)  # No unit - INCONSISTENT!
+    .build()
+)
+
+model.print_equations()  # ValueError: Some parameters have units but not all
+```
+
+This prevents accidentally mixing unit systems or forgetting to specify units for some parameters.
 
 ## Advanced: Conditional Transitions
 

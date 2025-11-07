@@ -156,11 +156,11 @@ model = (
 
 ### With Unit Checking
 
-Add units to parameters for automatic dimensional validation:
+Add units to parameters and bins for automatic dimensional validation and annotated equation display:
 
 ```python
 model = (
-    ModelBuilder(name="SIR with Units", version="1.0")
+    ModelBuilder(name="SIR with Units", version="1.0", bin_unit="person")
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
@@ -191,7 +191,15 @@ model = (
 
 # Validate dimensional consistency
 model.check_unit_consistency()  # Ensures all equations have correct units
+
+# Print equations with unit annotations
+model.print_equations()
+# Output shows:
+#   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
+#   I -> R: gamma(1/day) * I(person) [person/day]
 ```
+
+**Note**: Units must be defined for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError` to prevent inconsistent models.
 
 ### Model Calibration
 
