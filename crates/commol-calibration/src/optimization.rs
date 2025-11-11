@@ -2,11 +2,54 @@
 
 use argmin::core::Executor;
 use argmin::solver::neldermead::NelderMead;
-use argmin::solver::particleswarm::ParticleSwarm;
+use argmin::solver::particleswarm::{
+    InitializationStrategy as ArgminInitializationStrategy,
+    MutationApplication as ArgminMutationApplication, MutationStrategy as ArgminMutationStrategy,
+    ParticleSwarm,
+};
 use commol_core::SimulationEngine;
 
 use crate::calibration_problem::CalibrationProblem;
-use crate::types::CalibrationResult;
+use crate::types::{CalibrationParameterType, CalibrationResult};
+
+/// Apply parameter fixing to correct auto-calculated initial conditions
+///
+/// This function takes the optimizer's parameter values and corrects any
+/// auto-calculated initial condition parameters to ensure fractions sum to 1.0.
+///
+/// # Arguments
+/// * `param_values` - Parameter values from the optimizer
+/// * `fixed_ic_sum` - Sum of fixed (non-calibrated) IC fractions
+/// * `auto_calc_ic_idx` - Index of the IC parameter to auto-calculate (if any)
+/// * `param_types` - Types of each parameter
+///
+/// # Returns
+/// Corrected parameter values
+fn apply_parameter_corrections(
+    mut param_values: Vec<f64>,
+    fixed_ic_sum: f64,
+    auto_calc_ic_idx: Option<usize>,
+    param_types: &[CalibrationParameterType],
+) -> Vec<f64> {
+    if let Some(idx) = auto_calc_ic_idx {
+        // Calculate sum of other calibrated ICs (excluding the auto-calculated one)
+        let calibrated_ic_sum: f64 = param_values
+            .iter()
+            .enumerate()
+            .filter(|(param_idx, _)| {
+                param_types[*param_idx] == CalibrationParameterType::InitialCondition
+                    && *param_idx != idx
+            })
+            .map(|(_, value)| value)
+            .sum();
+
+        // Auto-calculated value ensures fractions sum to 1.0
+        let auto_calculated_value = (1.0 - fixed_ic_sum - calibrated_ic_sum).max(0.0);
+        param_values[idx] = auto_calculated_value;
+    }
+
+    param_values
+}
 
 /// Print optimization header for verbose output
 fn print_optimization_header(
@@ -136,6 +179,65 @@ impl NelderMeadConfig {
     }
 }
 
+/// Inertia weight strategy for PSO
+#[derive(Debug, Clone)]
+pub enum InertiaWeightStrategy {
+    /// Constant inertia weight (default: 1/(2*ln(2)) ≈ 0.721)
+    Constant(f64),
+    /// Chaotic inertia weight using logistic map
+    /// Parameters: (w_min, w_max)
+    Chaotic { w_min: f64, w_max: f64 },
+}
+
+/// Acceleration coefficient strategy for PSO
+#[derive(Debug, Clone)]
+pub enum AccelerationStrategy {
+    /// Constant coefficients (default: cognitive=0.5+ln(2), social=0.5+ln(2))
+    Constant { cognitive: f64, social: f64 },
+    /// Time-Varying Acceleration Coefficients (TVAC)
+    TimeVarying {
+        c1_initial: f64,
+        c1_final: f64,
+        c2_initial: f64,
+        c2_final: f64,
+    },
+}
+
+/// Particle initialization strategy
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitializationStrategy {
+    /// Standard uniform random initialization (default)
+    UniformRandom,
+    /// Latin Hypercube Sampling - ensures uniform distribution across search space
+    LatinHypercube,
+    /// Opposition-Based Learning - generates both random and opposite positions, selects best
+    OppositionBased,
+}
+
+/// Mutation strategy for avoiding local optima
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MutationStrategy {
+    /// No mutation (default)
+    None,
+    /// Gaussian mutation with specified standard deviation
+    Gaussian(f64),
+    /// Cauchy mutation with specified scale parameter
+    Cauchy(f64),
+}
+
+/// Determines which particles to apply mutation to
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationApplication {
+    /// No mutation application (default)
+    None,
+    /// Apply mutation only to the global best particle (most efficient)
+    GlobalBestOnly,
+    /// Apply mutation to all particles (maximum diversity)
+    AllParticles,
+    /// Apply mutation only to particles with below-average fitness (balanced approach)
+    BelowAverage,
+}
+
 /// Configuration for Particle Swarm Optimization
 #[derive(Debug, Clone)]
 pub struct ParticleSwarmConfig {
@@ -149,17 +251,34 @@ pub struct ParticleSwarmConfig {
     /// Optimization stops when cost reaches this value
     pub target_cost: Option<f64>,
 
-    /// Inertia weight applied to particle velocity
-    /// Defaults to 1/(2*ln(2)) ≈ 0.721
-    pub inertia_factor: Option<f64>,
+    /// Inertia weight strategy (constant or chaotic)
+    /// Defaults to Constant(1/(2*ln(2)) ≈ 0.721)
+    pub inertia_strategy: Option<InertiaWeightStrategy>,
 
-    /// Cognitive acceleration factor (attraction to personal best)
-    /// Defaults to 0.5 + ln(2) ≈ 1.193
-    pub cognitive_factor: Option<f64>,
+    /// Acceleration coefficient strategy (constant or time-varying)
+    /// Defaults to Constant with cognitive=0.5+ln(2), social=0.5+ln(2)
+    pub acceleration_strategy: Option<AccelerationStrategy>,
 
-    /// Social acceleration factor (attraction to swarm best)
-    /// Defaults to 0.5 + ln(2) ≈ 1.193
-    pub social_factor: Option<f64>,
+    /// Particle initialization strategy
+    /// Defaults to UniformRandom
+    pub initialization_strategy: InitializationStrategy,
+
+    /// Velocity clamping factor (as fraction of search space range, None = disabled)
+    /// Typical values: 0.1 to 0.2
+    pub velocity_clamp_factor: Option<f64>,
+
+    /// Threshold below which velocity is considered near-zero and should be reinitialized
+    /// None = disabled. Typical values: 0.001 to 0.01
+    pub velocity_mutation_threshold: Option<f64>,
+
+    /// Mutation strategy to help escape local optima
+    pub mutation_strategy: MutationStrategy,
+
+    /// Mutation probability (applied per iteration, 0.0 to 1.0)
+    pub mutation_probability: f64,
+
+    /// Which particles to apply mutation to
+    pub mutation_application: MutationApplication,
 
     /// Enable verbose output
     pub verbose: bool,
@@ -171,9 +290,14 @@ impl Default for ParticleSwarmConfig {
             num_particles: 20,
             max_iterations: 1000,
             target_cost: None,
-            inertia_factor: None,   // Use argmin's default: 1/(2*ln(2))
-            cognitive_factor: None, // Use argmin's default: 0.5 + ln(2)
-            social_factor: None,    // Use argmin's default: 0.5 + ln(2)
+            inertia_strategy: None,      // Use argmin's default
+            acceleration_strategy: None, // Use argmin's default
+            initialization_strategy: InitializationStrategy::UniformRandom,
+            velocity_clamp_factor: None,
+            velocity_mutation_threshold: None,
+            mutation_strategy: MutationStrategy::None,
+            mutation_probability: 0.0,
+            mutation_application: MutationApplication::None,
             verbose: false,
         }
     }
@@ -203,27 +327,110 @@ impl ParticleSwarmConfig {
         self
     }
 
-    /// Set inertia weight factor
+    /// Set constant inertia weight factor
     /// Controls the influence of previous velocity on current velocity
     /// Defaults to 1/(2*ln(2)) ≈ 0.721
     pub fn with_inertia_factor(mut self, factor: f64) -> Self {
-        self.inertia_factor = Some(factor);
+        self.inertia_strategy = Some(InertiaWeightStrategy::Constant(factor));
         self
     }
 
-    /// Set cognitive acceleration factor
-    /// Controls attraction to particle's personal best position
-    /// Defaults to 0.5 + ln(2) ≈ 1.193
-    pub fn with_cognitive_factor(mut self, factor: f64) -> Self {
-        self.cognitive_factor = Some(factor);
+    /// Enable chaotic inertia weight using logistic map
+    /// Uses a logistic map to generate chaotic variation in the inertia weight
+    /// This helps particles escape local optima through non-linear dynamics.
+    ///
+    /// # Arguments
+    /// * `w_min` - Minimum inertia weight
+    /// * `w_max` - Maximum inertia weight
+    pub fn with_chaotic_inertia(mut self, w_min: f64, w_max: f64) -> Self {
+        self.inertia_strategy = Some(InertiaWeightStrategy::Chaotic { w_min, w_max });
         self
     }
 
-    /// Set social acceleration factor
-    /// Controls attraction to swarm's best position
-    /// Defaults to 0.5 + ln(2) ≈ 1.193
-    pub fn with_social_factor(mut self, factor: f64) -> Self {
-        self.social_factor = Some(factor);
+    /// Set constant cognitive and social acceleration factors
+    /// * `cognitive` - Controls attraction to particle's personal best position (default: 0.5 + ln(2))
+    /// * `social` - Controls attraction to swarm's best position (default: 0.5 + ln(2))
+    pub fn with_acceleration_factors(mut self, cognitive: f64, social: f64) -> Self {
+        self.acceleration_strategy = Some(AccelerationStrategy::Constant { cognitive, social });
+        self
+    }
+
+    /// Enable Time-Varying Acceleration Coefficients (TVAC)
+    /// TVAC adjusts cognitive (c1) and social (c2) acceleration coefficients over iterations
+    /// to balance exploration and exploitation. Typically, c1 decreases and c2 increases over
+    /// time to shift from exploration to exploitation.
+    ///
+    /// # Arguments
+    /// * `c1_initial` - Initial cognitive factor
+    /// * `c1_final` - Final cognitive factor
+    /// * `c2_initial` - Initial social factor
+    /// * `c2_final` - Final social factor
+    pub fn with_tvac(
+        mut self,
+        c1_initial: f64,
+        c1_final: f64,
+        c2_initial: f64,
+        c2_final: f64,
+    ) -> Self {
+        self.acceleration_strategy = Some(AccelerationStrategy::TimeVarying {
+            c1_initial,
+            c1_final,
+            c2_initial,
+            c2_final,
+        });
+        self
+    }
+
+    /// Set particle initialization strategy
+    /// Choose between different strategies for initializing particle positions:
+    ///
+    /// - **UniformRandom** (default): Standard uniform random initialization
+    /// - **LatinHypercube**: Latin Hypercube Sampling ensures uniform distribution across search space
+    /// - **OppositionBased**: Opposition-Based Learning generates both random and opposite positions
+    pub fn with_initialization_strategy(mut self, strategy: InitializationStrategy) -> Self {
+        self.initialization_strategy = strategy;
+        self
+    }
+
+    /// Enable velocity clamping
+    /// Limits particle velocities to prevent explosive behavior. The velocity is clamped to
+    /// +-clamp_factor * (upper_bound - lower_bound) component-wise.
+    ///
+    /// # Arguments
+    /// * `clamp_factor` - Fraction of search space range (typically 0.1 to 0.2)
+    pub fn with_velocity_clamping(mut self, clamp_factor: f64) -> Self {
+        self.velocity_clamp_factor = Some(clamp_factor);
+        self
+    }
+
+    /// Enable velocity mutation when velocity approaches zero
+    /// Reinitializes velocity components when they fall below a threshold, preventing
+    /// particle stagnation.
+    ///
+    /// # Arguments
+    /// * `threshold` - Velocity threshold below which reinitialization occurs (typically 0.001 to 0.01)
+    pub fn with_velocity_mutation(mut self, threshold: f64) -> Self {
+        self.velocity_mutation_threshold = Some(threshold);
+        self
+    }
+
+    /// Enable mutation with specified strategy and application method
+    /// Applies Gaussian or Cauchy mutation to particles with specified probability
+    /// to help escape local optima.
+    ///
+    /// # Arguments
+    /// * `strategy` - Mutation strategy (Gaussian or Cauchy with scale parameter)
+    /// * `probability` - Mutation probability per iteration (0.0 to 1.0)
+    /// * `application` - Which particles to mutate (GlobalBestOnly, AllParticles, or BelowAverage)
+    pub fn with_mutation(
+        mut self,
+        strategy: MutationStrategy,
+        probability: f64,
+        application: MutationApplication,
+    ) -> Self {
+        self.mutation_strategy = strategy;
+        self.mutation_probability = probability;
+        self.mutation_application = application;
         self
     }
 
@@ -370,6 +577,9 @@ fn optimize_nelder_mead<E: SimulationEngine>(
     parameter_names: Vec<String>,
     config: NelderMeadConfig,
 ) -> Result<CalibrationResult, String> {
+    // Extract parameter fixing info before moving problem
+    let (fixed_ic_sum, last_ic_param_idx, param_types) = problem.get_parameter_fix_info();
+
     let solver = build_nelder_mead_solver(&initial_params, &config)?;
     let executor =
         Executor::new(problem, solver).configure(|state| state.max_iters(config.max_iterations));
@@ -393,8 +603,12 @@ fn optimize_nelder_mead<E: SimulationEngine>(
 
     let state = result.state();
 
+    let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
+    let corrected_params =
+        apply_parameter_corrections(best_params, fixed_ic_sum, last_ic_param_idx, &param_types);
+
     Ok(CalibrationResult {
-        best_parameters: state.best_param.clone().unwrap_or(initial_params),
+        best_parameters: corrected_params,
         parameter_names,
         final_loss: state.best_cost,
         iterations: state.iter as usize,
@@ -410,6 +624,9 @@ fn optimize_particle_swarm<E: SimulationEngine>(
     parameter_names: Vec<String>,
     config: ParticleSwarmConfig,
 ) -> Result<CalibrationResult, String> {
+    // Extract parameter fixing info before moving problem
+    let (fixed_ic_sum, last_ic_param_idx, param_types) = problem.get_parameter_fix_info();
+
     // Get bounds from CalibrationParameter definitions
     let bounds = problem.parameter_bounds();
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
@@ -418,23 +635,90 @@ fn optimize_particle_swarm<E: SimulationEngine>(
     // Build solver with configuration
     let mut solver = ParticleSwarm::new((lower_bound, upper_bound), config.num_particles);
 
-    // Apply optional parameters if provided
-    if let Some(inertia) = config.inertia_factor {
+    // Apply inertia strategy if provided
+    solver = match &config.inertia_strategy {
+        Some(InertiaWeightStrategy::Constant(w)) => solver
+            .with_inertia_factor(*w)
+            .map_err(|e| format!("Failed to set inertia_factor: {}", e))?,
+        Some(InertiaWeightStrategy::Chaotic { w_min, w_max }) => solver
+            .with_chaotic_inertia(*w_min, *w_max)
+            .map_err(|e| format!("Failed to set chaotic_inertia: {}", e))?,
+        None => solver, // Use argmin's default
+    };
+
+    // Apply acceleration strategy if provided
+    solver = match &config.acceleration_strategy {
+        Some(AccelerationStrategy::Constant { cognitive, social }) => {
+            solver = solver
+                .with_cognitive_factor(*cognitive)
+                .map_err(|e| format!("Failed to set cognitive_factor: {}", e))?;
+            solver
+                .with_social_factor(*social)
+                .map_err(|e| format!("Failed to set social_factor: {}", e))?
+        }
+        Some(AccelerationStrategy::TimeVarying {
+            c1_initial,
+            c1_final,
+            c2_initial,
+            c2_final,
+        }) => solver
+            .with_tvac(
+                *c1_initial,
+                *c1_final,
+                *c2_initial,
+                *c2_final,
+                config.max_iterations as usize,
+            )
+            .map_err(|e| format!("Failed to set TVAC: {}", e))?,
+        None => solver, // Use argmin's default
+    };
+
+    // Apply initialization strategy
+    let argmin_init_strategy = match config.initialization_strategy {
+        InitializationStrategy::UniformRandom => ArgminInitializationStrategy::UniformRandom,
+        InitializationStrategy::LatinHypercube => ArgminInitializationStrategy::LatinHypercube,
+        InitializationStrategy::OppositionBased => ArgminInitializationStrategy::OppositionBased,
+    };
+    solver = solver.with_initialization_strategy(argmin_init_strategy);
+
+    // Apply velocity clamping if enabled
+    if let Some(clamp_factor) = config.velocity_clamp_factor {
         solver = solver
-            .with_inertia_factor(inertia)
-            .map_err(|e| format!("Failed to set inertia_factor: {}", e))?;
+            .with_velocity_clamping(clamp_factor)
+            .map_err(|e| format!("Failed to set velocity_clamping: {}", e))?;
     }
 
-    if let Some(cognitive) = config.cognitive_factor {
+    // Apply velocity mutation if enabled
+    if let Some(threshold) = config.velocity_mutation_threshold {
         solver = solver
-            .with_cognitive_factor(cognitive)
-            .map_err(|e| format!("Failed to set cognitive_factor: {}", e))?;
+            .with_velocity_mutation(threshold)
+            .map_err(|e| format!("Failed to set velocity_mutation: {}", e))?;
     }
 
-    if let Some(social) = config.social_factor {
+    // Apply mutation if enabled
+    if !matches!(config.mutation_strategy, MutationStrategy::None)
+        && !matches!(config.mutation_application, MutationApplication::None)
+    {
+        let argmin_mutation_strategy = match config.mutation_strategy {
+            MutationStrategy::None => ArgminMutationStrategy::None,
+            MutationStrategy::Gaussian(std_dev) => ArgminMutationStrategy::Gaussian(std_dev),
+            MutationStrategy::Cauchy(scale) => ArgminMutationStrategy::Cauchy(scale),
+        };
+
+        let argmin_mutation_application = match config.mutation_application {
+            MutationApplication::None => ArgminMutationApplication::None,
+            MutationApplication::GlobalBestOnly => ArgminMutationApplication::GlobalBestOnly,
+            MutationApplication::AllParticles => ArgminMutationApplication::AllParticles,
+            MutationApplication::BelowAverage => ArgminMutationApplication::BelowAverage,
+        };
+
         solver = solver
-            .with_social_factor(social)
-            .map_err(|e| format!("Failed to set social_factor: {}", e))?;
+            .with_mutation(
+                argmin_mutation_strategy,
+                config.mutation_probability,
+                argmin_mutation_application,
+            )
+            .map_err(|e| format!("Failed to set mutation: {}", e))?;
     }
 
     let executor = Executor::new(problem, solver).configure(|state| {
@@ -454,6 +738,28 @@ fn optimize_particle_swarm<E: SimulationEngine>(
         );
         eprintln!("Bounds: {:?}", bounds);
         eprintln!("Num particles: {}", config.num_particles);
+        eprintln!(
+            "Initialization strategy: {:?}",
+            config.initialization_strategy
+        );
+        if let Some(ref strategy) = config.inertia_strategy {
+            eprintln!("Inertia strategy: {:?}", strategy);
+        }
+        if let Some(ref strategy) = config.acceleration_strategy {
+            eprintln!("Acceleration strategy: {:?}", strategy);
+        }
+        if let Some(clamp) = config.velocity_clamp_factor {
+            eprintln!("Velocity clamping: {}", clamp);
+        }
+        if let Some(threshold) = config.velocity_mutation_threshold {
+            eprintln!("Velocity mutation threshold: {}", threshold);
+        }
+        if !matches!(config.mutation_strategy, MutationStrategy::None) {
+            eprintln!(
+                "Mutation: {:?} (prob: {}, application: {:?})",
+                config.mutation_strategy, config.mutation_probability, config.mutation_application
+            );
+        }
         if let Some(target) = config.target_cost {
             eprintln!("Target cost: {}", target);
         }
@@ -474,8 +780,11 @@ fn optimize_particle_swarm<E: SimulationEngine>(
         None => (initial_params.clone(), f64::INFINITY),
     };
 
+    let corrected_params =
+        apply_parameter_corrections(best_params, fixed_ic_sum, last_ic_param_idx, &param_types);
+
     Ok(CalibrationResult {
-        best_parameters: best_params,
+        best_parameters: corrected_params,
         parameter_names,
         final_loss: best_cost,
         iterations: state.iter as usize,

@@ -1,7 +1,8 @@
 import copy
 import logging
-from typing import Literal, Self, TypedDict
+from typing import Literal, Self, TypedDict, cast
 
+from commol.constants import LogicOperators, ModelTypes
 from commol.context.bin import Bin
 from commol.context.dynamics import (
     Condition,
@@ -21,8 +22,6 @@ from commol.context.model import Model
 from commol.context.parameter import Parameter
 from commol.context.population import Population
 from commol.context.stratification import Stratification
-from commol.constants import ModelTypes, LogicOperators
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class BinFractionDict(TypedDict):
     """Type definition for a single bin fraction."""
 
     bin: str
-    fraction: float
+    fraction: float | None
 
 
 class StratificationFractionDict(TypedDict):
@@ -111,6 +110,7 @@ class ModelBuilder:
         name: str,
         description: str | None = None,
         version: str | None = None,
+        bin_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -123,10 +123,16 @@ class ModelBuilder:
             A human-readable description of the model's purpose and function.
         version : str | None, default=None
             The version number of the model.
+        bin_unit : str | None, default=None
+            The default unit for all bins.
+            Individual bins can override this with their own unit parameter.
+            Units are optional but required for model.print_equations() and
+            model.check_unit_consistency().
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
+        self._bin_unit: str | None = bin_unit
 
         self._bins: list[Bin] = []
         self._stratifications: list[Stratification] = []
@@ -141,7 +147,7 @@ class ModelBuilder:
             )
         )
 
-    def add_bin(self, id: str, name: str) -> Self:
+    def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
         """
         Add a bin to the model.
 
@@ -151,14 +157,18 @@ class ModelBuilder:
             Unique identifier for the bin.
         name : str
             Human-readable name for the bin.
+        unit : str | None, default=None
+            Unit of measurement for this bin. If None, uses the model-level bin_unit.
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
         """
-        self._bins.append(Bin(id=id, name=name))
-        logging.info(f"Added bin: id='{id}', name='{name}'")
+        # Use bin-specific unit, or fall back to model-level bin_unit
+        final_unit = unit if unit is not None else self._bin_unit
+        self._bins.append(Bin(id=id, name=name, unit=final_unit))
+        logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_stratification(self, id: str, categories: list[str]) -> Self:
@@ -184,7 +194,7 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float,
+        value: float | str | None,
         description: str | None = None,
         unit: str | None = None,
     ) -> Self:
@@ -195,8 +205,21 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float
-            Numerical value of the parameter.
+        value : float | str | None
+            Value of the parameter. Can be:
+            - float: A numerical constant value
+            - str: A mathematical formula that can reference other parameters,
+                   special variables (N, N_category, step/t, pi, e), or contain
+                   mathematical expressions (e.g., "beta * 2", "N_young / N")
+            - None: Indicates that the parameter needs to be calibrated before use
+
+            Special variables available in formulas:
+            - N: Total population (automatically calculated)
+            - N_{category}: Population in specific category (e.g., N_young, N_old)
+            - N_{cat1}_{cat2}: Population in category combinations
+            - step or t: Current simulation step
+            - pi, e: Mathematical constants
+
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
@@ -226,14 +249,79 @@ class ModelBuilder:
         """
         Add a transition between states to the model.
 
+        This method supports two distinct behaviors:
+
+        When you specify multiple sources without the $compartment placeholder,
+        a SINGLE transition is created that affects all sources simultaneously.
+        The rate is evaluated ONCE per time step, and that value is applied to
+        all source compartments at once.
+
+        Example:
+            .add_transition(
+                id="interaction",
+                source=["S", "I"],
+                target=["I", "I"],
+                rate="beta * S * I"
+            )
+
+        This creates ONE transition where:
+        - The rate "beta * S * I" is calculated once
+        - That rate removes from both S and I simultaneously
+        - That rate adds to I twice (once per target entry)
+        - Resulting equations:
+          dS/dt = ... - (beta*S*I)
+          dI/dt = ... - (beta*S*I) + 2*(beta*S*I) = ... + (beta*S*I)
+
+        When you use the $compartment placeholder in the rate formula with multiple
+        sources, the system automatically expands this into multiple independent
+        transitions - one for each source compartment. Each transition has its own
+        rate calculation where $compartment is replaced with the actual compartment
+        name.
+
+        Example:
+            .add_transition(
+                id="death",
+                source=["S", "L", "I", "R"],
+                target=[],
+                rate="d * $compartment"
+            )
+
+        This automatically expands to FOUR separate transitions:
+        - Transition 1: S -> [] with rate "d * S"
+        - Transition 2: L -> [] with rate "d * L"
+        - Transition 3: I -> [] with rate "d * I"
+        - Transition 4: R -> [] with rate "d * R"
+
+        Each transition's rate is evaluated independently, giving per-compartment
+        dynamics. This is ideal for processes like per-capita death rates, where the
+        rate should be proportional to each compartment's population.
+
+        **$compartment Usage Rules**:
+        - Only valid when len(source) > 1
+        - Target must be empty [] or have exactly one element
+        - Can be used with stratified_rates - the placeholder will be expanded in
+          both the base rate and all stratified rate expressions
+        - The placeholder $compartment will be replaced with each source compartment
+          name
+
+        **$compartment Restrictions**:
+        - Using $compartment with a single source will raise an error (use the
+          compartment name directly instead)
+        - Using $compartment with multiple targets will raise an error (ambiguous
+          which target corresponds to which source)
+
         Parameters
         ----------
         id : str
-            Unique identifier for the transition.
+            Unique identifier for the transition. When using $compartment expansion,
+            the system will append "__<compartment_name>" to create unique IDs for
+            each expanded transition (e.g., "death__S", "death__L").
         source : list[str]
-            List of source state/category identifiers.
+            List of source state/category identifiers. When using $compartment in
+            the rate, each source will generate a separate transition.
         target : list[str]
-            List of target state/category identifiers.
+            List of target state/category identifiers. When using $compartment,
+            target must be empty [] or have exactly one element.
         rate : str | float | None, default=None
             Default mathematical formula, parameter reference, or constant value for
             the transition rate. Used when no stratified rate matches.
@@ -241,11 +329,14 @@ class ModelBuilder:
             - A parameter reference (e.g., "beta")
             - A constant value (e.g., "0.5" or 0.5)
             - A mathematical formula (e.g., "beta * S * I / N")
+            - A formula with $compartment placeholder (e.g., "d * $compartment")
 
             Special variables available in formulas:
             - N: Total population (automatically calculated)
             - step or t: Current simulation step (both are equivalent)
             - pi, e: Mathematical constants
+            - $compartment: Expands to each source compartment name (only with
+              multiple sources)
 
         stratified_rates : list[dict] | None, default=None
             List of stratification-specific rates. Each dict must contain:
@@ -259,10 +350,53 @@ class ModelBuilder:
         -------
         ModelBuilder
             Self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            - If $compartment is used with only one source compartment
+            - If $compartment is used with multiple targets
+            - If rate is None when using $compartment
+
+        Examples
+        --------
+        Standard single transition affecting multiple sources:
+        >>> builder.add_transition(
+        ...     id="infection",
+        ...     source=["S", "I"],
+        ...     target=["I", "I"],
+        ...     rate="beta * S * I / N",
+        ... )
+
+        Expanded transitions using $compartment (creates 4 separate transitions):
+        >>> builder.add_transition(
+        ...     id="death",
+        ...     source=["S", "L", "I", "R"],
+        ...     target=[],
+        ...     rate="d * $compartment",
+        ... )
+
+        Per-compartment flow with target:
+        >>> builder.add_transition(
+        ...     id="treatment",
+        ...     source=["I_mild", "I_severe"],
+        ...     target=["R"],
+        ...     rate="treatment_rate * $compartment",
+        ... )
         """
         # Convert rate to string if numeric
         if isinstance(rate, int) or isinstance(rate, float):
             rate = str(rate)
+
+        # Check for $compartment placeholder and handle expansion
+        if rate and "$compartment" in rate:
+            self._validate_compartment_placeholder(
+                id, source, target, rate, stratified_rates
+            )
+            self._expand_compartment_transition(
+                id, source, target, rate, stratified_rates, condition
+            )
+            return self
 
         # Convert stratified rates dicts to Pydantic objects
         stratified_rates_objects: list[StratifiedRate] | None = None
@@ -296,9 +430,159 @@ class ModelBuilder:
         )
         return self
 
+    def _validate_compartment_placeholder(
+        self,
+        id: str,
+        source: list[str],
+        target: list[str],
+        rate: str,
+        stratified_rates: list[StratifiedRateDict] | None,
+    ) -> None:
+        """
+        Validate that $compartment placeholder is used correctly.
+
+        Parameters
+        ----------
+        id : str
+            Transition identifier (for error messages)
+        source : list[str]
+            Source compartments
+        target : list[str]
+            Target compartments
+        rate : str
+            Rate formula
+        stratified_rates : list[StratifiedRateDict] | None
+            Stratified rates
+
+        Raises
+        ------
+        ValueError
+            If $compartment usage violates any rules
+        """
+        # Check that source has multiple compartments
+        if len(source) <= 1:
+            raise ValueError(
+                (
+                    f"Transition '{id}': $compartment placeholder requires multiple "
+                    f"source compartments (found {len(source)}). "
+                    f"If you have a single source, use the compartment name directly "
+                    f"in the rate formula instead of $compartment."
+                )
+            )
+
+        # Check that target is empty or has exactly one element
+        if len(target) > 1:
+            raise ValueError(
+                (
+                    f"Transition '{id}': $compartment placeholder cannot be used "
+                    f"with multiple targets (found {len(target)} targets). "
+                    f"Multiple targets would create ambiguous mappings between "
+                    f"sources and targets. Use target=[] for removal or target with "
+                    f"a single element for transfers."
+                )
+            )
+
+    def _expand_compartment_transition(
+        self,
+        id: str,
+        source: list[str],
+        target: list[str],
+        rate: str,
+        stratified_rates: list[StratifiedRateDict] | None,
+        condition: Condition | None,
+    ) -> None:
+        """
+        Expand a transition with $compartment placeholder into multiple transitions.
+
+        Parameters
+        ----------
+        id : str
+            Base transition identifier
+        source : list[str]
+            Source compartments (will create one transition per source)
+        target : list[str]
+            Target compartments
+        rate : str
+            Rate formula containing $compartment
+        stratified_rates : list[StratifiedRateDict] | None
+            Stratified rates (can contain $compartment which will be expanded)
+        condition : Condition | None
+            Transition condition
+        """
+        logging.info(
+            (
+                f"Expanding transition '{id}' with $compartment placeholder: "
+                f"{len(source)} source compartments will create "
+                f"{len(source)} separate transitions"
+            )
+        )
+
+        for compartment in source:
+            # Replace $compartment with actual compartment name in base rate
+            expanded_rate = rate.replace("$compartment", compartment)
+
+            # Expand stratified rates if present
+            expanded_stratified_rates: list[StratifiedRate] | None = None
+            if stratified_rates:
+                expanded_stratified_rates = []
+                for rate_dict in stratified_rates:
+                    # Replace $compartment in stratified rate expression
+                    strat_rate_value = rate_dict["rate"]
+                    # Convert to string if it's a number
+                    if isinstance(strat_rate_value, (int, float)):
+                        strat_rate_str = str(strat_rate_value)
+                    else:
+                        strat_rate_str = strat_rate_value
+
+                    expanded_strat_rate = strat_rate_str.replace(
+                        "$compartment", compartment
+                    )
+
+                    # Convert conditions to Pydantic objects
+                    conditions = [
+                        StratificationCondition(**cond)
+                        for cond in rate_dict["conditions"]
+                    ]
+
+                    expanded_stratified_rates.append(
+                        StratifiedRate(conditions=conditions, rate=expanded_strat_rate)
+                    )
+
+            # Generate unique ID for this expanded transition
+            expanded_id = f"{id}__{compartment}"
+
+            # Create the expanded transition
+            self._transitions.append(
+                Transition(
+                    id=expanded_id,
+                    source=[compartment],
+                    target=target,
+                    rate=expanded_rate,
+                    stratified_rates=expanded_stratified_rates,
+                    condition=condition,
+                )
+            )
+
+            strat_info = (
+                f", {len(expanded_stratified_rates)} stratified rates"
+                if expanded_stratified_rates
+                else ""
+            )
+            logging.info(
+                (
+                    f"  Created expanded transition: id='{expanded_id}', "
+                    f"source=['{compartment}'], target={target}, "
+                    f"rate='{expanded_rate}'{strat_info}"
+                )
+            )
+
+        logging.info(
+            f"Successfully expanded transition '{id}' into {len(source)} transitions"
+        )
+
     def create_condition(
         self,
-        logic: Literal[LogicOperators.AND, LogicOperators.OR],
+        logic: Literal["and", "or"],
         rules: list[RuleDict],
     ) -> Condition:
         """
@@ -340,7 +624,12 @@ class ModelBuilder:
                 )
             )
 
-        return Condition(logic=logic, rules=rule_objects)
+        return Condition(
+            logic=cast(
+                Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
+            ),
+            rules=rule_objects,
+        )
 
     def set_initial_conditions(
         self,
@@ -498,7 +787,7 @@ class ModelBuilder:
         self._initial_conditions = None
         return self
 
-    def build(self, typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS]) -> Model:
+    def build(self, typology: Literal["DifferenceEquations"]) -> Model:
         """
         Build and return the final Model instance.
 
@@ -527,7 +816,12 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(typology=typology, transitions=self._transitions)
+        dynamics = Dynamics(
+            typology=cast(
+                Literal[ModelTypes.DIFFERENCE_EQUATIONS], ModelTypes(typology)
+            ),
+            transitions=self._transitions,
+        )
 
         model = Model(
             name=self._name,

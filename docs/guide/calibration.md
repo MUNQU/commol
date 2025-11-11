@@ -1,24 +1,24 @@
 # Model Calibration
 
-Calibration is the process of adjusting model parameters to match observed data. EpiModel provides a powerful calibration framework that uses optimization algorithms to find the best parameter values that minimize the difference between model predictions and real-world observations.
+Calibration is the process of adjusting model parameters to match observed data. Commol provides a calibration framework that uses optimization algorithms to find the best parameter values that minimize the difference between model predictions and real-world observations.
 
 ## Overview
 
 The calibration process involves:
 
 1. **Defining observed data**: Real-world measurements at specific time steps
-2. **Selecting parameters to calibrate**: Which model parameters to optimize
+2. **Selecting parameters to calibrate**: Which model parameters or initial conditions to optimize
 3. **Choosing a loss function**: How to measure fit quality (SSE, RMSE, MAE, etc.)
 4. **Selecting an optimization algorithm**: Nelder-Mead or Particle Swarm
 5. **Running the calibration**: Finding optimal parameter values
-6. **Creating a new model**: Rebuilding your model with the calibrated parameters
+6. **Updating the model**: Applying calibrated values to your model
 
-!!! note "Calibrator Returns Parameter Values Only"
-The `Calibrator.run()` method returns a `CalibrationResult` object containing the optimized parameter values, but **does not** return or modify your model. To use the calibrated parameters, you must create a new model using `ModelBuilder` with the fitted values.
+!!! note "Working with Uncalibrated Parameters"
+Parameters and initial conditions can be set to `None` to indicate they need calibration. A `Simulation` can be created with `None` values for calibration purposes, but attempting to call `run()` on a simulation with uncalibrated values will raise a `ValueError`. After calibration, use `model.update_parameters(result.best_parameters)` or `model.update_initial_conditions(result.best_parameters)` to update your model with the calibrated values.
 
 ## Basic Example
 
-Here's a simple calibration of an SIR model's transmission and recovery rates:
+Here's a simple calibration of an SIR model's transmission and recovery rates. Parameters to be calibrated should be set to `None`, and initial guesses are provided in the `CalibrationParameter` configuration:
 
 ```python
 from commol import (
@@ -27,23 +27,25 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
+    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
     LossFunction,
     OptimizationConfig,
     OptimizationAlgorithm,
     ParticleSwarmConfig,
+    NelderMeadConfig,
 )
 from commol.constants import ModelTypes
 
-# Build the model
+# Build model with parameters to be calibrated set to None
 model = (
     ModelBuilder(name="SIR Model", version="1.0")
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)   # Initial guess
-    .add_parameter(id="gamma", value=0.1)  # Initial guess
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
     .add_transition(
         id="infection",
         source=["S"],
@@ -77,39 +79,52 @@ observed_data = [
     ObservedDataPoint(step=50, compartment="I", value=18.7),
 ]
 
-# Define parameters to calibrate with bounds
+# Simulation can be created with None values for calibration
+simulation = Simulation(model)
+
+# But attempting to run without calibrated values raises an error
+try:
+    simulation.run(100)
+except ValueError as e:
+    print(f"Error: {e}")  # Cannot run Simulation: Parameters requiring calibration...
+
+# Define parameters to calibrate with bounds and initial guesses
 parameters = [
     CalibrationParameter(
         id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
         min_bound=0.0,
         max_bound=1.0,
-        initial_guess=0.3  # Optional starting point
+        initial_guess=0.3  # Starting point for optimization
     ),
     CalibrationParameter(
         id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
     ),
 ]
 
-# Configure the calibration problem
+# Configure the calibration problem with Particle Swarm Optimization
+# Use the builder pattern for clearer configuration
+pso_config = ParticleSwarmConfig.create(
+    num_particles=30,
+    max_iterations=500,
+    verbose=True  # Show optimization progress
+)
+
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(
-            num_particles=30,
-            max_iterations=500,
-            verbose=True  # Show optimization progress
-        ),
+        config=pso_config,
     ),
 )
 
 # Run calibration
-simulation = Simulation(model)
 calibrator = Calibrator(simulation, problem)
 result = calibrator.run()
 
@@ -117,11 +132,89 @@ result = calibrator.run()
 print(result)
 print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+
+# Update model with calibrated parameters
+model.update_parameters(result.best_parameters)
+
+# Create new simulation with calibrated model for predictions
+calibrated_simulation = Simulation(model)
+prediction_results = calibrated_simulation.run(num_steps=200)
+print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
+```
+
+### Calibrating Initial Conditions
+
+You can also calibrate initial population fractions:
+
+```python
+# Build model with unknown initial infected fraction
+model = (
+    ModelBuilder(name="SIR Model", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.3)
+    .add_parameter(id="gamma", value=0.1)
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.98},
+            {"bin": "I", "fraction": None},  # Unknown - to be calibrated
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Calibrate initial infected fraction
+parameters = [
+    CalibrationParameter(
+        id="I",
+        parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+        min_bound=0.0,
+        max_bound=0.1,
+        initial_guess=0.02  # Starting point for optimization
+    )
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_config=LossConfig(function=LossFunction.SSE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.NELDER_MEAD,
+        config=NelderMeadConfig(max_iterations=1000),
+    ),
+)
+
+# Simulation works with None initial conditions for calibration
+simulation = Simulation(model)
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+# Update initial conditions with calibrated values
+model.update_initial_conditions(result.best_parameters)
+
+# Now create final simulation
+final_simulation = Simulation(model)
+results = final_simulation.run(num_steps=100)
 ```
 
 ## Loss Functions
 
-EpiModel supports multiple loss functions for measuring fit quality:
+Commol supports multiple loss functions for measuring fit quality:
 
 ### Sum of Squared Errors (SSE)
 
@@ -174,31 +267,73 @@ $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
 
 ### Particle Swarm Optimization (PSO)
 
-Population-based algorithm inspired by social behavior. Good for global optimization:
+Population-based algorithm inspired by social behavior. Good for global optimization.
+
+**Basic Configuration:**
+
+Use the `create()` factory method and builder methods for clear configuration:
 
 ```python
 from commol import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
 
+# Basic PSO configuration
+pso_config = ParticleSwarmConfig.create(
+    num_particles=40,        # Number of particles in swarm
+    max_iterations=1000,     # Maximum iterations
+    target_cost=0.01,        # Stop if loss below this (optional)
+    verbose=True,            # Print progress
+    header_interval=50       # Print header every N iterations
+)
+
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-    config=ParticleSwarmConfig(
-        num_particles=40,        # Number of particles in swarm
-        max_iterations=1000,     # Maximum iterations
-        target_cost=0.01,        # Stop if loss below this (optional)
-        inertia_factor=0.7,      # Velocity inertia (optional)
-        cognitive_factor=1.5,    # Attraction to personal best (optional)
-        social_factor=1.5,       # Attraction to global best (optional)
-        verbose=True,            # Print progress
-        header_interval=50       # Print header every N iterations
-    ),
+    config=pso_config,
 )
 ```
 
-**When to use**:
+**Advanced Configuration with Builder Methods:**
+
+```python
+# PSO with chaotic inertia and TVAC
+pso_config = (
+    ParticleSwarmConfig.create(num_particles=40, max_iterations=1000, verbose=True)
+    .with_chaotic_inertia(w_min=0.4, w_max=0.9)  # Dynamic inertia weight
+    .with_tvac(c1_initial=2.5, c1_final=0.5,     # Time-varying acceleration
+               c2_initial=0.5, c2_final=2.5)
+    .with_initialization_strategy("latin_hypercube")  # Better initial distribution
+)
+
+# PSO with mutation to escape local optima
+pso_config = (
+    ParticleSwarmConfig.create(num_particles=50, max_iterations=2000)
+    .with_acceleration(cognitive=2.0, social=2.0)  # Constant acceleration
+    .with_velocity_clamping(0.2)  # Prevent explosive velocities
+    .with_mutation(
+        strategy="gaussian",      # Gaussian mutation
+        scale=0.1,               # Mutation intensity
+        probability=0.05,        # 5% mutation chance per iteration
+        application="global_best"  # Apply to best particle only
+    )
+)
+```
+
+**Builder Methods:**
+
+- `.with_inertia(factor)` - Set constant inertia weight
+- `.with_chaotic_inertia(w_min, w_max)` - Enable chaotic inertia (conflicts with `with_inertia`)
+- `.with_acceleration(cognitive, social)` - Set constant acceleration factors
+- `.with_tvac(c1_i, c1_f, c2_i, c2_f)` - Time-varying acceleration (conflicts with `with_acceleration`)
+- `.with_initialization_strategy(strategy)` - "uniform", "latin_hypercube", or "opposition_based"
+- `.with_velocity_clamping(factor)` - Clamp velocities (typically 0.1-0.2)
+- `.with_velocity_mutation(threshold)` - Reinitialize near-zero velocities
+- `.with_mutation(strategy, scale, probability, application)` - Enable mutation
+
+**When to use PSO:**
 
 - Multiple local minima expected
 - Robust global search needed
 - Multiple parameters to calibrate
+- Complex parameter landscapes
 
 ### Nelder-Mead Simplex
 
@@ -235,6 +370,37 @@ optimization_config = OptimizationConfig(
 Calibrate against observations from multiple compartments:
 
 ```python
+# Build model with parameters to calibrate
+model = (
+    ModelBuilder(name="SIR Model", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
 # Observed data from both infected and recovered compartments
 observed_data = [
     # Infected observations
@@ -247,18 +413,38 @@ observed_data = [
     ObservedDataPoint(step=30, compartment="R", value=68.2),
 ]
 
+simulation = Simulation(model)
+
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=[
-        CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-        CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(
+            id="beta",
+            parameter_type=CalibrationParameterType.PARAMETER,
+            min_bound=0.0,
+            max_bound=1.0,
+            initial_guess=0.3
+        ),
+        CalibrationParameter(
+            id="gamma",
+            parameter_type=CalibrationParameterType.PARAMETER,
+            min_bound=0.0,
+            max_bound=1.0,
+            initial_guess=0.1
+        ),
     ],
     loss_config=LossConfig(function=LossFunction.RMSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=500, verbose=False),
+        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
     ),
 )
+
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+# Update model with calibrated values
+model.update_parameters(result.best_parameters)
 ```
 
 ### Calibrating Stratified Models
@@ -266,16 +452,16 @@ problem = CalibrationProblem(
 Calibrate parameters specific to age groups or other stratifications:
 
 ```python
-# Build age-stratified model
+# Build age-stratified model with parameters to calibrate
 model = (
     ModelBuilder(name="Age-Stratified SIR", version="1.0")
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["young", "old"])
-    .add_parameter(id="beta", value=0.3)
-    .add_parameter(id="gamma_young", value=0.12)
-    .add_parameter(id="gamma_old", value=0.08)
+    .add_parameter(id="beta", value=None)          # To be calibrated
+    .add_parameter(id="gamma_young", value=None)   # To be calibrated
+    .add_parameter(id="gamma_old", value=None)     # To be calibrated
     .add_transition(
         id="infection",
         source=["S"],
@@ -317,13 +503,6 @@ model = (
     .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
 
-# Calibrate stratification-specific parameters
-parameters = [
-    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-    CalibrationParameter(id="gamma_young", min_bound=0.05, max_bound=0.2),
-    CalibrationParameter(id="gamma_old", min_bound=0.05, max_bound=0.2),
-]
-
 # Note: Observed data uses stratified compartment names like "I_young", "I_old"
 observed_data = [
     ObservedDataPoint(step=10, compartment="I_young", value=30.5),
@@ -331,11 +510,54 @@ observed_data = [
     ObservedDataPoint(step=20, compartment="I_young", value=52.3),
     ObservedDataPoint(step=20, compartment="I_old", value=26.1),
 ]
+
+simulation = Simulation(model)
+
+# Calibrate stratification-specific parameters
+parameters = [
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+        initial_guess=0.3
+    ),
+    CalibrationParameter(
+        id="gamma_young",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.05,
+        max_bound=0.2,
+        initial_guess=0.12
+    ),
+    CalibrationParameter(
+        id="gamma_old",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.05,
+        max_bound=0.2,
+        initial_guess=0.08
+    ),
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_config=LossConfig(function=LossFunction.SSE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
+    ),
+)
+
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+# Update model with calibrated values
+model.update_parameters(result.best_parameters)
 ```
 
 ### Using Calibration Results
 
-Once calibrated, you need to create a new model with the fitted parameters to run predictions:
+Once calibrated, update your model with the fitted parameters and create a new simulation:
 
 ```python
 # Run calibration
@@ -347,41 +569,11 @@ if result.converged:
     print(f"Final loss: {result.final_loss:.6f}")
     print(f"Calibrated parameters: {result.best_parameters}")
 
-    # Create a new model with the calibrated parameters
-    # You need to rebuild the model with the new parameter values
-    calibrated_model = (
-        ModelBuilder(name="Calibrated SIR", version="1.0")
-        .add_bin(id="S", name="Susceptible")
-        .add_bin(id="I", name="Infected")
-        .add_bin(id="R", name="Recovered")
-        # Use calibrated parameter values
-        .add_parameter(id="beta", value=result.best_parameters["beta"])
-        .add_parameter(id="gamma", value=result.best_parameters["gamma"])
-        .add_transition(
-            id="infection",
-            source=["S"],
-            target=["I"],
-            rate="beta * S * I / N"
-        )
-        .add_transition(
-            id="recovery",
-            source=["I"],
-            target=["R"],
-            rate="gamma * I"
-        )
-        .set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
-            ]
-        )
-        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
-    )
+    # Update the existing model with calibrated parameters
+    model.update_parameters(result.best_parameters)
 
-    # Run predictions with calibrated model
-    calibrated_simulation = Simulation(calibrated_model)
+    # Create a new simulation with the updated model
+    calibrated_simulation = Simulation(model)
     prediction_results = calibrated_simulation.run(num_steps=200)
 
     print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
@@ -389,7 +581,7 @@ else:
     print(f"Calibration did not converge: {result.termination_reason}")
 ```
 
-**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. You must manually create a new model with the calibrated parameters to use them for predictions.
+**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.update_parameters(result.best_parameters)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
 
 ## Best Practices
 
@@ -410,12 +602,18 @@ CalibrationParameter(id="beta", min_bound=0.1, max_bound=0.8)    # Good
 Initial guesses can speed up convergence:
 
 ```python
-# Let optimizer choose random
-CalibrationParameter(id="beta", min_bound=0.1, max_bound=0.8)
-
-# Provide informed starting point
+# Without initial guess - optimizer uses midpoint
 CalibrationParameter(
     id="beta",
+    parameter_type=CalibrationParameterType.PARAMETER,
+    min_bound=0.1,
+    max_bound=0.8
+)
+
+# Provide informed starting point (recommended)
+CalibrationParameter(
+    id="beta",
+    parameter_type=CalibrationParameterType.PARAMETER,
     min_bound=0.1,
     max_bound=0.8,
     initial_guess=0.4  # Based on literature

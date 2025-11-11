@@ -36,15 +36,53 @@ class Simulation:
         ----------
         model : Model
             A fully constructed and validated model object.
+            None values for parameters/initial conditions if used for calibration.
+
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
+
         self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
 
         self._compartments: list[str] = self._engine.compartments
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
+
+    def _validate_all_parameters_calibrated(self, model: Model) -> None:
+        """
+        Validates that all parameters and initial conditions have values
+        (are calibrated).
+
+        Parameters
+        ----------
+        model : Model
+            The model to validate.
+
+        Raises
+        ------
+        ValueError
+            If any parameter or initial condition has a None value.
+        """
+        uncalibrated_params = model.get_uncalibrated_parameters()
+        uncalibrated_ics = model.get_uncalibrated_initial_conditions()
+
+        errors = []
+        if uncalibrated_params:
+            errors.append(
+                f"Parameters requiring calibration: {', '.join(uncalibrated_params)}"
+            )
+        if uncalibrated_ics:
+            errors.append(
+                f"Initial conditions requiring calibration: "
+                f"{', '.join(uncalibrated_ics)}"
+            )
+
+        if errors:
+            raise ValueError(
+                f"Cannot run Simulation: {'; '.join(errors)}. "
+                f"Please calibrate these values before running a simulation."
+            )
 
     def _initialize_engine(self) -> "DifferenceEquationsProtocol":
         """Internal method to set up the Rust backend."""
@@ -111,6 +149,7 @@ class Simulation:
         dict[str, list[float]] | list[list[float]]
             The simulation results in the specified format.
         """
+        self._validate_all_parameters_calibrated(self.model_definition)
         raw_results = self._run_raw(num_steps)
         if output_format == "list_of_lists":
             logging.info("Returning results in 'list_of_lists' format.")

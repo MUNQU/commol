@@ -168,7 +168,10 @@ impl PyInitialConditions {
     ) -> Self {
         let bin_fractions: Vec<commol_core::BinFraction> = bin_fractions
             .into_iter()
-            .map(|(bin, fraction)| commol_core::BinFraction { bin, fraction })
+            .map(|(bin, fraction)| commol_core::BinFraction {
+                bin,
+                fraction: Some(fraction),
+            })
             .collect();
 
         let stratification_fractions = stratification_fractions
@@ -292,15 +295,37 @@ pub struct PyParameter {
 #[pymethods]
 impl PyParameter {
     #[new]
-    fn new(id: String, value: f64, description: Option<String>) -> Self {
+    #[pyo3(signature = (id, value, description=None))]
+    fn new(id: String, value: PyParameterValue, description: Option<String>) -> Self {
+        let param_value = match value {
+            PyParameterValue::Constant(v) => commol_core::ParameterValue::Constant(v),
+            PyParameterValue::Formula(f) => commol_core::ParameterValue::Formula(f),
+        };
+
         Self {
             inner: commol_core::Parameter {
                 id,
-                value,
+                value: Some(param_value),
                 description,
             },
         }
     }
+
+    fn __repr__(&self) -> String {
+        let value_str = match &self.inner.value {
+            Some(commol_core::ParameterValue::Constant(v)) => format!("{}", v),
+            Some(commol_core::ParameterValue::Formula(f)) => format!("'{}'", f),
+            None => "None".to_string(),
+        };
+        format!("Parameter(id='{}', value={})", self.inner.id, value_str)
+    }
+}
+
+/// Python-side representation of parameter values
+#[derive(FromPyObject)]
+pub enum PyParameterValue {
+    Constant(f64),
+    Formula(String),
 }
 
 /// Wrapper for commol_core::MathExpression

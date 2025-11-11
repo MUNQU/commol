@@ -1,7 +1,23 @@
-from typing import Self, override
 from enum import Enum
+from typing import Self, override
 
 from pydantic import BaseModel, Field, model_validator
+
+
+class CalibrationParameterType(str, Enum):
+    """
+    Type of value being calibrated.
+
+    Attributes
+    ----------
+    PARAMETER : str
+        Model parameter
+    INITIAL_CONDITION : str
+        Initial population in a compartment
+    """
+
+    PARAMETER = "parameter"
+    INITIAL_CONDITION = "initial_condition"
 
 
 class LossFunction(str, Enum):
@@ -58,11 +74,11 @@ class ObservedDataPoint(BaseModel):
         Weight for this observation in the loss function (default: 1.0)
     """
 
-    step: int = Field(..., ge=0, description="Time step of the observation")
+    step: int = Field(default=..., ge=0, description="Time step of the observation")
     compartment: str = Field(
-        ..., min_length=1, description="Name of the compartment being observed"
+        default=..., min_length=1, description="Name of the compartment being observed"
     )
-    value: float = Field(..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
         default=1.0,
         gt=0.0,
@@ -72,12 +88,14 @@ class ObservedDataPoint(BaseModel):
 
 class CalibrationParameter(BaseModel):
     """
-    Defines a parameter to be calibrated with its bounds.
+    Defines a parameter or initial condition to be calibrated with its bounds.
 
     Attributes
     ----------
     id : str
-        Parameter identifier (must match a model parameter ID)
+        Identifier (parameter ID for parameters, bin ID for initial conditions)
+    parameter_type : CalibrationParameterType
+        Type of value being calibrated (default: PARAMETER)
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
@@ -86,9 +104,15 @@ class CalibrationParameter(BaseModel):
         Optional starting value for optimization (if None, midpoint is used)
     """
 
-    id: str = Field(..., min_length=1, description="Parameter identifier")
-    min_bound: float = Field(..., description="Minimum allowed value")
-    max_bound: float = Field(..., description="Maximum allowed value")
+    id: str = Field(
+        default=..., min_length=1, description="Parameter or bin identifier"
+    )
+    parameter_type: CalibrationParameterType = Field(
+        default=...,
+        description="Type of value being calibrated",
+    )
+    min_bound: float = Field(default=..., description="Minimum allowed value")
+    max_bound: float = Field(default=..., description="Maximum allowed value")
     initial_guess: float | None = Field(
         default=None, description="Optional starting value for optimization"
     )
@@ -188,28 +212,12 @@ class ParticleSwarmConfig(BaseModel):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
-    Particle Swarm Optimization (PSO) is a population-based metaheuristic
-    inspired by social behavior of bird flocking or fish schooling.
-
-    Attributes
-    ----------
-    num_particles : int
-        Number of particles in the swarm (default: 40)
-    max_iterations : int
-        Maximum number of iterations (default: 1000)
-    target_cost : float | None
-        Target cost for early stopping (optional)
-    inertia_factor : float | None
-        Inertia weight applied to velocity (default: None, uses argmin's default)
-    cognitive_factor : float | None
-        Attraction to personal best (default: None, uses argmin's default)
-    social_factor : float | None
-        Attraction to swarm best (default: None, uses argmin's default)
-    verbose : bool
-        Enable verbose output during optimization (default: False)
-    header_interval: int
-        Number of iterations between table header repeats in verbose output
-        (default: 100)
+    Use `ParticleSwarmConfig.create()` and builder methods to configure:
+    - `.with_inertia()` or `.with_chaotic_inertia()` for inertia control
+    - `.with_acceleration()` or `.with_tvac()` for acceleration coefficients
+    - `.with_initialization_strategy()` for particle initialization
+    - `.with_velocity_clamping()` and `.with_velocity_mutation()` for velocity control
+    - `.with_mutation()` for mutation settings
     """
 
     num_particles: int = Field(
@@ -240,6 +248,41 @@ class ParticleSwarmConfig(BaseModel):
         gt=0.0,
         description="Attraction to swarm best (default: None, uses argmin's default)",
     )
+    chaotic_inertia: tuple[float, float] | None = Field(
+        default=None, description="Chaotic inertia weight range (w_min, w_max)"
+    )
+    tvac: tuple[float, float, float, float] | None = Field(
+        default=None,
+        description="Time-varying acceleration coefficients (c1_i, c1_f, c2_i, c2_f)",
+    )
+    initialization_strategy: str | None = Field(
+        default=None,
+        description=(
+            "Initialization strategy: "
+            "'uniform', 'latin_hypercube', or 'opposition_based'"
+        ),
+    )
+    velocity_clamp_factor: float | None = Field(
+        default=None, gt=0.0, le=1.0, description="Velocity clamping factor (0.0-1.0)"
+    )
+    velocity_mutation_threshold: float | None = Field(
+        default=None, ge=0.0, description="Velocity mutation threshold"
+    )
+    mutation_strategy: str | None = Field(
+        default=None, description="Mutation strategy: 'gaussian' or 'cauchy'"
+    )
+    mutation_scale: float | None = Field(
+        default=None, gt=0.0, description="Mutation scale parameter"
+    )
+    mutation_probability: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Mutation probability (0.0-1.0)"
+    )
+    mutation_application: str | None = Field(
+        default=None,
+        description=(
+            "Mutation application: 'global_best', 'all_particles', or 'below_average'"
+        ),
+    )
     verbose: bool = Field(
         default=False,
         description="Enable verbose output during optimization (default: False)",
@@ -253,6 +296,212 @@ class ParticleSwarmConfig(BaseModel):
         ),
     )
 
+    @classmethod
+    def create(
+        cls,
+        num_particles: int = 20,
+        max_iterations: int = 1000,
+        target_cost: float | None = None,
+        verbose: bool = False,
+        header_interval: int = 100,
+    ) -> Self:
+        """
+        Create a basic ParticleSwarmConfig.
+
+        Use builder methods to configure advanced features like chaotic inertia,
+        TVAC, initialization strategies, and mutation.
+
+        Parameters
+        ----------
+        num_particles : int
+            Number of particles in the swarm (default: 20)
+        max_iterations : int
+            Maximum number of iterations (default: 1000)
+        target_cost : float | None
+            Target cost for early stopping (default: None)
+        verbose : bool
+            Enable verbose output (default: False)
+        header_interval : int
+            Iterations between header repeats in verbose mode (default: 100)
+
+        Returns
+        -------
+        ParticleSwarmConfig
+            A new configuration instance
+        """
+        return cls(
+            num_particles=num_particles,
+            max_iterations=max_iterations,
+            target_cost=target_cost,
+            verbose=verbose,
+            header_interval=header_interval,
+        )
+
+    def with_inertia(self, inertia: float) -> Self:
+        """
+        Set constant inertia weight factor.
+
+        Parameters
+        ----------
+        inertia : float
+            Inertia weight (must be positive)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.inertia_factor = inertia
+        self.chaotic_inertia = None  # Clear conflicting setting
+        return self
+
+    def with_chaotic_inertia(self, w_min: float, w_max: float) -> Self:
+        """
+        Enable chaotic inertia weight using logistic map.
+
+        Parameters
+        ----------
+        w_min : float
+            Minimum inertia weight (must be positive)
+        w_max : float
+            Maximum inertia weight (must be > w_min)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.chaotic_inertia = (w_min, w_max)
+        self.inertia_factor = None  # Clear conflicting setting
+        return self
+
+    def with_acceleration(self, cognitive: float, social: float) -> Self:
+        """
+        Set constant cognitive and social acceleration factors.
+
+        Parameters
+        ----------
+        cognitive : float
+            Attraction to personal best (must be positive)
+        social : float
+            Attraction to swarm best (must be positive)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.cognitive_factor = cognitive
+        self.social_factor = social
+        self.tvac = None  # Clear conflicting setting
+        return self
+
+    def with_tvac(
+        self, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float
+    ) -> Self:
+        """
+        Enable Time-Varying Acceleration Coefficients (TVAC).
+
+        Parameters
+        ----------
+        c1_initial : float
+            Initial cognitive factor (must be positive)
+        c1_final : float
+            Final cognitive factor (must be positive)
+        c2_initial : float
+            Initial social factor (must be positive)
+        c2_final : float
+            Final social factor (must be positive)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.tvac = (c1_initial, c1_final, c2_initial, c2_final)
+        self.cognitive_factor = None  # Clear conflicting settings
+        self.social_factor = None
+        return self
+
+    def with_initialization_strategy(self, strategy: str) -> Self:
+        """
+        Set particle initialization strategy.
+
+        Parameters
+        ----------
+        strategy : str
+            One of: "uniform", "latin_hypercube", "opposition_based"
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.initialization_strategy = strategy
+        return self
+
+    def with_velocity_clamping(self, clamp_factor: float) -> Self:
+        """
+        Enable velocity clamping.
+
+        Parameters
+        ----------
+        clamp_factor : float
+            Fraction of search space range (typically 0.1 to 0.2)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.velocity_clamp_factor = clamp_factor
+        return self
+
+    def with_velocity_mutation(self, threshold: float) -> Self:
+        """
+        Enable velocity mutation when velocity approaches zero.
+
+        Parameters
+        ----------
+        threshold : float
+            Velocity threshold for reinitialization (typically 0.001 to 0.01)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.velocity_mutation_threshold = threshold
+        return self
+
+    def with_mutation(
+        self, strategy: str, scale: float, probability: float, application: str
+    ) -> Self:
+        """
+        Enable mutation to help escape local optima.
+
+        Parameters
+        ----------
+        strategy : str
+            Either "gaussian" or "cauchy"
+        scale : float
+            Standard deviation (gaussian) or scale parameter (cauchy)
+        probability : float
+            Mutation probability per iteration (0.0 to 1.0)
+        application : str
+            One of: "global_best", "all_particles", "below_average"
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.mutation_strategy = strategy
+        self.mutation_scale = scale
+        self.mutation_probability = probability
+        self.mutation_application = application
+        return self
+
 
 class LossConfig(BaseModel):
     """
@@ -265,7 +514,7 @@ class LossConfig(BaseModel):
     """
 
     function: LossFunction = Field(
-        LossFunction.SSE, description="Loss function for measuring fit quality"
+        default=LossFunction.SSE, description="Loss function for measuring fit quality"
     )
 
 
@@ -282,10 +531,10 @@ class OptimizationConfig(BaseModel):
     """
 
     algorithm: OptimizationAlgorithm = Field(
-        ..., description="Optimization algorithm to use"
+        default=..., description="Optimization algorithm to use"
     )
     config: NelderMeadConfig | ParticleSwarmConfig = Field(
-        ..., description="Algorithm-specific configuration"
+        default=..., description="Algorithm-specific configuration"
     )
 
     @model_validator(mode="after")
@@ -337,19 +586,21 @@ class CalibrationResult(BaseModel):
     """
 
     best_parameters: dict[str, float] = Field(
-        ..., description="Calibrated parameter values"
+        default=..., description="Calibrated parameter values"
     )
     parameter_names: list[str] = Field(
-        ..., description="Ordered list of parameter names"
+        default=..., description="Ordered list of parameter names"
     )
     best_parameters_list: list[float] = Field(
-        ..., description="Ordered list of parameter values"
+        default=..., description="Ordered list of parameter values"
     )
-    final_loss: float = Field(..., description="Final loss value")
-    iterations: int = Field(..., ge=0, description="Number of iterations performed")
-    converged: bool = Field(..., description="Whether optimization converged")
+    final_loss: float = Field(default=..., description="Final loss value")
+    iterations: int = Field(
+        default=..., ge=0, description="Number of iterations performed"
+    )
+    converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
-        ..., description="Reason for optimization termination"
+        default=..., description="Reason for optimization termination"
     )
 
     @override
@@ -387,17 +638,17 @@ class CalibrationProblem(BaseModel):
     """
 
     observed_data: list[ObservedDataPoint] = Field(
-        ..., min_length=1, description="Observed data points"
+        default=..., min_length=1, description="Observed data points"
     )
     parameters: list[CalibrationParameter] = Field(
-        ..., min_length=1, description="Parameters to calibrate"
+        default=..., min_length=1, description="Parameters to calibrate"
     )
     loss_config: LossConfig = Field(
         default_factory=lambda: LossConfig(function=LossFunction.SSE),
         description="Loss function configuration",
     )
     optimization_config: OptimizationConfig = Field(
-        ..., description="Optimization algorithm configuration"
+        default=..., description="Optimization algorithm configuration"
     )
 
     @model_validator(mode="after")

@@ -15,4 +15,4 @@ commol-difference = { path = "../crates/commol-difference" }
 commol-calibration = { path = "../crates/commol-calibration" }
 
 # Required for custom argmin observer
-argmin = "0.10"
+argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }

@@ -6,6 +6,7 @@ from commol.api import Calibrator, ModelBuilder, ModelLoader, Simulation
 from commol.context import Model
 from commol.context.calibration import (
     CalibrationParameter,
+    CalibrationParameterType,
     CalibrationProblem,
     CalibrationResult,
     LossConfig,
@@ -16,6 +17,7 @@ from commol.context.calibration import (
     OptimizationConfig,
     ParticleSwarmConfig,
 )
+from commol.context.parameter import Parameter
 
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -33,6 +35,7 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 __all__ = [
     "CalibrationParameter",
+    "CalibrationParameterType",
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
@@ -42,10 +45,11 @@ __all__ = [
     "Model",
     "ModelBuilder",
     "ModelLoader",
-    "Simulation",
     "NelderMeadConfig",
     "ObservedDataPoint",
     "OptimizationAlgorithm",
     "OptimizationConfig",
+    "Parameter",
     "ParticleSwarmConfig",
+    "Simulation",
 ]

@@ -101,6 +101,21 @@ impl PyDifferenceEquations {
         self.inner.current_step()
     }
 
+    /// Set the initial condition for a specific compartment
+    ///
+    /// Args:
+    ///     compartment_index: The index of the compartment (0-based)
+    ///     value: The new initial population value
+    ///
+    /// Raises:
+    ///     ValueError: If compartment_index is invalid or value is negative
+    fn set_initial_condition(&mut self, compartment_index: usize, value: f64) -> PyResult<()> {
+        use commol_core::SimulationEngine;
+        self.inner
+            .set_initial_condition(compartment_index, value)
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "DifferenceEquations(compartments={}, step={})",

@@ -220,20 +220,114 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
             let mut solver =
                 ParticleSwarm::new((lower_bound, upper_bound), ps_config.num_particles);
 
-            if let Some(inertia) = ps_config.inertia_factor {
+            // Apply inertia strategy if provided
+            solver = match &ps_config.inertia_strategy {
+                Some(commol_calibration::InertiaWeightStrategy::Constant(w)) => solver
+                    .with_inertia_factor(*w)
+                    .map_err(|e| format!("Failed to set inertia_factor: {}", e))?,
+                Some(commol_calibration::InertiaWeightStrategy::Chaotic { w_min, w_max }) => solver
+                    .with_chaotic_inertia(*w_min, *w_max)
+                    .map_err(|e| format!("Failed to set chaotic_inertia: {}", e))?,
+                None => solver,
+            };
+
+            // Apply acceleration strategy if provided
+            solver = match &ps_config.acceleration_strategy {
+                Some(commol_calibration::AccelerationStrategy::Constant { cognitive, social }) => {
+                    solver = solver
+                        .with_cognitive_factor(*cognitive)
+                        .map_err(|e| format!("Failed to set cognitive_factor: {}", e))?;
+                    solver
+                        .with_social_factor(*social)
+                        .map_err(|e| format!("Failed to set social_factor: {}", e))?
+                }
+                Some(commol_calibration::AccelerationStrategy::TimeVarying {
+                    c1_initial,
+                    c1_final,
+                    c2_initial,
+                    c2_final,
+                }) => solver
+                    .with_tvac(
+                        *c1_initial,
+                        *c1_final,
+                        *c2_initial,
+                        *c2_final,
+                        ps_config.max_iterations as usize,
+                    )
+                    .map_err(|e| format!("Failed to set TVAC: {}", e))?,
+                None => solver,
+            };
+
+            // Apply initialization strategy
+            let argmin_init_strategy = match ps_config.initialization_strategy {
+                commol_calibration::InitializationStrategy::UniformRandom => {
+                    argmin::solver::particleswarm::InitializationStrategy::UniformRandom
+                }
+                commol_calibration::InitializationStrategy::LatinHypercube => {
+                    argmin::solver::particleswarm::InitializationStrategy::LatinHypercube
+                }
+                commol_calibration::InitializationStrategy::OppositionBased => {
+                    argmin::solver::particleswarm::InitializationStrategy::OppositionBased
+                }
+            };
+            solver = solver.with_initialization_strategy(argmin_init_strategy);
+
+            // Apply velocity clamping if enabled
+            if let Some(clamp_factor) = ps_config.velocity_clamp_factor {
                 solver = solver
-                    .with_inertia_factor(inertia)
-                    .map_err(|e| format!("Failed to set inertia_factor: {}", e))?;
+                    .with_velocity_clamping(clamp_factor)
+                    .map_err(|e| format!("Failed to set velocity_clamping: {}", e))?;
             }
-            if let Some(cognitive) = ps_config.cognitive_factor {
+
+            // Apply velocity mutation if enabled
+            if let Some(threshold) = ps_config.velocity_mutation_threshold {
                 solver = solver
-                    .with_cognitive_factor(cognitive)
-                    .map_err(|e| format!("Failed to set cognitive_factor: {}", e))?;
+                    .with_velocity_mutation(threshold)
+                    .map_err(|e| format!("Failed to set velocity_mutation: {}", e))?;
             }
-            if let Some(social) = ps_config.social_factor {
+
+            // Apply mutation if enabled
+            if !matches!(
+                ps_config.mutation_strategy,
+                commol_calibration::MutationStrategy::None
+            ) && !matches!(
+                ps_config.mutation_application,
+                commol_calibration::MutationApplication::None
+            ) {
+                let argmin_mutation_strategy = match ps_config.mutation_strategy {
+                    commol_calibration::MutationStrategy::None => {
+                        argmin::solver::particleswarm::MutationStrategy::None
+                    }
+                    commol_calibration::MutationStrategy::Gaussian(std_dev) => {
+                        argmin::solver::particleswarm::MutationStrategy::Gaussian(std_dev)
+                    }
+                    commol_calibration::MutationStrategy::Cauchy(scale) => {
+                        argmin::solver::particleswarm::MutationStrategy::Cauchy(scale)
+                    }
+                };
+
+                let argmin_mutation_application = match ps_config.mutation_application {
+                    commol_calibration::MutationApplication::None => {
+                        argmin::solver::particleswarm::MutationApplication::None
+                    }
+                    commol_calibration::MutationApplication::GlobalBestOnly => {
+                        argmin::solver::particleswarm::MutationApplication::GlobalBestOnly
+                    }
+                    commol_calibration::MutationApplication::AllParticles => {
+                        argmin::solver::particleswarm::MutationApplication::AllParticles
+                    }
+                    commol_calibration::MutationApplication::BelowAverage => {
+                        argmin::solver::particleswarm::MutationApplication::BelowAverage
+                    }
+                };
+
                 solver = solver
-                    .with_social_factor(social)
-                    .map_err(|e| format!("Failed to set social_factor: {}", e))?;
+                    .with_mutation(
+                        argmin_mutation_strategy,
+                        ps_config.mutation_probability,
+                        argmin_mutation_application,
+                    )
+                    .map_err(|e| format!("Failed to set mutation: {}", e))?;
             }
 
             // Write header to Python stdout

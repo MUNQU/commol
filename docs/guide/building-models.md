@@ -12,9 +12,24 @@ from commol import ModelBuilder
 builder = ModelBuilder(
     name="My Model",
     version="1.0",
-    description="Optional description"
+    description="Optional description",
+    bin_unit="person"  # Optional: default unit for all bins
 )
 ```
+
+#### Parameters
+
+- **`name`** (required): Unique identifier for your model
+- **`version`** (optional): Version string for tracking model changes
+- **`description`** (optional): Human-readable description of the model
+- **`bin_unit`** (optional): Default unit for all bins (disease states). When specified, this enables:
+  - Automatic unit assignment to bins, predefined population variables (`N`, `N_young`, etc.), and stratification categories
+  - Unit checking via `model.check_unit_consistency()`
+  - Unit annotations in `model.print_equations()` output
+
+  Common values: `"person"`, `"individual"`, or any custom population unit.
+
+  **Note**: Individual bins can override this with their own `unit` parameter in `add_bin()`.
 
 ### Chaining Methods
 
@@ -102,6 +117,8 @@ builder.add_parameter(
 
 When **all parameters have units**, the model will automatically validate dimensional consistency. See [Unit Checking](#unit-checking) below.
 
+**Tip:** To mark a parameter as unitless (dimensionless) for unit checking, use `unit="dimensionless"`. This is useful for ratios, fractions, scaling factors, and amplitudes. Dimensionless parameters are also required as arguments to mathematical functions like `sin()`, `cos()`, `exp()`, `sqrt()`, `pow()`, etc.
+
 ### Parameter Guidelines
 
 - Use meaningful IDs (beta, gamma, R0, etc.)
@@ -181,6 +198,121 @@ builder.add_transition(
     target=[],  # Empty = leaves system
     rate="mu"
 )
+```
+
+### Using `$compartment` Placeholder for Per-Compartment Rates
+
+When applying the same type of transition to multiple compartments with per-compartment rates (like per-capita death rates), use the `$compartment` placeholder to avoid repetitive code:
+
+```python
+# Instead of writing 4 separate transitions:
+# .add_transition("death_S", ["S"], [], rate="d * S")
+# .add_transition("death_L", ["L"], [], rate="d * L")
+# .add_transition("death_I", ["I"], [], rate="d * I")
+# .add_transition("death_R", ["R"], [], rate="d * R")
+
+# Write one transition that automatically expands:
+builder.add_transition(
+    id="death",
+    source=["S", "L", "I", "R"],
+    target=[],
+    rate="d * $compartment"  # $compartment gets replaced with S, L, I, R
+)
+```
+
+**How it works:**
+
+- The system detects `$compartment` in the rate formula
+- Automatically creates one transition per source compartment
+- Replaces `$compartment` with the actual compartment name in each transition
+- Generated transition IDs use the pattern: `{id}__{compartment}` (e.g., `death__S`, `death__L`)
+
+**Complex formulas with multiple occurrences:**
+
+```python
+builder.add_transition(
+    id="nonlinear_death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d * $compartment * (1 + 0.1 * $compartment / N)"
+)
+# Expands to:
+# death__S: rate = "d * S * (1 + 0.1 * S / N)"
+# death__I: rate = "d * I * (1 + 0.1 * I / N)"
+# death__R: rate = "d * R * (1 + 0.1 * R / N)"
+```
+
+**With single target (transfers):**
+
+```python
+builder.add_transition(
+    id="treatment",
+    source=["I_mild", "I_severe"],
+    target=["R"],  # All recover to same compartment
+    rate="treatment_rate * $compartment"
+)
+```
+
+**With stratified rates:**
+
+```python
+builder.add_stratification(id="age", categories=["young", "old"])
+
+builder.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d_base * $compartment",  # Fallback rate
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "d_young * $compartment"  # Lower death rate for young
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "d_old * $compartment"  # Higher death rate for old
+        }
+    ]
+)
+# Expands to death__S, death__I, death__R, each with their own stratified rates
+```
+
+**Restrictions:**
+
+- Only valid with multiple source compartments (2 or more)
+- Target must be empty `[]` or contain exactly one compartment
+- Cannot be used if you want different targets for different sources
+
+**Comparison with standard multi-source transitions:**
+
+Standard multi-source transitions (without `$compartment`) create a **single** transition that affects all sources simultaneously:
+
+```python
+# This creates ONE transition
+.add_transition(
+    id="interaction",
+    source=["S", "I"],
+    target=["I", "I"],
+    rate="beta * S * I"
+)
+# Resulting equations:
+# dS/dt = ... - (beta*S*I)
+# dI/dt = ... - (beta*S*I) + 2*(beta*S*I) = ... + (beta*S*I)
+```
+
+With `$compartment`, you create **multiple independent** transitions:
+
+```python
+# This creates TWO separate transitions
+.add_transition(
+    id="death",
+    source=["S", "I"],
+    target=[],
+    rate="d * $compartment"
+)
+# Resulting equations:
+# dS/dt = ... - (d*S)
+# dI/dt = ... - (d*I)
 ```
 
 ### Stratified Transitions
@@ -439,15 +571,56 @@ rate="min(beta, threshold) * S"  # beta is 1/day, threshold is person
 3. **Ensure math function arguments are dimensionless** (divide by appropriate quantities)
 4. **Use consistent time units** throughout your model
 
-### When Unit Checking is Skipped
+### Unit Display in Equations
 
-If any parameter lacks a unit, checking is automatically skipped:
+When you print equations using `model.print_equations()`, unit annotations are displayed based on unit completeness:
 
 ```python
-builder.add_parameter("beta", 0.5)  # No unit
-builder.add_parameter("gamma", 0.1, unit="1/day")
-# Unit checking will be skipped (not all parameters have units)
+# Model with complete units - shows annotations
+model = (
+    ModelBuilder(name="SIR", bin_unit="person")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_parameter(id="beta", value=0.5, unit="1/day")
+    .add_parameter(id="gamma", value=0.1, unit="1/day")
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .build()
+)
+
+model.print_equations()
+# Output:
+#   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
+
+# Model without units - no annotations
+model = (
+    ModelBuilder(name="SIR")
+    .add_bin(id="S", name="Susceptible")
+    .add_parameter(id="beta", value=0.5)
+    .build()
+)
+
+model.print_equations()
+# Output:
+#   S -> I: beta * S * I / N
 ```
+
+### Partial Unit Definitions
+
+**Important**: You must define units for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError`:
+
+```python
+# This will raise an error!
+model = (
+    ModelBuilder(name="SIR", bin_unit="person")
+    .add_parameter(id="beta", value=0.5, unit="1/day")  # Has unit
+    .add_parameter(id="gamma", value=0.1)  # No unit - INCONSISTENT!
+    .build()
+)
+
+model.print_equations()  # ValueError: Some parameters have units but not all
+```
+
+This prevents accidentally mixing unit systems or forgetting to specify units for some parameters.
 
 ## Advanced: Conditional Transitions
 

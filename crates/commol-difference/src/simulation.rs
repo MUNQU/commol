@@ -60,6 +60,23 @@ impl DifferenceEquations {
                 .set_parameter_str(&mapping.parameter_name, total);
         }
 
+        // Evaluate formula parameters and update context
+        // Note: We need to clone to avoid borrow checker issues
+        let formula_params = self.formula_parameters.clone();
+        for (param_name, rate_expr) in &formula_params {
+            match rate_expr.evaluate(&mut self.expression_context) {
+                Ok(value) => {
+                    self.expression_context.set_parameter_str(param_name, value);
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "Failed to evaluate formula parameter '{}': {}",
+                        param_name, error
+                    ));
+                }
+            }
+        }
+
         // Use pre-computed transition flows - much faster!
         for flow_info in &self.transition_flows {
             let source_population = self.population[flow_info.source_index];
@@ -210,5 +227,36 @@ impl commol_core::SimulationEngine for DifferenceEquations {
     ) -> Result<(), String> {
         // Delegate to optimized implementation
         DifferenceEquations::run_into_buffer(self, num_steps, buffer)
+    }
+
+    fn set_initial_condition(
+        &mut self,
+        compartment_index: usize,
+        value: f64,
+    ) -> Result<(), String> {
+        // Validate compartment index
+        if compartment_index >= self.initial_population.len() {
+            return Err(format!(
+                "Invalid compartment index: {}. Model has {} compartments.",
+                compartment_index,
+                self.initial_population.len()
+            ));
+        }
+
+        // Validate value (non-negative population)
+        if value < 0.0 {
+            return Err(format!(
+                "Initial condition value must be non-negative, got: {}",
+                value
+            ));
+        }
+
+        // Update initial population
+        self.initial_population[compartment_index] = value;
+
+        // Also update current population to reflect the change
+        self.population[compartment_index] = value;
+
+        Ok(())
     }
 }

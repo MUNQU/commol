@@ -40,4 +40,6 @@ pub struct DifferenceEquations {
     pub(crate) compartment_flows: Vec<f64>,
     /// Pre-computed subpopulation mappings for stratifications
     pub(crate) subpopulation_mappings: Vec<SubpopulationMapping>,
+    /// Parameters defined as formulas that need to be evaluated each step
+    pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
 }

@@ -73,13 +73,94 @@ results = simulation.run(num_steps=100)
 print(f"Final infected: {results['I'][-1]:.0f}")
 ```
 
-### With Unit Checking
+### Using $compartment Placeholder for Multiple Transitions
 
-Add units to parameters for automatic dimensional validation:
+When you need to apply the same transition to multiple compartments (like death rates), use the `$compartment` placeholder instead of writing repetitive code:
 
 ```python
 model = (
-    ModelBuilder(name="SIR with Units", version="1.0")
+    ModelBuilder(name="SLIR with Deaths", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="L", name="Latent")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.3, unit="1/day")
+    .add_parameter(id="gamma", value=0.2, unit="1/day")
+    .add_parameter(id="delta", value=0.1, unit="1/day")
+    .add_parameter(id="d", value=0.01, unit="1/day")  # Death rate
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["L"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="progression",
+        source=["L"],
+        target=["I"],
+        rate="gamma * L"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="delta * I"
+    )
+    # Single transition automatically expands to 4 separate death transitions
+    .add_transition(
+        id="death",
+        source=["S", "L", "I", "R"],
+        target=[],
+        rate="d * $compartment"  # Expands to: d*S, d*L, d*I, d*R
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "L", "fraction": 0.005},
+            {"bin": "I", "fraction": 0.005},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+```
+
+**The `$compartment` placeholder:**
+
+- Automatically expands to multiple transitions (one per source compartment)
+- Replaces `$compartment` with the actual compartment name in the rate formula
+- Works with stratified rates for age-structured or location-based models
+- Reduces code duplication and improves maintainability
+
+**Example with stratified rates:**
+
+```python
+.add_transition(
+    id="death",
+    source=["S", "I", "R"],
+    target=[],
+    rate="d_base * $compartment",  # Fallback rate
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "d_young * $compartment"  # Lower death rate for young
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "d_old * $compartment"  # Higher death rate for old
+        }
+    ]
+)
+```
+
+### With Unit Checking
+
+Add units to parameters and bins for automatic dimensional validation and annotated equation display:
+
+```python
+model = (
+    ModelBuilder(name="SIR with Units", version="1.0", bin_unit="person")
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
@@ -110,23 +191,66 @@ model = (
 
 # Validate dimensional consistency
 model.check_unit_consistency()  # Ensures all equations have correct units
+
+# Print equations with unit annotations
+model.print_equations()
+# Output shows:
+#   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
+#   I -> R: gamma(1/day) * I(person) [person/day]
 ```
+
+**Note**: Units must be defined for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError` to prevent inconsistent models.
 
 ### Model Calibration
 
-Fit model parameters to observed data using optimization algorithms:
+Fit model parameters to observed data using optimization algorithms. Parameters to be calibrated should be set to `None`:
 
 ```python
 from commol import (
+    ModelBuilder,
+    Simulation,
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
+    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
     LossFunction,
     OptimizationConfig,
     OptimizationAlgorithm,
     ParticleSwarmConfig,
+)
+from commol.constants import ModelTypes
+
+# Build model with unknown parameters
+model = (
+    ModelBuilder(name="SIR Model", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="gamma", value=None)  # To be calibrated
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
 )
 
 # Define observed data from real outbreak
@@ -136,20 +260,40 @@ observed_data = [
     ObservedDataPoint(step=30, compartment="I", value=62.3),
 ]
 
-# Specify parameters to calibrate with bounds
+# Simulation can be created with None values for calibration
+simulation = Simulation(model)
+
+# Specify parameters to calibrate with bounds and initial guesses
 parameters = [
-    CalibrationParameter(id="beta", min_bound=0.0, max_bound=1.0),
-    CalibrationParameter(id="gamma", min_bound=0.0, max_bound=1.0),
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+        initial_guess=0.3  # Starting point
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.0,
+        max_bound=1.0,
+    ),
 ]
 
 # Configure calibration problem
+pso_config = ParticleSwarmConfig.create(
+    num_particles=40,
+    max_iterations=300,
+    verbose=True
+)
+
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=300),
+        config=pso_config,
     ),
 )
 
@@ -159,6 +303,13 @@ result = calibrator.run()
 
 print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
 print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+
+# Update model with calibrated parameters
+model.update_parameters(result.best_parameters)
+
+# Create new simulation with calibrated model
+calibrated_simulation = Simulation(model)
+calibrated_results = calibrated_simulation.run(num_steps=100)
 ```
 
 ## Documentation

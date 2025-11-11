@@ -1,11 +1,11 @@
 import math
 from collections.abc import Callable
+from typing import cast
 
 import pint
 
 from commol.context.parameter import Parameter
 from commol.context.stratification import Stratification
-
 
 # Initialize unit registry and define custom units
 ureg = pint.UnitRegistry()
@@ -15,6 +15,26 @@ ureg = pint.UnitRegistry()
 ureg.define("person = [population]")
 ureg.define("individual = person")
 ureg.define("people = person")
+
+# Define abstract time unit as a base dimension
+# This allows users to specify 'time' as a generic time unit
+ureg.define("time = [time_abstract]")
+
+# Define additional time units that are not in pint's default registry
+# Note: pint already includes many time units (second, minute, hour, day, week, year)
+# and some aliases (s, min, h, d, yr, a). We add commonly used aliases and units.
+
+_units_to_conditionally_add = {
+    "semester": "6 * month",
+    "wk": "week",
+    "mon": "month",
+}
+
+for unit_name, unit_definition in _units_to_conditionally_add.items():
+    try:
+        _ = ureg(unit_name)
+    except pint.UndefinedUnitError:
+        ureg.define(f"{unit_name} = {unit_definition}")
 
 
 class UnitConsistencyError(Exception):
@@ -50,7 +70,7 @@ def check_equation_units(
     """
     try:
         # Parse the equation to build a pint Quantity
-        equation_unit = _parse_equation_unit(equation, variable_units)
+        equation_unit = parse_equation_unit(equation, variable_units)
 
         # Check if result matches expected unit
         expected_quantity = ureg(expected_unit)
@@ -72,9 +92,7 @@ def check_equation_units(
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
 
 
-def _parse_equation_unit(
-    equation: str, variable_units: dict[str, str]
-) -> pint.Quantity:
+def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
     """
     Parse an equation and compute its resulting unit.
 
@@ -163,16 +181,45 @@ def _parse_equation_unit(
 
     # Evaluate the equation
     try:
-        result = eval(equation, {"__builtins__": {}}, namespace)
-        if isinstance(result, pint.Quantity):
-            return result
-        elif isinstance(result, (int, float)):
+        eval_result: object = cast(
+            object, eval(equation, {"__builtins__": {}}, namespace)
+        )
+
+        if isinstance(eval_result, pint.Quantity):
+            return eval_result
+        elif isinstance(eval_result, (int, float)):
             # If result is a number, it's dimensionless
-            dimensionless_quantity: pint.Quantity = float(result) * ureg.dimensionless
-            return dimensionless_quantity
+            numeric_value = float(eval_result)
+            unit_result = ureg.dimensionless
+
+            if isinstance(unit_result, pint.Unit):
+                # Multiply numeric value by Unit to get Quantity
+                quantity_result: object = cast(object, numeric_value * unit_result)
+                # The result should be a Quantity
+                if isinstance(quantity_result, pint.Quantity):
+                    return quantity_result
+                else:
+                    raise ValueError(
+                        (
+                            f"Multiplying float by Unit did not produce "
+                            f"Quantity: {type(quantity_result)}"
+                        )
+                    )
+            else:
+                # ureg.dimensionless might be a Quantity itself
+                quantity_result = cast(object, numeric_value * unit_result)
+                if isinstance(quantity_result, pint.Quantity):
+                    return quantity_result
+                else:
+                    raise ValueError(
+                        (
+                            f"Multiplying float by dimensionless did not "
+                            f"produce Quantity: {type(quantity_result)}"
+                        )
+                    )
         else:
             raise ValueError(
-                f"Unexpected result type {type(result)} from equation '{equation}'"
+                f"Unexpected result type {type(eval_result)} from equation '{equation}'"
             )
     except Exception as e:
         raise ValueError(f"Failed to evaluate equation '{equation}': {str(e)}")
@@ -180,16 +227,18 @@ def _parse_equation_unit(
 
 def get_predefined_variable_units(
     stratifications: list[Stratification],
+    bin_unit: str | None = None,
 ) -> dict[str, str]:
     """
     Get units for predefined variables like N, N_young, etc.
-
-    All population-related variables have units of "person".
 
     Parameters
     ----------
     stratifications : list
         List of stratification objects with categories.
+    bin_unit : str | None
+        The unit for bins. If None, predefined variables will not be added to the
+        units mapping.
 
     Returns
     -------
@@ -198,18 +247,22 @@ def get_predefined_variable_units(
     """
     predefined_units: dict[str, str] = {}
 
+    # Only add predefined variables if bin_unit is specified
+    if bin_unit is None:
+        return predefined_units
+
     # Total population N
-    predefined_units["N"] = "person"
+    predefined_units["N"] = bin_unit
 
     # Add N_{category} for each category in stratifications
     for strat in stratifications:
         for category in strat.categories:
-            predefined_units[f"N_{category}"] = "person"
+            predefined_units[f"N_{category}"] = bin_unit
 
     # Add N_{category1}_{category2} for combinations
     # This handles cases like N_young_urban, etc.
     if len(stratifications) > 1:
-        from itertools import product, combinations
+        from itertools import combinations, product
 
         category_groups = [s.categories for s in stratifications]
 
@@ -221,7 +274,7 @@ def get_predefined_variable_units(
             for i in range(1, len(combo_tuple) + 1):
                 for subset in combinations(combo_tuple, i):
                     var_name = f"N_{'_'.join(subset)}"
-                    predefined_units[var_name] = "person"
+                    predefined_units[var_name] = bin_unit
 
     return predefined_units
 

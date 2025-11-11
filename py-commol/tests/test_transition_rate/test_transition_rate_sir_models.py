@@ -38,7 +38,7 @@ class TestBasicSIRRateFormulas:
                 .add_transition(id="recovery", source=["I"], target=["R"], rate=0.1)
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -62,7 +62,7 @@ class TestBasicSIRRateFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -86,7 +86,7 @@ class TestBasicSIRRateFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -113,7 +113,7 @@ class TestBasicSIRRateFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -165,7 +165,7 @@ class TestStepVaryingRates:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -193,7 +193,7 @@ class TestStepVaryingRates:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -226,7 +226,7 @@ class TestStepVaryingRates:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -279,7 +279,7 @@ class TestComplexMathematicalFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -310,7 +310,7 @@ class TestComplexMathematicalFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -342,7 +342,7 @@ class TestComplexMathematicalFormulas:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             _ = simulation.run(10)
 
@@ -393,7 +393,7 @@ class TestMathematicalEdgeCases:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             results = simulation.run(1000)  # Longer simulation for small rates
 
@@ -422,7 +422,7 @@ class TestMathematicalEdgeCases:
                 # No recovery transition (zero recovery rate)
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             results = simulation.run(50)
 
@@ -462,7 +462,7 @@ class TestMathematicalEdgeCases:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             results = simulation.run(100)
 
@@ -500,7 +500,7 @@ class TestMathematicalEdgeCases:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             results = simulation.run(50)
 
@@ -550,7 +550,7 @@ class TestRateFormulaErrorHandling:
                         ],
                     )
                 )
-                _ = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                _ = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
     def test_undefined_parameters_in_formulas(self):
         """Test handling of undefined parameters in formulas."""
@@ -582,7 +582,7 @@ class TestRateFormulaErrorHandling:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
 
             # TODO: Check
@@ -628,7 +628,7 @@ class TestRateFormulaErrorHandling:
                 )
             )
 
-            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
             simulation = Simulation(model)
             results = simulation.run(10)
 
@@ -690,7 +690,7 @@ class TestMathematicalFunctionComprehensive:
                     )
                 )
 
-                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
                 simulation = Simulation(model)
                 results = simulation.run(50)
 
@@ -737,7 +737,7 @@ class TestMathematicalFunctionComprehensive:
                     )
                 )
 
-                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
                 simulation = Simulation(model)
                 results = simulation.run(30)
 
@@ -772,7 +772,7 @@ class TestMathematicalFunctionComprehensive:
                     )
                 )
 
-                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
                 simulation = Simulation(model)
                 results = simulation.run(30)
 
@@ -810,7 +810,7 @@ class TestMathematicalFunctionComprehensive:
                     )
                 )
 
-                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
                 simulation = Simulation(model)
                 results = simulation.run(30)
 
@@ -852,7 +852,7 @@ class TestMathematicalFunctionComprehensive:
                     )
                 )
 
-                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+                model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
                 simulation = Simulation(model)
                 results = simulation.run(20)
 
