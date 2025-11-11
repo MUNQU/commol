@@ -750,6 +750,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-compartment-placeholder" class="md-nav__link">
+    <span class="md-ellipsis">
+      The $compartment Placeholder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#parameter-references" class="md-nav__link">
     <span class="md-ellipsis">
       Parameter References
@@ -1672,6 +1681,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-compartment-placeholder" class="md-nav__link">
+    <span class="md-ellipsis">
+      The $compartment Placeholder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#parameter-references" class="md-nav__link">
     <span class="md-ellipsis">
       Parameter References
@@ -2112,6 +2130,11 @@
 <td>int</td>
 <td>Alias for <code>step</code></td>
 </tr>
+<tr>
+<td><code>$compartment</code></td>
+<td>str</td>
+<td>Placeholder that expands to each source compartment name (see below)</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
@@ -2119,13 +2142,79 @@
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * sin(2 * pi * t)&quot;</span>    <span class="c1"># Periodic variation</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;gamma * exp(-0.01 * step)&quot;</span> <span class="c1"># Exponential decay over time</span>
 </span></code></pre></div>
+<h3 id="the-compartment-placeholder">The <code>$compartment</code> Placeholder<a class="headerlink" href="#the-compartment-placeholder" title="Permanent link">&para;</a></h3>
+<p>The <code>$compartment</code> special variable is a <strong>template placeholder</strong> that automatically expands multi-compartment transitions into individual per-compartment transitions:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Instead of writing repetitive code:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;death_S&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;S&quot;</span><span class="p">],</span> <span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;d * S&quot;</span><span class="p">)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;death_I&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">],</span> <span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;d * I&quot;</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;death_R&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;R&quot;</span><span class="p">],</span> <span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;d * R&quot;</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1"># Use $compartment to write it once:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;death&quot;</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;S&quot;</span><span class="p">,</span> <span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="s2">&quot;R&quot;</span><span class="p">],</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[],</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;d * $compartment&quot;</span>  <span class="c1"># Automatically expands</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>System detects <code>$compartment</code> in the rate formula</li>
+<li>Creates one transition per source compartment</li>
+<li>Replaces <code>$compartment</code> with the actual compartment name in each formula</li>
+</ol>
+<p><strong>Generated transitions:</strong></p>
+<ul>
+<li><code>death__S</code>: <code>rate = "d * S"</code></li>
+<li><code>death__I</code>: <code>rate = "d * I"</code></li>
+<li><code>death__R</code>: <code>rate = "d * R"</code></li>
+</ul>
+<p><strong>Multiple occurrences in complex formulas:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;d * $compartment * (1 + 0.1 * $compartment / N)&quot;</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Expands to:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># death__S: &quot;d * S * (1 + 0.1 * S / N)&quot;</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># death__I: &quot;d * I * (1 + 0.1 * I / N)&quot;</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># death__R: &quot;d * R * (1 + 0.1 * R / N)&quot;</span>
+</span></code></pre></div>
+<p><strong>With stratified rates:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;death&quot;</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;S&quot;</span><span class="p">,</span> <span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="s2">&quot;R&quot;</span><span class="p">],</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[],</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;d_base * $compartment&quot;</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">stratified_rates</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="p">{</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>            <span class="s2">&quot;conditions&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;age&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;young&quot;</span><span class="p">}],</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>            <span class="s2">&quot;rate&quot;</span><span class="p">:</span> <span class="s2">&quot;d_young * $compartment&quot;</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="p">},</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="p">{</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>            <span class="s2">&quot;conditions&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;age&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;old&quot;</span><span class="p">}],</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>            <span class="s2">&quot;rate&quot;</span><span class="p">:</span> <span class="s2">&quot;d_old * $compartment&quot;</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>        <span class="p">}</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="p">]</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>When to use:</strong></p>
+<ul>
+<li>Per-capita rates that apply to multiple compartments (deaths, emigration)</li>
+<li>Treatment transitions from multiple disease states to recovery</li>
+<li>Any time you need the same formula pattern applied to different compartments</li>
+</ul>
+<p><strong>When NOT to use:</strong></p>
+<ul>
+<li>Standard multi-compartment interactions (use regular syntax)</li>
+<li>Single source compartment (use compartment name directly)</li>
+<li>Different formulas for different compartments (write separate transitions)</li>
+</ul>
+<p>See <a href="../building-models/#using-compartment-placeholder-for-per-compartment-rates">Building Models - Using $compartment Placeholder</a> for more details.</p>
 <h3 id="parameter-references">Parameter References<a class="headerlink" href="#parameter-references" title="Permanent link">&para;</a></h3>
 <p>Reference any parameter by its ID:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="n">rate</span><span class="o">=</span><span class="s2">&quot;beta * S * I / N&quot;</span><span class="p">)</span>  <span class="c1"># Uses beta parameter</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="n">rate</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">)</span>             <span class="c1"># Uses gamma parameter</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="n">rate</span><span class="o">=</span><span class="s2">&quot;beta * S * I / N&quot;</span><span class="p">)</span>  <span class="c1"># Uses beta parameter</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="n">rate</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">)</span>             <span class="c1"># Uses gamma parameter</span>
 </span></code></pre></div>
 <h2 id="mathematical-functions">Mathematical Functions<a class="headerlink" href="#mathematical-functions" title="Permanent link">&para;</a></h2>
 <h3 id="trigonometric-functions">Trigonometric Functions<a class="headerlink" href="#trigonometric-functions" title="Permanent link">&para;</a></h3>
@@ -2176,8 +2265,8 @@
 </tbody>
 </table>
 <p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Seasonal variation (peaks annually)</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * sin(2 * pi * step / 365)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Seasonal variation (peaks annually)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * sin(2 * pi * step / 365)&quot;</span>
 </span></code></pre></div>
 <h3 id="exponential-and-logarithmic">Exponential and Logarithmic<a class="headerlink" href="#exponential-and-logarithmic" title="Permanent link">&para;</a></h3>
 <table>
@@ -2217,8 +2306,8 @@
 </tbody>
 </table>
 <p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Exponential decay over time</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;gamma * exp(-0.01 * step)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Exponential decay over time</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;gamma * exp(-0.01 * step)&quot;</span>
 </span></code></pre></div>
 <h3 id="power-and-root">Power and Root<a class="headerlink" href="#power-and-root" title="Permanent link">&para;</a></h3>
 <table>
@@ -2248,8 +2337,8 @@
 </tbody>
 </table>
 <p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Square root relationship</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * sqrt(I)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Square root relationship</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * sqrt(I)&quot;</span>
 </span></code></pre></div>
 <h3 id="comparison-functions">Comparison Functions<a class="headerlink" href="#comparison-functions" title="Permanent link">&para;</a></h3>
 <table>
@@ -2279,8 +2368,8 @@
 </tbody>
 </table>
 <p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Ensure rate stays positive</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, beta - 0.001 * step)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Ensure rate stays positive</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, beta - 0.001 * step)&quot;</span>
 </span></code></pre></div>
 <h3 id="rounding-functions">Rounding Functions<a class="headerlink" href="#rounding-functions" title="Permanent link">&para;</a></h3>
 <table>
@@ -2339,39 +2428,39 @@
 <h2 id="common-patterns">Common Patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="time-dependent-rates">Time-Dependent Rates<a class="headerlink" href="#time-dependent-rates" title="Permanent link">&para;</a></h3>
 <p>Use <code>step</code> or <code>t</code> for time-varying rates:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Linear increase</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.1 + 0.001 * step&quot;</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Exponential decay</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * exp(-0.01 * t)&quot;</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Seasonal pattern (annual cycle)</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * step / 365))&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Linear increase</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.1 + 0.001 * step&quot;</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Exponential decay</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * exp(-0.01 * t)&quot;</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Seasonal pattern (annual cycle)</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * step / 365))&quot;</span>
 </span></code></pre></div>
 <h3 id="population-dependent-rates">Population-Dependent Rates<a class="headerlink" href="#population-dependent-rates" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Standard mass action</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I&quot;</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Frequency-dependent (normalized by population)</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Saturation effect</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / (1 + I)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Standard mass action</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I&quot;</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Frequency-dependent (normalized by population)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Saturation effect</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / (1 + I)&quot;</span>
 </span></code></pre></div>
 <h3 id="threshold-effects">Threshold Effects<a class="headerlink" href="#threshold-effects" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Activate when condition is met</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, beta) * (I &gt; 100)&quot;</span>  <span class="c1"># Only when I &gt; 100</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Reduce transmission above threshold</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * min(1, 100 / I)&quot;</span>    <span class="c1"># Reduces when I &gt; 100</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Activate when condition is met</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, beta) * (I &gt; 100)&quot;</span>  <span class="c1"># Only when I &gt; 100</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Reduce transmission above threshold</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * min(1, 100 / I)&quot;</span>    <span class="c1"># Reduces when I &gt; 100</span>
 </span></code></pre></div>
 <h3 id="composite-expressions">Composite Expressions<a class="headerlink" href="#composite-expressions" title="Permanent link">&para;</a></h3>
 <p>Combine multiple effects:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Seasonal transmission with saturation</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / (N + I)&quot;</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Time-varying intervention</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * max(0.2, 1 - 0.01 * step) * S * I / N&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Seasonal transmission with saturation</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / (N + I)&quot;</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Time-varying intervention</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * max(0.2, 1 - 0.01 * step) * S * I / N&quot;</span>
 </span></code></pre></div>
 <h2 id="operator-precedence">Operator Precedence<a class="headerlink" href="#operator-precedence" title="Permanent link">&para;</a></h2>
 <p>From highest to lowest priority:</p>
@@ -2382,59 +2471,59 @@
 <li><strong>Addition/Subtraction</strong>: <code>+</code>, <code>-</code></li>
 </ol>
 <p><strong>Examples:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 + 3 * 4&quot;</span>        <span class="c1"># = 14 (multiplication first)</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;(2 + 3) * 4&quot;</span>      <span class="c1"># = 20 (parentheses first)</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 ** 3 * 4&quot;</span>       <span class="c1"># = 32 (exponentiation first)</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 * 3 ** 4&quot;</span>       <span class="c1"># = 162 (exponentiation before multiplication)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 + 3 * 4&quot;</span>        <span class="c1"># = 14 (multiplication first)</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;(2 + 3) * 4&quot;</span>      <span class="c1"># = 20 (parentheses first)</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 ** 3 * 4&quot;</span>       <span class="c1"># = 32 (exponentiation first)</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;2 * 3 ** 4&quot;</span>       <span class="c1"># = 162 (exponentiation before multiplication)</span>
 </span></code></pre></div>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <h3 id="1-use-meaningful-parameters">1. Use Meaningful Parameters<a class="headerlink" href="#1-use-meaningful-parameters" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Good: Clear parameter names</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Avoid: Magic numbers</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.3 * S * I / N&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Good: Clear parameter names</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="c1"># Avoid: Magic numbers</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.3 * S * I / N&quot;</span>
 </span></code></pre></div>
 <h3 id="2-prevent-division-by-zero">2. Prevent Division by Zero<a class="headerlink" href="#2-prevent-division-by-zero" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Good: Add small constant</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / (N + 1)&quot;</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Good: Use max</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / max(N, 1)&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Good: Add small constant</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / (N + 1)&quot;</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Good: Use max</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / max(N, 1)&quot;</span>
 </span></code></pre></div>
 <h3 id="3-keep-expressions-simple">3. Keep Expressions Simple<a class="headerlink" href="#3-keep-expressions-simple" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Good: Simple and readable</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Acceptable but complex:</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / N&quot;</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Better: Split into parameters</span>
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;seasonal_beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365))&quot;</span><span class="p">)</span>
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;seasonal_beta * S * I / N&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Good: Simple and readable</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Acceptable but complex:</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / N&quot;</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Better: Split into parameters</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;seasonal_beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * t / 365))&quot;</span><span class="p">)</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;seasonal_beta * S * I / N&quot;</span>
 </span></code></pre></div>
 <h3 id="4-document-complex-expressions">4. Document Complex Expressions<a class="headerlink" href="#4-document-complex-expressions" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;seasonal_infection&quot;</span><span class="p">,</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;S&quot;</span><span class="p">],</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">],</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * step / 365)) * S * I / N&quot;</span><span class="p">,</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Infection with 30</span><span class="si">% s</span><span class="s2">easonal amplitude, annual cycle&quot;</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;seasonal_infection&quot;</span><span class="p">,</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;S&quot;</span><span class="p">],</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">],</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;beta * (1 + 0.3 * sin(2 * pi * step / 365)) * S * I / N&quot;</span><span class="p">,</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Infection with 30</span><span class="si">% s</span><span class="s2">easonal amplitude, annual cycle&quot;</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="security-features">Security Features<a class="headerlink" href="#security-features" title="Permanent link">&para;</a></h2>
 <p>EpiModel validates all expressions for security:</p>
 <h3 id="safe-operations">Safe Operations<a class="headerlink" href="#safe-operations" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>                    <span class="c1"># Mathematical operations</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;sin(2 * pi * t)&quot;</span>                     <span class="c1"># Mathematical functions</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, gamma - 0.01 * step)&quot;</span>        <span class="c1"># Built-in functions</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>                    <span class="c1"># Mathematical operations</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;sin(2 * pi * t)&quot;</span>                     <span class="c1"># Mathematical functions</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;max(0, gamma - 0.01 * step)&quot;</span>        <span class="c1"># Built-in functions</span>
 </span></code></pre></div>
 <h3 id="blocked-operations">Blocked Operations<a class="headerlink" href="#blocked-operations" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;__import__(&#39;os&#39;)&quot;</span>                    <span class="c1"># Python imports</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;eval(&#39;code&#39;)&quot;</span>                        <span class="c1"># Code evaluation</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;exec(&#39;code&#39;)&quot;</span>                        <span class="c1"># Code execution</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;open(&#39;file&#39;)&quot;</span>                        <span class="c1"># File operations</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;__import__(&#39;os&#39;)&quot;</span>                    <span class="c1"># Python imports</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;eval(&#39;code&#39;)&quot;</span>                        <span class="c1"># Code evaluation</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;exec(&#39;code&#39;)&quot;</span>                        <span class="c1"># Code execution</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;open(&#39;file&#39;)&quot;</span>                        <span class="c1"># File operations</span>
 </span></code></pre></div>
 <p>The parser:</p>
 <ul>
@@ -2455,21 +2544,21 @@
 <ol>
 <li><strong>Use parameters for constants</strong>:</li>
 </ol>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Slower: recalculates each step</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.3 * S * I / 1000&quot;</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Faster: parameter lookup</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Slower: recalculates each step</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;0.3 * S * I / 1000&quot;</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Faster: parameter lookup</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>
 </span></code></pre></div>
 <ol>
 <li><strong>Simplify when possible</strong>:</li>
 </ol>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Complex</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / N + gamma * I / N&quot;</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Simplified</span>
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;(beta + gamma) * I / N&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Complex</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * I / N + gamma * I / N&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Simplified</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;(beta + gamma) * I / N&quot;</span>
 </span></code></pre></div>
 <ol>
 <li><strong>Profile complex models</strong>: Use <code>time</code> module to measure performance with different expressions.</li>
