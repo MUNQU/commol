@@ -166,6 +166,7 @@ class TestCompartmentPlaceholder:
 
         # Check that all occurrences of $compartment were replaced
         for transition in model.dynamics.transitions:
+            assert transition.rate is not None
             assert "$compartment" not in transition.rate
             source_compartment = transition.source[0]
             expected_rate = (

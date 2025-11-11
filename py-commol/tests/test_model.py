@@ -38,7 +38,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -121,7 +121,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Check that the parameter was created with a formula
         beta_param = next(p for p in model.parameters if p.id == "beta")
@@ -171,7 +171,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Check that the parameter was created with a formula
         young_fraction_param = next(
@@ -214,7 +214,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "equations.txt"
@@ -305,7 +305,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -388,7 +388,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -551,7 +551,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -671,7 +671,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -745,7 +745,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
@@ -819,7 +819,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise ValueError for partial units
         with pytest.raises(ValueError, match="Some parameters have units but not all"):
@@ -854,7 +854,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise ValueError for partial units (bins have units but params don't)
         with pytest.raises(ValueError, match="Some parameters have units but not all"):
@@ -888,7 +888,7 @@ class TestModel:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         old_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()

@@ -230,11 +230,14 @@ impl PyParticleSwarmConfig {
     ///     num_particles: Number of particles in the swarm (default: 20)
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     target_cost: Target cost for early stopping (default: None)
-    ///     inertia_factor: Inertia weight applied to velocity (default: None, uses argmin's default)
-    ///     cognitive_factor: Attraction to personal best (default: None, uses argmin's default)
-    ///     social_factor: Attraction to swarm best (default: None, uses argmin's default)
+    ///     inertia_factor: Constant inertia weight applied to velocity (default: None, uses argmin's default)
+    ///     cognitive_factor: Cognitive acceleration factor - attraction to personal best (default: None, uses argmin's default)
+    ///     social_factor: Social acceleration factor - attraction to swarm best (default: None, uses argmin's default)
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
+    ///
+    /// Note: For advanced features like chaotic inertia, TVAC, initialization strategies,
+    /// velocity control, and mutation, use the builder methods after construction.
     #[new]
     #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
@@ -248,16 +251,36 @@ impl PyParticleSwarmConfig {
         verbose: bool,
         header_interval: u64,
     ) -> Self {
+        let mut config = commol_calibration::ParticleSwarmConfig {
+            num_particles,
+            max_iterations,
+            target_cost,
+            inertia_strategy: None,
+            acceleration_strategy: None,
+            initialization_strategy: commol_calibration::InitializationStrategy::UniformRandom,
+            velocity_clamp_factor: None,
+            velocity_mutation_threshold: None,
+            mutation_strategy: commol_calibration::MutationStrategy::None,
+            mutation_probability: 0.0,
+            mutation_application: commol_calibration::MutationApplication::None,
+            verbose,
+        };
+
+        // Convert old-style parameters to new-style if provided
+        if let Some(inertia) = inertia_factor {
+            config.inertia_strategy =
+                Some(commol_calibration::InertiaWeightStrategy::Constant(inertia));
+        }
+
+        if cognitive_factor.is_some() || social_factor.is_some() {
+            let cognitive = cognitive_factor.unwrap_or(0.5 + 2.0f64.ln());
+            let social = social_factor.unwrap_or(0.5 + 2.0f64.ln());
+            config.acceleration_strategy =
+                Some(commol_calibration::AccelerationStrategy::Constant { cognitive, social });
+        }
+
         Self {
-            inner: commol_calibration::ParticleSwarmConfig {
-                num_particles,
-                max_iterations,
-                target_cost,
-                inertia_factor,
-                cognitive_factor,
-                social_factor,
-                verbose,
-            },
+            inner: config,
             header_interval,
         }
     }
@@ -266,6 +289,117 @@ impl PyParticleSwarmConfig {
     #[getter]
     fn header_interval(&self) -> u64 {
         self.header_interval
+    }
+
+    /// Set chaotic inertia weight using logistic map
+    ///
+    /// Args:
+    ///     w_min: Minimum inertia weight
+    ///     w_max: Maximum inertia weight
+    fn set_chaotic_inertia(&mut self, w_min: f64, w_max: f64) {
+        self.inner.inertia_strategy =
+            Some(commol_calibration::InertiaWeightStrategy::Chaotic { w_min, w_max });
+    }
+
+    /// Enable Time-Varying Acceleration Coefficients (TVAC)
+    ///
+    /// Args:
+    ///     c1_initial: Initial cognitive factor
+    ///     c1_final: Final cognitive factor
+    ///     c2_initial: Initial social factor
+    ///     c2_final: Final social factor
+    fn set_tvac(&mut self, c1_initial: f64, c1_final: f64, c2_initial: f64, c2_final: f64) {
+        self.inner.acceleration_strategy =
+            Some(commol_calibration::AccelerationStrategy::TimeVarying {
+                c1_initial,
+                c1_final,
+                c2_initial,
+                c2_final,
+            });
+    }
+
+    /// Set initialization strategy
+    ///
+    /// Args:
+    ///     strategy: One of "uniform" (default), "latin_hypercube", or "opposition_based"
+    fn set_initialization_strategy(&mut self, strategy: &str) -> PyResult<()> {
+        self.inner.initialization_strategy = match strategy {
+            "uniform" | "uniform_random" => {
+                commol_calibration::InitializationStrategy::UniformRandom
+            }
+            "latin_hypercube" | "lhs" => commol_calibration::InitializationStrategy::LatinHypercube,
+            "opposition_based" | "obl" => {
+                commol_calibration::InitializationStrategy::OppositionBased
+            }
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unknown initialization strategy: {}. Valid options: 'uniform', 'latin_hypercube', 'opposition_based'",
+                    strategy
+                )));
+            }
+        };
+        Ok(())
+    }
+
+    /// Enable velocity clamping
+    ///
+    /// Args:
+    ///     clamp_factor: Fraction of search space range (typically 0.1 to 0.2)
+    fn set_velocity_clamping(&mut self, clamp_factor: f64) {
+        self.inner.velocity_clamp_factor = Some(clamp_factor);
+    }
+
+    /// Enable velocity mutation when velocity approaches zero
+    ///
+    /// Args:
+    ///     threshold: Velocity threshold below which reinitialization occurs (typically 0.001 to 0.01)
+    fn set_velocity_mutation(&mut self, threshold: f64) {
+        self.inner.velocity_mutation_threshold = Some(threshold);
+    }
+
+    /// Enable mutation to help escape local optima
+    ///
+    /// Args:
+    ///     strategy: Either "gaussian" or "cauchy"
+    ///     scale: Standard deviation (for gaussian) or scale parameter (for cauchy)
+    ///     probability: Mutation probability per iteration (0.0 to 1.0)
+    ///     application: One of "global_best" (default), "all_particles", or "below_average"
+    #[pyo3(signature = (strategy, scale, probability, application="global_best"))]
+    fn set_mutation(
+        &mut self,
+        strategy: &str,
+        scale: f64,
+        probability: f64,
+        application: &str,
+    ) -> PyResult<()> {
+        self.inner.mutation_strategy = match strategy {
+            "gaussian" => commol_calibration::MutationStrategy::Gaussian(scale),
+            "cauchy" => commol_calibration::MutationStrategy::Cauchy(scale),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unknown mutation strategy: {}. Valid options: 'gaussian', 'cauchy'",
+                    strategy
+                )));
+            }
+        };
+
+        self.inner.mutation_probability = probability;
+
+        self.inner.mutation_application = match application {
+            "global_best" | "global_best_only" => {
+                commol_calibration::MutationApplication::GlobalBestOnly
+            }
+            "all" | "all_particles" => commol_calibration::MutationApplication::AllParticles,
+            "below_average" => commol_calibration::MutationApplication::BelowAverage,
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unknown mutation application: {}. Valid options: 'global_best', 'all_particles', 'below_average'",
+                    application
+                )));
+            }
+        };
+
+        Ok(())
     }
 }
 

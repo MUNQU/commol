@@ -113,7 +113,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise an exception
         model.check_unit_consistency()
@@ -140,7 +140,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise error because parameters lack units
         with pytest.raises(UnitConsistencyError) as exc_info:
@@ -170,7 +170,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise UnitConsistencyError
         with pytest.raises(UnitConsistencyError) as error:
@@ -228,7 +228,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise an exception
         model.check_unit_consistency()
@@ -255,7 +255,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise error because gamma lacks a unit
         with pytest.raises(UnitConsistencyError) as exc_info:
@@ -293,7 +293,7 @@ class TestModelUnitConsistency:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise an exception
         model.check_unit_consistency()
@@ -329,7 +329,7 @@ class TestComplexUnits:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise
         model.check_unit_consistency()
@@ -423,7 +423,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -458,7 +458,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -497,7 +497,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -550,7 +550,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -590,7 +590,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -636,7 +636,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -722,7 +722,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -762,7 +762,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -806,7 +806,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -864,7 +864,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         with pytest.raises(UnitConsistencyError) as exc_info:
             model.check_unit_consistency()
@@ -1023,7 +1023,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise UnitConsistencyError
         with pytest.raises(UnitConsistencyError) as exc_info:
@@ -1244,7 +1244,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise an exception
         model.check_unit_consistency()
@@ -1283,7 +1283,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should not raise an exception
         model.check_unit_consistency()
@@ -1347,7 +1347,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Unit checking should pass because beta's unit is inferred as "1/day"
         model.check_unit_consistency()
@@ -1392,7 +1392,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
         model.check_unit_consistency()
 
     def test_formula_parameter_missing_dependency_units(self):
@@ -1424,7 +1424,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise error because invalid_param has no defined unit
         # (because it references nonexistent_var which has no unit)
@@ -1463,7 +1463,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
         # Should successfully infer units through the chain
         model.check_unit_consistency()
 
@@ -1491,7 +1491,7 @@ class TestFullModelUnitFailures:
             )
         )
 
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Should raise error because beta (constant) has no unit
         with pytest.raises(UnitConsistencyError) as exc_info:

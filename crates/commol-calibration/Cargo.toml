@@ -12,9 +12,9 @@ crate-type = ["rlib"]
 
 [dependencies]
 # Optimization library
-argmin = "0.10"
-argmin-math = "0.4"
-argmin-observer-slog = "0.1"
+argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }
+argmin-math = { git = "https://github.com/MUNQU/argmin", branch = "development" }
+argmin-observer-slog = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 
 # Commol dependencies
 commol-core = { path = "../commol-core" }

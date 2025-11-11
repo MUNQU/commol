@@ -106,18 +106,21 @@ parameters = [
     ),
 ]
 
-# Configure the calibration problem
+# Configure the calibration problem with Particle Swarm Optimization
+# Use the builder pattern for clearer configuration
+pso_config = ParticleSwarmConfig.create(
+    num_particles=30,
+    max_iterations=500,
+    verbose=True  # Show optimization progress
+)
+
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(
-            num_particles=30,
-            max_iterations=500,
-            verbose=True  # Show optimization progress
-        ),
+        config=pso_config,
     ),
 )
 
@@ -264,31 +267,73 @@ $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
 
 ### Particle Swarm Optimization (PSO)
 
-Population-based algorithm inspired by social behavior. Good for global optimization:
+Population-based algorithm inspired by social behavior. Good for global optimization.
+
+**Basic Configuration:**
+
+Use the `create()` factory method and builder methods for clear configuration:
 
 ```python
 from commol import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
 
+# Basic PSO configuration
+pso_config = ParticleSwarmConfig.create(
+    num_particles=40,        # Number of particles in swarm
+    max_iterations=1000,     # Maximum iterations
+    target_cost=0.01,        # Stop if loss below this (optional)
+    verbose=True,            # Print progress
+    header_interval=50       # Print header every N iterations
+)
+
 optimization_config = OptimizationConfig(
     algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-    config=ParticleSwarmConfig(
-        num_particles=40,        # Number of particles in swarm
-        max_iterations=1000,     # Maximum iterations
-        target_cost=0.01,        # Stop if loss below this (optional)
-        inertia_factor=0.7,      # Velocity inertia (optional)
-        cognitive_factor=1.5,    # Attraction to personal best (optional)
-        social_factor=1.5,       # Attraction to global best (optional)
-        verbose=True,            # Print progress
-        header_interval=50       # Print header every N iterations
-    ),
+    config=pso_config,
 )
 ```
 
-**When to use**:
+**Advanced Configuration with Builder Methods:**
+
+```python
+# PSO with chaotic inertia and TVAC
+pso_config = (
+    ParticleSwarmConfig.create(num_particles=40, max_iterations=1000, verbose=True)
+    .with_chaotic_inertia(w_min=0.4, w_max=0.9)  # Dynamic inertia weight
+    .with_tvac(c1_initial=2.5, c1_final=0.5,     # Time-varying acceleration
+               c2_initial=0.5, c2_final=2.5)
+    .with_initialization_strategy("latin_hypercube")  # Better initial distribution
+)
+
+# PSO with mutation to escape local optima
+pso_config = (
+    ParticleSwarmConfig.create(num_particles=50, max_iterations=2000)
+    .with_acceleration(cognitive=2.0, social=2.0)  # Constant acceleration
+    .with_velocity_clamping(0.2)  # Prevent explosive velocities
+    .with_mutation(
+        strategy="gaussian",      # Gaussian mutation
+        scale=0.1,               # Mutation intensity
+        probability=0.05,        # 5% mutation chance per iteration
+        application="global_best"  # Apply to best particle only
+    )
+)
+```
+
+**Builder Methods:**
+
+- `.with_inertia(factor)` - Set constant inertia weight
+- `.with_chaotic_inertia(w_min, w_max)` - Enable chaotic inertia (conflicts with `with_inertia`)
+- `.with_acceleration(cognitive, social)` - Set constant acceleration factors
+- `.with_tvac(c1_i, c1_f, c2_i, c2_f)` - Time-varying acceleration (conflicts with `with_acceleration`)
+- `.with_initialization_strategy(strategy)` - "uniform", "latin_hypercube", or "opposition_based"
+- `.with_velocity_clamping(factor)` - Clamp velocities (typically 0.1-0.2)
+- `.with_velocity_mutation(threshold)` - Reinitialize near-zero velocities
+- `.with_mutation(strategy, scale, probability, application)` - Enable mutation
+
+**When to use PSO:**
 
 - Multiple local minima expected
 - Robust global search needed
 - Multiple parameters to calibrate
+- Complex parameter landscapes
 
 ### Nelder-Mead Simplex
 
@@ -391,7 +436,7 @@ problem = CalibrationProblem(
     loss_config=LossConfig(function=LossFunction.RMSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=500, verbose=False),
+        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
     ),
 )
 
@@ -499,7 +544,7 @@ problem = CalibrationProblem(
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=500, verbose=False),
+        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
     ),
 )
 
