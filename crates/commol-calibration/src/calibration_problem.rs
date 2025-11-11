@@ -201,6 +201,121 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .collect()
     }
 
+    /// Helper method to determine which compartments are being calibrated as ICs
+    fn get_calibrated_compartments(&self) -> Vec<bool> {
+        let num_compartments = self.base_engine.compartments().len();
+        let mut calibrated_compartments = vec![false; num_compartments];
+
+        for (param, compartment_idx) in self
+            .parameters
+            .iter()
+            .zip(&self.parameter_compartment_indices)
+        {
+            if param.parameter_type == CalibrationParameterType::InitialCondition {
+                if let Some(idx) = compartment_idx {
+                    calibrated_compartments[*idx] = true;
+                }
+            }
+        }
+
+        calibrated_compartments
+    }
+
+    /// Calculate the sum of fixed (non-calibrated) initial condition fractions
+    fn calculate_fixed_ic_sum(&self, calibrated_compartments: &[bool]) -> f64 {
+        let current_population = self.base_engine.population();
+        current_population
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| !calibrated_compartments[*idx])
+            .map(|(_, &val)| val / self.initial_population_size)
+            .sum()
+    }
+
+    /// Determine which IC parameter (if any) should be auto-calculated
+    ///
+    /// Returns the index of the parameter that should be auto-calculated,
+    /// or None if no auto-calculation is needed.
+    fn get_auto_calculated_ic_index(&self) -> Option<usize> {
+        let num_compartments = self.base_engine.compartments().len();
+
+        let ic_params_indices: Vec<usize> = self
+            .parameters
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        let num_ic_params = ic_params_indices.len();
+        let all_compartments_are_ics = num_ic_params == num_compartments;
+
+        // Auto-calculate the last IC parameter if:
+        // 1. All compartments are ICs AND there are 2+ IC parameters, OR
+        // 2. There's exactly 1 IC parameter with fixed compartments (sum constraint)
+        if (num_ic_params >= 2 && all_compartments_are_ics)
+            || (num_ic_params == 1 && !all_compartments_are_ics)
+        {
+            ic_params_indices.last().copied()
+        } else {
+            None
+        }
+    }
+
+    /// Get information needed to fix auto-calculated parameters
+    ///
+    /// Returns (fixed_ic_sum, auto_calc_ic_idx, param_types) where:
+    /// - fixed_ic_sum: Sum of fractions for fixed (non-calibrated) compartments
+    /// - auto_calc_ic_idx: Index of the IC parameter to auto-calculate (if any)
+    /// - param_types: Vector of parameter types for each parameter
+    pub fn get_parameter_fix_info(&self) -> (f64, Option<usize>, Vec<CalibrationParameterType>) {
+        let calibrated_compartments = self.get_calibrated_compartments();
+        let fixed_ic_sum = self.calculate_fixed_ic_sum(&calibrated_compartments);
+        let auto_calc_ic_idx = self.get_auto_calculated_ic_index();
+        let param_types: Vec<CalibrationParameterType> =
+            self.parameters.iter().map(|p| p.parameter_type).collect();
+
+        (fixed_ic_sum, auto_calc_ic_idx, param_types)
+    }
+
+    /// Fix auto-calculated initial condition parameters in the result
+    ///
+    /// Some IC parameters may be auto-calculated to ensure fractions sum to 1.0.
+    /// This method replaces those auto-calculated values with their correct values
+    /// based on the constraint.
+    ///
+    /// # Arguments
+    /// * `param_values` - Parameter values from the optimizer
+    ///
+    /// # Returns
+    /// Corrected parameter values with auto-calculated ICs fixed
+    pub fn fix_auto_calculated_parameters(&self, mut param_values: Vec<f64>) -> Vec<f64> {
+        let calibrated_compartments = self.get_calibrated_compartments();
+        let fixed_ic_sum = self.calculate_fixed_ic_sum(&calibrated_compartments);
+        let auto_calc_ic_idx = self.get_auto_calculated_ic_index();
+
+        // If there's an auto-calculated parameter, compute and set its correct value
+        if let Some(idx) = auto_calc_ic_idx {
+            // Calculate sum of other calibrated ICs (excluding the auto-calculated one)
+            let calibrated_ic_sum: f64 = param_values
+                .iter()
+                .enumerate()
+                .filter(|(param_idx, _)| {
+                    self.parameters[*param_idx].parameter_type
+                        == CalibrationParameterType::InitialCondition
+                        && *param_idx != idx
+                })
+                .map(|(_, value)| value)
+                .sum();
+
+            // Auto-calculated value ensures fractions sum to 1.0
+            let auto_calculated_value = (1.0 - fixed_ic_sum - calibrated_ic_sum).max(0.0);
+            param_values[idx] = auto_calculated_value;
+        }
+
+        param_values
+    }
+
     /// Calculate loss between simulation results and observed data
     fn calculate_loss(&self, simulation_results: &[Vec<f64>]) -> f64 {
         let observation_iter = || {
@@ -300,11 +415,99 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Update parameters and initial conditions with clamped values
-        for ((value, param), compartment_idx) in clamped_params
+        // Calculate sum of fixed initial conditions (those not being calibrated)
+        let num_compartments = engine.compartments().len();
+        let mut calibrated_compartments = vec![false; num_compartments];
+
+        // Mark which compartments are being calibrated
+        for (param, compartment_idx) in self
+            .parameters
+            .iter()
+            .zip(&self.parameter_compartment_indices)
+        {
+            if param.parameter_type == CalibrationParameterType::InitialCondition {
+                if let Some(idx) = compartment_idx {
+                    calibrated_compartments[*idx] = true;
+                }
+            }
+        }
+
+        // Get current (fixed) initial conditions for non-calibrated compartments
+        let current_population = engine.population();
+        let fixed_ic_sum: f64 = current_population
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| !calibrated_compartments[*idx])
+            .map(|(_, &val)| val / self.initial_population_size)
+            .sum();
+
+        // Determine which IC parameter (if any) should be auto-calculated to ensure sum = 1.0
+        // Logic:
+        // - If there's only 1 IC parameter being calibrated, it should be auto-calculated
+        //   to ensure fixed + calibrated = 1.0 (unless all compartments are being calibrated)
+        // - If there are 2+ IC parameters, the last one is auto-calculated to ensure sum = 1.0
+        let ic_params_indices: Vec<usize> = self
+            .parameters
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        let num_ic_params = ic_params_indices.len();
+        let num_total_compartments = num_compartments;
+
+        // Auto-calculate the last IC parameter if:
+        // 1. There are IC parameters to calibrate, and
+        // 2. Either:
+        //    a) There are 2+ IC parameters (always auto-calculate last), or
+        //    b) There's 1 IC parameter and it's not the only compartment (has fixed compartments)
+        let last_ic_param_idx = if num_ic_params > 0 {
+            let has_fixed_compartments = num_ic_params < num_total_compartments;
+            if num_ic_params >= 2 || (num_ic_params == 1 && has_fixed_compartments) {
+                ic_params_indices.last().copied()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Calculate sum of calibrated initial conditions (excluding the last one)
+        let calibrated_ic_sum: f64 = clamped_params
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| {
+                self.parameters[*idx].parameter_type == CalibrationParameterType::InitialCondition
+                    && Some(*idx) != last_ic_param_idx
+            })
+            .map(|(_, value)| value)
+            .sum();
+
+        // Validate that fixed + calibrated fractions don't exceed 1.0
+        // This ensures the last initial condition can be calculated as a non-negative value
+        if fixed_ic_sum + calibrated_ic_sum > 1.0 {
+            // Invalid parameter combination: would result in negative last initial condition
+            // Return penalty proportional to the excess
+            let max_observed = self
+                .observed_data
+                .iter()
+                .map(|obs| obs.value)
+                .fold(0.0f64, |a, b| a.max(b));
+            let num_obs = self.observed_data.len() as f64;
+            let base_penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
+            // Scale penalty by how much we exceeded 1.0
+            let excess = fixed_ic_sum + calibrated_ic_sum - 1.0;
+            let penalty = base_penalty * (1.0 + excess * 100.0);
+            return Ok(penalty);
+        }
+
+        // Update parameters and initial conditions
+        for (param_idx, ((value, param), compartment_idx)) in clamped_params
             .iter()
             .zip(&self.parameters)
             .zip(&self.parameter_compartment_indices)
+            .enumerate()
         {
             match param.parameter_type {
                 CalibrationParameterType::Parameter => {
@@ -314,11 +517,22 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
                     })?;
                 }
                 CalibrationParameterType::InitialCondition => {
-                    // Set initial condition for compartment
-                    // Note: value is a fraction (0.0 to 1.0), convert to absolute population
                     let idx =
                         compartment_idx.expect("InitialCondition must have compartment index");
-                    let absolute_population = *value * self.initial_population_size;
+
+                    // Calculate the actual fraction to use
+                    let fraction = if Some(param_idx) == last_ic_param_idx {
+                        // Last initial condition: calculate as remainder
+                        // fraction = 1.0 - fixed_sum - calibrated_sum (excluding this one)
+                        let remaining = 1.0 - fixed_ic_sum - calibrated_ic_sum;
+                        // Ensure non-negative
+                        remaining.max(0.0)
+                    } else {
+                        // Regular calibrated initial condition
+                        *value
+                    };
+
+                    let absolute_population = fraction * self.initial_population_size;
                     engine
                         .set_initial_condition(idx, absolute_population)
                         .map_err(|e| {
@@ -337,8 +551,40 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .run_into_buffer(self.max_time_step, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
 
+        // Check for numerical instability (NaN or infinity values)
+        let has_invalid_values = buffer
+            .iter()
+            .any(|step| step.iter().any(|&value| !value.is_finite()));
+
+        if has_invalid_values {
+            // Return a penalty value proportional to the worst-case realistic loss
+            // Calculate penalty as: (max observed value)^2 * num_observations * penalty_factor
+            // This ensures the penalty is large enough to discourage invalid parameters
+            // but not so large that it causes numerical issues
+            let max_observed = self
+                .observed_data
+                .iter()
+                .map(|obs| obs.value)
+                .fold(0.0f64, |a, b| a.max(b));
+            let num_obs = self.observed_data.len() as f64;
+            let penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
+            return Ok(penalty);
+        }
+
         // Calculate and return loss
         let loss = self.calculate_loss(&buffer);
+
+        // Check if loss itself is invalid (defensive programming)
+        if !loss.is_finite() {
+            let max_observed = self
+                .observed_data
+                .iter()
+                .map(|obs| obs.value)
+                .fold(0.0f64, |a, b| a.max(b));
+            let num_obs = self.observed_data.len() as f64;
+            let penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
+            return Ok(penalty);
+        }
 
         Ok(loss)
     }

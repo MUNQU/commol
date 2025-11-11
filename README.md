@@ -281,13 +281,19 @@ parameters = [
 ]
 
 # Configure calibration problem
+pso_config = ParticleSwarmConfig.create(
+    num_particles=40,
+    max_iterations=300,
+    verbose=True
+)
+
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=300),
+        config=pso_config,
     ),
 )
 

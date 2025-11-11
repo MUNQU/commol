@@ -41,7 +41,7 @@ class TestSIR:
             )
         )
         try:
-            return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+            return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
 

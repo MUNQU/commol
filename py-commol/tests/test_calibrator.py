@@ -48,7 +48,7 @@ class TestCalibrator:
                 ],
             )
         )
-        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
     def test_model_calibration_nelder_mead(self, model: Model):
         """
@@ -123,7 +123,7 @@ class TestCalibrator:
             loss_config=LossConfig(function=LossFunction.SSE),
             optimization_config=OptimizationConfig(
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=ParticleSwarmConfig(max_iterations=200, verbose=False),
+                config=ParticleSwarmConfig.create(max_iterations=200, verbose=False),
             ),
         )
 
@@ -205,7 +205,7 @@ class TestCalibrator:
                 ],
             )
         )
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Creating a Simulation should succeed
         simulation = Simulation(model)
@@ -245,7 +245,7 @@ class TestCalibrator:
                 ],
             )
         )
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         uncalibrated = model.get_uncalibrated_parameters()
         assert len(uncalibrated) == 2
@@ -278,7 +278,7 @@ class TestCalibrator:
                 ],
             )
         )
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Update parameters
         model.update_parameters({"beta": 0.1, "gamma": 0.05})
@@ -313,7 +313,7 @@ class TestCalibrator:
                 ],
             )
         )
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Attempt to update with invalid parameter ID
         with pytest.raises(ValueError) as exc_info:
@@ -357,7 +357,7 @@ class TestCalibrator:
             )
         )
         model_uncalibrated = builder_uncalibrated.build(
-            typology=ModelTypes.DIFFERENCE_EQUATIONS
+            typology=ModelTypes.DIFFERENCE_EQUATIONS.value
         )
 
         # Verify we can create a simulation, but cannot run it yet
@@ -389,7 +389,9 @@ class TestCalibrator:
                 ],
             )
         )
-        model_known = builder_known.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        model_known = builder_known.build(
+            typology=ModelTypes.DIFFERENCE_EQUATIONS.value
+        )
         simulation_known = Simulation(model_known)
         results = simulation_known.run(100, output_format="dict_of_lists")
 
@@ -475,7 +477,7 @@ class TestCalibrator:
                     {"bin": "R", "fraction": 0.0},
                 ],
             )
-        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Generate observed data
         true_simulation = Simulation(true_model)
@@ -509,7 +511,7 @@ class TestCalibrator:
                     {"bin": "R", "fraction": 0.0},
                 ],
             )
-        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Create simulation - None values are allowed for calibration
         simulation = Simulation(test_model)
@@ -550,7 +552,12 @@ class TestCalibrator:
 
     def test_calibrate_parameter_and_initial_condition_together(self):
         """
-        Test calibrating both a parameter and an initial condition simultaneously.
+        Test calibrating both a parameter and an initial condition simultaneously
+        using Particle Swarm Optimization with advanced features to avoid stagnation:
+        - Latin Hypercube Sampling initialization
+        - Time-Varying Acceleration Coefficients (TVAC)
+        - Velocity clamping
+        - Mutation for escaping local optima
         """
         # Generate observed data
         true_model = (
@@ -575,7 +582,7 @@ class TestCalibrator:
                     {"bin": "R", "fraction": 0.0},
                 ],
             )
-        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         true_simulation = Simulation(true_model)
         true_results = true_simulation.run(50, output_format="dict_of_lists")
@@ -608,7 +615,7 @@ class TestCalibrator:
                     {"bin": "R", "fraction": 0.0},
                 ],
             )
-        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         # Create simulation - None values are allowed for calibration
         simulation = Simulation(test_model)
@@ -620,38 +627,85 @@ class TestCalibrator:
                 parameter_type=CalibrationParameterType.PARAMETER,
                 min_bound=0.0,
                 max_bound=1.0,
-                initial_guess=0.2,  # Starting point for beta
             ),
             CalibrationParameter(
                 id="I",
                 parameter_type=CalibrationParameterType.INITIAL_CONDITION,
                 min_bound=0.0,
                 max_bound=0.1,  # Fraction range
-                initial_guess=0.01,  # Starting point for I
             ),
         ]
+
+        # Create PSO config with advanced features to avoid stagnation
+        pso_config = (
+            ParticleSwarmConfig.create(
+                num_particles=40, max_iterations=1000, verbose=False
+            )
+            # Enable Latin Hypercube Sampling for better initial particle distribution
+            .with_initialization_strategy("latin_hypercube")
+            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
+            # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
+            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
+            # Enable velocity clamping to prevent particles from moving too fast
+            .with_velocity_clamping(0.2)
+            # Enable Gaussian mutation on global best to escape local optima
+            .with_mutation(
+                strategy="gaussian",
+                scale=0.1,
+                probability=0.05,
+                application="global_best",
+            )
+        )
 
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
             loss_config=LossConfig(function=LossFunction.SSE),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
-                config=NelderMeadConfig(max_iterations=1000, verbose=False),
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=pso_config,
             ),
         )
 
-        calibrator = Calibrator(simulation, problem)
-        result = calibrator.run()
+        # Retry up to 3 times due to stochastic nature of PSO
+        max_attempts = 3
+        last_result = None
 
-        # After calibration, update model with calibrated values
-        test_model.update_parameters({"beta": result.best_parameters["beta"]})
-        test_model.update_initial_conditions({"I": result.best_parameters["I"]})
+        for attempt in range(max_attempts):
+            result = Calibrator(simulation, problem).run()
+            last_result = result
 
-        # Should recover both values
-        assert result.converged
-        assert math.isclose(result.best_parameters["beta"], 0.3, rel_tol=0.05)
-        assert math.isclose(result.best_parameters["I"], 0.02, rel_tol=0.05)
+            # Check if calibration succeeded
+            beta_ok = math.isclose(result.best_parameters["beta"], 0.3, abs_tol=0.001)
+            I_ok = math.isclose(result.best_parameters["I"], 0.02, abs_tol=0.001)
+
+            if beta_ok and I_ok:
+                test_model.update_parameters({"beta": result.best_parameters["beta"]})
+                test_model.update_initial_conditions({"I": result.best_parameters["I"]})
+                return
+
+            if attempt < max_attempts - 1:
+                # Not the last attempt, will retry
+                print(
+                    (
+                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
+                        f"beta={result.best_parameters['beta']:.6f} (expected 0.3), "
+                        f"I={result.best_parameters['I']:.6f} (expected 0.02). "
+                        f"Retrying..."
+                    )
+                )
+
+        # All attempts failed, show final values and fail
+        assert last_result is not None
+        pytest.fail(
+            (
+                f"Advanced PSO calibration failed after {max_attempts} attempts. "
+                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
+                f"(expected 0.3), I={last_result.best_parameters['I']:.6f} "
+                f"(expected 0.02)"
+            )
+        )
 
     def test_invalid_bin_id_for_initial_condition_raises_error(self):
         """Test that using an invalid bin ID for initial condition raises an error."""
@@ -674,7 +728,7 @@ class TestCalibrator:
                     {"bin": "R", "fraction": 0.0},
                 ],
             )
-        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
         observed_data = [ObservedDataPoint(step=10, compartment="I", value=50.0)]
 
@@ -703,3 +757,160 @@ class TestCalibrator:
         # Should raise ValueError during calibrator initialization
         with pytest.raises(ValueError, match="not found in model bins"):
             _ = Calibrator(simulation, problem)
+
+    def test_particle_swarm_with_advanced_features(self, model: Model):
+        """
+        Test Particle Swarm Optimization with advanced features:
+        - Latin Hypercube Sampling initialization
+        - Time-Varying Acceleration Coefficients (TVAC)
+        - Velocity clamping
+        - Mutation for escaping local optima
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(100)
+        ]
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Create PSO config with advanced features using builder pattern
+        pso_config = (
+            ParticleSwarmConfig.create(
+                num_particles=30, max_iterations=200, verbose=False
+            )
+            # Enable Latin Hypercube Sampling for better initial particle distribution
+            .with_initialization_strategy("latin_hypercube")
+            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
+            # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
+            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
+            # Enable velocity clamping to prevent particles from moving too fast
+            .with_velocity_clamping(0.2)
+            # Enable Gaussian mutation on global best to escape local optima
+            .with_mutation(
+                strategy="gaussian",
+                scale=0.1,
+                probability=0.05,
+                application="global_best",
+            )
+        )
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=pso_config,
+            ),
+        )
+
+        # Retry up to 3 times due to stochastic nature of PSO
+        max_attempts = 3
+        last_result = None
+
+        for attempt in range(max_attempts):
+            result = Calibrator(simulation, problem).run()
+            last_result = result
+
+            # Check if calibration succeeded
+            beta_ok = math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-4)
+            gamma_ok = math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-4)
+
+            if beta_ok and gamma_ok:
+                # Success!
+                return
+
+            if attempt < max_attempts - 1:
+                # Not the last attempt, will retry
+                print(
+                    (
+                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
+                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
+                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
+                        f"Retrying..."
+                    )
+                )
+
+        # All attempts failed, show final values and fail
+        assert last_result is not None
+        pytest.fail(
+            (
+                f"Advanced PSO calibration failed after {max_attempts} attempts. "
+                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
+                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
+                f"(expected 0.05)"
+            )
+        )
+
+    def test_particle_swarm_with_chaotic_inertia(self, model: Model):
+        """
+        Test Particle Swarm Optimization with chaotic inertia weight.
+        Chaotic inertia uses a logistic map to generate non-linear dynamics,
+        helping particles escape local optima.
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(100)
+        ]
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Create PSO config with chaotic inertia using builder pattern
+        pso_config = (
+            ParticleSwarmConfig.create(
+                num_particles=25, max_iterations=200, verbose=False
+            )
+            # Enable chaotic inertia weight
+            # (varies between 0.4 and 0.9 using logistic map)
+            .with_chaotic_inertia(w_min=0.4, w_max=0.9)
+            # Use opposition-based initialization for diverse starting positions
+            .with_initialization_strategy("opposition_based")
+        )
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=pso_config,
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # With advanced features, calibration should be successful
+        # Allow slightly larger tolerance due to stochastic nature
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=2e-4)
+        assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=2e-4)

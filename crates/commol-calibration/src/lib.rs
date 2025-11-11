@@ -69,7 +69,9 @@ pub mod types;
 // Re-export commonly used items
 pub use calibration_problem::CalibrationProblem;
 pub use optimization::{
-    optimize, NelderMeadConfig, OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
+    optimize, AccelerationStrategy, InertiaWeightStrategy, InitializationStrategy,
+    MutationApplication, MutationStrategy, NelderMeadConfig, OptimizationAlgorithm,
+    OptimizationConfig, ParticleSwarmConfig,
 };
 pub use types::{
     CalibrationParameter, CalibrationParameterType, CalibrationResult, LossConfig,

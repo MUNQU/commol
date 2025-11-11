@@ -240,7 +240,7 @@ problem = CalibrationProblem(
     loss_config=LossConfig(function=LossFunction.SSE),
     optimization_config=OptimizationConfig(
         algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig(max_iterations=300, verbose=False),
+        config=ParticleSwarmConfig.create(max_iterations=300, verbose=False),
     ),
 )
 
