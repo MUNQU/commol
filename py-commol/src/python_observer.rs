@@ -11,6 +11,44 @@ use commol_calibration::{CalibrationProblem, OptimizationConfig};
 use commol_core::SimulationEngine;
 use pyo3::prelude::*;
 
+// Constants for table formatting
+const HEADER_SEPARATOR_WIDTH: usize = 76;
+const DEFAULT_HEADER_INTERVAL: u64 = 100;
+
+/// Write a message to Python's stdout
+///
+/// This function writes to Python's sys.stdout instead of Rust's stdout,
+/// which is necessary for proper display in Python environments.
+fn write_to_python_stdout(message: &str) {
+    Python::with_gil(|py| {
+        if let Err(e) = py
+            .import("sys")
+            .and_then(|sys| sys.getattr("stdout"))
+            .and_then(|stdout| {
+                stdout.call_method1("write", (format!("{}\n", message),))?;
+                stdout.call_method0("flush")
+            })
+        {
+            // Fallback to eprintln if Python stdout fails
+            eprintln!("Failed to write to Python stdout: {}", e);
+            eprintln!("{}", message);
+        }
+    });
+}
+
+/// Write an optimization header to Python's stdout
+fn write_optimization_header(header: &str) {
+    Python::with_gil(|py| {
+        let _ = py
+            .import("sys")
+            .and_then(|sys| sys.getattr("stdout"))
+            .and_then(|stdout| {
+                stdout.call_method1("write", (header,))?;
+                stdout.call_method0("flush")
+            });
+    });
+}
+
 /// Observer that writes optimization progress to Python's sys.stdout in table format
 pub struct PythonObserver {
     /// Number of iterations between header repeats
@@ -20,10 +58,10 @@ pub struct PythonObserver {
 }
 
 impl PythonObserver {
-    /// Create a new Python observer with default header interval of 100
+    /// Create a new Python observer with default header interval
     pub fn new() -> Self {
         Self {
-            header_interval: 100,
+            header_interval: DEFAULT_HEADER_INTERVAL,
             last_header_iter: 0,
         }
     }
@@ -36,33 +74,15 @@ impl PythonObserver {
         }
     }
 
-    /// Write a line to Python's stdout
-    fn write_to_python(&self, message: &str) {
-        Python::with_gil(|py| {
-            if let Err(e) = py
-                .import("sys")
-                .and_then(|sys| sys.getattr("stdout"))
-                .and_then(|stdout| {
-                    stdout.call_method1("write", (format!("{}\n", message),))?;
-                    stdout.call_method0("flush")
-                })
-            {
-                // Fallback to eprintln if Python stdout fails
-                eprintln!("Failed to write to Python stdout: {}", e);
-                eprintln!("{}", message);
-            }
-        });
-    }
-
     /// Print the table header
     fn print_header(&self) {
-        let separator = "=".repeat(92);
-        self.write_to_python(&separator);
-        self.write_to_python(&format!(
-            "{:>12} | {:>14} | {:>16} | {:>16} | {:>16}",
-            "Iteration", "Time (s)", "Objective", "Best Objective", "Obj. Evaluations"
+        let separator = "=".repeat(HEADER_SEPARATOR_WIDTH);
+        write_to_python_stdout(&separator);
+        write_to_python_stdout(&format!(
+            "{:>12} | {:>14} | {:>16} | {:>16}",
+            "Iteration", "Time (s)", "Obj. Evaluations", "Best Objective"
         ));
-        self.write_to_python(&separator);
+        write_to_python_stdout(&separator);
     }
 }
 
@@ -88,7 +108,6 @@ where
         }
 
         // Extract values from state
-        let obj = state.get_cost();
         let best_obj = state.get_best_cost();
         let time = state.get_time().map(|d| d.as_secs_f64()).unwrap_or(0.0);
 
@@ -98,16 +117,44 @@ where
 
         // Print data row in table format
         let output = format!(
-            "{:>12} | {:>14.6} | {:>16} | {:>16} | {:>16}",
+            "{:>12} | {:>14.6} | {:>16} | {:>16}",
             iter,
             time,
-            format!("{:.6e}", obj),
-            format!("{:.6e}", best_obj),
             obj_evaluations,
+            format!("{:.6e}", best_obj),
         );
 
-        self.write_to_python(&output);
+        write_to_python_stdout(&output);
         Ok(())
+    }
+}
+
+/// Helper struct to hold correction parameters extracted before moving problem
+struct CorrectionParams {
+    fixed_ic_sum: f64,
+    auto_calc_ic_idx: Option<usize>,
+    param_types: Vec<commol_calibration::CalibrationParameterType>,
+}
+
+impl CorrectionParams {
+    /// Apply corrections to parameter values
+    fn apply(&self, mut param_values: Vec<f64>) -> Vec<f64> {
+        if let Some(idx) = self.auto_calc_ic_idx {
+            let calibrated_ic_sum: f64 = param_values
+                .iter()
+                .enumerate()
+                .filter(|(param_idx, _)| {
+                    self.param_types[*param_idx]
+                        == commol_calibration::CalibrationParameterType::InitialCondition
+                        && *param_idx != idx
+                })
+                .map(|(_, value)| value)
+                .sum();
+
+            let auto_calculated_value = (1.0 - self.fixed_ic_sum - calibrated_ic_sum).max(0.0);
+            param_values[idx] = auto_calculated_value;
+        }
+        param_values
     }
 }
 
@@ -126,6 +173,14 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
 
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
+
+    // Extract correction info BEFORE moving problem into executor
+    let (fixed_ic_sum, auto_calc_ic_idx, param_types) = problem.get_parameter_fix_info();
+    let correction_params = CorrectionParams {
+        fixed_ic_sum,
+        auto_calc_ic_idx,
+        param_types,
+    };
 
     match config {
         OptimizationConfig::NelderMead(nm_config) => {
@@ -165,30 +220,20 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
             }
 
             // Write header to Python stdout
-            Python::with_gil(|py| {
-                let _ = py
-                    .import("sys")
-                    .and_then(|sys| sys.getattr("stdout"))
-                    .and_then(|stdout| {
-                        let header = format!(
-                            "=== Nelder-Mead Optimization (Verbose Mode) ===\n\
-                             Parameters: {:?}\n\
-                             Initial values: {:?}\n\
-                             Max iterations: {}\n\
-                             SD tolerance: {}\n\
-                             ===============================================\n",
-                            parameter_names,
-                            initial_params,
-                            nm_config.max_iterations,
-                            nm_config.sd_tolerance
-                        );
-                        stdout.call_method1("write", (header,))?;
-                        stdout.call_method0("flush")
-                    });
-            });
+            let header = format!(
+                "=== Nelder-Mead Optimization (Verbose Mode) ===\n\
+                 Parameters: {:?}\n\
+                 Initial values: {:?}\n\
+                 Max iterations: {}\n\
+                 SD tolerance: {}\n\
+                 ===============================================\n",
+                parameter_names, initial_params, nm_config.max_iterations, nm_config.sd_tolerance
+            );
+            write_optimization_header(&header);
 
             let executor = Executor::new(problem, solver)
-                .configure(|state| state.max_iters(nm_config.max_iterations))
+                .configure(|state| state.max_iters(nm_config.max_iterations).counting(true))
+                .timer(true)
                 .add_observer(
                     PythonObserver::with_header_interval(header_interval),
                     ObserverMode::Always,
@@ -200,8 +245,11 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
 
             let state = result.state();
 
+            let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
+            let corrected_params = correction_params.apply(best_params);
+
             Ok(commol_calibration::CalibrationResult {
-                best_parameters: state.best_param.clone().unwrap_or(initial_params),
+                best_parameters: corrected_params,
                 parameter_names,
                 final_loss: state.best_cost,
                 iterations: state.iter as usize,
@@ -331,39 +379,29 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
             }
 
             // Write header to Python stdout
-            Python::with_gil(|py| {
-                let _ = py
-                    .import("sys")
-                    .and_then(|sys| sys.getattr("stdout"))
-                    .and_then(|stdout| {
-                        let mut header = format!(
-                            "=== Particle Swarm Optimization (Verbose Mode) ===\n\
-                             Parameters: {:?}\n\
-                             Bounds: {:?}\n\
-                             Num particles: {}\n\
-                             Max iterations: {}\n",
-                            parameter_names,
-                            bounds,
-                            ps_config.num_particles,
-                            ps_config.max_iterations
-                        );
-                        if let Some(target) = ps_config.target_cost {
-                            header.push_str(&format!("Target cost: {}\n", target));
-                        }
-                        header.push_str("===================================================\n");
-                        stdout.call_method1("write", (header,))?;
-                        stdout.call_method0("flush")
-                    });
-            });
+            let mut header = format!(
+                "=== Particle Swarm Optimization (Verbose Mode) ===\n\
+                 Parameters: {:?}\n\
+                 Bounds: {:?}\n\
+                 Num particles: {}\n\
+                 Max iterations: {}\n",
+                parameter_names, bounds, ps_config.num_particles, ps_config.max_iterations
+            );
+            if let Some(target) = ps_config.target_cost {
+                header.push_str(&format!("Target cost: {}\n", target));
+            }
+            header.push_str("===================================================\n");
+            write_optimization_header(&header);
 
             let executor = Executor::new(problem, solver)
                 .configure(|state| {
-                    let mut state = state.max_iters(ps_config.max_iterations);
+                    let mut state = state.max_iters(ps_config.max_iterations).counting(true);
                     if let Some(target) = ps_config.target_cost {
                         state = state.target_cost(target);
                     }
                     state
                 })
+                .timer(true)
                 .add_observer(
                     PythonObserver::with_header_interval(header_interval),
                     ObserverMode::Always,
@@ -380,8 +418,10 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
                 None => (initial_params.clone(), f64::INFINITY),
             };
 
+            let corrected_params = correction_params.apply(best_params);
+
             Ok(commol_calibration::CalibrationResult {
-                best_parameters: best_params,
+                best_parameters: corrected_params,
                 parameter_names,
                 final_loss: best_cost,
                 iterations: state.iter as usize,
