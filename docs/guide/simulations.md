@@ -175,6 +175,71 @@ else:
     print(f"Compartment {key} not found. Available: {list(results.keys())}")
 ```
 
+## Visualizing Results
+
+Commol provides the `SimulationPlotter` class for visualizing simulation results with automatic subplot organization and Seaborn styling.
+
+### Basic Plotting
+
+```python
+from commol import SimulationPlotter
+
+# After running simulation
+results = simulation.run(num_steps=100)
+
+# Create plotter
+plotter = SimulationPlotter(simulation, results)
+
+# Plot time series (one subplot per compartment)
+plotter.plot_series(output_file="results.png")
+
+# Plot cumulative results
+plotter.plot_cumulative(output_file="cumulative.png")
+```
+
+### Customizing Plots
+
+```python
+from commol import PlotConfig, SeabornStyleConfig
+
+# Custom configuration
+config = PlotConfig(
+    figsize=(16, 10),
+    dpi=150,
+    layout=(2, 2),  # 2x2 subplot grid
+    seaborn=SeabornStyleConfig(
+        style="darkgrid",      # darkgrid, whitegrid, dark, white, ticks
+        palette="Set2",        # Color palette
+        context="talk"         # paper, notebook, talk, poster
+    )
+)
+
+plotter.plot_series(
+    output_file="custom.png",
+    config=config,
+    bins=["I", "R"],  # Only plot specific compartments
+    linewidth=2.5,
+    alpha=0.8
+)
+```
+
+### Overlaying Observed Data
+
+```python
+from commol import ObservedDataPoint
+
+observed_data = [
+    ObservedDataPoint(step=10, compartment="I", value=45.2),
+    ObservedDataPoint(step=20, compartment="I", value=78.5),
+    ObservedDataPoint(step=30, compartment="I", value=62.3),
+]
+
+plotter.plot_series(
+    output_file="with_data.png",
+    observed_data=observed_data
+)
+```
+
 ## Next Steps
 
 - [Examples](examples.md) - Complete model examples with analysis

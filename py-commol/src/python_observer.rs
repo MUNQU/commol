@@ -248,6 +248,16 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
             let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
             let corrected_params = correction_params.apply(best_params);
 
+            // Print final calibrated parameters
+            let separator = "=".repeat(HEADER_SEPARATOR_WIDTH);
+            write_to_python_stdout(&separator);
+            write_to_python_stdout("Optimization Complete - Calibrated Parameters:");
+            write_to_python_stdout(&separator);
+            for (name, value) in parameter_names.iter().zip(corrected_params.iter()) {
+                write_to_python_stdout(&format!("  {:<20} = {:.6e}", name, value));
+            }
+            write_to_python_stdout(&separator);
+
             Ok(commol_calibration::CalibrationResult {
                 best_parameters: corrected_params,
                 parameter_names,
@@ -419,6 +429,16 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
             };
 
             let corrected_params = correction_params.apply(best_params);
+
+            // Print final calibrated parameters
+            let separator = "=".repeat(HEADER_SEPARATOR_WIDTH);
+            write_to_python_stdout(&separator);
+            write_to_python_stdout("Optimization Complete - Calibrated Parameters:");
+            write_to_python_stdout(&separator);
+            for (name, value) in parameter_names.iter().zip(corrected_params.iter()) {
+                write_to_python_stdout(&format!("  {:<20} = {:.6e}", name, value));
+            }
+            write_to_python_stdout(&separator);
 
             Ok(commol_calibration::CalibrationResult {
                 best_parameters: corrected_params,

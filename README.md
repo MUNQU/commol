@@ -71,6 +71,12 @@ results = simulation.run(num_steps=100)
 
 # Display results
 print(f"Final infected: {results['I'][-1]:.0f}")
+
+# Visualize results
+from commol import SimulationPlotter
+
+plotter = SimulationPlotter(simulation, results)
+plotter.plot_series(output_file="sir_model.png")
 ```
 
 ### Using $compartment Placeholder for Multiple Transitions

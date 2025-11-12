@@ -1,12 +1,13 @@
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
 from .model_loader import ModelLoader
+from .plotter import SimulationPlotter
 from .simulation import Simulation
-
 
 __all__ = [
     "Calibrator",
     "ModelBuilder",
     "ModelLoader",
+    "SimulationPlotter",
     "Simulation",
 ]

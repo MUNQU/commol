@@ -2,7 +2,13 @@ import logging
 from typing import TextIO
 
 from commol import constants
-from commol.api import Calibrator, ModelBuilder, ModelLoader, Simulation
+from commol.api import (
+    Calibrator,
+    ModelBuilder,
+    ModelLoader,
+    Simulation,
+    SimulationPlotter,
+)
 from commol.context import Model
 from commol.context.calibration import (
     CalibrationParameter,
@@ -18,7 +24,12 @@ from commol.context.calibration import (
     ParticleSwarmConfig,
 )
 from commol.context.parameter import Parameter
-
+from commol.context.visualization import (
+    PlotConfig,
+    SeabornContext,
+    SeabornStyle,
+    SeabornStyleConfig,
+)
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -51,5 +62,10 @@ __all__ = [
     "OptimizationConfig",
     "Parameter",
     "ParticleSwarmConfig",
+    "PlotConfig",
+    "SeabornContext",
+    "SeabornStyle",
+    "SeabornStyleConfig",
     "Simulation",
+    "SimulationPlotter",
 ]

@@ -1333,6 +1333,68 @@ class Model(BaseModel):
                         )
                     )
 
+    def _infer_time_unit(self) -> str | None:
+        """
+        Infer the time unit used in the model from parameter units.
+
+        Returns
+        -------
+        str | None
+            The inferred time unit (e.g., "day", "week", "month"), or None if no
+            time unit can be inferred.
+
+        Notes
+        -----
+        This method looks for parameters with units like "1/time_unit" or
+        "quantity/time_unit" to infer the time unit used throughout the model.
+        """
+        from commol.utils.equations import ureg
+
+        for param in self.parameters:
+            if param.unit is None:
+                continue
+
+            try:
+                unit_obj = ureg(param.unit)
+
+                # Check if the unit has a time dimension in the denominator
+                # (e.g., "1/day", "person/week", "individual/month")
+                if "[time]" in str(unit_obj.dimensionality):
+                    # Extract the time component
+                    # The dimensionality will be like {[time]: -1, ...}
+                    if unit_obj.dimensionality.get("[time]", 0) < 0:
+                        # Get the time unit by analyzing the unit string
+                        unit_str = str(unit_obj.units)
+
+                        # Common time units to check
+                        time_units = [
+                            "second",
+                            "minute",
+                            "hour",
+                            "day",
+                            "week",
+                            "fortnight",
+                            "month",
+                            "year",
+                            "semester",
+                            "wk",
+                            "mon",
+                            "yr",
+                            "s",
+                            "min",
+                            "h",
+                            "d",
+                        ]
+
+                        for time_unit in time_units:
+                            if time_unit in unit_str:
+                                return time_unit
+
+            except Exception:
+                continue
+
+        return None
+
     def _check_transition_rate_units(
         self,
         rate: str,
@@ -1343,8 +1405,8 @@ class Model(BaseModel):
         Check units for a single transition rate.
 
         For transitions in difference equations, rates represent the absolute change
-        in population per time step, so they should have units of "person/day"
-        (or person/timestep).
+        in population per time step, so they should have units of "bin_unit/time_unit"
+        (e.g., "person/day", "individual/week").
         """
         # Get variables used in the rate expression
         variables = get_expression_variables(rate)
@@ -1365,9 +1427,11 @@ class Model(BaseModel):
                     ),
                 )
 
-        # For difference equations, rates should result in person per time unit
-        # This represents the absolute change in population per time step
-        expected_unit = "person/day"
+        # Determine the expected unit based on bin_unit and time_unit
+        bin_unit = self.population.bins[0].unit if self.population.bins else "person"
+        time_unit = self._infer_time_unit() or "day"
+
+        expected_unit = f"{bin_unit}/{time_unit}"
 
         # Check unit consistency
         is_consistent, error_msg = check_equation_units(
