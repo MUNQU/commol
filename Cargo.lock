@@ -142,6 +142,7 @@ dependencies = [
  "argmin-observer-slog",
  "commol-core",
  "commol-difference",
+ "rand",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

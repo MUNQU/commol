@@ -228,6 +228,7 @@ class Calibrator:
                 inertia_factor=opt_config.config.inertia_factor,
                 cognitive_factor=opt_config.config.cognitive_factor,
                 social_factor=opt_config.config.social_factor,
+                seed=opt_config.config.seed,
                 verbose=opt_config.config.verbose,
                 header_interval=opt_config.config.header_interval,
             )

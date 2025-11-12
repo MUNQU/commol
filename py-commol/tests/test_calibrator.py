@@ -123,47 +123,17 @@ class TestCalibrator:
             loss_config=LossConfig(function=LossFunction.SSE),
             optimization_config=OptimizationConfig(
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=ParticleSwarmConfig.create(max_iterations=200, verbose=False),
+                config=ParticleSwarmConfig.create(
+                    max_iterations=200, verbose=False
+                ).with_seed(42),
             ),
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
-
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
-            gamma_ok = math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
-
-            if beta_ok and gamma_ok:
-                # Success!
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAttempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
-                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
-                f"(expected 0.05)"
-            )
-        )
+        # With seed, calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
+        assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
 
     def test_parameter_with_none_value(self):
         """Test that Parameter can be created with None value."""
@@ -641,6 +611,7 @@ class TestCalibrator:
             ParticleSwarmConfig.create(
                 num_particles=40, max_iterations=1000, verbose=False
             )
+            .with_seed(42)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
             # Enable Time-Varying Acceleration Coefficients (TVAC)
@@ -668,44 +639,15 @@ class TestCalibrator:
             ),
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
+        # With seed, calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.3, abs_tol=0.001)
+        assert math.isclose(result.best_parameters["I"], 0.02, abs_tol=0.001)
 
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.3, abs_tol=0.001)
-            I_ok = math.isclose(result.best_parameters["I"], 0.02, abs_tol=0.001)
-
-            if beta_ok and I_ok:
-                test_model.update_parameters({"beta": result.best_parameters["beta"]})
-                test_model.update_initial_conditions({"I": result.best_parameters["I"]})
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.3), "
-                        f"I={result.best_parameters['I']:.6f} (expected 0.02). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Advanced PSO calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.3), I={last_result.best_parameters['I']:.6f} "
-                f"(expected 0.02)"
-            )
-        )
+        # Update model with calibrated values
+        test_model.update_parameters({"beta": result.best_parameters["beta"]})
+        test_model.update_initial_conditions({"I": result.best_parameters["I"]})
 
     def test_invalid_bin_id_for_initial_condition_raises_error(self):
         """Test that using an invalid bin ID for initial condition raises an error."""
@@ -793,6 +735,7 @@ class TestCalibrator:
             ParticleSwarmConfig.create(
                 num_particles=30, max_iterations=200, verbose=False
             )
+            .with_seed(123)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
             # Enable Time-Varying Acceleration Coefficients (TVAC)
@@ -820,43 +763,11 @@ class TestCalibrator:
             ),
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
-
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-4)
-            gamma_ok = math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-4)
-
-            if beta_ok and gamma_ok:
-                # Success!
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
-                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Advanced PSO calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
-                f"(expected 0.05)"
-            )
-        )
+        # With seed, advanced PSO calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-4)
+        assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-4)
 
     def test_particle_swarm_with_chaotic_inertia(self, model: Model):
         """
@@ -891,6 +802,7 @@ class TestCalibrator:
             ParticleSwarmConfig.create(
                 num_particles=25, max_iterations=200, verbose=False
             )
+            .with_seed(42)
             # Enable chaotic inertia weight
             # (varies between 0.4 and 0.9 using logistic map)
             .with_chaotic_inertia(w_min=0.4, w_max=0.9)

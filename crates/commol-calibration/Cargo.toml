@@ -20,6 +20,9 @@ argmin-observer-slog = { git = "https://github.com/MUNQU/argmin", branch = "deve
 commol-core = { path = "../commol-core" }
 commol-difference = { path = "../commol-difference" }
 
+# Random number generation
+rand = "0.9"
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

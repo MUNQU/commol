@@ -154,6 +154,7 @@ class ParticleSwarmConfigProtocol(Protocol):
         inertia_factor: float | None = None,
         cognitive_factor: float | None = None,
         social_factor: float | None = None,
+        seed: int | None = None,
         verbose: bool = False,
         header_interval: int = 100,
     ) -> None: ...

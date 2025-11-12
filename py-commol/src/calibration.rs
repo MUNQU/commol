@@ -233,13 +233,14 @@ impl PyParticleSwarmConfig {
     ///     inertia_factor: Constant inertia weight applied to velocity (default: None, uses argmin's default)
     ///     cognitive_factor: Cognitive acceleration factor - attraction to personal best (default: None, uses argmin's default)
     ///     social_factor: Social acceleration factor - attraction to swarm best (default: None, uses argmin's default)
+    ///     seed: Random seed for reproducibility (default: None, uses system entropy)
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     ///
     /// Note: For advanced features like chaotic inertia, TVAC, initialization strategies,
     /// velocity control, and mutation, use the builder methods after construction.
     #[new]
-    #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, verbose=false, header_interval=100))]
+    #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, seed=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         num_particles: usize,
@@ -248,6 +249,7 @@ impl PyParticleSwarmConfig {
         inertia_factor: Option<f64>,
         cognitive_factor: Option<f64>,
         social_factor: Option<f64>,
+        seed: Option<u64>,
         verbose: bool,
         header_interval: u64,
     ) -> Self {
@@ -263,6 +265,7 @@ impl PyParticleSwarmConfig {
             mutation_strategy: commol_calibration::MutationStrategy::None,
             mutation_probability: 0.0,
             mutation_application: commol_calibration::MutationApplication::None,
+            seed,
             verbose,
         };
 

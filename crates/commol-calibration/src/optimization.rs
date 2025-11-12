@@ -8,6 +8,8 @@ use argmin::solver::particleswarm::{
     ParticleSwarm,
 };
 use commol_core::SimulationEngine;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::types::{CalibrationParameterType, CalibrationResult};
@@ -280,6 +282,9 @@ pub struct ParticleSwarmConfig {
     /// Which particles to apply mutation to
     pub mutation_application: MutationApplication,
 
+    /// Random seed for reproducibility (None = use system entropy)
+    pub seed: Option<u64>,
+
     /// Enable verbose output
     pub verbose: bool,
 }
@@ -298,6 +303,7 @@ impl Default for ParticleSwarmConfig {
             mutation_strategy: MutationStrategy::None,
             mutation_probability: 0.0,
             mutation_application: MutationApplication::None,
+            seed: None,
             verbose: false,
         }
     }
@@ -431,6 +437,31 @@ impl ParticleSwarmConfig {
         self.mutation_strategy = strategy;
         self.mutation_probability = probability;
         self.mutation_application = application;
+        self
+    }
+
+    /// Set random seed for reproducibility
+    ///
+    /// When set, the particle swarm will produce deterministic results,
+    /// allowing you to reproduce the same optimization trajectory across runs.
+    ///
+    /// Note: The seed is set via this builder method (rather than as a required
+    /// constructor parameter) to allow easy modification without creating a new
+    /// configuration. This is particularly useful when running multiple
+    /// calibrations with different seeds while keeping other parameters constant.
+    ///
+    /// # Arguments
+    /// * `seed` - Random seed value
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let config = ParticleSwarmConfig::new()
+    ///     .with_num_particles(40)
+    ///     .with_max_iterations(500)
+    ///     .with_seed(42);  // Reproducible results
+    /// ```
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
         self
     }
 
@@ -632,8 +663,15 @@ fn optimize_particle_swarm<E: SimulationEngine>(
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 
-    // Build solver with configuration
-    let mut solver = ParticleSwarm::new((lower_bound, upper_bound), config.num_particles);
+    // Build solver with configuration and RNG
+    // Always use SmallRng for consistency, either seeded or from system entropy
+    let mut solver = if let Some(seed) = config.seed {
+        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+            .with_rng_generator(SmallRng::seed_from_u64(seed))
+    } else {
+        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+            .with_rng_generator(SmallRng::from_rng(&mut rand::rng()))
+    };
 
     // Apply inertia strategy if provided
     solver = match &config.inertia_strategy {

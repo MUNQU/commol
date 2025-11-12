@@ -283,6 +283,13 @@ class ParticleSwarmConfig(BaseModel):
             "Mutation application: 'global_best', 'all_particles', or 'below_average'"
         ),
     )
+    seed: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Random seed for reproducibility (default: None, uses system entropy)"
+        ),
+    )
     verbose: bool = Field(
         default=False,
         description="Enable verbose output during optimization (default: False)",
@@ -500,6 +507,32 @@ class ParticleSwarmConfig(BaseModel):
         self.mutation_scale = scale
         self.mutation_probability = probability
         self.mutation_application = application
+        return self
+
+    def with_seed(self, seed: int) -> Self:
+        """
+        Set random seed for reproducibility.
+
+        When set, the particle swarm will produce deterministic results,
+        allowing you to reproduce the same optimization trajectory.
+
+        Note: The seed is set via this builder method (rather than in the
+        constructor) to allow easy modification without creating a new
+        configuration. This is particularly useful when running multiple
+        calibrations with different seeds while keeping other parameters
+        constant.
+
+        Parameters
+        ----------
+        seed : int
+            Random seed value (must be non-negative)
+
+        Returns
+        -------
+        Self
+            Updated configuration for method chaining
+        """
+        self.seed = seed
         return self
 
 
