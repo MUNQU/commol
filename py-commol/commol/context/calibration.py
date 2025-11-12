@@ -212,12 +212,28 @@ class ParticleSwarmConfig(BaseModel):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
-    Use `ParticleSwarmConfig.create()` and builder methods to configure:
+    Use the constructor to create an instance, then chain builder methods to configure:
     - `.with_inertia()` or `.with_chaotic_inertia()` for inertia control
     - `.with_acceleration()` or `.with_tvac()` for acceleration coefficients
     - `.with_initialization_strategy()` for particle initialization
     - `.with_velocity_clamping()` and `.with_velocity_mutation()` for velocity control
     - `.with_mutation()` for mutation settings
+    - `.with_seed()` for reproducibility
+
+    Attributes
+    ----------
+    num_particles : int
+        Number of particles in the swarm (default: 20)
+    max_iterations : int
+        Maximum number of iterations (default: 1000)
+    target_cost : float | None
+        Target cost for early stopping (default: None)
+    seed : int | None
+        Random seed for reproducibility (default: None)
+    verbose : bool
+        Enable verbose output (default: False)
+    header_interval : int
+        Iterations between header repeats in verbose mode (default: 100)
     """
 
     num_particles: int = Field(
@@ -302,47 +318,6 @@ class ParticleSwarmConfig(BaseModel):
             "(default: 100)"
         ),
     )
-
-    @classmethod
-    def create(
-        cls,
-        num_particles: int = 20,
-        max_iterations: int = 1000,
-        target_cost: float | None = None,
-        verbose: bool = False,
-        header_interval: int = 100,
-    ) -> Self:
-        """
-        Create a basic ParticleSwarmConfig.
-
-        Use builder methods to configure advanced features like chaotic inertia,
-        TVAC, initialization strategies, and mutation.
-
-        Parameters
-        ----------
-        num_particles : int
-            Number of particles in the swarm (default: 20)
-        max_iterations : int
-            Maximum number of iterations (default: 1000)
-        target_cost : float | None
-            Target cost for early stopping (default: None)
-        verbose : bool
-            Enable verbose output (default: False)
-        header_interval : int
-            Iterations between header repeats in verbose mode (default: 100)
-
-        Returns
-        -------
-        ParticleSwarmConfig
-            A new configuration instance
-        """
-        return cls(
-            num_particles=num_particles,
-            max_iterations=max_iterations,
-            target_cost=target_cost,
-            verbose=verbose,
-            header_interval=header_interval,
-        )
 
     def with_inertia(self, inertia: float) -> Self:
         """

@@ -123,9 +123,9 @@ class TestCalibrator:
             loss_config=LossConfig(function=LossFunction.SSE),
             optimization_config=OptimizationConfig(
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=ParticleSwarmConfig.create(
-                    max_iterations=200, verbose=False
-                ).with_seed(42),
+                config=ParticleSwarmConfig(max_iterations=200, verbose=False).with_seed(
+                    42
+                ),
             ),
         )
 
@@ -608,9 +608,7 @@ class TestCalibrator:
 
         # Create PSO config with advanced features to avoid stagnation
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=40, max_iterations=1000, verbose=False
-            )
+            ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
             .with_seed(42)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
@@ -732,9 +730,7 @@ class TestCalibrator:
 
         # Create PSO config with advanced features using builder pattern
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=30, max_iterations=200, verbose=False
-            )
+            ParticleSwarmConfig(num_particles=30, max_iterations=200, verbose=False)
             .with_seed(123)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
@@ -799,9 +795,7 @@ class TestCalibrator:
 
         # Create PSO config with chaotic inertia using builder pattern
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=25, max_iterations=200, verbose=False
-            )
+            ParticleSwarmConfig(num_particles=25, max_iterations=200, verbose=False)
             .with_seed(42)
             # Enable chaotic inertia weight
             # (varies between 0.4 and 0.9 using logistic map)
