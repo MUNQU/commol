@@ -9,7 +9,6 @@ except ImportError as e:
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
 from commol.utils.security import validate_expression_security
 
-
 PREFIX_SEPARATOR: str = ":"
 VALID_PREFIXES = [el.value for el in VariablePrefixes]
 
@@ -254,13 +253,15 @@ class Dynamics(BaseModel):
 
     Attributes
     ----------
-    typology : Literal["DifferenceEquations"]
+    typology : Literal["DifferenceEquations", "DifferentialEquations"]
         The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
     """
 
-    typology: Literal[ModelTypes.DIFFERENCE_EQUATIONS]
+    typology: Literal[
+        ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
+    ]
     transitions: list[Transition]
 
     @field_validator("transitions")
