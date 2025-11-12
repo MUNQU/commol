@@ -16,6 +16,7 @@ class LogicOperators(StrEnum):
 @unique
 class ModelTypes(StrEnum):
     DIFFERENCE_EQUATIONS = "DifferenceEquations"
+    DIFFERENTIAL_EQUATIONS = "DifferentialEquations"
 
 
 @unique

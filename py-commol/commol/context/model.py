@@ -285,30 +285,21 @@ class Model(BaseModel):
 
     def print_equations(self, output_file: str | None = None) -> None:
         """
-        Prints the difference equations of the model in mathematical form.
+        Prints the equations of the model in mathematical form.
 
-        Displays model metadata and the system of difference equations in both
+        Displays model metadata and the system of equations in both
         compact (mathematical notation) and expanded (individual equations) forms.
+
+        For DifferentialEquations models, displays equations as dX/dt = ...
+        For DifferenceEquations models,
+        displays equations as [X(t+Dt) - X(t)] / Dt = ...
 
         Parameters
         ----------
         output_file : str | None
             If provided, writes the equations to this file path instead of printing
             to console. If None, prints to console.
-
-        Raises
-        ------
-        ValueError
-            If the model is not a DifferenceEquations model.
         """
-
-        if self.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
-            raise ValueError(
-                (
-                    f"print_equations only supports DifferenceEquations models. "
-                    f"Current model type: {self.dynamics.typology}"
-                )
-            )
 
         lines = self._generate_model_header()
 
@@ -522,7 +513,8 @@ class Model(BaseModel):
                         category, strat_by_id[strat.id]
                     )
                     if equation:
-                        lines.append(f"  dX_{category}/dt: {equation}")
+                        lhs = self._get_equation_lhs(f"X_{category}")
+                        lines.append(f"  {lhs}: {equation}")
 
                 lines.append("")
 
@@ -597,7 +589,8 @@ class Model(BaseModel):
             )
             if equation:
                 suffix = "_s" if self.population.stratifications else ""
-                lines.append(f"  d{bin_id}{suffix}/dt: {equation}")
+                lhs = self._get_equation_lhs(f"{bin_id}{suffix}")
+                lines.append(f"  {lhs}: {equation}")
 
         lines.append("")
         return lines
@@ -898,6 +891,25 @@ class Model(BaseModel):
 
         return lines
 
+    def _get_equation_lhs(self, variable_name: str) -> str:
+        """
+        Get the left-hand side of an equation based on model type.
+
+        Parameters
+        ----------
+        variable_name : str
+            The name of the variable
+
+        Returns
+        -------
+        str
+            The formatted LHS
+        """
+        if self.dynamics.typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
+            return f"d{variable_name}/dt"
+        else:  # DIFFERENCE_EQUATIONS
+            return f"[{variable_name}(t+Dt) - {variable_name}(t)] / Dt"
+
     def _generate_expanded_form(self) -> list[str]:
         """Generate expanded form with individual equations for each compartment."""
         lines: list[str] = []
@@ -919,7 +931,8 @@ class Model(BaseModel):
                 equation = self._build_compartment_equation(
                     compartment, bin_transitions, stratification_transitions
                 )
-                lines.append(f"d{compartment_str}/dt = {equation}")
+                lhs = self._get_equation_lhs(compartment_str)
+                lines.append(f"{lhs} = {equation}")
         else:
             bin_and_category_ids = self._collect_bin_and_category_ids()
             equations = self._build_flow_equations(bin_and_category_ids)
@@ -927,7 +940,8 @@ class Model(BaseModel):
 
             for bin_id in bin_ids:
                 equation = self._format_bin_equation(equations[bin_id])
-                lines.append(f"d{bin_id}/dt = {equation}")
+                lhs = self._get_equation_lhs(bin_id)
+                lines.append(f"{lhs} = {equation}")
 
         return lines
 
