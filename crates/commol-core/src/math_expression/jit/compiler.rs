@@ -21,8 +21,12 @@ pub struct JITFunction {
     func_ptr: extern "C" fn(*const f64) -> f64,
 
     /// Keep the JIT module alive (it owns the executable memory)
-    /// Wrapped in Arc<Mutex<>> for safe sharing across threads
-    /// The Mutex is never actually locked after creation - it only exists for Send+Sync
+    ///
+    /// Uses Arc<Mutex<>> instead of just Arc because:
+    /// - JITModule is `Send` (can be moved between threads) but not `Sync` (cannot be shared)
+    /// - Arc requires T: Send + Sync, so we need Mutex to provide the Sync implementation
+    /// - The Mutex is never actually locked after creation since the module is immutable
+    /// - This is a zero-cost abstraction: the mutex overhead only exists for thread safety guarantees
     _module: Arc<Mutex<JITModule>>,
 
     /// Ordered list of variable names (for context preparation)
