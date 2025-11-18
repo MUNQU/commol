@@ -297,50 +297,63 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         )))
     }
 
-    /// Call a single-argument libm function
-    fn call_libm_f64_to_f64(
+    /// Generic helper to call a libm function with any number of arguments
+    fn call_libm_function(
         &mut self,
         name: &str,
-        arg: Value,
+        args: &[Value],
     ) -> Result<Value, MathExpressionError> {
-        // Import the function if not already imported
-        let func_id = self.libm_registry.import_f64_to_f64(self.module, name)?;
+        // Import the function based on argument count
+        let func_id = match args.len() {
+            1 => self.libm_registry.import_f64_to_f64(self.module, name)?,
+            2 => self
+                .libm_registry
+                .import_f64_f64_to_f64(self.module, name)?,
+            3 => self
+                .libm_registry
+                .import_f64_f64_f64_to_f64(self.module, name)?,
+            n => {
+                return Err(MathExpressionError::InvalidExpression(format!(
+                    "Unsupported argument count {} for libm function {}",
+                    n, name
+                )));
+            }
+        };
 
         // Get function reference in current function
         let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
 
         // Generate call
-        let call = self.builder.ins().call(func_ref, &[arg]);
+        let call = self.builder.ins().call(func_ref, args);
 
         // Get return value
         let results = self.builder.inst_results(call);
         Ok(results[0])
     }
 
+    /// Call a single-argument libm function
+    #[inline]
+    fn call_libm_f64_to_f64(
+        &mut self,
+        name: &str,
+        arg: Value,
+    ) -> Result<Value, MathExpressionError> {
+        self.call_libm_function(name, &[arg])
+    }
+
     /// Call a two-argument libm function
+    #[inline]
     fn call_libm_f64_f64_to_f64(
         &mut self,
         name: &str,
         arg1: Value,
         arg2: Value,
     ) -> Result<Value, MathExpressionError> {
-        // Import the function if not already imported
-        let func_id = self
-            .libm_registry
-            .import_f64_f64_to_f64(self.module, name)?;
-
-        // Get function reference in current function
-        let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
-
-        // Generate call
-        let call = self.builder.ins().call(func_ref, &[arg1, arg2]);
-
-        // Get return value
-        let results = self.builder.inst_results(call);
-        Ok(results[0])
+        self.call_libm_function(name, &[arg1, arg2])
     }
 
     /// Call a three-argument libm function
+    #[inline]
     fn call_libm_f64_f64_f64_to_f64(
         &mut self,
         name: &str,
@@ -348,20 +361,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         arg2: Value,
         arg3: Value,
     ) -> Result<Value, MathExpressionError> {
-        // Import the function if not already imported
-        let func_id = self
-            .libm_registry
-            .import_f64_f64_f64_to_f64(self.module, name)?;
-
-        // Get function reference in current function
-        let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
-
-        // Generate call
-        let call = self.builder.ins().call(func_ref, &[arg1, arg2, arg3]);
-
-        // Get return value
-        let results = self.builder.inst_results(call);
-        Ok(results[0])
+        self.call_libm_function(name, &[arg1, arg2, arg3])
     }
 
     /// Generate min/max function (variadic)
