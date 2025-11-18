@@ -216,41 +216,39 @@ impl JITCompiler {
 
 /// Collect all variable names used in an expression
 fn collect_variables(expr: &Expr) -> Vec<String> {
-    let mut vars = Vec::new();
-    collect_variables_recursive(expr, &mut vars);
-
-    // Remove duplicates while preserving order
+    // Use HashMap for O(1) lookups while maintaining insertion order with Vec
     let mut seen = HashMap::new();
     let mut result = Vec::new();
-    for var in vars {
-        if !seen.contains_key(&var) {
-            seen.insert(var.clone(), true);
-            result.push(var);
-        }
-    }
-
+    collect_variables_recursive(expr, &mut seen, &mut result);
     result
 }
 
-/// Recursively collect variables from an expression
-fn collect_variables_recursive(expr: &Expr, vars: &mut Vec<String>) {
+/// Recursively collect variables from an expression, deduplicating on the fly
+fn collect_variables_recursive(
+    expr: &Expr,
+    seen: &mut HashMap<String, ()>,
+    result: &mut Vec<String>,
+) {
     match expr {
         Expr::Variable(name) => {
             // Skip special constants that are compiled directly
             if name != "pi" && name != "e" {
-                vars.push(name.clone());
+                // Only insert if we haven't seen this variable before
+                if seen.insert(name.clone(), ()).is_none() {
+                    result.push(name.clone());
+                }
             }
         }
         Expr::BinaryOp { left, right, .. } => {
-            collect_variables_recursive(left, vars);
-            collect_variables_recursive(right, vars);
+            collect_variables_recursive(left, seen, result);
+            collect_variables_recursive(right, seen, result);
         }
         Expr::UnaryOp { operand, .. } => {
-            collect_variables_recursive(operand, vars);
+            collect_variables_recursive(operand, seen, result);
         }
         Expr::FunctionCall { args, .. } => {
             for arg in args {
-                collect_variables_recursive(arg, vars);
+                collect_variables_recursive(arg, seen, result);
             }
         }
         Expr::Conditional {
@@ -258,9 +256,9 @@ fn collect_variables_recursive(expr: &Expr, vars: &mut Vec<String>) {
             true_expr,
             false_expr,
         } => {
-            collect_variables_recursive(condition, vars);
-            collect_variables_recursive(true_expr, vars);
-            collect_variables_recursive(false_expr, vars);
+            collect_variables_recursive(condition, seen, result);
+            collect_variables_recursive(true_expr, seen, result);
+            collect_variables_recursive(false_expr, seen, result);
         }
         Expr::Constant(_) => {}
     }
