@@ -9,23 +9,16 @@ use cranelift_module::{FuncId, Linkage, Module};
 use std::collections::HashMap;
 
 /// Registry of imported libm functions
+#[derive(Default)]
 pub struct LibmRegistry {
     /// Map of function name to Cranelift function ID
     functions: HashMap<String, FuncId>,
 }
 
-impl Default for LibmRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl LibmRegistry {
     /// Create a new libm registry
     pub fn new() -> Self {
-        Self {
-            functions: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Generic helper to import a libm function with a given number of f64 parameters
