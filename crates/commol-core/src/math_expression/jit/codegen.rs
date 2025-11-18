@@ -304,7 +304,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         arg: Value,
     ) -> Result<Value, MathExpressionError> {
         // Import the function if not already imported
-        let func_id = self.libm_registry.import_f64_to_f64(self.module, name);
+        let func_id = self.libm_registry.import_f64_to_f64(self.module, name)?;
 
         // Get function reference in current function
         let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
@@ -325,7 +325,9 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         arg2: Value,
     ) -> Result<Value, MathExpressionError> {
         // Import the function if not already imported
-        let func_id = self.libm_registry.import_f64_f64_to_f64(self.module, name);
+        let func_id = self
+            .libm_registry
+            .import_f64_f64_to_f64(self.module, name)?;
 
         // Get function reference in current function
         let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
@@ -349,7 +351,7 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
         // Import the function if not already imported
         let func_id = self
             .libm_registry
-            .import_f64_f64_f64_to_f64(self.module, name);
+            .import_f64_f64_f64_to_f64(self.module, name)?;
 
         // Get function reference in current function
         let func_ref = self.module.declare_func_in_func(func_id, self.builder.func);
