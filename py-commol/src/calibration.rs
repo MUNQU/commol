@@ -12,6 +12,7 @@ use crate::difference::PyDifferenceEquations;
 pub enum PyCalibrationParameterType {
     Parameter,
     InitialCondition,
+    Scale,
 }
 
 impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParameterType {
@@ -22,6 +23,9 @@ impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParamet
             }
             PyCalibrationParameterType::InitialCondition => {
                 commol_calibration::CalibrationParameterType::InitialCondition
+            }
+            PyCalibrationParameterType::Scale => {
+                commol_calibration::CalibrationParameterType::Scale
             }
         }
     }
@@ -43,16 +47,33 @@ impl PyObservedDataPoint {
     ///     compartment: Name of the compartment being observed
     ///     value: Observed value
     ///     weight: Optional weight for this observation (default: 1.0)
+    ///     scale_id: Optional scale parameter ID to apply to model output
     #[new]
-    #[pyo3(signature = (step, compartment, value, weight=None))]
-    fn new(step: u32, compartment: String, value: f64, weight: Option<f64>) -> Self {
-        Self {
-            inner: if let Some(w) = weight {
+    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None))]
+    fn new(
+        step: u32,
+        compartment: String,
+        value: f64,
+        weight: Option<f64>,
+        scale_id: Option<String>,
+    ) -> Self {
+        let inner = match (weight, scale_id) {
+            (Some(w), Some(s)) => commol_calibration::ObservedDataPoint::with_weight_and_scale(
+                step,
+                compartment,
+                value,
+                w,
+                s,
+            ),
+            (Some(w), None) => {
                 commol_calibration::ObservedDataPoint::with_weight(step, compartment, value, w)
-            } else {
-                commol_calibration::ObservedDataPoint::new(step, compartment, value)
-            },
-        }
+            }
+            (None, Some(s)) => {
+                commol_calibration::ObservedDataPoint::with_scale(step, compartment, value, s)
+            }
+            (None, None) => commol_calibration::ObservedDataPoint::new(step, compartment, value),
+        };
+        Self { inner }
     }
 
     fn __repr__(&self) -> String {

@@ -191,7 +191,7 @@ class TestCompartmentPlaceholder:
                 rate="d * $compartment",
             )
 
-        assert "$compartment placeholder requires multiple source" in str(
+        assert "$compartment placeholder requires either multiple source" in str(
             exc_info.value
         )
         assert "use the compartment name directly" in str(exc_info.value)
@@ -215,7 +215,9 @@ class TestCompartmentPlaceholder:
                 rate="recovery_rate * $compartment",
             )
 
-        assert "cannot be used with multiple targets" in str(exc_info.value)
+        assert "cannot be used with both multiple sources and multiple targets" in str(
+            exc_info.value
+        )
         assert "ambiguous mappings" in str(exc_info.value)
 
     def test_with_stratified_rates(self):

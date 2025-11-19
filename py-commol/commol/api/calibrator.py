@@ -103,6 +103,7 @@ class Calibrator:
                 compartment=point.compartment,
                 value=point.value,
                 weight=point.weight,
+                scale_id=point.scale_id,
             )
             for point in self.problem.observed_data
         ]
@@ -169,6 +170,8 @@ class Calibrator:
             return rust_calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
+        elif param_type == CalibrationParameterType.SCALE:
+            return rust_calibration.CalibrationParameterType.Scale
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -280,6 +283,12 @@ class Calibrator:
                     raise ValueError(
                         f"Calibration initial condition '{param.id}' not found in "
                         f"model bins. Available bins: {sorted(model_bin_ids)}"
+                    )
+            elif param.parameter_type == CalibrationParameterType.SCALE:
+                if param.min_bound <= 0 or param.max_bound <= 0:
+                    raise ValueError(
+                        f"Scale parameter '{param.id}' must have positive bounds "
+                        f"(got min={param.min_bound}, max={param.max_bound})"
                     )
             else:
                 raise ValueError(

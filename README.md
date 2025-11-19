@@ -318,6 +318,62 @@ calibrated_simulation = Simulation(model)
 calibrated_results = calibrated_simulation.run(num_steps=100)
 ```
 
+**Calibrating with Scale Parameters:**
+
+When observed data is underreported, use scale parameters to estimate the reporting rate:
+
+```python
+# Reported cases (potentially underreported)
+reported_cases = [10, 15, 25, 40, 60, 75, 85, 70, 50, 30]
+
+# Link observed data to scale parameter
+observed_data = [
+    ObservedDataPoint(
+        step=idx,
+        compartment="I",
+        value=cases,
+        scale_id="reporting_rate"  # Links to scale parameter
+    )
+    for idx, cases in enumerate(reported_cases)
+]
+
+parameters = [
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.1,
+        max_bound=1.0
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.05,
+        max_bound=0.5
+    ),
+    CalibrationParameter(
+        id="reporting_rate",
+        parameter_type=CalibrationParameterType.SCALE,
+        min_bound=0.01,
+        max_bound=1.0
+    ),
+]
+
+# Run calibration
+result = calibrator.run()
+
+# Separate parameters by type
+scale_values = {
+    param.id: result.best_parameters[param.id]
+    for param in problem.parameters
+    if param.parameter_type == CalibrationParameterType.SCALE
+}
+
+print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
+
+# Visualize with scale_values for correct display
+plotter.plot_series(observed_data=observed_data, scale_values=scale_values)
+```
+
 ## Documentation
 
 **[Full Documentation](https://munqu.github.io/commol)**

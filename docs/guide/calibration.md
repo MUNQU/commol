@@ -555,6 +555,160 @@ result = calibrator.run()
 model.update_parameters(result.best_parameters)
 ```
 
+### Calibrating Scale Parameters
+
+When observed data represents only a fraction of true cases (e.g., due to underreporting or detection limits), scale parameters allow you to calibrate the reporting or detection rate alongside model parameters.
+
+**How Scale Parameters Work:**
+
+During calibration, model predictions are multiplied by the scale factor before comparing with observed data. This allows simultaneous estimation of true disease dynamics and the observation process.
+
+**Basic Example:**
+
+```python
+# Build SIR model with parameters to calibrate
+model = (
+    ModelBuilder(name="SIR Model", version="1.0")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=None)
+    .add_parameter(id="gamma", value=None)
+    .add_transition(
+        id="infection",
+        source=["S"],
+        target=["I"],
+        rate="beta * S * I / N"
+    )
+    .add_transition(
+        id="recovery",
+        source=["I"],
+        target=["R"],
+        rate="gamma * I"
+    )
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0}
+        ]
+    )
+    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+)
+
+# Reported cases (potentially underreported)
+reported_cases = [10, 15, 25, 40, 60, 75, 85, 70, 50, 30]
+
+# Link observed data to scale parameter
+observed_data = [
+    ObservedDataPoint(
+        step=idx,
+        compartment="I",
+        value=cases,
+        scale_id="reporting_rate"
+    )
+    for idx, cases in enumerate(reported_cases)
+]
+
+simulation = Simulation(model)
+
+# Define parameters including scale
+parameters = [
+    CalibrationParameter(
+        id="beta",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.1,
+        max_bound=1.0
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type=CalibrationParameterType.PARAMETER,
+        min_bound=0.05,
+        max_bound=0.5
+    ),
+    CalibrationParameter(
+        id="reporting_rate",
+        parameter_type=CalibrationParameterType.SCALE,
+        min_bound=0.01,
+        max_bound=1.0
+    ),
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_config=LossConfig(function=LossFunction.MAE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        config=ParticleSwarmConfig.create(num_particles=40, max_iterations=500),
+    ),
+)
+
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run()
+
+# Separate parameters by type
+parameters = {}
+scale_values = {}
+
+for param in problem.parameters:
+    value = result.best_parameters[param.id]
+
+    if param.parameter_type == CalibrationParameterType.PARAMETER:
+        parameters[param.id] = value
+    elif param.parameter_type == CalibrationParameterType.SCALE:
+        scale_values[param.id] = value
+
+print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
+
+# Update model and run simulation
+model.update_parameters(parameters)
+calibrated_simulation = Simulation(model)
+results = calibrated_simulation.run(num_steps=len(observed_data) - 1)
+
+# Visualize with scale_values to correctly display observed data
+from commol import SimulationPlotter
+
+plotter = SimulationPlotter(calibrated_simulation, results)
+plotter.plot_series(
+    observed_data=observed_data,
+    scale_values=scale_values,
+)
+```
+
+**Multiple Scale Parameters:**
+
+Different compartments can have different detection rates:
+
+```python
+observed_data = [
+    ObservedDataPoint(step=10, compartment="I", value=45.0, scale_id="case_detection"),
+    ObservedDataPoint(step=10, compartment="R", value=120.0, scale_id="recovery_detection"),
+]
+
+parameters = [
+    CalibrationParameter(
+        id="case_detection",
+        parameter_type=CalibrationParameterType.SCALE,
+        min_bound=0.05,
+        max_bound=0.5
+    ),
+    CalibrationParameter(
+        id="recovery_detection",
+        parameter_type=CalibrationParameterType.SCALE,
+        min_bound=0.7,
+        max_bound=1.0
+    ),
+]
+```
+
+**Key Considerations:**
+
+- **Identifiability**: Calibrating transmission parameters and scale simultaneously may cause identifiability issues
+- **Visualization**: Always pass `scale_values` to plotter for correct display
+- **Interpretation**: Calibrated scale = fraction of true cases observed (e.g., 0.15 = 15% detection)
+
 ### Using Calibration Results
 
 Once calibrated, update your model with the fitted parameters and create a new simulation:

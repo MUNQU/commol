@@ -55,6 +55,10 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// None for Parameter type, Some(index) for InitialCondition type
     parameter_compartment_indices: Vec<Option<usize>>,
 
+    /// Scale parameter indices for observed data points (parallel to observed_data vec)
+    /// None if no scale is applied, Some(param_idx) if a scale parameter should be applied
+    observed_scale_indices: Vec<Option<usize>>,
+
     /// Loss function configuration
     loss_config: LossConfig,
 
@@ -150,6 +154,44 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                         }
                     }
                 }
+                CalibrationParameterType::Scale => {
+                    // No compartment index needed for scale parameters
+                    parameter_compartment_indices.push(None);
+                }
+            }
+        }
+
+        // Build parameter ID to index mapping for scale lookups
+        let param_id_map: std::collections::HashMap<&str, usize> = parameters
+            .iter()
+            .enumerate()
+            .map(|(idx, param)| (param.id.as_str(), idx))
+            .collect();
+
+        // Build scale parameter indices for observed data
+        let mut observed_scale_indices = Vec::with_capacity(observed_data.len());
+        for obs in &observed_data {
+            if let Some(ref scale_id) = obs.scale_id {
+                match param_id_map.get(scale_id.as_str()) {
+                    Some(&param_idx) => {
+                        // Verify this parameter is actually a Scale type
+                        if parameters[param_idx].parameter_type != CalibrationParameterType::Scale {
+                            return Err(format!(
+                                "Parameter '{}' referenced as scale_id but is not a Scale parameter",
+                                scale_id
+                            ));
+                        }
+                        observed_scale_indices.push(Some(param_idx));
+                    }
+                    None => {
+                        return Err(format!(
+                            "Invalid scale_id '{}' referenced in observed data (not found in parameters)",
+                            scale_id
+                        ));
+                    }
+                }
+            } else {
+                observed_scale_indices.push(None);
             }
         }
 
@@ -170,6 +212,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_compartment_indices,
             parameters,
             parameter_compartment_indices,
+            observed_scale_indices,
             loss_config,
             max_time_step,
             result_buffer: std::cell::RefCell::new(result_buffer),
@@ -317,16 +360,24 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 
     /// Calculate loss between simulation results and observed data
-    fn calculate_loss(&self, simulation_results: &[Vec<f64>]) -> f64 {
+    fn calculate_loss(&self, simulation_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
         let observation_iter = || {
             self.observed_data
                 .iter()
                 .zip(&self.observed_compartment_indices)
-                .filter_map(|(obs, &compartment_idx)| {
+                .zip(&self.observed_scale_indices)
+                .filter_map(|((obs, &compartment_idx), &scale_idx)| {
                     let time_idx = obs.time_step as usize;
-                    simulation_results
-                        .get(time_idx)
-                        .map(|step_data| (obs, step_data[compartment_idx]))
+                    simulation_results.get(time_idx).map(|step_data| {
+                        let predicted = step_data[compartment_idx];
+                        // Apply scale if present
+                        let scaled_predicted = if let Some(param_idx) = scale_idx {
+                            predicted * param_values[param_idx]
+                        } else {
+                            predicted
+                        };
+                        (obs, scaled_predicted)
+                    })
                 })
         };
 
@@ -542,6 +593,10 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
                             ))
                         })?;
                 }
+                CalibrationParameterType::Scale => {
+                    // Scale parameters are not applied to the engine
+                    // They are used in loss calculation
+                }
             }
         }
 
@@ -572,7 +627,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         }
 
         // Calculate and return loss
-        let loss = self.calculate_loss(&buffer);
+        let loss = self.calculate_loss(&buffer, &clamped_params);
 
         // Check if loss itself is invalid (defensive programming)
         if !loss.is_finite() {

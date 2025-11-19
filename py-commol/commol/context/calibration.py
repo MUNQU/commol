@@ -14,10 +14,13 @@ class CalibrationParameterType(str, Enum):
         Model parameter
     INITIAL_CONDITION : str
         Initial population in a compartment
+    SCALE : str
+        Scaling factor for observed data
     """
 
     PARAMETER = "parameter"
     INITIAL_CONDITION = "initial_condition"
+    SCALE = "scale"
 
 
 class LossFunction(str, Enum):
@@ -72,6 +75,8 @@ class ObservedDataPoint(BaseModel):
         Observed value
     weight : float
         Weight for this observation in the loss function (default: 1.0)
+    scale_id : str | None
+        Optional scale parameter ID to apply to model output before comparison
     """
 
     step: int = Field(default=..., ge=0, description="Time step of the observation")
@@ -83,6 +88,10 @@ class ObservedDataPoint(BaseModel):
         default=1.0,
         gt=0.0,
         description="Weight for this observation in the loss function",
+    )
+    scale_id: str | None = Field(
+        default=None,
+        description="Optional scale parameter ID to apply to model output",
     )
 
 

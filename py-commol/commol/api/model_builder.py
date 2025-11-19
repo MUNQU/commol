@@ -474,7 +474,7 @@ class ModelBuilder:
             raise ValueError(
                 (
                     f"Transition '{id}': $compartment placeholder cannot be used "
-                    f"with both multiple sources AND multiple targets "
+                    f"with both multiple sources and multiple targets "
                     f"(found {len(source)} sources and {len(target)} targets). "
                     f"This would create ambiguous mappings. Use either multiple "
                     f"sources with single/empty target, or single/empty source with "

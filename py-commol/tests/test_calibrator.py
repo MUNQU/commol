@@ -820,3 +820,178 @@ class TestCalibrator:
         # Allow slightly larger tolerance due to stochastic nature
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=2e-4)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=2e-4)
+
+    def test_scale_parameter_calibration(self, model: Model):
+        """
+        Test calibration with scale parameter.
+        Simulates the case where observed data is scaled by an unknown detection rate.
+        """
+        # Run simulation with known parameters
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create "observed" data that's scaled down by 0.5
+        # (simulating 50% detection rate)
+        true_scale = 0.5
+        observed_data = [
+            ObservedDataPoint(
+                step=i,
+                compartment="I",
+                value=results["I"][i] * true_scale,
+                scale_id="detection_rate",
+            )
+            for i in range(0, 100, 10)  # Sample every 10 steps
+        ]
+
+        # Define calibration parameters including the scale
+        parameters = [
+            CalibrationParameter(
+                id="detection_rate",
+                parameter_type=CalibrationParameterType.SCALE,
+                min_bound=0.1,
+                max_bound=1.0,
+                initial_guess=0.7,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=500, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover the true scale parameter
+        assert math.isclose(
+            result.best_parameters["detection_rate"], true_scale, abs_tol=1e-4
+        )
+        assert result.converged
+
+    def test_scale_and_parameter_calibration_combined(self, model: Model):
+        """
+        Test calibration with both model parameters and scale parameters.
+        """
+        # Run simulation with known parameters
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create "observed" data that's scaled and noisy
+        true_scale = 0.3
+        observed_data = [
+            ObservedDataPoint(
+                step=i,
+                compartment="I",
+                value=results["I"][i] * true_scale,
+                scale_id="detection_rate",
+            )
+            for i in range(0, 100, 5)
+        ]
+
+        # Calibrate both the model parameter beta and the scale
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="detection_rate",
+                parameter_type=CalibrationParameterType.SCALE,
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=ParticleSwarmConfig(
+                    max_iterations=300, num_particles=25, verbose=False
+                ).with_seed(42),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover both the model parameter and scale
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-3)
+        assert math.isclose(
+            result.best_parameters["detection_rate"], true_scale, abs_tol=1e-3
+        )
+
+    def test_multiple_scales_for_different_compartments(self, model: Model):
+        """
+        Test calibration with different scale parameters for different compartments.
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Different detection rates for I and R compartments
+        i_scale = 0.6
+        r_scale = 0.9
+
+        observed_data = []
+        # Infected observations with one scale
+        for i in range(0, 100, 10):
+            observed_data.append(
+                ObservedDataPoint(
+                    step=i,
+                    compartment="I",
+                    value=results["I"][i] * i_scale,
+                    scale_id="i_detection_rate",
+                )
+            )
+        # Recovered observations with different scale
+        for i in range(0, 100, 10):
+            observed_data.append(
+                ObservedDataPoint(
+                    step=i,
+                    compartment="R",
+                    value=results["R"][i] * r_scale,
+                    scale_id="r_detection_rate",
+                )
+            )
+
+        parameters = [
+            CalibrationParameter(
+                id="i_detection_rate",
+                parameter_type=CalibrationParameterType.SCALE,
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="r_detection_rate",
+                parameter_type=CalibrationParameterType.SCALE,
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=500, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover both scale parameters
+        assert math.isclose(
+            result.best_parameters["i_detection_rate"], i_scale, abs_tol=1e-3
+        )
+        assert math.isclose(
+            result.best_parameters["r_detection_rate"], r_scale, abs_tol=1e-3
+        )

@@ -9,6 +9,8 @@ pub enum CalibrationParameterType {
     Parameter,
     /// Initial population in a compartment (e.g., initial I value)
     InitialCondition,
+    /// Scaling factor for observed data (multiplies model output before comparison)
+    Scale,
 }
 
 /// Represents an observed data point to fit against
@@ -26,6 +28,12 @@ pub struct ObservedDataPoint {
     /// Weight for this observation (default 1.0)
     /// Higher weights give more importance to this data point in the loss function
     pub weight: f64,
+
+    /// Optional scale parameter ID to apply to model output before comparison
+    /// If provided, the model's predicted value will be multiplied by this scale parameter
+    /// before computing the loss. Useful when observed data is in different units or
+    /// there's an unknown proportionality constant.
+    pub scale_id: Option<String>,
 }
 
 impl ObservedDataPoint {
@@ -36,6 +44,7 @@ impl ObservedDataPoint {
             compartment,
             value,
             weight: 1.0,
+            scale_id: None,
         }
     }
 
@@ -46,6 +55,35 @@ impl ObservedDataPoint {
             compartment,
             value,
             weight,
+            scale_id: None,
+        }
+    }
+
+    /// Create a new observed data point with a scale parameter
+    pub fn with_scale(time_step: u32, compartment: String, value: f64, scale_id: String) -> Self {
+        Self {
+            time_step,
+            compartment,
+            value,
+            weight: 1.0,
+            scale_id: Some(scale_id),
+        }
+    }
+
+    /// Create a new observed data point with both weight and scale
+    pub fn with_weight_and_scale(
+        time_step: u32,
+        compartment: String,
+        value: f64,
+        weight: f64,
+        scale_id: String,
+    ) -> Self {
+        Self {
+            time_step,
+            compartment,
+            value,
+            weight,
+            scale_id: Some(scale_id),
         }
     }
 }

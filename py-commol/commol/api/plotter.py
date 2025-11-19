@@ -67,6 +67,7 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
+        scale_values: dict[str, float] | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
         seaborn_style: SeabornStyle | None = None,
@@ -86,6 +87,12 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay on corresponding bin subplots.
+        scale_values : dict[str, float] | None
+            Optional calibrated scale values
+            (e.g., from CalibrationResult.best_parameters).
+            Maps scale_id to scale value. Observed data points with a scale_id will be
+            unscaled for plotting: unscaled_value = observed_value / scale.
+            This allows observed data to be comparable with model predictions.
         config : PlotConfig | None
             Configuration for plot layout and styling. If None, uses defaults.
         bins : list[str] | None
@@ -111,6 +118,12 @@ class SimulationPlotter:
         --------
         >>> plotter = SimulationPlotter(simulation, results)
         >>> plotter.plot_series("output.png", seaborn_style="darkgrid")
+        >>> # With calibrated scales
+        >>> plotter.plot_series(
+        ...     "output.png",
+        ...     observed_data=obs_data,
+        ...     scale_values=result.best_parameters,
+        ... )
         """
         logger.info("Starting plot_series")
 
@@ -156,6 +169,7 @@ class SimulationPlotter:
                 ax,
                 bin_id,
                 observed_by_bin.get(bin_id, []),
+                scale_values or {},
                 dict(kwargs),
             )
 
@@ -177,6 +191,7 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
+        scale_values: dict[str, float] | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
         seaborn_style: SeabornStyle | None = None,
@@ -196,6 +211,11 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay (also shown as cumulative).
+        scale_values : dict[str, float] | None
+            Optional calibrated scale values
+            (e.g., from CalibrationResult.best_parameters).
+            Maps scale_id to scale value. Observed data points with a scale_id will be
+            unscaled for plotting: unscaled_value = observed_value / scale.
         config : PlotConfig | None
             Configuration for plot layout and styling. If None, uses defaults.
         bins : list[str] | None
@@ -247,7 +267,9 @@ class SimulationPlotter:
 
         # Group and accumulate observed data
         observed_by_bin = self._group_observed_data(observed_data)
-        cumulative_observed = self._calculate_cumulative_observed(observed_by_bin)
+        cumulative_observed = self._calculate_cumulative_observed(
+            observed_by_bin, scale_values or {}
+        )
 
         # Create figure and subplots
         fig, axes = plt.subplots(
@@ -365,6 +387,7 @@ class SimulationPlotter:
         ax: "Axes",
         bin_id: str,
         observed: list[ObservedDataPoint],
+        scale_values: dict[str, float],
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
         """
@@ -388,7 +411,13 @@ class SimulationPlotter:
         # Overlay observed data if available
         if observed:
             obs_steps = [p.step for p in observed]
-            obs_values = [p.value for p in observed]
+            # Apply scale if observation has a scale_id
+            obs_values = [
+                p.value / scale_values[p.scale_id]
+                if p.scale_id and p.scale_id in scale_values
+                else p.value
+                for p in observed
+            ]
             sns.scatterplot(
                 x=obs_steps,
                 y=obs_values,
@@ -438,10 +467,13 @@ class SimulationPlotter:
         return cumulative
 
     def _calculate_cumulative_observed(
-        self, observed_by_bin: dict[str, list[ObservedDataPoint]]
+        self,
+        observed_by_bin: dict[str, list[ObservedDataPoint]],
+        scale_values: dict[str, float],
     ) -> dict[str, list[tuple[int, float]]]:
         """
         Calculate cumulative observed data (step, cumulative_value).
+        Applies scale if observation has a scale_id.
         """
         cumulative: dict[str, list[tuple[int, float]]] = {}
 
@@ -450,7 +482,13 @@ class SimulationPlotter:
             running_total = 0.0
 
             for point in points:
-                running_total += point.value
+                # Apply scale if observation has a scale_id
+                value = (
+                    point.value / scale_values[point.scale_id]
+                    if point.scale_id and point.scale_id in scale_values
+                    else point.value
+                )
+                running_total += value
                 cumsum.append((point.step, running_total))
 
             cumulative[bin_id] = cumsum
