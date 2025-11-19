@@ -92,6 +92,7 @@ class ObservedDataPointProtocol(Protocol):
         compartment: str,
         value: float,
         weight: float | None = None,
+        scale_id: str | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...
@@ -99,10 +100,13 @@ class ObservedDataPointProtocol(Protocol):
     def compartment(self) -> str: ...
     @property
     def value(self) -> float: ...
+    @property
+    def scale_id(self) -> str | None: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: "CalibrationParameterTypeProtocol"
     InitialCondition: "CalibrationParameterTypeProtocol"
+    Scale: "CalibrationParameterTypeProtocol"
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
