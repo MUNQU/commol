@@ -374,6 +374,38 @@ print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
 plotter.plot_series(observed_data=observed_data, scale_values=scale_values)
 ```
 
+**Constraining Parameters:**
+
+Apply constraints to enforce biological knowledge during calibration.
+
+```python
+from commol import CalibrationConstraint
+
+# Add constraint: beta/gamma <= 5 (written as 5 - beta/gamma >= 0)
+constraints = [
+    CalibrationConstraint(
+        id="r0_bound",
+        expression="5.0 - beta/gamma",
+        description="R0 <= 5",
+    )
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    constraints=constraints,  # Include constraints
+    loss_config=LossConfig(function=LossFunction.SSE),
+    optimization_config=OptimizationConfig(
+        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        config=pso_config,
+    ),
+)
+
+result = calibrator.run()
+op = result.best_parameters["beta"] / result.best_parameters["gamma"]
+print(f"Calibrated op: {r0:.2f}")  # Will be <= 5
+```
+
 ## Documentation
 
 **[Full Documentation](https://munqu.github.io/commol)**
