@@ -1,7 +1,9 @@
 from enum import Enum
 from typing import Self, override
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from commol.utils.security import validate_expression_security
 
 
 class CalibrationParameterType(str, Enum):
@@ -146,6 +148,116 @@ class CalibrationParameter(BaseModel):
                     )
                 )
 
+        return self
+
+
+class CalibrationConstraint(BaseModel):
+    """
+    A constraint on calibration parameters defined as a mathematical expression.
+
+    Constraints are mathematical expressions that must evaluate to >= 0 for the
+    constraint to be satisfied. When the expression evaluates to < 0, the constraint
+    is violated and a penalty is applied during optimization.
+
+    Attributes
+    ----------
+    id : str
+        Unique identifier for this constraint
+    expression : str
+        Mathematical expression that must evaluate >= 0 for constraint satisfaction.
+        Can reference calibration parameters by their IDs. When time_steps is specified,
+        can also reference compartment values (S, I, R, etc.) at those time steps.
+    description : str | None
+        Human-readable description of the constraint (optional)
+    weight : float
+        Penalty weight multiplier (default: 1.0). Higher values make this constraint
+        more important relative to others. The penalty for violating this constraint
+        is: weight * violation^2
+    time_steps : list[int] | None
+        Optional time steps at which to evaluate this constraint. If None, constraint
+        is evaluated once before simulation using parameter values only. If specified,
+        constraint is evaluated at each time step and can reference compartment values.
+
+    Examples
+    --------
+    >>> # R0 = beta/gamma must be <= 5
+    >>> constraint = CalibrationConstraint(
+    ...     id="r0_bound",
+    ...     expression="5.0 - beta/gamma",
+    ...     description="Basic reproduction number R0 <= 5",
+    ... )
+
+    >>> # beta must be >= gamma
+    >>> constraint = CalibrationConstraint(
+    ...     id="ordering",
+    ...     expression="beta - gamma",
+    ...     description="Transmission rate >= recovery rate",
+    ... )
+
+    >>> # Sum of parameters <= 1.0
+    >>> constraint = CalibrationConstraint(
+    ...     id="sum_bound",
+    ...     expression="1.0 - (param1 + param2 + param3)",
+    ...     description="Sum of rates <= 1.0",
+    ... )
+
+    >>> # Time-dependent: Infected compartment <= 500 at specific time steps
+    >>> constraint = CalibrationConstraint(
+    ...     id="peak_infected",
+    ...     expression="500.0 - I",
+    ...     description="Peak infected never exceeds 500",
+    ...     time_steps=[10, 20, 30, 40, 50],
+    ... )
+    """
+
+    id: str = Field(
+        default=..., min_length=1, description="Unique identifier for this constraint"
+    )
+    expression: str = Field(
+        default=...,
+        min_length=1,
+        description="Mathematical expression that must evaluate >= 0",
+    )
+    description: str | None = Field(
+        default=None, description="Human-readable description of the constraint"
+    )
+    weight: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Penalty weight multiplier for violations",
+    )
+    time_steps: list[int] | None = Field(
+        default=None,
+        description=(
+            "Optional time steps at which to evaluate (for time-dependent constraints)"
+        ),
+    )
+
+    @field_validator("expression", mode="before")
+    @classmethod
+    def validate_expression(cls, value: str) -> str:
+        """Perform security validation on the constraint expression."""
+        try:
+            validate_expression_security(value)
+        except ValueError as e:
+            raise ValueError(
+                f"Security validation failed for expression '{value}': {e}"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def validate_time_steps(self) -> Self:
+        """Validate that time steps are non-negative and sorted."""
+        if self.time_steps is not None:
+            if len(self.time_steps) == 0:
+                raise ValueError(
+                    f"time_steps for constraint '{self.id}' must not be empty if "
+                    "specified"
+                )
+            if any(ts < 0 for ts in self.time_steps):
+                raise ValueError(
+                    f"time_steps for constraint '{self.id}' must all be non-negative"
+                )
         return self
 
 
@@ -648,6 +760,8 @@ class CalibrationProblem(BaseModel):
         List of observed data points to fit against
     parameters : list[CalibrationParameter]
         List of parameters to calibrate with their bounds
+    constraints : list[CalibrationConstraint]
+        List of constraints on calibration parameters (optional, default: empty list)
     loss_config : LossConfig
         Configuration for the loss function
     optimization_config : OptimizationConfig
@@ -659,6 +773,10 @@ class CalibrationProblem(BaseModel):
     )
     parameters: list[CalibrationParameter] = Field(
         default=..., min_length=1, description="Parameters to calibrate"
+    )
+    constraints: list[CalibrationConstraint] = Field(
+        default_factory=list,
+        description="Constraints on calibration parameters",
     )
     loss_config: LossConfig = Field(
         default_factory=lambda: LossConfig(function=LossFunction.SSE),

@@ -120,6 +120,18 @@ class Calibrator:
             for param in self.problem.parameters
         ]
 
+        # Convert constraints to Rust types
+        rust_constraints = [
+            rust_calibration.CalibrationConstraint(
+                id=constraint.id,
+                expression=constraint.expression,
+                description=constraint.description,
+                weight=constraint.weight,
+                time_steps=constraint.time_steps,
+            )
+            for constraint in self.problem.constraints
+        ]
+
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
 
@@ -137,6 +149,7 @@ class Calibrator:
             self._engine,
             rust_observed_data,
             rust_parameters,
+            rust_constraints,
             rust_loss_config,
             rust_optimization_config,
             initial_population_size,

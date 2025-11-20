@@ -126,6 +126,26 @@ class CalibrationParameterProtocol(Protocol):
     @property
     def max_bound(self) -> float: ...
 
+class CalibrationConstraintProtocol(Protocol):
+    def __init__(
+        self,
+        id: str,
+        expression: str,
+        description: str | None = None,
+        weight: float = 1.0,
+        time_steps: list[int] | None = None,
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def expression(self) -> str: ...
+    @property
+    def description(self) -> str | None: ...
+    @property
+    def weight(self) -> float: ...
+    @property
+    def time_steps(self) -> list[int] | None: ...
+
 class LossConfigProtocol(Protocol):
     @staticmethod
     def sum_squared_error() -> LossConfigProtocol: ...
@@ -194,6 +214,7 @@ class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
     CalibrationParameterType: type[CalibrationParameterTypeProtocol]
     CalibrationParameter: type[CalibrationParameterProtocol]
+    CalibrationConstraint: type[CalibrationConstraintProtocol]
     LossConfig: type[LossConfigProtocol]
     NelderMeadConfig: type[NelderMeadConfigProtocol]
     ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
@@ -205,6 +226,7 @@ class CalibrationModule(Protocol):
         engine: DifferenceEquationsProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
         initial_population_size: int,

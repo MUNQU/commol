@@ -138,6 +138,62 @@ impl PyCalibrationParameter {
     }
 }
 
+/// Calibration constraint defined as a mathematical expression
+#[pyclass(name = "CalibrationConstraint")]
+#[derive(Clone)]
+pub struct PyCalibrationConstraint {
+    pub inner: commol_calibration::CalibrationConstraint,
+}
+
+#[pymethods]
+impl PyCalibrationConstraint {
+    /// Create a new calibration constraint
+    ///
+    /// Args:
+    ///     id: Unique identifier for this constraint
+    ///     expression: Mathematical expression that must evaluate >= 0
+    ///     description: Optional human-readable description
+    ///     weight: Penalty weight multiplier (default: 1.0)
+    ///     time_steps: Optional time steps at which to evaluate (for time-dependent constraints)
+    #[new]
+    #[pyo3(signature = (id, expression, description=None, weight=1.0, time_steps=None))]
+    fn new(
+        id: String,
+        expression: String,
+        description: Option<String>,
+        weight: f64,
+        time_steps: Option<Vec<u32>>,
+    ) -> Self {
+        let mut constraint = commol_calibration::CalibrationConstraint::new(id, expression);
+
+        if let Some(desc) = description {
+            constraint = constraint.with_description(desc);
+        }
+
+        constraint = constraint.with_weight(weight);
+
+        if let Some(steps) = time_steps {
+            constraint = constraint.with_time_steps(steps);
+        }
+
+        Self { inner: constraint }
+    }
+
+    fn __repr__(&self) -> String {
+        if let Some(ref desc) = self.inner.description {
+            format!(
+                "CalibrationConstraint(id='{}', expression='{}', description='{}')",
+                self.inner.id, self.inner.expression, desc
+            )
+        } else {
+            format!(
+                "CalibrationConstraint(id='{}', expression='{}')",
+                self.inner.id, self.inner.expression
+            )
+        }
+    }
+}
+
 /// Loss function configuration
 #[pyclass(name = "LossConfig")]
 #[derive(Clone)]
@@ -548,6 +604,7 @@ fn calibrate(
     engine: &PyDifferenceEquations,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
+    constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
     initial_population_size: u64,
@@ -555,6 +612,7 @@ fn calibrate(
     // Extract inner Rust types
     let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
     let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
 
     // Clone the engine since CalibrationProblem takes ownership
     let engine_clone = engine.inner().clone();
@@ -564,6 +622,7 @@ fn calibrate(
         engine_clone,
         observed_data,
         parameters,
+        constraints,
         loss_config.inner,
         initial_population_size,
     )
@@ -595,6 +654,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationParameterType>()?;
     m.add_class::<PyObservedDataPoint>()?;
     m.add_class::<PyCalibrationParameter>()?;
+    m.add_class::<PyCalibrationConstraint>()?;
     m.add_class::<PyLossConfig>()?;
     m.add_class::<PyNelderMeadConfig>()?;
     m.add_class::<PyParticleSwarmConfig>()?;

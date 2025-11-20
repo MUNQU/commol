@@ -11,6 +11,7 @@ from commol.api import (
 )
 from commol.context import Model
 from commol.context.calibration import (
+    CalibrationConstraint,
     CalibrationParameter,
     CalibrationParameterType,
     CalibrationProblem,
@@ -45,6 +46,7 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 
 __all__ = [
+    "CalibrationConstraint",
     "CalibrationParameter",
     "CalibrationParameterType",
     "CalibrationProblem",

@@ -208,6 +208,146 @@ impl std::fmt::Display for LossConfig {
     }
 }
 
+/// A constraint on calibration parameters and/or compartment values defined as a mathematical expression
+///
+/// Constraints are mathematical expressions that must evaluate to >= 0 for the
+/// constraint to be satisfied. When the expression evaluates to < 0, the constraint
+/// is violated and a penalty is applied.
+///
+/// # Constraint Types
+///
+/// **Parameter-only constraints** (`time_steps: None`):
+/// - Evaluated once before simulation starts
+/// - Can only reference calibration parameter IDs
+/// - Use for relationships between parameters
+///
+/// **Time-dependent constraints** (`time_steps: Some(vec)`):
+/// - Evaluated at specified time steps during simulation
+/// - Can reference both parameter IDs AND compartment names
+/// - Use for constraining compartment values or dynamic relationships
+///
+/// # Examples
+///
+/// ## Parameter-only constraints:
+/// ```rust,ignore
+/// // R0 = beta/gamma must be <= 5
+/// CalibrationConstraint::new(
+///     "r0_bound".to_string(),
+///     "5.0 - beta/gamma".to_string(),
+/// )
+///
+/// // beta must be >= gamma
+/// CalibrationConstraint::new(
+///     "ordering".to_string(),
+///     "beta - gamma".to_string(),
+/// )
+///
+/// // Sum of parameters <= 1.0
+/// CalibrationConstraint::new(
+///     "sum_bound".to_string(),
+///     "1.0 - (param1 + param2 + param3)".to_string(),
+/// )
+/// ```
+///
+/// ## Time-dependent (compartment value) constraints:
+/// ```rust,ignore
+/// // Infected compartment must stay <= 500 at specific time steps
+/// CalibrationConstraint::new(
+///     "max_infected".to_string(),
+///     "500.0 - I".to_string(),
+/// )
+/// .with_time_steps(vec![10, 20, 30, 40])
+///
+/// // Total population must stay <= 1000
+/// CalibrationConstraint::new(
+///     "population_bound".to_string(),
+///     "1000.0 - (S + I + R)".to_string(),
+/// )
+/// .with_time_steps(vec![0, 5, 10, 15, 20])
+///
+/// // Ratio of compartments with parameter reference
+/// CalibrationConstraint::new(
+///     "ratio_bound".to_string(),
+///     "threshold - I/S".to_string(),
+/// )
+/// .with_time_steps(vec![10, 20, 30])
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationConstraint {
+    /// Unique identifier for this constraint
+    pub id: String,
+
+    /// Mathematical expression that must evaluate >= 0 for constraint satisfaction
+    ///
+    /// The expression can reference calibration parameters by their IDs.
+    /// When time_steps is specified, the expression can also reference
+    /// compartment values (S, I, R, etc.) at those time steps.
+    ///
+    /// Examples:
+    /// - "5.0 - beta/gamma" → R0 = beta/gamma must be <= 5
+    /// - "beta - gamma" → beta >= gamma
+    /// - "1.0 - (param1 + param2)" → param1 + param2 <= 1.0
+    /// - "500.0 - I" (with time_steps) → Infected compartment <= 500 at specified times
+    pub expression: String,
+
+    /// Human-readable description (optional, for diagnostics)
+    pub description: Option<String>,
+
+    /// Penalty weight multiplier (default 1.0)
+    ///
+    /// Higher values make this constraint more important relative to others.
+    /// The penalty for violating this constraint is: weight * violation^2
+    pub weight: f64,
+
+    /// Optional time steps at which to evaluate this constraint
+    ///
+    /// - If None: Constraint is evaluated once before simulation using parameter values only
+    /// - If Some(vec): Constraint is evaluated at each specified time step during simulation,
+    ///   and can reference both parameters and compartment values
+    pub time_steps: Option<Vec<u32>>,
+}
+
+impl CalibrationConstraint {
+    /// Create a new calibration constraint
+    pub fn new(id: String, expression: String) -> Self {
+        Self {
+            id,
+            expression,
+            description: None,
+            weight: 1.0,
+            time_steps: None,
+        }
+    }
+
+    /// Set the description
+    pub fn with_description(mut self, description: String) -> Self {
+        self.description = Some(description);
+        self
+    }
+
+    /// Set the weight
+    pub fn with_weight(mut self, weight: f64) -> Self {
+        self.weight = weight;
+        self
+    }
+
+    /// Set the time steps
+    pub fn with_time_steps(mut self, time_steps: Vec<u32>) -> Self {
+        self.time_steps = Some(time_steps);
+        self
+    }
+
+    /// Check if this is a parameter-only constraint
+    pub fn is_parameter_only(&self) -> bool {
+        self.time_steps.is_none()
+    }
+
+    /// Check if this is a time-dependent constraint
+    pub fn is_time_dependent(&self) -> bool {
+        self.time_steps.is_some()
+    }
+}
+
 /// Result from a calibration run
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationResult {

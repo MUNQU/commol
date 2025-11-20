@@ -74,6 +74,6 @@ pub use optimization::{
     OptimizationConfig, ParticleSwarmConfig,
 };
 pub use types::{
-    CalibrationParameter, CalibrationParameterType, CalibrationResult, LossConfig,
-    ObservedDataPoint,
+    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationResult,
+    LossConfig, ObservedDataPoint,
 };

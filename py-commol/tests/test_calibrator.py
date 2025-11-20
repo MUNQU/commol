@@ -3,6 +3,7 @@ import math
 import pytest
 
 from commol import (
+    CalibrationConstraint,
     CalibrationParameter,
     CalibrationParameterType,
     CalibrationProblem,
@@ -995,3 +996,418 @@ class TestCalibrator:
         assert math.isclose(
             result.best_parameters["r_detection_rate"], r_scale, abs_tol=1e-3
         )
+
+    def test_calibration_with_constraint(self, model: Model):
+        """Test calibration with constraint"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Constraint: beta/gamma must be <= 5
+        constraints = [
+            CalibrationConstraint(
+                id="r0_bound",
+                expression="5.0 - beta/gamma",
+                description="beta/gamma <= 5",
+                weight=1.0,
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=200, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        op = result.best_parameters["beta"] / result.best_parameters["gamma"]
+        assert op <= 5.0, f"constraint violated: {op}"
+
+    def test_calibration_with_linear_constraint(self, model: Model):
+        """Test calibration with linear sum constraint"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Constraint: beta + gamma <= 0.2
+        constraints = [
+            CalibrationConstraint(
+                id="sum_bound",
+                expression="0.2 - (beta + gamma)",
+                description="beta + gamma <= 0.2",
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=200, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        param_sum = result.best_parameters["beta"] + result.best_parameters["gamma"]
+        assert param_sum <= 0.21, f"Sum constraint violated: {param_sum}"
+
+    def test_calibration_with_ordering_constraint(self, model: Model):
+        """Test calibration with ordering constraint (beta >= gamma)"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Constraint: beta >= gamma
+        constraints = [
+            CalibrationConstraint(
+                id="beta_ge_gamma",
+                expression="beta - gamma",
+                description="beta >= gamma",
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=200, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        assert (
+            result.best_parameters["beta"] >= result.best_parameters["gamma"] - 1e-6
+        ), "Ordering constraint violated"
+
+    def test_calibration_with_time_dependent_constraint(self, model: Model):
+        """Test calibration with time-dependent constraint on compartment values"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Time-dependent constraint: I <= 100 at specific time steps
+        constraints = [
+            CalibrationConstraint(
+                id="peak_infected",
+                expression="100.0 - I",
+                description="Infected never exceeds 100",
+                time_steps=[10, 20, 30, 40, 50],
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                config=NelderMeadConfig(max_iterations=200, verbose=False),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Run simulation with calibrated parameters to check constraint
+        calibrated_model = model.model_copy(deep=True)
+        for param in calibrated_model.parameters:
+            if param.id == "beta":
+                param.value = result.best_parameters["beta"]
+
+        calibrated_sim = Simulation(calibrated_model)
+        calibrated_results = calibrated_sim.run(100, output_format="dict_of_lists")
+
+        # Verify constraint at specified time steps
+        for ts in [10, 20, 30, 40, 50]:
+            assert calibrated_results["I"][ts] <= 105.0, (
+                f"Time constraint violated at step {ts}: "
+                f"I={calibrated_results['I'][ts]}"
+            )
+
+    def test_calibration_with_compartment_sum_constraint(self, model: Model):
+        """Test time-dependent constraint on sum of two compartments."""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create observed data for infected compartment
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Time-dependent constraint: S + I <= 950 at specific time steps
+        constraints = [
+            CalibrationConstraint(
+                id="min_recovered",
+                expression="950.0 - (S + I)",
+                description="S + I <= 950",
+                time_steps=[30, 50, 70],
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=ParticleSwarmConfig(
+                    num_particles=20, max_iterations=200, verbose=False
+                ).with_seed(42),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Run simulation with calibrated parameters to verify constraint
+        calibrated_model = model.model_copy(deep=True)
+        for param in calibrated_model.parameters:
+            if param.id in result.best_parameters:
+                param.value = result.best_parameters[param.id]
+
+        calibrated_sim = Simulation(calibrated_model)
+        calibrated_results = calibrated_sim.run(100, output_format="dict_of_lists")
+
+        # Verify constraint at specified time steps
+        for ts in [30, 50, 70]:
+            s_plus_i = calibrated_results["S"][ts] + calibrated_results["I"][ts]
+            assert s_plus_i <= 955.0, (
+                f"Compartment sum constraint violated at step {ts}: S+I={s_plus_i:.2f}"
+            )
+
+            # Also verify R >= 45 (allowing some tolerance)
+            r = calibrated_results["R"][ts]
+            assert r >= 45.0, f"Recovered below threshold at step {ts}: R={r:.2f}"
+
+    def test_calibration_with_multiple_constraints(self, model: Model):
+        """Test calibration with multiple simultaneous constraints"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type=CalibrationParameterType.PARAMETER,
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Multiple constraints
+        constraints = [
+            CalibrationConstraint(
+                id="r0_bound",
+                expression="5.0 - beta/gamma",
+                description="R0 <= 5",
+            ),
+            CalibrationConstraint(
+                id="ordering",
+                expression="beta - gamma",
+                description="beta >= gamma",
+            ),
+            CalibrationConstraint(
+                id="sum_bound",
+                expression="0.6 - (beta + gamma)",
+                description="Sum <= 0.6",
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_config=LossConfig(function=LossFunction.SSE),
+            optimization_config=OptimizationConfig(
+                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                config=ParticleSwarmConfig(
+                    num_particles=20, max_iterations=200, verbose=False
+                ).with_seed(42),
+            ),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify all constraints are satisfied
+        beta = result.best_parameters["beta"]
+        gamma = result.best_parameters["gamma"]
+
+        r0 = beta / gamma
+        assert r0 <= 5.1, f"R0 constraint violated: {r0}"
+
+        assert beta >= gamma - 1e-6, "Ordering constraint violated"
+
+        param_sum = beta + gamma
+        assert param_sum <= 0.61, f"Sum constraint violated: {param_sum}"
+
+    def test_constraint_expression_security_validation(self, model: Model):
+        """Test that constraint expressions are validated for security threats."""
+        from pydantic import ValidationError
+
+        # Valid expressions should work
+        valid_constraint = CalibrationConstraint(
+            id="valid",
+            expression="5.0 - beta/gamma",
+            description="Valid R0 constraint",
+        )
+        assert valid_constraint.expression == "5.0 - beta/gamma"
+
+        # Dangerous Python patterns should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_eval",
+                expression="eval(beta)",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_import",
+                expression="import os",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Dangerous Rust patterns should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_unsafe",
+                expression="unsafe { beta }",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Encoding attacks should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_hex",
+                expression=r"beta + \x41",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Time-dependent constraints should also be validated
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_time_dependent",
+                expression="eval(I)",
+                time_steps=[10, 20, 30],
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Valid time-dependent constraint should work
+        valid_time_constraint = CalibrationConstraint(
+            id="peak_infected",
+            expression="500.0 - I",
+            time_steps=[10, 20, 30],
+        )
+        assert valid_time_constraint.expression == "500.0 - I"

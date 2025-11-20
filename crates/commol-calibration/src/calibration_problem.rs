@@ -1,10 +1,13 @@
 //! Calibration problem definition and implementation
 
 use argmin::core::{CostFunction, Error};
-use commol_core::SimulationEngine;
+use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
 use std::marker::PhantomData;
 
-use crate::types::{CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint};
+use crate::types::{
+    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, LossConfig,
+    ObservedDataPoint,
+};
 
 /// Generic calibration problem that works with any SimulationEngine implementation.
 ///
@@ -73,6 +76,18 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// From the model's defined initial_population_size
     initial_population_size: f64,
 
+    /// Constraints on parameters and/or compartment values
+    constraints: Vec<CalibrationConstraint>,
+
+    /// Compiled constraint expressions (cached for performance)
+    compiled_constraints: Vec<MathExpression>,
+
+    /// Indices of parameter-only constraints (no time_steps, evaluated once before simulation)
+    parameter_constraint_indices: Vec<usize>,
+
+    /// Indices of time-dependent constraints (with time_steps, evaluated at specified times during simulation)
+    time_dependent_constraint_indices: Vec<usize>,
+
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
 }
@@ -85,6 +100,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// * `base_engine` - The simulation engine to calibrate (cloned for each evaluation)
     /// * `observed_data` - Vector of observed data points
     /// * `parameters` - Parameters to calibrate with their bounds
+    /// * `constraints` - Constraints on parameters and/or compartment values
     /// * `loss_config` - Loss function to use
     ///
     /// # Returns
@@ -93,10 +109,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// - Compartment names in observed data are invalid
     /// - No observed data provided
     /// - No calibration parameters provided
+    /// - Constraint expressions are invalid or reference unknown variables
+    /// - Compartments are referenced in constraints without time_steps specified
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
         parameters: Vec<CalibrationParameter>,
+        constraints: Vec<CalibrationConstraint>,
         loss_config: LossConfig,
         initial_population_size: u64,
     ) -> Result<Self, String> {
@@ -206,6 +225,77 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let buffer_capacity = (max_time_step + 1) as usize;
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
+        // Compile and validate constraints
+        let compiled_constraints: Vec<MathExpression> = constraints
+            .iter()
+            .map(|c| MathExpression::new(c.expression.clone()))
+            .collect();
+
+        // Validate constraints
+        let param_ids: std::collections::HashMap<&str, usize> = parameters
+            .iter()
+            .enumerate()
+            .map(|(idx, p)| (p.id.as_str(), idx))
+            .collect();
+
+        let mut parameter_constraint_indices = Vec::new();
+        let mut time_dependent_constraint_indices = Vec::new();
+
+        for (idx, constraint) in constraints.iter().enumerate() {
+            let expr = &compiled_constraints[idx];
+
+            // Validate expression syntax
+            if let Err(e) = expr.validate() {
+                return Err(format!(
+                    "Constraint '{}' has invalid expression: {:?}",
+                    constraint.id, e
+                ));
+            }
+
+            let variables = expr.get_variables();
+
+            // Validate that all variables are either parameters, compartments, or special constants
+            for var in &variables {
+                // Skip special variables
+                if var == "N" || var == "step" || var == "t" || var == "pi" || var == "e" {
+                    continue;
+                }
+
+                let is_parameter = param_ids.contains_key(var.as_str());
+                let is_compartment = compartment_map.contains_key(var.as_str());
+
+                if !is_parameter && !is_compartment {
+                    return Err(format!(
+                        "Constraint '{}' references unknown variable '{}' (not a parameter or compartment)",
+                        constraint.id, var
+                    ));
+                }
+
+                // Compartments can only be used in time-dependent constraints
+                if is_compartment && constraint.time_steps.is_none() {
+                    return Err(format!(
+                        "Constraint '{}' references compartment '{}' but has no time_steps specified",
+                        constraint.id, var
+                    ));
+                }
+            }
+
+            // Validate time steps are within simulation range
+            if let Some(ref time_steps) = constraint.time_steps {
+                for &ts in time_steps {
+                    if ts > max_time_step {
+                        return Err(format!(
+                            "Constraint '{}' has time step {} exceeding max observed time step {}",
+                            constraint.id, ts, max_time_step
+                        ));
+                    }
+                }
+                time_dependent_constraint_indices.push(idx);
+            } else {
+                parameter_constraint_indices.push(idx);
+            }
+        }
+
         Ok(Self {
             base_engine,
             observed_data,
@@ -217,6 +307,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             max_time_step,
             result_buffer: std::cell::RefCell::new(result_buffer),
             initial_population_size: initial_population_size as f64,
+            constraints,
+            compiled_constraints,
+            parameter_constraint_indices,
+            time_dependent_constraint_indices,
             _phantom: PhantomData,
         })
     }
@@ -420,7 +514,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
     /// Clamp parameter values to their defined bounds
     ///
-    /// This is necessary because some optimization algorithms (like Nelder-Mead)
+    /// This is necessary because some optimization algorithms
     /// can explore outside the bounds during their search process. By clamping,
     /// we ensure the simulation always receives valid parameter values while
     /// still allowing the optimizer to explore the parameter space freely.
@@ -443,6 +537,145 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
         Ok(())
     }
+
+    /// Calculate base penalty value for constraint violations
+    ///
+    /// This is used to scale penalties relative to the loss function magnitude
+    fn calculate_base_penalty(&self) -> f64 {
+        let max_observed = self
+            .observed_data
+            .iter()
+            .map(|obs| obs.value)
+            .fold(0.0f64, |a, b| a.max(b));
+        let num_obs = self.observed_data.len() as f64;
+        (max_observed * max_observed * num_obs * 1000.0).max(1e10)
+    }
+
+    /// Evaluate parameter-only constraints (no time_steps specified)
+    ///
+    /// These constraints can only reference calibration parameters, not compartment values.
+    /// Evaluated once before simulation starts.
+    ///
+    /// Returns the total penalty from violated constraints, or 0.0 if all are satisfied.
+    fn evaluate_parameter_constraints(&self, param_values: &[f64]) -> Result<f64, String> {
+        if self.parameter_constraint_indices.is_empty() {
+            return Ok(0.0);
+        }
+
+        // Create context with parameter values
+        let mut context = MathExpressionContext::new();
+        for (idx, param) in self.parameters.iter().enumerate() {
+            context.set_parameter(param.id.clone(), param_values[idx]);
+        }
+
+        let mut total_penalty = 0.0;
+
+        for &constraint_idx in &self.parameter_constraint_indices {
+            let constraint = &self.constraints[constraint_idx];
+            let expr = &self.compiled_constraints[constraint_idx];
+
+            match expr.evaluate(&mut context) {
+                Ok(value) => {
+                    if value < 0.0 {
+                        // Constraint violated
+                        let violation_magnitude = -value;
+
+                        // Linear penalty scaled by weight
+                        let penalty = constraint.weight * violation_magnitude;
+
+                        total_penalty += penalty;
+                    }
+                    // value >= 0 means constraint satisfied, no penalty
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "Parameter constraint '{}' evaluation failed: {:?}",
+                        constraint.id, e
+                    ));
+                }
+            }
+        }
+
+        Ok(total_penalty)
+    }
+
+    /// Evaluate time-dependent constraints (with time_steps specified)
+    ///
+    /// These constraints can reference both calibration parameters and compartment values.
+    /// Evaluated at each specified time step after simulation completes.
+    ///
+    /// Returns the total penalty from violated constraints, or 0.0 if all are satisfied.
+    fn evaluate_time_dependent_constraints(
+        &self,
+        param_values: &[f64],
+        simulation_results: &[Vec<f64>],
+    ) -> Result<f64, String> {
+        if self.time_dependent_constraint_indices.is_empty() {
+            return Ok(0.0);
+        }
+
+        // Create context with parameter values
+        let mut context = MathExpressionContext::new();
+
+        // Initialize compartment names
+        let compartment_names = self.base_engine.compartments();
+        context.init_compartments(compartment_names);
+
+        // Set parameter values
+        for (idx, param) in self.parameters.iter().enumerate() {
+            context.set_parameter(param.id.clone(), param_values[idx]);
+        }
+
+        let mut total_penalty = 0.0;
+
+        for &constraint_idx in &self.time_dependent_constraint_indices {
+            let constraint = &self.constraints[constraint_idx];
+            let expr = &self.compiled_constraints[constraint_idx];
+
+            let time_steps = constraint
+                .time_steps
+                .as_ref()
+                .expect("Time-dependent constraint must have time_steps");
+
+            for &time_step in time_steps {
+                let time_idx = time_step as usize;
+
+                // Get compartment values at this time step
+                if let Some(step_data) = simulation_results.get(time_idx) {
+                    // Update context with compartment values at this time step
+                    context.set_compartments_by_index(step_data);
+                    context.set_step(time_step as f64);
+
+                    match expr.evaluate(&mut context) {
+                        Ok(value) => {
+                            if value < 0.0 {
+                                // Constraint violated at this time step
+                                let violation_magnitude = -value;
+
+                                // Linear penalty scaled by weight
+                                let penalty = constraint.weight * violation_magnitude;
+
+                                total_penalty += penalty;
+                            }
+                        }
+                        Err(e) => {
+                            return Err(format!(
+                                "Time-dependent constraint '{}' evaluation failed at step {}: {:?}",
+                                constraint.id, time_step, e
+                            ));
+                        }
+                    }
+                } else {
+                    return Err(format!(
+                        "Time step {} not found in simulation results for constraint '{}'",
+                        time_step, constraint.id
+                    ));
+                }
+            }
+        }
+
+        Ok(total_penalty)
+    }
 }
 
 /// Implement argmin's CostFunction trait - model-agnostic implementation
@@ -459,6 +692,17 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
 
         // Clamp parameters to bounds (handles optimizers that explore outside bounds)
         let clamped_params = self.clamp_to_bounds(param_values);
+
+        // Evaluate parameter-only constraints before running simulation
+        let param_constraint_penalty = self
+            .evaluate_parameter_constraints(&clamped_params)
+            .map_err(Error::msg)?;
+
+        if param_constraint_penalty > 0.0 {
+            // Parameter constraints violated - skip simulation and return penalty
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty + param_constraint_penalty * base_penalty);
+        }
 
         // Clone the base engine (works for any model type)
         let mut engine = self.base_engine.clone();
@@ -540,13 +784,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         if fixed_ic_sum + calibrated_ic_sum > 1.0 {
             // Invalid parameter combination: would result in negative last initial condition
             // Return penalty proportional to the excess
-            let max_observed = self
-                .observed_data
-                .iter()
-                .map(|obs| obs.value)
-                .fold(0.0f64, |a, b| a.max(b));
-            let num_obs = self.observed_data.len() as f64;
-            let base_penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
+            let base_penalty = self.calculate_base_penalty();
             // Scale penalty by how much we exceeded 1.0
             let excess = fixed_ic_sum + calibrated_ic_sum - 1.0;
             let penalty = base_penalty * (1.0 + excess * 100.0);
@@ -616,14 +854,19 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             // Calculate penalty as: (max observed value)^2 * num_observations * penalty_factor
             // This ensures the penalty is large enough to discourage invalid parameters
             // but not so large that it causes numerical issues
-            let max_observed = self
-                .observed_data
-                .iter()
-                .map(|obs| obs.value)
-                .fold(0.0f64, |a, b| a.max(b));
-            let num_obs = self.observed_data.len() as f64;
-            let penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
-            return Ok(penalty);
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty);
+        }
+
+        // Evaluate time-dependent constraints using simulation results
+        let time_constraint_penalty = self
+            .evaluate_time_dependent_constraints(&clamped_params, &buffer)
+            .map_err(Error::msg)?;
+
+        if time_constraint_penalty > 0.0 {
+            // Compartment value constraints violated - return penalty
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty + time_constraint_penalty * base_penalty);
         }
 
         // Calculate and return loss
@@ -631,14 +874,8 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
 
         // Check if loss itself is invalid (defensive programming)
         if !loss.is_finite() {
-            let max_observed = self
-                .observed_data
-                .iter()
-                .map(|obs| obs.value)
-                .fold(0.0f64, |a, b| a.max(b));
-            let num_obs = self.observed_data.len() as f64;
-            let penalty = (max_observed * max_observed * num_obs * 1000.0).max(1e10);
-            return Ok(penalty);
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty);
         }
 
         Ok(loss)
