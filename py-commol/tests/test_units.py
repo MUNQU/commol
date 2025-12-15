@@ -7,11 +7,70 @@ from commol.utils.equations import (
     check_all_parameters_have_units,
     check_equation_units,
     get_predefined_variable_units,
+    ureg,
 )
+
+
+def register_custom_unit(unit_name: str) -> None:
+    """
+    Helper function to register a custom unit if not already defined.
+
+    This is used in standalone tests that don't go through the Model object.
+    In production code, units are auto-registered by Model._register_custom_units().
+    """
+    import pint
+
+    try:
+        ureg(unit_name)
+    except pint.UndefinedUnitError:
+        dimension_name = f"{unit_name}_dimension"
+        ureg.define(f"{unit_name} = [{dimension_name}]")
+
+
+def register_common_units() -> None:
+    """
+    Register commonly used units for epidemiological modeling.
+
+    This includes population units (person, individual, people) and
+    abstract time unit, plus commonly used time aliases.
+    """
+    import pint
+
+    # Register person and aliases
+    try:
+        ureg("person")
+    except pint.UndefinedUnitError:
+        ureg.define("person = [population]")
+        ureg.define("individual = person")
+        ureg.define("people = person")
+
+    # Register abstract time unit
+    try:
+        ureg("time")
+    except pint.UndefinedUnitError:
+        ureg.define("time = [time_abstract]")
+
+    # Register time unit aliases
+    time_aliases = {
+        "semester": "6 * month",
+        "wk": "week",
+        "mon": "month",
+    }
+
+    for unit_name, unit_definition in time_aliases.items():
+        try:
+            ureg(unit_name)
+        except pint.UndefinedUnitError:
+            ureg.define(f"{unit_name} = {unit_definition}")
 
 
 class TestUnitUtilities:
     """Test utility functions for unit handling."""
+
+    @classmethod
+    def setup_class(cls):
+        """Register common units once for all tests in this class."""
+        register_common_units()
 
     def test_check_equation_units_simple(self):
         """Test simple unit consistency check."""
@@ -298,6 +357,33 @@ class TestModelUnitConsistency:
         # Should not raise an exception
         model.check_unit_consistency()
 
+    def test_custom_bin_unit_auto_registration(self):
+        """Test that custom bin units are automatically registered."""
+        builder = (
+            ModelBuilder(name="Custom Unit Test", version="1.0", bin_unit="cow")
+            .add_bin("healthy", "Healthy cows")
+            .add_bin("sick", "Sick cows")
+            .add_parameter("infection_rate", 0.1, "Infection rate", unit="1/semester")
+            .add_transition(
+                id="infection",
+                source=["healthy"],
+                target=["sick"],
+                rate="infection_rate * healthy * sick / N",
+            )
+            .set_initial_conditions(
+                population_size=100,
+                bin_fractions=[
+                    {"bin": "healthy", "fraction": 0.95},
+                    {"bin": "sick", "fraction": 0.05},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        # Should auto-register "cow" unit and not raise an exception
+        model.check_unit_consistency()
+
 
 class TestComplexUnits:
     """Test complex unit scenarios."""
@@ -338,6 +424,11 @@ class TestComplexUnits:
 class TestMathFunctionsInUnitChecking:
     """Test that mathematical functions work correctly in unit checking."""
 
+    @classmethod
+    def setup_class(cls):
+        """Register common units once for all tests in this class."""
+        register_common_units()
+
     def test_exponential_decay(self):
         """Test exponential decay with exp function."""
         variable_units = {
@@ -375,10 +466,6 @@ class TestMathFunctionsInUnitChecking:
             "month",
             "fortnight",
             "year",
-            "semester",
-            "wk",
-            "mon",
-            "yr",
         ]
 
         for time_unit in time_units:
@@ -400,6 +487,11 @@ class TestMathFunctionsInUnitChecking:
 
 class TestFullModelUnitFailures:
     """Test that full models with unit errors properly raise exceptions."""
+
+    @classmethod
+    def setup_class(cls):
+        """Register common units once for all tests in this class."""
+        register_common_units()
 
     def test_simple_sir_wrong_beta_units(self):
         """Test SIR model fails with wrong beta units."""

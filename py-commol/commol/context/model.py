@@ -1,7 +1,9 @@
 from collections.abc import Mapping
 from itertools import combinations, product
+import re
 from typing import Self
 
+import pint
 from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import ModelTypes
@@ -13,6 +15,7 @@ from commol.utils.equations import (
     UnitConsistencyError,
     check_equation_units,
     get_predefined_variable_units,
+    ureg,
 )
 from commol.utils.security import get_expression_variables
 
@@ -1089,6 +1092,74 @@ class Model(BaseModel):
         if verbose:
             print("Unit consistency check passed successfully.")
 
+    def _register_custom_units(self) -> None:
+        """Register custom units in the pint registry."""
+        # Collect all units that need to be registered
+        units_to_register = set()
+
+        # Add bin units
+        for bin_item in self.population.bins:
+            if bin_item.unit:
+                units_to_register.add(bin_item.unit)
+
+        # Add parameter units
+        for param in self.parameters:
+            if param.unit:
+                # Extract individual unit names from compound units like "1/semester"
+                # Remove operators and numbers to get unit names
+                unit_str = param.unit
+                # Split by common operators and filter out numbers/empty strings
+                unit_parts = re.split(r"[*/\s\(\)]+", unit_str)
+                for part in unit_parts:
+                    part = part.strip()
+                    if part and not part.replace(".", "").replace("-", "").isdigit():
+                        units_to_register.add(part)
+
+        # Known time unit aliases that should be defined relative to existing time units
+        # rather than as new base dimensions
+        known_time_aliases = {
+            # Periods
+            "decade": "10 * year",
+            "century": "100 * year",
+            "millennium": "1000 * year",
+            "fortnight": "14 * day",
+            "biweek": "14 * day",
+            "semester": "6 * month",
+            "trimester": "3 * month",
+            "quarter": "3 * month",
+            "bimester": "2 * month",
+            # Common abbreviations
+            "wk": "week",
+            "mo": "month",
+            "mon": "month",
+            "yr": "year",
+            "hr": "hour",
+            "min": "minute",
+            "sec": "second",
+            # Plural/singular variants
+            "secs": "second",
+            "mins": "minute",
+            "hrs": "hour",
+            "wks": "week",
+            "mons": "month",
+            "yrs": "year",
+        }
+
+        # Register each unit if not already defined
+        for unit_name in units_to_register:
+            try:
+                # Try to use the unit to see if it exists
+                ureg(unit_name)
+            except pint.UndefinedUnitError:
+                # Check if it's a known time alias
+                if unit_name in known_time_aliases:
+                    ureg.define(f"{unit_name} = {known_time_aliases[unit_name]}")
+                else:
+                    # If it doesn't exist, define it as a new base unit
+                    # Use the unit name as-is and create a unique dimension for it
+                    dimension_name = f"{unit_name}_dimension"
+                    ureg.define(f"{unit_name} = [{dimension_name}]")
+
     def _validate_unit_check_preconditions(self) -> None:
         """
         Validate preconditions for unit consistency checking.
@@ -1100,6 +1171,8 @@ class Model(BaseModel):
         ValueError
             If the model type doesn't support unit checking.
         """
+        # Register any custom bin units before validation
+        self._register_custom_units()
         # Check if all non-formula parameters have units
         non_formula_params_missing_units = [
             p
@@ -1441,8 +1514,15 @@ class Model(BaseModel):
                     ),
                 )
 
-        # Determine the expected unit based on bin_unit and time_unit
-        bin_unit = self.population.bins[0].unit if self.population.bins else "person"
+        # Determine the expected unit based on the transition's bins
+        # Extract the bin unit from the transition source/target bins
+        bin_unit = self._get_transition_bin_unit(transition_id)
+        if not bin_unit:
+            # Fallback to first bin's unit
+            bin_unit = (
+                self.population.bins[0].unit if self.population.bins else "person"
+            )
+
         time_unit = self._infer_time_unit() or "day"
 
         expected_unit = f"{bin_unit}/{time_unit}"
@@ -1459,6 +1539,35 @@ class Model(BaseModel):
             )
 
         return (True, None)
+
+    def _get_transition_bin_unit(self, transition_id: str) -> str | None:
+        """
+        Get the bin unit for a specific transition by looking at its source/target bins.
+
+        Parameters
+        ----------
+        transition_id : str
+            The ID of the transition to check.
+
+        Returns
+        -------
+        str | None
+            The unit of the bins involved in this transition, or None if not found.
+        """
+        # Find the transition
+        for transition in self.dynamics.transitions:
+            if transition.id == transition_id:
+                # Get bins from source or target
+                bin_ids = transition.source + transition.target
+
+                # Find the first bin that has a unit defined
+                for bin_id in bin_ids:
+                    for bin_obj in self.population.bins:
+                        if bin_obj.id == bin_id and bin_obj.unit:
+                            return bin_obj.unit
+                break
+
+        return None
 
     def _get_rate_unit(
         self, rate: str, variable_units: dict[str, str] | None = None
