@@ -75,6 +75,8 @@
 
 use evalexpr::{ContextWithMutableVariables, HashMapContext, Node, Value, build_operator_tree};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 pub mod context;
 pub mod error;
@@ -88,11 +90,51 @@ pub use jit::{JITCompiler, JITFunction};
 
 use preprocessing::{get_variables, preprocess_formula};
 
+/// Global cache for JIT-compiled functions.
+///
+/// This cache ensures that the same preprocessed formula always uses the same
+/// compiled machine code, which is critical for deterministic floating-point results.
+/// Without caching, each JIT compilation can produce slightly different machine code
+/// (due to memory layout, instruction scheduling, etc.) that leads to ULP-level
+/// differences in floating-point results.
+static JIT_CACHE: std::sync::LazyLock<RwLock<HashMap<String, Arc<JITFunction>>>> =
+    std::sync::LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Get or compile a JIT function for the given preprocessed formula.
+///
+/// Returns a cached JIT function if available, otherwise compiles and caches a new one.
+fn get_or_compile_jit(preprocessed: &str) -> Option<Arc<JITFunction>> {
+    // First, try to get from cache with a read lock
+    {
+        let cache = JIT_CACHE.read().ok()?;
+        if let Some(jit_fn) = cache.get(preprocessed) {
+            return Some(Arc::clone(jit_fn));
+        }
+    }
+
+    // Not in cache, need to compile
+    // Acquire write lock and check again (another thread might have compiled it)
+    let mut cache = JIT_CACHE.write().ok()?;
+    if let Some(jit_fn) = cache.get(preprocessed) {
+        return Some(Arc::clone(jit_fn));
+    }
+
+    // Compile the expression
+    let compiler = JITCompiler::new().ok()?;
+    let jit_fn = compiler.compile(preprocessed).ok()?;
+    let arc_fn = Arc::new(jit_fn);
+
+    // Cache it
+    cache.insert(preprocessed.to_string(), Arc::clone(&arc_fn));
+
+    Some(arc_fn)
+}
+
 /// Internal representation of compiled expression
 #[derive(Debug, Clone)]
 enum CompiledExpr {
-    /// JIT-compiled function (fast path)
-    Jit(JITFunction),
+    /// JIT-compiled function (fast path) - wrapped in Arc for sharing from cache
+    Jit(Arc<JITFunction>),
     /// Generic evalexpr fallback
     Generic(Node),
 }
@@ -147,17 +189,20 @@ impl MathExpression {
     ///
     /// Attempts to JIT-compile the expression for optimal performance.
     /// Falls back to evalexpr interpretation if JIT compilation fails.
+    ///
+    /// JIT-compiled functions are cached globally to ensure deterministic
+    /// floating-point results. Without caching, each compilation could produce
+    /// slightly different machine code leading to ULP-level differences.
     pub fn new(formula: String) -> Self {
         let preprocessed = preprocess_formula(&formula);
 
-        // Try JIT compilation first
-        let compiled = match JITCompiler::new().and_then(|compiler| compiler.compile(&preprocessed))
-        {
-            Ok(jit_fn) => {
-                // JIT compilation succeeded - use fast path
+        // Try to get JIT function from cache, or compile and cache it
+        let compiled = match get_or_compile_jit(&preprocessed) {
+            Some(jit_fn) => {
+                // JIT compilation succeeded (from cache or fresh) - use fast path
                 CompiledExpr::Jit(jit_fn)
             }
-            Err(_) => {
+            None => {
                 // JIT compilation failed - fall back to evalexpr
                 // Build the operator tree once and cache it
                 match build_operator_tree(&preprocessed) {

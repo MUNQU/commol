@@ -23,6 +23,9 @@ from commol import (
 from commol.constants import ModelTypes
 
 
+SEED = 42
+
+
 class TestCalibrator:
     @pytest.fixture(scope="class")
     def model(self) -> Model:
@@ -124,10 +127,9 @@ class TestCalibrator:
             loss_config=LossConfig(function=LossFunction.SSE),
             optimization_config=OptimizationConfig(
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=ParticleSwarmConfig(max_iterations=200, verbose=False).with_seed(
-                    42
-                ),
+                config=ParticleSwarmConfig(max_iterations=200, verbose=False),
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -303,7 +305,7 @@ class TestCalibrator:
         4. Update parameters
         5. Run simulation
         """
-        # Step 1: Create model with None parameters (to be calibrated)
+        # Create model with None parameters (to be calibrated)
         builder_uncalibrated = (
             ModelBuilder(name="Test SIR Uncalibrated", version="1.0")
             .add_bin(id="S", name="Susceptible")
@@ -336,7 +338,7 @@ class TestCalibrator:
         with pytest.raises(ValueError):
             _ = simulation_uncalibrated.run(100)
 
-        # Step 2: Create a temporary model with known values to generate observed data
+        # Create a temporary model with known values to generate observed data
         builder_known = (
             ModelBuilder(name="Test SIR Known", version="1.0")
             .add_bin(id="S", name="Susceptible")
@@ -366,7 +368,7 @@ class TestCalibrator:
         simulation_known = Simulation(model_known)
         results = simulation_known.run(100, output_format="dict_of_lists")
 
-        # Step 3: Prepare calibration using the uncalibrated model
+        # Prepare calibration using the uncalibrated model
         # First, update with None value for calibration
         model_uncalibrated.update_parameters({"beta": None, "gamma": None})
 
@@ -406,7 +408,7 @@ class TestCalibrator:
         calibrator = Calibrator(simulation_for_calibration, problem)
         result = calibrator.run()
 
-        # Step 4: Update the model with calibrated values
+        # Update the model with calibrated values
         model_uncalibrated.update_parameters(result.best_parameters)
 
         # Step 5: Now we can run a new simulation with the calibrated model
@@ -610,7 +612,6 @@ class TestCalibrator:
         # Create PSO config with advanced features to avoid stagnation
         pso_config = (
             ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
-            .with_seed(42)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
             # Enable Time-Varying Acceleration Coefficients (TVAC)
@@ -636,6 +637,7 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=pso_config,
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -732,7 +734,6 @@ class TestCalibrator:
         # Create PSO config with advanced features using builder pattern
         pso_config = (
             ParticleSwarmConfig(num_particles=30, max_iterations=200, verbose=False)
-            .with_seed(123)
             # Enable Latin Hypercube Sampling for better initial particle distribution
             .with_initialization_strategy("latin_hypercube")
             # Enable Time-Varying Acceleration Coefficients (TVAC)
@@ -758,6 +759,7 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=pso_config,
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -797,7 +799,6 @@ class TestCalibrator:
         # Create PSO config with chaotic inertia using builder pattern
         pso_config = (
             ParticleSwarmConfig(num_particles=25, max_iterations=200, verbose=False)
-            .with_seed(42)
             # Enable chaotic inertia weight
             # (varies between 0.4 and 0.9 using logistic map)
             .with_chaotic_inertia(w_min=0.4, w_max=0.9)
@@ -813,6 +814,7 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=pso_config,
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -917,8 +919,9 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=ParticleSwarmConfig(
                     max_iterations=300, num_particles=25, verbose=False
-                ).with_seed(42),
+                ),
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1255,8 +1258,9 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=ParticleSwarmConfig(
                     num_particles=20, max_iterations=200, verbose=False
-                ).with_seed(42),
+                ),
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1334,8 +1338,9 @@ class TestCalibrator:
                 algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
                 config=ParticleSwarmConfig(
                     num_particles=20, max_iterations=200, verbose=False
-                ).with_seed(42),
+                ),
             ),
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()

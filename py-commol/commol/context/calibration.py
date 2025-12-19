@@ -3,6 +3,7 @@ from typing import Self, override
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
 from commol.utils.security import validate_expression_security
 
 
@@ -274,6 +275,9 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
+    simplex_perturbation : float
+        Multiplier for creating initial simplex vertices by perturbing each
+        parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1)
     alpha : float | None
         Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
@@ -294,6 +298,14 @@ class NelderMeadConfig(BaseModel):
     )
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+    )
+    simplex_perturbation: float = Field(
+        default=1.1,
+        gt=1.0,
+        description=(
+            "Multiplier for creating initial simplex vertices (e.g., 1.1 = 10% "
+            "perturbation)"
+        ),
     )
     alpha: float | None = Field(
         default=None,
@@ -339,7 +351,6 @@ class ParticleSwarmConfig(BaseModel):
     - `.with_initialization_strategy()` for particle initialization
     - `.with_velocity_clamping()` and `.with_velocity_mutation()` for velocity control
     - `.with_mutation()` for mutation settings
-    - `.with_seed()` for reproducibility
 
     Attributes
     ----------
@@ -349,8 +360,6 @@ class ParticleSwarmConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     target_cost : float | None
         Target cost for early stopping (default: None)
-    seed : int | None
-        Random seed for reproducibility (default: None)
     verbose : bool
         Enable verbose output (default: False)
     header_interval : int
@@ -385,6 +394,14 @@ class ParticleSwarmConfig(BaseModel):
         gt=0.0,
         description="Attraction to swarm best (default: None, uses argmin's default)",
     )
+    default_acceleration_coefficient: float = Field(
+        default=1.1931471805599454,  # 0.5 + ln(2), standard PSO default
+        gt=0.0,
+        description=(
+            "Default value for cognitive_factor or social_factor when only one is "
+            "provided (default: 0.5 + ln(2) ≈ 1.193, standard PSO default)"
+        ),
+    )
     chaotic_inertia: tuple[float, float] | None = Field(
         default=None, description="Chaotic inertia weight range (w_min, w_max)"
     )
@@ -418,13 +435,6 @@ class ParticleSwarmConfig(BaseModel):
         default=None,
         description=(
             "Mutation application: 'global_best', 'all_particles', or 'below_average'"
-        ),
-    )
-    seed: int | None = Field(
-        default=None,
-        ge=0,
-        description=(
-            "Random seed for reproducibility (default: None, uses system entropy)"
         ),
     )
     verbose: bool = Field(
@@ -605,32 +615,6 @@ class ParticleSwarmConfig(BaseModel):
         self.mutation_application = application
         return self
 
-    def with_seed(self, seed: int) -> Self:
-        """
-        Set random seed for reproducibility.
-
-        When set, the particle swarm will produce deterministic results,
-        allowing you to reproduce the same optimization trajectory.
-
-        Note: The seed is set via this builder method (rather than in the
-        constructor) to allow easy modification without creating a new
-        configuration. This is particularly useful when running multiple
-        calibrations with different seeds while keeping other parameters
-        constant.
-
-        Parameters
-        ----------
-        seed : int
-            Random seed value (must be non-negative)
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.seed = seed
-        return self
-
 
 class LossConfig(BaseModel):
     """
@@ -766,6 +750,19 @@ class CalibrationProblem(BaseModel):
         Configuration for the loss function
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
+    probabilistic_config : ProbabilisticCalibrationConfig | None
+        Optional configuration for probabilistic calibration (default: None).
+        When provided, enables ensemble-based parameter estimation with
+        uncertainty quantification instead of single-point optimization.
+    seed : int | None
+        Random seed for reproducibility across all stochastic processes
+        (default: None, uses system entropy).
+        Controls randomness in:
+        - Optimization algorithms (e.g., Particle Swarm initialization)
+        - Probabilistic calibration runs
+        - Clustering algorithms
+        - Ensemble selection
+        When set, all random operations become deterministic and reproducible.
     """
 
     observed_data: list[ObservedDataPoint] = Field(
@@ -784,6 +781,18 @@ class CalibrationProblem(BaseModel):
     )
     optimization_config: OptimizationConfig = Field(
         default=..., description="Optimization algorithm configuration"
+    )
+    probabilistic_config: ProbabilisticCalibrationConfig | None = Field(
+        default=None,
+        description="Optional configuration for probabilistic calibration",
+    )
+    seed: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Random seed for reproducibility across all stochastic processes "
+            "(optimization, probabilistic calibration, clustering, ensemble selection)"
+        ),
     )
 
     @model_validator(mode="after")

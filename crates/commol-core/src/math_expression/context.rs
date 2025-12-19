@@ -146,7 +146,12 @@ impl MathExpressionContext {
             }
 
             // Add special variables
-            let total_pop: f64 = self.compartments.values().sum();
+            // Sum compartment values in sorted order for deterministic floating-point results.
+            // HashMap iteration order is non-deterministic, and floating-point addition
+            // is not associative, so summing in different orders produces different results.
+            let mut sorted_values: Vec<f64> = self.compartments.values().copied().collect();
+            sorted_values.sort_by(|a, b| a.total_cmp(b));
+            let total_pop: f64 = sorted_values.iter().sum();
             context
                 .set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
                 .ok();

@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 # Optimization library
-argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }
+argmin = { git = "https://github.com/MUNQU/argmin", branch = "development", features = ["rand"] }
 argmin-math = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 argmin-observer-slog = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 
@@ -22,6 +22,9 @@ commol-difference = { path = "../commol-difference" }
 
 # Random number generation
 rand = "0.9"
+
+# Parallel processing
+rayon = "1.11"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

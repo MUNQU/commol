@@ -3,10 +3,11 @@
 use argmin::core::{CostFunction, Error};
 use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
 use std::marker::PhantomData;
+use std::sync::RwLock;
 
 use crate::types::{
-    CalibrationConstraint, CalibrationParameter, CalibrationParameterType, LossConfig,
-    ObservedDataPoint,
+    CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
+    LossConfig, ObservedDataPoint,
 };
 
 /// Generic calibration problem that works with any SimulationEngine implementation.
@@ -69,8 +70,8 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     max_time_step: u32,
 
     /// Pre-allocated buffer for simulation results (reused across evaluations)
-    /// Wrapped in RefCell to allow mutation in cost() method
-    result_buffer: std::cell::RefCell<Vec<Vec<f64>>>,
+    /// Wrapped in RwLock to allow thread-safe mutation in cost() method
+    result_buffer: RwLock<Vec<Vec<f64>>>,
 
     /// Initial population size for converting fractions to absolute values
     /// From the model's defined initial_population_size
@@ -82,6 +83,9 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Compiled constraint expressions (cached for performance)
     compiled_constraints: Vec<MathExpression>,
 
+    /// Evaluation history tracker (wrapped in RwLock for thread-safe interior mutability)
+    evaluations: RwLock<Vec<CalibrationEvaluation>>,
+
     /// Indices of parameter-only constraints (no time_steps, evaluated once before simulation)
     parameter_constraint_indices: Vec<usize>,
 
@@ -90,6 +94,34 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
+}
+
+// Manual Clone implementation because RwLock doesn't implement Clone
+impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
+    fn clone(&self) -> Self {
+        // Pre-allocate result buffer for the clone
+        let buffer_capacity = (self.max_time_step + 1) as usize;
+        let result_buffer = Vec::with_capacity(buffer_capacity);
+
+        Self {
+            base_engine: self.base_engine.clone(),
+            observed_data: self.observed_data.clone(),
+            observed_compartment_indices: self.observed_compartment_indices.clone(),
+            parameters: self.parameters.clone(),
+            parameter_compartment_indices: self.parameter_compartment_indices.clone(),
+            observed_scale_indices: self.observed_scale_indices.clone(),
+            loss_config: self.loss_config,
+            max_time_step: self.max_time_step,
+            result_buffer: RwLock::new(result_buffer),
+            initial_population_size: self.initial_population_size,
+            constraints: self.constraints.clone(),
+            compiled_constraints: self.compiled_constraints.clone(),
+            evaluations: RwLock::new(Vec::new()), // Each clone gets fresh evaluation history
+            parameter_constraint_indices: self.parameter_constraint_indices.clone(),
+            time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl<E: SimulationEngine> CalibrationProblem<E> {
@@ -305,10 +337,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_scale_indices,
             loss_config,
             max_time_step,
-            result_buffer: std::cell::RefCell::new(result_buffer),
+            result_buffer: RwLock::new(result_buffer),
             initial_population_size: initial_population_size as f64,
             constraints,
             compiled_constraints,
+            evaluations: RwLock::new(Vec::new()),
             parameter_constraint_indices,
             time_dependent_constraint_indices,
             _phantom: PhantomData,
@@ -338,8 +371,35 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .collect()
     }
 
-    /// Helper method to determine which compartments are being calibrated as ICs
-    fn get_calibrated_compartments(&self) -> Vec<bool> {
+    /// Get all recorded objective function evaluations
+    pub fn get_evaluations(&self) -> Vec<CalibrationEvaluation> {
+        self.evaluations
+            .read()
+            .expect("Failed to acquire read lock on evaluations")
+            .clone()
+    }
+
+    /// Clear the evaluation history (useful when reusing the problem)
+    pub fn clear_evaluations(&self) {
+        self.evaluations
+            .write()
+            .expect("Failed to acquire write lock on evaluations")
+            .clear();
+    }
+
+    /// Calculate auto-corrected parameter values for initial conditions
+    ///
+    /// This is the single source of truth for auto-IC calculation logic.
+    /// When calibrating initial conditions, one IC parameter may be auto-calculated
+    /// to ensure all fractions sum to 1.0.
+    ///
+    /// # Arguments
+    /// * `param_values` - Raw parameter values from the optimizer
+    ///
+    /// # Returns
+    /// Tuple of (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum_excluding_auto)
+    fn calculate_auto_corrected_parameters(&self, param_values: &[f64]) -> (Vec<f64>, f64, f64) {
+        // Identify which compartments are being calibrated
         let num_compartments = self.base_engine.compartments().len();
         let mut calibrated_compartments = vec![false; num_compartments];
 
@@ -355,28 +415,17 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
-        calibrated_compartments
-    }
-
-    /// Calculate the sum of fixed (non-calibrated) initial condition fractions
-    fn calculate_fixed_ic_sum(&self, calibrated_compartments: &[bool]) -> f64 {
+        // Calculate sum of fixed (non-calibrated) initial condition fractions
         let current_population = self.base_engine.population();
-        current_population
+        let fixed_initial_conditions_sum: f64 = current_population
             .iter()
             .enumerate()
             .filter(|(idx, _)| !calibrated_compartments[*idx])
             .map(|(_, &val)| val / self.initial_population_size)
-            .sum()
-    }
+            .sum();
 
-    /// Determine which IC parameter (if any) should be auto-calculated
-    ///
-    /// Returns the index of the parameter that should be auto-calculated,
-    /// or None if no auto-calculation is needed.
-    fn get_auto_calculated_ic_index(&self) -> Option<usize> {
-        let num_compartments = self.base_engine.compartments().len();
-
-        let ic_params_indices: Vec<usize> = self
+        // Determine which initial condition parameter should be auto-calculated
+        let initial_conditions_params_indices: Vec<usize> = self
             .parameters
             .iter()
             .enumerate()
@@ -384,73 +433,108 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .map(|(idx, _)| idx)
             .collect();
 
-        let num_ic_params = ic_params_indices.len();
-        let all_compartments_are_ics = num_ic_params == num_compartments;
+        let num_initial_conditions_params = initial_conditions_params_indices.len();
+        let all_compartments_are_initial_conditions =
+            num_initial_conditions_params == num_compartments;
 
-        // Auto-calculate the last IC parameter if:
-        // 1. All compartments are ICs AND there are 2+ IC parameters, OR
-        // 2. There's exactly 1 IC parameter with fixed compartments (sum constraint)
-        if (num_ic_params >= 2 && all_compartments_are_ics)
-            || (num_ic_params == 1 && !all_compartments_are_ics)
+        // Auto-calculate the last initial condition parameter if:
+        // 1. All compartments are initial conditions AND there are 2+ initial condition parameters, OR
+        // 2. There's exactly 1 initial condition parameter with fixed compartments (sum constraint)
+        let auto_calc_initial_conditions_idx = if (num_initial_conditions_params >= 2
+            && all_compartments_are_initial_conditions)
+            || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
         {
-            ic_params_indices.last().copied()
+            initial_conditions_params_indices.last().copied()
         } else {
             None
+        };
+
+        // Calculate sum of calibrated initial conditions (excluding auto-calculated one)
+        let calibrated_initial_conditions_sum: f64 = param_values
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| {
+                self.parameters[*idx].parameter_type == CalibrationParameterType::InitialCondition
+                    && Some(*idx) != auto_calc_initial_conditions_idx
+            })
+            .map(|(_, value)| value)
+            .sum();
+
+        // Apply auto-calculation if needed
+        let mut corrected_params = param_values.to_vec();
+        if let Some(idx) = auto_calc_initial_conditions_idx {
+            let auto_calculated_value =
+                (1.0 - fixed_initial_conditions_sum - calibrated_initial_conditions_sum).max(0.0);
+            corrected_params[idx] = auto_calculated_value;
         }
+
+        (
+            corrected_params,
+            fixed_initial_conditions_sum,
+            calibrated_initial_conditions_sum,
+        )
     }
 
-    /// Get information needed to fix auto-calculated parameters
-    ///
-    /// Returns (fixed_ic_sum, auto_calc_ic_idx, param_types) where:
-    /// - fixed_ic_sum: Sum of fractions for fixed (non-calibrated) compartments
-    /// - auto_calc_ic_idx: Index of the IC parameter to auto-calculate (if any)
-    /// - param_types: Vector of parameter types for each parameter
-    pub fn get_parameter_fix_info(&self) -> (f64, Option<usize>, Vec<CalibrationParameterType>) {
-        let calibrated_compartments = self.get_calibrated_compartments();
-        let fixed_ic_sum = self.calculate_fixed_ic_sum(&calibrated_compartments);
-        let auto_calc_ic_idx = self.get_auto_calculated_ic_index();
-        let param_types: Vec<CalibrationParameterType> =
-            self.parameters.iter().map(|p| p.parameter_type).collect();
+    /// Get parameter types for external use
+    pub fn get_parameter_types(&self) -> Vec<CalibrationParameterType> {
+        self.parameters.iter().map(|p| p.parameter_type).collect()
+    }
 
-        (fixed_ic_sum, auto_calc_ic_idx, param_types)
+    /// Get information needed for parameter correction (used by python_observer)
+    ///
+    /// Returns (fixed_initial_conditions_sum, auto_calc_initial_conditions_idx, param_types)
+    /// This is a convenience method that extracts metadata without requiring parameter values.
+    pub fn get_parameter_fix_info(&self) -> (f64, Option<usize>, Vec<CalibrationParameterType>) {
+        // Calculate fixed initial conditions sum using empty params (we only need the structure)
+        let dummy_params = vec![0.0; self.parameters.len()];
+        let (_, fixed_initial_conditions_sum, _) =
+            self.calculate_auto_corrected_parameters(&dummy_params);
+
+        // Determine auto-calc index
+        let num_compartments = self.base_engine.compartments().len();
+        let initial_conditions_params_indices: Vec<usize> = self
+            .parameters
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        let num_initial_conditions_params = initial_conditions_params_indices.len();
+        let all_compartments_are_initial_conditions =
+            num_initial_conditions_params == num_compartments;
+
+        let auto_calc_initial_conditions_idx = if (num_initial_conditions_params >= 2
+            && all_compartments_are_initial_conditions)
+            || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
+        {
+            initial_conditions_params_indices.last().copied()
+        } else {
+            None
+        };
+
+        let param_types = self.get_parameter_types();
+
+        (
+            fixed_initial_conditions_sum,
+            auto_calc_initial_conditions_idx,
+            param_types,
+        )
     }
 
     /// Fix auto-calculated initial condition parameters in the result
     ///
-    /// Some IC parameters may be auto-calculated to ensure fractions sum to 1.0.
-    /// This method replaces those auto-calculated values with their correct values
-    /// based on the constraint.
+    /// This is a public wrapper around calculate_auto_corrected_parameters
+    /// for use by optimizers that need to correct final results.
     ///
     /// # Arguments
     /// * `param_values` - Parameter values from the optimizer
     ///
     /// # Returns
     /// Corrected parameter values with auto-calculated ICs fixed
-    pub fn fix_auto_calculated_parameters(&self, mut param_values: Vec<f64>) -> Vec<f64> {
-        let calibrated_compartments = self.get_calibrated_compartments();
-        let fixed_ic_sum = self.calculate_fixed_ic_sum(&calibrated_compartments);
-        let auto_calc_ic_idx = self.get_auto_calculated_ic_index();
-
-        // If there's an auto-calculated parameter, compute and set its correct value
-        if let Some(idx) = auto_calc_ic_idx {
-            // Calculate sum of other calibrated ICs (excluding the auto-calculated one)
-            let calibrated_ic_sum: f64 = param_values
-                .iter()
-                .enumerate()
-                .filter(|(param_idx, _)| {
-                    self.parameters[*param_idx].parameter_type
-                        == CalibrationParameterType::InitialCondition
-                        && *param_idx != idx
-                })
-                .map(|(_, value)| value)
-                .sum();
-
-            // Auto-calculated value ensures fractions sum to 1.0
-            let auto_calculated_value = (1.0 - fixed_ic_sum - calibrated_ic_sum).max(0.0);
-            param_values[idx] = auto_calculated_value;
-        }
-
-        param_values
+    pub fn fix_auto_calculated_parameters(&self, param_values: Vec<f64>) -> Vec<f64> {
+        let (corrected, _, _) = self.calculate_auto_corrected_parameters(&param_values);
+        corrected
     }
 
     /// Calculate loss between simulation results and observed data
@@ -710,93 +794,24 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Calculate sum of fixed initial conditions (those not being calibrated)
-        let num_compartments = engine.compartments().len();
-        let mut calibrated_compartments = vec![false; num_compartments];
-
-        // Mark which compartments are being calibrated
-        for (param, compartment_idx) in self
-            .parameters
-            .iter()
-            .zip(&self.parameter_compartment_indices)
-        {
-            if param.parameter_type == CalibrationParameterType::InitialCondition {
-                if let Some(idx) = compartment_idx {
-                    calibrated_compartments[*idx] = true;
-                }
-            }
-        }
-
-        // Get current (fixed) initial conditions for non-calibrated compartments
-        let current_population = engine.population();
-        let fixed_ic_sum: f64 = current_population
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| !calibrated_compartments[*idx])
-            .map(|(_, &val)| val / self.initial_population_size)
-            .sum();
-
-        // Determine which IC parameter (if any) should be auto-calculated to ensure sum = 1.0
-        // Logic:
-        // - If there's only 1 IC parameter being calibrated, it should be auto-calculated
-        //   to ensure fixed + calibrated = 1.0 (unless all compartments are being calibrated)
-        // - If there are 2+ IC parameters, the last one is auto-calculated to ensure sum = 1.0
-        let ic_params_indices: Vec<usize> = self
-            .parameters
-            .iter()
-            .enumerate()
-            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
-            .map(|(idx, _)| idx)
-            .collect();
-
-        let num_ic_params = ic_params_indices.len();
-        let num_total_compartments = num_compartments;
-
-        // Auto-calculate the last IC parameter if:
-        // 1. There are IC parameters to calibrate, and
-        // 2. Either:
-        //    a) There are 2+ IC parameters (always auto-calculate last), or
-        //    b) There's 1 IC parameter and it's not the only compartment (has fixed compartments)
-        let last_ic_param_idx = if num_ic_params > 0 {
-            let has_fixed_compartments = num_ic_params < num_total_compartments;
-            if num_ic_params >= 2 || (num_ic_params == 1 && has_fixed_compartments) {
-                ic_params_indices.last().copied()
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Calculate sum of calibrated initial conditions (excluding the last one)
-        let calibrated_ic_sum: f64 = clamped_params
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| {
-                self.parameters[*idx].parameter_type == CalibrationParameterType::InitialCondition
-                    && Some(*idx) != last_ic_param_idx
-            })
-            .map(|(_, value)| value)
-            .sum();
+        // Apply auto-correction for initial condition parameters
+        let (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum) =
+            self.calculate_auto_corrected_parameters(&clamped_params);
 
         // Validate that fixed + calibrated fractions don't exceed 1.0
-        // This ensures the last initial condition can be calculated as a non-negative value
-        if fixed_ic_sum + calibrated_ic_sum > 1.0 {
+        if fixed_initial_conditions_sum + calibrated_initial_conditions_sum > 1.0 {
             // Invalid parameter combination: would result in negative last initial condition
-            // Return penalty proportional to the excess
             let base_penalty = self.calculate_base_penalty();
-            // Scale penalty by how much we exceeded 1.0
-            let excess = fixed_ic_sum + calibrated_ic_sum - 1.0;
+            let excess = fixed_initial_conditions_sum + calibrated_initial_conditions_sum - 1.0;
             let penalty = base_penalty * (1.0 + excess * 100.0);
             return Ok(penalty);
         }
 
-        // Update parameters and initial conditions
-        for (param_idx, ((value, param), compartment_idx)) in clamped_params
+        // Update parameters and initial conditions using corrected values
+        for ((value, param), compartment_idx) in corrected_params
             .iter()
             .zip(&self.parameters)
             .zip(&self.parameter_compartment_indices)
-            .enumerate()
         {
             match param.parameter_type {
                 CalibrationParameterType::Parameter => {
@@ -809,18 +824,8 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
                     let idx =
                         compartment_idx.expect("InitialCondition must have compartment index");
 
-                    // Calculate the actual fraction to use
-                    let fraction = if Some(param_idx) == last_ic_param_idx {
-                        // Last initial condition: calculate as remainder
-                        // fraction = 1.0 - fixed_sum - calibrated_sum (excluding this one)
-                        let remaining = 1.0 - fixed_ic_sum - calibrated_ic_sum;
-                        // Ensure non-negative
-                        remaining.max(0.0)
-                    } else {
-                        // Regular calibrated initial condition
-                        *value
-                    };
-
+                    // Use corrected value (auto-calculation already applied)
+                    let fraction = *value;
                     let absolute_population = fraction * self.initial_population_size;
                     engine
                         .set_initial_condition(idx, absolute_population)
@@ -839,7 +844,10 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         }
 
         // Run simulation using pre-allocated buffer to avoid allocations
-        let mut buffer = self.result_buffer.borrow_mut();
+        let mut buffer = self
+            .result_buffer
+            .write()
+            .expect("Failed to acquire write lock on result_buffer");
         engine
             .run_into_buffer(self.max_time_step, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
@@ -869,14 +877,25 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             return Ok(base_penalty + time_constraint_penalty * base_penalty);
         }
 
-        // Calculate and return loss
-        let loss = self.calculate_loss(&buffer, &clamped_params);
+        // Calculate and return loss (use corrected params for scale parameters)
+        let loss = self.calculate_loss(&buffer, &corrected_params);
 
         // Check if loss itself is invalid (defensive programming)
         if !loss.is_finite() {
             let base_penalty = self.calculate_base_penalty();
             return Ok(base_penalty);
         }
+
+        // Record this evaluation in the history (use corrected params)
+        let evaluation = CalibrationEvaluation {
+            parameters: corrected_params.clone(),
+            loss,
+            predictions: vec![], // Predictions are generated later in Python
+        };
+        self.evaluations
+            .write()
+            .expect("Failed to acquire write lock on evaluations")
+            .push(evaluation);
 
         Ok(loss)
     }

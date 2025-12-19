@@ -6,6 +6,7 @@ from commol.api import (
     Calibrator,
     ModelBuilder,
     ModelLoader,
+    ProbabilisticCalibrator,
     Simulation,
     SimulationPlotter,
 )
@@ -25,6 +26,16 @@ from commol.context.calibration import (
     ParticleSwarmConfig,
 )
 from commol.context.parameter import Parameter
+from commol.context.probabilistic_calibration import (
+    CalibrationEvaluation,
+    ParameterSetStatistics,
+    ProbabilisticCalibrationConfig,
+    ProbabilisticCalibrationResult,
+    ProbClusteringConfig,
+    ProbEnsembleConfig,
+    ProbEvaluationFilterConfig,
+    ProbRepresentativeConfig,
+)
 from commol.context.visualization import (
     PlotConfig,
     SeabornContext,
@@ -47,6 +58,7 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 
 __all__ = [
     "CalibrationConstraint",
+    "CalibrationEvaluation",
     "CalibrationParameter",
     "CalibrationParameterType",
     "CalibrationProblem",
@@ -63,8 +75,16 @@ __all__ = [
     "OptimizationAlgorithm",
     "OptimizationConfig",
     "Parameter",
+    "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",
+    "ProbabilisticCalibrationConfig",
+    "ProbabilisticCalibrator",
+    "ProbabilisticCalibrationResult",
+    "ProbClusteringConfig",
+    "ProbEnsembleConfig",
+    "ProbEvaluationFilterConfig",
+    "ProbRepresentativeConfig",
     "SeabornContext",
     "SeabornStyle",
     "SeabornStyleConfig",

@@ -65,17 +65,23 @@ impl JITFunction {
             let value = if name == "step" || name == "t" {
                 context.step
             } else if name == "N" {
-                // Sum all compartments
-                context.compartments.values().sum()
+                // Sum all compartments in sorted order for deterministic floating-point results.
+                // HashMap iteration order is non-deterministic, and floating-point addition
+                // is not associative, so summing in different orders produces different results.
+                let mut sorted_values: Vec<f64> = context.compartments.values().copied().collect();
+                sorted_values.sort_by(|a, b| a.total_cmp(b));
+                sorted_values.iter().sum()
             } else if name.starts_with("N_") {
-                // Stratified population sum
+                // Stratified population sum in sorted order for deterministic results
                 let suffix = &name[1..]; // Keep "_age_young" etc.
-                context
+                let mut filtered_values: Vec<f64> = context
                     .compartments
                     .iter()
                     .filter(|(comp_name, _)| comp_name.ends_with(suffix))
-                    .map(|(_, val)| val)
-                    .sum()
+                    .map(|(_, val)| *val)
+                    .collect();
+                filtered_values.sort_by(|a, b| a.total_cmp(b));
+                filtered_values.iter().sum()
             } else {
                 // Try parameter first, then compartment
                 context
@@ -115,30 +121,30 @@ impl JITCompiler {
             MathExpressionError::InvalidExpression(format!("Failed to create JIT builder: {}", e))
         })?;
         let mut module = JITModule::new(builder);
-        // Step 1: Parse to AST
+        // Parse to AST
         let ast = parse_expression(preprocessed)?;
 
-        // Step 2: Collect all variables in the expression
+        // Collect all variables in the expression
         let variable_names = collect_variables(&ast);
         let mut variable_indices = HashMap::new();
         for (i, name) in variable_names.iter().enumerate() {
             variable_indices.insert(name.clone(), i);
         }
 
-        // Step 3: Define function signature
+        // Define function signature
         // extern "C" fn(context_ptr: *const f64) -> f64
         let mut sig = module.make_signature();
         sig.params.push(AbiParam::new(types::I64)); // context pointer
         sig.returns.push(AbiParam::new(types::F64)); // return f64
 
-        // Step 4: Declare function
+        // Declare function
         let func_id = module
             .declare_function("eval_expr", Linkage::Export, &sig)
             .map_err(|e| {
                 MathExpressionError::InvalidExpression(format!("Failed to declare function: {}", e))
             })?;
 
-        // Step 5: Build function body
+        // Build function body
         let mut ctx = module.make_context();
         ctx.func.signature = sig;
 
@@ -153,7 +159,7 @@ impl JITCompiler {
         // Get the context pointer parameter
         let context_ptr = builder.block_params(entry_block)[0];
 
-        // Step 6: Generate code
+        // Generate code
         let mut libm_registry = LibmRegistry::new();
         let mut codegen = CodeGenerator::new(
             builder,
@@ -164,27 +170,27 @@ impl JITCompiler {
         );
         let result_val = codegen.generate(&ast)?;
 
-        // Step 7: Return the result
+        // Return the result
         codegen.builder_mut().ins().return_(&[result_val]);
         codegen.finalize();
 
-        // Step 8: Compile to machine code
+        // Compile to machine code
         module.define_function(func_id, &mut ctx).map_err(|e| {
             MathExpressionError::InvalidExpression(format!("Failed to define function: {}", e))
         })?;
 
         module.clear_context(&mut ctx);
 
-        // Step 9: Finalize and get function pointer
+        // Finalize and get function pointer
         module.finalize_definitions().map_err(|e| {
             MathExpressionError::InvalidExpression(format!("Failed to finalize definitions: {}", e))
         })?;
 
         let code_ptr = module.get_finalized_function(func_id);
 
-        // Step 10: Convert code pointer to function pointer
-        // This is the only unavoidable unsafe in JIT compilation - we must convert
-        // a raw memory pointer to executable code into a callable function pointer.
+        // Convert code pointer to function pointer
+        // UNSAFE !!!
+        // We must convert a raw memory pointer to executable code into a callable function pointer.
         // We wrap this in a helper function with explicit safety documentation.
         let func_ptr = Self::code_ptr_to_fn(code_ptr);
 

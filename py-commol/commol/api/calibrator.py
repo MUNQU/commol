@@ -175,6 +175,94 @@ class Calibrator:
 
         return result
 
+    def run_with_history(self):
+        """
+        Runs the calibration optimization and returns evaluation history.
+
+        Returns all objective function evaluations that occurred during
+        optimization, not just the final best result. This is useful for
+        probabilistic calibration where we want to explore the parameter space.
+
+        Returns
+        -------
+        CalibrationResultWithHistory
+            Object containing optimized parameters, final loss, and all evaluations.
+
+        Raises
+        ------
+        ImportError
+            If Rust extension is not available.
+        ValueError
+            If calibration problem setup is invalid.
+        RuntimeError
+            If optimization fails.
+        """
+        logger.info("Starting calibration with history tracking")
+
+        # Convert observed data to Rust types
+        rust_observed_data = [
+            rust_calibration.ObservedDataPoint(
+                step=point.step,
+                compartment=point.compartment,
+                value=point.value,
+                weight=point.weight,
+                scale_id=point.scale_id,
+            )
+            for point in self.problem.observed_data
+        ]
+
+        # Convert parameters to Rust types
+        rust_parameters = [
+            rust_calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
+        # Convert constraints to Rust types
+        rust_constraints = [
+            rust_calibration.CalibrationConstraint(
+                id=constraint.id,
+                expression=constraint.expression,
+                description=constraint.description,
+                weight=constraint.weight,
+                time_steps=constraint.time_steps,
+            )
+            for constraint in self.problem.constraints
+        ]
+
+        # Convert loss config to Rust type
+        rust_loss_config = self._build_loss_config()
+
+        # Convert optimization config to Rust type
+        rust_optimization_config = self._build_optimization_config()
+
+        # Get initial population size for initial condition fraction conversion
+        initial_population_size = self._get_initial_population_size()
+
+        # Call the Rust calibrate_with_history function
+        rust_result = rust_calibration.calibrate_with_history(
+            self._engine,
+            rust_observed_data,
+            rust_parameters,
+            rust_constraints,
+            rust_loss_config,
+            rust_optimization_config,
+            initial_population_size,
+        )
+
+        logger.info(
+            f"Calibration finished after {rust_result.iterations} iterations. "
+            f"Final loss: {rust_result.final_loss:.6f}. "
+            f"Collected {len(rust_result.evaluations)} evaluations."
+        )
+
+        return rust_result
+
     def _to_rust_parameter_type(
         self, param_type: CalibrationParameterType
     ) -> "CalibrationParameterTypeProtocol":
@@ -219,6 +307,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.config.max_iterations,
                 sd_tolerance=opt_config.config.sd_tolerance,
+                simplex_perturbation=opt_config.config.simplex_perturbation,
                 alpha=opt_config.config.alpha,
                 gamma=opt_config.config.gamma,
                 rho=opt_config.config.rho,
@@ -244,7 +333,8 @@ class Calibrator:
                 inertia_factor=opt_config.config.inertia_factor,
                 cognitive_factor=opt_config.config.cognitive_factor,
                 social_factor=opt_config.config.social_factor,
-                seed=opt_config.config.seed,
+                default_acceleration_coefficient=opt_config.config.default_acceleration_coefficient,
+                seed=self.problem.seed,  # Use seed from CalibrationProblem
                 verbose=opt_config.config.verbose,
                 header_interval=opt_config.config.header_interval,
             )

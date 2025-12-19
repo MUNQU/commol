@@ -161,6 +161,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
+        simplex_perturbation: float = 1.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
@@ -178,6 +179,7 @@ class ParticleSwarmConfigProtocol(Protocol):
         inertia_factor: float | None = None,
         cognitive_factor: float | None = None,
         social_factor: float | None = None,
+        default_acceleration_coefficient: float = 1.1931471805599454,
         seed: int | None = None,
         verbose: bool = False,
         header_interval: int = 100,
@@ -210,6 +212,58 @@ class CalibrationResultProtocol(Protocol):
     def termination_reason(self) -> str: ...
     def to_dict(self) -> dict[str, object]: ...
 
+class CalibrationEvaluationProtocol(Protocol):
+    def __init__(
+        self,
+        parameters: list[float],
+        loss: float,
+        predictions: list[list[float]],
+    ) -> None: ...
+    @property
+    def parameters(self) -> list[float]: ...
+    @property
+    def loss(self) -> float: ...
+    @property
+    def predictions(self) -> list[list[float]]: ...
+
+class CalibrationResultWithHistoryProtocol(Protocol):
+    @property
+    def best_parameters(self) -> dict[str, float]: ...
+    @property
+    def best_parameters_list(self) -> list[float]: ...
+    @property
+    def parameter_names(self) -> list[str]: ...
+    @property
+    def final_loss(self) -> float: ...
+    @property
+    def iterations(self) -> int: ...
+    @property
+    def converged(self) -> bool: ...
+    @property
+    def termination_reason(self) -> str: ...
+    @property
+    def evaluations(self) -> list[CalibrationEvaluationProtocol]: ...
+
+class ParetoSolutionProtocol(Protocol):
+    @property
+    def ensemble_size(self) -> int: ...
+    @property
+    def ci_width(self) -> float: ...
+    @property
+    def coverage(self) -> float: ...
+    @property
+    def size_penalty(self) -> float: ...
+    @property
+    def selected_indices(self) -> list[int]: ...
+
+class EnsembleSelectionResultProtocol(Protocol):
+    @property
+    def selected_ensemble(self) -> list[int]: ...
+    @property
+    def pareto_front(self) -> list[ParetoSolutionProtocol]: ...
+    @property
+    def selected_pareto_index(self) -> int: ...
+
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
     CalibrationParameterType: type[CalibrationParameterTypeProtocol]
@@ -220,6 +274,10 @@ class CalibrationModule(Protocol):
     ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
     OptimizationConfig: type[OptimizationConfigProtocol]
     CalibrationResult: type[CalibrationResultProtocol]
+    CalibrationEvaluation: type[CalibrationEvaluationProtocol]
+    CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
+    ParetoSolution: type[ParetoSolutionProtocol]
+    EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
 
     def calibrate(
         self,
@@ -231,6 +289,72 @@ class CalibrationModule(Protocol):
         optimization_config: OptimizationConfigProtocol,
         initial_population_size: int,
     ) -> CalibrationResultProtocol: ...
+    def calibrate_with_history(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        optimization_config: OptimizationConfigProtocol,
+        initial_population_size: int,
+    ) -> CalibrationResultWithHistoryProtocol: ...
+    def run_multiple_calibrations(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        optimization_config: OptimizationConfigProtocol,
+        initial_population_size: int,
+        n_runs: int,
+        seed: int,
+    ) -> list[CalibrationResultWithHistoryProtocol]: ...
+    def select_optimal_ensemble(
+        self,
+        candidates: list[CalibrationEvaluationProtocol],
+        observed_data_tuples: list[tuple[int, int, float]],
+        population_size: int,
+        generations: int,
+        confidence_level: float,
+        seed: int,
+        pareto_preference: float,
+        ensemble_size_mode: str,
+        ensemble_size: int | None = None,
+        ensemble_size_min: int | None = None,
+        ensemble_size_max: int | None = None,
+        ci_margin_factor: float = 0.1,
+        ci_sample_sizes: list[int] | None = None,
+        nsga_crossover_probability: float = 0.9,
+    ) -> EnsembleSelectionResultProtocol: ...
+    def deduplicate_evaluations(
+        self,
+        evaluations: list[CalibrationEvaluationProtocol],
+        tolerance: float,
+    ) -> list[CalibrationEvaluationProtocol]: ...
+    def generate_predictions_parallel(
+        self,
+        engine,  # DifferenceEquationsProtocol
+        parameter_sets: list[list[float]],
+        parameter_names: list[str],
+        time_steps: int,
+    ) -> list[list[list[float]]]: ...
+    def select_cluster_representatives(
+        self,
+        evaluations: list[CalibrationEvaluationProtocol],
+        cluster_labels: list[int],
+        max_representatives: int,
+        elite_fraction: float,
+        strategy: str,
+        selection_method: str = "crowding_distance",
+        quality_temperature: float = 1.0,
+        seed: int = 42,
+        k_neighbors_min: int = 5,
+        k_neighbors_max: int = 10,
+        sparsity_weight: float = 2.0,
+        stratum_fit_weight: float = 10.0,
+    ) -> list[int]: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...

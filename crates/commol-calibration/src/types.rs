@@ -380,3 +380,65 @@ impl CalibrationResult {
             .collect()
     }
 }
+
+/// A single evaluation during calibration optimization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationEvaluation {
+    /// Parameter values for this evaluation
+    pub parameters: Vec<f64>,
+
+    /// Loss value for this parameter set
+    pub loss: f64,
+
+    /// Model predictions at each time step for all compartments
+    /// predictions[time_step][compartment_idx]
+    pub predictions: Vec<Vec<f64>>,
+}
+
+/// Result from a calibration run with history of all evaluations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationResultWithHistory {
+    /// Best parameter values found
+    pub best_parameters: Vec<f64>,
+
+    /// Parameter names (in same order as best_parameters)
+    pub parameter_names: Vec<String>,
+
+    /// Final loss value achieved
+    pub final_loss: f64,
+
+    /// Number of iterations performed
+    pub iterations: usize,
+
+    /// Whether the optimization converged
+    pub converged: bool,
+
+    /// Termination reason
+    pub termination_reason: String,
+
+    /// All unique evaluations performed during optimization (deduplicated)
+    pub evaluations: Vec<CalibrationEvaluation>,
+}
+
+impl CalibrationResultWithHistory {
+    /// Convert to a standard CalibrationResult (without history)
+    pub fn to_standard_result(&self) -> CalibrationResult {
+        CalibrationResult {
+            best_parameters: self.best_parameters.clone(),
+            parameter_names: self.parameter_names.clone(),
+            final_loss: self.final_loss,
+            iterations: self.iterations,
+            converged: self.converged,
+            termination_reason: self.termination_reason.clone(),
+        }
+    }
+
+    /// Get parameters as a HashMap for easy lookup
+    pub fn parameters_map(&self) -> std::collections::HashMap<String, f64> {
+        self.parameter_names
+            .iter()
+            .zip(self.best_parameters.iter())
+            .map(|(name, value)| (name.clone(), *value))
+            .collect()
+    }
+}

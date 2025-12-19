@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
 if TYPE_CHECKING:
@@ -11,7 +12,8 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 from commol.api.simulation import Simulation
-from commol.context.calibration import ObservedDataPoint
+from commol.context.calibration import CalibrationResult, ObservedDataPoint
+from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
 from commol.context.visualization import (
     PlotConfig,
     SeabornContext,
@@ -68,6 +70,9 @@ class SimulationPlotter:
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
         scale_values: dict[str, float] | None = None,
+        calibration_result: CalibrationResult
+        | ProbabilisticCalibrationResult
+        | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
         seaborn_style: SeabornStyle | None = None,
@@ -80,6 +85,7 @@ class SimulationPlotter:
 
         Creates a figure with subplots arranged in a grid, where each subplot shows
         the evolution of one bin over time. Optionally overlays observed data points.
+        If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
         Parameters
         ----------
@@ -93,6 +99,10 @@ class SimulationPlotter:
             Maps scale_id to scale value. Observed data points with a scale_id will be
             unscaled for plotting: unscaled_value = observed_value / scale.
             This allows observed data to be comparable with model predictions.
+        calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
+            Optional calibration result. If ProbabilisticCalibrationResult is provided,
+            plots the median prediction with confidence interval bands.
+            If CalibrationResult is provided, uses best_parameters as scale_values.
         config : PlotConfig | None
             Configuration for plot layout and styling. If None, uses defaults.
         bins : list[str] | None
@@ -113,77 +123,29 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
-
-        Examples
-        --------
-        >>> plotter = SimulationPlotter(simulation, results)
-        >>> plotter.plot_series("output.png", seaborn_style="darkgrid")
-        >>> # With calibrated scales
-        >>> plotter.plot_series(
-        ...     "output.png",
-        ...     observed_data=obs_data,
-        ...     scale_values=result.best_parameters,
-        ... )
         """
         logger.info("Starting plot_series")
 
-        # Use provided config or create default
-        if config is None:
-            config = PlotConfig()
-
-        # Override config with direct parameters if provided
-        seaborn_config = self._build_seaborn_config(
-            config.seaborn, seaborn_style, palette, context
-        )
-
-        # Apply Seaborn styling
-        self._apply_seaborn_style(seaborn_config)
-
-        # Select bins to plot
+        config = config or PlotConfig()
         bins_to_plot = bins if bins is not None else self.bins
 
-        # Calculate layout
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-
-        # Group observed data by compartment
-        observed_by_bin = self._group_observed_data(observed_data)
-
-        # Create figure and subplots
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
+        self._setup_series_style(config, seaborn_style, palette, context)
+        scale_values = self._extract_series_scale_values(
+            calibration_result, scale_values
         )
 
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
+        observed_by_bin = self._group_observed_data(observed_data)
 
-        # Plot each bin
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-            self._plot_bin_series(
-                ax,
-                bin_id,
-                observed_by_bin.get(bin_id, []),
-                scale_values or {},
-                dict(kwargs),
-            )
-
-        # Hide unused subplots
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
-
-        plt.tight_layout()
-
-        if output_file:
-            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Series plot saved to {output_file}")
-
-        plt.show()
+        fig, axes = self._create_series_figure(config, bins_to_plot)
+        self._plot_all_series_bins(
+            axes,
+            bins_to_plot,
+            observed_by_bin,
+            scale_values,
+            calibration_result,
+            kwargs,
+        )
+        self._finalize_series_plot(fig, axes, bins_to_plot, output_file, config)
 
         return fig
 
@@ -192,6 +154,9 @@ class SimulationPlotter:
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
         scale_values: dict[str, float] | None = None,
+        calibration_result: CalibrationResult
+        | ProbabilisticCalibrationResult
+        | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
         seaborn_style: SeabornStyle | None = None,
@@ -204,6 +169,7 @@ class SimulationPlotter:
 
         Creates a figure showing the running sum of each bin's values over time.
         Useful for tracking total infections, deaths, or other accumulated quantities.
+        If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
         Parameters
         ----------
@@ -216,6 +182,10 @@ class SimulationPlotter:
             (e.g., from CalibrationResult.best_parameters).
             Maps scale_id to scale value. Observed data points with a scale_id will be
             unscaled for plotting: unscaled_value = observed_value / scale.
+        calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
+            Optional calibration result. If ProbabilisticCalibrationResult is provided,
+            plots the median prediction with confidence interval bands.
+            If CalibrationResult is provided, uses best_parameters as scale_values.
         config : PlotConfig | None
             Configuration for plot layout and styling. If None, uses defaults.
         bins : list[str] | None
@@ -236,77 +206,27 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
-
-        Examples
-        --------
-        >>> plotter = SimulationPlotter(simulation, results)
-        >>> plotter.plot_cumulative("cumulative.png", bins=["I", "R"])
         """
         logger.info("Starting plot_cumulative")
 
-        # Use provided config or create default
-        if config is None:
-            config = PlotConfig()
-
-        # Override config with direct parameters if provided
-        seaborn_config = self._build_seaborn_config(
-            config.seaborn, seaborn_style, palette, context
-        )
-
-        # Apply Seaborn styling
-        self._apply_seaborn_style(seaborn_config)
-
-        # Select bins to plot
+        config = config or PlotConfig()
         bins_to_plot = bins if bins is not None else self.bins
 
-        # Calculate cumulative results
-        cumulative_results = self._calculate_cumulative(bins_to_plot)
+        self._setup_cumulative_style(config, seaborn_style, palette, context)
+        scale_values = self._extract_cumulative_scale_values(
+            calibration_result, scale_values
+        )
 
-        # Calculate layout
-        layout = config.layout or self._calculate_layout(len(bins_to_plot))
-
-        # Group and accumulate observed data
         observed_by_bin = self._group_observed_data(observed_data)
         cumulative_observed = self._calculate_cumulative_observed(
             observed_by_bin, scale_values or {}
         )
 
-        # Create figure and subplots
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
+        fig, axes = self._create_cumulative_figure(config, bins_to_plot)
+        self._plot_all_cumulative_bins(
+            axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
         )
-
-        # Ensure axes is always a flat array
-        if layout[0] == 1 and layout[1] == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
-
-        # Plot each bin
-        for idx, bin_id in enumerate(bins_to_plot):
-            if idx >= len(axes):
-                break
-
-            ax = axes[idx]
-            self._plot_bin_cumulative(
-                ax,
-                bin_id,
-                cumulative_results[bin_id],
-                cumulative_observed.get(bin_id, []),
-                dict(kwargs),
-            )
-
-        # Hide unused subplots
-        for idx in range(len(bins_to_plot), len(axes)):
-            axes[idx].set_visible(False)
-
-        plt.tight_layout()
-
-        if output_file:
-            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
-            logger.info(f"Cumulative plot saved to {output_file}")
-
-        plt.show()
+        self._finalize_cumulative_plot(fig, axes, bins_to_plot, output_file, config)
 
         return fig
 
@@ -382,6 +302,239 @@ class SimulationPlotter:
 
         return dict(grouped)
 
+    def _setup_series_style(
+        self,
+        config: PlotConfig,
+        seaborn_style: SeabornStyle | None,
+        palette: str | None,
+        context: SeabornContext | None,
+    ) -> None:
+        """
+        Set up plot styling with Seaborn configuration for series plots.
+        """
+        seaborn_config = self._build_seaborn_config(
+            config.seaborn, seaborn_style, palette, context
+        )
+        self._apply_seaborn_style(seaborn_config)
+
+    def _extract_series_scale_values(
+        self,
+        calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        scale_values: dict[str, float] | None,
+    ) -> dict[str, float] | None:
+        """
+        Extract scale values from calibration result for series plotting.
+        """
+        if calib_result is None:
+            return scale_values
+
+        if isinstance(calib_result, CalibrationResult):
+            return scale_values or calib_result.best_parameters
+
+        if isinstance(calib_result, ProbabilisticCalibrationResult):
+            if scale_values is None:
+                return {
+                    param_name: stats.median
+                    for (
+                        param_name,
+                        stats,
+                    ) in calib_result.selected_ensemble.parameter_statistics.items()
+                    if param_name.startswith("scale_")
+                }
+
+        return scale_values
+
+    def _create_series_figure(
+        self, config: PlotConfig, bins_to_plot: list[str]
+    ) -> tuple["Figure", list["Axes"]]:
+        """
+        Create figure and axes array for series plotting.
+        """
+        layout = config.layout or self._calculate_layout(len(bins_to_plot))
+        fig, axes = plt.subplots(
+            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
+        )
+
+        # Ensure axes is always a flat array
+        if layout[0] == 1 and layout[1] == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
+
+        return fig, axes
+
+    def _plot_all_series_bins(
+        self,
+        axes: list["Axes"],
+        bins_to_plot: list[str],
+        observed_by_bin: dict[str, list[ObservedDataPoint]],
+        scale_values: dict[str, float] | None,
+        calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        kwargs: dict[str, str | int | float | bool | None],
+    ) -> None:
+        """
+        Plot series data for all bins across subplots.
+        """
+        for idx, bin_id in enumerate(bins_to_plot):
+            if idx >= len(axes):
+                break
+
+            ax = axes[idx]
+
+            if isinstance(calibration_result, ProbabilisticCalibrationResult):
+                self._plot_bin_series_probabilistic(
+                    ax,
+                    bin_id,
+                    observed_by_bin.get(bin_id, []),
+                    scale_values or {},
+                    calibration_result,
+                    dict(kwargs),
+                )
+            else:
+                self._plot_bin_series(
+                    ax,
+                    bin_id,
+                    observed_by_bin.get(bin_id, []),
+                    scale_values or {},
+                    dict(kwargs),
+                )
+
+    def _finalize_series_plot(
+        self,
+        fig: "Figure",
+        axes: list["Axes"],
+        bins_to_plot: list[str],
+        output_file: str | None,
+        config: PlotConfig,
+    ) -> None:
+        """
+        Finalize series plot by hiding unused subplots and saving.
+        """
+        for idx in range(len(bins_to_plot), len(axes)):
+            axes[idx].set_visible(False)
+
+        plt.tight_layout()
+
+        if output_file:
+            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
+            logger.info(f"Series plot saved to {output_file}")
+
+    def _setup_cumulative_style(
+        self,
+        config: PlotConfig,
+        seaborn_style: SeabornStyle | None,
+        palette: str | None,
+        context: SeabornContext | None,
+    ) -> None:
+        """
+        Set up plot styling with Seaborn configuration for cumulative plots.
+        """
+        seaborn_config = self._build_seaborn_config(
+            config.seaborn, seaborn_style, palette, context
+        )
+        self._apply_seaborn_style(seaborn_config)
+
+    def _extract_cumulative_scale_values(
+        self,
+        calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        scale_values: dict[str, float] | None,
+    ) -> dict[str, float] | None:
+        """
+        Extract scale values from calibration result for cumulative plotting.
+        """
+        if calib_result is None:
+            return scale_values
+
+        if isinstance(calib_result, CalibrationResult):
+            return scale_values or calib_result.best_parameters
+
+        if isinstance(calib_result, ProbabilisticCalibrationResult):
+            if scale_values is None:
+                return {
+                    param_name: stats.median
+                    for (
+                        param_name,
+                        stats,
+                    ) in calib_result.selected_ensemble.parameter_statistics.items()
+                    if param_name.startswith("scale_")
+                }
+
+        return scale_values
+
+    def _create_cumulative_figure(
+        self, config: PlotConfig, bins_to_plot: list[str]
+    ) -> tuple["Figure", list["Axes"]]:
+        """
+        Create figure and axes array for cumulative plotting.
+        """
+        layout = config.layout or self._calculate_layout(len(bins_to_plot))
+        fig, axes = plt.subplots(
+            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
+        )
+
+        # Ensure axes is always a flat array
+        if layout[0] == 1 and layout[1] == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten() if hasattr(axes, "flatten") else [axes]
+
+        return fig, axes
+
+    def _plot_all_cumulative_bins(
+        self,
+        axes: list["Axes"],
+        bins_to_plot: list[str],
+        cumulative_observed: dict[str, list[tuple[int, float]]],
+        calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
+        kwargs: dict[str, str | int | float | bool | None],
+    ) -> None:
+        """
+        Plot cumulative data for all bins across subplots.
+        """
+        for idx, bin_id in enumerate(bins_to_plot):
+            if idx >= len(axes):
+                break
+
+            ax = axes[idx]
+
+            if isinstance(calibration_result, ProbabilisticCalibrationResult):
+                self._plot_bin_cumulative_probabilistic(
+                    ax,
+                    bin_id,
+                    cumulative_observed.get(bin_id, []),
+                    calibration_result,
+                    dict(kwargs),
+                )
+            else:
+                cumulative_results = self._calculate_cumulative(bins_to_plot)
+                self._plot_bin_cumulative(
+                    ax,
+                    bin_id,
+                    cumulative_results[bin_id],
+                    cumulative_observed.get(bin_id, []),
+                    dict(kwargs),
+                )
+
+    def _finalize_cumulative_plot(
+        self,
+        fig: "Figure",
+        axes: list["Axes"],
+        bins_to_plot: list[str],
+        output_file: str | None,
+        config: PlotConfig,
+    ) -> None:
+        """
+        Finalize cumulative plot by hiding unused subplots and saving.
+        """
+        for idx in range(len(bins_to_plot), len(axes)):
+            axes[idx].set_visible(False)
+
+        plt.tight_layout()
+
+        if output_file:
+            plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
+            logger.info(f"Cumulative plot saved to {output_file}")
+
     def _plot_bin_series(
         self,
         ax: "Axes",
@@ -423,6 +576,174 @@ class SimulationPlotter:
                 y=obs_values,
                 ax=ax,
                 label="Observed",
+                color="red",
+                s=30,
+                alpha=0.7,
+                zorder=5,
+            )
+
+        # Get bin unit from model for label
+        bin_obj = next(
+            (
+                b
+                for b in self.simulation.model_definition.population.bins
+                if b.id == bin_id
+            ),
+            None,
+        )
+        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
+        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+
+        ax.set_xlabel("Step")
+        ax.set_ylabel(f"{unit_str}")
+        ax.set_title(f"{bin_name}")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    def _plot_bin_series_probabilistic(
+        self,
+        ax: "Axes",
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+        scale_values: dict[str, float],
+        prob_result: ProbabilisticCalibrationResult,
+        plot_kwargs: dict[str, str | int | float | bool | None],
+    ) -> None:
+        """
+        Plot time series for a single bin with probabilistic confidence intervals.
+        """
+        if bin_id not in prob_result.selected_ensemble.prediction_median:
+            logger.warning(
+                f"Bin '{bin_id}' not found in probabilistic result predictions"
+            )
+            return
+
+        time_steps = list(
+            range(len(prob_result.selected_ensemble.prediction_median[bin_id]))
+        )
+        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
+        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
+        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+
+        # Build parameters for lineplot (median)
+        params = {
+            "x": time_steps,
+            "y": median_values,
+            "ax": ax,
+            "label": "Median Prediction",
+        }
+        params.update(plot_kwargs)
+
+        # Plot median prediction
+        sns.lineplot(**params)
+
+        # Plot confidence interval as filled area
+        ax.fill_between(
+            time_steps,
+            ci_lower,
+            ci_upper,
+            alpha=0.3,
+            label="95% CI",
+        )
+
+        # Overlay observed data if available
+        if observed:
+            obs_steps = [p.step for p in observed]
+            # Apply scale if observation has a scale_id
+            obs_values = [
+                p.value / scale_values[p.scale_id]
+                if p.scale_id and p.scale_id in scale_values
+                else p.value
+                for p in observed
+            ]
+            sns.scatterplot(
+                x=obs_steps,
+                y=obs_values,
+                ax=ax,
+                label="Observed",
+                color="red",
+                s=30,
+                alpha=0.7,
+                zorder=5,
+            )
+
+        # Get bin unit from model for label
+        bin_obj = next(
+            (
+                b
+                for b in self.simulation.model_definition.population.bins
+                if b.id == bin_id
+            ),
+            None,
+        )
+        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
+        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+
+        ax.set_xlabel("Step")
+        ax.set_ylabel(f"{unit_str}")
+        ax.set_title(f"{bin_name}")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    def _plot_bin_cumulative_probabilistic(
+        self,
+        ax: "Axes",
+        bin_id: str,
+        cumulative_observed: list[tuple[int, float]],
+        prob_result: ProbabilisticCalibrationResult,
+        plot_kwargs: dict[str, str | int | float | bool | None],
+    ) -> None:
+        """
+        Plot cumulative data for a single bin with probabilistic confidence intervals.
+        """
+        if bin_id not in prob_result.selected_ensemble.prediction_median:
+            logger.warning(
+                f"Bin '{bin_id}' not found in probabilistic result predictions"
+            )
+            return
+
+        # Calculate cumulative values from the probabilistic predictions
+        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
+        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
+        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+
+        # Calculate cumulative sums
+        cumulative_median = np.cumsum(median_values).tolist()
+        cumulative_ci_lower = np.cumsum(ci_lower).tolist()
+        cumulative_ci_upper = np.cumsum(ci_upper).tolist()
+
+        time_steps = list(range(len(cumulative_median)))
+
+        # Build parameters for lineplot (median)
+        params = {
+            "x": time_steps,
+            "y": cumulative_median,
+            "ax": ax,
+            "label": "Median Prediction (Cumulative)",
+        }
+        params.update(plot_kwargs)
+
+        # Plot cumulative median prediction
+        sns.lineplot(**params)
+
+        # Plot cumulative confidence interval as filled area
+        ax.fill_between(
+            time_steps,
+            cumulative_ci_lower,
+            cumulative_ci_upper,
+            alpha=0.3,
+            label="95% CI",
+        )
+
+        # Overlay cumulative observed data if available
+        if cumulative_observed:
+            obs_steps = [step for step, _ in cumulative_observed]
+            obs_values = [value for _, value in cumulative_observed]
+            sns.scatterplot(
+                x=obs_steps,
+                y=obs_values,
+                ax=ax,
+                label="Observed (Cumulative)",
                 color="red",
                 s=30,
                 alpha=0.7,

@@ -1,6 +1,6 @@
+import re
 from collections.abc import Mapping
 from itertools import combinations, product
-import re
 from typing import Self
 
 import pint
@@ -1590,6 +1590,9 @@ class Model(BaseModel):
             The unit of the rate expression, or None if units cannot be determined.
         """
         try:
+            # Register custom units before parsing
+            self._register_custom_units()
+
             # Use provided variable units or build them
             if variable_units is None:
                 variable_units = self._build_variable_units()
