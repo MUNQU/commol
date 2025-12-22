@@ -1449,7 +1449,8 @@ class Model(BaseModel):
                 if "[time]" in str(unit_obj.dimensionality):
                     # Extract the time component
                     # The dimensionality will be like {[time]: -1, ...}
-                    if unit_obj.dimensionality.get("[time]", 0) < 0:
+                    time_dimension = unit_obj.dimensionality.get("[time]", 0)
+                    if isinstance(time_dimension, (int, float)) and time_dimension < 0:
                         # Get the time unit by analyzing the unit string
                         unit_str = str(unit_obj.units)
 

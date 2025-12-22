@@ -7,8 +7,7 @@ import pint
 from commol.context.parameter import Parameter
 from commol.context.stratification import Stratification
 
-
-ureg = pint.UnitRegistry()
+ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
 
 
 class UnitConsistencyError(Exception):
@@ -66,7 +65,9 @@ def check_equation_units(
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
 
 
-def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
+def parse_equation_unit(
+    equation: str, variable_units: dict[str, str]
+) -> pint.Quantity[float]:
     """
     Parse an equation and compute its resulting unit.
 
@@ -89,7 +90,7 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     # The namespace also includes math functions which are callables
     namespace: dict[
         str,
-        pint.Quantity
+        pint.Quantity[float]
         | float
         | Callable[[float], float]
         | Callable[[float, float], float]
