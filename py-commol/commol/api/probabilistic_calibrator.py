@@ -11,7 +11,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
-    from commol.commol_rs.commol_rs import EnsembleSelectionResultProtocol
+    from commol.commol_rs.commol_rs import (
+        CalibrationResultWithHistoryProtocol,
+        EnsembleSelectionResultProtocol,
+    )
     from commol.context.calibration import CalibrationProblem
 
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
@@ -224,7 +227,7 @@ class ProbabilisticCalibrator:
 
         return result
 
-    def _run_calibrations(self) -> list:
+    def _run_calibrations(self) -> list["CalibrationResultWithHistoryProtocol"]:
         """Run multiple calibration attempts."""
         logger.info("Running multiple calibration attempts...")
         all_results = self._calibration_runner.run_multiple(
@@ -236,7 +239,9 @@ class ProbabilisticCalibrator:
         )
         return all_results
 
-    def _process_evaluations(self, all_results: list) -> list[CalibrationEvaluation]:
+    def _process_evaluations(
+        self, all_results: list["CalibrationResultWithHistoryProtocol"]
+    ) -> list[CalibrationEvaluation]:
         """Collect, deduplicate, and filter evaluations."""
         logger.info("Collecting and deduplicating evaluations...")
 
@@ -317,7 +322,9 @@ class ProbabilisticCalibrator:
 
         return representatives, optimal_k
 
-    def _select_ensemble(self, representatives: list[CalibrationEvaluation]):
+    def _select_ensemble(
+        self, representatives: list[CalibrationEvaluation]
+    ) -> "EnsembleSelectionResultProtocol":
         """Run NSGA-II ensemble selection."""
         logger.info("Running NSGA-II ensemble selection...")
 

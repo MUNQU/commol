@@ -12,6 +12,7 @@ from commol.commol_rs import commol_rs
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
+    from commol.commol_rs.commol_rs import EnsembleSelectionResultProtocol
     from commol.context.calibration import CalibrationProblem
 
 from commol.context.probabilistic_calibration import CalibrationEvaluation
@@ -65,7 +66,7 @@ class EnsembleSelector:
         ci_margin_factor: float,
         ci_sample_sizes: list[int],
         nsga_crossover_probability: float,
-    ):
+    ) -> "EnsembleSelectionResultProtocol":
         """Run NSGA-II ensemble selection.
 
         Parameters

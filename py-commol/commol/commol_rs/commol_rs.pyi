@@ -335,7 +335,7 @@ class CalibrationModule(Protocol):
     ) -> list[CalibrationEvaluationProtocol]: ...
     def generate_predictions_parallel(
         self,
-        engine,  # DifferenceEquationsProtocol
+        engine: DifferenceEquationsProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
         time_steps: int,

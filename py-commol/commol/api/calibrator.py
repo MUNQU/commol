@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from commol.commol_rs.commol_rs import (
         CalibrationParameterTypeProtocol,
+        CalibrationResultWithHistoryProtocol,
         DifferenceEquationsProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
@@ -175,7 +176,7 @@ class Calibrator:
 
         return result
 
-    def run_with_history(self):
+    def run_with_history(self) -> "CalibrationResultWithHistoryProtocol":
         """
         Runs the calibration optimization and returns evaluation history.
 
