@@ -7,4 +7,4 @@ mod distribution;
 mod methods;
 mod representatives;
 
-pub use representatives::select_cluster_representatives;
+pub use representatives::{select_cluster_representatives, ClusterRepresentativeConfig};

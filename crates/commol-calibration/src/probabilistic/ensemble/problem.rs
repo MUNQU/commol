@@ -333,8 +333,7 @@ impl MultiObjectiveCostFunction for EnsembleSelectionProblem {
         // Normalize CI width to [0, 1]
         let normalized_ci_width = if self.max_ci_width > self.min_ci_width {
             ((ci_width - self.min_ci_width) / (self.max_ci_width - self.min_ci_width))
-                .max(0.0)
-                .min(1.0)
+                .clamp(0.0, 1.0)
         } else {
             0.5 // If all CI widths are the same, use middle value
         };

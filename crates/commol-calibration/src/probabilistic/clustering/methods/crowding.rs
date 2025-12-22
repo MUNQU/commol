@@ -35,7 +35,7 @@ pub fn calculate_crowding_distance_parameter_space(
     let mut crowding_distances: Vec<f64> = vec![0.0; n_solutions];
 
     // For each parameter dimension
-    for param_idx in 0..n_params {
+    for (param_idx, _) in param_vectors.iter().enumerate().take(n_params) {
         // Create list of (local_idx, global_idx, param_value)
         let mut sorted_by_param: Vec<(usize, usize, f64)> = indices
             .iter()

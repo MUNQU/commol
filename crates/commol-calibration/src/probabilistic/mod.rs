@@ -31,10 +31,11 @@ mod utils;
 
 // Re-export public API
 pub use calibration::{generate_predictions_parallel, run_multiple_calibrations};
-pub use clustering::select_cluster_representatives;
+pub use clustering::{select_cluster_representatives, ClusterRepresentativeConfig};
 pub use config::EnsembleSelectionConfig;
 pub use deduplication::deduplicate_evaluations;
 pub use ensemble::{
-    select_optimal_ensemble, EnsembleSelectionResult, EnsembleSizeMode, ParetoSolution,
+    select_optimal_ensemble, EnsembleSelectionResult, EnsembleSizeMode, OptimalEnsembleConfig,
+    ParetoSolution,
 };
 pub use error::{CalibrationError, CalibrationResult};

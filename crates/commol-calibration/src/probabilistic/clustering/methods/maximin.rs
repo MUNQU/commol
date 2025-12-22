@@ -6,6 +6,16 @@
 use crate::probabilistic::utils::parameter_distance_normalized;
 use crate::types::CalibrationEvaluation;
 
+/// Configuration for maximin distance selection.
+pub struct MaximinConfig {
+    pub n_elite: usize,
+    pub n_remaining: usize,
+    pub quality_temperature: f64,
+    pub k_neighbors_min: usize,
+    pub k_neighbors_max: usize,
+    pub sparsity_weight: f64,
+}
+
 /// Select diverse representatives using density-aware quality-weighted maximin distance.
 ///
 /// This method provides uniform coverage of the parameter space without boundary bias,
@@ -20,12 +30,7 @@ use crate::types::CalibrationEvaluation;
 /// * `evaluations` - All evaluations with parameters and losses
 /// * `sorted_by_loss` - Indices sorted by loss (ascending)
 /// * `all_param_vectors` - Parameter vectors for all evaluations
-/// * `n_elite` - Number of elite solutions already selected
-/// * `n_remaining` - Number of additional solutions to select
-/// * `quality_temperature` - Temperature for quality weighting (higher = more diversity)
-/// * `k_neighbors_min` - Minimum k for k-nearest neighbors in density estimation
-/// * `k_neighbors_max` - Maximum k for k-nearest neighbors in density estimation
-/// * `sparsity_weight` - Exponential weight for sparsity bonus
+/// * `config` - Configuration for maximin distance selection
 ///
 /// # Returns
 /// Indices of selected solutions (excluding elite)
@@ -33,14 +38,9 @@ pub fn select_by_maximin_distance(
     evaluations: &[CalibrationEvaluation],
     sorted_by_loss: &[usize],
     all_param_vectors: &[Vec<f64>],
-    n_elite: usize,
-    n_remaining: usize,
-    quality_temperature: f64,
-    k_neighbors_min: usize,
-    k_neighbors_max: usize,
-    sparsity_weight: f64,
+    config: &MaximinConfig,
 ) -> Vec<usize> {
-    if n_remaining == 0 || sorted_by_loss.len() <= n_elite {
+    if config.n_remaining == 0 || sorted_by_loss.len() <= config.n_elite {
         return Vec::new();
     }
 
@@ -63,10 +63,10 @@ pub fn select_by_maximin_distance(
         .collect();
 
     // Initialize selected set with elite solutions
-    let mut selected: Vec<usize> = sorted_by_loss[..n_elite].to_vec();
+    let mut selected: Vec<usize> = sorted_by_loss[..config.n_elite].to_vec();
 
     // Candidate pool (solutions not yet selected)
-    let mut candidates: Vec<usize> = sorted_by_loss[n_elite..].to_vec();
+    let mut candidates: Vec<usize> = sorted_by_loss[config.n_elite..].to_vec();
 
     // Normalize losses for quality scoring
     let median_loss = if !evaluations.is_empty() {
@@ -80,9 +80,10 @@ pub fn select_by_maximin_distance(
     // Pre-calculate local density for each candidate using k-nearest neighbors
     // This helps identify over-sampled convergent regions
     // Adaptive k using configurable bounds
-    let k_neighbors = k_neighbors_max
+    let k_neighbors = config
+        .k_neighbors_max
         .min(sorted_by_loss.len() / 10)
-        .max(k_neighbors_min);
+        .max(config.k_neighbors_min);
 
     let mut local_densities: Vec<f64> = Vec::with_capacity(candidates.len());
 
@@ -139,7 +140,7 @@ pub fn select_by_maximin_distance(
     };
 
     // Iteratively select candidates with best quality × distance × sparsity score
-    for _ in 0..n_remaining {
+    for _ in 0..config.n_remaining {
         if candidates.is_empty() {
             break;
         }
@@ -165,7 +166,7 @@ pub fn select_by_maximin_distance(
             // Higher temperature = weaker quality preference (more diversity)
             // Lower temperature = stronger quality preference
             let normalized_loss = evaluations[cand_global_idx].loss / median_loss;
-            let quality_score = (-normalized_loss / quality_temperature).exp();
+            let quality_score = (-normalized_loss / config.quality_temperature).exp();
 
             // Calculate sparsity bonus: prefer candidates in sparse regions
             // normalized_density is in [0, 1], where 1 = densest region
@@ -174,7 +175,7 @@ pub fn select_by_maximin_distance(
 
             // Apply sparsity with exponential weighting to amplify the effect
             // This strongly penalizes selection from convergent (dense) regions
-            let density_weight = (sparsity_weight * sparsity_factor).exp(); // e^(weight*sparsity)
+            let density_weight = (config.sparsity_weight * sparsity_factor).exp(); // e^(weight*sparsity)
 
             // Combined score: quality × distance × density_weight
             // - quality_score: prefers better solutions
@@ -198,5 +199,5 @@ pub fn select_by_maximin_distance(
     }
 
     // Return only the newly selected indices (excluding elite)
-    selected[n_elite..].to_vec()
+    selected[config.n_elite..].to_vec()
 }

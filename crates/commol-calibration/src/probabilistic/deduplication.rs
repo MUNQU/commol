@@ -85,9 +85,7 @@ pub fn deduplicate_evaluations(
         if !is_duplicate {
             let unique_idx = unique.len();
             unique.push(eval);
-            grid.entry(grid_coords)
-                .or_insert_with(Vec::new)
-                .push(unique_idx);
+            grid.entry(grid_coords).or_default().push(unique_idx);
         }
     }
 

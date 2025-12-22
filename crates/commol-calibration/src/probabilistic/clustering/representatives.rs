@@ -10,12 +10,24 @@ use super::distribution::{
     distribute_representatives_equal, distribute_representatives_proportional,
 };
 use super::methods::{
-    select_by_crowding_distance, select_by_latin_hypercube, select_by_maximin_distance,
+    maximin::MaximinConfig, select_by_crowding_distance, select_by_latin_hypercube,
+    select_by_maximin_distance,
 };
 use crate::probabilistic::config::EnsembleSelectionConfig;
 use crate::probabilistic::error::{CalibrationError, CalibrationResult};
 use crate::probabilistic::utils::calculate_elite_count;
 use crate::types::CalibrationEvaluation;
+
+/// Configuration for cluster representative selection.
+pub struct ClusterRepresentativeConfig<'a> {
+    pub max_representatives: usize,
+    pub elite_fraction: f64,
+    pub strategy: &'a str,
+    pub selection_method: &'a str,
+    pub quality_temperature: f64,
+    pub seed: u64,
+    pub ensemble_config: &'a EnsembleSelectionConfig,
+}
 
 /// Select diverse representatives from clustered evaluations.
 ///
@@ -26,13 +38,7 @@ use crate::types::CalibrationEvaluation;
 /// # Arguments
 /// * `evaluations` - All evaluations with parameters and losses
 /// * `cluster_labels` - Cluster assignment for each evaluation (from KMeans)
-/// * `max_representatives` - Maximum total representatives to select
-/// * `elite_fraction` - Fraction of representatives to select by quality (0.0-1.0)
-/// * `strategy` - Distribution strategy: "equal" or "proportional"
-/// * `selection_method` - Selection method: "crowding_distance", "maximin_distance", or "latin_hypercube"
-/// * `quality_temperature` - Temperature for quality weighting in maximin selection
-/// * `seed` - Random seed for reproducibility
-/// * `config` - Configuration for ensemble selection algorithms
+/// * `config` - Configuration for cluster representative selection
 ///
 /// # Returns
 /// Indices of selected representative evaluations
@@ -42,13 +48,7 @@ use crate::types::CalibrationEvaluation;
 pub fn select_cluster_representatives(
     evaluations: Vec<CalibrationEvaluation>,
     cluster_labels: Vec<usize>,
-    max_representatives: usize,
-    elite_fraction: f64,
-    strategy: &str,
-    selection_method: &str,
-    quality_temperature: f64,
-    seed: u64,
-    config: &EnsembleSelectionConfig,
+    config: &ClusterRepresentativeConfig,
 ) -> CalibrationResult<Vec<usize>> {
     if evaluations.is_empty() {
         return Ok(Vec::new());
@@ -80,12 +80,13 @@ pub fn select_cluster_representatives(
         return Ok(Vec::new());
     }
 
-    let max_reps = max_representatives.min(total_evaluations);
+    let max_reps = config.max_representatives.min(total_evaluations);
 
     // Distribute representatives based on strategy
-    let reps_per_cluster = match strategy {
+    let reps_per_cluster = match config.strategy {
         "equal" => distribute_representatives_equal(&cluster_sizes, max_reps),
-        "proportional" | _ => distribute_representatives_proportional(&cluster_sizes, max_reps),
+        "proportional" => distribute_representatives_proportional(&cluster_sizes, max_reps),
+        _ => distribute_representatives_proportional(&cluster_sizes, max_reps),
     };
 
     // Select representatives from each cluster using elite + diversity selection
@@ -118,7 +119,7 @@ pub fn select_cluster_representatives(
         }
 
         // Calculate how many elite solutions to include
-        let n_elite = calculate_elite_count(n_to_select, elite_fraction);
+        let n_elite = calculate_elite_count(n_to_select, config.elite_fraction);
 
         // Include n_elite best solutions by loss (if any)
         if n_elite > 0 {
@@ -140,10 +141,10 @@ pub fn select_cluster_representatives(
         }
 
         // Select diverse solutions based on method
-        let diverse_solutions: Vec<usize> = match selection_method {
+        let diverse_solutions: Vec<usize> = match config.selection_method {
             "latin_hypercube" => {
                 // Latin Hypercube Sampling for stratified space-filling selection
-                let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(cluster_id as u64));
+                let mut rng = SmallRng::seed_from_u64(config.seed.wrapping_add(cluster_id as u64));
                 select_by_latin_hypercube(
                     &evaluations,
                     &sorted_by_loss,
@@ -151,25 +152,32 @@ pub fn select_cluster_representatives(
                     n_elite,
                     n_remaining,
                     &mut rng,
-                    config.stratum_fit_weight,
+                    config.ensemble_config.stratum_fit_weight,
                 )
             }
             "maximin_distance" => {
                 // Quality-weighted maximin distance selection
+                let maximin_config = MaximinConfig {
+                    n_elite,
+                    n_remaining,
+                    quality_temperature: config.quality_temperature,
+                    k_neighbors_min: config.ensemble_config.k_neighbors_min,
+                    k_neighbors_max: config.ensemble_config.k_neighbors_max,
+                    sparsity_weight: config.ensemble_config.sparsity_weight,
+                };
                 select_by_maximin_distance(
                     &evaluations,
                     &sorted_by_loss,
                     &all_param_vectors,
-                    n_elite,
-                    n_remaining,
-                    quality_temperature,
-                    config.k_neighbors_min,
-                    config.k_neighbors_max,
-                    config.sparsity_weight,
+                    &maximin_config,
                 )
             }
-            "crowding_distance" | _ => {
-                // NSGA-II crowding distance selection (default)
+            "crowding_distance" => {
+                // NSGA-II crowding distance selection
+                select_by_crowding_distance(&all_param_vectors, remaining_candidates, n_remaining)
+            }
+            _ => {
+                // Default to crowding distance
                 select_by_crowding_distance(&all_param_vectors, remaining_candidates, n_remaining)
             }
         };

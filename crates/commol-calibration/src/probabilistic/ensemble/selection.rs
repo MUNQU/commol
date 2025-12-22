@@ -14,6 +14,17 @@ use crate::probabilistic::config::EnsembleSelectionConfig;
 use crate::probabilistic::error::{CalibrationError, CalibrationResult};
 use crate::types::CalibrationEvaluation;
 
+/// Configuration for optimal ensemble selection.
+pub struct OptimalEnsembleConfig<'a> {
+    pub population_size: usize,
+    pub generations: usize,
+    pub confidence_level: f64,
+    pub seed: u64,
+    pub pareto_preference: f64,
+    pub size_mode: EnsembleSizeMode,
+    pub ensemble_config: &'a EnsembleSelectionConfig,
+}
+
 /// Information about a Pareto front solution
 #[derive(Debug, Clone)]
 pub struct ParetoSolution {
@@ -49,13 +60,7 @@ pub struct EnsembleSelectionResult {
 /// # Arguments
 /// * `candidates` - Candidate parameter evaluations with predictions
 /// * `observed_data` - Observed data points as (time_step, compartment_idx, value)
-/// * `population_size` - NSGA-II population size
-/// * `generations` - Number of NSGA-II generations to run
-/// * `confidence_level` - Confidence level for CI calculation (e.g., 0.95)
-/// * `seed` - Random seed for reproducibility
-/// * `pareto_preference` - Preference for Pareto front selection (0.0 = narrow CI, 1.0 = high coverage, 0.5 = balanced)
-/// * `size_mode` - Ensemble size constraint mode
-/// * `config` - Configuration for ensemble selection algorithms
+/// * `config` - Configuration for optimal ensemble selection
 ///
 /// # Returns
 /// EnsembleSelectionResult containing selected ensemble and full Pareto front
@@ -70,13 +75,7 @@ pub struct EnsembleSelectionResult {
 pub fn select_optimal_ensemble(
     candidates: Vec<CalibrationEvaluation>,
     observed_data: Vec<(usize, usize, f64)>,
-    population_size: usize,
-    generations: usize,
-    confidence_level: f64,
-    seed: u64,
-    pareto_preference: f64,
-    size_mode: EnsembleSizeMode,
-    config: &EnsembleSelectionConfig,
+    config: &OptimalEnsembleConfig,
 ) -> CalibrationResult<EnsembleSelectionResult> {
     let n_candidates = candidates.len();
 
@@ -91,27 +90,27 @@ pub fn select_optimal_ensemble(
     let problem = EnsembleSelectionProblem::new(
         candidates,
         observed_data,
-        confidence_level,
-        size_mode.clone(),
-        config,
+        config.confidence_level,
+        config.size_mode.clone(),
+        config.ensemble_config,
     );
 
     // Create bounds (0 to 1 for each candidate - binary selection)
     let bounds = vec![(0.0, 1.0); n_candidates];
 
     // Create NSGA-II solver with RNG
-    let mut solver = NsgaII::new(bounds, population_size)
+    let mut solver = NsgaII::new(bounds, config.population_size)
         .map_err(|e| CalibrationError::NsgaSolverCreation(e.to_string()))?
-        .with_rng(SmallRng::seed_from_u64(seed));
+        .with_rng(SmallRng::seed_from_u64(config.seed));
 
     // Configure crossover and mutation (crossover probability from config)
     solver = solver
-        .with_crossover_probability(config.nsga_crossover_probability)
+        .with_crossover_probability(config.ensemble_config.nsga_crossover_probability)
         .with_mutation_probability(1.0 / n_candidates as f64);
 
     // Run NSGA-II optimization
     let result = Executor::new(problem, solver)
-        .configure(|state| state.max_iters(generations as u64))
+        .configure(|state| state.max_iters(config.generations as u64))
         .run()
         .map_err(|e| CalibrationError::NsgaOptimization(e.to_string()))?;
 
@@ -139,7 +138,7 @@ pub fn select_optimal_ensemble(
                 .count();
 
             // Check if size satisfies constraints
-            let is_valid = match &size_mode {
+            let is_valid = match &config.size_mode {
                 EnsembleSizeMode::Fixed { size } => ensemble_size == *size,
                 EnsembleSizeMode::Bounded { min, max } => {
                     ensemble_size >= *min && ensemble_size <= *max
@@ -158,14 +157,15 @@ pub fn select_optimal_ensemble(
     // Select from valid solutions, or fall back to all if none are valid
     let selected_idx = if valid_indices.is_empty() {
         // No valid solutions - select from all (fallback)
-        select_from_pareto_front_by_preference(pareto_front, pareto_preference)
+        select_from_pareto_front_by_preference(pareto_front, config.pareto_preference)
     } else {
         // Create a filtered slice of the Pareto front with only valid solutions
         let valid_solutions: Vec<Individual<Vec<f64>, f64>> = valid_indices
             .iter()
             .map(|&idx| pareto_front[idx].clone())
             .collect();
-        let local_idx = select_from_pareto_front_by_preference(&valid_solutions, pareto_preference);
+        let local_idx =
+            select_from_pareto_front_by_preference(&valid_solutions, config.pareto_preference);
         valid_indices[local_idx]
     };
 

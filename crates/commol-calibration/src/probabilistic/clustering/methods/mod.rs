@@ -5,7 +5,7 @@
 
 mod crowding;
 mod latin_hypercube;
-mod maximin;
+pub mod maximin;
 
 pub use crowding::select_by_crowding_distance;
 pub use latin_hypercube::select_by_latin_hypercube;

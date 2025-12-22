@@ -922,6 +922,7 @@ fn calibrate_with_history(
 /// Returns:
 ///     List of CalibrationResultWithHistory for each successful run
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn run_multiple_calibrations(
     engine: &PyDifferenceEquations,
     observed_data: Vec<PyObservedDataPoint>,
@@ -1062,7 +1063,7 @@ fn select_optimal_ensemble(
     };
 
     // Build ensemble selection config from parameters
-    let config = commol_calibration::EnsembleSelectionConfig {
+    let ensemble_config = commol_calibration::EnsembleSelectionConfig {
         ci_margin_factor,
         ci_sample_sizes: ci_sample_sizes.unwrap_or_else(|| vec![10, 20, 50, 100]),
         nsga_crossover_probability,
@@ -1073,17 +1074,21 @@ fn select_optimal_ensemble(
         stratum_fit_weight: 10.0,
     };
 
-    // Run NSGA-II ensemble selection
-    let result = commol_calibration::select_optimal_ensemble(
-        rust_candidates,
-        observed_data_tuples,
+    let optimal_config = commol_calibration::OptimalEnsembleConfig {
         population_size,
         generations,
         confidence_level,
         seed,
         pareto_preference,
         size_mode,
-        &config,
+        ensemble_config: &ensemble_config,
+    };
+
+    // Run NSGA-II ensemble selection
+    let result = commol_calibration::select_optimal_ensemble(
+        rust_candidates,
+        observed_data_tuples,
+        &optimal_config,
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -1205,16 +1210,20 @@ fn select_cluster_representatives(
         stratum_fit_weight,
     };
 
-    let indices = commol_calibration::select_cluster_representatives(
-        rust_evaluations,
-        cluster_labels,
+    let cluster_config = commol_calibration::ClusterRepresentativeConfig {
         max_representatives,
         elite_fraction,
         strategy,
         selection_method,
         quality_temperature,
         seed,
-        &config,
+        ensemble_config: &config,
+    };
+
+    let indices = commol_calibration::select_cluster_representatives(
+        rust_evaluations,
+        cluster_labels,
+        &cluster_config,
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 

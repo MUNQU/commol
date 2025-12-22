@@ -8,5 +8,7 @@ mod problem;
 mod selection;
 mod size_mode;
 
-pub use selection::{select_optimal_ensemble, EnsembleSelectionResult, ParetoSolution};
+pub use selection::{
+    select_optimal_ensemble, EnsembleSelectionResult, OptimalEnsembleConfig, ParetoSolution,
+};
 pub use size_mode::EnsembleSizeMode;
