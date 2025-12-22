@@ -14,8 +14,9 @@ requires-python = ">=3.12.0"
 dependencies = [
     "pydantic>=2.0,<3.0",
     "cffi>=2.0,<3.0",
-    "pint>=0.23,<1.0",
+    "pint>=0.23,<0.24.0",
     "seaborn (>=0.13.2,<0.14.0)",
+    "scikit-learn (>=1.8,<2.0)",
 ]
 
 [project.optional-dependencies]
