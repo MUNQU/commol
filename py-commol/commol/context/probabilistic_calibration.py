@@ -22,7 +22,7 @@ class CalibrationEvaluation:
     parameter_names : list[str]
         Names of the parameters (in same order as parameters list)
     predictions : list[list[float]] | None
-        Optional predictions matrix [time_step][compartment_idx]
+        Optional predictions matrix with shape (time_steps, compartments)
     """
 
     parameters: list[float]
