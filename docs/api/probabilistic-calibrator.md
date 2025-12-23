@@ -1,11 +1,26 @@
-# Probabilistic Calibrator API
+# Probabilistic Calibration API
 
-::: commol.api.probabilistic_calibrator.ProbabilisticCalibrator
-options:
-show_root_heading: true
-show_source: true
-heading_level: 2
-show_docstring_attributes: false
+!!! info "Unified API"
+Probabilistic calibration is accessed through the `Calibrator` class using the `run_probabilistic()` method. See the [Calibrator API](calibrator.md) for the complete API reference.
+
+## Quick Reference
+
+```python
+from commol import Calibrator, CalibrationProblem, ProbabilisticCalibrationConfig
+
+# Configure probabilistic calibration in the problem
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_function="sse",
+    optimization_config=pso_config,
+    probabilistic_config=ProbabilisticCalibrationConfig(n_runs=20),
+)
+
+# Use the unified Calibrator with run_probabilistic()
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run_probabilistic()
+```
 
 ## Related Classes
 

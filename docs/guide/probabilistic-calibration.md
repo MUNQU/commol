@@ -68,7 +68,7 @@ Here's a complete example of probabilistic calibration for an SIR model:
 from commol import (
     ModelBuilder,
     Simulation,
-    ProbabilisticCalibrator,
+    Calibrator,
     ProbabilisticCalibrationConfig,
     CalibrationProblem,
     CalibrationParameter,
@@ -157,8 +157,8 @@ problem = CalibrationProblem(
 )
 
 # Run probabilistic calibration
-calibrator = ProbabilisticCalibrator(simulation, problem)
-result = calibrator.run()
+calibrator = Calibrator(simulation, problem)
+result = calibrator.run_probabilistic()
 ```
 
 ## Results
@@ -566,5 +566,5 @@ problem.seed = 42
 ## See Also
 
 - [Model Calibration](calibration.md) - Standard single-solution calibration
-- [API Reference](../api/probabilistic-calibrator.md) - Complete ProbabilisticCalibrator API
+- [API Reference](../api/calibrator.md) - Complete Calibrator API
 - [Examples](examples.md) - Additional examples

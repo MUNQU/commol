@@ -1,6 +1,7 @@
 import re
 from collections.abc import Mapping
 from itertools import combinations, product
+from pathlib import Path
 from typing import Self
 
 import pint
@@ -50,6 +51,36 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+
+    @classmethod
+    def from_json(cls, file_path: str | Path) -> Self:
+        """
+        Loads a model from a JSON file.
+
+        The method reads the specified JSON file, parses its content, and validates
+        it against the Model schema.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the JSON file.
+
+        Returns
+        -------
+        Model
+            A validated Model instance.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file at `file_path` does not exist.
+        pydantic.ValidationError
+            If the JSON content does not conform to the Model schema.
+        """
+        with open(file_path, "r") as f:
+            json_data = f.read()
+
+        return cls.model_validate_json(json_data)
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:

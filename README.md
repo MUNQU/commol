@@ -218,15 +218,10 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
-    LossConfig,
-    LossFunction,
-    OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes
+from commol.constants import ModelTypes, CalibrationParameterType, LossFunction
 
 # Build model with unknown parameters
 model = (
@@ -286,21 +281,19 @@ parameters = [
     ),
 ]
 
-# Configure calibration problem
-pso_config = ParticleSwarmConfig.create(
+# Configure optimization algorithm (config type determines the algorithm)
+pso_config = ParticleSwarmConfig(
     num_particles=40,
     max_iterations=300,
     verbose=True
 )
 
+# Configure calibration problem
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
-    optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=pso_config,
-    ),
+    loss_function=LossFunction.SSE,
+    optimization_config=pso_config,  # ParticleSwarmConfig or NelderMeadConfig
 )
 
 # Run calibration
@@ -394,16 +387,37 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     constraints=constraints,  # Include constraints
-    loss_config=LossConfig(function=LossFunction.SSE),
-    optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=pso_config,
-    ),
+    loss_function=LossFunction.SSE,
+    optimization_config=pso_config,
 )
 
 result = calibrator.run()
-op = result.best_parameters["beta"] / result.best_parameters["gamma"]
-print(f"Calibrated op: {r0:.2f}")  # Will be <= 5
+```
+
+**Probabilistic Calibration:**
+
+For uncertainty quantification, use probabilistic calibration to get an ensemble of parameter sets:
+
+```python
+from commol import ProbabilisticCalibrationConfig
+
+# Configure probabilistic calibration
+prob_config = ProbabilisticCalibrationConfig(
+    n_runs=20,  # Number of calibration runs
+    confidence_level=0.95
+)
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_function=LossFunction.SSE,
+    optimization_config=pso_config,
+    probabilistic_config=prob_config,  # Enable probabilistic mode
+)
+
+# Run probabilistic calibration
+calibrator = Calibrator(simulation, problem)
+prob_result = calibrator.run_probabilistic()
 ```
 
 ## Documentation

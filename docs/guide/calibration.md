@@ -115,10 +115,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_function="sse",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=pso_config,
-    ),
+    optimization_config=pso_config,
 )
 
 # Run calibration
@@ -190,10 +187,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_function="sse",
-    optimization_config=OptimizationConfig(
-        algorithm="nelder_mead",
-        config=NelderMeadConfig(max_iterations=1000),
-    ),
+    optimization_config=NelderMeadConfig(max_iterations=1000),
 )
 
 # Simulation works with None initial conditions for calibration
@@ -282,10 +276,8 @@ pso_config = ParticleSwarmConfig.create(
     header_interval=50       # Print header every N iterations
 )
 
-optimization_config = OptimizationConfig(
-    algorithm="particle_swarm",
-    config=pso_config,
-)
+# Use the config directly - type determines algorithm
+optimization_config = pso_config
 ```
 
 **Advanced Configuration with Builder Methods:**
@@ -337,20 +329,18 @@ pso_config = (
 Derivative-free simplex algorithm. Fast convergence for smooth problems:
 
 ```python
-from commol import NelderMeadConfig, OptimizationConfig
+from commol import NelderMeadConfig
 
-optimization_config = OptimizationConfig(
-    algorithm="nelder_mead",
-    config=NelderMeadConfig(
-        max_iterations=1000,     # Maximum iterations
-        sd_tolerance=1e-6,       # Convergence tolerance
-        alpha=1.0,               # Reflection coefficient (optional)
-        gamma=2.0,               # Expansion coefficient (optional)
-        rho=0.5,                 # Contraction coefficient (optional)
-        sigma=0.5,               # Shrink coefficient (optional)
-        verbose=True,            # Print progress
-        header_interval=50       # Print header every N iterations
-    ),
+# Config type determines the algorithm (Nelder-Mead in this case)
+optimization_config = NelderMeadConfig(
+    max_iterations=1000,     # Maximum iterations
+    sd_tolerance=1e-6,       # Convergence tolerance
+    alpha=1.0,               # Reflection coefficient (optional)
+    gamma=2.0,               # Expansion coefficient (optional)
+    rho=0.5,                 # Contraction coefficient (optional)
+    sigma=0.5,               # Shrink coefficient (optional)
+    verbose=True,            # Print progress
+    header_interval=50       # Print header every N iterations
 )
 ```
 
@@ -431,10 +421,7 @@ problem = CalibrationProblem(
         ),
     ],
     loss_function="rmse",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
-    ),
+    optimization_config=ParticleSwarmConfig(max_iterations=500, verbose=False),
 )
 
 calibrator = Calibrator(simulation, problem)
@@ -539,10 +526,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_function="sse",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
-    ),
+    optimization_config=ParticleSwarmConfig(max_iterations=500, verbose=False),
 )
 
 calibrator = Calibrator(simulation, problem)
@@ -636,10 +620,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_function="mae",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=ParticleSwarmConfig.create(num_particles=40, max_iterations=500),
-    ),
+    optimization_config=ParticleSwarmConfig(num_particles=40, max_iterations=500),
 )
 
 calibrator = Calibrator(simulation, problem)
@@ -904,10 +885,7 @@ problem = CalibrationProblem(
     parameters=parameters,
     constraints=constraints,  # Add constraints here
     loss_function="sse",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=ParticleSwarmConfig.create(num_particles=30, max_iterations=500),
-    ),
+    optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=500),
 )
 
 calibrator = Calibrator(simulation, problem)

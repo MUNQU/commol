@@ -110,9 +110,9 @@ class EvaluationProcessor:
                 # Fallback: if no evaluations history, just use the best result
                 evaluations.append(
                     CalibrationEvaluation(
-                        parameters=list(result.best_parameters_list),
+                        parameters=list(result.best_parameters.values()),
                         loss=result.final_loss,
-                        parameter_names=list(result.parameter_names),
+                        parameter_names=list(result.best_parameters.keys()),
                     )
                 )
                 logger.debug(

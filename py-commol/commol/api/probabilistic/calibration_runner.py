@@ -7,8 +7,6 @@ from commol.context.constants import (
     LOSS_RMSE,
     LOSS_SSE,
     LOSS_WEIGHTED_SSE,
-    OPT_ALG_NELDER_MEAD,
-    OPT_ALG_PARTICLE_SWARM,
     PARAM_TYPE_INITIAL_CONDITION,
     PARAM_TYPE_PARAMETER,
     PARAM_TYPE_SCALE,
@@ -178,48 +176,36 @@ class CalibrationRunner:
 
         opt_config = self.problem.optimization_config
 
-        if opt_config.algorithm == OPT_ALG_NELDER_MEAD:
-            if not isinstance(opt_config.config, NelderMeadConfig):
-                raise ValueError(
-                    f"Expected NelderMeadConfig for Nelder-Mead algorithm, "
-                    f"got {type(opt_config.config).__name__}"
-                )
-
+        if isinstance(opt_config, NelderMeadConfig):
             nm_config = commol_rs.calibration.NelderMeadConfig(
-                max_iterations=opt_config.config.max_iterations,
-                sd_tolerance=opt_config.config.sd_tolerance,
-                alpha=opt_config.config.alpha,
-                gamma=opt_config.config.gamma,
-                rho=opt_config.config.rho,
-                sigma=opt_config.config.sigma,
-                verbose=opt_config.config.verbose,
-                header_interval=opt_config.config.header_interval,
+                max_iterations=opt_config.max_iterations,
+                sd_tolerance=opt_config.sd_tolerance,
+                alpha=opt_config.alpha,
+                gamma=opt_config.gamma,
+                rho=opt_config.rho,
+                sigma=opt_config.sigma,
+                verbose=opt_config.verbose,
+                header_interval=opt_config.header_interval,
             )
             return commol_rs.calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif opt_config.algorithm == OPT_ALG_PARTICLE_SWARM:
-            if not isinstance(opt_config.config, ParticleSwarmConfig):
-                raise ValueError(
-                    f"Expected ParticleSwarmConfig for Particle Swarm algorithm, "
-                    f"got {type(opt_config.config).__name__}"
-                )
-
+        elif isinstance(opt_config, ParticleSwarmConfig):
             ps_config = commol_rs.calibration.ParticleSwarmConfig(
-                num_particles=opt_config.config.num_particles,
-                max_iterations=opt_config.config.max_iterations,
-                target_cost=opt_config.config.target_cost,
-                inertia_factor=opt_config.config.inertia_factor,
-                cognitive_factor=opt_config.config.cognitive_factor,
-                social_factor=opt_config.config.social_factor,
+                num_particles=opt_config.num_particles,
+                max_iterations=opt_config.max_iterations,
+                target_cost=opt_config.target_cost,
+                inertia_factor=opt_config.inertia_factor,
+                cognitive_factor=opt_config.cognitive_factor,
+                social_factor=opt_config.social_factor,
                 seed=self.problem.seed,
-                verbose=opt_config.config.verbose,
-                header_interval=opt_config.config.header_interval,
+                verbose=opt_config.verbose,
+                header_interval=opt_config.header_interval,
             )
             return commol_rs.calibration.OptimizationConfig.particle_swarm(ps_config)
 
         else:
             raise ValueError(
-                f"Unsupported optimization algorithm: {opt_config.algorithm}"
+                f"Unsupported optimization config type: {type(opt_config).__name__}"
             )
 
     def _get_initial_population_size(self) -> int:

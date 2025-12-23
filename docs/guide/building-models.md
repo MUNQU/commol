@@ -651,9 +651,9 @@ builder.add_transition(
 Load pre-defined models from JSON files:
 
 ```python
-from commol import ModelLoader
+from commol import Model
 
-model = ModelLoader.from_json("path/to/model.json")
+model = Model.from_json("path/to/model.json")
 ```
 
 ### JSON Structure

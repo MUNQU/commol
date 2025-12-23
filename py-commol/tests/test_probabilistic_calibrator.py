@@ -7,13 +7,12 @@ import pytest
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
+    Calibrator,
     Model,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationConfig,
     ParticleSwarmConfig,
-    ProbabilisticCalibrator,
     Simulation,
 )
 from commol.constants import ModelTypes
@@ -109,13 +108,10 @@ class TestProbabilisticCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(
-                    num_particles=60,
-                    max_iterations=1000,
-                    verbose=False,
-                ),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=60,
+                max_iterations=1000,
+                verbose=False,
             ),
         )
 
@@ -142,8 +138,8 @@ class TestProbabilisticCalibrator:
         problem.seed = SEED
 
         # Run probabilistic calibration
-        prob_calibrator = ProbabilisticCalibrator(simulation, problem)
-        result = prob_calibrator.run()
+        calibrator = Calibrator(simulation, problem)
+        result = calibrator.run_probabilistic()
 
         # Verify results
         assert result.selected_ensemble.ensemble_size >= 10, (
@@ -304,10 +300,7 @@ class TestProbabilisticCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(),
-            ),
+            optimization_config=NelderMeadConfig(),
         )
 
         # Configure probabilistic calibration using new structure
@@ -333,8 +326,8 @@ class TestProbabilisticCalibrator:
         problem.seed = SEED
 
         # Run probabilistic calibration
-        prob_calibrator = ProbabilisticCalibrator(simulation, problem)
-        result = prob_calibrator.run()
+        calibrator = Calibrator(simulation, problem)
+        result = calibrator.run_probabilistic()
 
         # Verify results
         assert result.selected_ensemble.ensemble_size >= 10, (
@@ -494,14 +487,13 @@ class TestProbabilisticCalibratorValidation:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=10, max_iterations=10
             ),
         )
 
         with pytest.raises(ValueError, match="not found in model"):
-            ProbabilisticCalibrator(simulation, problem)
+            Calibrator(simulation, problem)
 
     def test_invalid_compartment_in_observed_data(self, model: Model):
         """Test that invalid compartment in observed data raises ValueError."""
@@ -525,14 +517,13 @@ class TestProbabilisticCalibratorValidation:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=10, max_iterations=10
             ),
         )
 
         with pytest.raises(ValueError, match="not found in model"):
-            ProbabilisticCalibrator(simulation, problem)
+            Calibrator(simulation, problem)
 
     def test_empty_parameters_raises_validation_error(self, model: Model):
         """Test that empty parameters list raises ValidationError from Pydantic."""
@@ -545,9 +536,8 @@ class TestProbabilisticCalibratorValidation:
                 observed_data=observed_data,
                 parameters=[],  # Empty parameters
                 loss_function="sse",
-                optimization_config=OptimizationConfig(
-                    algorithm="particle_swarm",
-                    config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
+                optimization_config=ParticleSwarmConfig(
+                    num_particles=10, max_iterations=10
                 ),
             )
 
@@ -569,9 +559,8 @@ class TestProbabilisticCalibratorValidation:
                 observed_data=[],  # Empty observed data
                 parameters=parameters,
                 loss_function="sse",
-                optimization_config=OptimizationConfig(
-                    algorithm="particle_swarm",
-                    config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
+                optimization_config=ParticleSwarmConfig(
+                    num_particles=10, max_iterations=10
                 ),
             )
 
@@ -631,11 +620,8 @@ class TestProbabilisticCalibratorSelectionMethods:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(
-                    num_particles=20, max_iterations=50, verbose=False
-                ),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=20, max_iterations=50, verbose=False
             ),
         )
 
@@ -667,8 +653,8 @@ class TestProbabilisticCalibratorSelectionMethods:
         )
         base_problem.seed = SEED
 
-        calibrator = ProbabilisticCalibrator(simulation, base_problem)
-        result = calibrator.run()
+        calibrator = Calibrator(simulation, base_problem)
+        result = calibrator.run_probabilistic()
 
         assert result.selected_ensemble.ensemble_size > 0
         assert "beta" in result.selected_ensemble.parameter_statistics
@@ -712,8 +698,8 @@ class TestProbabilisticCalibratorSelectionMethods:
         )
         base_problem.seed = SEED
 
-        calibrator = ProbabilisticCalibrator(simulation, base_problem)
-        result = calibrator.run()
+        calibrator = Calibrator(simulation, base_problem)
+        result = calibrator.run_probabilistic()
 
         assert result.selected_ensemble.ensemble_size > 0
 

@@ -4,11 +4,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from commol.context.constants import (
     LOSS_SSE,
-    OPT_ALG_NELDER_MEAD,
-    OPT_ALG_PARTICLE_SWARM,
     CalibrationParameterType,
     LossFunction,
-    OptimizationAlgorithm,
 )
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
 from commol.utils.security import validate_expression_security
@@ -566,46 +563,8 @@ class ParticleSwarmConfig(BaseModel):
         return self
 
 
-class OptimizationConfig(BaseModel):
-    """
-    Configuration for the optimization algorithm.
-
-    Attributes
-    ----------
-    algorithm : Literal["nelder_mead", "particle_swarm"]
-        The optimization algorithm to use
-    config : NelderMeadConfig | ParticleSwarmConfig
-        Configuration for the selected algorithm
-    """
-
-    algorithm: OptimizationAlgorithm = Field(
-        default=..., description="Optimization algorithm to use"
-    )
-    config: NelderMeadConfig | ParticleSwarmConfig = Field(
-        default=..., description="Algorithm-specific configuration"
-    )
-
-    @model_validator(mode="after")
-    def validate_algorithm_config(self) -> Self:
-        """Ensure the config type matches the selected algorithm."""
-        if self.algorithm == OPT_ALG_NELDER_MEAD:
-            if not isinstance(self.config, NelderMeadConfig):
-                raise ValueError(
-                    (
-                        f"Algorithm '{OPT_ALG_NELDER_MEAD}' requires NelderMeadConfig, "
-                        f"but got {type(self.config).__name__}"
-                    )
-                )
-        elif self.algorithm == OPT_ALG_PARTICLE_SWARM:
-            if not isinstance(self.config, ParticleSwarmConfig):
-                raise ValueError(
-                    (
-                        f"Algorithm '{OPT_ALG_PARTICLE_SWARM}' requires "
-                        f"ParticleSwarmConfig, but got {type(self.config).__name__}"
-                    )
-                )
-
-        return self
+# Type alias for optimization configuration - the config type implies the algorithm
+OptimizationConfig = NelderMeadConfig | ParticleSwarmConfig
 
 
 class CalibrationResult(BaseModel):
@@ -619,10 +578,6 @@ class CalibrationResult(BaseModel):
     ----------
     best_parameters : dict[str, float]
         Dictionary mapping parameter IDs to their calibrated values
-    parameter_names : list[str]
-        Ordered list of parameter names
-    best_parameters_list : list[float]
-        Ordered list of parameter values (matches parameter_names order)
     final_loss : float
         Final loss value achieved
     iterations : int
@@ -635,12 +590,6 @@ class CalibrationResult(BaseModel):
 
     best_parameters: dict[str, float] = Field(
         default=..., description="Calibrated parameter values"
-    )
-    parameter_names: list[str] = Field(
-        default=..., description="Ordered list of parameter names"
-    )
-    best_parameters_list: list[float] = Field(
-        default=..., description="Ordered list of parameter values"
     )
     final_loss: float = Field(default=..., description="Final loss value")
     iterations: int = Field(

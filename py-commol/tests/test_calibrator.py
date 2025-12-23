@@ -11,7 +11,6 @@ from commol import (
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationConfig,
     Parameter,
     ParticleSwarmConfig,
     Simulation,
@@ -79,10 +78,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=1000, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=1000, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -120,10 +116,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(max_iterations=200, verbose=False),
-            ),
+            optimization_config=ParticleSwarmConfig(max_iterations=200, verbose=False),
             seed=SEED,
         )
 
@@ -394,10 +387,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=1000, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=1000, verbose=False),
         )
 
         calibrator = Calibrator(simulation_for_calibration, problem)
@@ -499,13 +489,10 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(
-                    max_iterations=5000,
-                    sd_tolerance=1e-9,  # Stricter convergence criterion
-                    verbose=False,
-                ),
+            optimization_config=NelderMeadConfig(
+                max_iterations=5000,
+                sd_tolerance=1e-9,  # Stricter convergence criterion
+                verbose=False,
             ),
         )
 
@@ -628,10 +615,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=pso_config,
-            ),
+            optimization_config=pso_config,
             seed=SEED,
         )
 
@@ -684,10 +668,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=100),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=100),
         )
 
         simulation = Simulation(model)
@@ -750,10 +731,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=pso_config,
-            ),
+            optimization_config=pso_config,
             seed=SEED,
         )
 
@@ -805,10 +783,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=pso_config,
-            ),
+            optimization_config=pso_config,
             seed=SEED,
         )
 
@@ -856,10 +831,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=500, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=500, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -910,11 +882,8 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(
-                    max_iterations=300, num_particles=25, verbose=False
-                ),
+            optimization_config=ParticleSwarmConfig(
+                max_iterations=300, num_particles=25, verbose=False
             ),
             seed=SEED,
         )
@@ -979,10 +948,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=500, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=500, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1035,10 +1001,7 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=200, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1086,10 +1049,7 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=200, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1137,10 +1097,7 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=200, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1184,10 +1141,7 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="nelder_mead",
-                config=NelderMeadConfig(max_iterations=200, verbose=False),
-            ),
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -1249,11 +1203,8 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(
-                    num_particles=20, max_iterations=200, verbose=False
-                ),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=20, max_iterations=200, verbose=False
             ),
             seed=SEED,
         )
@@ -1329,11 +1280,8 @@ class TestCalibrator:
             parameters=parameters,
             constraints=constraints,
             loss_function="sse",
-            optimization_config=OptimizationConfig(
-                algorithm="particle_swarm",
-                config=ParticleSwarmConfig(
-                    num_particles=20, max_iterations=200, verbose=False
-                ),
+            optimization_config=ParticleSwarmConfig(
+                num_particles=20, max_iterations=200, verbose=False
             ),
             seed=SEED,
         )

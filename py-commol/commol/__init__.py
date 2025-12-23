@@ -5,8 +5,6 @@ from commol import constants
 from commol.api import (
     Calibrator,
     ModelBuilder,
-    ModelLoader,
-    ProbabilisticCalibrator,
     Simulation,
     SimulationPlotter,
 )
@@ -62,7 +60,6 @@ __all__ = [
     "constants",
     "Model",
     "ModelBuilder",
-    "ModelLoader",
     "NelderMeadConfig",
     "ObservedDataPoint",
     "OptimizationConfig",
@@ -71,7 +68,6 @@ __all__ = [
     "ParticleSwarmConfig",
     "PlotConfig",
     "ProbabilisticCalibrationConfig",
-    "ProbabilisticCalibrator",
     "ProbabilisticCalibrationResult",
     "ProbClusteringConfig",
     "ProbEnsembleConfig",

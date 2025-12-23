@@ -77,6 +77,7 @@ class Calibrator:
 
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
+        self._validate_observed_data()
 
     def run(self) -> CalibrationResult:
         """
@@ -97,10 +98,16 @@ class Calibrator:
         RuntimeError
             If optimization fails.
         """
+        # Determine algorithm name from config type
+        algorithm_name = (
+            OPT_ALG_NELDER_MEAD
+            if isinstance(self.problem.optimization_config, NelderMeadConfig)
+            else OPT_ALG_PARTICLE_SWARM
+        )
         logger.info(
             (
                 f"Starting calibration with "
-                f"{self.problem.optimization_config.algorithm} algorithm and "
+                f"{algorithm_name} algorithm and "
                 f"{self.problem.loss_function} loss function."
             )
         )
@@ -167,8 +174,6 @@ class Calibrator:
         # Convert result back to Python CalibrationResult
         result = CalibrationResult(
             best_parameters=rust_result.best_parameters,
-            parameter_names=rust_result.parameter_names,
-            best_parameters_list=rust_result.best_parameters_list,
             final_loss=rust_result.final_loss,
             iterations=rust_result.iterations,
             converged=rust_result.converged,
@@ -304,54 +309,38 @@ class Calibrator:
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
         opt_config = self.problem.optimization_config
 
-        if opt_config.algorithm == OPT_ALG_NELDER_MEAD:
-            if not isinstance(opt_config.config, NelderMeadConfig):
-                raise ValueError(
-                    (
-                        f"Expected NelderMeadConfig for Nelder-Mead algorithm, "
-                        f"got {type(opt_config.config).__name__}"
-                    )
-                )
-
+        if isinstance(opt_config, NelderMeadConfig):
             nm_config = rust_calibration.NelderMeadConfig(
-                max_iterations=opt_config.config.max_iterations,
-                sd_tolerance=opt_config.config.sd_tolerance,
-                simplex_perturbation=opt_config.config.simplex_perturbation,
-                alpha=opt_config.config.alpha,
-                gamma=opt_config.config.gamma,
-                rho=opt_config.config.rho,
-                sigma=opt_config.config.sigma,
-                verbose=opt_config.config.verbose,
-                header_interval=opt_config.config.header_interval,
+                max_iterations=opt_config.max_iterations,
+                sd_tolerance=opt_config.sd_tolerance,
+                simplex_perturbation=opt_config.simplex_perturbation,
+                alpha=opt_config.alpha,
+                gamma=opt_config.gamma,
+                rho=opt_config.rho,
+                sigma=opt_config.sigma,
+                verbose=opt_config.verbose,
+                header_interval=opt_config.header_interval,
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif opt_config.algorithm == OPT_ALG_PARTICLE_SWARM:
-            if not isinstance(opt_config.config, ParticleSwarmConfig):
-                raise ValueError(
-                    (
-                        f"Expected ParticleSwarmConfig for Particle Swarm algorithm, "
-                        f"got {type(opt_config.config).__name__}"
-                    )
-                )
-
+        elif isinstance(opt_config, ParticleSwarmConfig):
             ps_config = rust_calibration.ParticleSwarmConfig(
-                num_particles=opt_config.config.num_particles,
-                max_iterations=opt_config.config.max_iterations,
-                target_cost=opt_config.config.target_cost,
-                inertia_factor=opt_config.config.inertia_factor,
-                cognitive_factor=opt_config.config.cognitive_factor,
-                social_factor=opt_config.config.social_factor,
-                default_acceleration_coefficient=opt_config.config.default_acceleration_coefficient,
+                num_particles=opt_config.num_particles,
+                max_iterations=opt_config.max_iterations,
+                target_cost=opt_config.target_cost,
+                inertia_factor=opt_config.inertia_factor,
+                cognitive_factor=opt_config.cognitive_factor,
+                social_factor=opt_config.social_factor,
+                default_acceleration_coefficient=opt_config.default_acceleration_coefficient,
                 seed=self.problem.seed,  # Use seed from CalibrationProblem
-                verbose=opt_config.config.verbose,
-                header_interval=opt_config.config.header_interval,
+                verbose=opt_config.verbose,
+                header_interval=opt_config.header_interval,
             )
             return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
 
         else:
             raise ValueError(
-                f"Unsupported optimization algorithm: {opt_config.algorithm}"
+                f"Unsupported optimization config type: {type(opt_config).__name__}"
             )
 
     @property
@@ -438,3 +427,58 @@ class Calibrator:
             self.simulation.model_definition.population.initial_conditions
         )
         return initial_conditions.population_size
+
+    def _validate_observed_data(self) -> None:
+        """Validate that observed data compartments exist and have valid steps.
+
+        Raises
+        ------
+        ValueError
+            If observed data contains invalid compartments or negative time steps.
+        """
+        model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
+
+        for obs in self.problem.observed_data:
+            if obs.compartment not in model_bin_ids:
+                raise ValueError(
+                    f"Observed data compartment '{obs.compartment}' not found in "
+                    f"model. Available compartments: {sorted(model_bin_ids)}"
+                )
+
+        if self.problem.observed_data:
+            min_step = min(obs.step for obs in self.problem.observed_data)
+            if min_step < 0:
+                raise ValueError(
+                    f"Observed data contains negative time step: {min_step}. "
+                    "Time steps must be non-negative."
+                )
+
+    def run_probabilistic(self):
+        """Run probabilistic calibration.
+
+        Returns
+        -------
+        ProbabilisticCalibrationResult
+            Object containing the ensemble of parameter sets, statistics,
+            predictions with confidence intervals, and coverage metrics.
+
+        Raises
+        ------
+        ValueError
+            If probabilistic_config is not set in the CalibrationProblem.
+        RuntimeError
+            If calibration or ensemble selection fails.
+        """
+        if self.problem.probabilistic_config is None:
+            raise ValueError(
+                "probabilistic_config must be set in CalibrationProblem to run "
+                "probabilistic calibration. Please set problem.probabilistic_config "
+                "to a ProbabilisticCalibrationConfig instance."
+            )
+
+        # Import ProbabilisticCalibrator implementation
+        from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
+
+        # Create a probabilistic calibrator instance and delegate to it
+        prob_calibrator = ProbabilisticCalibrator(self.simulation, self.problem)
+        return prob_calibrator.run()
