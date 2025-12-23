@@ -6,15 +6,12 @@ import pytest
 
 from commol import (
     CalibrationParameter,
-    CalibrationParameterType,
     CalibrationProblem,
     LossConfig,
-    LossFunction,
     Model,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationAlgorithm,
     OptimizationConfig,
     ParticleSwarmConfig,
     ProbabilisticCalibrator,
@@ -96,13 +93,13 @@ class TestProbabilisticCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=0.5,
             ),
@@ -112,9 +109,9 @@ class TestProbabilisticCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
                     num_particles=60,
                     max_iterations=1000,
@@ -291,13 +288,13 @@ class TestProbabilisticCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=0.5,
             ),
@@ -307,9 +304,9 @@ class TestProbabilisticCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(),
             ),
         )
@@ -488,7 +485,7 @@ class TestProbabilisticCalibratorValidation:
         parameters = [
             CalibrationParameter(
                 id="nonexistent_param",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -497,9 +494,9 @@ class TestProbabilisticCalibratorValidation:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
             ),
         )
@@ -519,7 +516,7 @@ class TestProbabilisticCalibratorValidation:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -528,9 +525,9 @@ class TestProbabilisticCalibratorValidation:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
             ),
         )
@@ -548,9 +545,9 @@ class TestProbabilisticCalibratorValidation:
             CalibrationProblem(
                 observed_data=observed_data,
                 parameters=[],  # Empty parameters
-                loss_config=LossConfig(function=LossFunction.SSE),
+                loss_config=LossConfig(function="sse"),
                 optimization_config=OptimizationConfig(
-                    algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                    algorithm="particle_swarm",
                     config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
                 ),
             )
@@ -562,7 +559,7 @@ class TestProbabilisticCalibratorValidation:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -572,9 +569,9 @@ class TestProbabilisticCalibratorValidation:
             CalibrationProblem(
                 observed_data=[],  # Empty observed data
                 parameters=parameters,
-                loss_config=LossConfig(function=LossFunction.SSE),
+                loss_config=LossConfig(function="sse"),
                 optimization_config=OptimizationConfig(
-                    algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                    algorithm="particle_swarm",
                     config=ParticleSwarmConfig(num_particles=10, max_iterations=10),
                 ),
             )
@@ -625,7 +622,7 @@ class TestProbabilisticCalibratorSelectionMethods:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.1,
                 max_bound=0.5,
             ),
@@ -634,9 +631,9 @@ class TestProbabilisticCalibratorSelectionMethods:
         return CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
                     num_particles=20, max_iterations=50, verbose=False
                 ),

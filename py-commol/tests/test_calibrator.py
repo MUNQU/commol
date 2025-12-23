@@ -5,23 +5,19 @@ import pytest
 from commol import (
     CalibrationConstraint,
     CalibrationParameter,
-    CalibrationParameterType,
     CalibrationProblem,
     Calibrator,
     LossConfig,
-    LossFunction,
     Model,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationAlgorithm,
     OptimizationConfig,
     Parameter,
     ParticleSwarmConfig,
     Simulation,
 )
 from commol.constants import ModelTypes
-
 
 SEED = 42
 
@@ -68,13 +64,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -83,9 +79,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=1000, verbose=False),
             ),
         )
@@ -109,13 +105,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -124,9 +120,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(max_iterations=200, verbose=False),
             ),
             seed=SEED,
@@ -383,13 +379,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -398,9 +394,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=1000, verbose=False),
             ),
         )
@@ -493,7 +489,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="I",
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=0.1,
                 initial_guess=0.01,  # Starting point for optimization
@@ -503,9 +499,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(
                     max_iterations=5000,
                     sd_tolerance=1e-9,  # Stricter convergence criterion
@@ -597,13 +593,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="I",
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=0.1,  # Fraction range
             ),
@@ -632,9 +628,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=pso_config,
             ),
             seed=SEED,
@@ -679,7 +675,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="X",  # Invalid bin ID
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=100.0,
             )
@@ -688,9 +684,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=100),
             ),
         )
@@ -719,13 +715,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -754,9 +750,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=pso_config,
             ),
             seed=SEED,
@@ -784,13 +780,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -809,9 +805,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=pso_config,
             ),
             seed=SEED,
@@ -850,7 +846,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="detection_rate",
-                parameter_type=CalibrationParameterType.SCALE,
+                parameter_type="scale",
                 min_bound=0.1,
                 max_bound=1.0,
                 initial_guess=0.7,
@@ -860,9 +856,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=500, verbose=False),
             ),
         )
@@ -899,13 +895,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="detection_rate",
-                parameter_type=CalibrationParameterType.SCALE,
+                parameter_type="scale",
                 min_bound=0.1,
                 max_bound=1.0,
             ),
@@ -914,9 +910,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
                     max_iterations=300, num_particles=25, verbose=False
                 ),
@@ -968,13 +964,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="i_detection_rate",
-                parameter_type=CalibrationParameterType.SCALE,
+                parameter_type="scale",
                 min_bound=0.1,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="r_detection_rate",
-                parameter_type=CalibrationParameterType.SCALE,
+                parameter_type="scale",
                 min_bound=0.1,
                 max_bound=1.0,
             ),
@@ -983,9 +979,9 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=500, verbose=False),
             ),
         )
@@ -1013,13 +1009,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=0.5,
             ),
@@ -1039,9 +1035,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
             ),
         )
@@ -1065,13 +1061,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -1090,9 +1086,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
             ),
         )
@@ -1116,13 +1112,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -1141,9 +1137,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
             ),
         )
@@ -1168,7 +1164,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -1188,9 +1184,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
+                algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
             ),
         )
@@ -1227,13 +1223,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=0.5,
             ),
@@ -1253,9 +1249,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
                     num_particles=20, max_iterations=200, verbose=False
                 ),
@@ -1298,13 +1294,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=0.5,
             ),
@@ -1333,9 +1329,9 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function=LossFunction.SSE),
+            loss_config=LossConfig(function="sse"),
             optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+                algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
                     num_particles=20, max_iterations=200, verbose=False
                 ),

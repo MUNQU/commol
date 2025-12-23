@@ -27,12 +27,9 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
-    LossFunction,
     OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
     NelderMeadConfig,
 )
@@ -92,14 +89,14 @@ except ValueError as e:
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3  # Starting point for optimization
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
@@ -117,9 +114,9 @@ pso_config = ParticleSwarmConfig.create(
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
+    loss_config=LossConfig(function="sse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=pso_config,
     ),
 )
@@ -182,7 +179,7 @@ model = (
 parameters = [
     CalibrationParameter(
         id="I",
-        parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+        parameter_type="initial_condition",
         min_bound=0.0,
         max_bound=0.1,
         initial_guess=0.02  # Starting point for optimization
@@ -192,9 +189,9 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
+    loss_config=LossConfig(function="sse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.NELDER_MEAD,
+        algorithm="nelder_mead",
         config=NelderMeadConfig(max_iterations=1000),
     ),
 )
@@ -221,7 +218,7 @@ Commol supports multiple loss functions for measuring fit quality:
 Default loss function. Minimizes the sum of squared differences:
 
 ```python
-loss_config = LossConfig(function=LossFunction.SSE)
+loss_config = LossConfig(function="sse")
 ```
 
 $$\text{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2$$
@@ -231,7 +228,7 @@ $$\text{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2$$
 Provides error in the same units as the data:
 
 ```python
-loss_config = LossConfig(function=LossFunction.RMSE)
+loss_config = LossConfig(function="rmse")
 ```
 
 $$\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$
@@ -241,7 +238,7 @@ $$\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$
 Less sensitive to outliers:
 
 ```python
-loss_config = LossConfig(function=LossFunction.MAE)
+loss_config = LossConfig(function="mae")
 ```
 
 $$\text{MAE} = \frac{1}{n}\sum_{i=1}^{n} |y_i - \hat{y}_i|$$
@@ -258,7 +255,7 @@ observed_data = [
     ObservedDataPoint(step=20, compartment="I", value=78.5, weight=1.0),
 ]
 
-loss_config = LossConfig(function=LossFunction.WEIGHTED_SSE)
+loss_config = LossConfig(function="weighted_sse")
 ```
 
 $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
@@ -274,7 +271,7 @@ Population-based algorithm inspired by social behavior. Good for global optimiza
 Use the `create()` factory method and builder methods for clear configuration:
 
 ```python
-from commol import ParticleSwarmConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import ParticleSwarmConfig, OptimizationConfig
 
 # Basic PSO configuration
 pso_config = ParticleSwarmConfig.create(
@@ -286,7 +283,7 @@ pso_config = ParticleSwarmConfig.create(
 )
 
 optimization_config = OptimizationConfig(
-    algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+    algorithm="particle_swarm",
     config=pso_config,
 )
 ```
@@ -340,10 +337,10 @@ pso_config = (
 Derivative-free simplex algorithm. Fast convergence for smooth problems:
 
 ```python
-from commol import NelderMeadConfig, OptimizationConfig, OptimizationAlgorithm
+from commol import NelderMeadConfig, OptimizationConfig
 
 optimization_config = OptimizationConfig(
-    algorithm=OptimizationAlgorithm.NELDER_MEAD,
+    algorithm="nelder_mead",
     config=NelderMeadConfig(
         max_iterations=1000,     # Maximum iterations
         sd_tolerance=1e-6,       # Convergence tolerance
@@ -420,22 +417,22 @@ problem = CalibrationProblem(
     parameters=[
         CalibrationParameter(
             id="beta",
-            parameter_type=CalibrationParameterType.PARAMETER,
+            parameter_type="parameter",
             min_bound=0.0,
             max_bound=1.0,
             initial_guess=0.3
         ),
         CalibrationParameter(
             id="gamma",
-            parameter_type=CalibrationParameterType.PARAMETER,
+            parameter_type="parameter",
             min_bound=0.0,
             max_bound=1.0,
             initial_guess=0.1
         ),
     ],
-    loss_config=LossConfig(function=LossFunction.RMSE),
+    loss_config=LossConfig(function="rmse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
     ),
 )
@@ -517,21 +514,21 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
         id="gamma_young",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.2,
         initial_guess=0.12
     ),
     CalibrationParameter(
         id="gamma_old",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.2,
         initial_guess=0.08
@@ -541,9 +538,9 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
+    loss_config=LossConfig(function="sse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
     ),
 )
@@ -617,19 +614,19 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.1,
         max_bound=1.0
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.5
     ),
     CalibrationParameter(
         id="reporting_rate",
-        parameter_type=CalibrationParameterType.SCALE,
+        parameter_type="scale",
         min_bound=0.01,
         max_bound=1.0
     ),
@@ -638,9 +635,9 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.MAE),
+    loss_config=LossConfig(function="mae"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(num_particles=40, max_iterations=500),
     ),
 )
@@ -655,9 +652,9 @@ scale_values = {}
 for param in problem.parameters:
     value = result.best_parameters[param.id]
 
-    if param.parameter_type == CalibrationParameterType.PARAMETER:
+    if param.parameter_type == "parameter":
         parameters[param.id] = value
-    elif param.parameter_type == CalibrationParameterType.SCALE:
+    elif param.parameter_type == "scale":
         scale_values[param.id] = value
 
 print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
@@ -690,13 +687,13 @@ observed_data = [
 parameters = [
     CalibrationParameter(
         id="case_detection",
-        parameter_type=CalibrationParameterType.SCALE,
+        parameter_type="scale",
         min_bound=0.05,
         max_bound=0.5
     ),
     CalibrationParameter(
         id="recovery_detection",
-        parameter_type=CalibrationParameterType.SCALE,
+        parameter_type="scale",
         min_bound=0.7,
         max_bound=1.0
     ),
@@ -759,7 +756,7 @@ Initial guesses can speed up convergence:
 # Without initial guess - optimizer uses midpoint
 CalibrationParameter(
     id="beta",
-    parameter_type=CalibrationParameterType.PARAMETER,
+    parameter_type="parameter",
     min_bound=0.1,
     max_bound=0.8
 )
@@ -767,7 +764,7 @@ CalibrationParameter(
 # Provide informed starting point (recommended)
 CalibrationParameter(
     id="beta",
-    parameter_type=CalibrationParameterType.PARAMETER,
+    parameter_type="parameter",
     min_bound=0.1,
     max_bound=0.8,
     initial_guess=0.4  # Based on literature
@@ -880,13 +877,13 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=0.5,
     ),
@@ -906,9 +903,9 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     constraints=constraints,  # Add constraints here
-    loss_config=LossConfig(function=LossFunction.SSE),
+    loss_config=LossConfig(function="sse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(num_particles=30, max_iterations=500),
     ),
 )

@@ -205,7 +205,7 @@ pub struct PyLossConfig {
 impl PyLossConfig {
     /// Sum of squared errors
     #[staticmethod]
-    fn sum_squared_error() -> Self {
+    fn sse() -> Self {
         Self {
             inner: commol_calibration::LossConfig::SumSquaredError,
         }
@@ -213,7 +213,7 @@ impl PyLossConfig {
 
     /// Root mean squared error
     #[staticmethod]
-    fn root_mean_squared_error() -> Self {
+    fn rmse() -> Self {
         Self {
             inner: commol_calibration::LossConfig::RootMeanSquaredError,
         }
@@ -221,7 +221,7 @@ impl PyLossConfig {
 
     /// Mean absolute error
     #[staticmethod]
-    fn mean_absolute_error() -> Self {
+    fn mae() -> Self {
         Self {
             inner: commol_calibration::LossConfig::MeanAbsoluteError,
         }

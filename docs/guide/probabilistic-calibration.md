@@ -72,12 +72,9 @@ from commol import (
     ProbabilisticCalibrationConfig,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
     LossConfig,
-    LossFunction,
     OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
 from commol.constants import ModelTypes
@@ -129,14 +126,14 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
@@ -147,9 +144,9 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
+    loss_config=LossConfig(function="sse"),
     optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
+        algorithm="particle_swarm",
         config=ParticleSwarmConfig(
             num_particles=30,
             max_iterations=500,

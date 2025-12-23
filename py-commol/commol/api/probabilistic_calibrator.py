@@ -21,6 +21,11 @@ from commol.api.probabilistic.calibration_runner import CalibrationRunner
 from commol.api.probabilistic.ensemble_selector import EnsembleSelector
 from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
+from commol.context.constants import (
+    PARAM_TYPE_INITIAL_CONDITION,
+    PARAM_TYPE_PARAMETER,
+    PARAM_TYPE_SCALE,
+)
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
     ParetoSolution,
@@ -131,20 +136,18 @@ class ProbabilisticCalibrator:
         self, model_param_ids: set[str], model_bin_ids: set[str]
     ) -> None:
         """Validate that calibration parameters exist in the model."""
-        from commol.context.calibration import CalibrationParameterType
-
         for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.SCALE:
+            if param.parameter_type == PARAM_TYPE_SCALE:
                 continue
 
-            if param.parameter_type == CalibrationParameterType.PARAMETER:
+            if param.parameter_type == PARAM_TYPE_PARAMETER:
                 if param.id not in model_param_ids:
                     raise ValueError(
                         f"Calibration parameter '{param.id}' not found in model. "
                         f"Available parameters: {sorted(model_param_ids)}"
                     )
 
-            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
+            if param.parameter_type == PARAM_TYPE_INITIAL_CONDITION:
                 if param.id not in model_bin_ids:
                     raise ValueError(
                         f"Initial condition parameter '{param.id}' not found in model "

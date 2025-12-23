@@ -21,13 +21,21 @@ except ImportError as e:
 
 from commol.api.simulation import Simulation
 from commol.context.calibration import (
-    CalibrationParameterType,
     CalibrationProblem,
     CalibrationResult,
-    LossFunction,
     NelderMeadConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
+)
+from commol.context.constants import (
+    LOSS_MAE,
+    LOSS_RMSE,
+    LOSS_SSE,
+    LOSS_WEIGHTED_SSE,
+    OPT_ALG_NELDER_MEAD,
+    OPT_ALG_PARTICLE_SWARM,
+    PARAM_TYPE_INITIAL_CONDITION,
+    PARAM_TYPE_PARAMETER,
+    PARAM_TYPE_SCALE,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,8 +100,8 @@ class Calibrator:
         logger.info(
             (
                 f"Starting calibration with "
-                f"{self.problem.optimization_config.algorithm.value} algorithm and "
-                f"{self.problem.loss_config.function.value} loss function."
+                f"{self.problem.optimization_config.algorithm} algorithm and "
+                f"{self.problem.loss_config.function} loss function."
             )
         )
 
@@ -265,14 +273,14 @@ class Calibrator:
         return rust_result
 
     def _to_rust_parameter_type(
-        self, param_type: CalibrationParameterType
+        self, param_type: str
     ) -> "CalibrationParameterTypeProtocol":
         """Convert Python CalibrationParameterType to Rust type."""
-        if param_type == CalibrationParameterType.PARAMETER:
+        if param_type == PARAM_TYPE_PARAMETER:
             return rust_calibration.CalibrationParameterType.Parameter
-        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
+        elif param_type == PARAM_TYPE_INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
+        elif param_type == PARAM_TYPE_SCALE:
             return rust_calibration.CalibrationParameterType.Scale
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
@@ -281,13 +289,13 @@ class Calibrator:
         """Convert Python LossConfig to Rust LossConfig."""
         loss_func = self.problem.loss_config.function
 
-        if loss_func == LossFunction.SSE:
-            return rust_calibration.LossConfig.sum_squared_error()
-        elif loss_func == LossFunction.RMSE:
-            return rust_calibration.LossConfig.root_mean_squared_error()
-        elif loss_func == LossFunction.MAE:
-            return rust_calibration.LossConfig.mean_absolute_error()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
+        if loss_func == LOSS_SSE:
+            return rust_calibration.LossConfig.sse()
+        elif loss_func == LOSS_RMSE:
+            return rust_calibration.LossConfig.rmse()
+        elif loss_func == LOSS_MAE:
+            return rust_calibration.LossConfig.mae()
+        elif loss_func == LOSS_WEIGHTED_SSE:
             return rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
@@ -296,7 +304,7 @@ class Calibrator:
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
         opt_config = self.problem.optimization_config
 
-        if opt_config.algorithm == OptimizationAlgorithm.NELDER_MEAD:
+        if opt_config.algorithm == OPT_ALG_NELDER_MEAD:
             if not isinstance(opt_config.config, NelderMeadConfig):
                 raise ValueError(
                     (
@@ -318,7 +326,7 @@ class Calibrator:
             )
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif opt_config.algorithm == OptimizationAlgorithm.PARTICLE_SWARM:
+        elif opt_config.algorithm == OPT_ALG_PARTICLE_SWARM:
             if not isinstance(opt_config.config, ParticleSwarmConfig):
                 raise ValueError(
                     (
@@ -375,20 +383,20 @@ class Calibrator:
         model_bin_ids = {b.id for b in model.population.bins}
 
         for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.PARAMETER:
+            if param.parameter_type == PARAM_TYPE_PARAMETER:
                 if param.id not in model_param_ids:
                     raise ValueError(
                         f"Calibration parameter '{param.id}' not found in model "
                         f"parameters. Available parameters: "
                         f"{sorted(model_param_ids)}"
                     )
-            elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
+            elif param.parameter_type == PARAM_TYPE_INITIAL_CONDITION:
                 if param.id not in model_bin_ids:
                     raise ValueError(
                         f"Calibration initial condition '{param.id}' not found in "
                         f"model bins. Available bins: {sorted(model_bin_ids)}"
                     )
-            elif param.parameter_type == CalibrationParameterType.SCALE:
+            elif param.parameter_type == PARAM_TYPE_SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
                         f"Scale parameter '{param.id}' must have positive bounds "

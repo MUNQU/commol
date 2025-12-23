@@ -2,6 +2,17 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import commol_rs
+from commol.context.constants import (
+    LOSS_MAE,
+    LOSS_RMSE,
+    LOSS_SSE,
+    LOSS_WEIGHTED_SSE,
+    OPT_ALG_NELDER_MEAD,
+    OPT_ALG_PARTICLE_SWARM,
+    PARAM_TYPE_INITIAL_CONDITION,
+    PARAM_TYPE_PARAMETER,
+    PARAM_TYPE_SCALE,
+)
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
@@ -11,7 +22,7 @@ if TYPE_CHECKING:
         LossConfigProtocol,
         OptimizationConfigProtocol,
     )
-    from commol.context.calibration import CalibrationParameterType, CalibrationProblem
+    from commol.context.calibration import CalibrationProblem
 
 
 logger = logging.getLogger(__name__)
@@ -131,31 +142,29 @@ class CalibrationRunner:
             raise RuntimeError(f"Parallel calibrations failed: {e}") from e
 
     def _to_rust_parameter_type(
-        self, param_type: "CalibrationParameterType"
+        self, param_type: str
     ) -> "CalibrationParameterTypeProtocol":
         """Convert Python CalibrationParameterType to Rust type."""
-        from commol.context.calibration import CalibrationParameterType
-
-        if param_type == CalibrationParameterType.PARAMETER:
+        if param_type == PARAM_TYPE_PARAMETER:
             return commol_rs.calibration.CalibrationParameterType.Parameter
-        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
+        elif param_type == PARAM_TYPE_INITIAL_CONDITION:
             return commol_rs.calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
+        elif param_type == PARAM_TYPE_SCALE:
             return commol_rs.calibration.CalibrationParameterType.Scale
+        else:
+            raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
         """Convert Python LossConfig to Rust LossConfig."""
-        from commol.context.calibration import LossFunction
-
         loss_func = self.problem.loss_config.function
 
-        if loss_func == LossFunction.SSE:
-            return commol_rs.calibration.LossConfig.sum_squared_error()
-        elif loss_func == LossFunction.RMSE:
-            return commol_rs.calibration.LossConfig.root_mean_squared_error()
-        elif loss_func == LossFunction.MAE:
-            return commol_rs.calibration.LossConfig.mean_absolute_error()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
+        if loss_func == LOSS_SSE:
+            return commol_rs.calibration.LossConfig.sse()
+        elif loss_func == LOSS_RMSE:
+            return commol_rs.calibration.LossConfig.rmse()
+        elif loss_func == LOSS_MAE:
+            return commol_rs.calibration.LossConfig.mae()
+        elif loss_func == LOSS_WEIGHTED_SSE:
             return commol_rs.calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}")
@@ -164,13 +173,12 @@ class CalibrationRunner:
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
         from commol.context.calibration import (
             NelderMeadConfig,
-            OptimizationAlgorithm,
             ParticleSwarmConfig,
         )
 
         opt_config = self.problem.optimization_config
 
-        if opt_config.algorithm == OptimizationAlgorithm.NELDER_MEAD:
+        if opt_config.algorithm == OPT_ALG_NELDER_MEAD:
             if not isinstance(opt_config.config, NelderMeadConfig):
                 raise ValueError(
                     f"Expected NelderMeadConfig for Nelder-Mead algorithm, "
@@ -189,7 +197,7 @@ class CalibrationRunner:
             )
             return commol_rs.calibration.OptimizationConfig.nelder_mead(nm_config)
 
-        elif opt_config.algorithm == OptimizationAlgorithm.PARTICLE_SWARM:
+        elif opt_config.algorithm == OPT_ALG_PARTICLE_SWARM:
             if not isinstance(opt_config.config, ParticleSwarmConfig):
                 raise ValueError(
                     f"Expected ParticleSwarmConfig for Particle Swarm algorithm, "

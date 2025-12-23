@@ -1,67 +1,17 @@
-from enum import Enum
 from typing import Self, override
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from commol.context.constants import (
+    LOSS_SSE,
+    OPT_ALG_NELDER_MEAD,
+    OPT_ALG_PARTICLE_SWARM,
+    CalibrationParameterType,
+    LossFunction,
+    OptimizationAlgorithm,
+)
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
 from commol.utils.security import validate_expression_security
-
-
-class CalibrationParameterType(str, Enum):
-    """
-    Type of value being calibrated.
-
-    Attributes
-    ----------
-    PARAMETER : str
-        Model parameter
-    INITIAL_CONDITION : str
-        Initial population in a compartment
-    SCALE : str
-        Scaling factor for observed data
-    """
-
-    PARAMETER = "parameter"
-    INITIAL_CONDITION = "initial_condition"
-    SCALE = "scale"
-
-
-class LossFunction(str, Enum):
-    """
-    Available loss functions for calibration.
-
-    Attributes
-    ----------
-    SSE : str
-        Sum of Squared Errors
-    RMSE : str
-        Root Mean Squared Error
-    MAE : str
-        Mean Absolute Error
-    WEIGHTED_SSE : str
-        Weighted Sum of Squared Errors
-    """
-
-    SSE = "sum_squared_error"
-    RMSE = "root_mean_squared_error"
-    MAE = "mean_absolute_error"
-    WEIGHTED_SSE = "weighted_sse"
-
-
-class OptimizationAlgorithm(str, Enum):
-    """
-    Available optimization algorithms.
-
-    Attributes
-    ----------
-    NELDER_MEAD : str
-        Nelder-Mead simplex algorithm
-    PARTICLE_SWARM : str
-        Particle Swarm Optimization
-    """
-
-    NELDER_MEAD = "nelder_mead"
-    PARTICLE_SWARM = "particle_swarm"
 
 
 class ObservedDataPoint(BaseModel):
@@ -627,7 +577,8 @@ class LossConfig(BaseModel):
     """
 
     function: LossFunction = Field(
-        default=LossFunction.SSE, description="Loss function for measuring fit quality"
+        default=LOSS_SSE,
+        description="Loss function for measuring fit quality",
     )
 
 
@@ -653,20 +604,20 @@ class OptimizationConfig(BaseModel):
     @model_validator(mode="after")
     def validate_algorithm_config(self) -> Self:
         """Ensure the config type matches the selected algorithm."""
-        if self.algorithm == "nelder_mead":
+        if self.algorithm == OPT_ALG_NELDER_MEAD:
             if not isinstance(self.config, NelderMeadConfig):
                 raise ValueError(
                     (
-                        f"Algorithm 'nelder_mead' requires NelderMeadConfig, "
+                        f"Algorithm '{OPT_ALG_NELDER_MEAD}' requires NelderMeadConfig, "
                         f"but got {type(self.config).__name__}"
                     )
                 )
-        elif self.algorithm == "particle_swarm":
+        elif self.algorithm == OPT_ALG_PARTICLE_SWARM:
             if not isinstance(self.config, ParticleSwarmConfig):
                 raise ValueError(
                     (
-                        f"Algorithm 'particle_swarm' requires ParticleSwarmConfig, "
-                        f"but got {type(self.config).__name__}"
+                        f"Algorithm '{OPT_ALG_PARTICLE_SWARM}' requires "
+                        f"ParticleSwarmConfig, but got {type(self.config).__name__}"
                     )
                 )
 
@@ -776,7 +727,7 @@ class CalibrationProblem(BaseModel):
         description="Constraints on calibration parameters",
     )
     loss_config: LossConfig = Field(
-        default_factory=lambda: LossConfig(function=LossFunction.SSE),
+        default_factory=lambda: LossConfig(function=LOSS_SSE),
         description="Loss function configuration",
     )
     optimization_config: OptimizationConfig = Field(
