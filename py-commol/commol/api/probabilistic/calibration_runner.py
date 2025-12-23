@@ -155,8 +155,8 @@ class CalibrationRunner:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
-        """Convert Python LossConfig to Rust LossConfig."""
-        loss_func = self.problem.loss_config.function
+        """Convert Python loss function to Rust LossConfig."""
+        loss_func = self.problem.loss_function
 
         if loss_func == LOSS_SSE:
             return commol_rs.calibration.LossConfig.sse()

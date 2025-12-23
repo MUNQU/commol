@@ -7,7 +7,6 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    LossConfig,
     Model,
     ModelBuilder,
     NelderMeadConfig,
@@ -79,7 +78,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=1000, verbose=False),
@@ -120,7 +119,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=ParticleSwarmConfig(max_iterations=200, verbose=False),
@@ -394,7 +393,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=1000, verbose=False),
@@ -499,7 +498,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(
@@ -628,7 +627,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=pso_config,
@@ -684,7 +683,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=100),
@@ -750,7 +749,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=pso_config,
@@ -805,7 +804,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=pso_config,
@@ -856,7 +855,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=500, verbose=False),
@@ -910,7 +909,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
@@ -979,7 +978,7 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=500, verbose=False),
@@ -1035,7 +1034,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
@@ -1086,7 +1085,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
@@ -1137,7 +1136,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
@@ -1184,7 +1183,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="nelder_mead",
                 config=NelderMeadConfig(max_iterations=200, verbose=False),
@@ -1249,7 +1248,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=ParticleSwarmConfig(
@@ -1329,7 +1328,7 @@ class TestCalibrator:
             observed_data=observed_data,
             parameters=parameters,
             constraints=constraints,
-            loss_config=LossConfig(function="sse"),
+            loss_function="sse",
             optimization_config=OptimizationConfig(
                 algorithm="particle_swarm",
                 config=ParticleSwarmConfig(

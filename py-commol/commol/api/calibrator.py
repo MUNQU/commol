@@ -101,7 +101,7 @@ class Calibrator:
             (
                 f"Starting calibration with "
                 f"{self.problem.optimization_config.algorithm} algorithm and "
-                f"{self.problem.loss_config.function} loss function."
+                f"{self.problem.loss_function} loss function."
             )
         )
 
@@ -286,8 +286,8 @@ class Calibrator:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
-        """Convert Python LossConfig to Rust LossConfig."""
-        loss_func = self.problem.loss_config.function
+        """Convert Python loss function to Rust LossConfig."""
+        loss_func = self.problem.loss_function
 
         if loss_func == LOSS_SSE:
             return rust_calibration.LossConfig.sse()

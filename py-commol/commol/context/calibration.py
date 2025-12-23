@@ -566,22 +566,6 @@ class ParticleSwarmConfig(BaseModel):
         return self
 
 
-class LossConfig(BaseModel):
-    """
-    Configuration for the loss function used in calibration.
-
-    Attributes
-    ----------
-    function : LossFunction
-        The loss function to use for measuring fit quality
-    """
-
-    function: LossFunction = Field(
-        default=LOSS_SSE,
-        description="Loss function for measuring fit quality",
-    )
-
-
 class OptimizationConfig(BaseModel):
     """
     Configuration for the optimization algorithm.
@@ -697,8 +681,8 @@ class CalibrationProblem(BaseModel):
         List of parameters to calibrate with their bounds
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
-    loss_config : LossConfig
-        Configuration for the loss function
+    loss_function : LossFunction
+        Loss function to use for measuring fit quality (default: "sse")
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     probabilistic_config : ProbabilisticCalibrationConfig | None
@@ -726,9 +710,9 @@ class CalibrationProblem(BaseModel):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_config: LossConfig = Field(
-        default_factory=lambda: LossConfig(function=LOSS_SSE),
-        description="Loss function configuration",
+    loss_function: LossFunction = Field(
+        default=LOSS_SSE,
+        description="Loss function to use for measuring fit quality",
     )
     optimization_config: OptimizationConfig = Field(
         default=..., description="Optimization algorithm configuration"

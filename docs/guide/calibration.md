@@ -114,7 +114,7 @@ pso_config = ParticleSwarmConfig.create(
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function="sse"),
+    loss_function="sse",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=pso_config,
@@ -189,7 +189,7 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function="sse"),
+    loss_function="sse",
     optimization_config=OptimizationConfig(
         algorithm="nelder_mead",
         config=NelderMeadConfig(max_iterations=1000),
@@ -218,7 +218,7 @@ Commol supports multiple loss functions for measuring fit quality:
 Default loss function. Minimizes the sum of squared differences:
 
 ```python
-loss_config = LossConfig(function="sse")
+loss_function = "sse"
 ```
 
 $$\text{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2$$
@@ -228,7 +228,7 @@ $$\text{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2$$
 Provides error in the same units as the data:
 
 ```python
-loss_config = LossConfig(function="rmse")
+loss_function = "rmse"
 ```
 
 $$\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$
@@ -238,7 +238,7 @@ $$\text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$
 Less sensitive to outliers:
 
 ```python
-loss_config = LossConfig(function="mae")
+loss_function = "mae"
 ```
 
 $$\text{MAE} = \frac{1}{n}\sum_{i=1}^{n} |y_i - \hat{y}_i|$$
@@ -255,7 +255,7 @@ observed_data = [
     ObservedDataPoint(step=20, compartment="I", value=78.5, weight=1.0),
 ]
 
-loss_config = LossConfig(function="weighted_sse")
+loss_function = "weighted_sse"
 ```
 
 $$\text{WSSE} = \sum_{i=1}^{n} w_i (y_i - \hat{y}_i)^2$$
@@ -430,7 +430,7 @@ problem = CalibrationProblem(
             initial_guess=0.1
         ),
     ],
-    loss_config=LossConfig(function="rmse"),
+    loss_function="rmse",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
@@ -538,7 +538,7 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function="sse"),
+    loss_function="sse",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(max_iterations=500, verbose=False),
@@ -635,7 +635,7 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function="mae"),
+    loss_function="mae",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(num_particles=40, max_iterations=500),
@@ -903,7 +903,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     constraints=constraints,  # Add constraints here
-    loss_config=LossConfig(function="sse"),
+    loss_function="sse",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=ParticleSwarmConfig.create(num_particles=30, max_iterations=500),

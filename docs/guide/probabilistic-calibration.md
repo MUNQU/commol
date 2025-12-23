@@ -144,7 +144,7 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function="sse"),
+    loss_function="sse",
     optimization_config=OptimizationConfig(
         algorithm="particle_swarm",
         config=ParticleSwarmConfig(
