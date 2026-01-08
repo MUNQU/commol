@@ -442,9 +442,11 @@ impl PyParticleSwarmConfig {
     ///     acceleration: Optional acceleration strategy (PSOAccelerationConstant or PSOAccelerationTimeVarying)
     ///     mutation: Optional mutation configuration (PSOMutation)
     ///     velocity: Optional velocity configuration (PSOVelocity)
+    ///     initialization: Initialization strategy (default: "uniform")
     ///     seed: Random seed for reproducibility (default: None, uses system entropy)
     #[new]
     #[pyo3(signature = (num_particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         num_particles: usize,
         max_iterations: u64,
