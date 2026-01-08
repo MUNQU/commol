@@ -87,7 +87,6 @@ Complete API documentation for all public interfaces:
 - [Model Builder](api/model-builder.md) - ModelBuilder class documentation
 - [Simulation](api/simulation.md) - Simulation runner
 - [Calibrator](api/calibrator.md) - Parameter calibration and optimization
-- [Constants](api/constants.md) - Model types and enumerations
 
 ### Development
 
