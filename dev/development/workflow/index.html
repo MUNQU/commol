@@ -2255,7 +2255,7 @@
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nb">cd</span><span class="w"> </span>py-commol
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--fix<span class="w">         </span><span class="c1"># Auto-fix Python linting issues</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>.<span class="w">              </span><span class="c1"># Format Python code</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>poetry<span class="w"> </span>run<span class="w"> </span>mypy<span class="w"> </span>epimodel<span class="w">              </span><span class="c1"># Type checking</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>poetry<span class="w"> </span>run<span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>commol<span class="w">            </span><span class="c1"># Type checking</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nb">cd</span><span class="w"> </span>..
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w">                       </span><span class="c1"># Format Rust code</span>
@@ -2335,7 +2335,7 @@
 <p>The project uses three main CI/CD pipelines:</p>
 <h3 id="1-code-quality-on-every-pushpr">1. Code Quality (on every push/PR)<a class="headerlink" href="#1-code-quality-on-every-pushpr" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Python: Ruff (linting/formatting), MyPy (type checking), Pytest (testing)</li>
+<li>Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing)</li>
 <li>Rust: rustfmt (formatting), Clippy (linting), cargo test</li>
 <li>Runs on: Ubuntu</li>
 <li>Purpose: Ensure code quality standards</li>
@@ -2358,7 +2358,7 @@
 <h2 id="local-development-tips">Local Development Tips<a class="headerlink" href="#local-development-tips" title="Permanent link">&para;</a></h2>
 <h3 id="quick-commands">Quick Commands<a class="headerlink" href="#quick-commands" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Run all quality checks (Python)</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>mypy<span class="w"> </span>epimodel<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>pytest
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>commol<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>poetry<span class="w"> </span>run<span class="w"> </span>pytest
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Run all quality checks (Rust)</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>clippy<span class="w"> </span>--all-targets<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--workspace
@@ -2376,7 +2376,7 @@
 <p>This runs:</p>
 <ul>
 <li>Ruff linting and formatting</li>
-<li>MyPy type checking</li>
+<li>Ty type checking</li>
 <li>Trailing whitespace removal</li>
 <li>End-of-file fixing</li>
 <li>Poetry lock file validation</li>
