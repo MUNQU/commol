@@ -1686,7 +1686,8 @@ class Model(BaseModel):
             annotated_rate = rate
             # Sort by length descending to avoid partial replacements
             # (e.g., replace "beta_young" before "beta")
-            for var in sorted(variables, key=len, reverse=True):
+            sorted_vars = sorted(variables, key=lambda x: len(x), reverse=True)
+            for var in sorted_vars:
                 if var in variable_units:
                     unit = variable_units[var]
                     # Replace the variable with annotated version

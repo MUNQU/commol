@@ -65,9 +65,7 @@ def check_equation_units(
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
 
 
-def parse_equation_unit(
-    equation: str, variable_units: dict[str, str]
-) -> pint.Quantity[float]:
+def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
     """
     Parse an equation and compute its resulting unit.
 
