@@ -1492,34 +1492,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/constants/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Constants
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -2385,7 +2357,7 @@
 
 
 <h1 id="mathematical-expressions">Mathematical Expressions<a class="headerlink" href="#mathematical-expressions" title="Permanent link">&para;</a></h1>
-<p>EpiModel supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.</p>
+<p>Commol supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.</p>
 <h2 id="basic-syntax">Basic Syntax<a class="headerlink" href="#basic-syntax" title="Permanent link">&para;</a></h2>
 <p>Transition rates are specified as <strong>string expressions</strong> that are evaluated during simulation:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
@@ -2878,7 +2850,7 @@
 </span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="security-features">Security Features<a class="headerlink" href="#security-features" title="Permanent link">&para;</a></h2>
-<p>EpiModel validates all expressions for security:</p>
+<p>Commol validates all expressions for security:</p>
 <h3 id="safe-operations">Safe Operations<a class="headerlink" href="#safe-operations" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;beta * S * I / N&quot;</span>                    <span class="c1"># Mathematical operations</span>
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">rate</span> <span class="o">=</span> <span class="s2">&quot;sin(2 * pi * t)&quot;</span>                     <span class="c1"># Mathematical functions</span>

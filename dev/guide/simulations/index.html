@@ -1293,34 +1293,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/constants/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Constants
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1998,7 +1970,7 @@
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="output-formats">Output Formats<a class="headerlink" href="#output-formats" title="Permanent link">&para;</a></h2>
-<p>EpiModel supports two output formats for simulation results.</p>
+<p>Commol supports two output formats for simulation results.</p>
 <h3 id="dictionary-of-lists-default">Dictionary of Lists (Default)<a class="headerlink" href="#dictionary-of-lists-default" title="Permanent link">&para;</a></h3>
 <p>Each disease state maps to a list of values over time:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;dict_of_lists&quot;</span><span class="p">)</span>
@@ -2034,7 +2006,7 @@
 <h2 id="working-with-stratifications">Working with Stratifications<a class="headerlink" href="#working-with-stratifications" title="Permanent link">&para;</a></h2>
 <p>Stratifications create multiple compartments by combining disease states with stratification categories. Understanding how to access and analyze stratified results is crucial for complex models.</p>
 <h3 id="understanding-stratified-compartment-names">Understanding Stratified Compartment Names<a class="headerlink" href="#understanding-stratified-compartment-names" title="Permanent link">&para;</a></h3>
-<p>When you add stratifications, EpiModel creates compartments by combining disease state IDs with stratification category names using underscore notation:</p>
+<p>When you add stratifications, Commol creates compartments by combining disease state IDs with stratification category names using underscore notation:</p>
 <p><strong>Pattern</strong>: <code>{disease_state}_{category1}_{category2}_...</code></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Model with one stratification (age)</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;S&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Susceptible&quot;</span><span class="p">)</span>
