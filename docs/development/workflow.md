@@ -2,7 +2,7 @@
 
 ## Development Setup
 
-EpiModel is built with Rust and Python. To set up your development environment:
+Commol is built with Rust and Python. To set up your development environment:
 
 ### 1. Install Prerequisites
 
@@ -21,7 +21,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 ```bash
 git clone https://github.com/MUNQU/commol.git
-cd epimodel
+cd commol
 
 # Install Python dependencies
 cd py-commol
@@ -292,7 +292,7 @@ Visit http://127.0.0.1:8000 to view the documentation locally.
 
 ### Documentation Versioning
 
-EpiModel maintains two documentation versions:
+Commol maintains two documentation versions:
 
 - **`latest`**: Documentation for the current stable release from the `main` branch
 - **`dev`**: Development documentation from the `develop` branch

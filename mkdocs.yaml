@@ -89,7 +89,6 @@ nav:
       - Simulation: api/simulation.md
       - Calibrator: api/calibrator.md
       - Probabilistic Calibrator: api/probabilistic-calibrator.md
-      - Constants: api/constants.md
   - Advanced:
       - Model Structure: advanced/model-structure.md
   - Development:

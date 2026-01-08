@@ -1,7 +1,6 @@
 import logging
 from typing import TextIO
 
-from commol import constants
 from commol.api import (
     Calibrator,
     ModelBuilder,
@@ -57,7 +56,6 @@ __all__ = [
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
-    "constants",
     "Model",
     "ModelBuilder",
     "NelderMeadConfig",

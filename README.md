@@ -31,7 +31,6 @@ maturin develop --release
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
 
 # Build a simple SIR model
 model = (
@@ -41,7 +40,6 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
-    .add_parameter(id="N", value=1000.0)
     .add_transition(
         id="infection",
         source=["S"],
@@ -62,7 +60,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run simulation
@@ -128,7 +126,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 ```
 
@@ -192,7 +190,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Validate dimensional consistency
@@ -221,7 +219,6 @@ from commol import (
     ObservedDataPoint,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes, CalibrationParameterType, LossFunction
 
 # Build model with unknown parameters
 model = (
@@ -251,7 +248,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Define observed data from real outbreak
@@ -268,14 +265,14 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3  # Starting point
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
     ),
@@ -292,7 +289,7 @@ pso_config = ParticleSwarmConfig(
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_function=LossFunction.SSE,
+    loss_function="sse",
     optimization_config=pso_config,  # ParticleSwarmConfig or NelderMeadConfig
 )
 
@@ -333,19 +330,19 @@ observed_data = [
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.1,
         max_bound=1.0
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.5
     ),
     CalibrationParameter(
         id="reporting_rate",
-        parameter_type=CalibrationParameterType.SCALE,
+        parameter_type="scale",
         min_bound=0.01,
         max_bound=1.0
     ),
@@ -358,7 +355,7 @@ result = calibrator.run()
 scale_values = {
     param.id: result.best_parameters[param.id]
     for param in problem.parameters
-    if param.parameter_type == CalibrationParameterType.SCALE
+    if param.parameter_type == "scale"
 }
 
 print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
@@ -387,7 +384,7 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     constraints=constraints,  # Include constraints
-    loss_function=LossFunction.SSE,
+    loss_function="sse",
     optimization_config=pso_config,
 )
 
@@ -410,7 +407,7 @@ prob_config = ProbabilisticCalibrationConfig(
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_function=LossFunction.SSE,
+    loss_function="sse",
     optimization_config=pso_config,
     probabilistic_config=prob_config,  # Enable probabilistic mode
 )
@@ -485,7 +482,11 @@ If you use Commol in your research, please cite:
 ```bibtex
 @software{commol2025,
   title = {Commol: A High-Performance Compartment Modelling Library},
-  author = {Villanueva Micó, Rafael J. and Andreu Vilarroig, Carlos and Martínez Rodríguez, David},
+  author = {
+    Villanueva Micó, Rafael J.
+    and Andreu Vilarroig, Carlos
+    and Martínez Rodríguez, David
+  },
   year = {2025},
   url = {https://github.com/MUNQU/commol}
 }

@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-Thank you for considering contributing to EpiModel! This document provides guidelines for contributing to the project.
+Thank you for considering contributing to Commol! This document provides guidelines for contributing to the project.
 
 ## How to Contribute
 
@@ -16,7 +16,7 @@ When creating a bug report, include:
 - **Clear title and description**
 - **Steps to reproduce** the issue
 - **Expected vs actual behavior**
-- **Environment details** (OS, Python version, EpiModel version)
+- **Environment details** (OS, Python version, Commol version)
 - **Code samples** or test cases that demonstrate the problem
 
 ### Suggesting Features
@@ -82,7 +82,7 @@ def test_model_builder_creates_valid_sir_model():
         ModelBuilder(name="Test SIR")
         .add_bin(id="S", name="Susceptible")
         # ... rest of model
-        .build(ModelTypes.DIFFERENCE_EQUATIONS)
+        .build("DifferenceEquations")
     )
     assert model.name == "Test SIR"
 ```
@@ -256,4 +256,4 @@ Contributors will be recognized in:
 - Release notes for significant contributions
 - GitHub's contributor graph
 
-Thank you for contributing to EpiModel! 🎉
+Thank you for contributing to Commol! 🎉

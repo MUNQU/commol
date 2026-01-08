@@ -8,7 +8,6 @@ Let's create a basic SIR (Susceptible-Infected-Recovered) model:
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
 
 # Build the model
 model = (
@@ -38,7 +37,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run simulation
@@ -57,12 +56,10 @@ print(f"Recovered at day 100: {results['R'][-1]:.0f}")
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
 ```
 
 - `ModelBuilder`: Fluent API for constructing models
 - `Simulation`: Runs the model simulation
-- `ModelTypes`: Enumeration of available model types
 
 ### 2. Define Disease States
 
@@ -110,7 +107,7 @@ Define the starting population distribution.
 ### 6. Build and Run
 
 ```python
-model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+model = builder.build(typology="DifferenceEquations")
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
@@ -147,7 +144,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Validate dimensional consistency
@@ -173,15 +170,10 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
-    LossConfig,
-    LossFunction,
-    OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes
+
 
 # Build model with unknown parameters
 calibration_model = (
@@ -201,7 +193,7 @@ calibration_model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Observed infected counts at different time steps
@@ -219,14 +211,14 @@ cal_simulation = Simulation(calibration_model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
@@ -237,10 +229,11 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
-    optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=ParticleSwarmConfig.create(max_iterations=300, verbose=False),
+    loss_function="sse",
+    optimization_config=ParticleSwarmConfig(
+        num_particles=30,
+        max_iterations=300,
+        verbose=False
     ),
 )
 
@@ -265,8 +258,8 @@ final_results = final_sim.run(num_steps=100)
 
 - `ObservedDataPoint`: Real-world measurements to fit against
 - `CalibrationParameter`: Parameters to optimize with bounds
-- `LossFunction`: How to measure fit quality (SSE, RMSE, MAE, etc.)
-- `OptimizationAlgorithm`: Optimization method (Particle Swarm or Nelder-Mead)
+- `loss_function`: How to measure fit quality ("sse", "rmse", "mae", etc.)
+- `optimization_config`: Optimization algorithm (ParticleSwarmConfig or NelderMeadConfig)
 
 See the [Calibration Guide](../guide/calibration.md) for advanced techniques.
 
@@ -274,7 +267,7 @@ See the [Calibration Guide](../guide/calibration.md) for advanced techniques.
 
 Now that you've built your first model, explore:
 
-- [Core Concepts](../guide/core-concepts.md) - Deep dive into EpiModel concepts
+- [Core Concepts](../guide/core-concepts.md) - Deep dive into Commol concepts
 - [Building Models](../guide/building-models.md) - Advanced model construction
 - [Mathematical Expressions](../guide/mathematical-expressions.md) - Complex rate formulas
 - [Model Calibration](../guide/calibration.md) - Comprehensive calibration guide

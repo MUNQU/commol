@@ -811,14 +811,42 @@ class ModelBuilder:
         self._initial_conditions = None
         return self
 
-    def build(self, typology: Literal["DifferenceEquations"]) -> Model:
+    def _validate_typology(self, typology: str) -> ModelTypes:
+        """
+        Validate and convert typology string to ModelTypes enum.
+
+        Parameters
+        ----------
+        typology : str
+            The model typology as a string.
+
+        Returns
+        -------
+        ModelTypes
+            The validated ModelTypes enum value.
+
+        Raises
+        ------
+        ValueError
+            If the typology string is not a valid ModelTypes value.
+        """
+        try:
+            return ModelTypes(typology)
+        except ValueError:
+            valid_values = [t.value for t in ModelTypes]
+            raise ValueError(
+                f"Invalid typology: '{typology}'. Must be one of {valid_values}"
+            ) from None
+
+    def build(self, typology: str) -> Model:
         """
         Build and return the final Model instance.
 
         Parameters
         ----------
-        typology : Literal["DifferenceEquations"]
-            Type of the model.
+        typology : str
+            Type of the model. Must be one of the valid ModelTypes values:
+            "DifferenceEquations".
 
         Returns
         -------
@@ -828,10 +856,14 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If validation fails or required components are missing.
+            If validation fails, required components are missing,
+            or typology is invalid.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
+
+        # Validate and convert typology string to enum
+        validated_typology = self._validate_typology(typology)
 
         population = Population(
             bins=self._bins,
@@ -841,9 +873,7 @@ class ModelBuilder:
         )
 
         dynamics = Dynamics(
-            typology=cast(
-                Literal[ModelTypes.DIFFERENCE_EQUATIONS], ModelTypes(typology)
-            ),
+            typology=validated_typology,
             transitions=self._transitions,
         )
 

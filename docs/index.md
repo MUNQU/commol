@@ -24,7 +24,6 @@ A high-performance compartment modelling library for mathematical modeling using
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
 
 # Build a simple SIR model
 model = (
@@ -34,7 +33,6 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
-    .add_parameter(id="N", value=1000.0)
     .add_transition(
         id="infection",
         source=["S"],
@@ -55,7 +53,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run simulation

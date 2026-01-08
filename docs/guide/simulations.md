@@ -16,7 +16,7 @@ results = simulation.run(num_steps=100)
 
 ## Output Formats
 
-EpiModel supports two output formats for simulation results.
+Commol supports two output formats for simulation results.
 
 ### Dictionary of Lists (Default)
 
@@ -66,7 +66,7 @@ Stratifications create multiple compartments by combining disease states with st
 
 ### Understanding Stratified Compartment Names
 
-When you add stratifications, EpiModel creates compartments by combining disease state IDs with stratification category names using underscore notation:
+When you add stratifications, Commol creates compartments by combining disease state IDs with stratification category names using underscore notation:
 
 **Pattern**: `{disease_state}_{category1}_{category2}_...`
 

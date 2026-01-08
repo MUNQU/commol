@@ -60,7 +60,7 @@ Test that Commol is correctly installed:
 
 ```python
 from commol import ModelBuilder
-from commol.constants import ModelTypes
+
 
 print("Commol installed successfully!")
 ```

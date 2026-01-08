@@ -31,7 +31,7 @@ from commol import (
     ParticleSwarmConfig,
     NelderMeadConfig,
 )
-from commol.constants import ModelTypes
+
 
 # Build model with parameters to be calibrated set to None
 model = (
@@ -61,7 +61,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Define observed data (e.g., from real outbreak data)
@@ -166,7 +166,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Calibrate initial infected fraction
@@ -378,7 +378,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Observed data from both infected and recovered compartments
@@ -477,7 +477,7 @@ model = (
             }
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Note: Observed data uses stratified compartment names like "I_young", "I_old"
@@ -568,7 +568,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Reported cases (potentially underreported)
@@ -837,7 +837,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 observed_data = [

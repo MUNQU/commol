@@ -73,11 +73,9 @@ from commol import (
     CalibrationProblem,
     CalibrationParameter,
     ObservedDataPoint,
-    LossConfig,
-    OptimizationConfig,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes
+
 
 # Build model with parameters to be calibrated set to None
 model = (
@@ -107,7 +105,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Define observed data
@@ -145,12 +143,9 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
     loss_function="sse",
-    optimization_config=OptimizationConfig(
-        algorithm="particle_swarm",
-        config=ParticleSwarmConfig(
-            num_particles=30,
-            max_iterations=500,
-        ),
+    optimization_config=ParticleSwarmConfig(
+        num_particles=30,
+        max_iterations=500,
     ),
     probabilistic_config=ProbabilisticCalibrationConfig(),  # Use defaults
     seed=42,  # For reproducibility across all stochastic processes
