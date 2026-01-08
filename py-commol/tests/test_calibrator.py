@@ -11,11 +11,11 @@ from commol import (
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    Parameter,
     ParticleSwarmConfig,
     Simulation,
 )
 from commol.constants import ModelTypes
+from commol.context.parameter import Parameter
 
 SEED = 42
 
