@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_valid
 from commol.context.constants import (
     CalibrationParameterType,
     LossFunction,
+    OptimizationAlgorithm,
     PSOAccelerationType,
     PSOInertiaType,
     PSOInitializationStrategy,
@@ -13,6 +14,9 @@ from commol.context.constants import (
 )
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
 from commol.utils.security import validate_expression_security
+
+# Re-export for documentation
+__all__ = ["OptimizationAlgorithm"]
 
 
 class ObservedDataPoint(BaseModel):
@@ -528,7 +532,7 @@ class ParticleSwarmConfig(BaseModel):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
-    Parameters
+    Attributes
     ----------
     num_particles : int
         Number of particles in the swarm (default: 20)
@@ -602,15 +606,15 @@ class ParticleSwarmConfig(BaseModel):
         type : str
             Inertia strategy type: "constant" or "chaotic"
 
-        For "constant":
-            factor : float, default=0.721
-                Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721)
-
-        For "chaotic":
-            w_min : float
-                Minimum inertia weight
-            w_max : float
-                Maximum inertia weight (must be > w_min)
+        Other Parameters
+        ----------------
+        factor : float, default=0.721
+            Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
+            Only used when type="constant".
+        w_min : float
+            Minimum inertia weight. Only used when type="chaotic".
+        w_max : float
+            Maximum inertia weight (must be > w_min). Only used when type="chaotic".
 
         Returns
         -------
@@ -662,21 +666,26 @@ class ParticleSwarmConfig(BaseModel):
         type : str
             Acceleration strategy type: "constant" or "time_varying"
 
-        For "constant":
-            cognitive : float, default=1.193
-                Cognitive coefficient (c1) - attraction to personal best
-            social : float, default=1.193
-                Social coefficient (c2) - attraction to swarm best
-
-        For "time_varying" (TVAC):
-            c1_initial : float
-                Initial cognitive factor (typically high, e.g., 2.5)
-            c1_final : float
-                Final cognitive factor (typically low, e.g., 0.5)
-            c2_initial : float
-                Initial social factor (typically low, e.g., 0.5)
-            c2_final : float
-                Final social factor (typically high, e.g., 2.5)
+        Other Parameters
+        ----------------
+        cognitive : float, default=1.193
+            Cognitive coefficient (c1) - attraction to personal best.
+            Only used when type="constant".
+        social : float, default=1.193
+            Social coefficient (c2) - attraction to swarm best.
+            Only used when type="constant".
+        c1_initial : float
+            Initial cognitive factor (typically high, e.g., 2.5).
+            Only used when type="time_varying".
+        c1_final : float
+            Final cognitive factor (typically low, e.g., 0.5).
+            Only used when type="time_varying".
+        c2_initial : float
+            Initial social factor (typically low, e.g., 0.5).
+            Only used when type="time_varying".
+        c2_final : float
+            Final social factor (typically high, e.g., 2.5).
+            Only used when type="time_varying".
 
         Returns
         -------
