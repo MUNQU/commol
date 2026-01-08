@@ -15,10 +15,8 @@ from commol.context.calibration import (
     CalibrationResult,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationConfig,
     ParticleSwarmConfig,
 )
-from commol.context.parameter import Parameter
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
     ParameterSetStatistics,
@@ -29,12 +27,7 @@ from commol.context.probabilistic_calibration import (
     ProbEvaluationFilterConfig,
     ProbRepresentativeConfig,
 )
-from commol.context.visualization import (
-    PlotConfig,
-    SeabornContext,
-    SeabornStyle,
-    SeabornStyleConfig,
-)
+from commol.context.visualization import PlotConfig
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -60,8 +53,6 @@ __all__ = [
     "ModelBuilder",
     "NelderMeadConfig",
     "ObservedDataPoint",
-    "OptimizationConfig",
-    "Parameter",
     "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",
@@ -71,9 +62,6 @@ __all__ = [
     "ProbEnsembleConfig",
     "ProbEvaluationFilterConfig",
     "ProbRepresentativeConfig",
-    "SeabornContext",
-    "SeabornStyle",
-    "SeabornStyleConfig",
     "Simulation",
     "SimulationPlotter",
 ]

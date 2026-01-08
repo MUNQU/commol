@@ -14,12 +14,7 @@ if TYPE_CHECKING:
 from commol.api.simulation import Simulation
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
-from commol.context.visualization import (
-    PlotConfig,
-    SeabornContext,
-    SeabornStyle,
-    SeabornStyleConfig,
-)
+from commol.context.visualization import PlotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +70,9 @@ class SimulationPlotter:
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
-        seaborn_style: SeabornStyle | None = None,
+        seaborn_style: str | None = None,
         palette: str | None = None,
-        context: SeabornContext | None = None,
+        context: str | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -159,9 +154,9 @@ class SimulationPlotter:
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
-        seaborn_style: SeabornStyle | None = None,
+        seaborn_style: str | None = None,
         palette: str | None = None,
-        context: SeabornContext | None = None,
+        context: str | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -230,37 +225,33 @@ class SimulationPlotter:
 
         return fig
 
-    def _build_seaborn_config(
+    def _apply_seaborn_style(
         self,
-        base_config: SeabornStyleConfig,
-        style: SeabornStyle | None,
-        palette: str | None,
-        context: SeabornContext | None,
-    ) -> SeabornStyleConfig:
-        """
-        Build Seaborn configuration, with direct parameters overriding config.
-        """
-        return SeabornStyleConfig(
-            style=style if style is not None else base_config.style,
-            palette=palette if palette is not None else base_config.palette,
-            context=context if context is not None else base_config.context,
-        )
-
-    def _apply_seaborn_style(self, config: SeabornStyleConfig) -> None:
+        config: PlotConfig,
+        style: str | None = None,
+        palette: str | None = None,
+        context: str | None = None,
+    ) -> None:
         """
         Apply Seaborn styling configuration.
+
+        Direct parameters override config values.
         """
-        if config.style:
-            sns.set_style(config.style)
-            logger.debug(f"Applied Seaborn style: {config.style}")
+        effective_style = style if style is not None else config.style
+        effective_palette = palette if palette is not None else config.palette
+        effective_context = context if context is not None else config.context
 
-        if config.palette:
-            sns.set_palette(config.palette)
-            logger.debug(f"Applied Seaborn palette: {config.palette}")
+        if effective_style:
+            sns.set_style(effective_style)
+            logger.debug(f"Applied Seaborn style: {effective_style}")
 
-        if config.context:
-            sns.set_context(config.context)
-            logger.debug(f"Applied Seaborn context: {config.context}")
+        if effective_palette:
+            sns.set_palette(effective_palette)
+            logger.debug(f"Applied Seaborn palette: {effective_palette}")
+
+        if effective_context:
+            sns.set_context(effective_context)
+            logger.debug(f"Applied Seaborn context: {effective_context}")
 
     def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
         """
@@ -305,17 +296,14 @@ class SimulationPlotter:
     def _setup_series_style(
         self,
         config: PlotConfig,
-        seaborn_style: SeabornStyle | None,
+        seaborn_style: str | None,
         palette: str | None,
-        context: SeabornContext | None,
+        context: str | None,
     ) -> None:
         """
         Set up plot styling with Seaborn configuration for series plots.
         """
-        seaborn_config = self._build_seaborn_config(
-            config.seaborn, seaborn_style, palette, context
-        )
-        self._apply_seaborn_style(seaborn_config)
+        self._apply_seaborn_style(config, seaborn_style, palette, context)
 
     def _extract_series_scale_values(
         self,
@@ -422,17 +410,14 @@ class SimulationPlotter:
     def _setup_cumulative_style(
         self,
         config: PlotConfig,
-        seaborn_style: SeabornStyle | None,
+        seaborn_style: str | None,
         palette: str | None,
-        context: SeabornContext | None,
+        context: str | None,
     ) -> None:
         """
         Set up plot styling with Seaborn configuration for cumulative plots.
         """
-        seaborn_config = self._build_seaborn_config(
-            config.seaborn, seaborn_style, palette, context
-        )
-        self._apply_seaborn_style(seaborn_config)
+        self._apply_seaborn_style(config, seaborn_style, palette, context)
 
     def _extract_cumulative_scale_values(
         self,

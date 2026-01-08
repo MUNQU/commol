@@ -13,7 +13,6 @@ from commol import (
     ModelBuilder,
     ObservedDataPoint,
     PlotConfig,
-    SeabornStyleConfig,
     Simulation,
 )
 from commol.api.plotter import SimulationPlotter
@@ -150,11 +149,9 @@ class TestSimulationPlotter:
             figsize=(12, 8),
             dpi=150,
             layout=(1, 3),
-            seaborn=SeabornStyleConfig(
-                style="whitegrid",
-                palette="Set2",
-                context="notebook",
-            ),
+            style="whitegrid",
+            palette="Set2",
+            context="notebook",
         )
 
         fig = plotter.plot_series(config=config)
@@ -271,5 +268,39 @@ class TestSimulationPlotter:
             alpha=0.8,
         )
 
+        assert fig is not None
+        plt.close(fig)
+
+    def test_plot_config_presets(self, simulation_results):
+        """Test PlotConfig preset class methods."""
+        simulation, results = simulation_results
+        plotter = SimulationPlotter(simulation, results)
+
+        # Test presentation preset
+        config = PlotConfig.presentation()
+        assert config.figsize == (16, 10)
+        assert config.dpi == 150
+        assert config.context == "talk"
+
+        fig = plotter.plot_series(config=config)
+        assert fig is not None
+        plt.close(fig)
+
+        # Test publication preset
+        config = PlotConfig.publication()
+        assert config.figsize == (8, 6)
+        assert config.dpi == 300
+        assert config.context == "paper"
+
+        fig = plotter.plot_series(config=config)
+        assert fig is not None
+        plt.close(fig)
+
+        # Test notebook preset
+        config = PlotConfig.notebook()
+        assert config.figsize == (12, 8)
+        assert config.context == "notebook"
+
+        fig = plotter.plot_series(config=config)
         assert fig is not None
         plt.close(fig)

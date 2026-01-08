@@ -815,10 +815,6 @@ class ParticleSwarmConfig(BaseModel):
         return self._velocity
 
 
-# Type alias for optimization configuration - the config type implies the algorithm
-OptimizationConfig = NelderMeadConfig | ParticleSwarmConfig
-
-
 class CalibrationResult(BaseModel):
     """
     Result of a calibration run.
@@ -915,7 +911,7 @@ class CalibrationProblem(BaseModel):
         default=LossFunction.SSE,
         description="Loss function to use for measuring fit quality",
     )
-    optimization_config: OptimizationConfig = Field(
+    optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
         default=..., description="Optimization algorithm configuration"
     )
     probabilistic_config: ProbabilisticCalibrationConfig | None = Field(
