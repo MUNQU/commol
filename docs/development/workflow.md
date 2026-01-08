@@ -76,7 +76,7 @@ git checkout -b feature/your-feature-name
 cd py-commol
 poetry run ruff check . --fix         # Auto-fix Python linting issues
 poetry run ruff format .              # Format Python code
-poetry run mypy epimodel              # Type checking
+poetry run ty check commol            # Type checking
 
 cd ..
 cargo fmt --all                       # Format Rust code
@@ -175,7 +175,7 @@ The project uses three main CI/CD pipelines:
 
 ### 1. Code Quality (on every push/PR)
 
-- Python: Ruff (linting/formatting), MyPy (type checking), Pytest (testing)
+- Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing)
 - Rust: rustfmt (formatting), Clippy (linting), cargo test
 - Runs on: Ubuntu
 - Purpose: Ensure code quality standards
@@ -201,7 +201,7 @@ The project uses three main CI/CD pipelines:
 
 ```bash
 # Run all quality checks (Python)
-cd py-commol && poetry run ruff check . && poetry run ruff format . && poetry run mypy epimodel && poetry run pytest
+cd py-commol && poetry run ruff check . && poetry run ruff format . && poetry run ty check commol && poetry run pytest
 
 # Run all quality checks (Rust)
 cargo fmt --all && cargo clippy --all-targets && cargo test --workspace
@@ -224,7 +224,7 @@ poetry run pre-commit install
 This runs:
 
 - Ruff linting and formatting
-- MyPy type checking
+- Ty type checking
 - Trailing whitespace removal
 - End-of-file fixing
 - Poetry lock file validation

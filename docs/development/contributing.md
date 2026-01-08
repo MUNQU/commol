@@ -51,7 +51,7 @@ Feature suggestions are welcome! Please:
 cd py-commol
 poetry run ruff check .
 poetry run ruff format .
-poetry run mypy epimodel
+poetry run ty check commol
 ```
 
 #### Rust

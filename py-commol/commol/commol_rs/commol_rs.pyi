@@ -170,19 +170,74 @@ class NelderMeadConfigProtocol(Protocol):
         header_interval: int = 100,
     ) -> None: ...
 
+class PSOInertiaConstantProtocol(Protocol):
+    def __init__(self, factor: float) -> None: ...
+    @property
+    def factor(self) -> float: ...
+
+class PSOInertiaChaoticProtocol(Protocol):
+    def __init__(self, w_min: float, w_max: float) -> None: ...
+    @property
+    def w_min(self) -> float: ...
+    @property
+    def w_max(self) -> float: ...
+
+class PSOAccelerationConstantProtocol(Protocol):
+    def __init__(self, cognitive: float, social: float) -> None: ...
+    @property
+    def cognitive(self) -> float: ...
+    @property
+    def social(self) -> float: ...
+
+class PSOAccelerationTimeVaryingProtocol(Protocol):
+    def __init__(
+        self, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float
+    ) -> None: ...
+    @property
+    def c1_initial(self) -> float: ...
+    @property
+    def c1_final(self) -> float: ...
+    @property
+    def c2_initial(self) -> float: ...
+    @property
+    def c2_final(self) -> float: ...
+
+class PSOMutationProtocol(Protocol):
+    def __init__(
+        self, strategy: str, scale: float, probability: float, application: str
+    ) -> None: ...
+    @property
+    def strategy(self) -> str: ...
+    @property
+    def scale(self) -> float: ...
+    @property
+    def probability(self) -> float: ...
+    @property
+    def application(self) -> str: ...
+
+class PSOVelocityProtocol(Protocol):
+    def __init__(
+        self, clamp_factor: float | None = None, mutation_threshold: float | None = None
+    ) -> None: ...
+    @property
+    def clamp_factor(self) -> float | None: ...
+    @property
+    def mutation_threshold(self) -> float | None: ...
+
 class ParticleSwarmConfigProtocol(Protocol):
     def __init__(
         self,
         num_particles: int = 20,
         max_iterations: int = 1000,
-        target_cost: float | None = None,
-        inertia_factor: float | None = None,
-        cognitive_factor: float | None = None,
-        social_factor: float | None = None,
-        default_acceleration_coefficient: float = 1.1931471805599454,
-        seed: int | None = None,
         verbose: bool = False,
-        header_interval: int = 100,
+        inertia: PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None = None,
+        acceleration: PSOAccelerationConstantProtocol
+        | PSOAccelerationTimeVaryingProtocol
+        | None = None,
+        mutation: PSOMutationProtocol | None = None,
+        velocity: PSOVelocityProtocol | None = None,
+        initialization: str = "uniform",
+        seed: int | None = None,
     ) -> None: ...
 
 class OptimizationConfigProtocol(Protocol):
@@ -271,6 +326,12 @@ class CalibrationModule(Protocol):
     CalibrationConstraint: type[CalibrationConstraintProtocol]
     LossConfig: type[LossConfigProtocol]
     NelderMeadConfig: type[NelderMeadConfigProtocol]
+    PSOInertiaConstant: type[PSOInertiaConstantProtocol]
+    PSOInertiaChaotic: type[PSOInertiaChaoticProtocol]
+    PSOAccelerationConstant: type[PSOAccelerationConstantProtocol]
+    PSOAccelerationTimeVarying: type[PSOAccelerationTimeVaryingProtocol]
+    PSOMutation: type[PSOMutationProtocol]
+    PSOVelocity: type[PSOVelocityProtocol]
     ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
     OptimizationConfig: type[OptimizationConfigProtocol]
     CalibrationResult: type[CalibrationResultProtocol]

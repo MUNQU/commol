@@ -294,6 +294,134 @@ impl PyNelderMeadConfig {
     }
 }
 
+/// PSO Inertia Weight Strategy - Constant
+#[pyclass(name = "PSOInertiaConstant")]
+#[derive(Clone)]
+pub struct PyPSOInertiaConstant {
+    #[pyo3(get)]
+    pub factor: f64,
+}
+
+#[pymethods]
+impl PyPSOInertiaConstant {
+    #[new]
+    fn new(factor: f64) -> Self {
+        Self { factor }
+    }
+}
+
+/// PSO Inertia Weight Strategy - Chaotic
+#[pyclass(name = "PSOInertiaChaotic")]
+#[derive(Clone)]
+pub struct PyPSOInertiaChaotic {
+    #[pyo3(get)]
+    pub w_min: f64,
+    #[pyo3(get)]
+    pub w_max: f64,
+}
+
+#[pymethods]
+impl PyPSOInertiaChaotic {
+    #[new]
+    fn new(w_min: f64, w_max: f64) -> Self {
+        Self { w_min, w_max }
+    }
+}
+
+/// PSO Acceleration Strategy - Constant
+#[pyclass(name = "PSOAccelerationConstant")]
+#[derive(Clone)]
+pub struct PyPSOAccelerationConstant {
+    #[pyo3(get)]
+    pub cognitive: f64,
+    #[pyo3(get)]
+    pub social: f64,
+}
+
+#[pymethods]
+impl PyPSOAccelerationConstant {
+    #[new]
+    fn new(cognitive: f64, social: f64) -> Self {
+        Self { cognitive, social }
+    }
+}
+
+/// PSO Acceleration Strategy - Time Varying (TVAC)
+#[pyclass(name = "PSOAccelerationTimeVarying")]
+#[derive(Clone)]
+pub struct PyPSOAccelerationTimeVarying {
+    #[pyo3(get)]
+    pub c1_initial: f64,
+    #[pyo3(get)]
+    pub c1_final: f64,
+    #[pyo3(get)]
+    pub c2_initial: f64,
+    #[pyo3(get)]
+    pub c2_final: f64,
+}
+
+#[pymethods]
+impl PyPSOAccelerationTimeVarying {
+    #[new]
+    fn new(c1_initial: f64, c1_final: f64, c2_initial: f64, c2_final: f64) -> Self {
+        Self {
+            c1_initial,
+            c1_final,
+            c2_initial,
+            c2_final,
+        }
+    }
+}
+
+/// PSO Mutation Configuration
+#[pyclass(name = "PSOMutation")]
+#[derive(Clone)]
+pub struct PyPSOMutation {
+    #[pyo3(get)]
+    pub strategy: String,
+    #[pyo3(get)]
+    pub scale: f64,
+    #[pyo3(get)]
+    pub probability: f64,
+    #[pyo3(get)]
+    pub application: String,
+}
+
+#[pymethods]
+impl PyPSOMutation {
+    #[new]
+    fn new(strategy: String, scale: f64, probability: f64, application: String) -> Self {
+        Self {
+            strategy,
+            scale,
+            probability,
+            application,
+        }
+    }
+}
+
+/// PSO Velocity Configuration
+#[pyclass(name = "PSOVelocity")]
+#[derive(Clone)]
+pub struct PyPSOVelocity {
+    #[pyo3(get)]
+    pub clamp_factor: Option<f64>,
+    #[pyo3(get)]
+    pub mutation_threshold: Option<f64>,
+}
+
+#[pymethods]
+impl PyPSOVelocity {
+    #[new]
+    #[pyo3(signature = (clamp_factor=None, mutation_threshold=None))]
+    fn new(clamp_factor: Option<f64>, mutation_threshold: Option<f64>) -> Self {
+        Self {
+            clamp_factor,
+            mutation_threshold,
+        }
+    }
+}
+
 /// Particle Swarm Optimization configuration
 #[pyclass(name = "ParticleSwarmConfig")]
 #[derive(Clone)]
@@ -309,65 +437,144 @@ impl PyParticleSwarmConfig {
     /// Args:
     ///     num_particles: Number of particles in the swarm (default: 20)
     ///     max_iterations: Maximum number of iterations (default: 1000)
-    ///     target_cost: Target cost for early stopping (default: None)
-    ///     inertia_factor: Constant inertia weight applied to velocity (default: None, uses argmin's default)
-    ///     cognitive_factor: Cognitive acceleration factor - attraction to personal best (default: None, uses argmin's default)
-    ///     social_factor: Social acceleration factor - attraction to swarm best (default: None, uses argmin's default)
-    ///     default_acceleration_coefficient: Default value for cognitive/social when only one is provided (default: 0.5 + ln(2))
-    ///     seed: Random seed for reproducibility (default: None, uses system entropy)
     ///     verbose: Enable verbose output (default: false)
-    ///     header_interval: Number of iterations between table header repeats (default: 100)
-    ///
-    /// Note: For advanced features like chaotic inertia, TVAC, initialization strategies,
-    /// velocity control, and mutation, use the builder methods after construction.
+    ///     inertia: Optional inertia strategy (PSOInertiaConstant or PSOInertiaChaotic)
+    ///     acceleration: Optional acceleration strategy (PSOAccelerationConstant or PSOAccelerationTimeVarying)
+    ///     mutation: Optional mutation configuration (PSOMutation)
+    ///     velocity: Optional velocity configuration (PSOVelocity)
+    ///     seed: Random seed for reproducibility (default: None, uses system entropy)
     #[new]
-    #[pyo3(signature = (num_particles=20, max_iterations=1000, target_cost=None, inertia_factor=None, cognitive_factor=None, social_factor=None, default_acceleration_coefficient=1.1931471805599454, seed=None, verbose=false, header_interval=100))]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (num_particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None))]
     fn new(
         num_particles: usize,
         max_iterations: u64,
-        target_cost: Option<f64>,
-        inertia_factor: Option<f64>,
-        cognitive_factor: Option<f64>,
-        social_factor: Option<f64>,
-        default_acceleration_coefficient: f64,
-        seed: Option<u64>,
         verbose: bool,
-        header_interval: u64,
-    ) -> Self {
-        let mut config = commol_calibration::ParticleSwarmConfig {
-            num_particles,
-            max_iterations,
-            target_cost,
-            inertia_strategy: None,
-            acceleration_strategy: None,
-            initialization_strategy: commol_calibration::InitializationStrategy::UniformRandom,
-            velocity_clamp_factor: None,
-            velocity_mutation_threshold: None,
-            mutation_strategy: commol_calibration::MutationStrategy::None,
-            mutation_probability: 0.0,
-            mutation_application: commol_calibration::MutationApplication::None,
-            seed,
-            verbose,
-        };
+        inertia: Option<PyObject>,
+        acceleration: Option<PyObject>,
+        mutation: Option<Py<PyPSOMutation>>,
+        velocity: Option<Py<PyPSOVelocity>>,
+        initialization: &str,
+        seed: Option<u64>,
+    ) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            // Parse initialization strategy
+            let init_strategy = match initialization {
+                "uniform" | "uniform_random" => {
+                    commol_calibration::InitializationStrategy::UniformRandom
+                }
+                "latin_hypercube" | "lhs" => {
+                    commol_calibration::InitializationStrategy::LatinHypercube
+                }
+                "opposition_based" | "obl" => {
+                    commol_calibration::InitializationStrategy::OppositionBased
+                }
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Unknown initialization strategy: {}. Valid options: 'uniform', 'latin_hypercube', 'opposition_based'",
+                        initialization
+                    )));
+                }
+            };
 
-        // Convert old-style parameters to new-style if provided
-        if let Some(inertia) = inertia_factor {
-            config.inertia_strategy =
-                Some(commol_calibration::InertiaWeightStrategy::Constant(inertia));
-        }
+            let mut config = commol_calibration::ParticleSwarmConfig {
+                num_particles,
+                max_iterations,
+                target_cost: None,
+                inertia_strategy: None,
+                acceleration_strategy: None,
+                initialization_strategy: init_strategy,
+                velocity_clamp_factor: None,
+                velocity_mutation_threshold: None,
+                mutation_strategy: commol_calibration::MutationStrategy::None,
+                mutation_probability: 0.0,
+                mutation_application: commol_calibration::MutationApplication::None,
+                seed,
+                verbose,
+            };
 
-        if cognitive_factor.is_some() || social_factor.is_some() {
-            let cognitive = cognitive_factor.unwrap_or(default_acceleration_coefficient);
-            let social = social_factor.unwrap_or(default_acceleration_coefficient);
-            config.acceleration_strategy =
-                Some(commol_calibration::AccelerationStrategy::Constant { cognitive, social });
-        }
+            // Handle inertia strategy
+            if let Some(inertia_obj) = inertia {
+                if let Ok(constant) = inertia_obj.extract::<PyRef<PyPSOInertiaConstant>>(py) {
+                    config.inertia_strategy = Some(
+                        commol_calibration::InertiaWeightStrategy::Constant(constant.factor),
+                    );
+                } else if let Ok(chaotic) = inertia_obj.extract::<PyRef<PyPSOInertiaChaotic>>(py) {
+                    config.inertia_strategy =
+                        Some(commol_calibration::InertiaWeightStrategy::Chaotic {
+                            w_min: chaotic.w_min,
+                            w_max: chaotic.w_max,
+                        });
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "inertia must be PSOInertiaConstant or PSOInertiaChaotic",
+                    ));
+                }
+            }
 
-        Self {
-            inner: config,
-            header_interval,
-        }
+            // Handle acceleration strategy
+            if let Some(accel_obj) = acceleration {
+                if let Ok(constant) = accel_obj.extract::<PyRef<PyPSOAccelerationConstant>>(py) {
+                    config.acceleration_strategy =
+                        Some(commol_calibration::AccelerationStrategy::Constant {
+                            cognitive: constant.cognitive,
+                            social: constant.social,
+                        });
+                } else if let Ok(tvac) =
+                    accel_obj.extract::<PyRef<PyPSOAccelerationTimeVarying>>(py)
+                {
+                    config.acceleration_strategy =
+                        Some(commol_calibration::AccelerationStrategy::TimeVarying {
+                            c1_initial: tvac.c1_initial,
+                            c1_final: tvac.c1_final,
+                            c2_initial: tvac.c2_initial,
+                            c2_final: tvac.c2_final,
+                        });
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "acceleration must be PSOAccelerationConstant or PSOAccelerationTimeVarying",
+                    ));
+                }
+            }
+
+            // Handle mutation
+            if let Some(mut_ref) = mutation {
+                let mut_obj = mut_ref.borrow(py);
+                config.mutation_strategy = match mut_obj.strategy.as_str() {
+                    "gaussian" => commol_calibration::MutationStrategy::Gaussian(mut_obj.scale),
+                    "cauchy" => commol_calibration::MutationStrategy::Cauchy(mut_obj.scale),
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "Invalid mutation strategy: {}",
+                            mut_obj.strategy
+                        )));
+                    }
+                };
+                config.mutation_probability = mut_obj.probability;
+                config.mutation_application = match mut_obj.application.as_str() {
+                    "global_best" => commol_calibration::MutationApplication::GlobalBestOnly,
+                    "all_particles" => commol_calibration::MutationApplication::AllParticles,
+                    "below_average" => commol_calibration::MutationApplication::BelowAverage,
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "Invalid mutation application: {}",
+                            mut_obj.application
+                        )));
+                    }
+                };
+            }
+
+            // Handle velocity
+            if let Some(vel_ref) = velocity {
+                let vel_obj = vel_ref.borrow(py);
+                config.velocity_clamp_factor = vel_obj.clamp_factor;
+                config.velocity_mutation_threshold = vel_obj.mutation_threshold;
+            }
+
+            Ok(Self {
+                inner: config,
+                header_interval: 100,
+            })
+        })
     }
 
     /// Get the header interval
@@ -794,8 +1001,10 @@ impl PyCalibrationResult {
 ///     engine: The simulation engine (e.g., DifferenceEquations)
 ///     observed_data: List of observed data points
 ///     parameters: List of parameters to calibrate
+///     constraints: List of calibration constraints
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
+///     initial_population_size: Initial population size from the model
 ///
 /// Returns:
 ///     CalibrationResult with best parameters and optimization statistics
@@ -1238,6 +1447,12 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationConstraint>()?;
     m.add_class::<PyLossConfig>()?;
     m.add_class::<PyNelderMeadConfig>()?;
+    m.add_class::<PyPSOInertiaConstant>()?;
+    m.add_class::<PyPSOInertiaChaotic>()?;
+    m.add_class::<PyPSOAccelerationConstant>()?;
+    m.add_class::<PyPSOAccelerationTimeVarying>()?;
+    m.add_class::<PyPSOMutation>()?;
+    m.add_class::<PyPSOVelocity>()?;
     m.add_class::<PyParticleSwarmConfig>()?;
     m.add_class::<PyOptimizationConfig>()?;
     m.add_class::<PyCalibrationEvaluation>()?;

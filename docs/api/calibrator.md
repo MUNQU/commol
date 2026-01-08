@@ -52,15 +52,6 @@ show_source: false
 heading_level: 3
 show_docstring_attributes: true
 
-### LossConfig
-
-::: commol.context.calibration.LossConfig
-options:
-show_root_heading: true
-show_source: false
-heading_level: 3
-show_docstring_attributes: true
-
 ### OptimizationConfig
 
 !!! info "Type Alias"

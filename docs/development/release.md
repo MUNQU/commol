@@ -87,7 +87,7 @@ Document all changes under the new version:
 cd py-commol
 poetry run ruff check .
 poetry run ruff format .
-poetry run mypy epimodel
+poetry run ty check commol
 poetry run pytest
 
 # Rust checks

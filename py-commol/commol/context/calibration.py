@@ -1,11 +1,15 @@
-from typing import Self, override
+from typing import Self, overload, override
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from commol.context.constants import (
-    LOSS_SSE,
     CalibrationParameterType,
     LossFunction,
+    PSOAccelerationType,
+    PSOInertiaType,
+    PSOInitializationStrategy,
+    PSOMutationApplication,
+    PSOMutationStrategy,
 )
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
 from commol.utils.security import validate_expression_security
@@ -53,8 +57,8 @@ class CalibrationParameter(BaseModel):
     ----------
     id : str
         Identifier (parameter ID for parameters, bin ID for initial conditions)
-    parameter_type : CalibrationParameterType
-        Type of value being calibrated (default: PARAMETER)
+    parameter_type : str
+        Type of value being calibrated
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
@@ -66,7 +70,7 @@ class CalibrationParameter(BaseModel):
     id: str = Field(
         default=..., min_length=1, description="Parameter or bin identifier"
     )
-    parameter_type: CalibrationParameterType = Field(
+    parameter_type: str = Field(
         default=...,
         description="Type of value being calibrated",
     )
@@ -75,6 +79,15 @@ class CalibrationParameter(BaseModel):
     initial_guess: float | None = Field(
         default=None, description="Optional starting value for optimization"
     )
+
+    @field_validator("parameter_type")
+    def validate_parameter_type(cls, v: str) -> str:
+        if v not in CalibrationParameterType:
+            raise ValueError(
+                f"Invalid parameter_type: {v}. "
+                f"Must be one of {list(CalibrationParameterType)}"
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_bounds(self) -> Self:
@@ -288,254 +301,418 @@ class NelderMeadConfig(BaseModel):
     )
 
 
+class PSOInertiaStrategy(BaseModel):
+    """
+    Base class for PSO inertia weight strategies.
+
+    Use either `PSOConstantInertia` or `PSOChaoticInertia`.
+    """
+
+    pass
+
+
+class PSOConstantInertia(PSOInertiaStrategy):
+    """
+    Constant inertia weight for PSO.
+
+    Attributes
+    ----------
+    factor : float
+        Constant inertia weight factor (must be positive).
+    """
+
+    factor: float = Field(
+        default=..., gt=0.0, description="Constant inertia weight factor"
+    )
+
+
+class PSOChaoticInertia(PSOInertiaStrategy):
+    """
+    Chaotic inertia weight for PSO using logistic map.
+
+    The chaotic variation helps particles escape local optima through
+    non-linear dynamics.
+
+    Attributes
+    ----------
+    w_min : float
+        Minimum inertia weight (must be positive)
+    w_max : float
+        Maximum inertia weight (must be > w_min)
+
+    References
+    ----------
+    Liu, B., Wang, L., Jin, Y. H., Tang, F., & Huang, D. X. (2005).
+    Improved particle swarm optimization combined with chaos.
+    Chaos, Solitons & Fractals, 25(5), 1261-1271.
+    """
+
+    w_min: float = Field(default=..., gt=0.0, description="Minimum inertia weight")
+    w_max: float = Field(default=..., gt=0.0, description="Maximum inertia weight")
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> Self:
+        """Validate that w_max > w_min."""
+        if self.w_max <= self.w_min:
+            raise ValueError(
+                f"w_max ({self.w_max}) must be greater than w_min ({self.w_min})"
+            )
+        return self
+
+
+class PSOAccelerationStrategy(BaseModel):
+    """
+    Base class for PSO acceleration coefficient strategies.
+
+    Use either `PSOConstantAcceleration` or `PSOTimeVaryingAcceleration`.
+    """
+
+    pass
+
+
+class PSOConstantAcceleration(PSOAccelerationStrategy):
+    """
+    Constant acceleration coefficients for PSO (canonical PSO).
+
+    Attributes
+    ----------
+    cognitive : float
+        Cognitive coefficient (c1) - attraction to personal best.
+    social : float
+        Social coefficient (c2) - attraction to swarm best.
+    """
+
+    cognitive: float = Field(
+        default=..., gt=0.0, description="Cognitive coefficient (c1)"
+    )
+    social: float = Field(default=..., gt=0.0, description="Social coefficient (c2)")
+
+
+class PSOTimeVaryingAcceleration(PSOAccelerationStrategy):
+    """
+    Time-Varying Acceleration Coefficients (TVAC) for PSO.
+
+    TVAC adjusts cognitive and social coefficients over iterations to
+    balance exploration and exploitation. Typically, c1 decreases and
+    c2 increases over time.
+
+    Attributes
+    ----------
+    c1_initial : float
+        Initial cognitive factor
+    c1_final : float
+        Final cognitive factor
+    c2_initial : float
+        Initial social factor
+    c2_final : float
+        Final social factor
+
+    References
+    ----------
+    Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004).
+    Self-organizing hierarchical particle swarm optimizer with
+    time-varying acceleration coefficients. IEEE Transactions on
+    Evolutionary Computation, 8(3), 240-255.
+    """
+
+    c1_initial: float = Field(
+        default=..., gt=0.0, description="Initial cognitive factor"
+    )
+    c1_final: float = Field(default=..., gt=0.0, description="Final cognitive factor")
+    c2_initial: float = Field(default=..., gt=0.0, description="Initial social factor")
+    c2_final: float = Field(default=..., gt=0.0, description="Final social factor")
+
+
+class PSOMutationConfig(BaseModel):
+    """
+    Configuration for PSO particle mutation to help escape local optima.
+
+    Mutation can use Gaussian or Cauchy distributions. Cauchy has heavier tails
+    and provides larger jumps, making it more effective for escaping local optima.
+
+    Attributes
+    ----------
+    strategy : str
+        Mutation strategy: "gaussian" or "cauchy"
+    scale : float
+        Standard deviation (gaussian) or scale parameter (cauchy)
+    probability : float
+        Mutation probability per iteration (0.0 to 1.0)
+    application : str
+        Which particles to mutate:
+        - "global_best": Only mutate global best (most efficient)
+        - "all_particles": Mutate all particles (maximum diversity)
+        - "below_average": Mutate only below-average particles (balanced)
+
+    References
+    ----------
+    Stacey, A., Jancic, M., & Grundy, I. (2003). Particle swarm
+    optimization with mutation. In Proceedings of the 2003 Congress
+    on Evolutionary Computation (CEC 2003) (Vol. 2, pp. 1425-1430).
+    """
+
+    strategy: str = Field(
+        default=...,
+        description='Mutation strategy: "gaussian" or "cauchy"',
+    )
+    scale: float = Field(
+        default=..., gt=0.0, description="Standard deviation or scale parameter"
+    )
+    probability: float = Field(
+        default=...,
+        ge=0.0,
+        le=1.0,
+        description="Mutation probability per iteration (0.0-1.0)",
+    )
+    application: str = Field(
+        default=...,
+        description='Application: "global_best", "all_particles", or "below_average"',
+    )
+
+    @field_validator("strategy")
+    def validate_strategy(cls, v: str) -> str:
+        if v not in PSOMutationStrategy:
+            raise ValueError(
+                f"Invalid strategy: {v}. Must be one of {list(PSOMutationStrategy)}"
+            )
+        return v
+
+    @field_validator("application")
+    def validate_application(cls, v: str) -> str:
+        if v not in PSOMutationApplication:
+            raise ValueError(
+                f"Invalid application: {v}. "
+                f"Must be one of {list(PSOMutationApplication)}"
+            )
+        return v
+
+
+class PSOVelocityConfig(BaseModel):
+    """
+    Configuration for PSO particle velocity control.
+
+    Both clamping and mutation threshold can be used together.
+
+    Attributes
+    ----------
+    clamp_factor : float | None
+        Velocity clamping factor as fraction of search space range (0.0-1.0).
+        Limits velocity to prevent explosive behavior.
+        Typically 0.1 to 0.2. If None, no clamping is applied.
+    mutation_threshold : float | None
+        Velocity threshold for reinitialization when velocity approaches zero.
+        Prevents particle stagnation.
+        Typically 0.001 to 0.01. If None, no velocity mutation is applied.
+
+    References
+    ----------
+    - Shi, Y., & Eberhart, R. C. (1998). A modified particle swarm optimizer.
+    - Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004).
+      Self-organizing hierarchical particle swarm optimizer.
+    """
+
+    clamp_factor: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description="Velocity clamping factor (0.0-1.0), typically 0.1-0.2",
+    )
+    mutation_threshold: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Velocity mutation threshold, typically 0.001-0.01",
+    )
+
+
 class ParticleSwarmConfig(BaseModel):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
-    Use the constructor to create an instance, then chain builder methods to configure:
-    - `.with_inertia()` or `.with_chaotic_inertia()` for inertia control
-    - `.with_acceleration()` or `.with_tvac()` for acceleration coefficients
-    - `.with_initialization_strategy()` for particle initialization
-    - `.with_velocity_clamping()` and `.with_velocity_mutation()` for velocity control
-    - `.with_mutation()` for mutation settings
-
-    Attributes
+    Parameters
     ----------
     num_particles : int
         Number of particles in the swarm (default: 20)
     max_iterations : int
         Maximum number of iterations (default: 1000)
-    target_cost : float | None
-        Target cost for early stopping (default: None)
     verbose : bool
         Enable verbose output (default: False)
-    header_interval : int
-        Iterations between header repeats in verbose mode (default: 100)
+    initialization : str
+        Particle initialization strategy (default: "uniform")
+
+    Methods
+    -------
+    inertia(type, **kwargs)
+        Set inertia weight strategy ("constant" or "chaotic")
+    acceleration(type, **kwargs)
+        Set acceleration coefficients ("constant" or "time_varying")
+    mutation(strategy, scale, probability, application)
+        Enable mutation to escape local optima
+    velocity(clamp_factor, mutation_threshold)
+        Configure velocity control
     """
 
+    # Core parameters
     num_particles: int = Field(
         default=20, gt=0, description="Number of particles in the swarm"
     )
     max_iterations: int = Field(
         default=1000, gt=0, description="Maximum number of iterations"
     )
-    target_cost: float | None = Field(
-        default=None, description="Target cost for early stopping (default: None)"
-    )
-    inertia_factor: float | None = Field(
-        default=None,
-        gt=0.0,
-        description=(
-            "Inertia weight applied to velocity (default: None, uses argmin's default)"
-        ),
-    )
-    cognitive_factor: float | None = Field(
-        default=None,
-        gt=0.0,
-        description=(
-            "Attraction to personal best (default: None, uses argmin's default)"
-        ),
-    )
-    social_factor: float | None = Field(
-        default=None,
-        gt=0.0,
-        description="Attraction to swarm best (default: None, uses argmin's default)",
-    )
-    default_acceleration_coefficient: float = Field(
-        default=1.1931471805599454,  # 0.5 + ln(2), standard PSO default
-        gt=0.0,
-        description=(
-            "Default value for cognitive_factor or social_factor when only one is "
-            "provided (default: 0.5 + ln(2) ≈ 1.193, standard PSO default)"
-        ),
-    )
-    chaotic_inertia: tuple[float, float] | None = Field(
-        default=None, description="Chaotic inertia weight range (w_min, w_max)"
-    )
-    tvac: tuple[float, float, float, float] | None = Field(
-        default=None,
-        description="Time-varying acceleration coefficients (c1_i, c1_f, c2_i, c2_f)",
-    )
-    initialization_strategy: str | None = Field(
-        default=None,
-        description=(
-            "Initialization strategy: "
-            "'uniform', 'latin_hypercube', or 'opposition_based'"
-        ),
-    )
-    velocity_clamp_factor: float | None = Field(
-        default=None, gt=0.0, le=1.0, description="Velocity clamping factor (0.0-1.0)"
-    )
-    velocity_mutation_threshold: float | None = Field(
-        default=None, ge=0.0, description="Velocity mutation threshold"
-    )
-    mutation_strategy: str | None = Field(
-        default=None, description="Mutation strategy: 'gaussian' or 'cauchy'"
-    )
-    mutation_scale: float | None = Field(
-        default=None, gt=0.0, description="Mutation scale parameter"
-    )
-    mutation_probability: float | None = Field(
-        default=None, ge=0.0, le=1.0, description="Mutation probability (0.0-1.0)"
-    )
-    mutation_application: str | None = Field(
-        default=None,
-        description=(
-            "Mutation application: 'global_best', 'all_particles', or 'below_average'"
-        ),
-    )
     verbose: bool = Field(
         default=False,
-        description="Enable verbose output during optimization (default: False)",
+        description="Enable verbose output during optimization",
     )
-    header_interval: int = Field(
-        default=100,
-        gt=0,
+    initialization: str = Field(
+        default=PSOInitializationStrategy.UNIFORM,
         description=(
-            "Number of iterations between table header repeats in verbose output "
-            "(default: 100)"
+            "Particle initialization strategy: 'uniform' (default), 'latin_hypercube',"
+            "or 'opposition_based'"
         ),
     )
 
-    def with_inertia(self, inertia: float) -> Self:
+    # Private attributes for optional configurations (set via fluent methods)
+    _inertia: PSOConstantInertia | PSOChaoticInertia | None = PrivateAttr(default=None)
+    _acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None = (
+        PrivateAttr(default=None)
+    )
+    _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
+    _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
+
+    @field_validator("initialization")
+    def validate_initialization(cls, v: str) -> str:
+        if v not in PSOInitializationStrategy:
+            raise ValueError(
+                f"Invalid initialization: {v}. "
+                f"Must be one of {list(PSOInitializationStrategy)}"
+            )
+        return v
+
+    @overload
+    def inertia(self, type: str, *, factor: float = 0.721) -> Self: ...
+
+    @overload
+    def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
+
+    def inertia(self, type: str, **kwargs: float) -> Self:
         """
-        Set constant inertia weight factor.
+        Set inertia weight strategy.
 
         Parameters
         ----------
-        inertia : float
-            Inertia weight (must be positive)
+        type : str
+            Inertia strategy type: "constant" or "chaotic"
+
+        For "constant":
+            factor : float, default=0.721
+                Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721)
+
+        For "chaotic":
+            w_min : float
+                Minimum inertia weight
+            w_max : float
+                Maximum inertia weight (must be > w_min)
 
         Returns
         -------
         Self
-            Updated configuration for method chaining
+            The config instance for method chaining
         """
-        self.inertia_factor = inertia
-        self.chaotic_inertia = None  # Clear conflicting setting
+        if type not in PSOInertiaType:
+            raise ValueError(
+                f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
+            )
+        if type == PSOInertiaType.CONSTANT:
+            self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+        elif type == PSOInertiaType.CHAOTIC:
+            self._inertia = PSOChaoticInertia(
+                w_min=kwargs["w_min"], w_max=kwargs["w_max"]
+            )
+        else:
+            raise ValueError(
+                f"Unknown inertia type: {type}. Use 'constant' or 'chaotic'"
+            )
         return self
 
-    def with_chaotic_inertia(self, w_min: float, w_max: float) -> Self:
+    @overload
+    def acceleration(
+        self,
+        type: str,
+        *,
+        cognitive: float = 1.193,
+        social: float = 1.193,
+    ) -> Self: ...
+
+    @overload
+    def acceleration(
+        self,
+        type: str,
+        *,
+        c1_initial: float,
+        c1_final: float,
+        c2_initial: float,
+        c2_final: float,
+    ) -> Self: ...
+
+    def acceleration(self, type: str, **kwargs: float) -> Self:
         """
-        Enable chaotic inertia weight using logistic map.
+        Set acceleration coefficient strategy.
 
         Parameters
         ----------
-        w_min : float
-            Minimum inertia weight (must be positive)
-        w_max : float
-            Maximum inertia weight (must be > w_min)
+        type : str
+            Acceleration strategy type: "constant" or "time_varying"
+
+        For "constant":
+            cognitive : float, default=1.193
+                Cognitive coefficient (c1) - attraction to personal best
+            social : float, default=1.193
+                Social coefficient (c2) - attraction to swarm best
+
+        For "time_varying" (TVAC):
+            c1_initial : float
+                Initial cognitive factor (typically high, e.g., 2.5)
+            c1_final : float
+                Final cognitive factor (typically low, e.g., 0.5)
+            c2_initial : float
+                Initial social factor (typically low, e.g., 0.5)
+            c2_final : float
+                Final social factor (typically high, e.g., 2.5)
 
         Returns
         -------
         Self
-            Updated configuration for method chaining
+            The config instance for method chaining
         """
-        self.chaotic_inertia = (w_min, w_max)
-        self.inertia_factor = None  # Clear conflicting setting
+        if type not in PSOAccelerationType:
+            raise ValueError(
+                f"Invalid acceleration type: {type}. "
+                f"Must be one of {list(PSOAccelerationType)}"
+            )
+        if type == PSOAccelerationType.CONSTANT:
+            self._acceleration = PSOConstantAcceleration(
+                cognitive=kwargs.get("cognitive", 1.193),
+                social=kwargs.get("social", 1.193),
+            )
+        elif type == PSOAccelerationType.TIME_VARYING:
+            self._acceleration = PSOTimeVaryingAcceleration(
+                c1_initial=kwargs["c1_initial"],
+                c1_final=kwargs["c1_final"],
+                c2_initial=kwargs["c2_initial"],
+                c2_final=kwargs["c2_final"],
+            )
+        else:
+            raise ValueError(
+                f"Unknown acceleration type: {type}. Use 'constant' or 'time_varying'"
+            )
         return self
 
-    def with_acceleration(self, cognitive: float, social: float) -> Self:
-        """
-        Set constant cognitive and social acceleration factors.
-
-        Parameters
-        ----------
-        cognitive : float
-            Attraction to personal best (must be positive)
-        social : float
-            Attraction to swarm best (must be positive)
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.cognitive_factor = cognitive
-        self.social_factor = social
-        self.tvac = None  # Clear conflicting setting
-        return self
-
-    def with_tvac(
-        self, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float
-    ) -> Self:
-        """
-        Enable Time-Varying Acceleration Coefficients (TVAC).
-
-        Parameters
-        ----------
-        c1_initial : float
-            Initial cognitive factor (must be positive)
-        c1_final : float
-            Final cognitive factor (must be positive)
-        c2_initial : float
-            Initial social factor (must be positive)
-        c2_final : float
-            Final social factor (must be positive)
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.tvac = (c1_initial, c1_final, c2_initial, c2_final)
-        self.cognitive_factor = None  # Clear conflicting settings
-        self.social_factor = None
-        return self
-
-    def with_initialization_strategy(self, strategy: str) -> Self:
-        """
-        Set particle initialization strategy.
-
-        Parameters
-        ----------
-        strategy : str
-            One of: "uniform", "latin_hypercube", "opposition_based"
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.initialization_strategy = strategy
-        return self
-
-    def with_velocity_clamping(self, clamp_factor: float) -> Self:
-        """
-        Enable velocity clamping.
-
-        Parameters
-        ----------
-        clamp_factor : float
-            Fraction of search space range (typically 0.1 to 0.2)
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.velocity_clamp_factor = clamp_factor
-        return self
-
-    def with_velocity_mutation(self, threshold: float) -> Self:
-        """
-        Enable velocity mutation when velocity approaches zero.
-
-        Parameters
-        ----------
-        threshold : float
-            Velocity threshold for reinitialization (typically 0.001 to 0.01)
-
-        Returns
-        -------
-        Self
-            Updated configuration for method chaining
-        """
-        self.velocity_mutation_threshold = threshold
-        return self
-
-    def with_mutation(
-        self, strategy: str, scale: float, probability: float, application: str
+    def mutation(
+        self,
+        strategy: str,
+        *,
+        scale: float,
+        probability: float,
+        application: str,
     ) -> Self:
         """
         Enable mutation to help escape local optima.
@@ -543,24 +720,90 @@ class ParticleSwarmConfig(BaseModel):
         Parameters
         ----------
         strategy : str
-            Either "gaussian" or "cauchy"
+            Mutation distribution: "gaussian" or "cauchy".
+            Cauchy has heavier tails for larger jumps.
         scale : float
             Standard deviation (gaussian) or scale parameter (cauchy)
         probability : float
             Mutation probability per iteration (0.0 to 1.0)
         application : str
-            One of: "global_best", "all_particles", "below_average"
+            Which particles to mutate:
+            "global_best", "all_particles", or "below_average"
 
         Returns
         -------
         Self
-            Updated configuration for method chaining
+            The config instance for method chaining
         """
-        self.mutation_strategy = strategy
-        self.mutation_scale = scale
-        self.mutation_probability = probability
-        self.mutation_application = application
+        if strategy not in PSOMutationStrategy:
+            raise ValueError(
+                f"Invalid mutation strategy: {strategy}. "
+                f"Must be one of {list(PSOMutationStrategy)}"
+            )
+        if application not in PSOMutationApplication:
+            raise ValueError(
+                f"Invalid mutation application: {application}. "
+                f"Must be one of {list(PSOMutationApplication)}"
+            )
+
+        self._mutation = PSOMutationConfig(
+            strategy=strategy,
+            scale=scale,
+            probability=probability,
+            application=application,
+        )
         return self
+
+    def velocity(
+        self,
+        *,
+        clamp_factor: float | None = None,
+        mutation_threshold: float | None = None,
+    ) -> Self:
+        """
+        Configure velocity control.
+
+        Parameters
+        ----------
+        clamp_factor : float, optional
+            Velocity clamping as fraction of search space (0.0-1.0).
+            Typically 0.1-0.2. Prevents explosive velocities.
+        mutation_threshold : float, optional
+            Reinitialize velocities below this threshold.
+            Typically 0.001-0.01. Prevents stagnation.
+
+        Returns
+        -------
+        Self
+            The config instance for method chaining
+        """
+        self._velocity = PSOVelocityConfig(
+            clamp_factor=clamp_factor,
+            mutation_threshold=mutation_threshold,
+        )
+        return self
+
+    @property
+    def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
+        """Get the inertia configuration (for internal use)."""
+        return self._inertia
+
+    @property
+    def acceleration_config(
+        self,
+    ) -> PSOConstantAcceleration | PSOTimeVaryingAcceleration | None:
+        """Get the acceleration configuration (for internal use)."""
+        return self._acceleration
+
+    @property
+    def mutation_config(self) -> PSOMutationConfig | None:
+        """Get the mutation configuration (for internal use)."""
+        return self._mutation
+
+    @property
+    def velocity_config(self) -> PSOVelocityConfig | None:
+        """Get the velocity configuration (for internal use)."""
+        return self._velocity
 
 
 # Type alias for optimization configuration - the config type implies the algorithm
@@ -630,7 +873,7 @@ class CalibrationProblem(BaseModel):
         List of parameters to calibrate with their bounds
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
-    loss_function : LossFunction
+    loss_function : str
         Loss function to use for measuring fit quality (default: "sse")
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
@@ -659,8 +902,8 @@ class CalibrationProblem(BaseModel):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_function: LossFunction = Field(
-        default=LOSS_SSE,
+    loss_function: str = Field(
+        default=LossFunction.SSE,
         description="Loss function to use for measuring fit quality",
     )
     optimization_config: OptimizationConfig = Field(
@@ -678,6 +921,14 @@ class CalibrationProblem(BaseModel):
             "(optimization, probabilistic calibration, clustering, ensemble selection)"
         ),
     )
+
+    @field_validator("loss_function")
+    def validate_loss_function(cls, v: str) -> str:
+        if v not in LossFunction:
+            raise ValueError(
+                f"Invalid loss_function: {v}. Must be one of {list(LossFunction)}"
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:

@@ -28,8 +28,6 @@ from commol import (
     CalibrationProblem,
     CalibrationParameter,
     ObservedDataPoint,
-    LossConfig,
-    OptimizationConfig,
     ParticleSwarmConfig,
     NelderMeadConfig,
 )
@@ -104,8 +102,7 @@ parameters = [
 ]
 
 # Configure the calibration problem with Particle Swarm Optimization
-# Use the builder pattern for clearer configuration
-pso_config = ParticleSwarmConfig.create(
+pso_config = ParticleSwarmConfig(
     num_particles=30,
     max_iterations=500,
     verbose=True  # Show optimization progress
@@ -262,43 +259,41 @@ Population-based algorithm inspired by social behavior. Good for global optimiza
 
 **Basic Configuration:**
 
-Use the `create()` factory method and builder methods for clear configuration:
-
 ```python
-from commol import ParticleSwarmConfig, OptimizationConfig
+from commol import ParticleSwarmConfig
 
 # Basic PSO configuration
-pso_config = ParticleSwarmConfig.create(
+pso_config = ParticleSwarmConfig(
     num_particles=40,        # Number of particles in swarm
     max_iterations=1000,     # Maximum iterations
-    target_cost=0.01,        # Stop if loss below this (optional)
     verbose=True,            # Print progress
-    header_interval=50       # Print header every N iterations
 )
-
-# Use the config directly - type determines algorithm
-optimization_config = pso_config
 ```
 
-**Advanced Configuration with Builder Methods:**
+**Advanced Configuration:**
 
 ```python
-# PSO with chaotic inertia and TVAC
+# PSO with chaotic inertia and TVAC (time-varying acceleration)
 pso_config = (
-    ParticleSwarmConfig.create(num_particles=40, max_iterations=1000, verbose=True)
-    .with_chaotic_inertia(w_min=0.4, w_max=0.9)  # Dynamic inertia weight
-    .with_tvac(c1_initial=2.5, c1_final=0.5,     # Time-varying acceleration
-               c2_initial=0.5, c2_final=2.5)
-    .with_initialization_strategy("latin_hypercube")  # Better initial distribution
+    ParticleSwarmConfig(
+        num_particles=40,
+        max_iterations=1000,
+        verbose=True,
+        initialization="latin_hypercube",  # Better initial distribution
+    )
+    .inertia("chaotic", w_min=0.4, w_max=0.9)  # Dynamic inertia weight
+    .acceleration("time_varying",              # Time-varying acceleration
+                  c1_initial=2.5, c1_final=0.5,
+                  c2_initial=0.5, c2_final=2.5)
 )
 
 # PSO with mutation to escape local optima
 pso_config = (
-    ParticleSwarmConfig.create(num_particles=50, max_iterations=2000)
-    .with_acceleration(cognitive=2.0, social=2.0)  # Constant acceleration
-    .with_velocity_clamping(0.2)  # Prevent explosive velocities
-    .with_mutation(
-        strategy="gaussian",      # Gaussian mutation
+    ParticleSwarmConfig(num_particles=50, max_iterations=2000)
+    .acceleration("constant", cognitive=2.0, social=2.0)  # Constant acceleration
+    .velocity(clamp_factor=0.2)  # Prevent explosive velocities
+    .mutation(
+        "gaussian",              # Gaussian mutation
         scale=0.1,               # Mutation intensity
         probability=0.05,        # 5% mutation chance per iteration
         application="global_best"  # Apply to best particle only
@@ -306,16 +301,14 @@ pso_config = (
 )
 ```
 
-**Builder Methods:**
+**Fluent Methods:**
 
-- `.with_inertia(factor)` - Set constant inertia weight
-- `.with_chaotic_inertia(w_min, w_max)` - Enable chaotic inertia (conflicts with `with_inertia`)
-- `.with_acceleration(cognitive, social)` - Set constant acceleration factors
-- `.with_tvac(c1_i, c1_f, c2_i, c2_f)` - Time-varying acceleration (conflicts with `with_acceleration`)
-- `.with_initialization_strategy(strategy)` - "uniform", "latin_hypercube", or "opposition_based"
-- `.with_velocity_clamping(factor)` - Clamp velocities (typically 0.1-0.2)
-- `.with_velocity_mutation(threshold)` - Reinitialize near-zero velocities
-- `.with_mutation(strategy, scale, probability, application)` - Enable mutation
+- `.inertia("constant", factor=...)` - Set constant inertia weight
+- `.inertia("chaotic", w_min=..., w_max=...)` - Enable chaotic inertia
+- `.acceleration("constant", cognitive=..., social=...)` - Set constant acceleration factors
+- `.acceleration("time_varying", c1_initial=..., c1_final=..., c2_initial=..., c2_final=...)` - Time-varying acceleration
+- `.velocity(clamp_factor=..., mutation_threshold=...)` - Velocity control
+- `.mutation(strategy, scale=..., probability=..., application=...)` - Enable mutation
 
 **When to use PSO:**
 

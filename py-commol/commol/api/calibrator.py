@@ -25,17 +25,15 @@ from commol.context.calibration import (
     CalibrationResult,
     NelderMeadConfig,
     ParticleSwarmConfig,
+    PSOChaoticInertia,
+    PSOConstantAcceleration,
+    PSOConstantInertia,
+    PSOTimeVaryingAcceleration,
 )
 from commol.context.constants import (
-    LOSS_MAE,
-    LOSS_RMSE,
-    LOSS_SSE,
-    LOSS_WEIGHTED_SSE,
-    OPT_ALG_NELDER_MEAD,
-    OPT_ALG_PARTICLE_SWARM,
-    PARAM_TYPE_INITIAL_CONDITION,
-    PARAM_TYPE_PARAMETER,
-    PARAM_TYPE_SCALE,
+    CalibrationParameterType,
+    LossFunction,
+    OptimizationAlgorithm,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,9 +98,9 @@ class Calibrator:
         """
         # Determine algorithm name from config type
         algorithm_name = (
-            OPT_ALG_NELDER_MEAD
+            OptimizationAlgorithm.NELDER_MEAD
             if isinstance(self.problem.optimization_config, NelderMeadConfig)
-            else OPT_ALG_PARTICLE_SWARM
+            else OptimizationAlgorithm.PARTICLE_SWARM
         )
         logger.info(
             (
@@ -281,11 +279,11 @@ class Calibrator:
         self, param_type: str
     ) -> "CalibrationParameterTypeProtocol":
         """Convert Python CalibrationParameterType to Rust type."""
-        if param_type == PARAM_TYPE_PARAMETER:
+        if param_type == CalibrationParameterType.PARAMETER:
             return rust_calibration.CalibrationParameterType.Parameter
-        elif param_type == PARAM_TYPE_INITIAL_CONDITION:
+        elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == PARAM_TYPE_SCALE:
+        elif param_type == CalibrationParameterType.SCALE:
             return rust_calibration.CalibrationParameterType.Scale
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
@@ -294,13 +292,13 @@ class Calibrator:
         """Convert Python loss function to Rust LossConfig."""
         loss_func = self.problem.loss_function
 
-        if loss_func == LOSS_SSE:
+        if loss_func == LossFunction.SSE:
             return rust_calibration.LossConfig.sse()
-        elif loss_func == LOSS_RMSE:
+        elif loss_func == LossFunction.RMSE:
             return rust_calibration.LossConfig.rmse()
-        elif loss_func == LOSS_MAE:
+        elif loss_func == LossFunction.MAE:
             return rust_calibration.LossConfig.mae()
-        elif loss_func == LOSS_WEIGHTED_SSE:
+        elif loss_func == LossFunction.WEIGHTED_SSE:
             return rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
@@ -324,24 +322,86 @@ class Calibrator:
             return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
 
         elif isinstance(opt_config, ParticleSwarmConfig):
-            ps_config = rust_calibration.ParticleSwarmConfig(
-                num_particles=opt_config.num_particles,
-                max_iterations=opt_config.max_iterations,
-                target_cost=opt_config.target_cost,
-                inertia_factor=opt_config.inertia_factor,
-                cognitive_factor=opt_config.cognitive_factor,
-                social_factor=opt_config.social_factor,
-                default_acceleration_coefficient=opt_config.default_acceleration_coefficient,
-                seed=self.problem.seed,  # Use seed from CalibrationProblem
-                verbose=opt_config.verbose,
-                header_interval=opt_config.header_interval,
-            )
-            return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
+            return self._build_pso_config(opt_config)
 
         else:
             raise ValueError(
                 f"Unsupported optimization config type: {type(opt_config).__name__}"
             )
+
+    def _build_pso_config(
+        self, opt_config: ParticleSwarmConfig
+    ) -> "OptimizationConfigProtocol":
+        """Convert ParticleSwarmConfig to Rust OptimizationConfig."""
+        rust_inertia = self._build_rust_inertia(opt_config.inertia_config)
+        rust_acceleration = self._build_rust_acceleration(
+            opt_config.acceleration_config
+        )
+
+        mutation = opt_config.mutation_config
+        rust_mutation = None
+        if mutation is not None:
+            rust_mutation = rust_calibration.PSOMutation(
+                strategy=mutation.strategy,
+                scale=mutation.scale,
+                probability=mutation.probability,
+                application=mutation.application,
+            )
+
+        velocity = opt_config.velocity_config
+        rust_velocity = None
+        if velocity is not None:
+            rust_velocity = rust_calibration.PSOVelocity(
+                clamp_factor=velocity.clamp_factor,
+                mutation_threshold=velocity.mutation_threshold,
+            )
+
+        ps_config = rust_calibration.ParticleSwarmConfig(
+            num_particles=opt_config.num_particles,
+            max_iterations=opt_config.max_iterations,
+            verbose=opt_config.verbose,
+            inertia=rust_inertia,
+            acceleration=rust_acceleration,
+            mutation=rust_mutation,
+            velocity=rust_velocity,
+            initialization=opt_config.initialization,
+            seed=self.problem.seed,
+        )
+        return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
+
+    def _build_rust_inertia(
+        self, inertia: PSOConstantInertia | PSOChaoticInertia | None
+    ):
+        """Convert Python inertia config to Rust type."""
+        if inertia is None:
+            return None
+        if isinstance(inertia, PSOConstantInertia):
+            return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
+        if isinstance(inertia, PSOChaoticInertia):
+            return rust_calibration.PSOInertiaChaotic(
+                w_min=inertia.w_min, w_max=inertia.w_max
+            )
+        return None
+
+    def _build_rust_acceleration(
+        self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
+    ):
+        """Convert Python acceleration config to Rust type."""
+        if acceleration is None:
+            return None
+        if isinstance(acceleration, PSOConstantAcceleration):
+            return rust_calibration.PSOAccelerationConstant(
+                cognitive=acceleration.cognitive,
+                social=acceleration.social,
+            )
+        if isinstance(acceleration, PSOTimeVaryingAcceleration):
+            return rust_calibration.PSOAccelerationTimeVarying(
+                c1_initial=acceleration.c1_initial,
+                c1_final=acceleration.c1_final,
+                c2_initial=acceleration.c2_initial,
+                c2_final=acceleration.c2_final,
+            )
+        return None
 
     @property
     def num_parameters(self) -> int:
@@ -372,20 +432,20 @@ class Calibrator:
         model_bin_ids = {b.id for b in model.population.bins}
 
         for param in self.problem.parameters:
-            if param.parameter_type == PARAM_TYPE_PARAMETER:
+            if param.parameter_type == CalibrationParameterType.PARAMETER:
                 if param.id not in model_param_ids:
                     raise ValueError(
                         f"Calibration parameter '{param.id}' not found in model "
                         f"parameters. Available parameters: "
                         f"{sorted(model_param_ids)}"
                     )
-            elif param.parameter_type == PARAM_TYPE_INITIAL_CONDITION:
+            elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
                 if param.id not in model_bin_ids:
                     raise ValueError(
                         f"Calibration initial condition '{param.id}' not found in "
                         f"model bins. Available bins: {sorted(model_bin_ids)}"
                     )
-            elif param.parameter_type == PARAM_TYPE_SCALE:
+            elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
                         f"Scale parameter '{param.id}' must have positive bounds "

@@ -592,22 +592,24 @@ class TestCalibrator:
         ]
 
         # Create PSO config with advanced features to avoid stagnation
+        # Using fluent API for configuration
         pso_config = (
             ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
-            # Enable Latin Hypercube Sampling for better initial particle distribution
-            .with_initialization_strategy("latin_hypercube")
-            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            # Time-Varying Acceleration Coefficients (TVAC)
             # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
             # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
-            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
-            # Enable velocity clamping to prevent particles from moving too fast
-            .with_velocity_clamping(0.2)
-            # Enable Gaussian mutation on global best to escape local optima
-            .with_mutation(
-                strategy="gaussian",
-                scale=0.1,
-                probability=0.05,
-                application="global_best",
+            .acceleration(
+                "time_varying",
+                c1_initial=2.5,
+                c1_final=0.5,
+                c2_initial=0.5,
+                c2_final=2.5,
+            )
+            # Velocity control
+            .velocity(clamp_factor=0.2)
+            # Gaussian mutation on global best to escape local optima
+            .mutation(
+                "gaussian", scale=0.1, probability=0.05, application="global_best"
             )
         )
 
@@ -707,23 +709,24 @@ class TestCalibrator:
             ),
         ]
 
-        # Create PSO config with advanced features using builder pattern
+        # Create PSO config with advanced features using fluent API
         pso_config = (
             ParticleSwarmConfig(num_particles=30, max_iterations=200, verbose=False)
-            # Enable Latin Hypercube Sampling for better initial particle distribution
-            .with_initialization_strategy("latin_hypercube")
-            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            # Time-Varying Acceleration Coefficients (TVAC)
             # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
             # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
-            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
-            # Enable velocity clamping to prevent particles from moving too fast
-            .with_velocity_clamping(0.2)
-            # Enable Gaussian mutation on global best to escape local optima
-            .with_mutation(
-                strategy="gaussian",
-                scale=0.1,
-                probability=0.05,
-                application="global_best",
+            .acceleration(
+                "time_varying",
+                c1_initial=2.5,
+                c1_final=0.5,
+                c2_initial=0.5,
+                c2_final=2.5,
+            )
+            # Velocity clamping to prevent particles from moving too fast
+            .velocity(clamp_factor=0.2)
+            # Gaussian mutation on global best to escape local optima
+            .mutation(
+                "gaussian", scale=0.1, probability=0.05, application="global_best"
             )
         )
 
@@ -769,14 +772,17 @@ class TestCalibrator:
             ),
         ]
 
-        # Create PSO config with chaotic inertia using builder pattern
+        # Create PSO config with chaotic inertia using fluent API
         pso_config = (
-            ParticleSwarmConfig(num_particles=25, max_iterations=200, verbose=False)
-            # Enable chaotic inertia weight
-            # (varies between 0.4 and 0.9 using logistic map)
-            .with_chaotic_inertia(w_min=0.4, w_max=0.9)
-            # Use opposition-based initialization for diverse starting positions
-            .with_initialization_strategy("opposition_based")
+            ParticleSwarmConfig(
+                num_particles=25,
+                max_iterations=200,
+                verbose=False,
+                # Opposition-based initialization for better initial population
+                initialization="opposition_based",
+            )
+            # Chaotic inertia weight (varies between 0.4 and 0.9 using logistic map)
+            .inertia("chaotic", w_min=0.4, w_max=0.9)
         )
 
         problem = CalibrationProblem(
@@ -1204,7 +1210,10 @@ class TestCalibrator:
             constraints=constraints,
             loss_function="sse",
             optimization_config=ParticleSwarmConfig(
-                num_particles=20, max_iterations=200, verbose=False
+                num_particles=20,
+                max_iterations=200,
+                verbose=False,
+                initialization="latin_hypercube",
             ),
             seed=SEED,
         )

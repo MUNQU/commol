@@ -44,8 +44,8 @@ jobs:
       - name: Run Ruff formatting check
         run: poetry run ruff format --check .
 
-      - name: Run mypy type checking
-        run: poetry run mypy commol
+      - name: Run ty type checking
+        run: poetry run ty check commol
 
       - name: Run pytest
         run: poetry run pytest --cov=commol --cov-report=xml --cov-report=term
