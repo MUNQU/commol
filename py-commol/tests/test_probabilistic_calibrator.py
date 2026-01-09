@@ -525,7 +525,7 @@ class TestProbabilisticCalibratorValidation:
         with pytest.raises(ValueError, match="not found in model"):
             Calibrator(simulation, problem)
 
-    def test_empty_parameters_raises_validation_error(self, model: Model):
+    def test_empty_parameters_raises_validation_error(self):
         """Test that empty parameters list raises ValidationError from Pydantic."""
         from pydantic import ValidationError
 
@@ -541,7 +541,7 @@ class TestProbabilisticCalibratorValidation:
                 ),
             )
 
-    def test_empty_observed_data_raises_validation_error(self, model: Model):
+    def test_empty_observed_data_raises_validation_error(self):
         """Test that empty observed data raises ValidationError from Pydantic."""
         from pydantic import ValidationError
 

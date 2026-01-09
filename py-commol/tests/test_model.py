@@ -83,6 +83,440 @@ class TestModel:
         )
         assert output == expected_output
 
+    def test_print_equations_latex_format(self):
+        """
+        Test that print_equations outputs to console in LaTeX format.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Model\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 2\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (S -> I):\n"
+            "  $S \\to I: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  $I \\to R: \\gamma \\cdot I$\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{S(t+\\Delta t) - S(t)}{\\Delta t} = - (\\frac{\\beta \\cdot S "
+            "\\cdot I}{N})\\]\n"
+            "\\[\\frac{I(t+\\Delta t) - I(t)}{\\Delta t} = (\\frac{\\beta \\cdot S "
+            "\\cdot I}{N}) - (\\gamma \\cdot I)\\]\n"
+            "\\[\\frac{R(t+\\Delta t) - R(t)}{\\Delta t} = (\\gamma \\cdot I)\\]\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_invalid_format(self):
+        """
+        Test that print_equations raises error for invalid format.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        with pytest.raises(ValueError, match="Invalid format"):
+            model.print_equations(format="invalid")
+
+    def test_print_equations_latex_with_stratification(self):
+        """
+        Test that print_equations outputs LaTeX format correctly with stratifications.
+        """
+        builder = (
+            ModelBuilder(name="Age-Stratified SIR Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_stratification(id="age", categories=["young", "old"])
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_parameter(id="aging_rate", value=0.01)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .add_transition(
+                id="aging", source=["young"], target=["old"], rate="aging_rate"
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "young", "fraction": 0.7},
+                            {"category": "old", "fraction": 0.3},
+                        ],
+                    }
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: Age-Stratified SIR Model\n"
+            "Model Type: DifferentialEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 1\n"
+            "Number of Parameters: 3\n"
+            "Number of Transitions: 3\n"
+            "Bins: S, I, R\n"
+            "Stratifications:\n"
+            "  - age: [young, old]\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (S -> I):\n"
+            "  $S_{young} \\to I_{young}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+            "  $S_{old} \\to I_{old}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  $I_{young} \\to R_{young}: \\gamma \\cdot I$\n"
+            "  $I_{old} \\to R_{old}: \\gamma \\cdot I$\n"
+            "\n"
+            "Age Stratification Transitions (young -> old):\n"
+            "For each bin X in {S, I, R}:\n"
+            "  $X_{young} \\to X_{old}: aging_{rate} \\cdot X_{young}$\n"
+            "\n"
+            "Total System: 6 coupled equations (3 bins × 2 age)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{dS_{young}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N}) - "
+            "(aging_{rate} \\cdot S_{young})\\]\n"
+            "\\[\\frac{dS_{old}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "+ (aging_{rate} \\cdot S_{young})\\]\n"
+            "\\[\\frac{dI_{young}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "- (\\gamma \\cdot I) - (aging_{rate} \\cdot I_{young})\\]\n"
+            "\\[\\frac{dI_{old}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "- (\\gamma \\cdot I) + (aging_{rate} \\cdot I_{young})\\]\n"
+            "\\[\\frac{dR_{young}}{dt} = (\\gamma \\cdot I) - (aging_{rate} "
+            "\\cdot R_{young})\\]\n"
+            "\\[\\frac{dR_{old}}{dt} = (\\gamma \\cdot I) + (aging_{rate} "
+            "\\cdot R_{young})\\]\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_latex_to_file(self):
+        """
+        Test that print_equations outputs LaTeX format to a file correctly.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = Path(tmpdir) / "equations_latex.txt"
+            model.print_equations(output_file=str(output_file), format="latex")
+
+            assert output_file.exists()
+            content = output_file.read_text()
+
+            expected_output = (
+                "========================================\n"
+                "MODEL INFORMATION\n"
+                "========================================\n"
+                "Model: SIR Model\n"
+                "Model Type: DifferentialEquations\n"
+                "Number of Bins: 3\n"
+                "Number of Stratifications: 0\n"
+                "Number of Parameters: 2\n"
+                "Number of Transitions: 2\n"
+                "Bins: S, I, R\n"
+                "\n"
+                "========================================\n"
+                "COMPACT FORM\n"
+                "========================================\n"
+                "\n"
+                "Bin Transitions:\n"
+                "Infection (S -> I):\n"
+                "  $S \\to I: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+                "\n"
+                "Recovery (I -> R):\n"
+                "  $I \\to R: \\gamma \\cdot I$\n"
+                "\n"
+                "Total System: 3 coupled equations (3 bins)\n"
+                "\n"
+                "========================================\n"
+                "EXPANDED FORM\n"
+                "========================================\n"
+                "\\[\\frac{dS}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N})\\]\n"
+                "\\[\\frac{dI}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+                "- (\\gamma \\cdot I)\\]\n"
+                "\\[\\frac{dR}{dt} = (\\gamma \\cdot I)\\]"
+            )
+            assert content == expected_output
+
+    def test_print_equations_latex_with_units(self):
+        """
+        Test that print_equations outputs LaTeX format correctly with unit annotations.
+        """
+        builder = (
+            ModelBuilder(name="SIR Model with Units", version="1.0.0")
+            .add_bin(id="S", name="Susceptible", unit="person")
+            .add_bin(id="I", name="Infected", unit="person")
+            .add_bin(id="R", name="Recovered", unit="person")
+            .add_parameter(id="beta", value=0.3, unit="1/day")
+            .add_parameter(id="gamma", value=0.1, unit="1/day")
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Model with Units\n"
+            "Model Type: DifferentialEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 2\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (S -> I):\n"
+            "  $S \\to I: \\frac{\\beta(\\text{1/day}) \\cdot S(\\text{person}) "
+            "\\cdot I(\\text{person})}{N(\\text{person})} [\\text{person / day}]$\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  $I \\to R: \\gamma(\\text{1/day}) \\cdot I(\\text{person}) "
+            "[\\text{person / day}]$\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{dS}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N})\\]\n"
+            "\\[\\frac{dI}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "- (\\gamma \\cdot I)\\]\n"
+            "\\[\\frac{dR}{dt} = (\\gamma \\cdot I)\\]\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_latex_without_rate(self):
+        """
+        Test LaTeX format with transitions without rate (LaTeX equivalent of
+        test_print_equations_without_rate). Verifies that None rates are properly
+        displayed as \\text{None} and result in 0 in expanded form.
+        """
+        builder = (
+            ModelBuilder(name="Test Model", version="1.0.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="gamma", value=0.1)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate=None,  # No rate specified
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+
+        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: Test Model\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 1\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "Infection (S -> I):\n"
+            "  $S \\to I: \\text{None}$\n"
+            "\n"
+            "Recovery (I -> R):\n"
+            "  $I \\to R: \\gamma \\cdot I$\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{S(t+\\Delta t) - S(t)}{\\Delta t} = 0\\]\n"
+            "\\[\\frac{I(t+\\Delta t) - I(t)}{\\Delta t} = - (\\gamma \\cdot I)\\]\n"
+            "\\[\\frac{R(t+\\Delta t) - R(t)}{\\Delta t} = (\\gamma \\cdot I)\\]\n"
+        )
+        assert output == expected_output
+
     def test_parameter_with_formula_referencing_other_parameters(self):
         """
         Test that parameters can use formulas referencing other parameters.

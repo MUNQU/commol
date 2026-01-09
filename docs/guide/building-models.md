@@ -622,6 +622,31 @@ model.print_equations()  # ValueError: Some parameters have units but not all
 
 This prevents accidentally mixing unit systems or forgetting to specify units for some parameters.
 
+### LaTeX Output Format
+
+Export equations in LaTeX format for inclusion in documents and publications:
+
+```python
+# Default text format
+model.print_equations()
+# Output: dS/dt = - (beta * S * I / N)
+
+# LaTeX format
+model.print_equations(format="latex")
+# Output: \[\frac{dS}{dt} = - (\beta \cdot S \cdot I / N)\]
+
+# Save to file
+model.print_equations(output_file="equations.txt", format="latex")
+```
+
+**LaTeX features:**
+
+- Compact form uses inline math: `$S \to I: \beta \cdot S \cdot I / N$`
+- Expanded form uses display math: `\[\frac{dS}{dt} = ...\]`
+- Equations are copy-paste ready into LaTeX documents
+- Subscripts formatted as: `S_{young,urban}`
+- Multiplication shown as: `\cdot`
+
 ## Advanced: Conditional Transitions
 
 Create transitions that only occur under certain conditions:

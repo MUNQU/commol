@@ -201,6 +201,10 @@ model.print_equations()
 # Output shows:
 #   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
 #   I -> R: gamma(1/day) * I(person) [person/day]
+
+# Export equations in LaTeX format for publications
+model.print_equations(format="latex")
+# Output: \[\frac{dS}{dt} = - (\beta \cdot S \cdot I / N)\]
 ```
 
 **Note**: Units must be defined for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError` to prevent inconsistent models.

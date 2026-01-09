@@ -140,7 +140,7 @@ class SimulationPlotter:
             calibration_result,
             kwargs,
         )
-        self._finalize_series_plot(fig, axes, bins_to_plot, output_file, config)
+        self._finalize_series_plot(axes, bins_to_plot, output_file, config)
 
         return fig
 
@@ -221,7 +221,7 @@ class SimulationPlotter:
         self._plot_all_cumulative_bins(
             axes, bins_to_plot, cumulative_observed, calibration_result, kwargs
         )
-        self._finalize_cumulative_plot(fig, axes, bins_to_plot, output_file, config)
+        self._finalize_cumulative_plot(axes, bins_to_plot, output_file, config)
 
         return fig
 
@@ -389,7 +389,6 @@ class SimulationPlotter:
 
     def _finalize_series_plot(
         self,
-        fig: "Figure",
         axes: list["Axes"],
         bins_to_plot: list[str],
         output_file: str | None,
@@ -502,7 +501,6 @@ class SimulationPlotter:
 
     def _finalize_cumulative_plot(
         self,
-        fig: "Figure",
         axes: list["Axes"],
         bins_to_plot: list[str],
         output_file: str | None,

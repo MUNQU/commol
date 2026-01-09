@@ -23,3 +23,9 @@ class ModelTypes(StrEnum):
 class VariablePrefixes(StrEnum):
     STATE = "state"
     STRAT = "strat"
+
+
+@unique
+class PrintEquationsOutputFormat(StrEnum):
+    TEXT = "text"
+    LATEX = "latex"

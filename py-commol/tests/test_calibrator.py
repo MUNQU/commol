@@ -1309,7 +1309,7 @@ class TestCalibrator:
         param_sum = beta + gamma
         assert param_sum <= 0.61, f"Sum constraint violated: {param_sum}"
 
-    def test_constraint_expression_security_validation(self, model: Model):
+    def test_constraint_expression_security_validation(self):
         """Test that constraint expressions are validated for security threats."""
         from pydantic import ValidationError
 
