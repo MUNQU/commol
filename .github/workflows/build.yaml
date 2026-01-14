@@ -43,6 +43,12 @@ jobs:
         working-directory: ./py-commol
         run: poetry run pytest
 
+      - name: Clean Rust extension before wheel build
+        working-directory: ./py-commol
+        shell: bash
+        run: |
+          rm -f commol/commol_rs/*.so commol/commol_rs/*.pyd commol/commol_rs/*.dll
+
       - name: Build distribution wheel (validates wheel builds correctly)
         uses: PyO3/maturin-action@v1
         with:
