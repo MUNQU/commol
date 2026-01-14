@@ -1,0 +1,24 @@
+name: "Set Version from Tag"
+description: "Extracts version from git tag and updates Cargo.toml and pyproject.toml"
+outputs:
+  version:
+    description: "The extracted version"
+    value: ${{ steps.extract.outputs.VERSION }}
+runs:
+  using: "composite"
+  steps:
+    - name: Extract version from tag
+      id: extract
+      shell: bash
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update version in Cargo.toml and pyproject.toml
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          sed -i '' 's/^version = ".*"/version = "${{ steps.extract.outputs.VERSION }}"/' py-commol/Cargo.toml
+          sed -i '' 's/^version = ".*"  # Placeholder.*/version = "${{ steps.extract.outputs.VERSION }}"/' py-commol/pyproject.toml
+        else
+          sed -i 's/^version = ".*"/version = "${{ steps.extract.outputs.VERSION }}"/' py-commol/Cargo.toml
+          sed -i 's/^version = ".*"  # Placeholder.*/version = "${{ steps.extract.outputs.VERSION }}"/' py-commol/pyproject.toml
+        fi

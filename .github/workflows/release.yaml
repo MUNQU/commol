@@ -20,9 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Set version from tag
+        uses: ./.github/actions/set-version
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -31,8 +30,6 @@ jobs:
           args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
           sccache: "true"
           manylinux: auto
-        env:
-          MATURIN_PYPROJECT_TOML_VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -51,9 +48,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $env:GITHUB_OUTPUT
+      - name: Set version from tag
+        uses: ./.github/actions/set-version
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -61,8 +57,6 @@ jobs:
           target: x86_64
           args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
           sccache: "true"
-        env:
-          MATURIN_PYPROJECT_TOML_VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -82,9 +76,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Set version from tag
+        uses: ./.github/actions/set-version
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -92,8 +85,6 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
           sccache: "true"
-        env:
-          MATURIN_PYPROJECT_TOML_VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -107,9 +98,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Set version from tag
+        uses: ./.github/actions/set-version
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -121,8 +111,6 @@ jobs:
 
       - name: Build sdist
         run: maturin sdist --out dist --manifest-path py-commol/Cargo.toml
-        env:
-          MATURIN_PYPROJECT_TOML_VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Upload sdist
         uses: actions/upload-artifact@v4
