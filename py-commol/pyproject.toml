@@ -1,6 +1,6 @@
 [project]
 name = "commol"
-version = "0.0.1"
+version = "0.0.0"  # Placeholder - actual version set by Git tag during release
 description = "A high-performance compartment modelling library in Rust and Python."
 authors = [
     {name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es"},
@@ -27,6 +27,7 @@ dev = [
     "pytest (>=8.4,<9.0)",
     "pytest-cov (>=6.2,<7.0)",
     "ruff (>=0.12,<0.13)",
+    "twine (>=6.2.0,<7.0.0)",
     "ty (>=0.0.9,<0.0.10)",
     "vulture (>=2.14,<3.0)",
 ]
