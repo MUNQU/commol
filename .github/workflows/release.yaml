@@ -8,13 +8,13 @@ permissions:
   contents: read
 
 jobs:
-  build-wheels:
-    name: Build wheels on ${{ matrix.os }} with Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
+  build-wheels-linux:
+    name: Build wheels on Linux (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        target: [x86_64, aarch64]
         python-version: ["3.12", "3.13"]
 
     steps:
@@ -25,19 +25,77 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install build dependencies
-        run: pip install maturin
-
       - name: Build wheels
-        run: maturin build --release --out dist --manifest-path py-commol/Cargo.toml
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --manifest-path py-commol/Cargo.toml
+          sccache: "true"
+          manylinux: auto
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  build-wheels-windows:
+    name: Build wheels on Windows with Python ${{ matrix.python-version }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          args: --release --out dist --manifest-path py-commol/Cargo.toml
+          sccache: "true"
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  build-wheels-macos:
+    name: Build wheels on macOS (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --manifest-path py-commol/Cargo.toml
+          sccache: "true"
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
           path: dist/*.whl
 
   build-sdist:
@@ -65,7 +123,13 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: [build-wheels, build-sdist]
+    needs:
+      [
+        build-wheels-linux,
+        build-wheels-windows,
+        build-wheels-macos,
+        build-sdist,
+      ]
     runs-on: ubuntu-latest
     environment:
       name: pypi
