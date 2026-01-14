@@ -8,7 +8,7 @@ Classic Susceptible-Infected-Recovered model:
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
+
 import matplotlib.pyplot as plt
 
 # Build model
@@ -29,7 +29,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Simulate
@@ -63,7 +63,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -99,7 +99,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run for 3 years to see seasonal pattern
@@ -165,7 +165,7 @@ model = (
             }
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -202,7 +202,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Compare with and without vaccination
@@ -239,7 +239,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -270,7 +270,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run for longer to see endemic equilibrium
@@ -333,7 +333,7 @@ model = (
             }
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Simulate
@@ -385,7 +385,7 @@ model = (
             }
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Simulate
@@ -404,15 +404,10 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
-    LossConfig,
-    LossFunction,
-    OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes
+
 
 # Build SIR model with parameters to be calibrated
 model = (
@@ -442,7 +437,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Define observed data (e.g., from real outbreak surveillance)
@@ -463,14 +458,14 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.1
@@ -478,19 +473,14 @@ parameters = [
 ]
 
 # Configure calibration problem
-pso_config = ParticleSwarmConfig.create(
-    num_particles=30,
-    max_iterations=500,
-    verbose=True
-)
-
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
-    optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=pso_config,
+    loss_function="sse",
+    optimization_config=ParticleSwarmConfig(
+        num_particles=30,
+        max_iterations=500,
+        verbose=True
     ),
 )
 

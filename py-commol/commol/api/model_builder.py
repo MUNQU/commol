@@ -390,9 +390,7 @@ class ModelBuilder:
 
         # Check for $compartment placeholder and handle expansion
         if rate and "$compartment" in rate:
-            self._validate_compartment_placeholder(
-                id, source, target, rate, stratified_rates
-            )
+            self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
                 id, source, target, rate, stratified_rates, condition
             )
@@ -435,8 +433,6 @@ class ModelBuilder:
         id: str,
         source: list[str],
         target: list[str],
-        rate: str,
-        stratified_rates: list[StratifiedRateDict] | None,
     ) -> None:
         """
         Validate that $compartment placeholder is used correctly.
@@ -459,26 +455,30 @@ class ModelBuilder:
         ValueError
             If $compartment usage violates any rules
         """
-        # Check that source has multiple compartments
-        if len(source) <= 1:
+        # Check that we have either multiple sources OR multiple targets, but not both
+        has_multiple_sources = len(source) > 1
+        has_multiple_targets = len(target) > 1
+
+        if not has_multiple_sources and not has_multiple_targets:
             raise ValueError(
                 (
-                    f"Transition '{id}': $compartment placeholder requires multiple "
-                    f"source compartments (found {len(source)}). "
-                    f"If you have a single source, use the compartment name directly "
-                    f"in the rate formula instead of $compartment."
+                    f"Transition '{id}': $compartment placeholder requires either "
+                    f"multiple source compartments or multiple target compartments "
+                    f"(found {len(source)} source(s) and {len(target)} target(s)). "
+                    f"If you have a single source/target, use the compartment name "
+                    f"directly in the rate formula instead of $compartment."
                 )
             )
 
-        # Check that target is empty or has exactly one element
-        if len(target) > 1:
+        if has_multiple_sources and has_multiple_targets:
             raise ValueError(
                 (
                     f"Transition '{id}': $compartment placeholder cannot be used "
-                    f"with multiple targets (found {len(target)} targets). "
-                    f"Multiple targets would create ambiguous mappings between "
-                    f"sources and targets. Use target=[] for removal or target with "
-                    f"a single element for transfers."
+                    f"with both multiple sources and multiple targets "
+                    f"(found {len(source)} sources and {len(target)} targets). "
+                    f"This would create ambiguous mappings. Use either multiple "
+                    f"sources with single/empty target, or single/empty source with "
+                    f"multiple targets."
                 )
             )
 
@@ -499,9 +499,11 @@ class ModelBuilder:
         id : str
             Base transition identifier
         source : list[str]
-            Source compartments (will create one transition per source)
+            Source compartments
+            (will create one transition per source if multiple sources)
         target : list[str]
             Target compartments
+            (will create one transition per target if multiple targets)
         rate : str
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
@@ -509,15 +511,26 @@ class ModelBuilder:
         condition : Condition | None
             Transition condition
         """
+        # Determine if we're expanding over sources or targets
+        has_multiple_sources = len(source) > 1
+        has_multiple_targets = len(target) > 1
+
+        if has_multiple_sources:
+            compartments = source
+            expand_type = "source"
+        else:
+            compartments = target
+            expand_type = "target"
+
         logging.info(
             (
                 f"Expanding transition '{id}' with $compartment placeholder: "
-                f"{len(source)} source compartments will create "
-                f"{len(source)} separate transitions"
+                f"{len(compartments)} {expand_type} compartments will create "
+                f"{len(compartments)} separate transitions"
             )
         )
 
-        for compartment in source:
+        for compartment in compartments:
             # Replace $compartment with actual compartment name in base rate
             expanded_rate = rate.replace("$compartment", compartment)
 
@@ -551,12 +564,23 @@ class ModelBuilder:
             # Generate unique ID for this expanded transition
             expanded_id = f"{id}__{compartment}"
 
-            # Create the expanded transition
+            # Create the expanded transition with appropriate source/target
+            if has_multiple_sources:
+                expanded_source = [compartment]
+                expanded_target = target
+            elif has_multiple_targets:
+                expanded_source = source
+                expanded_target = [compartment]
+            else:
+                raise ValueError(
+                    "The transition must have multiple sources or targets."
+                )
+
             self._transitions.append(
                 Transition(
                     id=expanded_id,
-                    source=[compartment],
-                    target=target,
+                    source=expanded_source,
+                    target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
                     condition=condition,
@@ -787,14 +811,42 @@ class ModelBuilder:
         self._initial_conditions = None
         return self
 
-    def build(self, typology: Literal["DifferenceEquations"]) -> Model:
+    def _validate_typology(self, typology: str) -> ModelTypes:
+        """
+        Validate and convert typology string to ModelTypes enum.
+
+        Parameters
+        ----------
+        typology : str
+            The model typology as a string.
+
+        Returns
+        -------
+        ModelTypes
+            The validated ModelTypes enum value.
+
+        Raises
+        ------
+        ValueError
+            If the typology string is not a valid ModelTypes value.
+        """
+        try:
+            return ModelTypes(typology)
+        except ValueError:
+            valid_values = [t.value for t in ModelTypes]
+            raise ValueError(
+                f"Invalid typology: '{typology}'. Must be one of {valid_values}"
+            ) from None
+
+    def build(self, typology: str) -> Model:
         """
         Build and return the final Model instance.
 
         Parameters
         ----------
-        typology : Literal["DifferenceEquations"]
-            Type of the model.
+        typology : str
+            Type of the model. Must be one of the valid ModelTypes values:
+            "DifferenceEquations".
 
         Returns
         -------
@@ -804,10 +856,14 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If validation fails or required components are missing.
+            If validation fails, required components are missing,
+            or typology is invalid.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
+
+        # Validate and convert typology string to enum
+        validated_typology = self._validate_typology(typology)
 
         population = Population(
             bins=self._bins,
@@ -817,9 +873,7 @@ class ModelBuilder:
         )
 
         dynamics = Dynamics(
-            typology=cast(
-                Literal[ModelTypes.DIFFERENCE_EQUATIONS], ModelTypes(typology)
-            ),
+            typology=validated_typology,
             transitions=self._transitions,
         )
 

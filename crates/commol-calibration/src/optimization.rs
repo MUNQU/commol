@@ -8,48 +8,11 @@ use argmin::solver::particleswarm::{
     ParticleSwarm,
 };
 use commol_core::SimulationEngine;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
 use crate::calibration_problem::CalibrationProblem;
-use crate::types::{CalibrationParameterType, CalibrationResult};
-
-/// Apply parameter fixing to correct auto-calculated initial conditions
-///
-/// This function takes the optimizer's parameter values and corrects any
-/// auto-calculated initial condition parameters to ensure fractions sum to 1.0.
-///
-/// # Arguments
-/// * `param_values` - Parameter values from the optimizer
-/// * `fixed_ic_sum` - Sum of fixed (non-calibrated) IC fractions
-/// * `auto_calc_ic_idx` - Index of the IC parameter to auto-calculate (if any)
-/// * `param_types` - Types of each parameter
-///
-/// # Returns
-/// Corrected parameter values
-fn apply_parameter_corrections(
-    mut param_values: Vec<f64>,
-    fixed_ic_sum: f64,
-    auto_calc_ic_idx: Option<usize>,
-    param_types: &[CalibrationParameterType],
-) -> Vec<f64> {
-    if let Some(idx) = auto_calc_ic_idx {
-        // Calculate sum of other calibrated ICs (excluding the auto-calculated one)
-        let calibrated_ic_sum: f64 = param_values
-            .iter()
-            .enumerate()
-            .filter(|(param_idx, _)| {
-                param_types[*param_idx] == CalibrationParameterType::InitialCondition
-                    && *param_idx != idx
-            })
-            .map(|(_, value)| value)
-            .sum();
-
-        // Auto-calculated value ensures fractions sum to 1.0
-        let auto_calculated_value = (1.0 - fixed_ic_sum - calibrated_ic_sum).max(0.0);
-        param_values[idx] = auto_calculated_value;
-    }
-
-    param_values
-}
+use crate::types::{CalibrationEvaluation, CalibrationResult};
 
 /// Print optimization header for verbose output
 fn print_optimization_header(
@@ -92,6 +55,11 @@ pub struct NelderMeadConfig {
     /// Must be non-negative, defaults to EPSILON
     pub sd_tolerance: f64,
 
+    /// Simplex perturbation multiplier for creating initial vertices
+    /// Each vertex is created by multiplying one parameter dimension by this factor.
+    /// A value of 1.1 means 10% perturbation. Must be > 1.0.
+    pub simplex_perturbation: f64,
+
     /// Reflection parameter (alpha)
     /// Must be > 0, defaults to 1.0
     pub alpha: Option<f64>,
@@ -117,10 +85,11 @@ impl Default for NelderMeadConfig {
         Self {
             max_iterations: 1000,
             sd_tolerance: 1e-6,
-            alpha: None, // Use argmin's default: 1.0
-            gamma: None, // Use argmin's default: 2.0
-            rho: None,   // Use argmin's default: 0.5
-            sigma: None, // Use argmin's default: 0.5
+            simplex_perturbation: 1.1, // 10% perturbation
+            alpha: None,               // Use argmin's default: 1.0
+            gamma: None,               // Use argmin's default: 2.0
+            rho: None,                 // Use argmin's default: 0.5
+            sigma: None,               // Use argmin's default: 0.5
             verbose: false,
         }
     }
@@ -141,6 +110,14 @@ impl NelderMeadConfig {
     /// Set sample standard deviation tolerance (convergence criterion)
     pub fn with_sd_tolerance(mut self, tolerance: f64) -> Self {
         self.sd_tolerance = tolerance;
+        self
+    }
+
+    /// Set simplex perturbation multiplier
+    /// Each simplex vertex is created by multiplying one parameter dimension by this factor.
+    /// A value of 1.1 means 10% perturbation. Must be > 1.0.
+    pub fn with_simplex_perturbation(mut self, perturbation: f64) -> Self {
+        self.simplex_perturbation = perturbation;
         self
     }
 
@@ -280,6 +257,9 @@ pub struct ParticleSwarmConfig {
     /// Which particles to apply mutation to
     pub mutation_application: MutationApplication,
 
+    /// Random seed for reproducibility (None = use system entropy)
+    pub seed: Option<u64>,
+
     /// Enable verbose output
     pub verbose: bool,
 }
@@ -298,6 +278,7 @@ impl Default for ParticleSwarmConfig {
             mutation_strategy: MutationStrategy::None,
             mutation_probability: 0.0,
             mutation_application: MutationApplication::None,
+            seed: None,
             verbose: false,
         }
     }
@@ -434,6 +415,31 @@ impl ParticleSwarmConfig {
         self
     }
 
+    /// Set random seed for reproducibility
+    ///
+    /// When set, the particle swarm will produce deterministic results,
+    /// allowing you to reproduce the same optimization trajectory across runs.
+    ///
+    /// Note: The seed is set via this builder method (rather than as a required
+    /// constructor parameter) to allow easy modification without creating a new
+    /// configuration. This is particularly useful when running multiple
+    /// calibrations with different seeds while keeping other parameters constant.
+    ///
+    /// # Arguments
+    /// * `seed` - Random seed value
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let config = ParticleSwarmConfig::new()
+    ///     .with_num_particles(40)
+    ///     .with_max_iterations(500)
+    ///     .with_seed(42);  // Reproducible results
+    /// ```
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
     /// Enable verbose output
     pub fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
@@ -533,7 +539,7 @@ fn build_nelder_mead_solver(
     // Create n additional vertices by perturbing each parameter
     for i in 0..initial_params.len() {
         let mut vertex = initial_params.to_vec();
-        vertex[i] *= 1.1; // 10% perturbation
+        vertex[i] *= config.simplex_perturbation;
         vertices.push(vertex);
     }
 
@@ -570,16 +576,14 @@ fn build_nelder_mead_solver(
     Ok(solver)
 }
 
-/// Optimize using Nelder-Mead algorithm
-fn optimize_nelder_mead<E: SimulationEngine>(
+/// Internal optimization function for Nelder-Mead that optionally returns evaluations
+fn optimize_nelder_mead_internal<E: SimulationEngine>(
     problem: CalibrationProblem<E>,
     initial_params: Vec<f64>,
     parameter_names: Vec<String>,
     config: NelderMeadConfig,
-) -> Result<CalibrationResult, String> {
-    // Extract parameter fixing info before moving problem
-    let (fixed_ic_sum, last_ic_param_idx, param_types) = problem.get_parameter_fix_info();
-
+    with_history: bool,
+) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String> {
     let solver = build_nelder_mead_solver(&initial_params, &config)?;
     let executor =
         Executor::new(problem, solver).configure(|state| state.max_iters(config.max_iterations));
@@ -601,39 +605,76 @@ fn optimize_nelder_mead<E: SimulationEngine>(
             .map_err(|e| format!("Optimization failed: {}", e))?
     };
 
+    // Extract evaluations if requested before consuming result
+    let evaluations = if with_history {
+        // Access the problem directly from the Problem wrapper
+        result
+            .problem()
+            .problem
+            .as_ref()
+            .map(|p| p.get_evaluations())
+    } else {
+        None
+    };
+
     let state = result.state();
-
     let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
-    let corrected_params =
-        apply_parameter_corrections(best_params, fixed_ic_sum, last_ic_param_idx, &param_types);
 
-    Ok(CalibrationResult {
-        best_parameters: corrected_params,
-        parameter_names,
-        final_loss: state.best_cost,
-        iterations: state.iter as usize,
-        converged: state.termination_status.terminated(),
-        termination_reason: format!("{:?}", state.termination_status),
-    })
+    // Use CalibrationProblem's method to fix auto-calculated parameters
+    let corrected_params = result
+        .problem()
+        .problem
+        .as_ref()
+        .map(|p| p.fix_auto_calculated_parameters(best_params.clone()))
+        .unwrap_or(best_params);
+
+    Ok((
+        CalibrationResult {
+            best_parameters: corrected_params,
+            parameter_names,
+            final_loss: state.best_cost,
+            iterations: state.iter as usize,
+            converged: state.termination_status.terminated(),
+            termination_reason: format!("{:?}", state.termination_status),
+        },
+        evaluations,
+    ))
 }
 
-/// Optimize using Particle Swarm algorithm
-fn optimize_particle_swarm<E: SimulationEngine>(
+/// Optimize using Nelder-Mead algorithm
+fn optimize_nelder_mead<E: SimulationEngine>(
+    problem: CalibrationProblem<E>,
+    initial_params: Vec<f64>,
+    parameter_names: Vec<String>,
+    config: NelderMeadConfig,
+) -> Result<CalibrationResult, String> {
+    let (result, _) =
+        optimize_nelder_mead_internal(problem, initial_params, parameter_names, config, false)?;
+    Ok(result)
+}
+
+/// Internal optimization function for Particle Swarm that optionally returns evaluations
+fn optimize_particle_swarm_internal<E: SimulationEngine>(
     problem: CalibrationProblem<E>,
     initial_params: Vec<f64>,
     parameter_names: Vec<String>,
     config: ParticleSwarmConfig,
-) -> Result<CalibrationResult, String> {
-    // Extract parameter fixing info before moving problem
-    let (fixed_ic_sum, last_ic_param_idx, param_types) = problem.get_parameter_fix_info();
-
+    with_history: bool,
+) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String> {
     // Get bounds from CalibrationParameter definitions
     let bounds = problem.parameter_bounds();
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 
-    // Build solver with configuration
-    let mut solver = ParticleSwarm::new((lower_bound, upper_bound), config.num_particles);
+    // Build solver with configuration and RNG
+    // Always use SmallRng for consistency, either seeded or from system entropy
+    let mut solver = if let Some(seed) = config.seed {
+        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+            .with_rng_generator(SmallRng::seed_from_u64(seed))
+    } else {
+        ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
+            .with_rng_generator(SmallRng::from_rng(&mut rand::rng()))
+    };
 
     // Apply inertia strategy if provided
     solver = match &config.inertia_strategy {
@@ -772,6 +813,18 @@ fn optimize_particle_swarm<E: SimulationEngine>(
             .map_err(|e| format!("Optimization failed: {}", e))?
     };
 
+    // Extract evaluations if requested before consuming result
+    let evaluations = if with_history {
+        // Access the problem directly from the Problem wrapper
+        result
+            .problem()
+            .problem
+            .as_ref()
+            .map(|p| p.get_evaluations())
+    } else {
+        None
+    };
+
     let state = result.state();
 
     // For ParticleSwarm, best_individual contains the best particle found
@@ -780,15 +833,81 @@ fn optimize_particle_swarm<E: SimulationEngine>(
         None => (initial_params.clone(), f64::INFINITY),
     };
 
-    let corrected_params =
-        apply_parameter_corrections(best_params, fixed_ic_sum, last_ic_param_idx, &param_types);
+    // Use CalibrationProblem's method to fix auto-calculated parameters
+    let corrected_params = result
+        .problem()
+        .problem
+        .as_ref()
+        .map(|p| p.fix_auto_calculated_parameters(best_params.clone()))
+        .unwrap_or(best_params);
 
-    Ok(CalibrationResult {
-        best_parameters: corrected_params,
-        parameter_names,
-        final_loss: best_cost,
-        iterations: state.iter as usize,
-        converged: state.termination_status.terminated(),
-        termination_reason: format!("{:?}", state.termination_status),
+    Ok((
+        CalibrationResult {
+            best_parameters: corrected_params,
+            parameter_names,
+            final_loss: best_cost,
+            iterations: state.iter as usize,
+            converged: state.termination_status.terminated(),
+            termination_reason: format!("{:?}", state.termination_status),
+        },
+        evaluations,
+    ))
+}
+
+/// Optimize using Particle Swarm algorithm
+fn optimize_particle_swarm<E: SimulationEngine>(
+    problem: CalibrationProblem<E>,
+    initial_params: Vec<f64>,
+    parameter_names: Vec<String>,
+    config: ParticleSwarmConfig,
+) -> Result<CalibrationResult, String> {
+    let (result, _) =
+        optimize_particle_swarm_internal(problem, initial_params, parameter_names, config, false)?;
+    Ok(result)
+}
+
+/// Optimize calibration problem with evaluation history tracking
+///
+/// This function runs optimization and returns all objective function evaluations
+/// that occurred during the optimization process.
+///
+/// # Arguments
+/// * `problem` - The calibration problem to optimize
+/// * `config` - The optimization algorithm configuration
+///
+/// # Returns
+/// * `CalibrationResultWithHistory` containing best parameters and all evaluations
+pub fn optimize_with_history<E: SimulationEngine>(
+    problem: CalibrationProblem<E>,
+    config: OptimizationConfig,
+) -> Result<crate::types::CalibrationResultWithHistory, String> {
+    let initial_params = problem.initial_parameters();
+    let parameter_names = problem.parameter_names();
+
+    let (result, evaluations) = match config {
+        OptimizationConfig::NelderMead(nm_config) => optimize_nelder_mead_internal(
+            problem,
+            initial_params,
+            parameter_names,
+            nm_config,
+            true,
+        )?,
+        OptimizationConfig::ParticleSwarm(ps_config) => optimize_particle_swarm_internal(
+            problem,
+            initial_params,
+            parameter_names,
+            ps_config,
+            true,
+        )?,
+    };
+
+    Ok(crate::types::CalibrationResultWithHistory {
+        best_parameters: result.best_parameters,
+        parameter_names: result.parameter_names,
+        final_loss: result.final_loss,
+        iterations: result.iterations,
+        converged: result.converged,
+        termination_reason: result.termination_reason,
+        evaluations: evaluations.unwrap_or_default(),
     })
 }

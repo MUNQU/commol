@@ -92,6 +92,7 @@ class ObservedDataPointProtocol(Protocol):
         compartment: str,
         value: float,
         weight: float | None = None,
+        scale_id: str | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...
@@ -99,10 +100,13 @@ class ObservedDataPointProtocol(Protocol):
     def compartment(self) -> str: ...
     @property
     def value(self) -> float: ...
+    @property
+    def scale_id(self) -> str | None: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: "CalibrationParameterTypeProtocol"
     InitialCondition: "CalibrationParameterTypeProtocol"
+    Scale: "CalibrationParameterTypeProtocol"
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
@@ -122,13 +126,33 @@ class CalibrationParameterProtocol(Protocol):
     @property
     def max_bound(self) -> float: ...
 
+class CalibrationConstraintProtocol(Protocol):
+    def __init__(
+        self,
+        id: str,
+        expression: str,
+        description: str | None = None,
+        weight: float = 1.0,
+        time_steps: list[int] | None = None,
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def expression(self) -> str: ...
+    @property
+    def description(self) -> str | None: ...
+    @property
+    def weight(self) -> float: ...
+    @property
+    def time_steps(self) -> list[int] | None: ...
+
 class LossConfigProtocol(Protocol):
     @staticmethod
-    def sum_squared_error() -> LossConfigProtocol: ...
+    def sse() -> LossConfigProtocol: ...
     @staticmethod
-    def root_mean_squared_error() -> LossConfigProtocol: ...
+    def rmse() -> LossConfigProtocol: ...
     @staticmethod
-    def mean_absolute_error() -> LossConfigProtocol: ...
+    def mae() -> LossConfigProtocol: ...
     @staticmethod
     def weighted_sse() -> LossConfigProtocol: ...
 
@@ -137,6 +161,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
+        simplex_perturbation: float = 1.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
@@ -145,17 +170,74 @@ class NelderMeadConfigProtocol(Protocol):
         header_interval: int = 100,
     ) -> None: ...
 
+class PSOInertiaConstantProtocol(Protocol):
+    def __init__(self, factor: float) -> None: ...
+    @property
+    def factor(self) -> float: ...
+
+class PSOInertiaChaoticProtocol(Protocol):
+    def __init__(self, w_min: float, w_max: float) -> None: ...
+    @property
+    def w_min(self) -> float: ...
+    @property
+    def w_max(self) -> float: ...
+
+class PSOAccelerationConstantProtocol(Protocol):
+    def __init__(self, cognitive: float, social: float) -> None: ...
+    @property
+    def cognitive(self) -> float: ...
+    @property
+    def social(self) -> float: ...
+
+class PSOAccelerationTimeVaryingProtocol(Protocol):
+    def __init__(
+        self, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float
+    ) -> None: ...
+    @property
+    def c1_initial(self) -> float: ...
+    @property
+    def c1_final(self) -> float: ...
+    @property
+    def c2_initial(self) -> float: ...
+    @property
+    def c2_final(self) -> float: ...
+
+class PSOMutationProtocol(Protocol):
+    def __init__(
+        self, strategy: str, scale: float, probability: float, application: str
+    ) -> None: ...
+    @property
+    def strategy(self) -> str: ...
+    @property
+    def scale(self) -> float: ...
+    @property
+    def probability(self) -> float: ...
+    @property
+    def application(self) -> str: ...
+
+class PSOVelocityProtocol(Protocol):
+    def __init__(
+        self, clamp_factor: float | None = None, mutation_threshold: float | None = None
+    ) -> None: ...
+    @property
+    def clamp_factor(self) -> float | None: ...
+    @property
+    def mutation_threshold(self) -> float | None: ...
+
 class ParticleSwarmConfigProtocol(Protocol):
     def __init__(
         self,
         num_particles: int = 20,
         max_iterations: int = 1000,
-        target_cost: float | None = None,
-        inertia_factor: float | None = None,
-        cognitive_factor: float | None = None,
-        social_factor: float | None = None,
         verbose: bool = False,
-        header_interval: int = 100,
+        inertia: PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None = None,
+        acceleration: PSOAccelerationConstantProtocol
+        | PSOAccelerationTimeVaryingProtocol
+        | None = None,
+        mutation: PSOMutationProtocol | None = None,
+        velocity: PSOVelocityProtocol | None = None,
+        initialization: str = "uniform",
+        seed: int | None = None,
     ) -> None: ...
 
 class OptimizationConfigProtocol(Protocol):
@@ -185,25 +267,155 @@ class CalibrationResultProtocol(Protocol):
     def termination_reason(self) -> str: ...
     def to_dict(self) -> dict[str, object]: ...
 
+class CalibrationEvaluationProtocol(Protocol):
+    def __init__(
+        self,
+        parameters: list[float],
+        loss: float,
+        predictions: list[list[float]],
+    ) -> None: ...
+    @property
+    def parameters(self) -> list[float]: ...
+    @property
+    def loss(self) -> float: ...
+    @property
+    def predictions(self) -> list[list[float]]: ...
+
+class CalibrationResultWithHistoryProtocol(Protocol):
+    @property
+    def best_parameters(self) -> dict[str, float]: ...
+    @property
+    def best_parameters_list(self) -> list[float]: ...
+    @property
+    def parameter_names(self) -> list[str]: ...
+    @property
+    def final_loss(self) -> float: ...
+    @property
+    def iterations(self) -> int: ...
+    @property
+    def converged(self) -> bool: ...
+    @property
+    def termination_reason(self) -> str: ...
+    @property
+    def evaluations(self) -> list[CalibrationEvaluationProtocol]: ...
+
+class ParetoSolutionProtocol(Protocol):
+    @property
+    def ensemble_size(self) -> int: ...
+    @property
+    def ci_width(self) -> float: ...
+    @property
+    def coverage(self) -> float: ...
+    @property
+    def size_penalty(self) -> float: ...
+    @property
+    def selected_indices(self) -> list[int]: ...
+
+class EnsembleSelectionResultProtocol(Protocol):
+    @property
+    def selected_ensemble(self) -> list[int]: ...
+    @property
+    def pareto_front(self) -> list[ParetoSolutionProtocol]: ...
+    @property
+    def selected_pareto_index(self) -> int: ...
+
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
     CalibrationParameterType: type[CalibrationParameterTypeProtocol]
     CalibrationParameter: type[CalibrationParameterProtocol]
+    CalibrationConstraint: type[CalibrationConstraintProtocol]
     LossConfig: type[LossConfigProtocol]
     NelderMeadConfig: type[NelderMeadConfigProtocol]
+    PSOInertiaConstant: type[PSOInertiaConstantProtocol]
+    PSOInertiaChaotic: type[PSOInertiaChaoticProtocol]
+    PSOAccelerationConstant: type[PSOAccelerationConstantProtocol]
+    PSOAccelerationTimeVarying: type[PSOAccelerationTimeVaryingProtocol]
+    PSOMutation: type[PSOMutationProtocol]
+    PSOVelocity: type[PSOVelocityProtocol]
     ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
     OptimizationConfig: type[OptimizationConfigProtocol]
     CalibrationResult: type[CalibrationResultProtocol]
+    CalibrationEvaluation: type[CalibrationEvaluationProtocol]
+    CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
+    ParetoSolution: type[ParetoSolutionProtocol]
+    EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
 
     def calibrate(
         self,
         engine: DifferenceEquationsProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
         initial_population_size: int,
     ) -> CalibrationResultProtocol: ...
+    def calibrate_with_history(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        optimization_config: OptimizationConfigProtocol,
+        initial_population_size: int,
+    ) -> CalibrationResultWithHistoryProtocol: ...
+    def run_multiple_calibrations(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        optimization_config: OptimizationConfigProtocol,
+        initial_population_size: int,
+        n_runs: int,
+        seed: int,
+    ) -> list[CalibrationResultWithHistoryProtocol]: ...
+    def select_optimal_ensemble(
+        self,
+        candidates: list[CalibrationEvaluationProtocol],
+        observed_data_tuples: list[tuple[int, int, float]],
+        population_size: int,
+        generations: int,
+        confidence_level: float,
+        seed: int,
+        pareto_preference: float,
+        ensemble_size_mode: str,
+        ensemble_size: int | None = None,
+        ensemble_size_min: int | None = None,
+        ensemble_size_max: int | None = None,
+        ci_margin_factor: float = 0.1,
+        ci_sample_sizes: list[int] | None = None,
+        nsga_crossover_probability: float = 0.9,
+    ) -> EnsembleSelectionResultProtocol: ...
+    def deduplicate_evaluations(
+        self,
+        evaluations: list[CalibrationEvaluationProtocol],
+        tolerance: float,
+    ) -> list[CalibrationEvaluationProtocol]: ...
+    def generate_predictions_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameter_sets: list[list[float]],
+        parameter_names: list[str],
+        time_steps: int,
+    ) -> list[list[list[float]]]: ...
+    def select_cluster_representatives(
+        self,
+        evaluations: list[CalibrationEvaluationProtocol],
+        cluster_labels: list[int],
+        max_representatives: int,
+        elite_fraction: float,
+        strategy: str,
+        selection_method: str = "crowding_distance",
+        quality_temperature: float = 1.0,
+        seed: int = 42,
+        k_neighbors_min: int = 5,
+        k_neighbors_max: int = 10,
+        sparsity_weight: float = 2.0,
+        stratum_fit_weight: float = 10.0,
+    ) -> list[int]: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...

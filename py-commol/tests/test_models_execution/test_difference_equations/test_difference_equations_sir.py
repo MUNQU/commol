@@ -44,6 +44,7 @@ class TestSIR:
             return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
         except ImportError:
             pytest.skip("Rust extension not built. Skipping simulation tests.")
+        assert False, "Should not be reached"
 
     def test_sir_list_of_lists_output(self, sir_model: Model):
         """

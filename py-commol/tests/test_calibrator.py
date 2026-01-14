@@ -3,23 +3,21 @@ import math
 import pytest
 
 from commol import (
+    CalibrationConstraint,
     CalibrationParameter,
-    CalibrationParameterType,
     CalibrationProblem,
     Calibrator,
-    LossConfig,
-    LossFunction,
     Model,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    OptimizationAlgorithm,
-    OptimizationConfig,
-    Parameter,
     ParticleSwarmConfig,
     Simulation,
 )
 from commol.constants import ModelTypes
+from commol.context.parameter import Parameter
+
+SEED = 42
 
 
 class TestCalibrator:
@@ -64,13 +62,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -79,11 +77,8 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
-                config=NelderMeadConfig(max_iterations=1000, verbose=False),
-            ),
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1000, verbose=False),
         )
 
         result = Calibrator(simulation, problem).run()
@@ -105,13 +100,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -120,50 +115,16 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=ParticleSwarmConfig.create(max_iterations=200, verbose=False),
-            ),
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(max_iterations=200, verbose=False),
+            seed=SEED,
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
-
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
-            gamma_ok = math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
-
-            if beta_ok and gamma_ok:
-                # Success!
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAttempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
-                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
-                f"(expected 0.05)"
-            )
-        )
+        # With seed, calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
+        assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
 
     def test_parameter_with_none_value(self):
         """Test that Parameter can be created with None value."""
@@ -332,7 +293,7 @@ class TestCalibrator:
         4. Update parameters
         5. Run simulation
         """
-        # Step 1: Create model with None parameters (to be calibrated)
+        # Create model with None parameters (to be calibrated)
         builder_uncalibrated = (
             ModelBuilder(name="Test SIR Uncalibrated", version="1.0")
             .add_bin(id="S", name="Susceptible")
@@ -365,7 +326,7 @@ class TestCalibrator:
         with pytest.raises(ValueError):
             _ = simulation_uncalibrated.run(100)
 
-        # Step 2: Create a temporary model with known values to generate observed data
+        # Create a temporary model with known values to generate observed data
         builder_known = (
             ModelBuilder(name="Test SIR Known", version="1.0")
             .add_bin(id="S", name="Susceptible")
@@ -395,7 +356,7 @@ class TestCalibrator:
         simulation_known = Simulation(model_known)
         results = simulation_known.run(100, output_format="dict_of_lists")
 
-        # Step 3: Prepare calibration using the uncalibrated model
+        # Prepare calibration using the uncalibrated model
         # First, update with None value for calibration
         model_uncalibrated.update_parameters({"beta": None, "gamma": None})
 
@@ -410,13 +371,13 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
@@ -425,17 +386,14 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
-                config=NelderMeadConfig(max_iterations=1000, verbose=False),
-            ),
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1000, verbose=False),
         )
 
         calibrator = Calibrator(simulation_for_calibration, problem)
         result = calibrator.run()
 
-        # Step 4: Update the model with calibrated values
+        # Update the model with calibrated values
         model_uncalibrated.update_parameters(result.best_parameters)
 
         # Step 5: Now we can run a new simulation with the calibrated model
@@ -520,7 +478,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="I",
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=0.1,
                 initial_guess=0.01,  # Starting point for optimization
@@ -530,14 +488,11 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
-                config=NelderMeadConfig(
-                    max_iterations=5000,
-                    sd_tolerance=1e-9,  # Stricter convergence criterion
-                    verbose=False,
-                ),
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(
+                max_iterations=5000,
+                sd_tolerance=1e-9,  # Stricter convergence criterion
+                verbose=False,
             ),
         )
 
@@ -624,88 +579,57 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="I",
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=0.1,  # Fraction range
             ),
         ]
 
         # Create PSO config with advanced features to avoid stagnation
+        # Using fluent API for configuration
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=40, max_iterations=1000, verbose=False
-            )
-            # Enable Latin Hypercube Sampling for better initial particle distribution
-            .with_initialization_strategy("latin_hypercube")
-            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
+            # Time-Varying Acceleration Coefficients (TVAC)
             # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
             # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
-            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
-            # Enable velocity clamping to prevent particles from moving too fast
-            .with_velocity_clamping(0.2)
-            # Enable Gaussian mutation on global best to escape local optima
-            .with_mutation(
-                strategy="gaussian",
-                scale=0.1,
-                probability=0.05,
-                application="global_best",
+            .acceleration(
+                "time_varying",
+                c1_initial=2.5,
+                c1_final=0.5,
+                c2_initial=0.5,
+                c2_final=2.5,
+            )
+            # Velocity control
+            .velocity(clamp_factor=0.2)
+            # Gaussian mutation on global best to escape local optima
+            .mutation(
+                "gaussian", scale=0.1, probability=0.05, application="global_best"
             )
         )
 
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=pso_config,
-            ),
+            loss_function="sse",
+            optimization_config=pso_config,
+            seed=SEED,
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
+        # With seed, calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.3, abs_tol=0.001)
+        assert math.isclose(result.best_parameters["I"], 0.02, abs_tol=0.001)
 
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.3, abs_tol=0.001)
-            I_ok = math.isclose(result.best_parameters["I"], 0.02, abs_tol=0.001)
-
-            if beta_ok and I_ok:
-                test_model.update_parameters({"beta": result.best_parameters["beta"]})
-                test_model.update_initial_conditions({"I": result.best_parameters["I"]})
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.3), "
-                        f"I={result.best_parameters['I']:.6f} (expected 0.02). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Advanced PSO calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.3), I={last_result.best_parameters['I']:.6f} "
-                f"(expected 0.02)"
-            )
-        )
+        # Update model with calibrated values
+        test_model.update_parameters({"beta": result.best_parameters["beta"]})
+        test_model.update_initial_conditions({"I": result.best_parameters["I"]})
 
     def test_invalid_bin_id_for_initial_condition_raises_error(self):
         """Test that using an invalid bin ID for initial condition raises an error."""
@@ -736,7 +660,7 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="X",  # Invalid bin ID
-                parameter_type=CalibrationParameterType.INITIAL_CONDITION,
+                parameter_type="initial_condition",
                 min_bound=0.0,
                 max_bound=100.0,
             )
@@ -745,11 +669,8 @@ class TestCalibrator:
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.NELDER_MEAD,
-                config=NelderMeadConfig(max_iterations=100),
-            ),
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=100),
         )
 
         simulation = Simulation(model)
@@ -776,87 +697,52 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
         ]
 
-        # Create PSO config with advanced features using builder pattern
+        # Create PSO config with advanced features using fluent API
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=30, max_iterations=200, verbose=False
-            )
-            # Enable Latin Hypercube Sampling for better initial particle distribution
-            .with_initialization_strategy("latin_hypercube")
-            # Enable Time-Varying Acceleration Coefficients (TVAC)
+            ParticleSwarmConfig(num_particles=30, max_iterations=200, verbose=False)
+            # Time-Varying Acceleration Coefficients (TVAC)
             # Cognitive factor decreases from 2.5 to 0.5 (exploration to exploitation)
             # Social factor increases from 0.5 to 2.5 (individual to swarm guidance)
-            .with_tvac(c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
-            # Enable velocity clamping to prevent particles from moving too fast
-            .with_velocity_clamping(0.2)
-            # Enable Gaussian mutation on global best to escape local optima
-            .with_mutation(
-                strategy="gaussian",
-                scale=0.1,
-                probability=0.05,
-                application="global_best",
+            .acceleration(
+                "time_varying",
+                c1_initial=2.5,
+                c1_final=0.5,
+                c2_initial=0.5,
+                c2_final=2.5,
+            )
+            # Velocity clamping to prevent particles from moving too fast
+            .velocity(clamp_factor=0.2)
+            # Gaussian mutation on global best to escape local optima
+            .mutation(
+                "gaussian", scale=0.1, probability=0.05, application="global_best"
             )
         )
 
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=pso_config,
-            ),
+            loss_function="sse",
+            optimization_config=pso_config,
+            seed=SEED,
         )
 
-        # Retry up to 3 times due to stochastic nature of PSO
-        max_attempts = 3
-        last_result = None
+        result = Calibrator(simulation, problem).run()
 
-        for attempt in range(max_attempts):
-            result = Calibrator(simulation, problem).run()
-            last_result = result
-
-            # Check if calibration succeeded
-            beta_ok = math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-4)
-            gamma_ok = math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-4)
-
-            if beta_ok and gamma_ok:
-                # Success!
-                return
-
-            if attempt < max_attempts - 1:
-                # Not the last attempt, will retry
-                print(
-                    (
-                        f"\nAdvanced PSO attempt {attempt + 1} failed. "
-                        f"beta={result.best_parameters['beta']:.6f} (expected 0.1), "
-                        f"gamma={result.best_parameters['gamma']:.6f} (expected 0.05). "
-                        f"Retrying..."
-                    )
-                )
-
-        # All attempts failed, show final values and fail
-        assert last_result is not None
-        pytest.fail(
-            (
-                f"Advanced PSO calibration failed after {max_attempts} attempts. "
-                f"Final values: beta={last_result.best_parameters['beta']:.6f} "
-                f"(expected 0.1), gamma={last_result.best_parameters['gamma']:.6f} "
-                f"(expected 0.05)"
-            )
-        )
+        # With seed, advanced PSO calibration is now deterministic and reproducible
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-4)
+        assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-4)
 
     def test_particle_swarm_with_chaotic_inertia(self, model: Model):
         """
@@ -874,38 +760,37 @@ class TestCalibrator:
         parameters = [
             CalibrationParameter(
                 id="beta",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
             CalibrationParameter(
                 id="gamma",
-                parameter_type=CalibrationParameterType.PARAMETER,
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             ),
         ]
 
-        # Create PSO config with chaotic inertia using builder pattern
+        # Create PSO config with chaotic inertia using fluent API
         pso_config = (
-            ParticleSwarmConfig.create(
-                num_particles=25, max_iterations=200, verbose=False
+            ParticleSwarmConfig(
+                num_particles=25,
+                max_iterations=200,
+                verbose=False,
+                # Opposition-based initialization for better initial population
+                initialization="opposition_based",
             )
-            # Enable chaotic inertia weight
-            # (varies between 0.4 and 0.9 using logistic map)
-            .with_chaotic_inertia(w_min=0.4, w_max=0.9)
-            # Use opposition-based initialization for diverse starting positions
-            .with_initialization_strategy("opposition_based")
+            # Chaotic inertia weight (varies between 0.4 and 0.9 using logistic map)
+            .inertia("chaotic", w_min=0.4, w_max=0.9)
         )
 
         problem = CalibrationProblem(
             observed_data=observed_data,
             parameters=parameters,
-            loss_config=LossConfig(function=LossFunction.SSE),
-            optimization_config=OptimizationConfig(
-                algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-                config=pso_config,
-            ),
+            loss_function="sse",
+            optimization_config=pso_config,
+            seed=SEED,
         )
 
         result = Calibrator(simulation, problem).run()
@@ -914,3 +799,572 @@ class TestCalibrator:
         # Allow slightly larger tolerance due to stochastic nature
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=2e-4)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=2e-4)
+
+    def test_scale_parameter_calibration(self, model: Model):
+        """
+        Test calibration with scale parameter.
+        Simulates the case where observed data is scaled by an unknown detection rate.
+        """
+        # Run simulation with known parameters
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create "observed" data that's scaled down by 0.5
+        # (simulating 50% detection rate)
+        true_scale = 0.5
+        observed_data = [
+            ObservedDataPoint(
+                step=i,
+                compartment="I",
+                value=results["I"][i] * true_scale,
+                scale_id="detection_rate",
+            )
+            for i in range(0, 100, 10)  # Sample every 10 steps
+        ]
+
+        # Define calibration parameters including the scale
+        parameters = [
+            CalibrationParameter(
+                id="detection_rate",
+                parameter_type="scale",
+                min_bound=0.1,
+                max_bound=1.0,
+                initial_guess=0.7,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=500, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover the true scale parameter
+        assert math.isclose(
+            result.best_parameters["detection_rate"], true_scale, abs_tol=1e-4
+        )
+        assert result.converged
+
+    def test_scale_and_parameter_calibration_combined(self, model: Model):
+        """
+        Test calibration with both model parameters and scale parameters.
+        """
+        # Run simulation with known parameters
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create "observed" data that's scaled and noisy
+        true_scale = 0.3
+        observed_data = [
+            ObservedDataPoint(
+                step=i,
+                compartment="I",
+                value=results["I"][i] * true_scale,
+                scale_id="detection_rate",
+            )
+            for i in range(0, 100, 5)
+        ]
+
+        # Calibrate both the model parameter beta and the scale
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="detection_rate",
+                parameter_type="scale",
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(
+                max_iterations=300, num_particles=25, verbose=False
+            ),
+            seed=SEED,
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover both the model parameter and scale
+        assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-3)
+        assert math.isclose(
+            result.best_parameters["detection_rate"], true_scale, abs_tol=1e-3
+        )
+
+    def test_multiple_scales_for_different_compartments(self, model: Model):
+        """
+        Test calibration with different scale parameters for different compartments.
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Different detection rates for I and R compartments
+        i_scale = 0.6
+        r_scale = 0.9
+
+        observed_data = []
+        # Infected observations with one scale
+        for i in range(0, 100, 10):
+            observed_data.append(
+                ObservedDataPoint(
+                    step=i,
+                    compartment="I",
+                    value=results["I"][i] * i_scale,
+                    scale_id="i_detection_rate",
+                )
+            )
+        # Recovered observations with different scale
+        for i in range(0, 100, 10):
+            observed_data.append(
+                ObservedDataPoint(
+                    step=i,
+                    compartment="R",
+                    value=results["R"][i] * r_scale,
+                    scale_id="r_detection_rate",
+                )
+            )
+
+        parameters = [
+            CalibrationParameter(
+                id="i_detection_rate",
+                parameter_type="scale",
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="r_detection_rate",
+                parameter_type="scale",
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=500, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Should recover both scale parameters
+        assert math.isclose(
+            result.best_parameters["i_detection_rate"], i_scale, abs_tol=1e-3
+        )
+        assert math.isclose(
+            result.best_parameters["r_detection_rate"], r_scale, abs_tol=1e-3
+        )
+
+    def test_calibration_with_constraint(self, model: Model):
+        """Test calibration with constraint"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Constraint: beta/gamma must be <= 5
+        constraints = [
+            CalibrationConstraint(
+                id="r0_bound",
+                expression="5.0 - beta/gamma",
+                description="beta/gamma <= 5",
+                weight=1.0,
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        op = result.best_parameters["beta"] / result.best_parameters["gamma"]
+        assert op <= 5.0, f"constraint violated: {op}"
+
+    def test_calibration_with_linear_constraint(self, model: Model):
+        """Test calibration with linear sum constraint"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Constraint: beta + gamma <= 0.2
+        constraints = [
+            CalibrationConstraint(
+                id="sum_bound",
+                expression="0.2 - (beta + gamma)",
+                description="beta + gamma <= 0.2",
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        param_sum = result.best_parameters["beta"] + result.best_parameters["gamma"]
+        assert param_sum <= 0.21, f"Sum constraint violated: {param_sum}"
+
+    def test_calibration_with_ordering_constraint(self, model: Model):
+        """Test calibration with ordering constraint (beta >= gamma)"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Constraint: beta >= gamma
+        constraints = [
+            CalibrationConstraint(
+                id="beta_ge_gamma",
+                expression="beta - gamma",
+                description="beta >= gamma",
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify constraint is satisfied
+        assert (
+            result.best_parameters["beta"] >= result.best_parameters["gamma"] - 1e-6
+        ), "Ordering constraint violated"
+
+    def test_calibration_with_time_dependent_constraint(self, model: Model):
+        """Test calibration with time-dependent constraint on compartment values"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        # Time-dependent constraint: I <= 100 at specific time steps
+        constraints = [
+            CalibrationConstraint(
+                id="peak_infected",
+                expression="100.0 - I",
+                description="Infected never exceeds 100",
+                time_steps=[10, 20, 30, 40, 50],
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=200, verbose=False),
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Run simulation with calibrated parameters to check constraint
+        calibrated_model = model.model_copy(deep=True)
+        for param in calibrated_model.parameters:
+            if param.id == "beta":
+                param.value = result.best_parameters["beta"]
+
+        calibrated_sim = Simulation(calibrated_model)
+        calibrated_results = calibrated_sim.run(100, output_format="dict_of_lists")
+
+        # Verify constraint at specified time steps
+        for ts in [10, 20, 30, 40, 50]:
+            assert calibrated_results["I"][ts] <= 105.0, (
+                f"Time constraint violated at step {ts}: "
+                f"I={calibrated_results['I'][ts]}"
+            )
+
+    def test_calibration_with_compartment_sum_constraint(self, model: Model):
+        """Test time-dependent constraint on sum of two compartments."""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Create observed data for infected compartment
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Time-dependent constraint: S + I <= 950 at specific time steps
+        constraints = [
+            CalibrationConstraint(
+                id="min_recovered",
+                expression="950.0 - (S + I)",
+                description="S + I <= 950",
+                time_steps=[30, 50, 70],
+            )
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(
+                num_particles=20,
+                max_iterations=200,
+                verbose=False,
+                initialization="latin_hypercube",
+            ),
+            seed=SEED,
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Run simulation with calibrated parameters to verify constraint
+        calibrated_model = model.model_copy(deep=True)
+        for param in calibrated_model.parameters:
+            if param.id in result.best_parameters:
+                param.value = result.best_parameters[param.id]
+
+        calibrated_sim = Simulation(calibrated_model)
+        calibrated_results = calibrated_sim.run(100, output_format="dict_of_lists")
+
+        # Verify constraint at specified time steps
+        for ts in [30, 50, 70]:
+            s_plus_i = calibrated_results["S"][ts] + calibrated_results["I"][ts]
+            assert s_plus_i <= 955.0, (
+                f"Compartment sum constraint violated at step {ts}: S+I={s_plus_i:.2f}"
+            )
+
+            # Also verify R >= 45 (allowing some tolerance)
+            r = calibrated_results["R"][ts]
+            assert r >= 45.0, f"Recovered below threshold at step {ts}: R={r:.2f}"
+
+    def test_calibration_with_multiple_constraints(self, model: Model):
+        """Test calibration with multiple simultaneous constraints"""
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+            for i in range(0, 100, 10)
+        ]
+
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=0.5,
+            ),
+        ]
+
+        # Multiple constraints
+        constraints = [
+            CalibrationConstraint(
+                id="r0_bound",
+                expression="5.0 - beta/gamma",
+                description="R0 <= 5",
+            ),
+            CalibrationConstraint(
+                id="ordering",
+                expression="beta - gamma",
+                description="beta >= gamma",
+            ),
+            CalibrationConstraint(
+                id="sum_bound",
+                expression="0.6 - (beta + gamma)",
+                description="Sum <= 0.6",
+            ),
+        ]
+
+        problem = CalibrationProblem(
+            observed_data=observed_data,
+            parameters=parameters,
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(
+                num_particles=20, max_iterations=200, verbose=False
+            ),
+            seed=SEED,
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        # Verify all constraints are satisfied
+        beta = result.best_parameters["beta"]
+        gamma = result.best_parameters["gamma"]
+
+        r0 = beta / gamma
+        assert r0 <= 5.1, f"R0 constraint violated: {r0}"
+
+        assert beta >= gamma - 1e-6, "Ordering constraint violated"
+
+        param_sum = beta + gamma
+        assert param_sum <= 0.61, f"Sum constraint violated: {param_sum}"
+
+    def test_constraint_expression_security_validation(self):
+        """Test that constraint expressions are validated for security threats."""
+        from pydantic import ValidationError
+
+        # Valid expressions should work
+        valid_constraint = CalibrationConstraint(
+            id="valid",
+            expression="5.0 - beta/gamma",
+            description="Valid R0 constraint",
+        )
+        assert valid_constraint.expression == "5.0 - beta/gamma"
+
+        # Dangerous Python patterns should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_eval",
+                expression="eval(beta)",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_import",
+                expression="import os",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Dangerous Rust patterns should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_unsafe",
+                expression="unsafe { beta }",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Encoding attacks should be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_hex",
+                expression=r"beta + \x41",
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Time-dependent constraints should also be validated
+        with pytest.raises(ValidationError) as exc_info:
+            CalibrationConstraint(
+                id="evil_time_dependent",
+                expression="eval(I)",
+                time_steps=[10, 20, 30],
+            )
+        assert "Security validation failed" in str(exc_info.value)
+
+        # Valid time-dependent constraint should work
+        valid_time_constraint = CalibrationConstraint(
+            id="peak_infected",
+            expression="500.0 - I",
+            time_steps=[10, 20, 30],
+        )
+        assert valid_time_constraint.expression == "500.0 - I"

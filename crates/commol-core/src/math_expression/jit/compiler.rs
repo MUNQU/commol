@@ -21,8 +21,12 @@ pub struct JITFunction {
     func_ptr: extern "C" fn(*const f64) -> f64,
 
     /// Keep the JIT module alive (it owns the executable memory)
-    /// Wrapped in Arc<Mutex<>> for safe sharing across threads
-    /// The Mutex is never actually locked after creation - it only exists for Send+Sync
+    ///
+    /// Uses Arc<Mutex<>> instead of just Arc because:
+    /// - JITModule is `Send` (can be moved between threads) but not `Sync` (cannot be shared)
+    /// - Arc requires T: Send + Sync, so we need Mutex to provide the Sync implementation
+    /// - The Mutex is never actually locked after creation since the module is immutable
+    /// - This is a zero-cost abstraction: the mutex overhead only exists for thread safety guarantees
     _module: Arc<Mutex<JITModule>>,
 
     /// Ordered list of variable names (for context preparation)
@@ -61,17 +65,23 @@ impl JITFunction {
             let value = if name == "step" || name == "t" {
                 context.step
             } else if name == "N" {
-                // Sum all compartments
-                context.compartments.values().sum()
+                // Sum all compartments in sorted order for deterministic floating-point results.
+                // HashMap iteration order is non-deterministic, and floating-point addition
+                // is not associative, so summing in different orders produces different results.
+                let mut sorted_values: Vec<f64> = context.compartments.values().copied().collect();
+                sorted_values.sort_by(|a, b| a.total_cmp(b));
+                sorted_values.iter().sum()
             } else if name.starts_with("N_") {
-                // Stratified population sum
+                // Stratified population sum in sorted order for deterministic results
                 let suffix = &name[1..]; // Keep "_age_young" etc.
-                context
+                let mut filtered_values: Vec<f64> = context
                     .compartments
                     .iter()
                     .filter(|(comp_name, _)| comp_name.ends_with(suffix))
-                    .map(|(_, val)| val)
-                    .sum()
+                    .map(|(_, val)| *val)
+                    .collect();
+                filtered_values.sort_by(|a, b| a.total_cmp(b));
+                filtered_values.iter().sum()
             } else {
                 // Try parameter first, then compartment
                 context
@@ -111,30 +121,30 @@ impl JITCompiler {
             MathExpressionError::InvalidExpression(format!("Failed to create JIT builder: {}", e))
         })?;
         let mut module = JITModule::new(builder);
-        // Step 1: Parse to AST
+        // Parse to AST
         let ast = parse_expression(preprocessed)?;
 
-        // Step 2: Collect all variables in the expression
+        // Collect all variables in the expression
         let variable_names = collect_variables(&ast);
         let mut variable_indices = HashMap::new();
         for (i, name) in variable_names.iter().enumerate() {
             variable_indices.insert(name.clone(), i);
         }
 
-        // Step 3: Define function signature
+        // Define function signature
         // extern "C" fn(context_ptr: *const f64) -> f64
         let mut sig = module.make_signature();
         sig.params.push(AbiParam::new(types::I64)); // context pointer
         sig.returns.push(AbiParam::new(types::F64)); // return f64
 
-        // Step 4: Declare function
+        // Declare function
         let func_id = module
             .declare_function("eval_expr", Linkage::Export, &sig)
             .map_err(|e| {
                 MathExpressionError::InvalidExpression(format!("Failed to declare function: {}", e))
             })?;
 
-        // Step 5: Build function body
+        // Build function body
         let mut ctx = module.make_context();
         ctx.func.signature = sig;
 
@@ -149,7 +159,7 @@ impl JITCompiler {
         // Get the context pointer parameter
         let context_ptr = builder.block_params(entry_block)[0];
 
-        // Step 6: Generate code
+        // Generate code
         let mut libm_registry = LibmRegistry::new();
         let mut codegen = CodeGenerator::new(
             builder,
@@ -160,27 +170,27 @@ impl JITCompiler {
         );
         let result_val = codegen.generate(&ast)?;
 
-        // Step 7: Return the result
+        // Return the result
         codegen.builder_mut().ins().return_(&[result_val]);
         codegen.finalize();
 
-        // Step 8: Compile to machine code
+        // Compile to machine code
         module.define_function(func_id, &mut ctx).map_err(|e| {
             MathExpressionError::InvalidExpression(format!("Failed to define function: {}", e))
         })?;
 
         module.clear_context(&mut ctx);
 
-        // Step 9: Finalize and get function pointer
+        // Finalize and get function pointer
         module.finalize_definitions().map_err(|e| {
             MathExpressionError::InvalidExpression(format!("Failed to finalize definitions: {}", e))
         })?;
 
         let code_ptr = module.get_finalized_function(func_id);
 
-        // Step 10: Convert code pointer to function pointer
-        // This is the only unavoidable unsafe in JIT compilation - we must convert
-        // a raw memory pointer to executable code into a callable function pointer.
+        // Convert code pointer to function pointer
+        // UNSAFE !!!
+        // We must convert a raw memory pointer to executable code into a callable function pointer.
         // We wrap this in a helper function with explicit safety documentation.
         let func_ptr = Self::code_ptr_to_fn(code_ptr);
 
@@ -212,41 +222,39 @@ impl JITCompiler {
 
 /// Collect all variable names used in an expression
 fn collect_variables(expr: &Expr) -> Vec<String> {
-    let mut vars = Vec::new();
-    collect_variables_recursive(expr, &mut vars);
-
-    // Remove duplicates while preserving order
+    // Use HashMap for O(1) lookups while maintaining insertion order with Vec
     let mut seen = HashMap::new();
     let mut result = Vec::new();
-    for var in vars {
-        if !seen.contains_key(&var) {
-            seen.insert(var.clone(), true);
-            result.push(var);
-        }
-    }
-
+    collect_variables_recursive(expr, &mut seen, &mut result);
     result
 }
 
-/// Recursively collect variables from an expression
-fn collect_variables_recursive(expr: &Expr, vars: &mut Vec<String>) {
+/// Recursively collect variables from an expression, deduplicating on the fly
+fn collect_variables_recursive(
+    expr: &Expr,
+    seen: &mut HashMap<String, ()>,
+    result: &mut Vec<String>,
+) {
     match expr {
         Expr::Variable(name) => {
             // Skip special constants that are compiled directly
             if name != "pi" && name != "e" {
-                vars.push(name.clone());
+                // Only insert if we haven't seen this variable before
+                if seen.insert(name.clone(), ()).is_none() {
+                    result.push(name.clone());
+                }
             }
         }
         Expr::BinaryOp { left, right, .. } => {
-            collect_variables_recursive(left, vars);
-            collect_variables_recursive(right, vars);
+            collect_variables_recursive(left, seen, result);
+            collect_variables_recursive(right, seen, result);
         }
         Expr::UnaryOp { operand, .. } => {
-            collect_variables_recursive(operand, vars);
+            collect_variables_recursive(operand, seen, result);
         }
         Expr::FunctionCall { args, .. } => {
             for arg in args {
-                collect_variables_recursive(arg, vars);
+                collect_variables_recursive(arg, seen, result);
             }
         }
         Expr::Conditional {
@@ -254,9 +262,9 @@ fn collect_variables_recursive(expr: &Expr, vars: &mut Vec<String>) {
             true_expr,
             false_expr,
         } => {
-            collect_variables_recursive(condition, vars);
-            collect_variables_recursive(true_expr, vars);
-            collect_variables_recursive(false_expr, vars);
+            collect_variables_recursive(condition, seen, result);
+            collect_variables_recursive(true_expr, seen, result);
+            collect_variables_recursive(false_expr, seen, result);
         }
         Expr::Constant(_) => {}
     }

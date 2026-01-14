@@ -1,6 +1,6 @@
 # Release Process
 
-EpiModel follows [Semantic Versioning](https://semver.org/) (SemVer) for version numbering: `MAJOR.MINOR.PATCH`
+Commol follows [Semantic Versioning](https://semver.org/) (SemVer) for version numbering: `MAJOR.MINOR.PATCH`
 
 ## Version Guidelines
 
@@ -87,7 +87,7 @@ Document all changes under the new version:
 cd py-commol
 poetry run ruff check .
 poetry run ruff format .
-poetry run mypy epimodel
+poetry run ty check commol
 poetry run pytest
 
 # Rust checks
@@ -176,7 +176,7 @@ Monitor progress:
 
 #### 4.1 Check PyPI
 
-Verify the package appears at: https://pypi.org/project/epimodel/
+Verify the package appears at: https://pypi.org/project/commol/
 
 #### 4.2 Test Installation
 
@@ -196,7 +196,7 @@ python -c "from commol import ModelBuilder; print('Success!')"
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
+
 
 # Run a quick test
 model = (
@@ -206,7 +206,6 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
-    .add_parameter(id="N", value=1000.0)
     .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
     .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
@@ -217,7 +216,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 sim = Simulation(model)

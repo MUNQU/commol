@@ -679,4 +679,240 @@ mod jit_tests {
         let expected = 0.5_f64.rem_euclid(0.2);
         assert!((result - expected).abs() < 1e-10);
     }
+
+    #[test]
+    fn test_jit_division_by_zero() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1 / 0");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Division by zero should produce infinity
+        assert!(result.is_infinite());
+        assert!(result.is_sign_positive());
+    }
+
+    #[test]
+    fn test_jit_negative_division_by_zero() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("-1 / 0");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Negative division by zero should produce negative infinity
+        assert!(result.is_infinite());
+        assert!(result.is_sign_negative());
+    }
+
+    #[test]
+    fn test_jit_zero_divided_by_zero() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("0 / 0");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // 0/0 should produce NaN
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_jit_nan_propagation() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("sqrt(-1)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // sqrt of negative number should be NaN
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_jit_nan_in_expression() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("sqrt(-1) + 5");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // NaN should propagate through operations
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_jit_infinity_arithmetic() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1 / 0 + 100");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Infinity + finite = Infinity
+        assert!(result.is_infinite());
+        assert!(result.is_sign_positive());
+    }
+
+    #[test]
+    fn test_jit_infinity_minus_infinity() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("(1 / 0) - (1 / 0)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Infinity - Infinity = NaN
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_jit_very_large_number() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1e308");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Should handle very large numbers
+        assert!((result - 1e308).abs() < 1e295);
+    }
+
+    #[test]
+    fn test_jit_overflow_to_infinity() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1e308 * 1e308");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Overflow should produce infinity
+        assert!(result.is_infinite());
+        assert!(result.is_sign_positive());
+    }
+
+    #[test]
+    fn test_jit_very_small_number() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1e-308");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Should handle very small numbers
+        assert!((result - 1e-308).abs() < 1e-320);
+    }
+
+    #[test]
+    fn test_jit_underflow_to_zero() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("1e-308 / 1e308");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // Underflow should produce zero or very small number
+        assert!(result.abs() < 1e-300);
+    }
+
+    #[test]
+    fn test_jit_empty_expression_error() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("");
+        let result = compiler.compile(&preprocessed);
+
+        // Empty expression should fail to compile
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_jit_malformed_function_wrong_arg_count() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("sin(1, 2)");
+        let result = compiler.compile(&preprocessed);
+
+        // sin with 2 arguments should fail
+        assert!(result.is_err());
+        if let Err(e) = result {
+            let error_msg = format!("{:?}", e);
+            assert!(error_msg.contains("sin") || error_msg.contains("argument"));
+        }
+    }
+
+    #[test]
+    fn test_jit_malformed_function_no_args() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("sqrt()");
+        let result = compiler.compile(&preprocessed);
+
+        // sqrt with no arguments should fail
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_jit_unknown_function() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("unknown_func(1)");
+        let result = compiler.compile(&preprocessed);
+
+        // Unknown function should fail
+        assert!(result.is_err());
+        if let Err(e) = result {
+            let error_msg = format!("{:?}", e);
+            assert!(error_msg.contains("unknown") || error_msg.contains("Unknown"));
+        }
+    }
+
+    #[test]
+    fn test_jit_pow_with_too_many_args() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("pow(2, 3, 4)");
+        let result = compiler.compile(&preprocessed);
+
+        // pow with 3 arguments should fail
+        assert!(result.is_err());
+        if let Err(e) = result {
+            let error_msg = format!("{:?}", e);
+            assert!(error_msg.contains("pow") || error_msg.contains("argument"));
+        }
+    }
+
+    #[test]
+    fn test_jit_log_of_zero() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("ln(0)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // ln(0) should produce negative infinity
+        assert!(result.is_infinite());
+        assert!(result.is_sign_negative());
+    }
+
+    #[test]
+    fn test_jit_log_of_negative() {
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("ln(-1)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let ctx = create_test_context();
+        let result = jit_fn.call(&ctx).unwrap();
+
+        // ln of negative number should be NaN
+        assert!(result.is_nan());
+    }
 }

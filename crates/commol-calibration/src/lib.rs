@@ -64,16 +64,24 @@
 
 pub mod calibration_problem;
 pub mod optimization;
+pub mod probabilistic;
 pub mod types;
 
 // Re-export commonly used items
 pub use calibration_problem::CalibrationProblem;
 pub use optimization::{
-    optimize, AccelerationStrategy, InertiaWeightStrategy, InitializationStrategy,
-    MutationApplication, MutationStrategy, NelderMeadConfig, OptimizationAlgorithm,
-    OptimizationConfig, ParticleSwarmConfig,
+    optimize, optimize_with_history, AccelerationStrategy, InertiaWeightStrategy,
+    InitializationStrategy, MutationApplication, MutationStrategy, NelderMeadConfig,
+    OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
 };
+pub use probabilistic::{
+    deduplicate_evaluations, generate_predictions_parallel, run_multiple_calibrations,
+    select_cluster_representatives, select_optimal_ensemble, ClusterRepresentativeConfig,
+    EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, OptimalEnsembleConfig,
+    ParetoSolution,
+};
+pub use probabilistic::{CalibrationError, CalibrationResult as CalibrationResultType};
 pub use types::{
-    CalibrationParameter, CalibrationParameterType, CalibrationResult, LossConfig,
-    ObservedDataPoint,
+    CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
+    CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
 };

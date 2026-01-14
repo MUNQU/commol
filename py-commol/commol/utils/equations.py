@@ -7,34 +7,7 @@ import pint
 from commol.context.parameter import Parameter
 from commol.context.stratification import Stratification
 
-# Initialize unit registry and define custom units
-ureg = pint.UnitRegistry()
-
-# Define custom units for population/compartment modeling
-# 'person' is a base unit for counting individuals in a population
-ureg.define("person = [population]")
-ureg.define("individual = person")
-ureg.define("people = person")
-
-# Define abstract time unit as a base dimension
-# This allows users to specify 'time' as a generic time unit
-ureg.define("time = [time_abstract]")
-
-# Define additional time units that are not in pint's default registry
-# Note: pint already includes many time units (second, minute, hour, day, week, year)
-# and some aliases (s, min, h, d, yr, a). We add commonly used aliases and units.
-
-_units_to_conditionally_add = {
-    "semester": "6 * month",
-    "wk": "week",
-    "mon": "month",
-}
-
-for unit_name, unit_definition in _units_to_conditionally_add.items():
-    try:
-        _ = ureg(unit_name)
-    except pint.UndefinedUnitError:
-        ureg.define(f"{unit_name} = {unit_definition}")
+ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
 
 
 class UnitConsistencyError(Exception):
@@ -115,7 +88,7 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     # The namespace also includes math functions which are callables
     namespace: dict[
         str,
-        pint.Quantity
+        pint.Quantity[float]
         | float
         | Callable[[float], float]
         | Callable[[float, float], float]

@@ -16,9 +16,16 @@ class LogicOperators(StrEnum):
 @unique
 class ModelTypes(StrEnum):
     DIFFERENCE_EQUATIONS = "DifferenceEquations"
+    DIFFERENTIAL_EQUATIONS = "DifferentialEquations"
 
 
 @unique
 class VariablePrefixes(StrEnum):
     STATE = "state"
     STRAT = "strat"
+
+
+@unique
+class PrintEquationsOutputFormat(StrEnum):
+    TEXT = "text"
+    LATEX = "latex"

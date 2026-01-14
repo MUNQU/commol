@@ -7,6 +7,38 @@ use super::ast::{BinaryOperator, Expr, UnaryOperator};
 use crate::math_expression::error::MathExpressionError;
 use evalexpr::{Node, Operator};
 
+/// Macro to reduce boilerplate for binary operators
+macro_rules! binary_op {
+    ($node:expr, $op_name:expr, $binary_op:expr) => {{
+        let children = $node.children();
+        if children.len() != 2 {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "{} requires exactly 2 operands",
+                $op_name
+            )));
+        }
+        Ok(Expr::binary(
+            $binary_op,
+            convert_node(&children[0])?,
+            convert_node(&children[1])?,
+        ))
+    }};
+}
+
+/// Macro to reduce boilerplate for unary operators
+macro_rules! unary_op {
+    ($node:expr, $op_name:expr, $unary_op:expr) => {{
+        let children = $node.children();
+        if children.len() != 1 {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "{} requires exactly 1 operand",
+                $op_name
+            )));
+        }
+        Ok(Expr::unary($unary_op, convert_node(&children[0])?))
+    }};
+}
+
 /// Parse a preprocessed formula string into our AST
 pub fn parse_expression(preprocessed: &str) -> Result<Expr, MathExpressionError> {
     // Use evalexpr to parse the expression into its AST
@@ -46,224 +78,28 @@ fn convert_node(node: &Node) -> Result<Expr, MathExpressionError> {
         Operator::VariableIdentifierRead { identifier } => Ok(Expr::Variable(identifier.clone())),
 
         // Binary operations - Arithmetic
-        Operator::Add => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Add requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Add,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Sub => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Sub requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Sub,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Mul => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Mul requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Mul,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Div => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Div requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Div,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Mod => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Mod requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Mod,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Exp => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Exp requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Pow,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
+        Operator::Add => binary_op!(node, "Add", BinaryOperator::Add),
+        Operator::Sub => binary_op!(node, "Sub", BinaryOperator::Sub),
+        Operator::Mul => binary_op!(node, "Mul", BinaryOperator::Mul),
+        Operator::Div => binary_op!(node, "Div", BinaryOperator::Div),
+        Operator::Mod => binary_op!(node, "Mod", BinaryOperator::Mod),
+        Operator::Exp => binary_op!(node, "Exp", BinaryOperator::Pow),
 
         // Binary operations - Comparison
-        Operator::Lt => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Lt requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Lt,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Gt => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Gt requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Gt,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Leq => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Leq requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Le,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Geq => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Geq requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Ge,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Eq => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Eq requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Eq,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Neq => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Neq requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Ne,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
+        Operator::Lt => binary_op!(node, "Lt", BinaryOperator::Lt),
+        Operator::Gt => binary_op!(node, "Gt", BinaryOperator::Gt),
+        Operator::Leq => binary_op!(node, "Leq", BinaryOperator::Le),
+        Operator::Geq => binary_op!(node, "Geq", BinaryOperator::Ge),
+        Operator::Eq => binary_op!(node, "Eq", BinaryOperator::Eq),
+        Operator::Neq => binary_op!(node, "Neq", BinaryOperator::Ne),
 
         // Binary operations - Logical
-        Operator::And => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "And requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::And,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
-
-        Operator::Or => {
-            let children = node.children();
-            if children.len() != 2 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Or requires exactly 2 operands".to_string(),
-                ));
-            }
-            Ok(Expr::binary(
-                BinaryOperator::Or,
-                convert_node(&children[0])?,
-                convert_node(&children[1])?,
-            ))
-        }
+        Operator::And => binary_op!(node, "And", BinaryOperator::And),
+        Operator::Or => binary_op!(node, "Or", BinaryOperator::Or),
 
         // Unary operations
-        Operator::Neg => {
-            let children = node.children();
-            if children.len() != 1 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Neg requires exactly 1 operand".to_string(),
-                ));
-            }
-            Ok(Expr::unary(UnaryOperator::Neg, convert_node(&children[0])?))
-        }
-
-        Operator::Not => {
-            let children = node.children();
-            if children.len() != 1 {
-                return Err(MathExpressionError::InvalidExpression(
-                    "Not requires exactly 1 operand".to_string(),
-                ));
-            }
-            Ok(Expr::unary(UnaryOperator::Not, convert_node(&children[0])?))
-        }
+        Operator::Neg => unary_op!(node, "Neg", UnaryOperator::Neg),
+        Operator::Not => unary_op!(node, "Not", UnaryOperator::Not),
 
         // Function calls
         Operator::FunctionIdentifier { identifier } => {

@@ -158,12 +158,10 @@ builder.set_initial_conditions(
 
 ## Model Types
 
-EpiModel currently supports:
+Commol currently supports:
 
 ```python
-from commol.constants import ModelTypes
-
-model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+model = builder.build(typology="DifferenceEquations")
 ```
 
 ### Difference Equations

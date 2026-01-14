@@ -1,10 +1,13 @@
+import re
 from collections.abc import Mapping
 from itertools import combinations, product
+from pathlib import Path
 from typing import Self
 
+import pint
 from pydantic import BaseModel, Field, model_validator
 
-from commol.constants import ModelTypes
+from commol.constants import ModelTypes, PrintEquationsOutputFormat
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
 from commol.context.population import Population
@@ -13,6 +16,7 @@ from commol.utils.equations import (
     UnitConsistencyError,
     check_equation_units,
     get_predefined_variable_units,
+    ureg,
 )
 from commol.utils.security import get_expression_variables
 
@@ -47,6 +51,36 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+
+    @classmethod
+    def from_json(cls, file_path: str | Path) -> Self:
+        """
+        Loads a model from a JSON file.
+
+        The method reads the specified JSON file, parses its content, and validates
+        it against the Model schema.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the JSON file.
+
+        Returns
+        -------
+        Model
+            A validated Model instance.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file at `file_path` does not exist.
+        pydantic.ValidationError
+            If the JSON content does not conform to the Model schema.
+        """
+        with open(file_path, "r") as f:
+            json_data = f.read()
+
+        return cls.model_validate_json(json_data)
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:
@@ -283,39 +317,58 @@ class Model(BaseModel):
 
         return self
 
-    def print_equations(self, output_file: str | None = None) -> None:
+    def print_equations(
+        self,
+        output_file: str | None = None,
+        format: str = PrintEquationsOutputFormat.TEXT,
+    ) -> None:
         """
-        Prints the difference equations of the model in mathematical form.
+        Prints the equations of the model in mathematical form.
 
-        Displays model metadata and the system of difference equations in both
+        Displays model metadata and the system of equations in both
         compact (mathematical notation) and expanded (individual equations) forms.
+
+        For DifferentialEquations models, displays equations as dX/dt = ...
+        For DifferenceEquations models,
+        displays equations as [X(t+Dt) - X(t)] / Dt = ...
 
         Parameters
         ----------
         output_file : str | None
             If provided, writes the equations to this file path instead of printing
             to console. If None, prints to console.
+        format : str, default="text"
+            Output format for equations. Must be one of:
+            - "text": Plain text format (default)
+            - "latex": LaTeX mathematical notation format
 
         Raises
         ------
         ValueError
-            If the model is not a DifferenceEquations model.
-        """
+            If format is not "text" or "latex"
 
-        if self.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
+        Examples
+        --------
+        >>> model.print_equations()  # Print to console in text format
+        >>> model.print_equations(output_file="equations.txt")  # Save text format
+        >>> model.print_equations(format="latex")  # Print LaTeX to console
+        >>> model.print_equations(
+        ...     output_file="equations.txt", format="latex"
+        ... )  # Save LaTeX
+        """
+        # Validate format parameter
+        if format not in PrintEquationsOutputFormat:
             raise ValueError(
-                (
-                    f"print_equations only supports DifferenceEquations models. "
-                    f"Current model type: {self.dynamics.typology}"
-                )
+                f"Invalid format: {format}. "
+                f"Must be one of {list(PrintEquationsOutputFormat)}"
             )
 
         lines = self._generate_model_header()
 
         # Always generate both compact and expanded forms
-        lines.extend(self._generate_compact_form())
+        lines.extend(self._generate_compact_form(format=format))
         lines.append("")
-        lines.extend(self._generate_expanded_form())
+        lines.extend(self._generate_expanded_form(format=format))
 
         output = "\n".join(lines)
         self._write_output(output, output_file)
@@ -383,17 +436,36 @@ class Model(BaseModel):
 
         return equations
 
-    def _format_bin_equation(self, flows: dict[str, list[str]]) -> str:
-        """Format the equation for a single bin or category from its flows."""
+    def _format_bin_equation(self, flows: dict[str, list[str]], format: str) -> str:
+        """
+        Format the equation for a single bin or category from its flows.
+
+        Parameters
+        ----------
+        flows : dict[str, list[str]]
+            Dictionary with 'inflows' and 'outflows' lists
+        format : str
+            Output format: "text" or "latex"
+        """
         terms: list[str] = []
 
         for inflow in flows["inflows"]:
             if inflow:  # Only add if not empty
-                terms.append(f"+ ({inflow})")
+                # Format rate for LaTeX if needed
+                if format == PrintEquationsOutputFormat.LATEX:
+                    formatted_inflow = self._latex_rate_expression(inflow)
+                else:
+                    formatted_inflow = inflow
+                terms.append(f"+ ({formatted_inflow})")
 
         for outflow in flows["outflows"]:
             if outflow:  # Only add if not empty
-                terms.append(f"- ({outflow})")
+                # Format rate for LaTeX if needed
+                if format == PrintEquationsOutputFormat.LATEX:
+                    formatted_outflow = self._latex_rate_expression(outflow)
+                else:
+                    formatted_outflow = outflow
+                terms.append(f"- ({formatted_outflow})")
 
         if not terms:
             return "0"
@@ -404,8 +476,15 @@ class Model(BaseModel):
             result = result[2:]
         return result
 
-    def _generate_compact_form(self) -> list[str]:
-        """Generate compact mathematical notation form for stratified models."""
+    def _generate_compact_form(self, format: str) -> list[str]:
+        """
+        Generate compact mathematical notation form for stratified models.
+
+        Parameters
+        ----------
+        format : str
+            Output format: "text" or "latex"
+        """
         lines: list[str] = []
         lines.append("=" * 40)
         lines.append("COMPACT FORM")
@@ -421,12 +500,12 @@ class Model(BaseModel):
 
         lines.extend(
             self._format_bin_transitions_compact_stratified(
-                bin_transitions, compartments
+                bin_transitions, compartments, format
             )
         )
         lines.extend(
             self._format_stratification_transitions_compact_stratified(
-                stratification_transitions, bin_ids
+                stratification_transitions, bin_ids, format
             )
         )
         lines.extend(self._format_total_system_size(bin_ids))
@@ -453,9 +532,34 @@ class Model(BaseModel):
 
         return compartments
 
-    def _compartment_to_string(self, compartment: tuple[str, ...]) -> str:
-        """Convert compartment tuple to string like 'S_young_urban'."""
-        return "_".join(compartment)
+    def _compartment_to_string(self, compartment: tuple[str, ...], format: str) -> str:
+        """
+        Convert compartment tuple to string.
+
+        Parameters
+        ----------
+        compartment : tuple[str, ...]
+            Compartment as tuple (e.g., ('S', 'young', 'urban'))
+        format : str, default="text"
+            Output format: "text" or "latex"
+
+        Returns
+        -------
+        str
+            Formatted compartment string
+
+        Examples
+        --------
+        Text: ('S', 'young', 'urban') -> 'S_young_urban'
+        LaTeX: ('S', 'young', 'urban') -> 'S_{young,urban}'
+        """
+        if format == PrintEquationsOutputFormat.LATEX:
+            # Use _latex_variable to format with subscripts
+            compartment_str = "_".join(compartment)
+            return self._latex_variable(compartment_str)
+        else:
+            # Text format (original)
+            return "_".join(compartment)
 
     def _get_rate_for_compartment(
         self, transition: Transition, compartment: tuple[str, ...]
@@ -502,32 +606,6 @@ class Model(BaseModel):
 
         return bin_transitions, stratification_transitions
 
-    def _format_stratification_transitions_compact(
-        self, bin_ids: list[str], stratification_transitions: list[Transition]
-    ) -> list[str]:
-        """Format stratification transitions in compact form."""
-        lines: list[str] = []
-        strat_by_id = self._group_transitions_by_stratification(
-            stratification_transitions
-        )
-
-        for strat in self.population.stratifications:
-            if strat_by_id[strat.id]:
-                lines.append(f"Stratification Transitions ({strat.id}):")
-                disease_states_str = ", ".join(bin_ids)
-                lines.append(f"For each bin X in {{{disease_states_str}}}:")
-
-                for category in strat.categories:
-                    equation = self._build_category_equation(
-                        category, strat_by_id[strat.id]
-                    )
-                    if equation:
-                        lines.append(f"  dX_{category}/dt: {equation}")
-
-                lines.append("")
-
-        return lines
-
     def _group_transitions_by_stratification(
         self, transitions: list[Transition]
     ) -> dict[str, list[Transition]]:
@@ -540,97 +618,6 @@ class Model(BaseModel):
                 if transition_states.issubset(set(strat.categories)):
                     strat_by_id[strat.id].append(transition)
         return strat_by_id
-
-    def _build_category_equation(
-        self, category: str, transitions: list[Transition]
-    ) -> str:
-        """Build equation for a stratification category."""
-        inflows: list[str] = []
-        outflows: list[str] = []
-
-        for transition in transitions:
-            if not transition.rate:
-                continue
-
-            source_count = transition.source.count(category)
-            target_count = transition.target.count(category)
-            net_change = target_count - source_count
-
-            if net_change > 0:
-                inflows.append(f"+ ({transition.rate} * X)")
-            elif net_change < 0:
-                outflows.append(f"- ({transition.rate} * X)")
-
-        terms = inflows + outflows
-        if not terms:
-            return ""
-
-        result = " ".join(terms)
-        # Remove leading + sign if present
-        if result.startswith("+"):
-            result = result[1:]
-        return result
-
-    def _format_bin_transitions_compact(
-        self, bin_ids: list[str], bin_transitions: list[Transition]
-    ) -> list[str]:
-        """Format bin transitions in compact form."""
-        lines: list[str] = []
-
-        if not bin_transitions:
-            return lines
-
-        lines.append("Bin Transitions:")
-
-        if self.population.stratifications:
-            all_categories = [
-                cat
-                for strat in self.population.stratifications
-                for cat in strat.categories
-            ]
-            categories_str = ", ".join(all_categories)
-            lines.append(f"For each stratification s in {{{categories_str}}}:")
-
-        for bin_id in bin_ids:
-            equation = self._build_bin_equation_from_transitions(
-                bin_id, bin_transitions
-            )
-            if equation:
-                suffix = "_s" if self.population.stratifications else ""
-                lines.append(f"  d{bin_id}{suffix}/dt: {equation}")
-
-        lines.append("")
-        return lines
-
-    def _build_bin_equation_from_transitions(
-        self, bin_id: str, transitions: list[Transition]
-    ) -> str:
-        """Build equation for a bin."""
-        inflows: list[str] = []
-        outflows: list[str] = []
-
-        for transition in transitions:
-            if not transition.rate:
-                continue
-
-            source_count = transition.source.count(bin_id)
-            target_count = transition.target.count(bin_id)
-            net_change = target_count - source_count
-
-            if net_change > 0:
-                inflows.append(f"+ ({transition.rate})")
-            elif net_change < 0:
-                outflows.append(f"- ({transition.rate})")
-
-        terms = inflows + outflows
-        if not terms:
-            return ""
-
-        result = " ".join(terms)
-        # Remove leading + sign if present
-        if result.startswith("+"):
-            result = result[1:]
-        return result
 
     def _format_total_system_size(self, bin_ids: list[str]) -> list[str]:
         """Format the total system size information."""
@@ -666,9 +653,23 @@ class Model(BaseModel):
         return lines
 
     def _format_bin_transitions_compact_stratified(
-        self, bin_transitions: list[Transition], compartments: list[tuple[str, ...]]
+        self,
+        bin_transitions: list[Transition],
+        compartments: list[tuple[str, ...]],
+        format: str,
     ) -> list[str]:
-        """Format bin transitions showing specific compartments and rates."""
+        """
+        Format bin transitions showing specific compartments and rates.
+
+        Parameters
+        ----------
+        bin_transitions : list[Transition]
+            List of bin transitions
+        compartments : list[tuple[str, ...]]
+            List of compartments
+        format : str
+            Output format: "text" or "latex"
+        """
         lines: list[str] = []
 
         if not bin_transitions:
@@ -678,67 +679,127 @@ class Model(BaseModel):
 
         # Check if we have complete units for annotation
         show_units = self._has_all_units()
-
-        # Cache variable units for efficiency when formatting multiple rates
         variable_units = self._build_variable_units() if show_units else None
 
         for transition in bin_transitions:
-            source_bins = transition.source
-            target_bins = transition.target
-
-            source_str = ", ".join(sorted(set(source_bins))) if source_bins else "none"
-            target_str = ", ".join(sorted(set(target_bins))) if target_bins else "none"
+            source_str = (
+                ", ".join(sorted(set(transition.source)))
+                if transition.source
+                else "none"
+            )
+            target_str = (
+                ", ".join(sorted(set(transition.target)))
+                if transition.target
+                else "none"
+            )
             lines.append(
                 f"{transition.id.capitalize()} ({source_str} -> {target_str}):"
             )
 
-            # Handle influx transitions (empty source)
-            if not source_bins and target_bins:
-                for compartment in compartments:
-                    bin_id = compartment[0]
-                    if bin_id in target_bins:
-                        target_compartment_str = self._compartment_to_string(
-                            compartment
-                        )
-                        rate = self._get_rate_for_compartment(transition, compartment)
-                        rate_with_unit = self._format_rate_with_unit(
-                            rate, variable_units, show_units
-                        )
-
-                        lines.append(
-                            f"  none -> {target_compartment_str}: {rate_with_unit}"
-                        )
-            # Handle normal transitions (source to target)
+            # Handle influx vs normal transitions
+            if not transition.source and transition.target:
+                lines.extend(
+                    self._format_influx_transition_lines(
+                        transition, compartments, variable_units, show_units, format
+                    )
+                )
             else:
-                for compartment in compartments:
-                    bin_id = compartment[0]
-
-                    if bin_id in source_bins:
-                        source_compartment_str = self._compartment_to_string(
-                            compartment
-                        )
-
-                        if target_bins:
-                            target_bin = target_bins[0]
-                            target_compartment_str = source_compartment_str.replace(
-                                bin_id, target_bin, 1
-                            )
-                        else:
-                            target_compartment_str = "none"
-
-                        rate = self._get_rate_for_compartment(transition, compartment)
-                        rate_with_unit = self._format_rate_with_unit(
-                            rate, variable_units, show_units
-                        )
-
-                        lines.append(
-                            f"  {source_compartment_str} -> "
-                            f"{target_compartment_str}: {rate_with_unit}"
-                        )
+                lines.extend(
+                    self._format_normal_transition_lines(
+                        transition, compartments, variable_units, show_units, format
+                    )
+                )
 
             lines.append("")
 
         return lines
+
+    def _format_influx_transition_lines(
+        self,
+        transition: Transition,
+        compartments: list[tuple[str, ...]],
+        variable_units: dict[str, str] | None,
+        show_units: bool,
+        format: str,
+    ) -> list[str]:
+        """Format lines for influx transitions (empty source)."""
+        lines: list[str] = []
+        for compartment in compartments:
+            bin_id = compartment[0]
+            if bin_id in transition.target:
+                target_compartment_str = self._compartment_to_string(
+                    compartment, format
+                )
+                rate = self._get_rate_for_compartment(transition, compartment)
+                rate_with_unit = self._format_rate_with_unit(
+                    rate, variable_units, show_units, format
+                )
+
+                if format == PrintEquationsOutputFormat.LATEX:
+                    arrow = self._latex_transition_arrow("none", target_compartment_str)
+                    lines.append(f"  ${arrow}: {rate_with_unit}$")
+                else:
+                    lines.append(
+                        f"  none -> {target_compartment_str}: {rate_with_unit}"
+                    )
+        return lines
+
+    def _format_normal_transition_lines(
+        self,
+        transition: Transition,
+        compartments: list[tuple[str, ...]],
+        variable_units: dict[str, str] | None,
+        show_units: bool,
+        format: str,
+    ) -> list[str]:
+        """Format lines for normal transitions (source to target)."""
+        lines: list[str] = []
+        for compartment in compartments:
+            bin_id = compartment[0]
+            if bin_id in transition.source:
+                source_compartment_str = self._compartment_to_string(
+                    compartment, format
+                )
+                target_compartment_str = self._get_target_compartment_str(
+                    compartment, bin_id, transition.target, format
+                )
+
+                rate = self._get_rate_for_compartment(transition, compartment)
+                rate_with_unit = self._format_rate_with_unit(
+                    rate, variable_units, show_units, format
+                )
+
+                if format == PrintEquationsOutputFormat.LATEX:
+                    arrow = self._latex_transition_arrow(
+                        source_compartment_str, target_compartment_str
+                    )
+                    lines.append(f"  ${arrow}: {rate_with_unit}$")
+                else:
+                    lines.append(
+                        f"  {source_compartment_str} -> "
+                        f"{target_compartment_str}: {rate_with_unit}"
+                    )
+        return lines
+
+    def _get_target_compartment_str(
+        self,
+        compartment: tuple[str, ...],
+        bin_id: str,
+        target_bins: list[str],
+        format: str,
+    ) -> str:
+        """Get the target compartment string for a transition."""
+        if not target_bins:
+            return "none"
+
+        target_bin = target_bins[0]
+        if format == PrintEquationsOutputFormat.LATEX:
+            target_compartment = list(compartment)
+            target_compartment[0] = target_bin
+            return self._compartment_to_string(tuple(target_compartment), format)
+        else:
+            source_compartment_str = self._compartment_to_string(compartment, format)
+            return source_compartment_str.replace(bin_id, target_bin, 1)
 
     def _build_stratified_for_each_line(
         self, bin_ids: list[str], other_strats: list["Stratification"]
@@ -760,6 +821,7 @@ class Model(BaseModel):
         combo: tuple[str, ...],
         variable_units: dict[str, str] | None = None,
         show_units: bool = True,
+        format: str = PrintEquationsOutputFormat.TEXT,
     ) -> str:
         """
         Build a transition line for stratification transitions.
@@ -798,19 +860,39 @@ class Model(BaseModel):
                 target_parts[i] = combo[combo_idx]
                 combo_idx += 1
 
-        source_comp = f"X_{'_'.join(source_parts)}"
-        target_comp = f"X_{'_'.join(target_parts)}"
+        # Format compartment strings based on output format
+        if format == PrintEquationsOutputFormat.LATEX:
+            source_comp_parts = "_".join(["X"] + source_parts)
+            target_comp_parts = "_".join(["X"] + target_parts)
+            source_comp = self._latex_variable(source_comp_parts)
+            target_comp = self._latex_variable(target_comp_parts)
+        else:
+            source_comp = f"X_{'_'.join(source_parts)}"
+            target_comp = f"X_{'_'.join(target_parts)}"
 
         sample_compartment = ("X",) + tuple(source_parts)
         rate = self._get_rate_for_compartment(trans, sample_compartment)
 
-        # Build the rate expression with variable annotations
-        if show_units and rate and self.population.bins:
-            # Replace X with the first bin id to get a concrete compartment for
-            # annotation
+        # Format the rate expression
+        if format == PrintEquationsOutputFormat.LATEX:
+            # LaTeX format
+            effective_rate = rate if rate else trans.rate
+            if effective_rate:
+                rate_expr = (
+                    f"{self._latex_rate_expression(effective_rate)} "
+                    f"\\cdot {source_comp}"
+                )
+            else:
+                rate_expr = f"\\text{{None}} \\cdot {source_comp}"
+            arrow = self._latex_transition_arrow(source_comp, target_comp)
+            return f"  ${arrow}: {rate_expr}$"
+        elif show_units and rate and self.population.bins:
+            # Text format with units
             first_bin_id = self.population.bins[0].id
             concrete_compartment = (first_bin_id,) + tuple(source_parts)
-            concrete_comp_str = self._compartment_to_string(concrete_compartment)
+            concrete_comp_str = self._compartment_to_string(
+                concrete_compartment, format
+            )
             full_rate_expr = f"{rate} * {concrete_comp_str}"
 
             # Annotate the concrete expression with units
@@ -819,7 +901,6 @@ class Model(BaseModel):
             )
 
             # Replace the concrete compartment back with X (generic bin placeholder)
-            # Handle both simple case and stratified case
             bin_unit = self.population.bins[0].unit
             annotated_expr = annotated_expr.replace(
                 f"{concrete_comp_str}({bin_unit})", f"{source_comp}({bin_unit})"
@@ -831,7 +912,7 @@ class Model(BaseModel):
 
             return f"  {source_comp} -> {target_comp}: {annotated_expr}{unit_str}"
         else:
-            # Fallback without annotations
+            # Text format without annotations
             rate_expr = (
                 f"{rate} * {source_comp}" if rate else f"{trans.rate} * {source_comp}"
             )
@@ -841,8 +922,20 @@ class Model(BaseModel):
         self,
         stratification_transitions: list[Transition],
         bin_ids: list[str],
+        format: str,
     ) -> list[str]:
-        """Format stratification transitions showing movements between categories."""
+        """
+        Format stratification transitions showing movements between categories.
+
+        Parameters
+        ----------
+        stratification_transitions : list[Transition]
+            List of stratification transitions
+        bin_ids : list[str]
+            List of bin IDs
+        format : str
+            Output format: "text" or "latex"
+        """
         lines: list[str] = []
         strat_by_id = self._group_transitions_by_stratification(
             stratification_transitions
@@ -890,7 +983,7 @@ class Model(BaseModel):
                 for combo in other_cat_combos:
                     lines.append(
                         self._build_stratified_transition_line(
-                            trans, strat_idx, combo, variable_units, show_units
+                            trans, strat_idx, combo, variable_units, show_units, format
                         )
                     )
 
@@ -898,8 +991,48 @@ class Model(BaseModel):
 
         return lines
 
-    def _generate_expanded_form(self) -> list[str]:
-        """Generate expanded form with individual equations for each compartment."""
+    def _get_equation_lhs(self, variable_name: str, format: str) -> str:
+        """
+        Get the left-hand side of an equation based on model type.
+
+        Parameters
+        ----------
+        variable_name : str
+            The name of the variable (already LaTeX-formatted if format is "latex")
+        format : str, default="text"
+            Output format: "text" or "latex"
+
+        Returns
+        -------
+        str
+            The formatted LHS
+        """
+        if format == PrintEquationsOutputFormat.LATEX:
+            # variable_name is already LaTeX-formatted (e.g., S_{young})
+            # Don't call _latex_variable again
+            if self.dynamics.typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
+                return f"\\frac{{d{variable_name}}}{{dt}}"
+            else:  # DIFFERENCE_EQUATIONS:
+                return (
+                    f"\\frac{{{variable_name}(t+\\Delta t) - "
+                    f"{variable_name}(t)}}{{\\Delta t}}"
+                )
+        else:
+            # Text format (original)
+            if self.dynamics.typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
+                return f"d{variable_name}/dt"
+            else:  # DIFFERENCE_EQUATIONS
+                return f"[{variable_name}(t+Dt) - {variable_name}(t)] / Dt"
+
+    def _generate_expanded_form(self, format: str) -> list[str]:
+        """
+        Generate expanded form with individual equations for each compartment.
+
+        Parameters
+        ----------
+        format : str
+            Output format: "text" or "latex"
+        """
         lines: list[str] = []
 
         lines.append("=" * 40)
@@ -915,19 +1048,27 @@ class Model(BaseModel):
             )
 
             for compartment in compartments:
-                compartment_str = self._compartment_to_string(compartment)
+                compartment_str = self._compartment_to_string(compartment, format)
                 equation = self._build_compartment_equation(
-                    compartment, bin_transitions, stratification_transitions
+                    compartment, bin_transitions, stratification_transitions, format
                 )
-                lines.append(f"d{compartment_str}/dt = {equation}")
+                lhs = self._get_equation_lhs(compartment_str, format)
+                if format == PrintEquationsOutputFormat.LATEX:
+                    lines.append(f"\\[{lhs} = {equation}\\]")
+                else:
+                    lines.append(f"{lhs} = {equation}")
         else:
             bin_and_category_ids = self._collect_bin_and_category_ids()
             equations = self._build_flow_equations(bin_and_category_ids)
             bin_ids = [bin_item.id for bin_item in self.population.bins]
 
             for bin_id in bin_ids:
-                equation = self._format_bin_equation(equations[bin_id])
-                lines.append(f"d{bin_id}/dt = {equation}")
+                equation = self._format_bin_equation(equations[bin_id], format)
+                lhs = self._get_equation_lhs(bin_id, format)
+                if format == PrintEquationsOutputFormat.LATEX:
+                    lines.append(f"\\[{lhs} = {equation}\\]")
+                else:
+                    lines.append(f"{lhs} = {equation}")
 
         return lines
 
@@ -936,27 +1077,33 @@ class Model(BaseModel):
         compartment: tuple[str, ...],
         bin_transitions: list[Transition],
         stratification_transitions: list[Transition],
+        format: str,
     ) -> str:
-        """Build the complete equation for a specific compartment."""
+        """
+        Build the complete equation for a specific compartment.
+
+        Parameters
+        ----------
+        compartment : tuple[str, ...]
+            The compartment tuple
+        bin_transitions : list[Transition]
+            List of bin transitions
+        stratification_transitions : list[Transition]
+            List of stratification transitions
+        format : str
+            Output format: "text" or "latex"
+        """
         terms: list[str] = []
-        bin_id = compartment[0]
 
-        for transition in bin_transitions:
-            source_count = transition.source.count(bin_id)
-            target_count = transition.target.count(bin_id)
-            net_change = target_count - source_count
+        # Add bin transition terms
+        terms.extend(
+            self._get_bin_transition_terms(compartment, bin_transitions, format)
+        )
 
-            if net_change != 0:
-                rate = self._get_rate_for_compartment(transition, compartment)
-                if rate:
-                    if net_change > 0:
-                        terms.append(f"+ ({rate})")
-                    else:
-                        terms.append(f"- ({rate})")
-
+        # Add stratification transition terms
         for transition in stratification_transitions:
             flow_term = self._get_stratification_flow_for_compartment(
-                compartment, transition
+                compartment, transition, format
             )
             if flow_term:
                 terms.append(flow_term)
@@ -971,10 +1118,52 @@ class Model(BaseModel):
             return equation[1:]
         return equation
 
+    def _get_bin_transition_terms(
+        self,
+        compartment: tuple[str, ...],
+        bin_transitions: list[Transition],
+        format: str,
+    ) -> list[str]:
+        """Extract terms from bin transitions for a compartment."""
+        terms: list[str] = []
+        bin_id = compartment[0]
+
+        for transition in bin_transitions:
+            source_count = transition.source.count(bin_id)
+            target_count = transition.target.count(bin_id)
+            net_change = target_count - source_count
+
+            if net_change != 0:
+                rate = self._get_rate_for_compartment(transition, compartment)
+                if rate:
+                    # Format rate for LaTeX if needed
+                    if format == PrintEquationsOutputFormat.LATEX:
+                        formatted_rate = self._latex_rate_expression(rate)
+                    else:
+                        formatted_rate = rate
+
+                    if net_change > 0:
+                        terms.append(f"+ ({formatted_rate})")
+                    else:
+                        terms.append(f"- ({formatted_rate})")
+
+        return terms
+
     def _get_stratification_flow_for_compartment(
-        self, compartment: tuple[str, ...], transition: Transition
+        self, compartment: tuple[str, ...], transition: Transition, format: str
     ) -> str | None:
-        """Calculate stratification flow term for a compartment."""
+        """
+        Calculate stratification flow term for a compartment.
+
+        Parameters
+        ----------
+        compartment : tuple[str, ...]
+            The compartment tuple
+        transition : Transition
+            The transition
+        format : str
+            Output format: "text" or "latex"
+        """
         if len(compartment) == 1:
             return None
 
@@ -1004,18 +1193,26 @@ class Model(BaseModel):
         if not rate:
             return None
 
+        # Format rate and compartment strings
+        if format == PrintEquationsOutputFormat.LATEX:
+            formatted_rate = self._latex_rate_expression(rate)
+            mult_op = " \\cdot "
+        else:
+            formatted_rate = rate
+            mult_op = " * "
+
         if net_change < 0:
-            compartment_str = self._compartment_to_string(compartment)
-            return f"- ({rate} * {compartment_str})"
+            compartment_str = self._compartment_to_string(compartment, format)
+            return f"- ({formatted_rate}{mult_op}{compartment_str})"
         else:
             source_category = source_categories[0] if source_categories else None
             if source_category:
                 source_compartment = list(compartment)
                 source_compartment[target_strat_idx + 1] = source_category
                 source_compartment_str = self._compartment_to_string(
-                    tuple(source_compartment)
+                    tuple(source_compartment), format
                 )
-                return f"+ ({rate} * {source_compartment_str})"
+                return f"+ ({formatted_rate}{mult_op}{source_compartment_str})"
 
         return None
 
@@ -1026,6 +1223,260 @@ class Model(BaseModel):
                 _ = f.write(output)
         else:
             print(output)
+
+    def _latex_variable(self, var_name: str) -> str:
+        """
+        Format variable name for LaTeX math mode.
+
+        Converts variable names to LaTeX format with proper subscripts.
+        Variables with underscores get subscripts with comma-separated values.
+        All output is in math mode (not text mode).
+
+        Parameters
+        ----------
+        var_name : str
+            Variable name to format
+
+        Returns
+        -------
+        str
+            LaTeX-formatted variable name
+
+        Examples
+        --------
+        - S -> S
+        - beta -> \\beta (if common Greek letter name)
+        - S_young_urban -> S_{young,urban}
+        - N_young -> N_{young}
+        """
+        # Greek letters commonly used in epidemiology
+        greek_letters = {
+            "alpha",
+            "beta",
+            "gamma",
+            "delta",
+            "epsilon",
+            "zeta",
+            "eta",
+            "theta",
+            "iota",
+            "kappa",
+            "lambda",
+            "mu",
+            "nu",
+            "xi",
+            "omicron",
+            "pi",
+            "rho",
+            "sigma",
+            "tau",
+            "upsilon",
+            "phi",
+            "chi",
+            "psi",
+            "omega",
+        }
+
+        # Check if the variable is a Greek letter
+        if var_name in greek_letters:
+            return f"\\{var_name}"
+
+        # Handle variables with underscores (subscripts)
+        if "_" in var_name:
+            parts = var_name.split("_")
+            base = parts[0]
+            subscripts = parts[1:]
+
+            # Format base (check if it's a Greek letter)
+            if base in greek_letters:
+                base = f"\\{base}"
+
+            # Join subscripts with commas
+            subscript_str = ",".join(subscripts)
+            return f"{base}_{{{subscript_str}}}"
+
+        return var_name
+
+    def _latex_transition_arrow(self, source: str, target: str) -> str:
+        """
+        Format transition arrow for LaTeX.
+
+        Parameters
+        ----------
+        source : str
+            Source compartment (or "none" for influx) - should already be
+            LaTeX-formatted
+        target : str
+            Target compartment (or "none" for outflux) - should already be
+            LaTeX-formatted
+
+        Returns
+        -------
+        str
+            LaTeX-formatted transition arrow
+
+        Examples
+        --------
+        - none -> S_{young}: \\varnothing \\to S_{young}
+        - S_{young} -> I_{young}: S_{young} \\to I_{young}
+        - S -> none: S \\to \\varnothing
+        """
+        formatted_source = "\\varnothing" if source == "none" else source
+        formatted_target = "\\varnothing" if target == "none" else target
+        return f"{formatted_source} \\to {formatted_target}"
+
+    def _latex_rate_expression(self, rate: str) -> str:
+        """
+        Convert rate expression to LaTeX math mode.
+
+        Transforms rate expressions by:
+        - Formatting all variables as math variables (bins, parameters)
+        - Converting * to \\cdot
+        - Converting / to \\frac{numerator}{denominator}
+        - Wrapping units in \\text{...} when annotated
+
+        Parameters
+        ----------
+        rate : str
+            The rate expression to convert
+
+        Returns
+        -------
+        str
+            LaTeX-formatted rate expression
+
+        Examples
+        --------
+        Input:  "beta * S * I / N"
+        Output: "\\frac{\\beta \\cdot S \\cdot I}{N}"
+
+        Input:  "beta(1/day) * S(person)"
+        Output: "\\beta\\ (\\frac{1}{\\text{day}}) \\cdot S\\ (\\text{person})"
+        """
+        if not rate:
+            return rate
+
+        # First, replace * with \cdot
+        latex_rate = rate.replace(" * ", " \\cdot ")
+
+        # Get all variables in the expression
+        variables = get_expression_variables(rate)
+
+        # Sort variables by length (descending) to avoid partial replacements
+        sorted_vars = sorted(variables, key=lambda x: len(x), reverse=True)
+
+        # Replace each variable with its LaTeX formatted version
+        for var in sorted_vars:
+            latex_var = self._latex_variable(var)
+            # Use word boundaries to avoid partial matches
+            pattern = r"\b" + re.escape(var) + r"\b"
+            # Escape backslashes in replacement string for re.sub
+            latex_rate = re.sub(pattern, latex_var.replace("\\", "\\\\"), latex_rate)
+
+        # Handle units: wrap them in \text{...}
+        # Pattern: (unit) or [unit] where unit contains letters
+        latex_rate = re.sub(r"\(([^)]*[a-zA-Z][^)]*)\)", r"(\\text{\1})", latex_rate)
+        latex_rate = re.sub(r"\[([^\]]*[a-zA-Z][^\]]*)\]", r"[\\text{\1}]", latex_rate)
+
+        # Convert division to fractions
+        # This is complex because we need to handle operator precedence
+        # For now, convert simple divisions like "a / b" to "\frac{a}{b}"
+        # More complex cases with parentheses need careful handling
+        latex_rate = self._convert_division_to_frac(latex_rate)
+
+        return latex_rate
+
+    def _convert_division_to_frac(self, expr: str) -> str:
+        """
+        Convert division operations to LaTeX fractions.
+
+        Handles operator precedence and nested parentheses correctly.
+        For example: "a \\cdot b / c" becomes "\\frac{a \\cdot b}{c}"
+                    "(a + b) / (c \\cdot d)" becomes "\\frac{a + b}{c \\cdot d}"
+
+        Parameters
+        ----------
+        expr : str
+            Expression with division operators
+
+        Returns
+        -------
+        str
+            Expression with divisions converted to \\frac
+        """
+        if " / " not in expr:
+            return expr
+
+        # Find division operators not inside parentheses
+        divisions = []
+        paren_depth = 0
+        i = 0
+
+        while i < len(expr):
+            if expr[i] == "(":
+                paren_depth += 1
+            elif expr[i] == ")":
+                paren_depth -= 1
+            elif paren_depth == 0 and i + 3 <= len(expr) and expr[i : i + 3] == " / ":
+                divisions.append(i)
+                i += 2  # Skip the " / " for next iteration
+            i += 1
+
+        if not divisions:
+            # No divisions at top level, return as is
+            return expr
+
+        # Process divisions from left to right
+        # Split expression at division points
+        parts = []
+        start = 0
+        for div_pos in divisions:
+            parts.append(expr[start:div_pos].strip())
+            start = div_pos + 3  # Skip " / "
+        parts.append(expr[start:].strip())
+
+        # Build fractions from left to right
+        # a / b / c becomes \frac{\frac{a}{b}}{c}
+        result = self._strip_outer_parens(parts[0])
+        for i in range(1, len(parts)):
+            denominator = self._strip_outer_parens(parts[i])
+            result = f"\\frac{{{result}}}{{{denominator}}}"
+
+        return result
+
+    def _strip_outer_parens(self, expr: str) -> str:
+        """
+        Remove outer parentheses if they wrap the entire expression.
+
+        Parameters
+        ----------
+        expr : str
+            Expression to process
+
+        Returns
+        -------
+        str
+            Expression with outer parentheses removed if applicable
+        """
+        expr = expr.strip()
+        if not expr.startswith("(") or not expr.endswith(")"):
+            return expr
+
+        # Check if parentheses actually wrap the whole expression
+        # Need to ensure they're matching outer parentheses
+        depth = 0
+        for i, char in enumerate(expr):
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+
+            # If depth reaches 0 before the end, these aren't wrapping parentheses
+            if depth == 0 and i < len(expr) - 1:
+                return expr
+
+        # If we get here, the parentheses wrap the whole expression
+        return expr[1:-1]
 
     def check_unit_consistency(self, verbose: bool = False) -> None:
         """
@@ -1075,6 +1526,74 @@ class Model(BaseModel):
         if verbose:
             print("Unit consistency check passed successfully.")
 
+    def _register_custom_units(self) -> None:
+        """Register custom units in the pint registry."""
+        # Collect all units that need to be registered
+        units_to_register = set()
+
+        # Add bin units
+        for bin_item in self.population.bins:
+            if bin_item.unit:
+                units_to_register.add(bin_item.unit)
+
+        # Add parameter units
+        for param in self.parameters:
+            if param.unit:
+                # Extract individual unit names from compound units like "1/semester"
+                # Remove operators and numbers to get unit names
+                unit_str = param.unit
+                # Split by common operators and filter out numbers/empty strings
+                unit_parts = re.split(r"[*/\s\(\)]+", unit_str)
+                for part in unit_parts:
+                    part = part.strip()
+                    if part and not part.replace(".", "").replace("-", "").isdigit():
+                        units_to_register.add(part)
+
+        # Known time unit aliases that should be defined relative to existing time units
+        # rather than as new base dimensions
+        known_time_aliases = {
+            # Periods
+            "decade": "10 * year",
+            "century": "100 * year",
+            "millennium": "1000 * year",
+            "fortnight": "14 * day",
+            "biweek": "14 * day",
+            "semester": "6 * month",
+            "trimester": "3 * month",
+            "quarter": "3 * month",
+            "bimester": "2 * month",
+            # Common abbreviations
+            "wk": "week",
+            "mo": "month",
+            "mon": "month",
+            "yr": "year",
+            "hr": "hour",
+            "min": "minute",
+            "sec": "second",
+            # Plural/singular variants
+            "secs": "second",
+            "mins": "minute",
+            "hrs": "hour",
+            "wks": "week",
+            "mons": "month",
+            "yrs": "year",
+        }
+
+        # Register each unit if not already defined
+        for unit_name in units_to_register:
+            try:
+                # Try to use the unit to see if it exists
+                ureg(unit_name)
+            except pint.UndefinedUnitError:
+                # Check if it's a known time alias
+                if unit_name in known_time_aliases:
+                    ureg.define(f"{unit_name} = {known_time_aliases[unit_name]}")
+                else:
+                    # If it doesn't exist, define it as a new base unit
+                    # Use the unit name as-is and create a unique dimension for it
+                    dimension_name = f"{unit_name}_dimension"
+                    ureg.define(f"{unit_name} = [{dimension_name}]")
+
     def _validate_unit_check_preconditions(self) -> None:
         """
         Validate preconditions for unit consistency checking.
@@ -1086,6 +1605,8 @@ class Model(BaseModel):
         ValueError
             If the model type doesn't support unit checking.
         """
+        # Register any custom bin units before validation
+        self._register_custom_units()
         # Check if all non-formula parameters have units
         non_formula_params_missing_units = [
             p
@@ -1204,7 +1725,9 @@ class Model(BaseModel):
 
         compartments = self._generate_compartments()
         for compartment in compartments:
-            compartment_str = self._compartment_to_string(compartment)
+            compartment_str = self._compartment_to_string(
+                compartment, format=PrintEquationsOutputFormat.TEXT
+            )
             bin_id = compartment[0]
             bin_obj = next((b for b in self.population.bins if b.id == bin_id), None)
             if bin_obj and bin_obj.unit:
@@ -1333,6 +1856,69 @@ class Model(BaseModel):
                         )
                     )
 
+    def _infer_time_unit(self) -> str | None:
+        """
+        Infer the time unit used in the model from parameter units.
+
+        Returns
+        -------
+        str | None
+            The inferred time unit (e.g., "day", "week", "month"), or None if no
+            time unit can be inferred.
+
+        Notes
+        -----
+        This method looks for parameters with units like "1/time_unit" or
+        "quantity/time_unit" to infer the time unit used throughout the model.
+        """
+        from commol.utils.equations import ureg
+
+        for param in self.parameters:
+            if param.unit is None:
+                continue
+
+            try:
+                unit_obj = ureg(param.unit)
+
+                # Check if the unit has a time dimension in the denominator
+                # (e.g., "1/day", "person/week", "individual/month")
+                if "[time]" in str(unit_obj.dimensionality):
+                    # Extract the time component
+                    # The dimensionality will be like {[time]: -1, ...}
+                    time_dimension = unit_obj.dimensionality.get("[time]", 0)
+                    if isinstance(time_dimension, (int, float)) and time_dimension < 0:
+                        # Get the time unit by analyzing the unit string
+                        unit_str = str(unit_obj.units)
+
+                        # Common time units to check
+                        time_units = [
+                            "second",
+                            "minute",
+                            "hour",
+                            "day",
+                            "week",
+                            "fortnight",
+                            "month",
+                            "year",
+                            "semester",
+                            "wk",
+                            "mon",
+                            "yr",
+                            "s",
+                            "min",
+                            "h",
+                            "d",
+                        ]
+
+                        for time_unit in time_units:
+                            if time_unit in unit_str:
+                                return time_unit
+
+            except Exception:
+                continue
+
+        return None
+
     def _check_transition_rate_units(
         self,
         rate: str,
@@ -1343,8 +1929,8 @@ class Model(BaseModel):
         Check units for a single transition rate.
 
         For transitions in difference equations, rates represent the absolute change
-        in population per time step, so they should have units of "person/day"
-        (or person/timestep).
+        in population per time step, so they should have units of "bin_unit/time_unit"
+        (e.g., "person/day", "individual/week").
         """
         # Get variables used in the rate expression
         variables = get_expression_variables(rate)
@@ -1365,9 +1951,18 @@ class Model(BaseModel):
                     ),
                 )
 
-        # For difference equations, rates should result in person per time unit
-        # This represents the absolute change in population per time step
-        expected_unit = "person/day"
+        # Determine the expected unit based on the transition's bins
+        # Extract the bin unit from the transition source/target bins
+        bin_unit = self._get_transition_bin_unit(transition_id)
+        if not bin_unit:
+            # Fallback to first bin's unit
+            bin_unit = (
+                self.population.bins[0].unit if self.population.bins else "person"
+            )
+
+        time_unit = self._infer_time_unit() or "day"
+
+        expected_unit = f"{bin_unit}/{time_unit}"
 
         # Check unit consistency
         is_consistent, error_msg = check_equation_units(
@@ -1381,6 +1976,35 @@ class Model(BaseModel):
             )
 
         return (True, None)
+
+    def _get_transition_bin_unit(self, transition_id: str) -> str | None:
+        """
+        Get the bin unit for a specific transition by looking at its source/target bins.
+
+        Parameters
+        ----------
+        transition_id : str
+            The ID of the transition to check.
+
+        Returns
+        -------
+        str | None
+            The unit of the bins involved in this transition, or None if not found.
+        """
+        # Find the transition
+        for transition in self.dynamics.transitions:
+            if transition.id == transition_id:
+                # Get bins from source or target
+                bin_ids = transition.source + transition.target
+
+                # Find the first bin that has a unit defined
+                for bin_id in bin_ids:
+                    for bin_obj in self.population.bins:
+                        if bin_obj.id == bin_id and bin_obj.unit:
+                            return bin_obj.unit
+                break
+
+        return None
 
     def _get_rate_unit(
         self, rate: str, variable_units: dict[str, str] | None = None
@@ -1403,6 +2027,9 @@ class Model(BaseModel):
             The unit of the rate expression, or None if units cannot be determined.
         """
         try:
+            # Register custom units before parsing
+            self._register_custom_units()
+
             # Use provided variable units or build them
             if variable_units is None:
                 variable_units = self._build_variable_units()
@@ -1464,7 +2091,8 @@ class Model(BaseModel):
             annotated_rate = rate
             # Sort by length descending to avoid partial replacements
             # (e.g., replace "beta_young" before "beta")
-            for var in sorted(variables, key=len, reverse=True):
+            sorted_vars = sorted(variables, key=lambda x: len(x), reverse=True)
+            for var in sorted_vars:
                 if var in variable_units:
                     unit = variable_units[var]
                     # Replace the variable with annotated version
@@ -1516,6 +2144,7 @@ class Model(BaseModel):
         rate: str | None,
         variable_units: dict[str, str] | None = None,
         show_units: bool = True,
+        format: str = PrintEquationsOutputFormat.TEXT,
     ) -> str:
         """
         Format a rate expression with variable units and final unit annotation.
@@ -1529,21 +2158,46 @@ class Model(BaseModel):
         show_units : bool, default=True
             If True, annotate variables and show final unit.
             If False, return the plain rate expression.
+        format : str, default=PrintEquationsOutputFormat.TEXT
+            Output format: "text" or "latex"
 
         Returns
         -------
         str
-            The formatted rate string with variables annotated and final unit,
-            e.g., "beta(1/day) * S(person) * I(person) / N(person) [person / day]".
+            The formatted rate string with variables annotated and final unit.
             Returns "None" if rate is None.
         """
         if not rate:
-            return "None"
+            return (
+                "None" if format == PrintEquationsOutputFormat.TEXT else "\\text{None}"
+            )
+
+        if format == PrintEquationsOutputFormat.LATEX:
+            # For LaTeX format
+            if not show_units:
+                # No units, just convert to LaTeX
+                return self._latex_rate_expression(rate)
+
+            # Annotate variables with their units first
+            annotated_rate = self._annotate_rate_variables(rate, variable_units)
+
+            # Add final unit
+            unit = self._get_rate_unit(rate, variable_units)
+            unit_suffix = f" [{unit}]" if unit else ""
+
+            # Convert annotated rate to LaTeX
+            latex_rate = self._latex_rate_expression(annotated_rate)
+
+            # Wrap final unit in \text{} if present
+            if unit_suffix:
+                latex_unit_suffix = f" [\\text{{{unit}}}]"
+                return f"{latex_rate}{latex_unit_suffix}"
+            return latex_rate
 
         if not show_units:
             return rate
 
-        # Annotate variables with their units
+        # Annotate variables with their units (text format)
         annotated_rate = self._annotate_rate_variables(rate, variable_units)
 
         # Add final unit

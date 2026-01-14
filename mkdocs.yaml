@@ -82,12 +82,13 @@ nav:
       - Mathematical Expressions: guide/mathematical-expressions.md
       - Running Simulations: guide/simulations.md
       - Model Calibration: guide/calibration.md
+      - Probabilistic Calibration: guide/probabilistic-calibration.md
       - Examples: guide/examples.md
   - API Reference:
       - Model Builder: api/model-builder.md
       - Simulation: api/simulation.md
       - Calibrator: api/calibrator.md
-      - Constants: api/constants.md
+      - Probabilistic Calibrator: api/probabilistic-calibrator.md
   - Advanced:
       - Model Structure: advanced/model-structure.md
   - Development:

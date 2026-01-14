@@ -7,7 +7,7 @@ This section documents the internal structure of the `Model` class and its compo
 
     This is useful for:
     - Understanding the internal model representation
-    - Working with `ModelLoader.from_json()`
+    - Working with `Model.from_json()`
     - Contributing to the library
     - Debugging complex models
 

@@ -43,7 +43,7 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
-    .build(ModelTypes.DIFFERENCE_EQUATIONS)
+    .build("DifferenceEquations")
 )
 ```
 
@@ -439,9 +439,9 @@ builder.set_initial_conditions(
 Once all components are added, build the model:
 
 ```python
-from commol.constants import ModelTypes
 
-model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+
+model = builder.build(typology="DifferenceEquations")
 ```
 
 ### Validation
@@ -458,7 +458,7 @@ If validation fails, a descriptive error is raised.
 
 ## Unit Checking
 
-EpiModel provides automatic dimensional analysis to catch unit errors in your model equations. This validates that rate expressions produce the correct units and that mathematical functions receive dimensionally correct arguments.
+Commol provides automatic dimensional analysis to catch unit errors in your model equations. This validates that rate expressions produce the correct units and that mathematical functions receive dimensionally correct arguments.
 
 ### Enabling Unit Checking
 
@@ -491,7 +491,7 @@ builder.set_initial_conditions(
     ],
 )
 
-model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+model = builder.build(typology="DifferenceEquations")
 
 # Validate dimensional consistency
 model.check_unit_consistency()  # Raises error if units are inconsistent
@@ -622,6 +622,31 @@ model.print_equations()  # ValueError: Some parameters have units but not all
 
 This prevents accidentally mixing unit systems or forgetting to specify units for some parameters.
 
+### LaTeX Output Format
+
+Export equations in LaTeX format for inclusion in documents and publications:
+
+```python
+# Default text format
+model.print_equations()
+# Output: dS/dt = - (beta * S * I / N)
+
+# LaTeX format
+model.print_equations(format="latex")
+# Output: \[\frac{dS}{dt} = - (\beta \cdot S \cdot I / N)\]
+
+# Save to file
+model.print_equations(output_file="equations.txt", format="latex")
+```
+
+**LaTeX features:**
+
+- Compact form uses inline math: `$S \to I: \beta \cdot S \cdot I / N$`
+- Expanded form uses display math: `\[\frac{dS}{dt} = ...\]`
+- Equations are copy-paste ready into LaTeX documents
+- Subscripts formatted as: `S_{young,urban}`
+- Multiplication shown as: `\cdot`
+
 ## Advanced: Conditional Transitions
 
 Create transitions that only occur under certain conditions:
@@ -651,9 +676,9 @@ builder.add_transition(
 Load pre-defined models from JSON files:
 
 ```python
-from commol import ModelLoader
+from commol import Model
 
-model = ModelLoader.from_json("path/to/model.json")
+model = Model.from_json("path/to/model.json")
 ```
 
 ### JSON Structure
@@ -691,7 +716,7 @@ model = ModelLoader.from_json("path/to/model.json")
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
+
 
 # Build SEIR model
 model = (
@@ -715,7 +740,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run simulation

@@ -24,14 +24,20 @@ pip install commol
 git clone https://github.com/MUNQU/commol.git
 cd commol/py-commol
 pip install maturin
+
+# If using a virtual environment, activate it first
+# source venv/bin/activate  # On Linux/macOS
+# venv\Scripts\activate     # On Windows
+
 maturin develop --release
 ```
+
+> **⚠️ Important**: The project directory path must not contain tildes (`~`) or spaces. Maturin may fail with paths like `~/projects/commol` or `/home/my projects/commol`. Use full paths like `/home/username/projects/commol` instead.
 
 ## Quick Start
 
 ```python
 from commol import ModelBuilder, Simulation
-from commol.constants import ModelTypes
 
 # Build a simple SIR model
 model = (
@@ -41,7 +47,6 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
-    .add_parameter(id="N", value=1000.0)
     .add_transition(
         id="infection",
         source=["S"],
@@ -62,7 +67,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Run simulation
@@ -71,6 +76,12 @@ results = simulation.run(num_steps=100)
 
 # Display results
 print(f"Final infected: {results['I'][-1]:.0f}")
+
+# Visualize results
+from commol import SimulationPlotter
+
+plotter = SimulationPlotter(simulation, results)
+plotter.plot_series(output_file="sir_model.png")
 ```
 
 ### Using $compartment Placeholder for Multiple Transitions
@@ -122,7 +133,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 ```
 
@@ -186,7 +197,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Validate dimensional consistency
@@ -197,6 +208,10 @@ model.print_equations()
 # Output shows:
 #   S -> I: beta(1/day) * S(person) * I(person) / N(person) [person/day]
 #   I -> R: gamma(1/day) * I(person) [person/day]
+
+# Export equations in LaTeX format for publications
+model.print_equations(format="latex")
+# Output: \[\frac{dS}{dt} = - (\beta \cdot S \cdot I / N)\]
 ```
 
 **Note**: Units must be defined for ALL parameters and bins, or for NONE. Partial unit definitions will raise a `ValueError` to prevent inconsistent models.
@@ -212,15 +227,9 @@ from commol import (
     Calibrator,
     CalibrationProblem,
     CalibrationParameter,
-    CalibrationParameterType,
     ObservedDataPoint,
-    LossConfig,
-    LossFunction,
-    OptimizationConfig,
-    OptimizationAlgorithm,
     ParticleSwarmConfig,
 )
-from commol.constants import ModelTypes
 
 # Build model with unknown parameters
 model = (
@@ -250,7 +259,7 @@ model = (
             {"bin": "R", "fraction": 0.0}
         ]
     )
-    .build(typology=ModelTypes.DIFFERENCE_EQUATIONS)
+    .build(typology="DifferenceEquations")
 )
 
 # Define observed data from real outbreak
@@ -267,34 +276,32 @@ simulation = Simulation(model)
 parameters = [
     CalibrationParameter(
         id="beta",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3  # Starting point
     ),
     CalibrationParameter(
         id="gamma",
-        parameter_type=CalibrationParameterType.PARAMETER,
+        parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
     ),
 ]
 
-# Configure calibration problem
-pso_config = ParticleSwarmConfig.create(
+# Configure optimization algorithm (config type determines the algorithm)
+pso_config = ParticleSwarmConfig(
     num_particles=40,
     max_iterations=300,
     verbose=True
 )
 
+# Configure calibration problem
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
-    loss_config=LossConfig(function=LossFunction.SSE),
-    optimization_config=OptimizationConfig(
-        algorithm=OptimizationAlgorithm.PARTICLE_SWARM,
-        config=pso_config,
-    ),
+    loss_function="sse",
+    optimization_config=pso_config,  # ParticleSwarmConfig or NelderMeadConfig
 )
 
 # Run calibration
@@ -310,6 +317,115 @@ model.update_parameters(result.best_parameters)
 # Create new simulation with calibrated model
 calibrated_simulation = Simulation(model)
 calibrated_results = calibrated_simulation.run(num_steps=100)
+```
+
+**Calibrating with Scale Parameters:**
+
+When observed data is underreported, use scale parameters to estimate the reporting rate:
+
+```python
+# Reported cases (potentially underreported)
+reported_cases = [10, 15, 25, 40, 60, 75, 85, 70, 50, 30]
+
+# Link observed data to scale parameter
+observed_data = [
+    ObservedDataPoint(
+        step=idx,
+        compartment="I",
+        value=cases,
+        scale_id="reporting_rate"  # Links to scale parameter
+    )
+    for idx, cases in enumerate(reported_cases)
+]
+
+parameters = [
+    CalibrationParameter(
+        id="beta",
+        parameter_type="parameter",
+        min_bound=0.1,
+        max_bound=1.0
+    ),
+    CalibrationParameter(
+        id="gamma",
+        parameter_type="parameter",
+        min_bound=0.05,
+        max_bound=0.5
+    ),
+    CalibrationParameter(
+        id="reporting_rate",
+        parameter_type="scale",
+        min_bound=0.01,
+        max_bound=1.0
+    ),
+]
+
+# Run calibration
+result = calibrator.run()
+
+# Separate parameters by type
+scale_values = {
+    param.id: result.best_parameters[param.id]
+    for param in problem.parameters
+    if param.parameter_type == "scale"
+}
+
+print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
+
+# Visualize with scale_values for correct display
+plotter.plot_series(observed_data=observed_data, scale_values=scale_values)
+```
+
+**Constraining Parameters:**
+
+Apply constraints to enforce biological knowledge during calibration.
+
+```python
+from commol import CalibrationConstraint
+
+# Add constraint: beta/gamma <= 5 (written as 5 - beta/gamma >= 0)
+constraints = [
+    CalibrationConstraint(
+        id="r0_bound",
+        expression="5.0 - beta/gamma",
+        description="R0 <= 5",
+    )
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    constraints=constraints,  # Include constraints
+    loss_function="sse",
+    optimization_config=pso_config,
+)
+
+result = calibrator.run()
+```
+
+**Probabilistic Calibration:**
+
+For uncertainty quantification, use probabilistic calibration to get an ensemble of parameter sets:
+
+```python
+from commol import ProbabilisticCalibrationConfig
+
+# Configure probabilistic calibration
+prob_config = ProbabilisticCalibrationConfig(
+    n_runs=20,  # Number of calibration runs
+    confidence_level=0.95
+)
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    loss_function="sse",
+    optimization_config=pso_config,
+    probabilistic_config=prob_config,  # Enable probabilistic mode
+)
+
+# Run probabilistic calibration
+calibrator = Calibrator(simulation, problem)
+prob_result = calibrator.run_probabilistic()
 ```
 
 ## Documentation
@@ -338,27 +454,37 @@ For contributors and developers:
 git clone https://github.com/MUNQU/commol.git
 cd commol
 
+# Create and activate virtual environment
+python -m venv venv
+
+source venv/bin/activate  # On Linux/macOS
+venv\Scripts\activate   # On Windows
+
 # Install Python dependencies
 cd py-commol
-poetry install --with dev,docs
+pip install -e ".[dev,docs]"
 
 # Build Rust workspace
 cd ..
 cargo build --workspace
 
-# Build Python extension
+# Build Python extension (with virtual environment activated)
 cd py-commol
 maturin develop --release
 
 # Run tests
-poetry run pytest
+pytest
 cd ..
 cargo test --workspace
 
 # Build documentation locally
 cd py-commol
-poetry run mkdocs serve
+mkdocs serve
 ```
+
+> **⚠️ Path Requirements**: Ensure the project path contains no tildes (`~`) or spaces. Maturin may fail otherwise.
+>
+> **💡 Tip**: Make sure your virtual environment is activated before running `maturin develop`.
 
 ## License
 
@@ -377,7 +503,11 @@ If you use Commol in your research, please cite:
 ```bibtex
 @software{commol2025,
   title = {Commol: A High-Performance Compartment Modelling Library},
-  author = {Villanueva Micó, Rafael J. and Andreu Vilarroig, Carlos and Martínez Rodríguez, David},
+  author = {
+    Villanueva Micó, Rafael J.
+    and Andreu Vilarroig, Carlos
+    and Martínez Rodríguez, David
+  },
   year = {2025},
   url = {https://github.com/MUNQU/commol}
 }

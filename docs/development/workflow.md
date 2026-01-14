@@ -2,7 +2,22 @@
 
 ## Development Setup
 
-EpiModel is built with Rust and Python. To set up your development environment:
+Commol is built with Rust and Python. To set up your development environment:
+
+!!! warning "Path Requirements"
+The project directory path **must not contain tildes (`~`) or spaces**. Maturin (the Rust-Python build tool) may fail with these characters in the path.
+
+    **Good paths:**
+
+    - `/home/username/projects/commol`
+    - `/Users/username/Documents/commol`
+    - `/opt/projects/commol`
+
+    **Bad paths:**
+
+    - `~/projects/commol` (contains tilde)
+    - `/home/my projects/commol` (contains space)
+    - `/Users/User Name/commol` (contains space)
 
 ### 1. Install Prerequisites
 
@@ -12,23 +27,26 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Install Python 3.11 or higher
 # (use your system's package manager)
-
-# Install Poetry
-curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 ### 2. Clone and Setup
 
 ```bash
 git clone https://github.com/MUNQU/commol.git
-cd epimodel
+cd commol
+
+# Create and activate virtual environment
+python -m venv venv
+
+source venv/bin/activate  # On Linux/macOS
+venv\Scripts\activate   # On Windows
 
 # Install Python dependencies
 cd py-commol
-poetry install --with dev
+pip install -e ".[dev,docs]"
 
 # Install pre-commit hooks (optional but recommended)
-poetry run pre-commit install
+pre-commit install
 ```
 
 ### 3. Build the Project
@@ -37,10 +55,13 @@ poetry run pre-commit install
 # Build Rust workspace
 cargo build --workspace
 
-# Build Python extension
+# Build Python extension (with virtual environment activated)
 cd py-commol
 maturin develop --release
 ```
+
+!!! important "Virtual Environment and Maturin"
+Make sure your virtual environment is **activated before running `maturin develop`**. This ensures the Rust extension is built into the correct Python environment.
 
 ## Branching Strategy
 
@@ -72,11 +93,11 @@ git checkout -b feature/your-feature-name
 ```bash
 # Make your changes to the code
 
-# Run quality checks before committing
+# Run quality checks before committing (with virtual environment activated)
 cd py-commol
-poetry run ruff check . --fix         # Auto-fix Python linting issues
-poetry run ruff format .              # Format Python code
-poetry run mypy epimodel              # Type checking
+ruff check . --fix         # Auto-fix Python linting issues
+ruff format .              # Format Python code
+ty check commol            # Type checking
 
 cd ..
 cargo fmt --all                       # Format Rust code
@@ -86,9 +107,9 @@ cargo clippy --all-targets --fix      # Fix Rust linting issues
 ### 3. Testing Your Changes
 
 ```bash
-# Run Python tests
+# Run Python tests (with virtual environment activated)
 cd py-commol
-poetry run pytest -v
+pytest -v
 
 # Run Rust tests
 cd ..
@@ -175,7 +196,7 @@ The project uses three main CI/CD pipelines:
 
 ### 1. Code Quality (on every push/PR)
 
-- Python: Ruff (linting/formatting), MyPy (type checking), Pytest (testing)
+- Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing)
 - Rust: rustfmt (formatting), Clippy (linting), cargo test
 - Runs on: Ubuntu
 - Purpose: Ensure code quality standards
@@ -200,16 +221,16 @@ The project uses three main CI/CD pipelines:
 ### Quick Commands
 
 ```bash
-# Run all quality checks (Python)
-cd py-commol && poetry run ruff check . && poetry run ruff format . && poetry run mypy epimodel && poetry run pytest
+# Run all quality checks (Python) - make sure venv is activated
+cd py-commol && ruff check . && ruff format . && ty check commol && pytest
 
 # Run all quality checks (Rust)
 cargo fmt --all && cargo clippy --all-targets && cargo test --workspace
 
-# Build and test the Python package locally
+# Build and test the Python package locally - make sure venv is activated
 cd py-commol
 maturin develop --release
-poetry run pytest
+pytest
 ```
 
 ### Pre-commit Hooks
@@ -218,58 +239,25 @@ Install pre-commit hooks to automatically check code before committing:
 
 ```bash
 cd py-commol
-poetry run pre-commit install
+pre-commit install
 ```
 
 This runs:
 
 - Ruff linting and formatting
-- MyPy type checking
+- Ty type checking
 - Trailing whitespace removal
 - End-of-file fixing
-- Poetry lock file validation
-- Ensures `poetry.lock` stays in sync with `pyproject.toml`
-
-### Keeping poetry.lock in Sync
-
-**Important**: Always ensure `poetry.lock` is synchronized with `pyproject.toml` before committing.
-
-#### Automatic (Recommended)
-
-Pre-commit hooks handle this automatically:
-
-```bash
-cd py-commol
-poetry run pre-commit install  # One-time setup
-
-# Now git commit automatically updates poetry.lock if needed
-git add pyproject.toml
-git commit -m "chore: update dependencies"
-```
-
-#### Manual
-
-If not using pre-commit hooks:
-
-```bash
-cd py-commol
-poetry check  # Check if lock file is in sync
-poetry lock   # Update lock file without changing versions
-git add poetry.lock
-git commit -m "chore: update poetry.lock"
-```
-
-**Why this matters**: Out-of-sync lock files cause CI/CD pipeline failures. The pre-commit hook prevents this automatically.
 
 ### Debugging Rust from Python
 
 ```bash
-# Build with debug symbols
+# Build with debug symbols (with virtual environment activated)
+cd py-commol
 maturin develop
 
 # Run Python
-cd py-commol
-poetry run python -m your_test_script.py
+python -m your_test_script.py
 ```
 
 ## Building Documentation
@@ -277,22 +265,22 @@ poetry run python -m your_test_script.py
 The project uses MkDocs Material for documentation with multi-version support via Mike:
 
 ```bash
-# Install documentation dependencies
+# Install documentation dependencies (with virtual environment activated)
 cd py-commol
-poetry install --with docs
+pip install -e ".[docs]"
 
 # Serve documentation locally
-poetry run mkdocs serve
+mkdocs serve
 
 # Build documentation
-poetry run mkdocs build
+mkdocs build
 ```
 
 Visit http://127.0.0.1:8000 to view the documentation locally.
 
 ### Documentation Versioning
 
-EpiModel maintains two documentation versions:
+Commol maintains two documentation versions:
 
 - **`latest`**: Documentation for the current stable release from the `main` branch
 - **`dev`**: Development documentation from the `develop` branch
@@ -312,20 +300,20 @@ Users can switch between versions using the version selector in the documentatio
 If you need to manually deploy documentation:
 
 ```bash
-# Deploy latest version (from main branch)
+# Deploy latest version (from main branch) - with venv activated
 cd py-commol
-poetry run mike deploy --push --update-aliases latest
-poetry run mike set-default --push latest
+mike deploy --push --update-aliases latest
+mike set-default --push latest
 
 # Deploy dev version (from develop branch)
 cd py-commol
-poetry run mike deploy --push dev
+mike deploy --push dev
 
 # List all deployed versions
-poetry run mike list
+mike list
 
 # Delete a version
-poetry run mike delete <version-name> --push
+mike delete <version-name> --push
 ```
 
 #### Version Management Tips

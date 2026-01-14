@@ -3,94 +3,82 @@
 //! This module provides infrastructure for importing and calling
 //! standard math functions from libm in JIT-compiled code.
 
+use crate::math_expression::error::MathExpressionError;
 use cranelift::prelude::*;
 use cranelift_module::{FuncId, Linkage, Module};
 use std::collections::HashMap;
 
 /// Registry of imported libm functions
+#[derive(Default)]
 pub struct LibmRegistry {
     /// Map of function name to Cranelift function ID
     functions: HashMap<String, FuncId>,
 }
 
-impl Default for LibmRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl LibmRegistry {
     /// Create a new libm registry
     pub fn new() -> Self {
-        Self {
-            functions: HashMap::new(),
+        Self::default()
+    }
+
+    /// Generic helper to import a libm function with a given number of f64 parameters
+    fn import_function<M: Module>(
+        &mut self,
+        module: &mut M,
+        name: &str,
+        param_count: usize,
+    ) -> Result<FuncId, MathExpressionError> {
+        // Check if already imported
+        if let Some(&func_id) = self.functions.get(name) {
+            return Ok(func_id);
         }
+
+        // Create signature with `param_count` f64 parameters and f64 return
+        let mut sig = module.make_signature();
+        for _ in 0..param_count {
+            sig.params.push(AbiParam::new(types::F64));
+        }
+        sig.returns.push(AbiParam::new(types::F64));
+
+        // Declare external function
+        let func_id = module
+            .declare_function(name, Linkage::Import, &sig)
+            .map_err(|e| {
+                MathExpressionError::InvalidExpression(format!(
+                    "Failed to declare libm function '{}': {}",
+                    name, e
+                ))
+            })?;
+
+        self.functions.insert(name.to_string(), func_id);
+        Ok(func_id)
     }
 
     /// Import a single-argument f64 function from libm
-    pub fn import_f64_to_f64<M: Module>(&mut self, module: &mut M, name: &str) -> FuncId {
-        // Check if already imported
-        if let Some(&func_id) = self.functions.get(name) {
-            return func_id;
-        }
-
-        // Create signature: f64 -> f64
-        let mut sig = module.make_signature();
-        sig.params.push(AbiParam::new(types::F64));
-        sig.returns.push(AbiParam::new(types::F64));
-
-        // Declare external function
-        let func_id = module
-            .declare_function(name, Linkage::Import, &sig)
-            .expect("Failed to declare libm function");
-
-        self.functions.insert(name.to_string(), func_id);
-        func_id
+    pub fn import_f64_to_f64<M: Module>(
+        &mut self,
+        module: &mut M,
+        name: &str,
+    ) -> Result<FuncId, MathExpressionError> {
+        self.import_function(module, name, 1)
     }
 
     /// Import a two-argument f64 function from libm
-    pub fn import_f64_f64_to_f64<M: Module>(&mut self, module: &mut M, name: &str) -> FuncId {
-        // Check if already imported
-        if let Some(&func_id) = self.functions.get(name) {
-            return func_id;
-        }
-
-        // Create signature: (f64, f64) -> f64
-        let mut sig = module.make_signature();
-        sig.params.push(AbiParam::new(types::F64));
-        sig.params.push(AbiParam::new(types::F64));
-        sig.returns.push(AbiParam::new(types::F64));
-
-        // Declare external function
-        let func_id = module
-            .declare_function(name, Linkage::Import, &sig)
-            .expect("Failed to declare libm function");
-
-        self.functions.insert(name.to_string(), func_id);
-        func_id
+    pub fn import_f64_f64_to_f64<M: Module>(
+        &mut self,
+        module: &mut M,
+        name: &str,
+    ) -> Result<FuncId, MathExpressionError> {
+        self.import_function(module, name, 2)
     }
 
     /// Import a three-argument f64 function from libm
-    pub fn import_f64_f64_f64_to_f64<M: Module>(&mut self, module: &mut M, name: &str) -> FuncId {
-        // Check if already imported
-        if let Some(&func_id) = self.functions.get(name) {
-            return func_id;
-        }
-
-        // Create signature: (f64, f64, f64) -> f64
-        let mut sig = module.make_signature();
-        sig.params.push(AbiParam::new(types::F64));
-        sig.params.push(AbiParam::new(types::F64));
-        sig.params.push(AbiParam::new(types::F64));
-        sig.returns.push(AbiParam::new(types::F64));
-
-        // Declare external function
-        let func_id = module
-            .declare_function(name, Linkage::Import, &sig)
-            .expect("Failed to declare libm function");
-
-        self.functions.insert(name.to_string(), func_id);
-        func_id
+    pub fn import_f64_f64_f64_to_f64<M: Module>(
+        &mut self,
+        module: &mut M,
+        name: &str,
+    ) -> Result<FuncId, MathExpressionError> {
+        self.import_function(module, name, 3)
     }
 
     /// Get a function ID by name (if already imported)

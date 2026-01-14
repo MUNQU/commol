@@ -1,6 +1,6 @@
 # Mathematical Expressions
 
-EpiModel supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.
+Commol supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.
 
 ## Basic Syntax
 
@@ -364,7 +364,7 @@ rate = "seasonal_beta * S * I / N"
 
 ## Security Features
 
-EpiModel validates all expressions for security:
+Commol validates all expressions for security:
 
 ### Safe Operations
 
