@@ -620,17 +620,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#install-poetry-optional-for-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Poetry (optional, for development)
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -648,10 +637,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-install-with-pip" class="md-nav__link">
+  <a href="#3-create-and-activate-virtual-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Install with pip
+        3. Create and Activate Virtual Environment
       
     </span>
   </a>
@@ -659,10 +648,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-install-with-poetry-for-development" class="md-nav__link">
+  <a href="#4-install-dependencies-and-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Install with Poetry (for development)
+        4. Install Dependencies and Build
       
     </span>
   </a>
@@ -1594,17 +1583,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#install-poetry-optional-for-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install Poetry (optional, for development)
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -1622,10 +1600,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-install-with-pip" class="md-nav__link">
+  <a href="#3-create-and-activate-virtual-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Install with pip
+        3. Create and Activate Virtual Environment
       
     </span>
   </a>
@@ -1633,10 +1611,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-install-with-poetry-for-development" class="md-nav__link">
+  <a href="#4-install-dependencies-and-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Install with Poetry (for development)
+        4. Install Dependencies and Build
       
     </span>
   </a>
@@ -1696,6 +1674,22 @@
 <li>Python 3.11 or higher</li>
 <li>Rust toolchain (for building from source)</li>
 </ul>
+<div class="admonition warning">
+<p class="admonition-title">Path Requirements</p>
+</div>
+<p>The project directory path <strong>must not contain tildes (<code>´</code>, <code>~</code>) or spaces</strong>. Maturin (the Rust-Python build tool) may fail with these characters in the path.</p>
+<div class="language-text highlight"><pre><span></span><code>**Good paths:**
+
+- `/home/username/projects/commol`
+- `/Users/username/Documents/commol`
+- `/opt/projects/commol`
+
+**Bad paths:**
+
+- `~/projects/commol` (contains tilde)
+- `/home/my projects/commol` (contains space)
+- `/Users/User Name/commol` (contains space)
+</code></pre></div>
 <h2 id="install-from-pypi">Install from PyPI<a class="headerlink" href="#install-from-pypi" title="Permanent link">&para;</a></h2>
 <p>Once published, you can install Commol directly from PyPI:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>commol
@@ -1706,29 +1700,38 @@
 <h4 id="install-rust">Install Rust<a class="headerlink" href="#install-rust" title="Permanent link">&para;</a></h4>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>--proto<span class="w"> </span><span class="s1">&#39;=https&#39;</span><span class="w"> </span>--tlsv1.2<span class="w"> </span>-sSf<span class="w"> </span>https://sh.rustup.rs<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
 </span></code></pre></div>
-<h4 id="install-poetry-optional-for-development">Install Poetry (optional, for development)<a class="headerlink" href="#install-poetry-optional-for-development" title="Permanent link">&para;</a></h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-sSL<span class="w"> </span>https://install.python-poetry.org<span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-
-</span></code></pre></div>
 <h3 id="2-clone-the-repository">2. Clone the Repository<a class="headerlink" href="#2-clone-the-repository" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/MUNQU/commol.git
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">cd</span><span class="w"> </span>commol
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/MUNQU/commol.git
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>commol
 </span></code></pre></div>
-<h3 id="3-install-with-pip">3. Install with pip<a class="headerlink" href="#3-install-with-pip" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>maturin
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>maturin<span class="w"> </span>develop<span class="w"> </span>--release
+<h3 id="3-create-and-activate-virtual-environment">3. Create and Activate Virtual Environment<a class="headerlink" href="#3-create-and-activate-virtual-environment" title="Permanent link">&para;</a></h3>
+<p>It's recommended to use a virtual environment:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Create virtual environment</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Activate virtual environment</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate<span class="w">  </span><span class="c1"># On Linux/macOS</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>venv<span class="se">\S</span>cripts<span class="se">\a</span>ctivate<span class="w">   </span><span class="c1"># On Windows</span>
 </span></code></pre></div>
-<h3 id="4-install-with-poetry-for-development">4. Install with Poetry (for development)<a class="headerlink" href="#4-install-with-poetry-for-development" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>poetry<span class="w"> </span>install
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>maturin<span class="w"> </span>develop<span class="w"> </span>--release
+<h3 id="4-install-dependencies-and-build">4. Install Dependencies and Build<a class="headerlink" href="#4-install-dependencies-and-build" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Install maturin (build tool)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>pip<span class="w"> </span>install<span class="w"> </span>maturin
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1"># Build and install the package</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>maturin<span class="w"> </span>develop<span class="w"> </span>--release
 </span></code></pre></div>
+<div class="admonition important">
+<p class="admonition-title">Virtual Environment</p>
+</div>
+<p>Make sure your virtual environment is <strong>activated before running <code>maturin develop</code></strong>. This ensures the extension is built into the correct Python environment.</p>
 <h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
 <p>Test that Commol is correctly installed:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Commol installed successfully!&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Commol installed successfully!&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
