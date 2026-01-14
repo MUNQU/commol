@@ -7,14 +7,18 @@ on:
     branches: [main, develop]
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }} (Python ${{ matrix.python-version }})
+  test-and-build:
+    name: Test and Build on ${{ matrix.os }} ${{ matrix.target }} (Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        target: [x86_64, aarch64]
         python-version: ["3.12", "3.13"]
+        exclude:
+          - os: windows-latest
+            target: aarch64
 
     steps:
       - uses: actions/checkout@v4
@@ -24,59 +28,34 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Install Poetry
-        run: |
-          pip install poetry
+        run: pip install poetry
 
       - name: Install Python dependencies
         working-directory: ./py-commol
-        run: |
-          poetry install --extras dev
+        run: poetry install --extras dev
 
       - name: Build and install for testing
-        working-directory: ./py-commol
-        run: |
-          poetry run maturin develop --release
+        uses: PyO3/maturin-action@v1
+        with:
+          command: develop
+          args: --release --manifest-path py-commol/Cargo.toml
+          sccache: "true"
 
       - name: Run tests
         working-directory: ./py-commol
-        run: |
-          poetry run pytest
+        run: poetry run pytest
 
-      - name: Clean Rust extension before wheel build
-        working-directory: ./py-commol
-        shell: bash
-        run: |
-          rm -f commol/commol_rs/commol_rs.*.so commol/commol_rs/commol_rs.*.pyd
-
-      - name: Build wheel
-        working-directory: ./py-commol
-        run: |
-          poetry run maturin build --release
+      - name: Build wheel (same as release workflow)
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
+          sccache: "true"
+          manylinux: ${{ matrix.os == 'ubuntu-latest' && 'auto' || '' }}
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: target/wheels/*.whl
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}-py${{ matrix.python-version }}
+          path: dist/*.whl
