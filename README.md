@@ -24,8 +24,15 @@ pip install commol
 git clone https://github.com/MUNQU/commol.git
 cd commol/py-commol
 pip install maturin
+
+# If using a virtual environment, activate it first
+# source venv/bin/activate  # On Linux/macOS
+# venv\Scripts\activate     # On Windows
+
 maturin develop --release
 ```
+
+> **⚠️ Important**: The project directory path must not contain tildes (`~`) or spaces. Maturin may fail with paths like `~/projects/commol` or `/home/my projects/commol`. Use full paths like `/home/username/projects/commol` instead.
 
 ## Quick Start
 
@@ -447,27 +454,37 @@ For contributors and developers:
 git clone https://github.com/MUNQU/commol.git
 cd commol
 
+# Create and activate virtual environment
+python -m venv venv
+
+source venv/bin/activate  # On Linux/macOS
+venv\Scripts\activate   # On Windows
+
 # Install Python dependencies
 cd py-commol
-poetry install --with dev,docs
+pip install -e ".[dev,docs]"
 
 # Build Rust workspace
 cd ..
 cargo build --workspace
 
-# Build Python extension
+# Build Python extension (with virtual environment activated)
 cd py-commol
 maturin develop --release
 
 # Run tests
-poetry run pytest
+pytest
 cd ..
 cargo test --workspace
 
 # Build documentation locally
 cd py-commol
-poetry run mkdocs serve
+mkdocs serve
 ```
+
+> **⚠️ Path Requirements**: Ensure the project path contains no tildes (`~`) or spaces. Maturin may fail otherwise.
+>
+> **💡 Tip**: Make sure your virtual environment is activated before running `maturin develop`.
 
 ## License
 
