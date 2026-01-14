@@ -44,9 +44,10 @@ jobs:
           manylinux: ${{ matrix.os == 'ubuntu-latest' && 'auto' || '' }}
 
       - name: Install wheel for testing
-        working-directory: ./py-commol
         shell: bash
-        run: poetry run pip install ../dist-test/*.whl
+        run: |
+          cd py-commol
+          poetry run pip install --force-reinstall ../dist-test/*.whl
 
       - name: Run tests
         working-directory: ./py-commol
