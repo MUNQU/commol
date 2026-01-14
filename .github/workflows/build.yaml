@@ -35,25 +35,15 @@ jobs:
         working-directory: ./py-commol
         run: poetry install --extras dev
 
-      - name: Build wheel for testing
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist-test --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
-          sccache: "true"
-          manylinux: ${{ matrix.os == 'ubuntu-latest' && 'auto' || '' }}
-
-      - name: Install wheel for testing
-        shell: bash
-        run: |
-          cd py-commol
-          poetry run pip install --force-reinstall ../dist-test/*.whl
+      - name: Build and install for testing (maturin develop)
+        working-directory: ./py-commol
+        run: poetry run maturin develop --release
 
       - name: Run tests
         working-directory: ./py-commol
         run: poetry run pytest
 
-      - name: Build wheel (same as release workflow)
+      - name: Build distribution wheel (validates wheel builds correctly)
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
