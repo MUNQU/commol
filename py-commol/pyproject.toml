@@ -1,6 +1,6 @@
 [project]
 name = "commol"
-version = "0.0.0"  # Placeholder - actual version set by Git tag during release
+dynamic = ["version"]
 description = "A high-performance compartment modelling library in Rust and Python."
 authors = [
     {name = "Rafael J. Villanueva Micó", email = "rjvillan@imm.upv.es"},
@@ -47,6 +47,7 @@ Repository = "https://github.com/MUNQU/commol"
 
 # Poetry-specific configuration
 [tool.poetry]
+version = "0.0.0"  # Placeholder for Poetry compatibility - maturin uses dynamic version from Cargo.toml
 packages = [{include = "commol"}]
 requires-poetry = ">=2.2"
 
