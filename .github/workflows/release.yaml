@@ -1,152 +1,152 @@
 name: Release to PyPI
 
 on:
-  release:
-    types: [published]
+    release:
+        types: [published]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  build-wheels-linux:
-    name: Build wheels on Linux (${{ matrix.target }}) with Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64, aarch64]
-        python-version: ["3.12", "3.13"]
+    build-wheels-linux:
+        name: Build wheels on Linux (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                target: [x86_64, aarch64]
+                python-version: ["3.12", "3.13", "3.14"]
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set version from tag
-        uses: ./.github/actions/set-version
+            - name: Set version from tag
+              uses: ./.github/actions/set-version
 
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
-          sccache: "true"
-          manylinux: auto
+            - name: Build wheels
+              uses: PyO3/maturin-action@v1
+              with:
+                  target: ${{ matrix.target }}
+                  args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
+                  sccache: "true"
+                  manylinux: auto
 
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python-version }}
-          path: dist/*.whl
+            - name: Upload wheels
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wheels-linux-${{ matrix.target }}-py${{ matrix.python-version }}
+                  path: dist/*.whl
 
-  build-wheels-windows:
-    name: Build wheels on Windows with Python ${{ matrix.python-version }}
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13"]
+    build-wheels-windows:
+        name: Build wheels on Windows with Python ${{ matrix.python-version }}
+        runs-on: windows-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                python-version: ["3.12", "3.13", "3.14"]
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set version from tag
-        uses: ./.github/actions/set-version
+            - name: Set version from tag
+              uses: ./.github/actions/set-version
 
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: x86_64
-          args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
-          sccache: "true"
+            - name: Build wheels
+              uses: PyO3/maturin-action@v1
+              with:
+                  target: x86_64
+                  args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
+                  sccache: "true"
 
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-py${{ matrix.python-version }}
-          path: dist/*.whl
+            - name: Upload wheels
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wheels-windows-py${{ matrix.python-version }}
+                  path: dist/*.whl
 
-  build-wheels-macos:
-    name: Build wheels on macOS (${{ matrix.target }}) with Python ${{ matrix.python-version }}
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64, aarch64]
-        python-version: ["3.12", "3.13"]
+    build-wheels-macos:
+        name: Build wheels on macOS (${{ matrix.target }}) with Python ${{ matrix.python-version }}
+        runs-on: macos-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                target: [x86_64, aarch64]
+                python-version: ["3.12", "3.13", "3.14"]
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set version from tag
-        uses: ./.github/actions/set-version
+            - name: Set version from tag
+              uses: ./.github/actions/set-version
 
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
-          sccache: "true"
+            - name: Build wheels
+              uses: PyO3/maturin-action@v1
+              with:
+                  target: ${{ matrix.target }}
+                  args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
+                  sccache: "true"
 
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
-          path: dist/*.whl
+            - name: Upload wheels
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
+                  path: dist/*.whl
 
-  build-sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    build-sdist:
+        name: Build source distribution
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set version from tag
-        uses: ./.github/actions/set-version
+            - name: Set version from tag
+              uses: ./.github/actions/set-version
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
 
-      - name: Install build dependencies
-        run: pip install maturin
+            - name: Install build dependencies
+              run: pip install maturin
 
-      - name: Build sdist
-        run: maturin sdist --out dist --manifest-path py-commol/Cargo.toml
+            - name: Build sdist
+              run: maturin sdist --out dist --manifest-path py-commol/Cargo.toml
 
-      - name: Upload sdist
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: dist/*.tar.gz
+            - name: Upload sdist
+              uses: actions/upload-artifact@v4
+              with:
+                  name: sdist
+                  path: dist/*.tar.gz
 
-  publish-to-pypi:
-    name: Publish to PyPI
-    needs:
-      [
-        build-wheels-linux,
-        build-wheels-windows,
-        build-wheels-macos,
-        build-sdist,
-      ]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/commol
-    permissions:
-      id-token: write
+    publish-to-pypi:
+        name: Publish to PyPI
+        needs:
+            [
+                build-wheels-linux,
+                build-wheels-windows,
+                build-wheels-macos,
+                build-sdist,
+            ]
+        runs-on: ubuntu-latest
+        environment:
+            name: pypi
+            url: https://pypi.org/p/commol
+        permissions:
+            id-token: write
 
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          pattern: wheels-*
-          merge-multiple: true
+        steps:
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: dist
+                  pattern: wheels-*
+                  merge-multiple: true
 
-      - name: Download sdist
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          name: sdist
+            - name: Download sdist
+              uses: actions/download-artifact@v4
+              with:
+                  path: dist
+                  name: sdist
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+            - name: Publish to PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
