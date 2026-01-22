@@ -64,15 +64,11 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
-        scale_values: dict[str, float] | None = None,
         calibration_result: CalibrationResult
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
-        seaborn_style: str | None = None,
-        palette: str | None = None,
-        context: str | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -88,28 +84,19 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay on corresponding bin subplots.
-        scale_values : dict[str, float] | None
-            Optional calibrated scale values
-            (e.g., from CalibrationResult.best_parameters).
-            Maps scale_id to scale value. Observed data points with a scale_id will be
-            unscaled for plotting: unscaled_value = observed_value / scale.
-            This allows observed data to be comparable with model predictions.
+            Observed data points with a scale_id will be unscaled for plotting using
+            scale values from the calibration_result.
         calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
-            If CalibrationResult is provided, uses best_parameters as scale_values.
+            Scale values are extracted from best_parameters (CalibrationResult) or
+            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
+            data for comparison with model predictions.
         config : PlotConfig | None
-            Configuration for plot layout and styling. If None, uses defaults.
+            Configuration for plot layout and styling (figsize, dpi, layout,
+            style, palette, context). If None, uses defaults.
         bins : list[str] | None
             List of bin IDs to plot. If None, plots all bins.
-        seaborn_style : SeabornStyle | None
-            Seaborn style preset: "darkgrid", "whitegrid", "dark", "white", "ticks".
-            Overrides config if provided.
-        palette : str | None
-            Color palette name (overrides config if provided).
-        context : SeabornContext | None
-            Seaborn context: "paper", "notebook", "talk", "poster".
-            Overrides config if provided.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -124,10 +111,8 @@ class SimulationPlotter:
         config = config or PlotConfig()
         bins_to_plot = bins if bins is not None else self.bins
 
-        self._setup_series_style(config, seaborn_style, palette, context)
-        scale_values = self._extract_series_scale_values(
-            calibration_result, scale_values
-        )
+        self._apply_seaborn_style(config)
+        scale_values = self._extract_scale_values(calibration_result)
 
         observed_by_bin = self._group_observed_data(observed_data)
 
@@ -148,15 +133,11 @@ class SimulationPlotter:
         self,
         output_file: str | None = None,
         observed_data: list[ObservedDataPoint] | None = None,
-        scale_values: dict[str, float] | None = None,
         calibration_result: CalibrationResult
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
-        seaborn_style: str | None = None,
-        palette: str | None = None,
-        context: str | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -172,27 +153,19 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay (also shown as cumulative).
-        scale_values : dict[str, float] | None
-            Optional calibrated scale values
-            (e.g., from CalibrationResult.best_parameters).
-            Maps scale_id to scale value. Observed data points with a scale_id will be
-            unscaled for plotting: unscaled_value = observed_value / scale.
+            Observed data points with a scale_id will be unscaled for plotting using
+            scale values from the calibration_result.
         calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
-            If CalibrationResult is provided, uses best_parameters as scale_values.
+            Scale values are extracted from best_parameters (CalibrationResult) or
+            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
+            data for comparison with model predictions.
         config : PlotConfig | None
-            Configuration for plot layout and styling. If None, uses defaults.
+            Configuration for plot layout and styling (figsize, dpi, layout,
+            style, palette, context). If None, uses defaults.
         bins : list[str] | None
             List of bin IDs to plot. If None, plots all bins.
-        seaborn_style : SeabornStyle | None
-            Seaborn style preset: "darkgrid", "whitegrid", "dark", "white", "ticks".
-            Overrides config if provided.
-        palette : str | None
-            Color palette name (overrides config if provided).
-        context : SeabornContext | None
-            Seaborn context: "paper", "notebook", "talk", "poster".
-            Overrides config if provided.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -207,10 +180,8 @@ class SimulationPlotter:
         config = config or PlotConfig()
         bins_to_plot = bins if bins is not None else self.bins
 
-        self._setup_cumulative_style(config, seaborn_style, palette, context)
-        scale_values = self._extract_cumulative_scale_values(
-            calibration_result, scale_values
-        )
+        self._apply_seaborn_style(config)
+        scale_values = self._extract_scale_values(calibration_result)
 
         observed_by_bin = self._group_observed_data(observed_data)
         cumulative_observed = self._calculate_cumulative_observed(
@@ -225,33 +196,19 @@ class SimulationPlotter:
 
         return fig
 
-    def _apply_seaborn_style(
-        self,
-        config: PlotConfig,
-        style: str | None = None,
-        palette: str | None = None,
-        context: str | None = None,
-    ) -> None:
-        """
-        Apply Seaborn styling configuration.
+    def _apply_seaborn_style(self, config: PlotConfig) -> None:
+        """Apply Seaborn styling configuration from PlotConfig."""
+        if config.style:
+            sns.set_style(config.style)
+            logger.debug(f"Applied Seaborn style: {config.style}")
 
-        Direct parameters override config values.
-        """
-        effective_style = style if style is not None else config.style
-        effective_palette = palette if palette is not None else config.palette
-        effective_context = context if context is not None else config.context
+        if config.palette:
+            sns.set_palette(config.palette)
+            logger.debug(f"Applied Seaborn palette: {config.palette}")
 
-        if effective_style:
-            sns.set_style(effective_style)
-            logger.debug(f"Applied Seaborn style: {effective_style}")
-
-        if effective_palette:
-            sns.set_palette(effective_palette)
-            logger.debug(f"Applied Seaborn palette: {effective_palette}")
-
-        if effective_context:
-            sns.set_context(effective_context)
-            logger.debug(f"Applied Seaborn context: {effective_context}")
+        if config.context:
+            sns.set_context(config.context)
+            logger.debug(f"Applied Seaborn context: {config.context}")
 
     def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
         """
@@ -293,44 +250,33 @@ class SimulationPlotter:
 
         return dict(grouped)
 
-    def _setup_series_style(
-        self,
-        config: PlotConfig,
-        seaborn_style: str | None,
-        palette: str | None,
-        context: str | None,
-    ) -> None:
-        """
-        Set up plot styling with Seaborn configuration for series plots.
-        """
-        self._apply_seaborn_style(config, seaborn_style, palette, context)
-
-    def _extract_series_scale_values(
+    def _extract_scale_values(
         self,
         calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
-        scale_values: dict[str, float] | None,
     ) -> dict[str, float] | None:
         """
-        Extract scale values from calibration result for series plotting.
+        Extract scale values from calibration result.
+
+        For CalibrationResult, returns best_parameters.
+        For ProbabilisticCalibrationResult, returns median values of scale parameters.
         """
         if calib_result is None:
-            return scale_values
+            return None
 
         if isinstance(calib_result, CalibrationResult):
-            return scale_values or calib_result.best_parameters
+            return calib_result.best_parameters
 
         if isinstance(calib_result, ProbabilisticCalibrationResult):
-            if scale_values is None:
-                return {
-                    param_name: stats.median
-                    for (
-                        param_name,
-                        stats,
-                    ) in calib_result.selected_ensemble.parameter_statistics.items()
-                    if param_name.startswith("scale_")
-                }
+            return {
+                param_name: stats.median
+                for (
+                    param_name,
+                    stats,
+                ) in calib_result.selected_ensemble.parameter_statistics.items()
+                if param_name.startswith("scale_")
+            }
 
-        return scale_values
+        return None
 
     def _create_series_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
@@ -405,45 +351,6 @@ class SimulationPlotter:
         if output_file:
             plt.savefig(output_file, dpi=config.dpi, bbox_inches="tight")
             logger.info(f"Series plot saved to {output_file}")
-
-    def _setup_cumulative_style(
-        self,
-        config: PlotConfig,
-        seaborn_style: str | None,
-        palette: str | None,
-        context: str | None,
-    ) -> None:
-        """
-        Set up plot styling with Seaborn configuration for cumulative plots.
-        """
-        self._apply_seaborn_style(config, seaborn_style, palette, context)
-
-    def _extract_cumulative_scale_values(
-        self,
-        calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
-        scale_values: dict[str, float] | None,
-    ) -> dict[str, float] | None:
-        """
-        Extract scale values from calibration result for cumulative plotting.
-        """
-        if calib_result is None:
-            return scale_values
-
-        if isinstance(calib_result, CalibrationResult):
-            return scale_values or calib_result.best_parameters
-
-        if isinstance(calib_result, ProbabilisticCalibrationResult):
-            if scale_values is None:
-                return {
-                    param_name: stats.median
-                    for (
-                        param_name,
-                        stats,
-                    ) in calib_result.selected_ensemble.parameter_statistics.items()
-                    if param_name.startswith("scale_")
-                }
-
-        return scale_values
 
     def _create_cumulative_figure(
         self, config: PlotConfig, bins_to_plot: list[str]

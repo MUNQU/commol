@@ -17,6 +17,7 @@ from commol import (
 )
 from commol.api.plotter import SimulationPlotter
 from commol.constants import ModelTypes
+from commol.context.calibration import CalibrationResult
 
 
 class TestSimulationPlotter:
@@ -105,8 +106,8 @@ class TestSimulationPlotter:
         assert fig is not None
         plt.close(fig)
 
-    def test_plot_series_with_scale_values(self, simulation_results):
-        """Test series plotting with scale values for observed data."""
+    def test_plot_series_with_calibration_result(self, simulation_results):
+        """Test series plotting with calibration result for scale values."""
         simulation, results = simulation_results
         plotter = SimulationPlotter(simulation, results)
 
@@ -121,10 +122,16 @@ class TestSimulationPlotter:
             for i in range(0, 100, 10)
         ]
 
-        scale_values = {"detection_rate": scale_factor}
+        calibration_result = CalibrationResult(
+            best_parameters={"detection_rate": scale_factor},
+            final_loss=0.0,
+            iterations=1,
+            converged=True,
+            termination_reason="Test",
+        )
 
         fig = plotter.plot_series(
-            observed_data=observed_data, scale_values=scale_values
+            observed_data=observed_data, calibration_result=calibration_result
         )
 
         assert fig is not None
@@ -160,16 +167,18 @@ class TestSimulationPlotter:
         assert len(fig.axes) == 3
         plt.close(fig)
 
-    def test_plot_series_with_seaborn_overrides(self, simulation_results):
-        """Test that direct seaborn parameters override config."""
+    def test_plot_series_with_seaborn_config(self, simulation_results):
+        """Test that seaborn parameters work via PlotConfig."""
         simulation, results = simulation_results
         plotter = SimulationPlotter(simulation, results)
 
-        fig = plotter.plot_series(
-            seaborn_style="dark",
+        config = PlotConfig(
+            style="dark",
             palette="husl",
             context="talk",
         )
+
+        fig = plotter.plot_series(config=config)
 
         assert fig is not None
         plt.close(fig)
