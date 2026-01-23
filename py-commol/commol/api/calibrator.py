@@ -2,7 +2,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from commol.commol_rs.commol_rs import (
+    from commol.commol_rs._commol_rs import (
         CalibrationParameterTypeProtocol,
         CalibrationResultWithHistoryProtocol,
         DifferenceEquationsProtocol,
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     )
 
 try:
-    from commol.commol_rs import commol_rs
+    from commol.commol_rs import _commol_rs as commol_rs
 
     rust_core = commol_rs.core
     rust_difference = commol_rs.difference

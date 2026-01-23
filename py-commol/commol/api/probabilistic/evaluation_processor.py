@@ -11,10 +11,10 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-from commol.commol_rs import commol_rs
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
-    from commol.commol_rs.commol_rs import CalibrationResultWithHistoryProtocol
+    from commol.commol_rs._commol_rs import CalibrationResultWithHistoryProtocol
 
 from commol.context.probabilistic_calibration import CalibrationEvaluation
 

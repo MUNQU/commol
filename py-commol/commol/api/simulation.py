@@ -1,24 +1,23 @@
 import logging
 import time
-from typing import TYPE_CHECKING, Literal, overload, assert_never
+from typing import TYPE_CHECKING, Literal, assert_never, overload
 
 if TYPE_CHECKING:
-    from commol.commol_rs.commol_rs import (
+    from commol.commol_rs._commol_rs import (
         DifferenceEquationsProtocol,
         RustModelProtocol,
     )
 
 try:
-    from commol.commol_rs import commol_rs
+    from commol.commol_rs import _commol_rs as commol_rs
 
     core = commol_rs.core
     difference = commol_rs.difference
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.context.model import Model
 from commol.constants import ModelTypes
-
+from commol.context.model import Model
 
 logger = logging.getLogger(__name__)
 

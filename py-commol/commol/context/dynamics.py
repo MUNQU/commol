@@ -3,7 +3,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 try:
-    from commol.commol_rs import commol_rs
+    from commol.commol_rs import _commol_rs as commol_rs
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes

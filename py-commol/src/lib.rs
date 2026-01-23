@@ -40,7 +40,7 @@ pub(crate) mod python_observer;
 /// This module provides Python bindings to the Commol Rust library,
 /// enabling high-performance compartment modeling with a Pythonic API.
 #[pymodule]
-fn commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Core module: fundamental data structures
     let core_module = PyModule::new(py, "core")?;
     core_module.add(

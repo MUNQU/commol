@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from commol.commol_rs import commol_rs
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import (
     PSOChaoticInertia,
     PSOConstantAcceleration,
@@ -15,7 +15,7 @@ from commol.context.constants import (
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
-    from commol.commol_rs.commol_rs import (
+    from commol.commol_rs._commol_rs import (
         CalibrationParameterTypeProtocol,
         CalibrationResultWithHistoryProtocol,
         LossConfigProtocol,

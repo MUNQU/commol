@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from commol.commol_rs import commol_rs
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation

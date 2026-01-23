@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
-    from commol.commol_rs.commol_rs import (
+    from commol.commol_rs._commol_rs import (
         CalibrationResultWithHistoryProtocol,
         EnsembleSelectionResultProtocol,
     )
