@@ -5214,7 +5214,7 @@ heading_level: 4</p>
 
 
 <a href="#commol.api.probabilistic.calibration_runner.CalibrationRunner.run_multiple" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">run_multiple</span><span class="p">(</span><span class="n">n_runs</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="commol.commol_rs.commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span></span><span class="p">]</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">run_multiple</span><span class="p">(</span><span class="n">n_runs</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="commol.commol_rs._commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5264,7 +5264,7 @@ heading_level: 4</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="list">list</span>[<span title="commol.commol_rs.commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span>]</code>
+                  <code><span title="list">list</span>[<span title="commol.commol_rs._commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6469,7 +6469,7 @@ compatibility)</p>
 
 
 <a href="#commol.api.probabilistic.evaluation_processor.EvaluationProcessor.collect_evaluations" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">collect_evaluations</span><span class="p">(</span><span class="n">results</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="commol.commol_rs.commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="CalibrationEvaluation
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">collect_evaluations</span><span class="p">(</span><span class="n">results</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="commol.commol_rs._commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="CalibrationEvaluation
 
 
   
@@ -6498,7 +6498,7 @@ compatibility)</p>
                 <code>results</code>
             </td>
             <td>
-                  <code><span title="list">list</span>[<span title="commol.commol_rs.commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span>]</code>
+                  <code><span title="list">list</span>[<span title="commol.commol_rs._commol_rs.CalibrationResultWithHistoryProtocol">CalibrationResultWithHistoryProtocol</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8378,7 +8378,7 @@ members: - collect_evaluations - deduplicate - filter_by_loss_percentile - find_
 
   
       dataclass
-   (commol.context.probabilistic_calibration.CalibrationEvaluation)" href="#commol.context.probabilistic_calibration.CalibrationEvaluation">CalibrationEvaluation</a></span><span class="p">],</span> <span class="n">nsga_population_size</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">nsga_generations</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">pareto_preference</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">ensemble_size_mode</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">ensemble_size</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ensemble_size_min</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ensemble_size_max</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ci_margin_factor</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">ci_sample_sizes</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="int">int</span></span><span class="p">],</span> <span class="n">nsga_crossover_probability</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="commol.commol_rs.commol_rs.EnsembleSelectionResultProtocol">EnsembleSelectionResultProtocol</span></span>
+   (commol.context.probabilistic_calibration.CalibrationEvaluation)" href="#commol.context.probabilistic_calibration.CalibrationEvaluation">CalibrationEvaluation</a></span><span class="p">],</span> <span class="n">nsga_population_size</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">nsga_generations</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">pareto_preference</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">ensemble_size_mode</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">ensemble_size</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ensemble_size_min</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ensemble_size_max</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ci_margin_factor</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">ci_sample_sizes</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="int">int</span></span><span class="p">],</span> <span class="n">nsga_crossover_probability</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="commol.commol_rs._commol_rs.EnsembleSelectionResultProtocol">EnsembleSelectionResultProtocol</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
