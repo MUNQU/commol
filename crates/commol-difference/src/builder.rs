@@ -71,8 +71,11 @@ impl DifferenceEquations {
         let compartment_flows = vec![0.0; num_compartments];
 
         // Pre-compute subpopulation mappings for stratifications
-        let subpopulation_mappings =
-            build_subpopulation_mappings(&compartments, &model.population.stratifications);
+        let subpopulation_mappings = build_subpopulation_mappings(
+            &compartments,
+            &model.population.stratifications,
+            &model.population.bins,
+        );
 
         Self {
             compartments,
@@ -252,9 +255,18 @@ fn build_transition_flows(
 }
 
 /// Build pre-computed subpopulation mappings for stratifications.
+///
+/// This function creates mappings for:
+/// 1. Subpopulation totals (N_young, N_old, N_young_urban, etc.)
+/// 2. Base compartment totals (S, I, R) - sum of all stratified versions
+///
+/// When stratifications are present, base compartment names (S, I, R) become
+/// available as variables representing the sum of all their stratified versions.
+/// For example, S = S_young + S_old when age stratification is applied.
 fn build_subpopulation_mappings(
     compartments: &[String],
     stratifications: &[commol_core::Stratification],
+    bins: &[commol_core::Bin],
 ) -> Vec<SubpopulationMapping> {
     if stratifications.is_empty() {
         return Vec::new();
@@ -262,6 +274,7 @@ fn build_subpopulation_mappings(
 
     let mut subpopulation_map: HashMap<String, Vec<usize>> = HashMap::new();
 
+    // Build mappings for subpopulation totals (N_young, N_old, etc.)
     for (compartment_index, compartment_name) in compartments.iter().enumerate() {
         let categories: Vec<_> = compartment_name.split('_').skip(1).collect();
 
@@ -284,12 +297,46 @@ fn build_subpopulation_mappings(
         }
     }
 
-    // Convert to vector for faster iteration during simulation
-    subpopulation_map
+    // Build mappings for base compartment totals (S, I, R)
+    // Each base compartment name maps to the sum of all its stratified versions
+    let mut base_compartment_map: HashMap<String, Vec<usize>> = HashMap::new();
+
+    for bin in bins {
+        let bin_id = &bin.id;
+        for (compartment_index, compartment_name) in compartments.iter().enumerate() {
+            // Check if this compartment belongs to this bin
+            // (starts with bin_id followed by underscore)
+            if compartment_name.starts_with(bin_id)
+                && compartment_name
+                    .chars()
+                    .nth(bin_id.len())
+                    .map_or(false, |c| c == '_')
+            {
+                base_compartment_map
+                    .entry(bin_id.clone())
+                    .or_default()
+                    .push(compartment_index);
+            }
+        }
+    }
+
+    // Convert subpopulation mappings to vector
+    let mut mappings: Vec<SubpopulationMapping> = subpopulation_map
         .into_iter()
         .map(|(combination_name, indices)| SubpopulationMapping {
             contributing_compartment_indices: indices,
             parameter_name: format!("N_{}", combination_name),
         })
-        .collect()
+        .collect();
+
+    // Add base compartment mappings
+    // These use the bin name directly (S, I, R) instead of N_ prefix
+    for (bin_name, indices) in base_compartment_map {
+        mappings.push(SubpopulationMapping {
+            contributing_compartment_indices: indices,
+            parameter_name: bin_name,
+        });
+    }
+
+    mappings
 }
