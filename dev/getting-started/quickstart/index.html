@@ -626,10 +626,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-define-disease-states" class="md-nav__link">
+  <a href="#2-define-compartments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Define Disease States
+        2. Define Compartments
       
     </span>
   </a>
@@ -1566,10 +1566,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-define-disease-states" class="md-nav__link">
+  <a href="#2-define-compartments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Define Disease States
+        2. Define Compartments
       
     </span>
   </a>
@@ -1732,15 +1732,15 @@
 <li><code>ModelBuilder</code>: Fluent API for constructing models</li>
 <li><code>Simulation</code>: Runs the model simulation</li>
 </ul>
-<h3 id="2-define-disease-states">2. Define Disease States<a class="headerlink" href="#2-define-disease-states" title="Permanent link">&para;</a></h3>
+<h3 id="2-define-compartments">2. Define Compartments<a class="headerlink" href="#2-define-compartments" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;S&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Susceptible&quot;</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Infected&quot;</span><span class="p">)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;R&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Recovered&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Disease states represent compartments in your model.</p>
+<p>Compartments (also called bins or states) represent the different states in your model.</p>
 <h3 id="3-add-parameters">3. Add Parameters<a class="headerlink" href="#3-add-parameters" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>   <span class="c1"># Transmission rate</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>  <span class="c1"># Recovery rate</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;beta&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.003</span><span class="p">)</span>   <span class="c1"># Transition rate from S to I</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;gamma&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>  <span class="c1"># Transition rate from I to R</span>
 </span></code></pre></div>
 <p>Parameters are constants used in transition rate formulas.</p>
 <h3 id="4-define-transitions">4. Define Transitions<a class="headerlink" href="#4-define-transitions" title="Permanent link">&para;</a></h3>
