@@ -2,9 +2,9 @@
 
 Commol is built around several key concepts that work together to create compartment models.
 
-## Disease States
+## Compartments
 
-Disease states (also called compartments) represent different stages of infection in your population.
+Compartments (also called bins or states) represent distinct states that entities in your model can occupy. In the API, these are added using `add_bin()`.
 
 ```python
 builder.add_bin(id="S", name="Susceptible")
@@ -13,7 +13,9 @@ builder.add_bin(id="I", name="Infected")
 builder.add_bin(id="R", name="Recovered")
 ```
 
-### Common Disease States
+### Example: Epidemiological Compartments
+
+The following table shows common compartments used in epidemiological models:
 
 | ID  | Name        | Description                         |
 | --- | ----------- | ----------------------------------- |
@@ -23,9 +25,52 @@ builder.add_bin(id="R", name="Recovered")
 | R   | Recovered   | No longer infectious, immune        |
 | D   | Dead        | Deceased from disease               |
 
+Note: Compartments can represent any type of state depending on your application domain (e.g., customer segments, chemical species, population groups).
+
 ## Stratifications
 
-Stratifications allow you to model population subgroups (age, location, risk factors, etc.):
+Stratifications divide your population into subgroups based on characteristics like age, location, or risk factors. When you add a stratification, Commol automatically creates separate compartments for each subgroup, tracking disease dynamics independently within each stratum.
+
+### How Stratification Works
+
+When you define compartments **without** stratification, each compartment represents the entire population in that state:
+
+```
+Base compartments: S, I, R
+Total: 3 compartments
+```
+
+When you add a stratification, Commol **expands** each compartment by creating one version per category. The naming pattern is `{compartment}_{category}`:
+
+```
+Add stratification: age = [young, old]
+
+Expanded compartments:
+  S → S_young, S_old
+  I → I_young, I_old
+  R → R_young, R_old
+
+Total: 6 compartments (3 bins × 2 categories)
+```
+
+With **multiple stratifications**, compartments are expanded using the Cartesian product of all categories. Each additional stratification multiplies the number of compartments:
+
+```
+Add stratifications:
+  age = [young, old]
+  location = [urban, rural]
+
+Expanded compartments:
+  S → S_young_urban, S_young_rural, S_old_urban, S_old_rural
+  I → I_young_urban, I_young_rural, I_old_urban, I_old_rural
+  R → R_young_urban, R_young_rural, R_old_urban, R_old_rural
+
+Total: 12 compartments (3 bins × 2 ages × 2 locations)
+```
+
+The order of category suffixes matches the order in which stratifications are added to the model.
+
+### Defining Stratifications
 
 ```python
 # Age stratification
@@ -43,13 +88,20 @@ builder.add_stratification(
 
 ### Initial Conditions with Stratifications
 
+When setting initial conditions, you specify:
+
+1. **Bin fractions**: How the population is distributed across disease states
+2. **Stratification fractions**: How each disease state is distributed across categories
+
+These fractions are applied multiplicatively:
+
 ```python
 builder.set_initial_conditions(
     population_size=10000,
     bin_fractions=[
-        {"bin": "S", "fraction": 0.99},
-        {"bin": "I", "fraction": 0.01},
-        {"bin": "R", "fraction": 0.0}
+        {"bin": "S", "fraction": 0.99},   # 9900 susceptible
+        {"bin": "I", "fraction": 0.01},   # 100 infected
+        {"bin": "R", "fraction": 0.0}     # 0 recovered
     ],
     stratification_fractions=[
         {
@@ -64,7 +116,28 @@ builder.set_initial_conditions(
 )
 ```
 
-This creates compartments: `S_young`, `S_adult`, `S_elderly`, `I_young`, etc.
+**Resulting initial populations:**
+
+| Compartment | Calculation        | Initial Value |
+| ----------- | ------------------ | ------------- |
+| `S_young`   | 10000 × 0.99 × 0.3 | 2970          |
+| `S_adult`   | 10000 × 0.99 × 0.5 | 4950          |
+| `S_elderly` | 10000 × 0.99 × 0.2 | 1980          |
+| `I_young`   | 10000 × 0.01 × 0.3 | 30            |
+| `I_adult`   | 10000 × 0.01 × 0.5 | 50            |
+| `I_elderly` | 10000 × 0.01 × 0.2 | 20            |
+| `R_young`   | 10000 × 0.0 × 0.3  | 0             |
+| `R_adult`   | 10000 × 0.0 × 0.5  | 0             |
+| `R_elderly` | 10000 × 0.0 × 0.2  | 0             |
+
+### Why Use Stratifications?
+
+Stratifications are essential when:
+
+- **Different groups have different rates**: Young people may recover faster, elderly may have higher mortality
+- **Modeling heterogeneous mixing**: Urban populations may have higher contact rates than rural ones
+- **Policy analysis**: Evaluate interventions targeting specific subgroups (e.g., vaccinating the elderly first)
+- **Data fitting**: Match model outputs to age-stratified surveillance data
 
 ## Parameters
 
@@ -74,17 +147,19 @@ Parameters are global constants used throughout your model:
 builder.add_parameter(
     id="beta",
     value=0.3,
-    description="Transmission rate per contact"
+    description="Transition rate coefficient"
 )
 
 builder.add_parameter(
     id="gamma",
     value=0.1,
-    description="Recovery rate (1/infectious_period)"
+    description="Rate constant"
 )
 ```
 
-### Common Parameters
+### Example: Epidemiological Parameters
+
+The following table shows common parameters used in epidemiological models:
 
 | Parameter | Meaning                               | Typical Range  |
 | --------- | ------------------------------------- | -------------- |
@@ -96,7 +171,7 @@ builder.add_parameter(
 
 ## Transitions
 
-Transitions define how populations move between disease states:
+Transitions define how populations move between compartments:
 
 ### Simple Transitions
 
@@ -142,19 +217,19 @@ Initial conditions define the starting state of your model:
 builder.set_initial_conditions(
     population_size=1000,
     bin_fractions=[
-        {"bin": "S", "fraction": 0.99},  # 99% susceptible
-        {"bin": "I", "fraction": 0.01},  # 1% infected
-        {"bin": "R", "fraction": 0.0}    # 0% recovered
+        {"bin": "S", "fraction": 0.99},  # 99% in state S
+        {"bin": "I", "fraction": 0.01},  # 1% in state I
+        {"bin": "R", "fraction": 0.0}    # 0% in state R
     ]
 )
 ```
 
 ### Validation Rules
 
-- Disease state fractions must sum to 1.0
+- Compartment fractions must sum to 1.0
 - Stratification fractions must sum to 1.0 for each stratification
 - Population size must be positive
-- All disease states must have initial fractions defined
+- All compartments must have initial fractions defined
 
 ## Model Types
 
@@ -175,10 +250,10 @@ model = builder.build(typology="DifferenceEquations")
 
 A typical workflow:
 
-1. **Define disease states** - What compartments exist?
+1. **Define compartments** - What states exist in your model?
 2. **Add stratifications** (optional) - What subgroups matter?
 3. **Define parameters** - What rates and constants?
-4. **Create transitions** - How do populations flow?
+4. **Create transitions** - How do populations flow between compartments?
 5. **Set initial conditions** - What's the starting state?
 6. **Build the model** - Validate and construct
 7. **Run simulation** - Execute and analyze

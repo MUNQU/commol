@@ -1,6 +1,6 @@
 # License
 
-EpiModel is licensed under the MIT License.
+Commol is licensed under the MIT License.
 
 ## MIT License
 
@@ -30,7 +30,7 @@ SOFTWARE.
 
 ## Third-Party Licenses
 
-EpiModel uses the following open-source libraries:
+Commol uses the following open-source libraries:
 
 ### Python Dependencies
 

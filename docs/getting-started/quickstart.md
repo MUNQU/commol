@@ -61,7 +61,7 @@ from commol import ModelBuilder, Simulation
 - `ModelBuilder`: Fluent API for constructing models
 - `Simulation`: Runs the model simulation
 
-### 2. Define Disease States
+### 2. Define Compartments
 
 ```python
 .add_bin(id="S", name="Susceptible")
@@ -69,13 +69,13 @@ from commol import ModelBuilder, Simulation
 .add_bin(id="R", name="Recovered")
 ```
 
-Disease states represent compartments in your model.
+Compartments (also called bins or states) represent the different states in your model.
 
 ### 3. Add Parameters
 
 ```python
-.add_parameter(id="beta", value=0.3)   # Transmission rate
-.add_parameter(id="gamma", value=0.1)  # Recovery rate
+.add_parameter(id="beta", value=0.003)   # Transition rate from S to I
+.add_parameter(id="gamma", value=0.01)  # Transition rate from I to R
 ```
 
 Parameters are constants used in transition rate formulas.

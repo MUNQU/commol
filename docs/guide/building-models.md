@@ -22,12 +22,12 @@ builder = ModelBuilder(
 - **`name`** (required): Unique identifier for your model
 - **`version`** (optional): Version string for tracking model changes
 - **`description`** (optional): Human-readable description of the model
-- **`bin_unit`** (optional): Default unit for all bins (disease states). When specified, this enables:
+- **`bin_unit`** (optional): Default unit for all bins (compartments). When specified, this enables:
   - Automatic unit assignment to bins, predefined population variables (`N`, `N_young`, etc.), and stratification categories
   - Unit checking via `model.check_unit_consistency()`
   - Unit annotations in `model.print_equations()` output
 
-  Common values: `"person"`, `"individual"`, or any custom population unit.
+  Common values: `"person"`, `"individual"`, `"molecule"`, or any custom unit.
 
   **Note**: Individual bins can override this with their own `unit` parameter in `add_bin()`.
 
@@ -47,24 +47,26 @@ model = (
 )
 ```
 
-## Adding Disease States
+## Adding Compartments
+
+Compartments (also called bins or states) represent the different states in your model:
 
 ```python
 builder.add_bin(
     id="S",                    # Required: Unique identifier
     name="Susceptible",        # Required: Display name
-    description="Population susceptible to infection"  # Optional
+    description="Initial population state"  # Optional
 )
 ```
 
 ### Best Practices
 
-- Use short, clear IDs (S, I, R, E, etc.)
+- Use short, clear IDs (S, I, R, A, B, etc.)
 - Provide descriptive names
 
 ## Adding Stratifications
 
-Stratifications create population subgroups:
+Stratifications divide your population into distinct subgroups, allowing different rates and dynamics for each group. When you add stratifications, Commol automatically expands your compartments to track each subgroup separately.
 
 ```python
 builder.add_stratification(
@@ -74,14 +76,37 @@ builder.add_stratification(
 )
 ```
 
+### How Compartment Expansion Works
+
+When you add a stratification, every compartment is expanded by appending each category as a suffix:
+
+```
+Before: S, I, R (3 compartments)
+After adding age=[young, old]: S_young, S_old, I_young, I_old, R_young, R_old (6 compartments)
+```
+
 ### Multiple Stratifications
+
+With multiple stratifications, compartments are expanded using the **Cartesian product**—every combination of categories is created:
 
 ```python
 builder.add_stratification(id="age", categories=["young", "old"])
 builder.add_stratification(id="location", categories=["urban", "rural"])
 ```
 
-This creates compartments: `S_young_urban`, `S_young_rural`, `S_old_urban`, `S_old_rural`, etc.
+This creates 12 compartments for a 3-bin model:
+
+| Base Bin | Expanded Compartments                                          |
+| -------- | -------------------------------------------------------------- |
+| S        | `S_young_urban`, `S_young_rural`, `S_old_urban`, `S_old_rural` |
+| I        | `I_young_urban`, `I_young_rural`, `I_old_urban`, `I_old_rural` |
+| R        | `R_young_urban`, `R_young_rural`, `R_old_urban`, `R_old_rural` |
+
+**Key points:**
+
+- Category suffixes are added in the **order stratifications are defined**
+- With 3 bins, 2 age categories, and 2 location categories: 3 × 2 × 2 = 12 compartments
+- Compartment names are case-sensitive: `S_young` ≠ `S_Young`
 
 ## Adding Parameters
 
@@ -135,7 +160,7 @@ Transitions move populations between states.
 The `rate` parameter accepts **mathematical expressions** that can include:
 
 - **Parameters**: Reference parameter IDs (e.g., `"gamma"`)
-- **Disease states**: Use state populations (e.g., `"S"`, `"I"`)
+- **Compartments**: Use compartment populations (e.g., `"S"`, `"I"`)
 - **Special variables**: `N` (total population), `step` or `t` (current time step), `pi`, `e`
 - **Mathematical operations**: `+`, `-`, `*`, `/`, `**` (power)
 - **Functions**: `sin()`, `cos()`, `exp()`, `log()`, `sqrt()`, `max()`, `min()`, etc.
@@ -202,7 +227,7 @@ builder.add_transition(
 
 ### Using `$compartment` Placeholder for Per-Compartment Rates
 
-When applying the same type of transition to multiple compartments with per-compartment rates (like per-capita death rates), use the `$compartment` placeholder to avoid repetitive code:
+When applying the same type of transition to multiple compartments with per-compartment rates, use the `$compartment` placeholder to avoid repetitive code:
 
 ```python
 # Instead of writing 4 separate transitions:
@@ -248,7 +273,7 @@ builder.add_transition(
 builder.add_transition(
     id="treatment",
     source=["I_mild", "I_severe"],
-    target=["R"],  # All recover to same compartment
+    target=["R"],  # All transfer to same compartment
     rate="treatment_rate * $compartment"
 )
 ```
@@ -319,11 +344,29 @@ With `$compartment`, you create **multiple independent** transitions:
 
 When a model includes stratifications, you often need different transition rates for different subgroups. The `add_transition` method supports this via the `stratified_rates` parameter.
 
-This parameter takes a list of dictionaries, where each dictionary defines a rate for a specific combination of stratification categories.
+#### How Stratified Rate Matching Works
 
-#### Single Stratification
+When a transition is applied to a stratified compartment, Commol determines which rate to use by:
 
-Let's define different recovery rates for different age groups.
+1. **Extracting categories** from the compartment name (e.g., `I_young_urban` → age=young, location=urban)
+2. **Finding the best match** among stratified rates based on how many conditions match
+3. **Falling back to the default rate** if no stratified rate matches
+
+The system uses a **most-specific-match** strategy: if multiple stratified rates match, the one with the most matching conditions is used.
+
+```
+Compartment: I_young_urban
+Stratified rates:
+  1. [age=young] → matches 1 condition
+  2. [age=young, location=urban] → matches 2 conditions ← SELECTED
+  3. [age=old] → matches 0 conditions
+
+Result: Rate #2 is used because it's most specific
+```
+
+#### Single Stratification Example
+
+Define different recovery rates for different age groups:
 
 ```python
 builder.add_stratification(id="age", categories=["child", "adult", "elderly"])
@@ -352,11 +395,15 @@ builder.add_transition(
 )
 ```
 
+This creates three transition flows:
+
+- `I_child → R_child` with rate `gamma_child` (0.15)
+- `I_adult → R_adult` with rate `gamma_adult` (0.1)
+- `I_elderly → R_elderly` with rate `gamma_elderly` (0.08)
+
 #### Multi-Stratification Transitions
 
-To define rates for intersections of multiple stratifications, add multiple conditions to a single rate entry.
-
-For example, let's model different infection rates for high-risk adults in urban areas.
+To define rates for intersections of multiple stratifications, add multiple conditions to a single rate entry. Conditions within the same entry use **AND** logic—all must match.
 
 ```python
 builder.add_stratification(id="age", categories=["child", "adult"])
@@ -367,7 +414,7 @@ builder.add_parameter(id="beta_urban_adult_high_risk", value=0.8)
 builder.add_parameter(id="beta_default", value=0.3)
 
 builder.add_transition(
-    id="infection",
+    id="transition_S_to_I",
     source=["S"],
     target=["I"],
     rate="beta_default * S * I / N",  # Fallback rate
@@ -384,10 +431,22 @@ builder.add_transition(
 )
 ```
 
-In this example:
+**Rate assignment for each compartment:**
 
-- The `rate` parameter acts as a **fallback** for any compartment that doesn't match a specific stratified rate.
-- The `stratified_rates` entry defines a high infection rate that only applies to compartments matching all three conditions (e.g., `S_adult_high_urban`).
+| Compartment          | Matching Conditions | Rate Used                                |
+| -------------------- | ------------------- | ---------------------------------------- |
+| `S_adult_high_urban` | 3 (all match)       | `beta_urban_adult_high_risk * S * I / N` |
+| `S_adult_high_rural` | 2 (age, risk)       | `beta_default * S * I / N` (fallback)    |
+| `S_child_low_urban`  | 1 (location only)   | `beta_default * S * I / N` (fallback)    |
+| `S_child_low_rural`  | 0                   | `beta_default * S * I / N` (fallback)    |
+
+Only `S_adult_high_urban` matches all three conditions, so it gets the special high-risk rate. All other compartments use the fallback rate.
+
+#### Fallback Rate Behavior
+
+- The `rate` parameter acts as a **fallback** for any compartment that doesn't match a specific stratified rate
+- If you define `stratified_rates` for all categories, the fallback rate is never used
+- It's good practice to always provide a fallback rate for defensive coding
 
 ## Setting Initial Conditions
 
@@ -448,9 +507,9 @@ model = builder.build(typology="DifferenceEquations")
 
 The build process validates:
 
-- All disease state fractions sum to 1.0
+- All compartment fractions sum to 1.0
 - All stratification fractions sum to 1.0
-- Transition sources/targets reference valid states
+- Transition sources/targets reference valid compartments
 - Mathematical expressions are syntactically correct
 - No security issues in formulas
 
@@ -541,8 +600,8 @@ builder.add_transition(
 
 The system automatically assigns units to:
 
-- **Disease states**: All have units of `person` (S, I, R, etc.)
-- **Population variables**: `N`, `N_young`, `N_urban`, etc. have units of `person`
+- **Compartments**: All have the specified bin_unit (e.g., `person`, `molecule`)
+- **Population variables**: `N`, `N_young`, `N_urban`, etc. have the same unit
 - **Time variables**: `t` and `step` are dimensionless
 - **Constants**: `pi` and `e` are dimensionless
 
@@ -611,7 +670,7 @@ model.print_equations()
 ```python
 # This will raise an error!
 model = (
-    ModelBuilder(name="SIR", bin_unit="person")
+    ModelBuilder(name="Model", bin_unit="person")
     .add_parameter(id="beta", value=0.5, unit="1/day")  # Has unit
     .add_parameter(id="gamma", value=0.1)  # No unit - INCONSISTENT!
     .build()

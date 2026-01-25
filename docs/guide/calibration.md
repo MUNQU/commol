@@ -64,7 +64,7 @@ model = (
     .build(typology="DifferenceEquations")
 )
 
-# Define observed data (e.g., from real outbreak data)
+# Define observed data (e.g., from real-world measurements)
 observed_data = [
     ObservedDataPoint(step=0, compartment="I", value=10.0),
     ObservedDataPoint(step=10, compartment="I", value=45.2),
@@ -712,13 +712,13 @@ else:
 
 ### 1. Choose Appropriate Bounds
 
-Set realistic bounds based on biological knowledge:
+Set realistic bounds based on domain knowledge:
 
 ```python
 # Too wide: allows unrealistic values
 CalibrationParameter(id="beta", min_bound=0.0, max_bound=100.0)  # Bad
 
-# Reasonable: based on disease characteristics
+# Reasonable: based on expected parameter ranges
 CalibrationParameter(id="beta", min_bound=0.1, max_bound=0.8)    # Good
 ```
 
@@ -758,14 +758,14 @@ CalibrationParameter(
 
 ### 5. Validate Results
 
-Always check biological plausibility:
+Always check plausibility of results:
 
 ```python
 result = calibrator.run()
 
 # Check parameter values make sense
 if result.best_parameters['beta'] > 1.0:
-    print("Warning: Unusually high transmission rate")
+    print("Warning: Unusually high rate parameter")
 
 # Check final loss
 if result.final_loss > 1000:
@@ -896,14 +896,14 @@ print(f"Calibrated R0: {r0:.2f}")  # Should be <= 5
 Enforce mathematical relationships between parameters:
 
 ```python
-# Chemical reaction: Forward rate must be faster than reverse rate
+# Forward rate must be faster than reverse rate
 CalibrationConstraint(
     id="k_forward_ge_reverse",
     expression="k_forward - k_reverse",
-    description="Forward reaction rate >= reverse rate",
+    description="Forward rate >= reverse rate",
 )
 
-# Population dynamics: Birth rate limited relative to death rate
+# Birth rate limited relative to death rate
 CalibrationConstraint(
     id="birth_death_ratio",
     expression="3.0 - birth_rate/death_rate",
@@ -923,21 +923,21 @@ CalibrationConstraint(
 Enforce relative ordering of parameters:
 
 ```python
-# Manufacturing: Production rate faster than defect rate
+# Production rate faster than defect rate
 CalibrationConstraint(
     id="production_ordering",
     expression="production_rate - defect_rate",
     description="Production rate >= defect rate",
 )
 
-# Customer behavior: Purchase rate greater than return rate
+# Inflow rate greater than outflow rate
 CalibrationConstraint(
-    id="purchase_return_order",
-    expression="purchase_rate - return_rate",
-    description="Purchases >= returns",
+    id="flow_order",
+    expression="inflow_rate - outflow_rate",
+    description="Inflow >= outflow",
 )
 
-# Material degradation: Fast decay rate exceeds slow decay rate
+# Fast decay rate exceeds slow decay rate
 CalibrationConstraint(
     id="decay_ordering",
     expression="k_fast - k_slow",
@@ -950,15 +950,15 @@ CalibrationConstraint(
 Constrain compartment values at specific time steps. These constraints can reference both parameters and compartment states:
 
 ```python
-# Inventory management: Stock level must not exceed warehouse capacity
+# Stock level must not exceed capacity
 CalibrationConstraint(
-    id="warehouse_capacity",
-    expression="1000.0 - Inventory",
-    description="Inventory never exceeds warehouse capacity",
+    id="capacity_limit",
+    expression="1000.0 - Stock",
+    description="Stock never exceeds capacity",
     time_steps=[10, 20, 30, 40, 50],
 )
 
-# Chemical reactor: Minimum product concentration by time 30
+# Minimum product amount by time 30
 CalibrationConstraint(
     id="min_product",
     expression="Product - 50.0",
@@ -966,11 +966,11 @@ CalibrationConstraint(
     time_steps=[30],
 )
 
-# Environmental model: Total pollutants must stay below threshold
+# Total amount must stay below threshold
 CalibrationConstraint(
-    id="pollution_limit",
-    expression="100.0 - (AirPollution + WaterPollution)",
-    description="Total pollution <= 100",
+    id="total_limit",
+    expression="100.0 - (A + B)",
+    description="Total A + B <= 100",
     time_steps=[30, 50, 70],
 )
 ```

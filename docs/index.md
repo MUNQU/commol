@@ -1,6 +1,6 @@
 # Commol
 
-A high-performance compartment modelling library for mathematical modeling using difference equations. Commol provides a clean Python API backed by a fast Rust engine for numerical computations.
+A high-performance compartmental modelling library for mathematical modeling using difference equations. Commol provides a clean Python API backed by a fast Rust engine for numerical computations.
 
 !!! warning "Alpha Stage - API Unstable"
 **Commol is currently in alpha development.** The API is not yet stable and may change between versions without backward compatibility guarantees.
@@ -73,12 +73,12 @@ results = simulation.run(num_steps=100)
 
 Learn how to build and run compartment models:
 
-- [Core Concepts](guide/core-concepts.md) - Disease states, stratifications, parameters
+- [Core Concepts](guide/core-concepts.md) - Compartments, stratifications, parameters
 - [Building Models](guide/building-models.md) - Using the ModelBuilder API
 - [Mathematical Expressions](guide/mathematical-expressions.md) - Advanced rate formulas
 - [Running Simulations](guide/simulations.md) - Execute models and analyze results
 - [Model Calibration](guide/calibration.md) - Fit models to observed data
-- [Examples](guide/examples.md) - Complete model examples (SIR, SEIR, stratified)
+- [Examples](guide/examples.md) - Complete examples (SIR, SEIR, stratified models)
 
 ### API Reference
 

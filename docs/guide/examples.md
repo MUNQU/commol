@@ -1,6 +1,7 @@
 # Examples
 
-Complete examples demonstrating different modeling scenarios.
+Complete examples demonstrating different modeling scenarios. The examples below use epidemiological models (SIR, SEIR, etc.) as they are classic applications of compartmental modeling, but the same techniques apply to any domain where populations flow between discrete states.
+
 
 ## Example 1: Basic SIR Model
 
@@ -109,7 +110,7 @@ results = simulation.run(num_steps=365 * 3)
 
 ## Example 4: Age-Stratified Model
 
-Different age groups with varying recovery rates:
+Different age groups with varying recovery rates. Note that when using stratifications, compartment names become stratified (e.g., `S_child`, `I_adult`). Use parameter-based rates or `stratified_rates` with appropriate formulas:
 
 ```python
 model = (
@@ -118,16 +119,18 @@ model = (
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
     .add_stratification(id="age", categories=["child", "adult", "elderly"])
-    .add_parameter(id="beta", value=0.3)
+    .add_parameter(id="beta", value=0.0003)  # Scaled for population
     .add_parameter(id="gamma_child", value=0.15)
     .add_parameter(id="gamma_adult", value=0.12)
     .add_parameter(id="gamma_elderly", value=0.08)
+    # Infection uses parameter-based rate (applied per-capita)
     .add_transition(
         id="infection",
         source=["S"],
         target=["I"],
-        rate="beta * S * I / N"
+        rate="beta"
     )
+    # Recovery has different rates per age group
     .add_transition(
         id="recovery",
         source=["I"],
@@ -170,6 +173,11 @@ model = (
 
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
+
+# Access stratified results
+print(f"I_child: {results['I_child'][-1]:.2f}")
+print(f"I_adult: {results['I_adult'][-1]:.2f}")
+print(f"I_elderly: {results['I_elderly'][-1]:.2f}")
 ```
 
 ## Example 5: Vaccination Campaign
@@ -395,7 +403,7 @@ results = simulation.run(num_steps=100)
 
 ## Example 10: Parameter Calibration
 
-Calibrate model parameters to match observed data:
+Calibrate model parameters to match observed data. This example shows how to fit an SIR model to surveillance data:
 
 ```python
 from commol import (
@@ -440,7 +448,7 @@ model = (
     .build(typology="DifferenceEquations")
 )
 
-# Define observed data (e.g., from real outbreak surveillance)
+# Define observed data (e.g., from real-world measurements)
 observed_data = [
     ObservedDataPoint(step=0, compartment="I", value=10.0),
     ObservedDataPoint(step=10, compartment="I", value=45.2),

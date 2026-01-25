@@ -1,6 +1,6 @@
 # Mathematical Expressions
 
-Commol supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.
+Commol supports rich mathematical expressions in transition rates, enabling complex and realistic model dynamics.
 
 ## Basic Syntax
 
@@ -40,12 +40,12 @@ rate = "beta ** 2"              # Square a value
 
 ## Available Variables
 
-### Disease State Variables
+### Compartment Variables
 
-Reference any disease state by its ID:
+Reference any compartment by its ID:
 
 ```python
-# In a model with states S, I, R
+# In a model with compartments S, I, R
 rate = "beta * S * I"    # Use S and I populations
 rate = "gamma * I"       # Use I population
 rate = "0.01 * R"        # Use R population
@@ -69,6 +69,55 @@ rate = "beta * I / N"              # Frequency-dependent transmission
 rate = "beta * sin(2 * pi * t)"    # Periodic variation
 rate = "gamma * exp(-0.01 * step)" # Exponential decay over time
 ```
+
+### Subpopulation Variables (N_category)
+
+When you use stratifications, Commol automatically creates subpopulation total variables that sum compartments belonging to each category. These are essential for modeling **frequency-dependent transmission within subgroups**.
+
+#### How Subpopulation Variables Are Generated
+
+For a model with bins `S, I, R` and stratification `age = [young, old]`:
+
+| Variable  | Equals                                                | Description                  |
+| --------- | ----------------------------------------------------- | ---------------------------- |
+| `N`       | `S_young + S_old + I_young + I_old + R_young + R_old` | Total population             |
+| `N_young` | `S_young + I_young + R_young`                         | Total young population       |
+| `N_old`   | `S_old + I_old + R_old`                               | Total old population         |
+| `S`       | `S_young + S_old`                                     | Total susceptible (base bin) |
+| `I`       | `I_young + I_old`                                     | Total infected (base bin)    |
+| `R`       | `R_young + R_old`                                     | Total recovered (base bin)   |
+
+With multiple stratifications (age × location), intersection variables are also created:
+
+| Variable        | Equals                                      |
+| --------------- | ------------------------------------------- |
+| `N_young`       | Sum of all compartments with `_young`       |
+| `N_urban`       | Sum of all compartments with `_urban`       |
+| `N_young_urban` | Sum of all compartments with `_young_urban` |
+
+#### Use Case: Subgroup-Specific Transmission
+
+A common use case is modeling transmission **within** age groups (assortative mixing) rather than across the entire population:
+
+```python
+# Standard frequency-dependent transmission (homogeneous mixing)
+rate = "beta * S * I / N"
+
+# Age-assortative transmission (young people primarily infect young people)
+# For the S_young → I_young transition:
+stratified_rates=[
+    {
+        "conditions": [{"stratification": "age", "category": "young"}],
+        "rate": "beta * S_young * I_young / N_young"  # Normalized by young population
+    },
+    {
+        "conditions": [{"stratification": "age", "category": "old"}],
+        "rate": "beta * S_old * I_old / N_old"  # Normalized by old population
+    }
+]
+```
+
+This models a scenario where young people mainly mix with other young people, and old people mainly mix with other old people.
 
 ### The `$compartment` Placeholder
 
@@ -135,8 +184,8 @@ rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
 
 **When to use:**
 
-- Per-capita rates that apply to multiple compartments (deaths, emigration)
-- Treatment transitions from multiple disease states to recovery
+- Per-capita rates that apply to multiple compartments
+- Transitions from multiple source compartments to a single target
 - Any time you need the same formula pattern applied to different compartments
 
 **When NOT to use:**
@@ -439,15 +488,15 @@ The parser:
 
 ### All Available Variables
 
-| Variable           | Type  | Description                  |
-| ------------------ | ----- | ---------------------------- |
-| **Disease states** | float | Any state ID (S, I, R, etc.) |
-| **Parameters**     | float | Any parameter ID             |
-| `N`                | float | Total population             |
-| `step`             | int   | Current time step            |
-| `t`                | int   | Alias for step               |
-| `pi`               | float | π constant                   |
-| `e`                | float | e constant                   |
+| Variable         | Type  | Description                        |
+| ---------------- | ----- | ---------------------------------- |
+| **Compartments** | float | Any compartment ID (S, I, R, etc.) |
+| **Parameters**   | float | Any parameter ID                   |
+| `N`              | float | Total population                   |
+| `step`           | int   | Current time step                  |
+| `t`              | int   | Alias for step                     |
+| `pi`             | float | π constant                         |
+| `e`              | float | e constant                         |
 
 ### All Operators
 

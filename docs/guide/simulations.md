@@ -20,7 +20,7 @@ Commol supports two output formats for simulation results.
 
 ### Dictionary of Lists (Default)
 
-Each disease state maps to a list of values over time:
+Each compartment maps to a list of values over time:
 
 ```python
 results = simulation.run(num_steps=100, output_format="dict_of_lists")
@@ -60,34 +60,30 @@ for t, state in enumerate(results):
 
 **Best for**: Matrix operations, comparing states, exporting to CSV
 
-## Working with Stratifications
+## Working with Stratified Results
 
-Stratifications create multiple compartments by combining disease states with stratification categories. Understanding how to access and analyze stratified results is crucial for complex models.
+When you use stratifications, your simulation results contain separate time series for each stratified compartment. Understanding how to navigate, access, and aggregate these results is essential for analysis.
 
-### Understanding Stratified Compartment Names
+### Understanding the Naming Convention
 
-When you add stratifications, Commol creates compartments by combining disease state IDs with stratification category names using underscore notation:
+Commol creates stratified compartment names by joining the base compartment ID with category names using underscores. The categories appear in the **order stratifications were added** to the model.
 
-**Pattern**: `{disease_state}_{category1}_{category2}_...`
+**Pattern**: `{base_compartment}_{category1}_{category2}_...`
 
 ```python
-# Model with one stratification (age)
+# Model definition
 .add_bin(id="S", name="Susceptible")
 .add_bin(id="I", name="Infected")
-.add_stratification(id="age", categories=["young", "old"])
+.add_stratification(id="age", categories=["young", "old"])  # Added first
+.add_stratification(id="location", categories=["urban", "rural"])  # Added second
 
-# Creates compartments: S_young, S_old, I_young, I_old
+# Resulting compartment names (12 total):
+# S_young_urban, S_young_rural, S_old_urban, S_old_rural
+# I_young_urban, I_young_rural, I_old_urban, I_old_rural
+# R_young_urban, R_young_rural, R_old_urban, R_old_rural
 ```
 
-```python
-# Model with two stratifications (age and location)
-.add_bin(id="I", name="Infected")
-.add_stratification(id="age", categories=["child", "adult"])
-.add_stratification(id="location", categories=["urban", "rural"])
-
-# Creates compartments:
-# I_child_urban, I_child_rural, I_adult_urban, I_adult_rural
-```
+**Important**: The order is `{bin}_{age}_{location}` because age was added before location. If you reverse the order of `add_stratification` calls, names would be `{bin}_{location}_{age}`.
 
 ### Accessing Stratified Results
 
@@ -133,14 +129,64 @@ urban_keys = [key for key in results.keys() if "_urban" in key]
 
 ### Aggregating Stratified Results
 
+A common task is computing totals across one or more stratification dimensions.
+
 #### Sum Across One Stratification
 
 ```python
-# Total infected across all age groups
+import numpy as np
+
+# Total infected across all age groups (removing age stratification)
 total_infected = np.array(results["I_young"]) + np.array(results["I_old"])
 
-# Or using list comprehension
+# Or using list comprehension (no NumPy required)
 total_infected = [y + o for y, o in zip(results["I_young"], results["I_old"])]
+```
+
+#### Sum Across Multiple Stratifications
+
+```python
+# Model has age=[young, old] and location=[urban, rural]
+# Get total infected (sum across all strata)
+total_I = (
+    np.array(results["I_young_urban"]) +
+    np.array(results["I_young_rural"]) +
+    np.array(results["I_old_urban"]) +
+    np.array(results["I_old_rural"])
+)
+
+# Or dynamically using pattern matching
+infected_keys = [k for k in results.keys() if k.startswith("I_")]
+total_I = sum(np.array(results[k]) for k in infected_keys)
+```
+
+#### Sum by Stratification Category
+
+```python
+# Total young population (across all disease states)
+young_keys = [k for k in results.keys() if "_young" in k]
+total_young = sum(np.array(results[k]) for k in young_keys)
+
+# Total urban population
+urban_keys = [k for k in results.keys() if "_urban" in k]
+total_urban = sum(np.array(results[k]) for k in urban_keys)
+```
+
+#### Create Aggregated DataFrame
+
+```python
+import pandas as pd
+import numpy as np
+
+# Convert results to DataFrame
+df = pd.DataFrame(results)
+
+# Add aggregated columns
+df["I_total"] = df[[c for c in df.columns if c.startswith("I_")]].sum(axis=1)
+df["young_total"] = df[[c for c in df.columns if "_young" in c]].sum(axis=1)
+
+# Compute proportions
+df["I_proportion"] = df["I_total"] / df[[c for c in df.columns if not c.endswith("_total")]].sum(axis=1)
 ```
 
 ### Common Pitfalls
