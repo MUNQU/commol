@@ -93,8 +93,8 @@ class ModelBuilder:
         The model description.
     _version : str | None
         The model version.
-    _disease_states : list[Bin]
-        List of bins in the model.
+    _bins : list[Bin]
+        List of bins (compartments) in the model.
     _stratifications : list[Stratification]
         List of population stratifications.
     _transitions : list[Transition]
@@ -764,7 +764,7 @@ class ModelBuilder:
             "name": self._name,
             "description": self._description,
             "version": self._version,
-            "disease_states_count": len(self._bins),
+            "bins_count": len(self._bins),
             "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],

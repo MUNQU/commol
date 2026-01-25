@@ -1,7 +1,7 @@
 import math
 from typing import Self
 
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from commol.context.bin import Bin
 from commol.context.dynamics import Transition
@@ -15,7 +15,7 @@ class Population(BaseModel):
 
     Attributes
     ----------
-    disease_states : list[Bin]
+    bins : list[Bin]
         A list of compartments or states that make up the model.
     stratifications : list[Stratification]
         A list of categorical subdivisions of the population.

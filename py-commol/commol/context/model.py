@@ -95,6 +95,31 @@ class Model(BaseModel):
             raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
         return self
 
+    @model_validator(mode="after")
+    def validate_parameter_names_not_reserved(self) -> Self:
+        """
+        Validates that parameter IDs do not conflict with reserved variable names.
+
+        Bin IDs are reserved variables that cannot be used as parameter names.
+        When stratifications are present, base compartment names represent the
+        sum of all stratified versions (e.g., S = S_young + S_old).
+
+        Parameters cannot use these reserved names to avoid conflicts during
+        rate expression evaluation.
+        """
+        bin_ids = {bin_item.id for bin_item in self.population.bins}
+        parameter_ids = {p.id for p in self.parameters}
+
+        conflicting_names = bin_ids & parameter_ids
+        if conflicting_names:
+            raise ValueError(
+                f"Parameter IDs conflict with reserved compartment names: "
+                f"{sorted(conflicting_names)}. "
+                f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
+                f"Please rename the conflicting parameters."
+            )
+        return self
+
     def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
         """
         Update parameter values in the model.
@@ -623,14 +648,11 @@ class Model(BaseModel):
         """Format the total system size information."""
         lines: list[str] = []
 
-        num_disease_states = len(bin_ids)
+        num_bins = len(bin_ids)
         if not self.population.stratifications:
-            total_equations = num_disease_states
+            total_equations = num_bins
             lines.append(
-                (
-                    f"Total System: {total_equations} coupled equations "
-                    f"({num_disease_states} bins)"
-                )
+                (f"Total System: {total_equations} coupled equations ({num_bins} bins)")
             )
             return lines
 
@@ -641,12 +663,12 @@ class Model(BaseModel):
             num_strat_combinations *= num_cat
             strat_details.append(f"{num_cat} {strat.id}")
 
-        total_equations = num_disease_states * num_strat_combinations
+        total_equations = num_bins * num_strat_combinations
 
         lines.append(
             (
                 f"Total System: {total_equations} coupled equations "
-                f"({num_disease_states} bins × {' × '.join(strat_details)})"
+                f"({num_bins} bins × {' × '.join(strat_details)})"
             )
         )
 
@@ -1249,7 +1271,7 @@ class Model(BaseModel):
         - S_young_urban -> S_{young,urban}
         - N_young -> N_{young}
         """
-        # Greek letters commonly used in epidemiology
+        # Greek letters commonly used in mathematical modeling
         greek_letters = {
             "alpha",
             "beta",

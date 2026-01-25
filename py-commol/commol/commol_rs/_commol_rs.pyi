@@ -11,7 +11,7 @@ class ConditionProtocol(Protocol):
     logic: LogicOperators
     rules: list[RuleProtocol]
 
-class DiseaseStateProtocol(Protocol):
+class BinProtocol(Protocol):
     id: str
     name: str
 
@@ -50,11 +50,11 @@ class StratificationFractionsProtocol(Protocol):
 
 class InitialConditionsProtocol(Protocol):
     population_size: int
-    disease_state_fraction: dict[str, float]
+    bin_fraction: dict[str, float]
     stratification_fractions: list[StratificationFractionsProtocol]
 
 class PopulationProtocol(Protocol):
-    disease_states: list[DiseaseStateProtocol]
+    bins: list[BinProtocol]
     stratifications: list[StratificationProtocol]
     transitions: list[TransitionProtocol]
     initial_conditions: InitialConditionsProtocol
@@ -435,7 +435,7 @@ class RateMathExpressionProtocol(Protocol):
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
     Population: type[PopulationProtocol]
-    DiseaseState: type[DiseaseStateProtocol]
+    Bin: type[BinProtocol]
     Stratification: type[StratificationProtocol]
     StratificationCondition: type[StratificationConditionProtocol]
     StratifiedRate: type[StratifiedRateProtocol]
