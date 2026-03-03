@@ -13,12 +13,17 @@ class Stratification(BaseModel):
         Identifier of the stratification.
     categories : list[str]
         List of the different stratification groups identifiers.
+    description : str | None
+        A human-readable description of the stratification.
     """
 
     id: str = Field(default=..., description="Identifier of the stratification.")
     categories: list[str] = Field(
         default=...,
         description="List of the different stratification groups identifiers.",
+    )
+    description: str | None = Field(
+        default=None, description="Human-readable description of the stratification."
     )
 
     @override
