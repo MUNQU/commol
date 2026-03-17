@@ -70,54 +70,28 @@ rate = "beta * sin(2 * pi * t)"    # Periodic variation
 rate = "gamma * exp(-0.01 * step)" # Exponential decay over time
 ```
 
-### Subpopulation Variables (N_category)
+### Subpopulation Variables
 
-When you use stratifications, Commol automatically creates subpopulation total variables that sum compartments belonging to each category. These are essential for modeling **frequency-dependent transmission within subgroups**.
+When you use stratifications, Commol automatically creates several types of **subpopulation sum variables** that aggregate compartment populations. These are updated at every simulation step and can be used in any rate expression.
 
-#### How Subpopulation Variables Are Generated
+#### Types of Subpopulation Variables
 
-For a model with bins `S, I, R` and stratification `age = [young, old]`:
+Given a model with bins and stratifications, Commol generates:
 
-| Variable  | Equals                                                | Description                  |
-| --------- | ----------------------------------------------------- | ---------------------------- |
-| `N`       | `S_young + S_old + I_young + I_old + R_young + R_old` | Total population             |
-| `N_young` | `S_young + I_young + R_young`                         | Total young population       |
-| `N_old`   | `S_old + I_old + R_old`                               | Total old population         |
-| `S`       | `S_young + S_old`                                     | Total susceptible (base bin) |
-| `I`       | `I_young + I_old`                                     | Total infected (base bin)    |
-| `R`       | `R_young + R_old`                                     | Total recovered (base bin)   |
+| Variable pattern                  | Description                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `N`                               | Total population across all compartments                                                          |
+| `N_{cat}`                         | Total population matching a stratification category (e.g., `N_young`)                             |
+| `N_{cat1_cat2}`                   | Total population matching an intersection of categories (e.g., `N_young_urban`)                   |
+| `{bin}`                           | Base bin total — sum of all stratified versions of a bin (e.g., `S` = sum of all `S_*`)           |
+| `{bin}_{cat}`                     | Partial bin sum — sum of all compartments for a bin matching a category subset (e.g., `S_young`)  |
+| `{bin}_{cat1}_{cat2}_{...}_{catN}` | Full stratified compartment name (e.g., `S_young_urban`) — the individual compartment population |
 
-With multiple stratifications (age × location), intersection variables are also created:
+**Partial bin sums** (e.g., `S_young`) are available when the model has **two or more stratifications**. They represent the sum of a bin's compartments across one or more stratification categories, summing over the remaining dimensions. For instance, with stratifications `age` and `location`, the variable `S_young` equals the sum of all susceptible compartments where `age=young`, regardless of location.
 
-| Variable        | Equals                                      |
-| --------------- | ------------------------------------------- |
-| `N_young`       | Sum of all compartments with `_young`       |
-| `N_urban`       | Sum of all compartments with `_urban`       |
-| `N_young_urban` | Sum of all compartments with `_young_urban` |
+Category suffixes in variable names must follow the **declaration order** of stratifications. For example, if `age` is declared before `location`, then `S_young` (summing over location) and `S_urban` (summing over age) are both valid, but the intersection must be written as `S_young_urban` (not `S_urban_young`).
 
-#### Use Case: Subgroup-Specific Transmission
-
-A common use case is modeling transmission **within** age groups (assortative mixing) rather than across the entire population:
-
-```python
-# Standard frequency-dependent transmission (homogeneous mixing)
-rate = "beta * S * I / N"
-
-# Age-assortative transmission (young people primarily infect young people)
-# For the S_young → I_young transition:
-stratified_rates=[
-    {
-        "conditions": [{"stratification": "age", "category": "young"}],
-        "rate": "beta * S_young * I_young / N_young"  # Normalized by young population
-    },
-    {
-        "conditions": [{"stratification": "age", "category": "old"}],
-        "rate": "beta * S_old * I_old / N_old"  # Normalized by old population
-    }
-]
-```
-
-This models a scenario where young people mainly mix with other young people, and old people mainly mix with other old people.
+See [Building Models - Partial Conditions with Bin Sums](building-models.md#partial-conditions-with-bin-sums) for how to combine these variables with stratified rate conditions to write concise transition definitions.
 
 ### The `$compartment` Placeholder
 
@@ -195,6 +169,22 @@ rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
 - Different formulas for different compartments (write separate transitions)
 
 See [Building Models - Using $compartment Placeholder](building-models.md#using-compartment-placeholder-for-per-compartment-rates) for more details.
+
+### The `per_compartment` Flag
+
+When a model uses stratifications, base compartment names in rate expressions (like `E`, `I`) resolve to the **sum** of all their stratified versions. The `per_compartment=True` flag on a transition changes this behavior, replacing base compartment names with the specific stratified compartment name for each expanded flow:
+
+```python
+# Without per_compartment: E means total E (E_young + E_old + ...)
+.add_transition(id="latency", source=["E"], target=["I"], rate="sigma * E")
+
+# With per_compartment: E is replaced with E_young, E_old, etc.
+.add_transition(id="latency", source=["E"], target=["I"], rate="sigma * E", per_compartment=True)
+```
+
+Both source and target bin names are replaced. Use this for transitions where each subpopulation should evolve independently (latency, recovery), not for force-of-infection terms that depend on the total infectious population.
+
+See [Building Models - Per-Compartment Rates](building-models.md#per-compartment-rates-with-per_compartment) for detailed examples.
 
 ### Parameter References
 
@@ -488,15 +478,18 @@ The parser:
 
 ### All Available Variables
 
-| Variable         | Type  | Description                        |
-| ---------------- | ----- | ---------------------------------- |
-| **Compartments** | float | Any compartment ID (S, I, R, etc.) |
-| **Parameters**   | float | Any parameter ID                   |
-| `N`              | float | Total population                   |
-| `step`           | int   | Current time step                  |
-| `t`              | int   | Alias for step                     |
-| `pi`             | float | π constant                         |
-| `e`              | float | e constant                         |
+| Variable                    | Type  | Description                                                            |
+| --------------------------- | ----- | ---------------------------------------------------------------------- |
+| **Compartments**            | float | Any full compartment name (e.g., `S`, `S_young`, `S_young_urban`)      |
+| **Parameters**              | float | Any parameter ID                                                       |
+| `N`                         | float | Total population                                                       |
+| `N_{cat}`, `N_{cat1_cat2}`  | float | Subpopulation totals by category (e.g., `N_young`, `N_young_urban`)    |
+| `{bin}`                     | float | Base bin total (e.g., `S` = sum of all `S_*` when stratified)          |
+| `{bin}_{cat}`               | float | Partial bin sum (e.g., `S_young`); requires 2+ stratifications         |
+| `step`                      | int   | Current time step                                                      |
+| `t`                         | int   | Alias for step                                                         |
+| `pi`                        | float | π constant                                                             |
+| `e`                         | float | e constant                                                             |
 
 ### All Operators
 

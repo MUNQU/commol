@@ -210,6 +210,8 @@ class Model(BaseModel):
         }
 
         subpopulation_n_vars = self._get_subpopulation_n_vars()
+        full_compartment_names = self._get_full_compartment_names()
+        bin_subpopulation_vars = self._get_bin_subpopulation_vars()
 
         return (
             param_ids
@@ -217,6 +219,8 @@ class Model(BaseModel):
             | strat_category_ids
             | special_vars
             | subpopulation_n_vars
+            | full_compartment_names
+            | bin_subpopulation_vars
         )
 
     def _get_subpopulation_n_vars(self) -> set[str]:
@@ -238,6 +242,42 @@ class Model(BaseModel):
                     subpopulation_n_vars.add(var_name)
 
         return subpopulation_n_vars
+
+    def _get_full_compartment_names(self) -> set[str]:
+        """Returns all full stratified compartment names."""
+        if not self.population.stratifications:
+            return set()
+
+        compartments = self._generate_compartments()
+        return {"_".join(comp) for comp in compartments}
+
+    def _get_bin_subpopulation_vars(self) -> set[str]:
+        """Generates partial bin-stratification sum variable names.
+
+        For bins and stratifications, generates the combinations. These represent
+        partial sums over one or more stratification dimensions. Requires 2+
+        stratifications (with 1, partial sums duplicate existing names).
+        """
+        if len(self.population.stratifications) < 2:
+            return set()
+
+        bin_strat_vars: set[str] = set()
+        bin_ids = [bin_item.id for bin_item in self.population.bins]
+        category_groups = [s.categories for s in self.population.stratifications]
+
+        for combo_tuple in product(*category_groups):
+            num_cats = len(combo_tuple)
+            full_mask = (1 << num_cats) - 1
+            # Proper non-empty subsets only (exclude full mask)
+            for subset_mask in range(1, full_mask):
+                subset = [
+                    cat for k, cat in enumerate(combo_tuple) if (subset_mask >> k) & 1
+                ]
+                suffix = "_".join(subset)
+                for bin_id in bin_ids:
+                    bin_strat_vars.add(f"{bin_id}_{suffix}")
+
+        return bin_strat_vars
 
     def _validate_transition_rates(
         self, transition: Transition, valid_identifiers: set[str]
@@ -572,11 +612,6 @@ class Model(BaseModel):
         -------
         str
             Formatted compartment string
-
-        Examples
-        --------
-        Text: ('S', 'young', 'urban') -> 'S_young_urban'
-        LaTeX: ('S', 'young', 'urban') -> 'S_{young,urban}'
         """
         if format == PrintEquationsOutputFormat.LATEX:
             # Use _latex_variable to format with subscripts
@@ -586,31 +621,54 @@ class Model(BaseModel):
             # Text format (original)
             return "_".join(compartment)
 
+    @staticmethod
+    def _replace_bin_in_rate(rate: str, bin_name: str, replacement: str) -> str:
+        """Replace a base bin name in a rate expression with word-boundary matching."""
+        return re.sub(rf"\b{re.escape(bin_name)}\b", replacement, rate)
+
+    def _match_stratified_rate(
+        self, transition: Transition, compartment: tuple[str, ...]
+    ) -> str | None:
+        """Find the stratified rate matching a compartment's categories."""
+        compartment_strat_map: dict[str, str] = {
+            strat.id: compartment[i + 1]
+            for i, strat in enumerate(self.population.stratifications)
+        }
+        for strat_rate in transition.stratified_rates or []:
+            if all(
+                compartment_strat_map.get(c.stratification) == c.category
+                for c in strat_rate.conditions
+            ):
+                return strat_rate.rate
+        return None
+
+    def _apply_per_compartment_substitution(
+        self, rate: str, transition: Transition, compartment: tuple[str, ...]
+    ) -> str:
+        """Replace base bin names in rate with stratified compartment names."""
+        strat_categories = compartment[1:]
+        for bin_name in transition.source[:1] + transition.target[:1]:
+            full_name = "_".join((bin_name,) + strat_categories)
+            rate = self._replace_bin_in_rate(rate, bin_name, full_name)
+        return rate
+
     def _get_rate_for_compartment(
         self, transition: Transition, compartment: tuple[str, ...]
     ) -> str | None:
         """Get the appropriate rate for a compartment, considering stratified rates."""
         if not transition.stratified_rates or len(compartment) == 1:
-            return transition.rate
+            rate = transition.rate
+        else:
+            rate = self._match_stratified_rate(transition, compartment)
+            if rate is None:
+                rate = transition.rate
 
-        compartment_strat_map: dict[str, str] = {}
-        for i, strat in enumerate(self.population.stratifications):
-            compartment_strat_map[strat.id] = compartment[i + 1]
+        if rate and transition.per_compartment and len(compartment) > 1:
+            rate = self._apply_per_compartment_substitution(
+                rate, transition, compartment
+            )
 
-        for strat_rate in transition.stratified_rates:
-            matches = True
-            for condition in strat_rate.conditions:
-                if (
-                    compartment_strat_map.get(condition.stratification)
-                    != condition.category
-                ):
-                    matches = False
-                    break
-            if matches:
-                return strat_rate.rate
-
-        # No stratified rate matched, use fallback
-        return transition.rate
+        return rate
 
     def _separate_transitions_by_type(
         self,

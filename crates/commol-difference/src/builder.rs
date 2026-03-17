@@ -1,9 +1,12 @@
 //! Model builder for constructing DifferenceEquations from a compartment model.
 
-use crate::helpers::{extract_stratifications, get_rate_string_for_compartment};
+use crate::helpers::{
+    compute_target_with_category_overrides, extract_stratifications,
+    get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
+};
 use crate::types::{DifferenceEquations, SubpopulationMapping, TransitionFlow};
 use commol_core::{MathExpressionContext, Model, RateMathExpression};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 impl DifferenceEquations {
     /// Create a new DifferenceEquations instance from a model.
@@ -58,24 +61,32 @@ impl DifferenceEquations {
         // Store initial population for reset functionality
         let initial_population = population.clone();
 
+        // Pre-compute subpopulation mappings for stratifications
+        // (must be done before transition flows, as references_compartments
+        // detection needs to know about subpopulation variable names)
+        let subpopulation_mappings = build_subpopulation_mappings(
+            &compartments,
+            &model.population.stratifications,
+            &model.population.bins,
+        );
+
+        let subpopulation_param_names: HashSet<String> = subpopulation_mappings
+            .iter()
+            .map(|m| m.parameter_name.clone())
+            .collect();
+
         // Pre-compute all transition flows
         let transition_flows = build_transition_flows(
             model,
             &compartments,
             &compartment_map,
             &model.population.stratifications,
+            &subpopulation_param_names,
         );
 
         // Initialize compartment flows buffer
         let num_compartments = compartments.len();
         let compartment_flows = vec![0.0; num_compartments];
-
-        // Pre-compute subpopulation mappings for stratifications
-        let subpopulation_mappings = build_subpopulation_mappings(
-            &compartments,
-            &model.population.stratifications,
-            &model.population.bins,
-        );
 
         Self {
             compartments,
@@ -202,6 +213,7 @@ fn build_transition_flows(
     compartments: &[String],
     compartment_map: &HashMap<String, usize>,
     stratifications: &[commol_core::Stratification],
+    subpopulation_names: &HashSet<String>,
 ) -> Vec<TransitionFlow> {
     let mut transition_flows = Vec::new();
 
@@ -215,28 +227,66 @@ fn build_transition_flows(
                 if compartment_name.starts_with(source_bin) {
                     let source_index = i;
 
-                    // Construct the target compartment name
-                    let target_compartment_name =
-                        compartment_name.replacen(source_bin, target_bin, 1);
+                    // Extract stratifications for this compartment
+                    let stratification_values =
+                        extract_stratifications(compartment_name, source_bin, stratifications);
 
-                    if let Some(&target_index) = compartment_map.get(&target_compartment_name) {
-                        // Extract stratifications for this compartment
-                        let stratification_values =
-                            extract_stratifications(compartment_name, source_bin, stratifications);
-
-                        // Get the appropriate rate for this compartment
-                        if let Some(rate_string) =
-                            get_rate_string_for_compartment(transition, &stratification_values)
+                    // Get the appropriate rate for this compartment
+                    if let Some(matched) =
+                        get_rate_string_for_compartment(transition, &stratification_values)
+                    {
+                        // Compute target compartment name:
+                        // If matched stratified rate has `to` overrides, use them
+                        // to remap categories. Otherwise, use standard bin replacement.
+                        let target_compartment_name = if let Some(sr) = matched.stratified_rate
                         {
+                            if has_category_overrides(&sr.conditions) {
+                                compute_target_with_category_overrides(
+                                    target_bin,
+                                    &stratification_values,
+                                    stratifications,
+                                    &sr.conditions,
+                                )
+                            } else {
+                                compartment_name.replacen(source_bin, target_bin, 1)
+                            }
+                        } else {
+                            compartment_name.replacen(source_bin, target_bin, 1)
+                        };
+
+                        if let Some(&target_index) =
+                            compartment_map.get(&target_compartment_name)
+                        {
+                            // If per_compartment is enabled, replace base bin names
+                            // with the specific stratified compartment names
+                            let rate_string =
+                                if transition.per_compartment.unwrap_or(false) {
+                                    let mut modified = replace_bin_in_rate(
+                                        &matched.rate_string,
+                                        source_bin,
+                                        compartment_name,
+                                    );
+                                    modified = replace_bin_in_rate(
+                                        &modified,
+                                        target_bin,
+                                        &target_compartment_name,
+                                    );
+                                    modified
+                                } else {
+                                    matched.rate_string
+                                };
+
                             // Parse the rate expression once
                             let rate_expression =
                                 RateMathExpression::from_string(rate_string.clone());
 
-                            // Check if rate expression references compartment variables
+                            // Check if rate expression references compartment or
+                            // subpopulation variables (partial bin sums)
                             let rate_variables = rate_expression.get_variables();
-                            let references_compartments = rate_variables
-                                .iter()
-                                .any(|v| compartment_map.contains_key(v));
+                            let references_compartments = rate_variables.iter().any(|v| {
+                                compartment_map.contains_key(v)
+                                    || subpopulation_names.contains(v)
+                            });
 
                             transition_flows.push(TransitionFlow {
                                 source_index,
@@ -336,6 +386,61 @@ fn build_subpopulation_mappings(
             contributing_compartment_indices: indices,
             parameter_name: bin_name,
         });
+    }
+
+    // Build mappings for partial bin-stratification sums
+    // These represent the sum of all compartments for a given bin that match
+    // a partial subset of stratification categories. Only meaningful with 2+
+    // stratifications (with 1 stratification, partial sums would duplicate
+    // either the full compartment or the base compartment total).
+    if stratifications.len() >= 2 {
+        let mut bin_strat_partial_map: HashMap<String, Vec<usize>> = HashMap::new();
+
+        for bin in bins {
+            let bin_id = &bin.id;
+            let bin_prefix_len = bin_id.len();
+
+            for (compartment_index, compartment_name) in compartments.iter().enumerate() {
+                // Only process compartments belonging to this bin
+                if !compartment_name.starts_with(bin_id.as_str())
+                    || compartment_name
+                        .chars()
+                        .nth(bin_prefix_len)
+                        .map_or(true, |c| c != '_')
+                {
+                    continue;
+                }
+
+                // Extract categories from the stratification suffix
+                let strat_suffix = &compartment_name[bin_prefix_len + 1..];
+                let categories: Vec<&str> = strat_suffix.split('_').collect();
+                let num_cats = categories.len();
+
+                // Iterate over all proper non-empty subsets (exclude full mask)
+                let full_mask: u32 = (1 << num_cats) - 1;
+                for subset_mask in 1..full_mask {
+                    let subset: Vec<&str> = categories
+                        .iter()
+                        .enumerate()
+                        .filter(|(k, _)| (subset_mask >> *k) & 1 == 1)
+                        .map(|(_, cat)| *cat)
+                        .collect();
+
+                    let var_name = format!("{}_{}", bin_id, subset.join("_"));
+                    bin_strat_partial_map
+                        .entry(var_name)
+                        .or_default()
+                        .push(compartment_index);
+                }
+            }
+        }
+
+        for (var_name, indices) in bin_strat_partial_map {
+            mappings.push(SubpopulationMapping {
+                contributing_compartment_indices: indices,
+                parameter_name: var_name,
+            });
+        }
     }
 
     mappings

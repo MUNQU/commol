@@ -340,6 +340,60 @@ With `$compartment`, you create **multiple independent** transitions:
 # dI/dt = ... - (d*I)
 ```
 
+### Per-Compartment Rates with `per_compartment`
+
+When a model has stratifications, base compartment names like `E` or `I` in rate expressions resolve to the **total** across all stratified versions (e.g., `E = E_young + E_old + ...`). This is useful for force-of-infection terms where you need the global infectious population, but it's **incorrect** for transitions where each subpopulation should evolve independently—like latency (`E → I`) or recovery (`I → R`).
+
+The `per_compartment` flag solves this by automatically replacing base compartment names with the specific stratified compartment name for each expanded transition flow:
+
+```python
+builder.add_transition(
+    id="latency",
+    source=["E"],
+    target=["I"],
+    rate="sigma * E",
+    per_compartment=True  # E becomes E_young, E_old, etc.
+)
+```
+
+**Without** `per_compartment` (default):
+
+| Flow                       | Rate Expression     | `E` resolves to        |
+| -------------------------- | ------------------- | ---------------------- |
+| `E_young → I_young`        | `sigma * E`         | `E_young + E_old` (total) |
+| `E_old → I_old`            | `sigma * E`         | `E_young + E_old` (total) |
+
+**With** `per_compartment=True`:
+
+| Flow                       | Rate Expression     | Meaning                  |
+| -------------------------- | ------------------- | ------------------------ |
+| `E_young → I_young`        | `sigma * E_young`   | Only this subpopulation  |
+| `E_old → I_old`            | `sigma * E_old`     | Only this subpopulation  |
+
+Both source and target bin names are replaced. For example, with `rate="alpha * E + beta * I"` and `per_compartment=True`, the flow `E_young → I_young` uses `alpha * E_young + beta * I_young`.
+
+**Works with stratified rates:**
+
+```python
+builder.add_transition(
+    id="recovery",
+    source=["I"],
+    target=["R"],
+    rate="gamma * I",  # Fallback
+    stratified_rates=[
+        {
+            "conditions": [{"stratification": "age", "category": "young"}],
+            "rate": "gamma_young * I"
+        },
+        {
+            "conditions": [{"stratification": "age", "category": "old"}],
+            "rate": "gamma_old * I"
+        }
+    ],
+    per_compartment=True  # I is replaced in each stratified rate
+)
+```
+
 ### Stratified Transitions
 
 When a model includes stratifications, you often need different transition rates for different subgroups. The `add_transition` method supports this via the `stratified_rates` parameter.
