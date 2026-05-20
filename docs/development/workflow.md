@@ -25,7 +25,7 @@ The project directory path **must not contain tildes (`~`) or spaces**. Maturin 
 # Install Rust toolchain
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Install Python 3.11 or higher
+# Install Python 3.12 or higher
 # (use your system's package manager)
 ```
 
