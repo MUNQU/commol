@@ -110,9 +110,9 @@ fn stratification_conditions_met(
 ) -> bool {
     match conditions {
         None => true,
-        Some(conds) => conds.iter().all(|c| {
-            applied.get(&c.stratification) == Some(&c.category)
-        }),
+        Some(conds) => conds
+            .iter()
+            .all(|c| applied.get(&c.stratification) == Some(&c.category)),
     }
 }
 

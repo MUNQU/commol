@@ -80,9 +80,9 @@ pub(crate) fn extract_stratifications(
         // Check if this stratification applies given already-extracted categories
         let applies = match &stratification.conditions {
             None => true,
-            Some(conds) => conds.iter().all(|c| {
-                result.get(&c.stratification) == Some(&c.category)
-            }),
+            Some(conds) => conds
+                .iter()
+                .all(|c| result.get(&c.stratification) == Some(&c.category)),
         };
 
         if applies && token_index < tokens.len() {
@@ -235,9 +235,9 @@ pub(crate) fn compute_target_with_category_overrides(
         // (evaluated against target's accumulated categories so far)
         let applies = match &strat.conditions {
             None => true,
-            Some(conds) => conds.iter().all(|c| {
-                target_applied.get(&c.stratification) == Some(&c.category)
-            }),
+            Some(conds) => conds
+                .iter()
+                .all(|c| target_applied.get(&c.stratification) == Some(&c.category)),
         };
 
         if applies && let Some(cat) = effective_cat {
