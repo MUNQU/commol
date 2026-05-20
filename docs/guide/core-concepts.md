@@ -7,82 +7,96 @@ Commol is built around several key concepts that work together to create compart
 Compartments (also called bins or states) represent distinct states that entities in your model can occupy. In the API, these are added using `add_bin()`.
 
 ```python
-builder.add_bin(id="S", name="Susceptible")
-builder.add_bin(id="E", name="Exposed")
-builder.add_bin(id="I", name="Infected")
-builder.add_bin(id="R", name="Recovered")
+builder.add_bin(id="A", name="State A")
+builder.add_bin(id="B", name="State B")
+builder.add_bin(id="C", name="State C")
 ```
 
-### Example: Epidemiological Compartments
-
-The following table shows common compartments used in epidemiological models:
-
-| ID  | Name        | Description                         |
-| --- | ----------- | ----------------------------------- |
-| S   | Susceptible | Individuals who can become infected |
-| E   | Exposed     | Infected but not yet infectious     |
-| I   | Infected    | Actively infected and infectious    |
-| R   | Recovered   | No longer infectious, immune        |
-| D   | Dead        | Deceased from disease               |
-
-Note: Compartments can represent any type of state depending on your application domain (e.g., customer segments, chemical species, population groups).
+A model can have any number of compartments with any names. Compartments represent whatever discrete states are meaningful in your system.
 
 ## Stratifications
 
-Stratifications divide your population into subgroups based on characteristics like age, location, or risk factors. When you add a stratification, Commol automatically creates separate compartments for each subgroup, tracking disease dynamics independently within each stratum.
+Stratifications divide your population into subgroups along a dimension that matters for the model. When you add a stratification, Commol automatically creates separate compartments for each category, tracking dynamics independently within each subgroup.
 
 ### How Stratification Works
 
 When you define compartments **without** stratification, each compartment represents the entire population in that state:
 
 ```
-Base compartments: S, I, R
+Base compartments: A, B, C
 Total: 3 compartments
 ```
 
 When you add a stratification, Commol **expands** each compartment by creating one version per category. The naming pattern is `{compartment}_{category}`:
 
 ```
-Add stratification: age = [young, old]
+Add stratification: group = [g1, g2]
 
 Expanded compartments:
-  S → S_young, S_old
-  I → I_young, I_old
-  R → R_young, R_old
+  A → A_g1, A_g2
+  B → B_g1, B_g2
+  C → C_g1, C_g2
 
 Total: 6 compartments (3 bins × 2 categories)
 ```
 
-With **multiple stratifications**, compartments are expanded using the Cartesian product of all categories. Each additional stratification multiplies the number of compartments:
+With **multiple stratifications**, compartments are expanded using the Cartesian product of all categories by default. Each additional stratification multiplies the number of compartments:
 
 ```
 Add stratifications:
-  age = [young, old]
-  location = [urban, rural]
+  group = [g1, g2]
+  type  = [t1, t2]
 
 Expanded compartments:
-  S → S_young_urban, S_young_rural, S_old_urban, S_old_rural
-  I → I_young_urban, I_young_rural, I_old_urban, I_old_rural
-  R → R_young_urban, R_young_rural, R_old_urban, R_old_rural
+  A → A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2
+  B → B_g1_t1, B_g1_t2, B_g2_t1, B_g2_t2
+  C → C_g1_t1, C_g1_t2, C_g2_t1, C_g2_t2
 
-Total: 12 compartments (3 bins × 2 ages × 2 locations)
+Total: 12 compartments (3 bins × 2 groups × 2 types)
 ```
 
 The order of category suffixes matches the order in which stratifications are added to the model.
 
+### Conditional Stratifications
+
+Sometimes a second stratification only makes sense for a subset of the first. You can express this with the `conditions` parameter: the stratification is only applied to compartments whose already-assigned categories satisfy all conditions.
+
+```
+Add stratifications:
+  group = [g1, g2]
+  subtype = [s1, s2]   (conditions: group = g2)
+
+Expanded compartments:
+  A_g1          ← subtype not applied (condition not met)
+  A_g2_s1
+  A_g2_s2
+  B_g1
+  B_g2_s1
+  B_g2_s2
+  C_g1
+  C_g2_s1
+  C_g2_s2
+
+Total: 9 compartments instead of 12
+```
+
+Conditions may only reference stratifications declared **before** the conditional one. See [Conditional Stratifications](building-models.md#conditional-stratifications) in the Building Models guide for the full API.
+
 ### Defining Stratifications
 
 ```python
-# Age stratification
+# Unconditional stratification
 builder.add_stratification(
-    id="age_group",
-    categories=["young", "adult", "elderly"]
+    id="group",
+    categories=["g1", "g2"],
+    description="Primary grouping dimension"
 )
 
-# Location stratification
+# Conditional stratification — only expands g2 compartments
 builder.add_stratification(
-    id="region",
-    categories=["urban", "rural"]
+    id="subtype",
+    categories=["s1", "s2"],
+    conditions=[{"stratification": "group", "category": "g2"}]
 )
 ```
 
@@ -90,8 +104,8 @@ builder.add_stratification(
 
 When setting initial conditions, you specify:
 
-1. **Bin fractions**: How the population is distributed across disease states
-2. **Stratification fractions**: How each disease state is distributed across categories
+1. **Bin fractions**: How the population is distributed across states
+2. **Stratification fractions**: How each state is distributed across categories
 
 These fractions are applied multiplicatively:
 
@@ -99,75 +113,61 @@ These fractions are applied multiplicatively:
 builder.set_initial_conditions(
     population_size=10000,
     bin_fractions=[
-        {"bin": "S", "fraction": 0.99},   # 9900 susceptible
-        {"bin": "I", "fraction": 0.01},   # 100 infected
-        {"bin": "R", "fraction": 0.0}     # 0 recovered
+        {"bin": "A", "fraction": 0.9},
+        {"bin": "B", "fraction": 0.1},
+        {"bin": "C", "fraction": 0.0},
     ],
     stratification_fractions=[
         {
-            "stratification": "age_group",
+            "stratification": "group",
             "fractions": [
-                {"category": "young", "fraction": 0.3},
-                {"category": "adult", "fraction": 0.5},
-                {"category": "elderly", "fraction": 0.2}
+                {"category": "g1", "fraction": 0.6},
+                {"category": "g2", "fraction": 0.4},
             ]
         }
     ]
 )
 ```
 
-**Resulting initial populations:**
+**Resulting initial populations (single stratification):**
 
-| Compartment | Calculation        | Initial Value |
-| ----------- | ------------------ | ------------- |
-| `S_young`   | 10000 × 0.99 × 0.3 | 2970          |
-| `S_adult`   | 10000 × 0.99 × 0.5 | 4950          |
-| `S_elderly` | 10000 × 0.99 × 0.2 | 1980          |
-| `I_young`   | 10000 × 0.01 × 0.3 | 30            |
-| `I_adult`   | 10000 × 0.01 × 0.5 | 50            |
-| `I_elderly` | 10000 × 0.01 × 0.2 | 20            |
-| `R_young`   | 10000 × 0.0 × 0.3  | 0             |
-| `R_adult`   | 10000 × 0.0 × 0.5  | 0             |
-| `R_elderly` | 10000 × 0.0 × 0.2  | 0             |
+| Compartment | Calculation       | Initial Value |
+| ----------- | ----------------- | ------------- |
+| `A_g1`      | 10000 × 0.9 × 0.6 | 5400          |
+| `A_g2`      | 10000 × 0.9 × 0.4 | 3600          |
+| `B_g1`      | 10000 × 0.1 × 0.6 | 600           |
+| `B_g2`      | 10000 × 0.1 × 0.4 | 400           |
+| `C_g1`      | 10000 × 0.0 × 0.6 | 0             |
+| `C_g2`      | 10000 × 0.0 × 0.4 | 0             |
 
 ### Why Use Stratifications?
 
-Stratifications are essential when:
+Stratifications are useful when:
 
-- **Different groups have different rates**: Young people may recover faster, elderly may have higher mortality
-- **Modeling heterogeneous mixing**: Urban populations may have higher contact rates than rural ones
-- **Policy analysis**: Evaluate interventions targeting specific subgroups (e.g., vaccinating the elderly first)
-- **Data fitting**: Match model outputs to age-stratified surveillance data
+- **Different subgroups have different rates**: transition rates vary by category
+- **Tracking subgroup dynamics independently**: you need per-category output over time
+- **Fitting to stratified data**: model outputs must match data broken down by category
+- **Modelling targeted flows**: some transitions only apply to specific categories
 
 ## Parameters
 
-Parameters are global constants used throughout your model:
+Parameters are global constants (or formulas) used throughout your model:
 
 ```python
 builder.add_parameter(
-    id="beta",
+    id="k1",
     value=0.3,
-    description="Transition rate coefficient"
+    description="Forward rate constant"
 )
 
 builder.add_parameter(
-    id="gamma",
+    id="k2",
     value=0.1,
-    description="Rate constant"
+    description="Reverse rate constant"
 )
 ```
 
-### Example: Epidemiological Parameters
-
-The following table shows common parameters used in epidemiological models:
-
-| Parameter | Meaning                               | Typical Range  |
-| --------- | ------------------------------------- | -------------- |
-| `beta`    | Transmission rate                     | 0.1 - 1.0      |
-| `gamma`   | Recovery rate                         | 0.05 - 0.5     |
-| `sigma`   | Incubation rate (1/incubation_period) | 0.1 - 0.5      |
-| `mu`      | Birth/death rate                      | 0.0001 - 0.001 |
-| `R0`      | Basic reproduction number             | 1.0 - 10.0     |
+Parameters can be constants (`float`), formulas (`str`) that reference other parameters or special variables, or `None` when the value is to be determined by calibration.
 
 ## Transitions
 
@@ -176,36 +176,36 @@ Transitions define how populations move between compartments:
 ### Simple Transitions
 
 ```python
-# Recovery: I → R
+# Constant-rate flow: A → B
 builder.add_transition(
-    id="recovery",
-    source=["I"],
-    target=["R"],
-    rate="gamma"
+    id="forward",
+    source=["A"],
+    target=["B"],
+    rate="k1"
 )
 ```
 
 ### Formula-Based Transitions
 
 ```python
-# Infection: S → I (with force of infection)
+# Population-dependent flow: A → B
 builder.add_transition(
-    id="infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * S * I / N"
+    id="transfer",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N"
 )
 ```
 
 ### Multi-Source Transitions
 
 ```python
-# Natural death from any state
+# Outflow from multiple states
 builder.add_transition(
-    id="death",
-    source=["S", "I", "R"],
+    id="outflow",
+    source=["A", "B", "C"],
     target=[],  # Empty = removal from system
-    rate="0.000027"  # Daily death rate
+    rate="mu"
 )
 ```
 
@@ -217,19 +217,19 @@ Initial conditions define the starting state of your model:
 builder.set_initial_conditions(
     population_size=1000,
     bin_fractions=[
-        {"bin": "S", "fraction": 0.99},  # 99% in state S
-        {"bin": "I", "fraction": 0.01},  # 1% in state I
-        {"bin": "R", "fraction": 0.0}    # 0% in state R
+        {"bin": "A", "fraction": 0.9},
+        {"bin": "B", "fraction": 0.1},
+        {"bin": "C", "fraction": 0.0},
     ]
 )
 ```
 
 ### Validation Rules
 
-- Compartment fractions must sum to 1.0
+- Bin fractions must sum to 1.0
 - Stratification fractions must sum to 1.0 for each stratification
 - Population size must be positive
-- All compartments must have initial fractions defined
+- All bins must have initial fractions defined
 
 ## Model Types
 

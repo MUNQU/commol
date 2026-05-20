@@ -25,32 +25,32 @@ A high-performance compartmental modelling library for mathematical modeling usi
 ```python
 from commol import ModelBuilder, Simulation
 
-# Build a simple SIR model
+# Build a simple 3-compartment model
 model = (
-    ModelBuilder(name="Basic SIR", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)
-    .add_parameter(id="gamma", value=0.1)
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
@@ -78,7 +78,7 @@ Learn how to build and run compartment models:
 - [Mathematical Expressions](guide/mathematical-expressions.md) - Advanced rate formulas
 - [Running Simulations](guide/simulations.md) - Execute models and analyze results
 - [Model Calibration](guide/calibration.md) - Fit models to observed data
-- [Examples](guide/examples.md) - Complete examples (SIR, SEIR, stratified models)
+- [Examples](guide/examples.md) - Complete examples (basic, stratified, conditional models)
 
 ### API Reference
 
