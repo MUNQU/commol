@@ -102,32 +102,61 @@ impl DifferenceEquations {
     }
 }
 
+/// Check whether a stratification's conditions are all satisfied by the
+/// already-applied categories of the current compartment being built.
+fn stratification_conditions_met(
+    conditions: &Option<Vec<commol_core::StratificationCondition>>,
+    applied: &HashMap<String, String>,
+) -> bool {
+    match conditions {
+        None => true,
+        Some(conds) => conds
+            .iter()
+            .all(|c| applied.get(&c.stratification).map_or(false, |v| v == &c.category)),
+    }
+}
+
 /// Generate all stratified compartment combinations.
+///
+/// When a stratification has `conditions`, it only expands compartments whose
+/// already-applied categories satisfy all of those conditions. Compartments
+/// that do not satisfy the conditions are kept as-is (without appending this
+/// stratification's categories), so the result is a non-uniform Cartesian
+/// product.
 ///
 /// Returns a tuple of (compartments vector, compartment_map for lookups).
 fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>) {
-    // Start with disease states
-    let mut compartments: Vec<String> = model
+    // Each element: (compartment_name, applied_categories)
+    // applied_categories maps stratification_id → chosen_category for that compartment
+    let mut partials: Vec<(String, HashMap<String, String>)> = model
         .population
         .bins
         .iter()
-        .map(|ds| ds.id.clone())
+        .map(|b| (b.id.clone(), HashMap::new()))
         .collect();
 
-    // Iteratively apply stratifications
     for stratification in &model.population.stratifications {
-        compartments = compartments
-            .iter()
-            .flat_map(|compartment_name| {
-                stratification
-                    .categories
-                    .iter()
-                    .map(move |category| format!("{}_{}", compartment_name, category))
-            })
-            .collect();
+        let mut new_partials: Vec<(String, HashMap<String, String>)> = Vec::new();
+
+        for (name, applied) in partials {
+            if stratification_conditions_met(&stratification.conditions, &applied) {
+                // Conditions met: expand into one entry per category
+                for cat in &stratification.categories {
+                    let mut new_applied = applied.clone();
+                    new_applied.insert(stratification.id.clone(), cat.clone());
+                    new_partials.push((format!("{}_{}", name, cat), new_applied));
+                }
+            } else {
+                // Conditions not met: keep compartment unchanged
+                new_partials.push((name, applied));
+            }
+        }
+
+        partials = new_partials;
     }
 
-    // Create the compartment map for quick lookups
+    let compartments: Vec<String> = partials.into_iter().map(|(name, _)| name).collect();
+
     let compartment_map: HashMap<String, usize> = compartments
         .iter()
         .enumerate()
@@ -138,12 +167,14 @@ fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>)
 }
 
 /// Initialize population distribution across compartments.
+///
+/// Mirrors the conditional expansion logic of `generate_compartments`: when a
+/// stratification has conditions that are not satisfied by a compartment's
+/// already-applied categories, that compartment is kept as-is (its population
+/// is not split by that stratification's fractions).
 fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
     let total_population = model.population.initial_conditions.population_size as f64;
 
-    // Build bin fraction map
-    // Note: None fractions indicate calibration is needed
-    // We store them as Option to distinguish from 0.0
     let bin_fraction_map: HashMap<String, Option<f64>> = model
         .population
         .initial_conditions
@@ -152,8 +183,8 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
         .map(|bf| (bf.bin.clone(), bf.fraction))
         .collect();
 
-    // Initialize with bins
-    let mut population_distribution: HashMap<String, f64> = model
+    // Each element: (compartment_name, applied_categories, population_value)
+    let mut partials: Vec<(String, HashMap<String, String>, f64)> = model
         .population
         .bins
         .iter()
@@ -162,48 +193,54 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
                 .get(&bin.id)
                 .and_then(|f| *f)
                 .unwrap_or(0.0);
-            (bin.id.clone(), total_population * fraction)
+            (bin.id.clone(), HashMap::new(), total_population * fraction)
         })
         .collect();
 
-    // Apply stratifications iteratively
     for stratification in &model.population.stratifications {
-        // Find the stratification fractions for this stratification
-        let stratification_fractions_item = model
+        let fraction_map: HashMap<String, f64> = model
             .population
             .initial_conditions
             .stratification_fractions
             .iter()
-            .find(|sf| sf.stratification == stratification.id);
+            .find(|sf| sf.stratification == stratification.id)
+            .map(|item| {
+                item.fractions
+                    .iter()
+                    .map(|frac| (frac.category.clone(), frac.fraction))
+                    .collect()
+            })
+            .unwrap_or_default();
 
-        if let Some(fractions_item) = stratification_fractions_item {
-            // Build fraction map for this stratification
-            let fraction_map: HashMap<String, f64> = fractions_item
-                .fractions
-                .iter()
-                .map(|frac| (frac.category.clone(), frac.fraction))
-                .collect();
+        let mut new_partials: Vec<(String, HashMap<String, String>, f64)> = Vec::new();
 
-            // Apply stratification to all current compartments
-            let mut stratified_distribution = HashMap::new();
-            for (compartment_name, population) in &population_distribution {
-                for category in &stratification.categories {
-                    let fraction = fraction_map.get(category).unwrap_or(&0.0);
-                    stratified_distribution.insert(
-                        format!("{}_{}", compartment_name, category),
-                        population * fraction,
-                    );
+        for (name, applied, pop) in partials {
+            if stratification_conditions_met(&stratification.conditions, &applied) {
+                // Conditions met: split population by stratification fractions
+                for cat in &stratification.categories {
+                    let fraction = fraction_map.get(cat).unwrap_or(&0.0);
+                    let mut new_applied = applied.clone();
+                    new_applied.insert(stratification.id.clone(), cat.clone());
+                    new_partials.push((format!("{}_{}", name, cat), new_applied, pop * fraction));
                 }
+            } else {
+                // Conditions not met: keep compartment and population unchanged
+                new_partials.push((name, applied, pop));
             }
-
-            population_distribution = stratified_distribution;
         }
+
+        partials = new_partials;
     }
 
     // Convert to vector indexed by compartment order
+    let distribution: HashMap<String, f64> = partials
+        .into_iter()
+        .map(|(name, _, pop)| (name, pop))
+        .collect();
+
     compartments
         .iter()
-        .map(|comp| *population_distribution.get(comp).unwrap_or(&0.0))
+        .map(|comp| *distribution.get(comp).unwrap_or(&0.0))
         .collect()
 }
 

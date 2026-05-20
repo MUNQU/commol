@@ -27,21 +27,30 @@ pub(crate) fn rate_to_string(rate: &RateMathExpression) -> String {
 
 /// Extract stratification categories from a compartment name.
 ///
+/// Handles conditional stratifications: when a stratification has `conditions`,
+/// it is only present in the compartment name if those conditions were satisfied
+/// at generation time. This function processes stratifications in declaration
+/// order, checks conditions against already-extracted categories, and only
+/// consumes a token from the compartment name suffix when the stratification
+/// applies.
+///
 /// # Arguments
 ///
 /// * `compartment_name` - The full compartment name (e.g., "S_young_urban")
 /// * `bin` - The bin prefix (e.g., "S")
-/// * `stratifications` - List of stratifications in the model
+/// * `stratifications` - List of stratifications in the model (in declaration order)
 ///
 /// # Returns
 ///
-/// A HashMap mapping stratification IDs to their category values.
+/// A HashMap mapping stratification IDs to their category values for the
+/// stratifications that apply to this compartment.
 ///
 /// # Example
 ///
 /// ```text
-/// Input: "S_young_urban" with bin "S" and stratifications ["age", "location"]
-/// Output: { "age" -> "young", "location" -> "urban" }
+/// Model has: age=[y60, oe60], vaccination=[nv,v] (cond: age=oe60)
+/// Input: "S_y60"  → Output: { "age" -> "y60" }
+/// Input: "S_oe60_nv" → Output: { "age" -> "oe60", "vaccination" -> "nv" }
 /// ```
 pub(crate) fn extract_stratifications(
     compartment_name: &str,
@@ -50,31 +59,41 @@ pub(crate) fn extract_stratifications(
 ) -> HashMap<String, String> {
     let mut result = HashMap::new();
 
-    // Remove bin prefix
     if !compartment_name.starts_with(bin) {
         return result;
     }
 
-    // Get the stratification part (everything after bin and first underscore)
     let stratification_part = &compartment_name[bin.len()..];
     if stratification_part.is_empty() {
-        return result; // No stratifications
+        return result;
     }
 
-    // Remove leading underscore, return empty if invalid format
     let stratification_part = match stratification_part.strip_prefix('_') {
         Some(stripped) => stripped,
         None => return result,
     };
 
-    // Split by underscore to get categories
-    let categories: Vec<&str> = stratification_part.split('_').collect();
+    let tokens: Vec<&str> = stratification_part.split('_').collect();
+    let mut token_index = 0;
 
-    // Match categories with stratification IDs (in order)
-    for (i, stratification) in stratifications.iter().enumerate() {
-        if i < categories.len() {
-            result.insert(stratification.id.clone(), categories[i].to_string());
+    for stratification in stratifications {
+        // Check if this stratification applies given already-extracted categories
+        let applies = match &stratification.conditions {
+            None => true,
+            Some(conds) => conds.iter().all(|c| {
+                result
+                    .get(&c.stratification)
+                    .map_or(false, |v: &String| v == &c.category)
+            }),
+        };
+
+        if applies {
+            if token_index < tokens.len() {
+                result.insert(stratification.id.clone(), tokens[token_index].to_string());
+                token_index += 1;
+            }
         }
+        // If applies is false: skip this stratification, don't consume a token
     }
 
     result
@@ -172,6 +191,10 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
 /// in the target compartment name is replaced with the `to` value. Categories
 /// without `to` overrides are preserved from the source compartment.
 ///
+/// Handles conditional stratifications: a stratification is only included in
+/// the target name if its conditions are satisfied by the target's accumulated
+/// categories (determined by applying `to` overrides to the source categories).
+///
 /// # Arguments
 ///
 /// * `target_bin` - The target bin ID
@@ -194,20 +217,38 @@ pub(crate) fn compute_target_with_category_overrides(
         .filter_map(|c| c.to.as_ref().map(|to| (c.stratification.as_str(), to.as_str())))
         .collect();
 
-    // Reconstruct target compartment name using stratification declaration order
     let mut parts = Vec::with_capacity(stratifications.len() + 1);
     parts.push(target_bin.to_string());
 
+    // Track the target's effective categories to evaluate conditions for later stratifications
+    let mut target_applied: HashMap<String, String> = HashMap::new();
+
     for strat in stratifications {
-        let category = if let Some(&to_cat) = override_map.get(strat.id.as_str()) {
-            to_cat.to_string()
+        // Determine the effective category for this stratification in the target:
+        // override takes priority, then the source value
+        let effective_cat = if let Some(&to_cat) = override_map.get(strat.id.as_str()) {
+            Some(to_cat.to_string())
         } else {
-            stratification_values
-                .get(&strat.id)
-                .cloned()
-                .unwrap_or_default()
+            stratification_values.get(&strat.id).cloned()
         };
-        parts.push(category);
+
+        // Check if this stratification applies to the TARGET
+        // (evaluated against target's accumulated categories so far)
+        let applies = match &strat.conditions {
+            None => true,
+            Some(conds) => conds.iter().all(|c| {
+                target_applied
+                    .get(&c.stratification)
+                    .map_or(false, |v| v == &c.category)
+            }),
+        };
+
+        if applies {
+            if let Some(cat) = effective_cat {
+                target_applied.insert(strat.id.clone(), cat.clone());
+                parts.push(cat);
+            }
+        }
     }
 
     parts.join("_")
