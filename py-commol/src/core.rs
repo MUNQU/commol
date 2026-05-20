@@ -146,7 +146,7 @@ impl PyStratification {
     #[new]
     fn new(id: String, categories: Vec<String>) -> Self {
         Self {
-            inner: commol_core::Stratification { id, categories },
+            inner: commol_core::Stratification { id, categories, conditions: None },
         }
     }
 }
