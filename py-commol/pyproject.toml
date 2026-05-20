@@ -32,7 +32,7 @@ dev = [
     "vulture (>=2.16,<3.0)",
 ]
 docs = [
-    "mike>=2.0,<3.0",
+    "mike>=2.2.0,<3.0",
     "mkdocs>=1.6,<2.0",
     "mkdocstrings[python]>=0.26,<1.0",
     "mkdocs-autorefs>=1.4.4,<2.0",
