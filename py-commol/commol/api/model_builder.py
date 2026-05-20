@@ -172,7 +172,13 @@ class ModelBuilder:
         logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
-    def add_stratification(self, id: str, categories: list[str]) -> Self:
+    def add_stratification(
+        self,
+        id: str,
+        categories: list[str],
+        description: str | None = None,
+        conditions: list[StratificationConditionDict] | None = None,
+    ) -> Self:
         """
         Add a population stratification to the model.
 
@@ -182,13 +188,50 @@ class ModelBuilder:
             Unique identifier for the stratification.
         categories : list[str]
             list of category identifiers within this stratification.
+        description : str | None, default=None
+            Human-readable description of the stratification.
+        conditions : list[dict] | None, default=None
+            When set, this stratification only expands compartments whose
+            already-applied categories satisfy ALL conditions. Each dict must
+            contain "stratification" and "category" keys referencing a
+            stratification declared before this one.
+
+            Example: only apply vaccination stratification to oe60 age group::
+
+                conditions = [{"stratification": "age", "category": "oe60"}]
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            If any condition references a stratification not yet declared.
         """
-        self._stratifications.append(Stratification(id=id, categories=categories))
+        if conditions:
+            declared_ids = {s.id for s in self._stratifications}
+            for cond in conditions:
+                if cond["stratification"] not in declared_ids:
+                    raise ValueError(
+                        f"Stratification '{id}': condition references "
+                        f"'{cond['stratification']}' which has not been declared yet. "
+                        "Conditions may only reference stratifications declared before "
+                        "this one."
+                    )
+
+        condition_objects = (
+            [StratificationCondition(**c) for c in conditions] if conditions else None
+        )
+        self._stratifications.append(
+            Stratification(
+                id=id,
+                categories=categories,
+                description=description,
+                conditions=condition_objects,
+            )
+        )
         logging.info(f"Added stratification: id='{id}', categories={categories}")
         return self
 
