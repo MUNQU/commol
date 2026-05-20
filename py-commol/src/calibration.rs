@@ -1,4 +1,4 @@
-//! Python bindings for epimodel-calibration (parameter optimization).
+//! Python bindings for commol-calibration (parameter optimization).
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

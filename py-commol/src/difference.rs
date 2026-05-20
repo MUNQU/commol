@@ -1,4 +1,4 @@
-//! Python bindings for epimodel-difference (discrete-time solver).
+//! Python bindings for commol-difference (discrete-time solver).
 
 use crate::core::PyModel;
 use pyo3::prelude::*;

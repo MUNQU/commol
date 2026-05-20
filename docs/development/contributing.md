@@ -91,7 +91,7 @@ Run tests:
 
 ```bash
 cd py-commol
-poetry run pytest -v --cov=epimodel
+poetry run pytest -v --cov=commol
 ```
 
 #### Rust Tests

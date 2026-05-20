@@ -1,4 +1,4 @@
-"""Utility functions for the epimodel package."""
+"""Utility functions for the commol package."""
 
 from commol.utils.equations import (
     UnitConsistencyError,
