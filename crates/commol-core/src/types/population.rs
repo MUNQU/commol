@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::dynamics::Transition;
+use super::dynamics::{StratificationCondition, Transition};
 
 /// A disease state (compartment) in the model
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,6 +14,15 @@ pub struct Bin {
 pub struct Stratification {
     pub id: String,
     pub categories: Vec<String>,
+    /// Conditions that must be satisfied (by already-applied stratifications) for
+    /// this stratification to expand a compartment. When `None`, it always applies
+    /// (standard full Cartesian product). When set, only compartments whose
+    /// already-applied categories satisfy ALL conditions are further expanded;
+    /// others are kept as-is without this stratification's categories appended.
+    ///
+    /// Conditions may only reference stratifications declared before this one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conditions: Option<Vec<StratificationCondition>>,
 }
 
 /// Specifies the fraction of population in a particular bin
