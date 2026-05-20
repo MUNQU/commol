@@ -1,4 +1,4 @@
-//! Python bindings for epimodel-core types.
+//! Python bindings for commol-core types.
 //!
 //! This module provides Python-accessible wrappers around core Rust types.
 

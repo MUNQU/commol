@@ -150,7 +150,7 @@ git push origin vX.Y.Z
 
 ## Installation
 
-pip install epimodel==X.Y.Z
+pip install commol==X.Y.Z
 
 ## Full Changelog
 
@@ -186,7 +186,7 @@ python -m venv test_env
 source test_env/bin/activate  # or test_env\Scripts\activate on Windows
 
 # Install the new version
-pip install epimodel==X.Y.Z
+pip install commol==X.Y.Z
 
 # Verify it works
 python -c "from commol import ModelBuilder; print('Success!')"
@@ -277,7 +277,7 @@ To enable automated PyPI publishing, configure trusted publishing:
 3. Navigate to "Publishing" section
 4. Add GitHub as a trusted publisher:
    - **Owner**: MUNQU
-   - **Repository**: epimodel
+   - **Repository**: commol
    - **Workflow**: release.yml
    - **Environment**: pypi
 

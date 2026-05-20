@@ -3,7 +3,7 @@
 //! Model-agnostic calibration and parameter estimation for compartment models.
 //!
 //! This crate provides tools for calibrating any model that implements the
-//! `SimulationEngine` trait from `epimodel-core`. It uses the `argmin` optimization
+//! `SimulationEngine` trait from `commol-core`. It uses the `argmin` optimization
 //! library to find parameter values that minimize the difference between model
 //! predictions and observed data.
 //!

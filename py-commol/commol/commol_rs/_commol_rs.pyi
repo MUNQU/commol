@@ -453,7 +453,7 @@ class CoreModule(Protocol):
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]
 
-class RustEpiModelModule(Protocol):
+class RustCommolModule(Protocol):
     core: CoreModule
     difference: DifferenceModule
     calibration: CalibrationModule
@@ -461,4 +461,4 @@ class RustEpiModelModule(Protocol):
 core: CoreModule
 difference: DifferenceModule
 calibration: CalibrationModule
-rust_epimodel: RustEpiModelModule
+rust_commol: RustCommolModule
