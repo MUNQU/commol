@@ -81,17 +81,13 @@ pub(crate) fn extract_stratifications(
         let applies = match &stratification.conditions {
             None => true,
             Some(conds) => conds.iter().all(|c| {
-                result
-                    .get(&c.stratification)
-                    .map_or(false, |v: &String| v == &c.category)
+                result.get(&c.stratification) == Some(&c.category)
             }),
         };
 
-        if applies {
-            if token_index < tokens.len() {
-                result.insert(stratification.id.clone(), tokens[token_index].to_string());
-                token_index += 1;
-            }
+        if applies && token_index < tokens.len() {
+            result.insert(stratification.id.clone(), tokens[token_index].to_string());
+            token_index += 1;
         }
         // If applies is false: skip this stratification, don't consume a token
     }
@@ -240,17 +236,13 @@ pub(crate) fn compute_target_with_category_overrides(
         let applies = match &strat.conditions {
             None => true,
             Some(conds) => conds.iter().all(|c| {
-                target_applied
-                    .get(&c.stratification)
-                    .map_or(false, |v| v == &c.category)
+                target_applied.get(&c.stratification) == Some(&c.category)
             }),
         };
 
-        if applies {
-            if let Some(cat) = effective_cat {
-                target_applied.insert(strat.id.clone(), cat.clone());
-                parts.push(cat);
-            }
+        if applies && let Some(cat) = effective_cat {
+            target_applied.insert(strat.id.clone(), cat.clone());
+            parts.push(cat);
         }
     }
 

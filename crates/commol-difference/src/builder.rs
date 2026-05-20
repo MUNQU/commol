@@ -111,9 +111,7 @@ fn stratification_conditions_met(
     match conditions {
         None => true,
         Some(conds) => conds.iter().all(|c| {
-            applied
-                .get(&c.stratification)
-                .map_or(false, |v| v == &c.category)
+            applied.get(&c.stratification) == Some(&c.category)
         }),
     }
 }
@@ -391,10 +389,7 @@ fn build_subpopulation_mappings(
             // Check if this compartment belongs to this bin
             // (starts with bin_id followed by underscore)
             if compartment_name.starts_with(bin_id)
-                && compartment_name
-                    .chars()
-                    .nth(bin_id.len())
-                    .map_or(false, |c| c == '_')
+                && (compartment_name.chars().nth(bin_id.len()) == Some('_'))
             {
                 base_compartment_map
                     .entry(bin_id.clone())
@@ -437,10 +432,7 @@ fn build_subpopulation_mappings(
             for (compartment_index, compartment_name) in compartments.iter().enumerate() {
                 // Only process compartments belonging to this bin
                 if !compartment_name.starts_with(bin_id.as_str())
-                    || compartment_name
-                        .chars()
-                        .nth(bin_prefix_len)
-                        .map_or(true, |c| c != '_')
+                    || (compartment_name.chars().nth(bin_prefix_len) != Some('_'))
                 {
                     continue;
                 }
