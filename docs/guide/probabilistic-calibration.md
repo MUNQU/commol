@@ -62,7 +62,7 @@ Use probabilistic calibration when you need:
 
 ## Basic Example
 
-Here's a complete example of probabilistic calibration for an SIR model:
+Here's a complete example of probabilistic calibration for a 3-compartment model:
 
 ```python
 from commol import (
@@ -79,30 +79,30 @@ from commol import (
 
 # Build model with parameters to be calibrated set to None
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)   # To be calibrated
-    .add_parameter(id="gamma", value=None)  # To be calibrated
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)   # To be calibrated
+    .add_parameter(id="k2", value=None)   # To be calibrated
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
@@ -110,12 +110,12 @@ model = (
 
 # Define observed data
 observed_data = [
-    ObservedDataPoint(step=0, compartment="I", value=10.0),
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
-    ObservedDataPoint(step=40, compartment="I", value=38.1),
-    ObservedDataPoint(step=50, compartment="I", value=18.7),
+    ObservedDataPoint(step=0, compartment="B", value=10.0),
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
+    ObservedDataPoint(step=40, compartment="B", value=38.1),
+    ObservedDataPoint(step=50, compartment="B", value=18.7),
 ]
 
 simulation = Simulation(model)
@@ -123,14 +123,14 @@ simulation = Simulation(model)
 # Define parameters to calibrate
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
-        id="gamma",
+        id="k2",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
@@ -174,7 +174,7 @@ print(f"Average CI width: {selected.average_ci_width:.4f}")
 
 # Access individual parameter sets
 for i, params in enumerate(selected.ensemble_parameters):
-    print(f"Set {i}: beta={params['beta']:.4f}, gamma={params['gamma']:.4f}")
+    print(f"Set {i}: k1={params['k1']:.4f}, k2={params['k2']:.4f}")
 ```
 
 ### Parameter Statistics
@@ -196,14 +196,14 @@ for param_name, stats in selected.parameter_statistics.items():
 Median predictions and confidence interval bounds for each compartment:
 
 ```python
-# Access predictions for the Infected compartment
-median_I = selected.prediction_median["I"]
-lower_I = selected.prediction_ci_lower["I"]
-upper_I = selected.prediction_ci_upper["I"]
+# Access predictions for compartment B
+median_B = selected.prediction_median["B"]
+lower_B = selected.prediction_ci_lower["B"]
+upper_B = selected.prediction_ci_upper["B"]
 
 print(f"At step 30:")
-print(f"  Median: {median_I[30]:.1f}")
-print(f"  95% CI: [{lower_I[30]:.1f}, {upper_I[30]:.1f}]")
+print(f"  Median: {median_B[30]:.1f}")
+print(f"  95% CI: [{lower_B[30]:.1f}, {upper_B[30]:.1f}]")
 ```
 
 ### Exploring the Pareto Front
@@ -301,7 +301,7 @@ plotter.plot_series(
 plotter.plot_series(
     observed_data=observed_data,
     calibration_result=result,
-    bins=["I", "R"],  # Only Infected and Recovered
+    bins=["B", "C"],  # Only State B and State C
 )
 ```
 

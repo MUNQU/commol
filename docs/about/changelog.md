@@ -21,11 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of Commol
 - ModelBuilder fluent API for constructing compartment models
 - Support for difference equations models
-- Disease states and stratifications
+- Compartment states (bins) and stratifications
 - Mathematical expression support in transition rates
 - Rust-powered simulation engine
 - Python API with Pydantic validation
-- Basic SIR, SEIR model support
+- Basic compartment model support (difference equations)
 - Initial conditions and parameter management
 - Simulation runner with multiple output formats
 

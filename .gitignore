@@ -115,3 +115,8 @@ flake.lock
 site/
 
 /beamer/
+
+## Local files
+CLAUDE.md
+example.py
+flu.py

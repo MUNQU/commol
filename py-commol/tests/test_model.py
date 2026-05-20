@@ -66,10 +66,10 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  S -> I: beta * S * I / N\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I -> R: gamma * I\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -139,10 +139,10 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  $S \\to I: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  $I \\to R: \\gamma \\cdot I$\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -263,11 +263,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  $S_{young} \\to I_{young}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
             "  $S_{old} \\to I_{old}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  $I_{young} \\to R_{young}: \\gamma \\cdot I$\n"
             "  $I_{old} \\to R_{old}: \\gamma \\cdot I$\n"
             "\n"
@@ -349,10 +349,10 @@ class TestModel:
                 "========================================\n"
                 "\n"
                 "Bin Transitions:\n"
-                "Infection (S -> I):\n"
+                "infection (S -> I):\n"
                 "  $S \\to I: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
                 "\n"
-                "Recovery (I -> R):\n"
+                "recovery (I -> R):\n"
                 "  $I \\to R: \\gamma \\cdot I$\n"
                 "\n"
                 "Total System: 3 coupled equations (3 bins)\n"
@@ -423,11 +423,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  $S \\to I: \\frac{\\beta(\\text{1/day}) \\cdot S(\\text{person}) "
             "\\cdot I(\\text{person})}{N(\\text{person})} [\\text{person / day}]$\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  $I \\to R: \\gamma(\\text{1/day}) \\cdot I(\\text{person}) "
             "[\\text{person / day}]$\n"
             "\n"
@@ -500,10 +500,10 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  $S \\to I: \\text{None}$\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  $I \\to R: \\gamma \\cdot I$\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -682,7 +682,7 @@ class TestModel:
                 "Infection (E -> I):\n"
                 "  E -> I: sigma * E\n"
                 "\n"
-                "Recovery (I -> R):\n"
+                "recovery (I -> R):\n"
                 "  I -> R: gamma * I\n"
                 "\n"
                 "Total System: 4 coupled equations (4 bins)\n"
@@ -769,11 +769,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  S_young -> I_young: beta * S * I / N\n"
             "  S_old -> I_old: beta * S * I / N\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I_young -> R_young: gamma * I\n"
             "  I_old -> R_old: gamma * I\n"
             "\n"
@@ -854,10 +854,10 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  S -> I: None\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I -> R: gamma * I\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -1020,13 +1020,13 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (S -> I):\n"
+            "infection (S -> I):\n"
             "  S_young_urban -> I_young_urban: beta_young_urban * S * I / N_young\n"
             "  S_young_rural -> I_young_rural: beta_young_rural * S * I / N_young\n"
             "  S_old_urban -> I_old_urban: beta_old_urban * S * I / N_old\n"
             "  S_old_rural -> I_old_rural: 0.3 * S * I / N\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I_young_urban -> R_young_urban: gamma_young * I\n"
             "  I_young_rural -> R_young_rural: gamma_young * I\n"
             "  I_old_urban -> R_old_urban: 0.1 * I\n"
@@ -1145,11 +1145,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (I, S -> I):\n"
+            "infection (I, S -> I):\n"
             "  S -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
             "  I -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I -> R: gamma(1/day) * I(person) [person / day]\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -1219,11 +1219,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Infection (I, S -> I):\n"
+            "infection (I, S -> I):\n"
             "  S -> I: beta * S * I / N\n"
             "  I -> I: beta * S * I / N\n"
             "\n"
-            "Recovery (I -> R):\n"
+            "recovery (I -> R):\n"
             "  I -> R: gamma * I\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -1362,11 +1362,11 @@ class TestModel:
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "Forward (A, B -> C):\n"
+            "forward (A, B -> C):\n"
             "  A -> C: k1(1/s) * A(mol) * B(mol) [mole ** 2 / second]\n"
             "  B -> C: k1(1/s) * A(mol) * B(mol) [mole ** 2 / second]\n"
             "\n"
-            "Backward (C -> A):\n"
+            "backward (C -> A):\n"
             "  C -> A: k2(1/s) * C(mol) [mole / second]\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
@@ -1377,5 +1377,491 @@ class TestModel:
             "[A(t+Dt) - A(t)] / Dt = (k2 * C) - (k1 * A * B)\n"
             "[B(t+Dt) - B(t)] / Dt = - (k1 * A * B)\n"
             "[C(t+Dt) - C(t)] / Dt = (k1 * A * B) - (k2 * C)\n"
+        )
+        assert output == expected_output
+
+    def _build_conditional_stratification_model(self):
+        """Build model with conditional stratification and cross-category flows."""
+        return (
+            ModelBuilder(name="SIR Conditional", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_stratification(id="age", categories=["y", "o"])
+            .add_stratification(
+                id="vax",
+                categories=["nv", "v"],
+                conditions=[{"stratification": "age", "category": "o"}],
+            )
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_parameter(id="aging", value=0.01)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+                per_compartment=True,
+            )
+            .add_transition(
+                id="recovery",
+                source=["I"],
+                target=["R"],
+                rate="gamma",
+                per_compartment=True,
+            )
+            .add_transition(
+                id="aging_transition",
+                source=["S"],
+                target=["S"],
+                stratified_rates=[
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "y", "to": "o"},
+                            {"stratification": "vax", "category": "nv"},
+                        ],
+                        "rate": "aging * S_y",
+                    }
+                ],
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.005},
+                    {"bin": "R", "fraction": 0.005},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "y", "fraction": 0.7},
+                            {"category": "o", "fraction": 0.3},
+                        ],
+                    },
+                    {
+                        "stratification": "vax",
+                        "fractions": [
+                            {"category": "nv", "fraction": 0.6},
+                            {"category": "v", "fraction": 0.4},
+                        ],
+                    },
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+    def test_print_equations_conditional_stratification_text(self):
+        """
+        Test print_equations with conditional stratifications and cross-category
+        transitions in text format.
+
+        Verifies that:
+        - Compartments respect conditions (vax only applies to age=o)
+        - Cross-category transitions (with ``to`` overrides) appear correctly
+        - Expanded form shows correct inflow/outflow terms
+        """
+        model = self._build_conditional_stratification_model()
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="text")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Conditional\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 2\n"
+            "Number of Parameters: 3\n"
+            "Number of Transitions: 3\n"
+            "Bins: S, I, R\n"
+            "Stratifications:\n"
+            "  - age: [y, o]\n"
+            "  - vax: [nv, v]\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "infection (S -> I):\n"
+            "  S_y -> I_y: beta * S_y * I_y / N\n"
+            "  S_o_nv -> I_o_nv: beta * S_o_nv * I_o_nv / N\n"
+            "  S_o_v -> I_o_v: beta * S_o_v * I_o_v / N\n"
+            "\n"
+            "recovery (I -> R):\n"
+            "  I_y -> R_y: gamma\n"
+            "  I_o_nv -> R_o_nv: gamma\n"
+            "  I_o_v -> R_o_v: gamma\n"
+            "\n"
+            "aging_transition (S -> S):\n"
+            "  S_y -> S_o_nv: aging * S_y\n"
+            "\n"
+            "Total System: 9 coupled equations "
+            "(3 bins × 2 age × 2 vax)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "[S_y(t+Dt) - S_y(t)] / Dt = "
+            "- (beta * S_y * I_y / N) - (aging * S_y)\n"
+            "[S_o_nv(t+Dt) - S_o_nv(t)] / Dt = "
+            "- (beta * S_o_nv * I_o_nv / N) + (aging * S_y)\n"
+            "[S_o_v(t+Dt) - S_o_v(t)] / Dt = "
+            "- (beta * S_o_v * I_o_v / N)\n"
+            "[I_y(t+Dt) - I_y(t)] / Dt = "
+            "(beta * S_y * I_y / N) - (gamma)\n"
+            "[I_o_nv(t+Dt) - I_o_nv(t)] / Dt = "
+            "(beta * S_o_nv * I_o_nv / N) - (gamma)\n"
+            "[I_o_v(t+Dt) - I_o_v(t)] / Dt = "
+            "(beta * S_o_v * I_o_v / N) - (gamma)\n"
+            "[R_y(t+Dt) - R_y(t)] / Dt = (gamma)\n"
+            "[R_o_nv(t+Dt) - R_o_nv(t)] / Dt = (gamma)\n"
+            "[R_o_v(t+Dt) - R_o_v(t)] / Dt = (gamma)\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_conditional_stratification_latex(self):
+        """
+        Test print_equations with conditional stratifications and cross-category
+        transitions in LaTeX format.
+
+        Verifies LaTeX rendering of conditional compartments and cross-category
+        transition arrows.
+        """
+        model = self._build_conditional_stratification_model()
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Conditional\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 2\n"
+            "Number of Parameters: 3\n"
+            "Number of Transitions: 3\n"
+            "Bins: S, I, R\n"
+            "Stratifications:\n"
+            "  - age: [y, o]\n"
+            "  - vax: [nv, v]\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "infection (S -> I):\n"
+            "  $S_{y} \\to I_{y}: "
+            "\\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{N}$\n"
+            "  $S_{o,nv} \\to I_{o,nv}: "
+            "\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{N}$\n"
+            "  $S_{o,v} \\to I_{o,v}: "
+            "\\frac{\\beta \\cdot S_{o,v} \\cdot I_{o,v}}{N}$\n"
+            "\n"
+            "recovery (I -> R):\n"
+            "  $I_{y} \\to R_{y}: \\gamma$\n"
+            "  $I_{o,nv} \\to R_{o,nv}: \\gamma$\n"
+            "  $I_{o,v} \\to R_{o,v}: \\gamma$\n"
+            "\n"
+            "aging_transition (S -> S):\n"
+            "  $S_{y} \\to S_{o,nv}: aging \\cdot S_{y}$\n"
+            "\n"
+            "Total System: 9 coupled equations "
+            "(3 bins × 2 age × 2 vax)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{S_{y}(t+\\Delta t) - S_{y}(t)}{\\Delta t} = "
+            "- (\\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{N}) "
+            "- (aging \\cdot S_{y})\\]\n"
+            "\\[\\frac{S_{o,nv}(t+\\Delta t) - S_{o,nv}(t)}{\\Delta t} = "
+            "- (\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{N}) "
+            "+ (aging \\cdot S_{y})\\]\n"
+            "\\[\\frac{S_{o,v}(t+\\Delta t) - S_{o,v}(t)}{\\Delta t} = "
+            "- (\\frac{\\beta \\cdot S_{o,v} \\cdot I_{o,v}}{N})\\]\n"
+            "\\[\\frac{I_{y}(t+\\Delta t) - I_{y}(t)}{\\Delta t} = "
+            "(\\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{N}) "
+            "- (\\gamma)\\]\n"
+            "\\[\\frac{I_{o,nv}(t+\\Delta t) - I_{o,nv}(t)}{\\Delta t} = "
+            "(\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{N}) "
+            "- (\\gamma)\\]\n"
+            "\\[\\frac{I_{o,v}(t+\\Delta t) - I_{o,v}(t)}{\\Delta t} = "
+            "(\\frac{\\beta \\cdot S_{o,v} \\cdot I_{o,v}}{N}) "
+            "- (\\gamma)\\]\n"
+            "\\[\\frac{R_{y}(t+\\Delta t) - R_{y}(t)}{\\Delta t} = "
+            "(\\gamma)\\]\n"
+            "\\[\\frac{R_{o,nv}(t+\\Delta t) - R_{o,nv}(t)}{\\Delta t} = "
+            "(\\gamma)\\]\n"
+            "\\[\\frac{R_{o,v}(t+\\Delta t) - R_{o,v}(t)}{\\Delta t} = "
+            "(\\gamma)\\]\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_cross_category_multiple_targets(self):
+        """
+        Test cross-category transitions that split into multiple target
+        compartments (e.g. aging from y to o with comorbidity split).
+        """
+        model = (
+            ModelBuilder(name="SIR Aging Split", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_stratification(id="age", categories=["y", "o"])
+            .add_stratification(
+                id="comorbidity",
+                categories=["nc", "c"],
+                conditions=[{"stratification": "age", "category": "o"}],
+            )
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_parameter(id="aging", value=0.01)
+            .add_parameter(id="p_c", value=0.2)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+                per_compartment=True,
+            )
+            .add_transition(
+                id="recovery",
+                source=["I"],
+                target=["R"],
+                rate="gamma",
+                per_compartment=True,
+            )
+            .add_transition(
+                id="aging_nc",
+                source=["S"],
+                target=["S"],
+                stratified_rates=[
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "y", "to": "o"},
+                            {"stratification": "comorbidity", "category": "nc"},
+                        ],
+                        "rate": "aging * (1 - p_c) * S_y",
+                    }
+                ],
+            )
+            .add_transition(
+                id="aging_c",
+                source=["S"],
+                target=["S"],
+                stratified_rates=[
+                    {
+                        "conditions": [
+                            {"stratification": "age", "category": "y", "to": "o"},
+                            {"stratification": "comorbidity", "category": "c"},
+                        ],
+                        "rate": "aging * p_c * S_y",
+                    }
+                ],
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.005},
+                    {"bin": "R", "fraction": 0.005},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "y", "fraction": 0.7},
+                            {"category": "o", "fraction": 0.3},
+                        ],
+                    },
+                    {
+                        "stratification": "comorbidity",
+                        "fractions": [
+                            {"category": "nc", "fraction": 0.8},
+                            {"category": "c", "fraction": 0.2},
+                        ],
+                    },
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="text")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Aging Split\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 2\n"
+            "Number of Parameters: 4\n"
+            "Number of Transitions: 4\n"
+            "Bins: S, I, R\n"
+            "Stratifications:\n"
+            "  - age: [y, o]\n"
+            "  - comorbidity: [nc, c]\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "infection (S -> I):\n"
+            "  S_y -> I_y: beta * S_y * I_y / N\n"
+            "  S_o_nc -> I_o_nc: beta * S_o_nc * I_o_nc / N\n"
+            "  S_o_c -> I_o_c: beta * S_o_c * I_o_c / N\n"
+            "\n"
+            "recovery (I -> R):\n"
+            "  I_y -> R_y: gamma\n"
+            "  I_o_nc -> R_o_nc: gamma\n"
+            "  I_o_c -> R_o_c: gamma\n"
+            "\n"
+            "aging_nc (S -> S):\n"
+            "  S_y -> S_o_nc: aging * (1 - p_c) * S_y\n"
+            "\n"
+            "aging_c (S -> S):\n"
+            "  S_y -> S_o_c: aging * p_c * S_y\n"
+            "\n"
+            "Total System: 9 coupled equations "
+            "(3 bins × 2 age × 2 comorbidity)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "[S_y(t+Dt) - S_y(t)] / Dt = "
+            "- (beta * S_y * I_y / N) "
+            "- (aging * S_y)\n"
+            "[S_o_nc(t+Dt) - S_o_nc(t)] / Dt = "
+            "- (beta * S_o_nc * I_o_nc / N) "
+            "+ (aging * (1 - p_c) * S_y)\n"
+            "[S_o_c(t+Dt) - S_o_c(t)] / Dt = "
+            "- (beta * S_o_c * I_o_c / N) "
+            "+ (aging * p_c * S_y)\n"
+            "[I_y(t+Dt) - I_y(t)] / Dt = "
+            "(beta * S_y * I_y / N) - (gamma)\n"
+            "[I_o_nc(t+Dt) - I_o_nc(t)] / Dt = "
+            "(beta * S_o_nc * I_o_nc / N) - (gamma)\n"
+            "[I_o_c(t+Dt) - I_o_c(t)] / Dt = "
+            "(beta * S_o_c * I_o_c / N) - (gamma)\n"
+            "[R_y(t+Dt) - R_y(t)] / Dt = (gamma)\n"
+            "[R_o_nc(t+Dt) - R_o_nc(t)] / Dt = (gamma)\n"
+            "[R_o_c(t+Dt) - R_o_c(t)] / Dt = (gamma)\n"
+        )
+        assert output == expected_output
+
+    def test_print_equations_latex_no_text_wrapping_on_math_parentheses(self):
+        """
+        Test that parenthesized math sub-expressions like ``(1 - p_h)`` are
+        NOT wrapped in ``\\text{...}`` in LaTeX output.
+
+        The ``\\text{}`` wrapper is only for unit annotations like ``(person)``
+        or ``(1/day)``, not for mathematical grouping with operators or LaTeX
+        commands.
+        """
+        model = (
+            ModelBuilder(name="SIR Parenthesized Rate", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_parameter(id="beta", value=0.3)
+            .add_parameter(id="gamma", value=0.1)
+            .add_parameter(id="p_h", value=0.05)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+            )
+            .add_transition(
+                id="recovery",
+                source=["I"],
+                target=["R"],
+                rate="(1 - p_h) * gamma * I",
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        try:
+            model.print_equations(format="latex")
+            output = captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        expected_output = (
+            "========================================\n"
+            "MODEL INFORMATION\n"
+            "========================================\n"
+            "Model: SIR Parenthesized Rate\n"
+            "Model Type: DifferenceEquations\n"
+            "Number of Bins: 3\n"
+            "Number of Stratifications: 0\n"
+            "Number of Parameters: 3\n"
+            "Number of Transitions: 2\n"
+            "Bins: S, I, R\n"
+            "\n"
+            "========================================\n"
+            "COMPACT FORM\n"
+            "========================================\n"
+            "\n"
+            "Bin Transitions:\n"
+            "infection (S -> I):\n"
+            "  $S \\to I: "
+            "\\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+            "\n"
+            "recovery (I -> R):\n"
+            "  $I \\to R: "
+            "(1 - p_{h}) \\cdot \\gamma \\cdot I$\n"
+            "\n"
+            "Total System: 3 coupled equations (3 bins)\n"
+            "\n"
+            "========================================\n"
+            "EXPANDED FORM\n"
+            "========================================\n"
+            "\\[\\frac{S(t+\\Delta t) - S(t)}{\\Delta t} = "
+            "- (\\frac{\\beta \\cdot S \\cdot I}{N})\\]\n"
+            "\\[\\frac{I(t+\\Delta t) - I(t)}{\\Delta t} = "
+            "(\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "- ((1 - p_{h}) \\cdot \\gamma \\cdot I)\\]\n"
+            "\\[\\frac{R(t+\\Delta t) - R(t)}{\\Delta t} = "
+            "((1 - p_{h}) \\cdot \\gamma \\cdot I)\\]\n"
         )
         assert output == expected_output

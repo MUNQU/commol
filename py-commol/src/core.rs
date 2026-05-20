@@ -6,8 +6,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 
 /// Type alias for stratified rates: Vec<(conditions, rate_expression)>
-/// where conditions is Vec<(stratification_name, category_value)>
-type StratifiedRatesInput = Vec<(Vec<(String, String)>, String)>;
+/// where conditions is Vec<(stratification_name, category_value, optional_to_category)>
+type StratifiedRatesInput = Vec<(Vec<(String, String, Option<String>)>, String)>;
 
 /// Wrapper for commol_core::Model
 #[pyclass(name = "Model")]
@@ -146,7 +146,7 @@ impl PyStratification {
     #[new]
     fn new(id: String, categories: Vec<String>) -> Self {
         Self {
-            inner: commol_core::Stratification { id, categories },
+            inner: commol_core::Stratification { id, categories, conditions: None },
         }
     }
 }
@@ -244,13 +244,14 @@ pub struct PyTransition {
 #[pymethods]
 impl PyTransition {
     #[new]
-    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None))]
+    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None, per_compartment=None))]
     fn new(
         id: String,
         source: Vec<String>,
         target: Vec<String>,
         rate: Option<String>,
         stratified_rates: Option<StratifiedRatesInput>,
+        per_compartment: Option<bool>,
     ) -> Self {
         let rate = rate.map(commol_core::RateMathExpression::from_string);
 
@@ -261,9 +262,12 @@ impl PyTransition {
                     conditions: conditions
                         .into_iter()
                         .map(
-                            |(stratification, category)| commol_core::StratificationCondition {
-                                stratification,
-                                category,
+                            |(stratification, category, to)| {
+                                commol_core::StratificationCondition {
+                                    stratification,
+                                    category,
+                                    to,
+                                }
                             },
                         )
                         .collect(),
@@ -280,6 +284,7 @@ impl PyTransition {
                 rate,
                 stratified_rates,
                 condition: None,
+                per_compartment,
             },
         }
     }

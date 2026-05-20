@@ -7,6 +7,7 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
+from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
 PREFIX_SEPARATOR: str = ":"
@@ -98,22 +99,6 @@ class Condition(BaseModel):
         description="How to combine the rules. Allowed operators: ['and', 'or']",
     )
     rules: list[Rule]
-
-
-class StratificationCondition(BaseModel):
-    """
-    Specifies a category within a stratification for rate matching.
-
-    Attributes
-    ----------
-    stratification : str
-        The ID of the stratification (e.g., "age", "location")
-    category : str
-        The category within that stratification (e.g., "young", "urban")
-    """
-
-    stratification: str = Field(default=..., description="ID of the stratification")
-    category: str = Field(default=..., description="Category within the stratification")
 
 
 class StratifiedRate(BaseModel):
@@ -229,6 +214,15 @@ class Transition(BaseModel):
 
     condition: Condition | None = Field(
         default=None, description="Logical restrictions for the transition."
+    )
+
+    per_compartment: bool | None = Field(
+        default=None,
+        description=(
+            "When True, base compartment names in the rate expression "
+            "are replaced with the specific stratified compartment name "
+            "for each expanded transition flow."
+        ),
     )
 
     @field_validator("rate", mode="before")

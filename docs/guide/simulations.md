@@ -26,16 +26,16 @@ Each compartment maps to a list of values over time:
 results = simulation.run(num_steps=100, output_format="dict_of_lists")
 
 # Access results
-susceptible = results["S"]  # [990, 985, 978, ...]
-infected = results["I"]     # [10, 15, 22, ...]
-recovered = results["R"]    # [0, 0, 0, ...]
+state_a = results["A"]  # [900, 880, 855, ...]
+state_b = results["B"]  # [100, 120, 145, ...]
+state_c = results["C"]  # [0, 0, 0, ...]
 
 # Get final values
-final_S = results["S"][-1]
-final_I = results["I"][-1]
-final_R = results["R"][-1]
+final_A = results["A"][-1]
+final_B = results["B"][-1]
+final_C = results["C"][-1]
 
-print(f"Final state: S={final_S:.0f}, I={final_I:.0f}, R={final_R:.0f}")
+print(f"Final state: A={final_A:.0f}, B={final_B:.0f}, C={final_C:.0f}")
 ```
 
 **Best for**: Plotting, time series analysis, accessing specific compartments
@@ -48,9 +48,9 @@ Each time step is a list of all compartment values:
 results = simulation.run(num_steps=100, output_format="list_of_lists")
 
 # results[time][compartment_index]
-initial_state = results[0]     # [990, 10, 0]
-midpoint_state = results[50]   # [450, 200, 350]
-final_state = results[-1]      # [340, 50, 610]
+initial_state = results[0]     # [900, 100, 0]
+midpoint_state = results[50]   # [450, 300, 250]
+final_state = results[-1]      # [200, 100, 700]
 
 # Iterate over time steps
 for t, state in enumerate(results):
@@ -72,18 +72,17 @@ Commol creates stratified compartment names by joining the base compartment ID w
 
 ```python
 # Model definition
-.add_bin(id="S", name="Susceptible")
-.add_bin(id="I", name="Infected")
-.add_stratification(id="age", categories=["young", "old"])  # Added first
-.add_stratification(id="location", categories=["urban", "rural"])  # Added second
+.add_bin(id="A", name="State A")
+.add_bin(id="B", name="State B")
+.add_stratification(id="group", categories=["g1", "g2"])   # Added first
+.add_stratification(id="type", categories=["t1", "t2"])    # Added second
 
-# Resulting compartment names (12 total):
-# S_young_urban, S_young_rural, S_old_urban, S_old_rural
-# I_young_urban, I_young_rural, I_old_urban, I_old_rural
-# R_young_urban, R_young_rural, R_old_urban, R_old_rural
+# Resulting compartment names (8 total):
+# A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2
+# B_g1_t1, B_g1_t2, B_g2_t1, B_g2_t2
 ```
 
-**Important**: The order is `{bin}_{age}_{location}` because age was added before location. If you reverse the order of `add_stratification` calls, names would be `{bin}_{location}_{age}`.
+**Important**: The order is `{bin}_{group}_{type}` because group was added before type. If you reverse the order of `add_stratification` calls, names would be `{bin}_{type}_{group}`.
 
 ### Accessing Stratified Results
 
@@ -94,7 +93,7 @@ results = simulation.run(num_steps=100)
 
 # See all compartment names
 print("All compartments:", list(results.keys()))
-# Output: ['S_young', 'S_old', 'I_young', 'I_old', 'R_young', 'R_old']
+# Output: ['A_g1', 'A_g2', 'B_g1', 'B_g2', 'C_g1', 'C_g2']
 
 # Count compartments
 print(f"Total compartments: {len(results)}")
@@ -103,28 +102,28 @@ print(f"Total compartments: {len(results)}")
 #### 2. Access Specific Strata
 
 ```python
-# Access specific age groups
-young_infected = results["I_young"]
-old_infected = results["I_old"]
+# Access specific categories
+g1_b = results["B_g1"]
+g2_b = results["B_g2"]
 
 # Access specific combinations (multiple stratifications)
-urban_child_infected = results["I_child_urban"]
-rural_adult_infected = results["I_adult_rural"]
+g1_t1_b = results["B_g1_t1"]
+g2_t2_b = results["B_g2_t2"]
 ```
 
 #### 3. Filter Compartments by Pattern
 
 ```python
-# Get all infected compartments
-infected_keys = [key for key in results.keys() if key.startswith("I_")]
-print("Infected compartments:", infected_keys)
+# Get all B compartments
+b_keys = [key for key in results.keys() if key.startswith("B_")]
+print("B compartments:", b_keys)
 
-# Get all young compartments
-young_keys = [key for key in results.keys() if "_young" in key]
-print("Young compartments:", young_keys)
+# Get all g1 compartments
+g1_keys = [key for key in results.keys() if "_g1" in key]
+print("g1 compartments:", g1_keys)
 
-# Get all urban compartments (multi-stratification)
-urban_keys = [key for key in results.keys() if "_urban" in key]
+# Get all t2 compartments (multi-stratification)
+t2_keys = [key for key in results.keys() if "_t2" in key]
 ```
 
 ### Aggregating Stratified Results
@@ -136,40 +135,40 @@ A common task is computing totals across one or more stratification dimensions.
 ```python
 import numpy as np
 
-# Total infected across all age groups (removing age stratification)
-total_infected = np.array(results["I_young"]) + np.array(results["I_old"])
+# Total B across all groups
+total_b = np.array(results["B_g1"]) + np.array(results["B_g2"])
 
 # Or using list comprehension (no NumPy required)
-total_infected = [y + o for y, o in zip(results["I_young"], results["I_old"])]
+total_b = [a + b for a, b in zip(results["B_g1"], results["B_g2"])]
 ```
 
 #### Sum Across Multiple Stratifications
 
 ```python
-# Model has age=[young, old] and location=[urban, rural]
-# Get total infected (sum across all strata)
-total_I = (
-    np.array(results["I_young_urban"]) +
-    np.array(results["I_young_rural"]) +
-    np.array(results["I_old_urban"]) +
-    np.array(results["I_old_rural"])
+# Model has group=[g1, g2] and type=[t1, t2]
+# Get total B (sum across all strata)
+total_B = (
+    np.array(results["B_g1_t1"]) +
+    np.array(results["B_g1_t2"]) +
+    np.array(results["B_g2_t1"]) +
+    np.array(results["B_g2_t2"])
 )
 
 # Or dynamically using pattern matching
-infected_keys = [k for k in results.keys() if k.startswith("I_")]
-total_I = sum(np.array(results[k]) for k in infected_keys)
+b_keys = [k for k in results.keys() if k.startswith("B_")]
+total_B = sum(np.array(results[k]) for k in b_keys)
 ```
 
 #### Sum by Stratification Category
 
 ```python
-# Total young population (across all disease states)
-young_keys = [k for k in results.keys() if "_young" in k]
-total_young = sum(np.array(results[k]) for k in young_keys)
+# Total g1 population (across all states)
+g1_keys = [k for k in results.keys() if "_g1" in k]
+total_g1 = sum(np.array(results[k]) for k in g1_keys)
 
-# Total urban population
-urban_keys = [k for k in results.keys() if "_urban" in k]
-total_urban = sum(np.array(results[k]) for k in urban_keys)
+# Total t2 population
+t2_keys = [k for k in results.keys() if "_t2" in k]
+total_t2 = sum(np.array(results[k]) for k in t2_keys)
 ```
 
 #### Create Aggregated DataFrame
@@ -182,11 +181,11 @@ import numpy as np
 df = pd.DataFrame(results)
 
 # Add aggregated columns
-df["I_total"] = df[[c for c in df.columns if c.startswith("I_")]].sum(axis=1)
-df["young_total"] = df[[c for c in df.columns if "_young" in c]].sum(axis=1)
+df["B_total"] = df[[c for c in df.columns if c.startswith("B_")]].sum(axis=1)
+df["g1_total"] = df[[c for c in df.columns if "_g1" in c]].sum(axis=1)
 
 # Compute proportions
-df["I_proportion"] = df["I_total"] / df[[c for c in df.columns if not c.endswith("_total")]].sum(axis=1)
+df["B_proportion"] = df["B_total"] / df[[c for c in df.columns if not c.endswith("_total")]].sum(axis=1)
 ```
 
 ### Common Pitfalls
@@ -194,27 +193,27 @@ df["I_proportion"] = df["I_total"] / df[[c for c in df.columns if not c.endswith
 #### 1. Case Sensitivity
 
 ```python
-# Compartment names use exact category names
-.add_stratification(id="age", categories=["Young", "Old"])  # Capital Y and O
-# Access with: results["I_Young"], results["I_Old"]
+# Compartment names use exact category names as declared
+.add_stratification(id="group", categories=["G1", "G2"])  # Capital G
+# Access with: results["B_G1"], results["B_G2"]
 ```
 
 #### 2. Order of Stratifications
 
 ```python
 # Categories combine in the order stratifications are added
-.add_stratification(id="age", categories=["young", "old"])
-.add_stratification(id="location", categories=["urban", "rural"])
+.add_stratification(id="group", categories=["g1", "g2"])
+.add_stratification(id="type", categories=["t1", "t2"])
 
-# Creates: I_young_urban, I_young_rural, I_old_urban, I_old_rural
-# NOT: I_urban_young, I_rural_young, etc.
+# Creates: B_g1_t1, B_g1_t2, B_g2_t1, B_g2_t2
+# NOT: B_t1_g1, B_t2_g1, etc.
 ```
 
 #### 3. Missing Compartments
 
 ```python
 # Always check compartments exist before accessing
-key = "I_young"
+key = "B_g1"
 if key in results:
     data = results[key]
 else:
@@ -263,7 +262,7 @@ config = PlotConfig(
 plotter.plot_series(
     output_file="custom.png",
     config=config,
-    bins=["I", "R"],  # Only plot specific compartments
+    bins=["B", "C"],  # Only plot specific compartments
     linewidth=2.5,
     alpha=0.8
 )
@@ -275,9 +274,9 @@ plotter.plot_series(
 from commol import ObservedDataPoint
 
 observed_data = [
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
 ]
 
 plotter.plot_series(

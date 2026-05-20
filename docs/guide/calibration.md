@@ -18,7 +18,7 @@ Parameters and initial conditions can be set to `None` to indicate they need cal
 
 ## Basic Example
 
-Here's a simple calibration of an SIR model's transmission and recovery rates. Parameters to be calibrated should be set to `None`, and initial guesses are provided in the `CalibrationParameter` configuration:
+Here's a simple calibration of a model's rate parameters. Parameters to be calibrated should be set to `None`, and initial guesses are provided in the `CalibrationParameter` configuration:
 
 ```python
 from commol import (
@@ -35,43 +35,43 @@ from commol import (
 
 # Build model with parameters to be calibrated set to None
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)   # To be calibrated
-    .add_parameter(id="gamma", value=None)  # To be calibrated
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)   # To be calibrated
+    .add_parameter(id="k2", value=None)   # To be calibrated
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
-# Define observed data (e.g., from real-world measurements)
+# Define observed data
 observed_data = [
-    ObservedDataPoint(step=0, compartment="I", value=10.0),
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
-    ObservedDataPoint(step=40, compartment="I", value=38.1),
-    ObservedDataPoint(step=50, compartment="I", value=18.7),
+    ObservedDataPoint(step=0, compartment="B", value=10.0),
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
+    ObservedDataPoint(step=40, compartment="B", value=38.1),
+    ObservedDataPoint(step=50, compartment="B", value=18.7),
 ]
 
 # Simulation can be created with None values for calibration
@@ -86,14 +86,14 @@ except ValueError as e:
 # Define parameters to calibrate with bounds and initial guesses
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3  # Starting point for optimization
     ),
     CalibrationParameter(
-        id="gamma",
+        id="k2",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
@@ -121,8 +121,8 @@ result = calibrator.run()
 
 # Display results
 print(result)
-print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
-print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+print(f"Calibrated k1: {result.best_parameters['k1']:.4f}")
+print(f"Calibrated k2: {result.best_parameters['k2']:.4f}")
 
 # Update model with calibrated parameters
 model.update_parameters(result.best_parameters)
@@ -130,7 +130,7 @@ model.update_parameters(result.best_parameters)
 # Create new simulation with calibrated model for predictions
 calibrated_simulation = Simulation(model)
 prediction_results = calibrated_simulation.run(num_steps=200)
-print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
+print(f"State B at step 200: {prediction_results['B'][-1]:.0f}")
 ```
 
 ### Calibrating Initial Conditions
@@ -138,41 +138,41 @@ print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
 You can also calibrate initial population fractions:
 
 ```python
-# Build model with unknown initial infected fraction
+# Build model with unknown initial fraction for compartment B
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)
-    .add_parameter(id="gamma", value=0.1)
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.98},
-            {"bin": "I", "fraction": None},  # Unknown - to be calibrated
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.98},
+            {"bin": "B", "fraction": None},  # Unknown - to be calibrated
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
-# Calibrate initial infected fraction
+# Calibrate initial fraction for B
 parameters = [
     CalibrationParameter(
-        id="I",
+        id="B",
         parameter_type="initial_condition",
         min_bound=0.0,
         max_bound=0.1,
@@ -241,9 +241,9 @@ Allows different importance for different observations:
 ```python
 # Give more weight to early observations
 observed_data = [
-    ObservedDataPoint(step=0, compartment="I", value=10.0, weight=2.0),
-    ObservedDataPoint(step=10, compartment="I", value=45.2, weight=1.5),
-    ObservedDataPoint(step=20, compartment="I", value=78.5, weight=1.0),
+    ObservedDataPoint(step=0, compartment="B", value=10.0, weight=2.0),
+    ObservedDataPoint(step=10, compartment="B", value=45.2, weight=1.5),
+    ObservedDataPoint(step=20, compartment="B", value=78.5, weight=1.0),
 ]
 
 loss_function = "weighted_sse"
@@ -352,45 +352,45 @@ Calibrate against observations from multiple compartments:
 ```python
 # Build model with parameters to calibrate
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)   # To be calibrated
-    .add_parameter(id="gamma", value=None)  # To be calibrated
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)   # To be calibrated
+    .add_parameter(id="k2", value=None)   # To be calibrated
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
-# Observed data from both infected and recovered compartments
+# Observed data from both B and C compartments
 observed_data = [
-    # Infected observations
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
-    # Recovered observations
-    ObservedDataPoint(step=10, compartment="R", value=12.5),
-    ObservedDataPoint(step=20, compartment="R", value=35.8),
-    ObservedDataPoint(step=30, compartment="R", value=68.2),
+    # B observations
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
+    # C observations
+    ObservedDataPoint(step=10, compartment="C", value=12.5),
+    ObservedDataPoint(step=20, compartment="C", value=35.8),
+    ObservedDataPoint(step=30, compartment="C", value=68.2),
 ]
 
 simulation = Simulation(model)
@@ -399,14 +399,14 @@ problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=[
         CalibrationParameter(
-            id="beta",
+            id="k1",
             parameter_type="parameter",
             min_bound=0.0,
             max_bound=1.0,
             initial_guess=0.3
         ),
         CalibrationParameter(
-            id="gamma",
+            id="k2",
             parameter_type="parameter",
             min_bound=0.0,
             max_bound=1.0,
@@ -426,53 +426,53 @@ model.update_parameters(result.best_parameters)
 
 ### Calibrating Stratified Models
 
-Calibrate parameters specific to age groups or other stratifications:
+Calibrate parameters specific to individual stratification categories:
 
 ```python
-# Build age-stratified model with parameters to calibrate
+# Build stratified model with group-specific parameters to calibrate
 model = (
-    ModelBuilder(name="Age-Stratified SIR", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_stratification(id="age", categories=["young", "old"])
-    .add_parameter(id="beta", value=None)          # To be calibrated
-    .add_parameter(id="gamma_young", value=None)   # To be calibrated
-    .add_parameter(id="gamma_old", value=None)     # To be calibrated
+    ModelBuilder(name="Stratified Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_parameter(id="k1", value=None)       # To be calibrated
+    .add_parameter(id="k2_g1", value=None)    # To be calibrated
+    .add_parameter(id="k2_g2", value=None)    # To be calibrated
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
+        id="t_bc",
+        source=["B"],
+        target=["C"],
         stratified_rates=[
             {
-                "conditions": [{"stratification": "age", "category": "young"}],
-                "rate": "gamma_young * I"
+                "conditions": [{"stratification": "group", "category": "g1"}],
+                "rate": "k2_g1 * B"
             },
             {
-                "conditions": [{"stratification": "age", "category": "old"}],
-                "rate": "gamma_old * I"
+                "conditions": [{"stratification": "group", "category": "g2"}],
+                "rate": "k2_g2 * B"
             },
         ]
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ],
         stratification_fractions=[
             {
-                "stratification": "age",
+                "stratification": "group",
                 "fractions": [
-                    {"category": "young", "fraction": 0.6},
-                    {"category": "old", "fraction": 0.4}
+                    {"category": "g1", "fraction": 0.6},
+                    {"category": "g2", "fraction": 0.4}
                 ]
             }
         ]
@@ -480,12 +480,12 @@ model = (
     .build(typology="DifferenceEquations")
 )
 
-# Note: Observed data uses stratified compartment names like "I_young", "I_old"
+# Observed data uses stratified compartment names like "B_g1", "B_g2"
 observed_data = [
-    ObservedDataPoint(step=10, compartment="I_young", value=30.5),
-    ObservedDataPoint(step=10, compartment="I_old", value=15.2),
-    ObservedDataPoint(step=20, compartment="I_young", value=52.3),
-    ObservedDataPoint(step=20, compartment="I_old", value=26.1),
+    ObservedDataPoint(step=10, compartment="B_g1", value=30.5),
+    ObservedDataPoint(step=10, compartment="B_g2", value=15.2),
+    ObservedDataPoint(step=20, compartment="B_g1", value=52.3),
+    ObservedDataPoint(step=20, compartment="B_g2", value=26.1),
 ]
 
 simulation = Simulation(model)
@@ -493,21 +493,21 @@ simulation = Simulation(model)
 # Calibrate stratification-specific parameters
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
-        id="gamma_young",
+        id="k2_g1",
         parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.2,
         initial_guess=0.12
     ),
     CalibrationParameter(
-        id="gamma_old",
+        id="k2_g2",
         parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.2,
@@ -531,58 +531,58 @@ model.update_parameters(result.best_parameters)
 
 ### Calibrating Scale Parameters
 
-When observed data represents only a fraction of true cases (e.g., due to underreporting or detection limits), scale parameters allow you to calibrate the reporting or detection rate alongside model parameters.
+When observed data represents only a fraction of true values (e.g., due to partial detection or measurement limits), scale parameters allow you to calibrate the detection rate alongside model parameters.
 
 **How Scale Parameters Work:**
 
-During calibration, model predictions are multiplied by the scale factor before comparing with observed data. This allows simultaneous estimation of true disease dynamics and the observation process.
+During calibration, model predictions are multiplied by the scale factor before comparing with observed data. This allows simultaneous estimation of true dynamics and the observation process.
 
 **Basic Example:**
 
 ```python
-# Build SIR model with parameters to calibrate
+# Build model with parameters to calibrate
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)
-    .add_parameter(id="gamma", value=None)
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)
+    .add_parameter(id="k2", value=None)
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
-# Reported cases (potentially underreported)
-reported_cases = [10, 15, 25, 40, 60, 75, 85, 70, 50, 30]
+# Observed values (potentially partially detected)
+observed_values = [10, 15, 25, 40, 60, 75, 85, 70, 50, 30]
 
 # Link observed data to scale parameter
 observed_data = [
     ObservedDataPoint(
         step=idx,
-        compartment="I",
-        value=cases,
-        scale_id="reporting_rate"
+        compartment="B",
+        value=val,
+        scale_id="detection_rate"
     )
-    for idx, cases in enumerate(reported_cases)
+    for idx, val in enumerate(observed_values)
 ]
 
 simulation = Simulation(model)
@@ -590,19 +590,19 @@ simulation = Simulation(model)
 # Define parameters including scale
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.1,
         max_bound=1.0
     ),
     CalibrationParameter(
-        id="gamma",
+        id="k2",
         parameter_type="parameter",
         min_bound=0.05,
         max_bound=0.5
     ),
     CalibrationParameter(
-        id="reporting_rate",
+        id="detection_rate",
         parameter_type="scale",
         min_bound=0.01,
         max_bound=1.0
@@ -631,7 +631,7 @@ for param in problem.parameters:
     elif param.parameter_type == "scale":
         scale_values[param.id] = value
 
-print(f"Calibrated reporting rate: {scale_values['reporting_rate']:.2%}")
+print(f"Calibrated detection rate: {scale_values['detection_rate']:.2%}")
 
 # Update model and run simulation
 model.update_parameters(parameters)
@@ -654,19 +654,19 @@ Different compartments can have different detection rates:
 
 ```python
 observed_data = [
-    ObservedDataPoint(step=10, compartment="I", value=45.0, scale_id="case_detection"),
-    ObservedDataPoint(step=10, compartment="R", value=120.0, scale_id="recovery_detection"),
+    ObservedDataPoint(step=10, compartment="B", value=45.0, scale_id="b_detection"),
+    ObservedDataPoint(step=10, compartment="C", value=120.0, scale_id="c_detection"),
 ]
 
 parameters = [
     CalibrationParameter(
-        id="case_detection",
+        id="b_detection",
         parameter_type="scale",
         min_bound=0.05,
         max_bound=0.5
     ),
     CalibrationParameter(
-        id="recovery_detection",
+        id="c_detection",
         parameter_type="scale",
         min_bound=0.7,
         max_bound=1.0
@@ -676,9 +676,9 @@ parameters = [
 
 **Key Considerations:**
 
-- **Identifiability**: Calibrating transmission parameters and scale simultaneously may cause identifiability issues
+- **Identifiability**: Calibrating rate parameters and scale simultaneously may cause identifiability issues
 - **Visualization**: Always pass `scale_values` to plotter for correct display
-- **Interpretation**: Calibrated scale = fraction of true cases observed (e.g., 0.15 = 15% detection)
+- **Interpretation**: Calibrated scale = fraction of true compartment value observed (e.g., 0.15 = 15% detection)
 
 ### Using Calibration Results
 
@@ -701,7 +701,7 @@ if result.converged:
     calibrated_simulation = Simulation(model)
     prediction_results = calibrated_simulation.run(num_steps=200)
 
-    print(f"Predicted infections at day 200: {prediction_results['I'][-1]:.0f}")
+    print(f"State B at step 200: {prediction_results['B'][-1]:.0f}")
 else:
     print(f"Calibration did not converge: {result.termination_reason}")
 ```
@@ -716,10 +716,10 @@ Set realistic bounds based on domain knowledge:
 
 ```python
 # Too wide: allows unrealistic values
-CalibrationParameter(id="beta", min_bound=0.0, max_bound=100.0)  # Bad
+CalibrationParameter(id="k1", min_bound=0.0, max_bound=100.0)  # Bad
 
 # Reasonable: based on expected parameter ranges
-CalibrationParameter(id="beta", min_bound=0.1, max_bound=0.8)    # Good
+CalibrationParameter(id="k1", min_bound=0.1, max_bound=0.8)    # Good
 ```
 
 ### 2. Provide Good Initial Guesses
@@ -729,7 +729,7 @@ Initial guesses can speed up convergence:
 ```python
 # Without initial guess - optimizer uses midpoint
 CalibrationParameter(
-    id="beta",
+    id="k1",
     parameter_type="parameter",
     min_bound=0.1,
     max_bound=0.8
@@ -737,11 +737,11 @@ CalibrationParameter(
 
 # Provide informed starting point (recommended)
 CalibrationParameter(
-    id="beta",
+    id="k1",
     parameter_type="parameter",
     min_bound=0.1,
     max_bound=0.8,
-    initial_guess=0.4  # Based on literature
+    initial_guess=0.4  # Based on prior knowledge
 )
 ```
 
@@ -764,7 +764,7 @@ Always check plausibility of results:
 result = calibrator.run()
 
 # Check parameter values make sense
-if result.best_parameters['beta'] > 1.0:
+if result.best_parameters['k1'] > 1.0:
     print("Warning: Unusually high rate parameter")
 
 # Check final loss
@@ -811,64 +811,64 @@ from commol import CalibrationConstraint
 
 # Build model with parameters to calibrate
 model = (
-    ModelBuilder(name="SIR Model", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)
-    .add_parameter(id="gamma", value=None)
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)
+    .add_parameter(id="k2", value=None)
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
 observed_data = [
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
 ]
 
 simulation = Simulation(model)
 
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
     ),
     CalibrationParameter(
-        id="gamma",
+        id="k2",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=0.5,
     ),
 ]
 
-# Add constraint: beta/gamma <= 5, which is equivalent to 5 - beta/gamma >= 0
+# Add constraint: k1/k2 <= 5, which is equivalent to 5 - k1/k2 >= 0
 constraints = [
     CalibrationConstraint(
-        id="r0_bound",
-        expression="5.0 - beta/gamma",
-        description="R0 <= 5",
+        id="ratio_bound",
+        expression="5.0 - k1/k2",
+        description="k1/k2 <= 5",
         weight=1.0,
     )
 ]
@@ -885,8 +885,8 @@ calibrator = Calibrator(simulation, problem)
 result = calibrator.run()
 
 # Verify constraint is satisfied
-r0 = result.best_parameters["beta"] / result.best_parameters["gamma"]
-print(f"Calibrated R0: {r0:.2f}")  # Should be <= 5
+ratio = result.best_parameters["k1"] / result.best_parameters["k2"]
+print(f"Calibrated k1/k2 ratio: {ratio:.2f}")  # Should be <= 5
 ```
 
 ### Types of Constraints
@@ -983,31 +983,31 @@ You can apply multiple constraints simultaneously:
 
 ```python
 constraints = [
-    # R0 must be between 2 and 5
+    # k1/k2 ratio must be between 2 and 5
     CalibrationConstraint(
-        id="r0_min",
-        expression="beta/gamma - 2.0",
-        description="R0 >= 2",
+        id="ratio_min",
+        expression="k1/k2 - 2.0",
+        description="k1/k2 >= 2",
         weight=1.0,
     ),
     CalibrationConstraint(
-        id="r0_max",
-        expression="5.0 - beta/gamma",
-        description="R0 <= 5",
+        id="ratio_max",
+        expression="5.0 - k1/k2",
+        description="k1/k2 <= 5",
         weight=1.0,
     ),
-    # Beta must be greater than gamma
+    # k1 must be greater than k2
     CalibrationConstraint(
         id="ordering",
-        expression="beta - gamma",
-        description="Beta >= Gamma",
+        expression="k1 - k2",
+        description="k1 >= k2",
         weight=0.5,
     ),
-    # Peak infected below 500
+    # Peak B below 500
     CalibrationConstraint(
         id="peak_limit",
-        expression="500.0 - I",
-        description="Peak infected <= 500",
+        expression="500.0 - B",
+        description="Peak B <= 500",
         time_steps=[10, 20, 30, 40, 50],
         weight=2.0,  # Higher weight = stricter enforcement
     ),
@@ -1022,14 +1022,14 @@ The `weight` parameter controls how strictly a constraint is enforced. Higher we
 # Strict enforcement - large penalty for violations
 CalibrationConstraint(
     id="critical_constraint",
-    expression="10.0 - beta/gamma",
+    expression="10.0 - k1/k2",
     weight=10.0,  # High weight
 )
 
 # Soft enforcement - smaller penalty
 CalibrationConstraint(
     id="preferred_constraint",
-    expression="beta - gamma",
+    expression="k1 - k2",
     weight=0.5,  # Low weight
 )
 ```
@@ -1039,17 +1039,17 @@ CalibrationConstraint(
 ### Best Practices for Constraints
 
 1. **Write expressions that evaluate to ≥ 0 when satisfied**:
-   - For `beta <= 0.5`, use `"0.5 - beta"`
-   - For `beta >= gamma`, use `"beta - gamma"`
-   - For `R0 <= 5` where R0 = β/γ, use `"5.0 - beta/gamma"`
+   - For `k1 <= 0.5`, use `"0.5 - k1"`
+   - For `k1 >= k2`, use `"k1 - k2"`
+   - For ratio `k1/k2 <= 5`, use `"5.0 - k1/k2"`
 
 2. **Use descriptive IDs and descriptions**:
 
    ```python
    CalibrationConstraint(
-       id="r0_epidemiological_bound",
-       expression="5.0 - beta/gamma",
-       description="R0 must be <= 5 based on historical outbreaks",
+       id="ratio_upper_bound",
+       expression="5.0 - k1/k2",
+       description="k1/k2 ratio must be <= 5",
    )
    ```
 
@@ -1066,9 +1066,9 @@ CalibrationConstraint(
 5. **Validate constraint expressions**:
    ```python
    # Test constraint expression with sample parameters
-   beta, gamma = 0.3, 0.1
-   r0_constraint = 5.0 - beta/gamma
-   print(f"R0 constraint value: {r0_constraint}")  # Should be >= 0 if satisfied
+   k1, k2 = 0.3, 0.1
+   ratio_constraint = 5.0 - k1/k2
+   print(f"Ratio constraint value: {ratio_constraint}")  # Should be >= 0 if satisfied
    ```
 
 ### Troubleshooting Constraints
@@ -1092,8 +1092,8 @@ CalibrationConstraint(
 ```python
 # These constraints conflict!
 constraints = [
-    CalibrationConstraint(id="c1", expression="beta - 0.5"),  # beta >= 0.5
-    CalibrationConstraint(id="c2", expression="0.4 - beta"),  # beta <= 0.4
+    CalibrationConstraint(id="c1", expression="k1 - 0.5"),  # k1 >= 0.5
+    CalibrationConstraint(id="c2", expression="0.4 - k1"),  # k1 <= 0.4
 ]
 ```
 
