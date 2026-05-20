@@ -110,9 +110,11 @@ fn stratification_conditions_met(
 ) -> bool {
     match conditions {
         None => true,
-        Some(conds) => conds
-            .iter()
-            .all(|c| applied.get(&c.stratification).map_or(false, |v| v == &c.category)),
+        Some(conds) => conds.iter().all(|c| {
+            applied
+                .get(&c.stratification)
+                .map_or(false, |v| v == &c.category)
+        }),
     }
 }
 
@@ -275,8 +277,7 @@ fn build_transition_flows(
                         // Compute target compartment name:
                         // If matched stratified rate has `to` overrides, use them
                         // to remap categories. Otherwise, use standard bin replacement.
-                        let target_compartment_name = if let Some(sr) = matched.stratified_rate
-                        {
+                        let target_compartment_name = if let Some(sr) = matched.stratified_rate {
                             if has_category_overrides(&sr.conditions) {
                                 compute_target_with_category_overrides(
                                     target_bin,
@@ -291,27 +292,24 @@ fn build_transition_flows(
                             compartment_name.replacen(source_bin, target_bin, 1)
                         };
 
-                        if let Some(&target_index) =
-                            compartment_map.get(&target_compartment_name)
-                        {
+                        if let Some(&target_index) = compartment_map.get(&target_compartment_name) {
                             // If per_compartment is enabled, replace base bin names
                             // with the specific stratified compartment names
-                            let rate_string =
-                                if transition.per_compartment.unwrap_or(false) {
-                                    let mut modified = replace_bin_in_rate(
-                                        &matched.rate_string,
-                                        source_bin,
-                                        compartment_name,
-                                    );
-                                    modified = replace_bin_in_rate(
-                                        &modified,
-                                        target_bin,
-                                        &target_compartment_name,
-                                    );
-                                    modified
-                                } else {
-                                    matched.rate_string
-                                };
+                            let rate_string = if transition.per_compartment.unwrap_or(false) {
+                                let mut modified = replace_bin_in_rate(
+                                    &matched.rate_string,
+                                    source_bin,
+                                    compartment_name,
+                                );
+                                modified = replace_bin_in_rate(
+                                    &modified,
+                                    target_bin,
+                                    &target_compartment_name,
+                                );
+                                modified
+                            } else {
+                                matched.rate_string
+                            };
 
                             // Parse the rate expression once
                             let rate_expression =
@@ -321,8 +319,7 @@ fn build_transition_flows(
                             // subpopulation variables (partial bin sums)
                             let rate_variables = rate_expression.get_variables();
                             let references_compartments = rate_variables.iter().any(|v| {
-                                compartment_map.contains_key(v)
-                                    || subpopulation_names.contains(v)
+                                compartment_map.contains_key(v) || subpopulation_names.contains(v)
                             });
 
                             transition_flows.push(TransitionFlow {

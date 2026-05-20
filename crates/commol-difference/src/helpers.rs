@@ -214,7 +214,10 @@ pub(crate) fn compute_target_with_category_overrides(
     // Build override map: stratification_id -> to_category
     let override_map: HashMap<&str, &str> = conditions
         .iter()
-        .filter_map(|c| c.to.as_ref().map(|to| (c.stratification.as_str(), to.as_str())))
+        .filter_map(|c| {
+            c.to.as_ref()
+                .map(|to| (c.stratification.as_str(), to.as_str()))
+        })
         .collect();
 
     let mut parts = Vec::with_capacity(stratifications.len() + 1);

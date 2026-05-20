@@ -146,7 +146,11 @@ impl PyStratification {
     #[new]
     fn new(id: String, categories: Vec<String>) -> Self {
         Self {
-            inner: commol_core::Stratification { id, categories, conditions: None },
+            inner: commol_core::Stratification {
+                id,
+                categories,
+                conditions: None,
+            },
         }
     }
 }
@@ -261,15 +265,13 @@ impl PyTransition {
                 .map(|(conditions, rate_str)| commol_core::StratifiedRate {
                     conditions: conditions
                         .into_iter()
-                        .map(
-                            |(stratification, category, to)| {
-                                commol_core::StratificationCondition {
-                                    stratification,
-                                    category,
-                                    to,
-                                }
-                            },
-                        )
+                        .map(|(stratification, category, to)| {
+                            commol_core::StratificationCondition {
+                                stratification,
+                                category,
+                                to,
+                            }
+                        })
                         .collect(),
                     rate: rate_str,
                 })
