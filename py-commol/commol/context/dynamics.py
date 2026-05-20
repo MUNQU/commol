@@ -7,6 +7,7 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
+from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
 PREFIX_SEPARATOR: str = ":"
@@ -98,37 +99,6 @@ class Condition(BaseModel):
         description="How to combine the rules. Allowed operators: ['and', 'or']",
     )
     rules: list[Rule]
-
-
-class StratificationCondition(BaseModel):
-    """
-    Specifies a category within a stratification for rate matching.
-
-    When ``to`` is set, the matched category in the source compartment is
-    replaced with the ``to`` category in the target compartment name. This
-    enables cross-category transitions within the same bin (e.g., aging).
-
-    Attributes
-    ----------
-    stratification : str
-        The ID of the stratification (e.g., "age", "location")
-    category : str
-        The category within that stratification (e.g., "young", "urban")
-    to : str | None
-        Target category override. When set, the target compartment will use
-        this category instead of the source compartment's category for this
-        stratification.
-    """
-
-    stratification: str = Field(default=..., description="ID of the stratification")
-    category: str = Field(default=..., description="Category within the stratification")
-    to: str | None = Field(
-        default=None,
-        description=(
-            "Target category override. When set, the target compartment uses "
-            "this category instead of the source's for this stratification."
-        ),
-    )
 
 
 class StratifiedRate(BaseModel):
