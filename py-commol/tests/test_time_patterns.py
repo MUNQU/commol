@@ -112,6 +112,27 @@ class TestPulses:
         with pytest.raises(ValueError):
             TimePattern.pulses(at=[1, 2], amount="1, 0")
 
+    def test_per_step_amounts_formula(self):
+        p = TimePattern.pulses(at=[2, 5, 9], amount=[0.1, 0.2, 0.3])
+        formula = str(p)
+        assert "step == 2, 0.1" in formula
+        assert "step == 5, 0.2" in formula
+        assert "step == 9, 0.3" in formula
+
+    def test_per_step_amounts_string_values(self):
+        p = TimePattern.pulses(at=[1, 4], amount=["alpha", "beta"])
+        formula = str(p)
+        assert "step == 1, alpha" in formula
+        assert "step == 4, beta" in formula
+
+    def test_per_step_amounts_length_mismatch_raises(self):
+        with pytest.raises(ValidationError):
+            TimePattern.pulses(at=[1, 2, 3], amount=[0.1, 0.2])
+
+    def test_per_step_amounts_invalid_element_raises(self):
+        with pytest.raises(ValueError):
+            TimePattern.pulses(at=[1, 2], amount=[0.1, "1, 0"])
+
 
 # ---------------------------------------------------------------------------
 # periodic — unit tests
@@ -629,6 +650,20 @@ class TestPulsesIntegration:
         a = result["A"]
         nonzero = {t for t in range(15) if a[t] - a[t + 1] > 1e-6}
         assert nonzero == {3, 7, 10}
+
+    def test_per_step_amounts_fire_with_distinct_magnitudes(self):
+        p = TimePattern.pulses(at=[2, 6, 11], amount=[0.1, 0.2, 0.4])
+        result = _run_ab(str(p), steps=15)
+        a = result["A"]
+        # only the three listed steps trigger a flow
+        nonzero = {t for t in range(15) if a[t] - a[t + 1] > 1e-9}
+        assert nonzero == {2, 6, 11}
+        # per-capita rates differ by the prescribed amounts (0.1, 0.2, 0.4)
+        rate2 = (a[2] - a[3]) / a[2]
+        rate6 = (a[6] - a[7]) / a[6]
+        rate11 = (a[11] - a[12]) / a[11]
+        assert rate6 == pytest.approx(rate2 * 2, rel=1e-6)
+        assert rate11 == pytest.approx(rate2 * 4, rel=1e-6)
 
 
 class TestPerCompartmentInteraction:

@@ -356,10 +356,29 @@ class TimePattern(BaseModel):
         return _PulseTimePattern(at=at, amount=amount)
 
     @classmethod
-    def pulses(cls, at: Iterable[int], amount: float | str) -> "TimePattern":
-        """Multi-step discrete pulses. Steps must be unique and non-negative."""
-        _validate_amount_string(amount)
-        return _PulsesTimePattern(steps=list(at), amount=amount)
+    def pulses(
+        cls,
+        at: Iterable[int],
+        amount: float | str | Iterable[float | str],
+    ) -> "TimePattern":
+        """Multi-step discrete pulses. Steps must be unique and non-negative.
+
+        Parameters
+        ----------
+        at : Iterable[int]
+            Step indices at which the pulse fires. Must be unique and non-negative.
+        amount : float | str | Iterable[float | str]
+            Pulse magnitude. Either a single value applied to every step, or an
+            iterable of values with the same length as ``at`` — one per step.
+        """
+        amount_resolved: float | str | list[float | str] = (
+            list(amount)  # type: ignore[arg-type]
+            if not isinstance(amount, (float, int, str))
+            else amount
+        )
+        if isinstance(amount_resolved, (float, int, str)):
+            _validate_amount_string(amount_resolved)
+        return _PulsesTimePattern(steps=list(at), amount=amount_resolved)
 
     @classmethod
     def periodic(
@@ -492,7 +511,7 @@ class _PulseTimePattern(TimePattern):
 
 class _PulsesTimePattern(TimePattern):
     steps: list[Annotated[int, Field(ge=0)]]
-    amount: float | str
+    amount: float | str | list[float | str]
 
     @field_validator("steps")
     @classmethod
@@ -509,9 +528,26 @@ class _PulsesTimePattern(TimePattern):
             raise ValueError(f"'at' must contain unique steps (got {v!r})")
         return v
 
+    @model_validator(mode="after")
+    def validate_amount_list(self) -> "_PulsesTimePattern":
+        if isinstance(self.amount, list):
+            if len(self.amount) != len(self.steps):
+                raise ValueError(
+                    f"'amount' list length ({len(self.amount)}) must match "
+                    f"'at' length ({len(self.steps)})"
+                )
+            for a in self.amount:
+                _validate_amount_string(a)
+        return self
+
     @property
     def formula(self) -> str:
-        terms = " + ".join(f"if(step == {s}, {self.amount}, 0)" for s in self.steps)
+        if isinstance(self.amount, list):
+            terms = " + ".join(
+                f"if(step == {s}, {a}, 0)" for s, a in zip(self.steps, self.amount)
+            )
+        else:
+            terms = " + ".join(f"if(step == {s}, {self.amount}, 0)" for s in self.steps)
         return f"({terms})"
 
 
