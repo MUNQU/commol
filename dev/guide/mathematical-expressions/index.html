@@ -18,7 +18,7 @@
         <link rel="prev" href="../building-models/">
       
       
-        <link rel="next" href="../simulations/">
+        <link rel="next" href="../time-patterns/">
       
       
         
@@ -1229,6 +1229,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#time-pattern-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-Pattern Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1243,6 +1254,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1462,6 +1501,34 @@
     
   
     Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/time-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Patterns
   
 
     
@@ -2404,6 +2471,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#time-pattern-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-Pattern Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3162,9 +3240,29 @@
 </tr>
 </tbody>
 </table>
+<h2 id="time-pattern-helpers">Time-Pattern Helpers<a class="headerlink" href="#time-pattern-helpers" title="Permanent link">&para;</a></h2>
+<p>For rate expressions that vary with the simulation step — single pulses,
+periodic events, sinusoidal seasonal forcing, sliding windows, Gaussian
+bumps, linear ramps, or arbitrary compositions — Commol provides the
+<code>TimePattern</code> class. It produces parenthesised, security-validated formula
+strings that compose safely with the rest of the expression vocabulary,
+and <code>add_transition</code> accepts a <code>TimePattern</code> directly via <code>rate=</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimePattern</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="n">TimePattern</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.3</span><span class="p">),</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">seasonal</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">365</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="p">)</span>
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="n">rate</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>TimePattern</code> is the sole user-facing class — multi-group schedules are
+built by chaining <code>TimePattern.add_group(...)</code> calls. See
+<a href="../time-patterns/">Time Patterns</a> for the full catalogue.</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../building-models/">Building Models</a> - Use expressions in transitions</li>
+<li><a href="../time-patterns/">Time Patterns</a> - Time-varying rate helpers</li>
 <li><a href="../simulations/">Simulations</a> - Run models with mathematical expressions</li>
 <li><a href="../examples/">Examples</a> - See complex expressions in complete models</li>
 </ul>
