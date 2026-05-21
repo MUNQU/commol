@@ -260,3 +260,116 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use commol_core::{
+        Bin, BinFraction, Dynamics, InitialConditions, Model, ModelTypes, Population,
+        RateMathExpression, Transition,
+    };
+
+    fn make_periodic_ab_model() -> Model {
+        Model {
+            name: "AB_periodic".to_string(),
+            description: None,
+            version: None,
+            parameters: vec![],
+            population: Population {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "Source".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "Sink".to_string(),
+                    },
+                ],
+                stratifications: vec![],
+                transitions: vec![],
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![
+                        BinFraction {
+                            bin: "A".to_string(),
+                            fraction: Some(1.0),
+                        },
+                        BinFraction {
+                            bin: "B".to_string(),
+                            fraction: Some(0.0),
+                        },
+                    ],
+                    stratification_fractions: vec![],
+                },
+            },
+            dynamics: Dynamics {
+                typology: ModelTypes::DifferenceEquations,
+                transitions: vec![Transition {
+                    id: "flow".to_string(),
+                    source: vec!["A".to_string()],
+                    target: vec!["B".to_string()],
+                    rate: Some(RateMathExpression::from_string(
+                        "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
+                    )),
+                    stratified_rates: None,
+                    condition: None,
+                    per_compartment: None,
+                }],
+            },
+        }
+    }
+
+    #[test]
+    fn test_periodic_rate_fires_at_exact_steps() {
+        // A→B model where rate fires at step 0 and step 7 (period=7).
+        // Verifies the floor-based modulo formula compiles and evaluates
+        // correctly end-to-end through the DifferenceEquations engine.
+        let model = make_periodic_ab_model();
+        let mut engine = DifferenceEquations::from_model(&model);
+        let results = engine.run(14).unwrap();
+
+        // results[k] = state after k step() calls; step counter k-1 was used for k>=1.
+        // Compartment order: A=index 0, B=index 1.
+        let b: Vec<f64> = results.iter().map(|s| s[1]).collect();
+        let a: Vec<f64> = results.iter().map(|s| s[0]).collect();
+
+        // Step 0 fires: B increases from initial zero
+        assert!(b[1] > b[0], "B should increase after step 0");
+
+        // Steps 1–6 do not fire
+        for k in 2..=7 {
+            assert!(
+                (b[k] - b[k - 1]).abs() < 1e-10,
+                "B should not change at step {}, delta = {}",
+                k - 1,
+                (b[k] - b[k - 1]).abs()
+            );
+        }
+
+        // Step 7 fires: B increases again
+        assert!(b[8] > b[7], "B should increase after step 7");
+
+        // Steps 8–13 do not fire
+        for k in 9..=14 {
+            assert!(
+                (b[k] - b[k - 1]).abs() < 1e-10,
+                "B should not change at step {}, delta = {}",
+                k - 1,
+                (b[k] - b[k - 1]).abs()
+            );
+        }
+
+        // Population conserved at every recorded state
+        for k in 0..=14 {
+            assert!(
+                (a[k] + b[k] - 1000.0).abs() < 1e-8,
+                "Population not conserved at step {}: A={}, B={}, total={}",
+                k,
+                a[k],
+                b[k],
+                a[k] + b[k]
+            );
+        }
+    }
+}
