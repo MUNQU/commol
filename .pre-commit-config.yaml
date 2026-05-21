@@ -13,6 +13,12 @@ repos:
         language: system
         pass_filenames: false
         types: [rust]
+      - id: ty-check
+        name: ty check
+        entry: bash -c "cd py-commol && ty check commol"
+        language: system
+        pass_filenames: false
+        types: [python]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.0
     hooks:

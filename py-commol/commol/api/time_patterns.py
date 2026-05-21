@@ -322,7 +322,7 @@ class TimePattern(BaseModel):
     # The methods below are what ModelBuilder.add_transition reads when it
     # receives a TimePattern as `rate=`. Users do not call them directly.
 
-    def _builder_rate(self) -> str | None:
+    def _builder_rate(self) -> str | float | None:
         """Default rate string to pass to add_transition (or None)."""
         if self.conditions is None:
             return self.formula
@@ -723,7 +723,7 @@ class _ScheduleTimePattern(TimePattern):
 
     # ----- builder hooks -----
 
-    def _builder_rate(self) -> str | None:
+    def _builder_rate(self) -> str | float | None:
         for p in self.patterns:
             if not p.conditions:
                 return p.to_stratified_rate()["rate"]
