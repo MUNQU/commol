@@ -528,9 +528,90 @@ calibrated_sim = Simulation(model)
 results = calibrated_sim.run(num_steps=100)
 ```
 
+## Example: Time-Pattern Driven Transition
+
+A composed time-varying transition: an opening pulse, a monthly periodic
+event, and a continuous seasonal baseline.
+
+```python
+from commol import ModelBuilder, Simulation, TimePattern
+
+rate = TimePattern.combine(
+    TimePattern.pulse(at=0, amount=0.3),
+    TimePattern.periodic(period=30, amount=0.05),
+    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+)
+
+model = (
+    ModelBuilder("AB-time-varying")
+    .add_bin("A", "Source")
+    .add_bin("B", "Sink")
+    .add_transition("flow", ["A"], ["B"], rate=rate)
+    .set_initial_conditions(
+        population_size=10_000,
+        bin_fractions=[
+            {"bin": "A", "fraction": 1.0},
+            {"bin": "B", "fraction": 0.0},
+        ],
+    )
+    .build("DifferenceEquations")
+)
+
+results = Simulation(model).run(num_steps=365)
+```
+
+## Example: Sub-Group Specific Schedules
+
+Different stratification sub-groups receive different patterns. The schedule
+is built by chaining `TimePattern.add_group(...)` calls — the first call
+on the class itself, subsequent calls on the returned instance:
+
+```python
+from commol import ModelBuilder, Simulation, TimePattern
+
+rate = (
+    TimePattern.add_group(
+        conditions=[{"stratification": "group", "category": "cat1"}],
+        schedule=TimePattern.periodic(period=7, amount=0.05),
+    )
+    .add_group(
+        conditions=[{"stratification": "group", "category": "cat2"}],
+        schedule=TimePattern.periodic(period=30, amount=0.05),
+    )
+)
+
+model = (
+    ModelBuilder("AB-stratified-schedule")
+    .add_bin("A", "Source")
+    .add_bin("B", "Sink")
+    .add_stratification("group", ["cat1", "cat2"])
+    .add_transition("flow", ["A"], ["B"], rate=rate)
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "A", "fraction": 1.0},
+            {"bin": "B", "fraction": 0.0},
+        ],
+        stratification_fractions=[
+            {
+                "stratification": "group",
+                "fractions": [
+                    {"category": "cat1", "fraction": 0.5},
+                    {"category": "cat2", "fraction": 0.5},
+                ],
+            }
+        ],
+    )
+    .build("DifferenceEquations")
+)
+
+results = Simulation(model).run(num_steps=60)
+```
+
 ## Next Steps
 
 - [API Reference](../api/model-builder.md) - Complete API documentation
 - [Calibration Guide](calibration.md) - Comprehensive calibration documentation
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
+- [Time Patterns](time-patterns.md) - Time-varying rate helpers
 - [Contributing](../development/contributing.md) - Build your own examples

@@ -6,6 +6,7 @@ from commol.api import (
     ModelBuilder,
     Simulation,
     SimulationPlotter,
+    TimePattern,
 )
 from commol.context import Model
 from commol.context.calibration import (
@@ -64,4 +65,5 @@ __all__ = [
     "ProbRepresentativeConfig",
     "Simulation",
     "SimulationPlotter",
+    "TimePattern",
 ]
