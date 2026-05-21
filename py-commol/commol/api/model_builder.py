@@ -1,7 +1,12 @@
 import copy
 import logging
-from typing import Literal, NotRequired, Self, TypedDict, cast
+from typing import Literal, Self, TypedDict, cast
 
+from commol.api.time_patterns import (
+    ConditionDict as StratificationConditionDict,
+    StratifiedRateDict,
+    TimePattern,
+)
 from commol.constants import LogicOperators, ModelTypes
 from commol.context.bin import Bin
 from commol.context.dynamics import (
@@ -60,21 +65,6 @@ class StratificationFractionsDict(TypedDict):
 
     stratification: str
     fractions: list[StratificationFractionDict]
-
-
-class StratificationConditionDict(TypedDict):
-    """Type definition for a stratification condition in a stratified rate."""
-
-    stratification: str
-    category: str
-    to: NotRequired[str]
-
-
-class StratifiedRateDict(TypedDict):
-    """Type definition for a stratified rate."""
-
-    conditions: list[StratificationConditionDict]
-    rate: str | float
 
 
 class ModelBuilder:
@@ -286,7 +276,7 @@ class ModelBuilder:
         id: str,
         source: list[str],
         target: list[str],
-        rate: str | float | None = None,
+        rate: "str | float | TimePattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
         condition: Condition | None = None,
         per_compartment: bool | None = None,
@@ -380,6 +370,19 @@ class ModelBuilder:
             - If $compartment is used with multiple targets
             - If rate is None when using $compartment
         """
+        # If `rate` is a TimePattern, extract its rate string and stratified
+        # rates and route them into the existing pipeline. A TimePattern fully
+        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # alongside it is a conflict.
+        if isinstance(rate, TimePattern):
+            if stratified_rates is not None:
+                raise ValueError(
+                    f"Transition '{id}': pass either a TimePattern as `rate=` "
+                    "or `stratified_rates=`, not both."
+                )
+            stratified_rates = rate._builder_stratified_rates()
+            rate = rate._builder_rate()
+
         # Convert rate to string if numeric
         if isinstance(rate, int) or isinstance(rate, float):
             rate = str(rate)

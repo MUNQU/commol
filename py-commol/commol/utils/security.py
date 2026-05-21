@@ -49,6 +49,11 @@ class ExpressionSecurityValidator:
         "\t",
         "\n",
         "\r",
+        # Comparison operators (used in conditional expressions via evalexpr `if`)
+        "=",
+        "<",
+        ">",
+        "!",
     }
 
     # Safe mathematical functions supported by evalexpr (case-insensitive matching)
