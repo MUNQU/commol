@@ -915,4 +915,113 @@ mod jit_tests {
         // ln of negative number should be NaN
         assert!(result.is_nan());
     }
+
+    // ===== Tests for floor-based modulo =====
+
+    #[test]
+    fn test_jit_floor_based_modulo_periodic() {
+        // step - floor(step / 7) * 7 == 0 must be 1.0 at multiples of 7 only.
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("step - floor(step / 7) * 7 == 0");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let mut ctx = MathExpressionContext::new();
+
+        for step in 0..15_i32 {
+            ctx.set_step(step as f64);
+            let result = jit_fn.call(&ctx).unwrap();
+            let expected = if step % 7 == 0 { 1.0 } else { 0.0 };
+            assert!(
+                (result - expected).abs() < 1e-10,
+                "step={}: expected {}, got {}",
+                step,
+                expected,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_jit_floor_based_modulo_if_expression() {
+        // Full periodic pattern: if(step - floor(step / 7) * 7 == 0, 0.1, 0).
+        // Returns 0.1 exactly at multiples of 7 and 0.0 elsewhere.
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("if(step - floor(step / 7) * 7 == 0, 0.1, 0)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let mut ctx = MathExpressionContext::new();
+
+        for step in 0..15_i32 {
+            ctx.set_step(step as f64);
+            let result = jit_fn.call(&ctx).unwrap();
+            let expected = if step % 7 == 0 { 0.1 } else { 0.0 };
+            assert!(
+                (result - expected).abs() < 1e-10,
+                "step={}: expected {}, got {}",
+                step,
+                expected,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_jit_floor_of_negative_value() {
+        // _PeriodicTimePattern with offset>0 substitutes `step - O`, which is
+        // negative for any `step < O`. The floor of a negative quotient must
+        // return the next-lower integer (e.g. floor(-3.0 / 7.0) == -1).
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed = preprocess_formula("floor(step / 7)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let mut ctx = MathExpressionContext::new();
+        let cases: [(f64, f64); 6] = [
+            (-1.0, -1.0),
+            (-3.0, -1.0),
+            (-6.0, -1.0),
+            (-7.0, -1.0),
+            (-8.0, -2.0),
+            (-14.0, -2.0),
+        ];
+        for (input, expected) in cases.iter() {
+            ctx.set_step(*input);
+            let result = jit_fn.call(&ctx).unwrap();
+            assert!(
+                (result - expected).abs() < 1e-10,
+                "floor({} / 7): expected {}, got {}",
+                input,
+                expected,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_jit_periodic_with_offset_negative_branch() {
+        // Periodic with offset=3 evaluated for step < 3 exercises the
+        // negative-input floor branch. Verifies the offset case end-to-end
+        // via the JIT.
+        let compiler = JITCompiler::new().unwrap();
+        let preprocessed =
+            preprocess_formula("if((step - 3) - floor((step - 3) / 7) * 7 == 0, 1.0, 0.0)");
+        let jit_fn = compiler.compile(&preprocessed).unwrap();
+
+        let mut ctx = MathExpressionContext::new();
+        for step in 0..20_i32 {
+            ctx.set_step(step as f64);
+            let result = jit_fn.call(&ctx).unwrap();
+            let expected = if (step - 3).rem_euclid(7) == 0 {
+                1.0
+            } else {
+                0.0
+            };
+            assert!(
+                (result - expected).abs() < 1e-10,
+                "step={}: expected {}, got {}",
+                step,
+                expected,
+                result
+            );
+        }
+    }
 }
