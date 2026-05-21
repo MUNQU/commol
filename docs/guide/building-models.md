@@ -887,8 +887,31 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=200)
 ```
 
+## Time-Varying Rates and Conditional Schedules
+
+For transitions whose rate depends on the simulation step (pulses, periodic
+events, seasonal forcing, sliding windows, Gaussian bumps, linear ramps),
+pass a [`TimePattern`](time-patterns.md) instance directly as the
+`rate=` argument:
+
+```python
+from commol import TimePattern
+
+builder.add_transition(
+    "flow",
+    ["A"], ["B"],
+    rate=TimePattern.periodic(period=7, amount=0.05),
+)
+```
+
+When different stratification sub-groups require different schedules, build
+the schedule with `TimePattern.add_group(...)` and chain. The result is
+itself a `TimePattern` and passes straight into `rate=` — there is no
+separate schedule class.
+
 ## Next Steps
 
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
+- [Time Patterns](time-patterns.md) - Time-varying rate helpers
 - [Simulations](simulations.md) - Running and analyzing models
 - [Examples](examples.md) - Complete model examples

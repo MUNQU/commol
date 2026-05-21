@@ -502,8 +502,33 @@ The parser:
 | `**`     | Exponentiation |
 | `()`     | Grouping       |
 
+## Time-Pattern Helpers
+
+For rate expressions that vary with the simulation step — single pulses,
+periodic events, sinusoidal seasonal forcing, sliding windows, Gaussian
+bumps, linear ramps, or arbitrary compositions — Commol provides the
+`TimePattern` class. It produces parenthesised, security-validated formula
+strings that compose safely with the rest of the expression vocabulary,
+and `add_transition` accepts a `TimePattern` directly via `rate=`:
+
+```python
+from commol import TimePattern
+
+rate = TimePattern.combine(
+    TimePattern.pulse(at=0, amount=0.3),
+    TimePattern.periodic(period=30, amount=0.05),
+    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+)
+builder.add_transition("flow", ["A"], ["B"], rate=rate)
+```
+
+`TimePattern` is the sole user-facing class — multi-group schedules are
+built by chaining `TimePattern.add_group(...)` calls. See
+[Time Patterns](time-patterns.md) for the full catalogue.
+
 ## Next Steps
 
 - [Building Models](building-models.md) - Use expressions in transitions
+- [Time Patterns](time-patterns.md) - Time-varying rate helpers
 - [Simulations](simulations.md) - Run models with mathematical expressions
 - [Examples](examples.md) - See complex expressions in complete models
