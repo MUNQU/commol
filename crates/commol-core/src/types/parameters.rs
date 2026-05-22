@@ -9,6 +9,25 @@ pub enum VariablePrefixes {
     Strat,
 }
 
+/// How a [`ParameterValue::TimeSeries`] is interpolated between listed steps.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum SeriesMode {
+    /// Non-zero only at the listed steps; returns 0.0 at all other steps.
+    /// Use for discrete events such as vaccination campaigns or intervention pulses.
+    #[serde(rename = "pulse")]
+    Pulse,
+    /// Returns the value of the most recent listed step at or before the current
+    /// step (zero-order hold); returns 0.0 before the first listed step.
+    /// Use for step-changes such as time-varying transmission rates or policy shifts.
+    #[serde(rename = "step_function")]
+    StepFunction,
+    /// Linearly interpolates between adjacent listed steps; returns 0.0 outside
+    /// the listed range.
+    /// Use for smooth empirical schedules such as seasonally adjusted parameters.
+    #[serde(rename = "linear")]
+    Linear,
+}
+
 /// Represents different types of parameter values
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -17,6 +36,15 @@ pub enum ParameterValue {
     Constant(f64),
     /// Formula expression that can reference other parameters or special variables
     Formula(String),
+    /// Empirical time series: a sorted list of (step, value) pairs evaluated
+    /// according to the chosen [`SeriesMode`].  Efficient O(log N) lookup —
+    /// avoids embedding large lookup tables as formula strings.
+    TimeSeries {
+        /// (step, value) pairs.  Need not be pre-sorted; the engine sorts them
+        /// at build time.
+        data: Vec<(u64, f64)>,
+        mode: SeriesMode,
+    },
 }
 
 impl ParameterValue {
@@ -28,6 +56,11 @@ impl ParameterValue {
     /// Check if this is a formula
     pub fn is_formula(&self) -> bool {
         matches!(self, ParameterValue::Formula(_))
+    }
+
+    /// Check if this is a time series
+    pub fn is_time_series(&self) -> bool {
+        matches!(self, ParameterValue::TimeSeries { .. })
     }
 
     /// Get the constant value if this is a constant, otherwise None

@@ -60,6 +60,14 @@ impl DifferenceEquations {
                 .set_parameter_str(&mapping.parameter_name, total);
         }
 
+        // Evaluate time-series parameters (O(log N) binary search, no allocation)
+        let step_u64 = self.current_step as u64;
+        for ts in &self.series_parameters {
+            let value = ts.evaluate(step_u64);
+            self.expression_context
+                .set_parameter_str(&ts.parameter_name, value);
+        }
+
         // Evaluate formula parameters and update context
         // Note: We need to clone to avoid borrow checker issues
         let formula_params = self.formula_parameters.clone();

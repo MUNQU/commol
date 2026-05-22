@@ -4,7 +4,9 @@ use crate::helpers::{
     compute_target_with_category_overrides, extract_stratifications,
     get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
 };
-use crate::types::{DifferenceEquations, SubpopulationMapping, TransitionFlow};
+use crate::types::{
+    DifferenceEquations, SubpopulationMapping, TimeSeriesParameter, TransitionFlow,
+};
 use commol_core::{MathExpressionContext, Model, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
@@ -35,6 +37,7 @@ impl DifferenceEquations {
         // Formula parameters will be evaluated on each step
         let mut constant_parameters: HashMap<String, f64> = HashMap::new();
         let mut formula_parameters: Vec<(String, RateMathExpression)> = Vec::new();
+        let mut series_parameters: Vec<TimeSeriesParameter> = Vec::new();
 
         for p in &model.parameters {
             match &p.value {
@@ -42,9 +45,15 @@ impl DifferenceEquations {
                     constant_parameters.insert(p.id.clone(), *val);
                 }
                 Some(commol_core::ParameterValue::Formula(formula)) => {
-                    // Parse formula once and store for later evaluation
                     let rate_expr = RateMathExpression::from_string(formula.clone());
                     formula_parameters.push((p.id.clone(), rate_expr));
+                }
+                Some(commol_core::ParameterValue::TimeSeries { data, mode }) => {
+                    series_parameters.push(TimeSeriesParameter::new(
+                        p.id.clone(),
+                        data.clone(),
+                        mode.clone(),
+                    ));
                 }
                 None => {
                     // Parameter needs calibration - skip it for now
@@ -98,6 +107,7 @@ impl DifferenceEquations {
             compartment_flows,
             subpopulation_mappings,
             formula_parameters,
+            series_parameters,
         }
     }
 }
@@ -313,12 +323,21 @@ fn build_transition_flows(
                             let rate_expression =
                                 RateMathExpression::from_string(rate_string.clone());
 
-                            // Check if rate expression references compartment or
-                            // subpopulation variables (partial bin sums)
-                            let rate_variables = rate_expression.get_variables();
-                            let references_compartments = rate_variables.iter().any(|v| {
-                                compartment_map.contains_key(v) || subpopulation_names.contains(v)
-                            });
+                            // Determine absolute vs per-capita mode: the matched
+                            // stratified rate's explicit flag takes precedence;
+                            // otherwise infer from whether the expression references
+                            // any compartment or subpopulation variable.
+                            let references_compartments =
+                                match matched.stratified_rate.and_then(|sr| sr.absolute) {
+                                    Some(abs) => abs,
+                                    None => {
+                                        let rate_variables = rate_expression.get_variables();
+                                        rate_variables.iter().any(|v| {
+                                            compartment_map.contains_key(v)
+                                                || subpopulation_names.contains(v)
+                                        })
+                                    }
+                                };
 
                             transition_flows.push(TransitionFlow {
                                 source_index,

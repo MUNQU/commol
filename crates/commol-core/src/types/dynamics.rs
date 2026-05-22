@@ -28,6 +28,8 @@ pub struct StratificationCondition {
 pub struct StratifiedRate {
     pub conditions: Vec<StratificationCondition>,
     pub rate: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub absolute: Option<bool>,
 }
 
 /// Transition between disease states with optional stratified rates and conditions
