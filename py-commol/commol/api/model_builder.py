@@ -6,6 +6,9 @@ from commol.api.time_patterns import (
     ConditionDict as StratificationConditionDict,
     StratifiedRateDict,
     TimePattern,
+    _ComputedTimePattern,
+    _GroupEntry,
+    _ScheduleTimePattern,
 )
 from commol.constants import LogicOperators, ModelTypes
 from commol.context.bin import Bin
@@ -24,7 +27,7 @@ from commol.context.initial_conditions import (
     StratificationFractions,
 )
 from commol.context.model import Model
-from commol.context.parameter import Parameter
+from commol.context.parameter import Parameter, TimeSeriesValue
 from commol.context.population import Population
 from commol.context.stratification import Stratification
 
@@ -130,6 +133,7 @@ class ModelBuilder:
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
+        self._ts_counter: int = 0
 
         logging.info(
             (
@@ -228,9 +232,10 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float | str | None,
+        value: float | str | list[tuple[int, float]] | None,
         description: str | None = None,
         unit: str | None = None,
+        mode: str | None = None,
     ) -> Self:
         """
         Add a global parameter to the model.
@@ -239,37 +244,98 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float | str | None
+        value : float | str | list[tuple[int, float]] | None
             Value of the parameter. Can be:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
                    special variables (N, N_category, step/t, pi, e), or contain
                    mathematical expressions (e.g., "beta * 2", "N_young / N")
+            - list[tuple[int, float]]: Empirical time series as (step, value) pairs;
+                   requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
-
-            Special variables available in formulas:
-            - N: Total population (automatically calculated)
-            - N_{category}: Population in specific category (e.g., N_young, N_old)
-            - N_{cat1}_{cat2}: Population in category combinations
-            - step or t: Current simulation step
-            - pi, e: Mathematical constants
 
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
             Unit of the parameter (e.g., "1/day", "dimensionless", "person").
             Used for unit consistency checking in equations.
+        mode : str | None, default=None
+            Required when ``value`` is a list of (step, value) pairs. Selects the
+            interpolation mode: ``"pulse"`` (non-zero only at listed steps),
+            ``"step_function"`` (zero-order hold from last listed step), or
+            ``"linear"`` (interpolation between adjacent listed steps).
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is a list but ``mode`` is not provided, or if
+            ``mode`` is provided without a list ``value``.
         """
+        if isinstance(value, list):
+            if mode is None:
+                raise ValueError(
+                    f"Parameter '{id}': 'mode' is required when 'value' is a "
+                    "time-series list. Use mode='pulse', 'step_function', or 'linear'."
+                )
+            param_value: float | str | TimeSeriesValue | None = TimeSeriesValue(
+                data=value, mode=mode
+            )
+        else:
+            if mode is not None:
+                raise ValueError(
+                    f"Parameter '{id}': 'mode' is only valid when 'value' is a "
+                    "time-series list."
+                )
+            param_value = value
         self._parameters.append(
-            Parameter(id=id, value=value, description=description, unit=unit)
+            Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
+
+    def _register_ts_pattern(
+        self,
+        pattern: TimePattern,
+        *,
+        transition_id: str = "",
+        source_bin: str = "",
+        target_bin: str = "",
+    ) -> TimePattern:
+        """Auto-register a TimeSeries parameter for pulse-type patterns.
+
+        If ``pattern`` has numeric pulse data, registers a ``TimeSeries``
+        parameter and returns a ``_ComputedTimePattern`` whose formula is the
+        generated parameter name. Otherwise returns ``pattern`` unchanged.
+        """
+        data = pattern._as_time_series_data()
+        if data is None:
+            return pattern
+        conditions = pattern.conditions
+        if transition_id and conditions:
+            src_cats = "_".join(c["category"] for c in conditions)
+            tgt_cats = "_".join(c.get("to", c["category"]) for c in conditions)
+            src = f"{source_bin}_{src_cats}" if source_bin else src_cats
+            tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
+            param_name = f"{transition_id}_{src}_to_{tgt}"
+        else:
+            param_name = f"_ts_{self._ts_counter}"
+            self._ts_counter += 1
+        self._parameters.append(
+            Parameter(
+                id=param_name,
+                value=TimeSeriesValue(data=data, mode="pulse"),
+            )
+        )
+        return _ComputedTimePattern(
+            computed_formula=param_name,
+            conditions=conditions,
+            source_compartment=pattern.source_compartment,
+        )
 
     def add_transition(
         self,
@@ -380,6 +446,30 @@ class ModelBuilder:
                     f"Transition '{id}': pass either a TimePattern as `rate=` "
                     "or `stratified_rates=`, not both."
                 )
+            src_bin = source[0] if source else ""
+            tgt_bin = target[0] if target else ""
+            if isinstance(rate, _ScheduleTimePattern):
+                resolved = rate.model_copy(
+                    update={
+                        "patterns": [
+                            _GroupEntry(
+                                pattern=self._register_ts_pattern(
+                                    entry.pattern,
+                                    transition_id=id,
+                                    source_bin=src_bin,
+                                    target_bin=tgt_bin,
+                                ),
+                                absolute=entry.absolute,
+                            )
+                            for entry in rate.patterns
+                        ]
+                    }
+                )
+                rate = resolved
+            else:
+                rate = self._register_ts_pattern(
+                    rate, transition_id=id, source_bin=src_bin, target_bin=tgt_bin
+                )
             stratified_rates = rate._builder_stratified_rates()
             rate = rate._builder_rate()
 
@@ -404,7 +494,11 @@ class ModelBuilder:
                     StratificationCondition(**cond) for cond in rate_dict["conditions"]
                 ]
                 stratified_rates_objects.append(
-                    StratifiedRate(conditions=conditions, rate=str(rate_dict["rate"]))
+                    StratifiedRate(
+                        conditions=conditions,
+                        rate=str(rate_dict["rate"]),
+                        absolute=rate_dict.get("absolute"),
+                    )
                 )
 
         self._transitions.append(

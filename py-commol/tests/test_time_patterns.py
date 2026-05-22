@@ -98,11 +98,9 @@ class TestPulses:
         with pytest.raises(ValidationError):
             TimePattern.pulses(at=[-1, 5], amount=1.0)
 
-    def test_too_many_steps_raises(self):
-        config = SecurityConfig()
-        max_pulses = config.max_function_calls
-        with pytest.raises(ValidationError):
-            TimePattern.pulses(at=list(range(max_pulses + 5)), amount=1.0)
+    def test_large_step_count_accepted(self):
+        p = TimePattern.pulses(at=list(range(50)), amount=1.0)
+        assert "step ==" in str(p)
 
     def test_duplicate_step_raises(self):
         with pytest.raises(ValidationError):
@@ -357,8 +355,8 @@ class TestCombine:
 
     def test_combine_security_cap_raises_clear_error(self):
         """Repeatedly combining hits the security-length cap with a clear error."""
-        # Each periodic formula is ~47 chars; ~11 of them saturates the 500-char cap.
-        periodics = [TimePattern.periodic(period=7, amount=0.1) for _ in range(12)]
+        # Each periodic formula is ~47 chars; need enough to exceed the 10000-char cap.
+        periodics = [TimePattern.periodic(period=7, amount=0.1) for _ in range(220)]
         with pytest.raises(ValueError, match="exceeds maximum"):
             TimePattern.combine(*periodics)
 

@@ -45,6 +45,7 @@ class StratifiedRateDict(TypedDict):
 
     conditions: list[ConditionDict]
     rate: str | float
+    absolute: NotRequired[bool]
 
 
 class AddGroupFn(Protocol):
@@ -56,6 +57,7 @@ class AddGroupFn(Protocol):
         schedule: "TimePattern",
         *,
         source_compartment: str | None = None,
+        absolute: bool = False,
     ) -> "TimePattern": ...
 
 
@@ -186,10 +188,14 @@ class _AddGroupDescriptor:
                 schedule: "TimePattern",
                 *,
                 source_compartment: str | None = None,
+                absolute: bool = False,
             ) -> "TimePattern":
                 empty = _ScheduleTimePattern()
                 return empty._append_group(
-                    conditions, schedule, source_compartment=source_compartment
+                    conditions,
+                    schedule,
+                    source_compartment=source_compartment,
+                    absolute=absolute,
                 )
 
             return factory
@@ -201,6 +207,7 @@ class _AddGroupDescriptor:
                 schedule: "TimePattern",  # noqa: ARG001
                 *,
                 source_compartment: str | None = None,  # noqa: ARG001
+                absolute: bool = False,  # noqa: ARG001
             ) -> "TimePattern":
                 raise TypeError(
                     "add_group on a single TimePattern is only valid as a "
@@ -217,9 +224,13 @@ class _AddGroupDescriptor:
             schedule: "TimePattern",
             *,
             source_compartment: str | None = None,
+            absolute: bool = False,
         ) -> "TimePattern":
             return schedule_instance._append_group(
-                conditions, schedule, source_compartment=source_compartment
+                conditions,
+                schedule,
+                source_compartment=source_compartment,
+                absolute=absolute,
             )
 
         return bound
@@ -279,6 +290,15 @@ class TimePattern(BaseModel):
     def formula(self) -> str:
         """The mathematical expression for this pattern (always parenthesised)."""
         raise NotImplementedError("Subclasses must implement formula")
+
+    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
+        """Return pulse data as (step, value) pairs if representable as TimeSeries.
+
+        Returns None for patterns that cannot be expressed as a numeric
+        time series (e.g. formula amounts, mathematical patterns).
+        Overridden only by ``_PulseTimePattern`` and ``_PulsesTimePattern``.
+        """
+        return None
 
     def __str__(self) -> str:
         return self.formula
@@ -508,6 +528,11 @@ class _PulseTimePattern(TimePattern):
     def formula(self) -> str:
         return f"(if(step == {self.at}, {self.amount}, 0))"
 
+    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
+        if not isinstance(self.amount, (int, float)):
+            return None
+        return [(self.at, float(self.amount))]
+
 
 class _PulsesTimePattern(TimePattern):
     steps: list[Annotated[int, Field(ge=0)]]
@@ -516,14 +541,8 @@ class _PulsesTimePattern(TimePattern):
     @field_validator("steps")
     @classmethod
     def validate_steps(cls, v: list[int]) -> list[int]:
-        config = SecurityConfig()
-        max_pulses = config.max_function_calls - 1
         if not v:
             raise ValueError("'at' must contain at least one step")
-        if len(v) > max_pulses:
-            raise ValueError(
-                f"Too many pulse steps: {len(v)} provided, at most {max_pulses} allowed"
-            )
         if len(set(v)) != len(v):
             raise ValueError(f"'at' must contain unique steps (got {v!r})")
         return v
@@ -549,6 +568,15 @@ class _PulsesTimePattern(TimePattern):
         else:
             terms = " + ".join(f"if(step == {s}, {self.amount}, 0)" for s in self.steps)
         return f"({terms})"
+
+    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
+        if isinstance(self.amount, list):
+            if not all(isinstance(a, (int, float)) for a in self.amount):
+                return None
+            return [(s, float(a)) for s, a in zip(self.steps, self.amount)]
+        if not isinstance(self.amount, (int, float)):
+            return None
+        return [(s, float(self.amount)) for s in self.steps]
 
 
 class _PeriodicTimePattern(TimePattern):
@@ -678,6 +706,18 @@ class _ComputedTimePattern(TimePattern):
 
 
 # ---------------------------------------------------------------------------
+# Internal entry type for schedule groups
+# ---------------------------------------------------------------------------
+
+
+class _GroupEntry(BaseModel):
+    """Pairs a pattern with its absolute-flow flag inside a schedule."""
+
+    pattern: TimePattern
+    absolute: bool = False
+
+
+# ---------------------------------------------------------------------------
 # Schedule: private subclass exposed to users only through TimePattern methods
 # ---------------------------------------------------------------------------
 
@@ -689,7 +729,7 @@ class _ScheduleTimePattern(TimePattern):
     calling ``TimePattern.add_group(...)`` on the class.
     """
 
-    patterns: list[TimePattern] = Field(default_factory=list)
+    patterns: list[_GroupEntry] = Field(default_factory=list)
     _has_default: bool = PrivateAttr(default=False)
 
     @property
@@ -713,23 +753,22 @@ class _ScheduleTimePattern(TimePattern):
         schedule: TimePattern,
         *,
         source_compartment: str | None,
+        absolute: bool = False,
     ) -> "_ScheduleTimePattern":
         if not conditions:
             raise ValueError(
                 "'conditions' must be non-empty. "
                 "Use set_default() for the condition-free fallback."
             )
-        # Validate condition keys up front so malformed entries raise a clear
-        # ValueError before any other processing.
         key = _condition_key(conditions)
         pattern = schedule.for_group(conditions, source_compartment=source_compartment)
         for existing in self.patterns:
-            if _condition_key(existing.conditions) == key:
+            if _condition_key(existing.pattern.conditions) == key:
                 raise ValueError(
                     f"A group with conditions {pattern.conditions!r} has "
                     "already been registered."
                 )
-        self.patterns.append(pattern)
+        self.patterns.append(_GroupEntry(pattern=pattern, absolute=absolute))
         return self
 
     def set_default(self, pattern: TimePattern) -> "_ScheduleTimePattern":
@@ -753,20 +792,27 @@ class _ScheduleTimePattern(TimePattern):
                 "The default rate is applied to every unmatched compartment, "
                 "so binding it to one compartment is almost certainly a bug."
             )
-        self.patterns.append(pattern)
+        self.patterns.append(_GroupEntry(pattern=pattern, absolute=False))
         self._has_default = True
         return self
 
     # ----- builder hooks -----
 
     def _builder_rate(self) -> str | float | None:
-        for p in self.patterns:
-            if not p.conditions:
-                return p.to_stratified_rate()["rate"]
+        for entry in self.patterns:
+            if not entry.pattern.conditions:
+                return entry.pattern.to_stratified_rate()["rate"]
         return None
 
     def _builder_stratified_rates(self) -> list[StratifiedRateDict] | None:
-        return [p.to_stratified_rate() for p in self.patterns if p.conditions]
+        result = []
+        for entry in self.patterns:
+            if entry.pattern.conditions:
+                d = entry.pattern.to_stratified_rate()
+                if entry.absolute:
+                    d["absolute"] = True
+                result.append(d)
+        return result if result else None
 
 
 __all__ = [
