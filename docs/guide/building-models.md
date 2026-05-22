@@ -909,6 +909,9 @@ the schedule with `TimePattern.add_group(...)` and chain. The result is
 itself a `TimePattern` and passes straight into `rate=` — there is no
 separate schedule class.
 
+Each group can also choose absolute-flow handling independently with
+`absolute=True`, `absolute=False`, or the default `absolute=None` inference.
+
 ## Next Steps
 
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas

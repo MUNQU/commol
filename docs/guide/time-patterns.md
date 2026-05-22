@@ -223,23 +223,65 @@ The default pattern must not carry `conditions` or a `source_compartment`.
 
 ### Per-capita vs absolute flows
 
-By default the schedule formula is treated as a **per-capita rate** — the
-engine multiplies it by the source compartment automatically. To express
-the rate as an **absolute flow** (a count per step), pass
-`source_compartment`:
+For schedule groups, `absolute` controls whether the group formula is
+interpreted as a per-capita rate or as an absolute count per step:
+
+- `absolute=None` (default): infer from the formula. Expressions that
+  reference compartment or sub-population variables are treated as absolute;
+  other expressions are treated as per-capita.
+- `absolute=False`: force per-capita behavior.
+- `absolute=True`: force absolute-flow behavior.
+
+```python
+rate = (
+    TimePattern.add_group(
+        conditions=[{"stratification": "group", "category": "cat1"}],
+        schedule=TimePattern.pulse(at=5, amount=0.1),
+        absolute=False,  # 10% of the matching source compartment
+    )
+    .add_group(
+        conditions=[{"stratification": "group", "category": "cat2"}],
+        schedule=TimePattern.pulse(at=5, amount=100.0),
+        absolute=True,  # exactly 100 units at step 5
+    )
+)
+```
+
+For advanced cases, `source_compartment` multiplies the group formula by a
+specific compartment variable:
 
 ```python
 rate = TimePattern.add_group(
     conditions=[{"stratification": "group", "category": "cat1"}],
-    schedule=TimePattern.pulse(at=5, amount=100.0),
+    schedule=TimePattern.pulse(at=5, amount=0.25),
     source_compartment="A_cat1",
 )
 ```
 
-When `source_compartment` is set, the resulting rate string is
-`{formula} * {source_compartment}` — read by the engine as absolute.
+With the default `absolute=None`, that compartment reference is inferred as
+an absolute flow. If you need a per-capita expression that references
+population variables, pass `absolute=False` explicitly.
+
 `set_default` rejects `source_compartment` (the default applies to every
 unmatched compartment, so binding it to one name is almost always a bug).
+
+### Numeric pulse schedules as parameters
+
+Numeric `TimePattern.pulse(...)` and `TimePattern.pulses(...)` schedules are
+stored internally as `TimeSeries` parameters instead of long generated
+formula strings. This keeps extended equations readable and makes large
+pulse schedules efficient to evaluate.
+
+For grouped schedules, generated parameter names use the transition name and
+the source/target group labels:
+
+```text
+{transition_id}_{source_bin}_{source_categories}_to_{target_bin}_{target_categories}
+```
+
+Generated parameter names must be unique. If a user-defined parameter already
+uses the same name, model construction raises an error instead of silently
+renaming it.
 
 ### Cross-category routing (`to:`)
 
@@ -298,7 +340,7 @@ list of available variables and operators.
 | Pattern          | Constraints                                                  |
 |------------------|--------------------------------------------------------------|
 | `pulse`          | `at >= 0`. `amount` strings must not contain `,`.            |
-| `pulses`         | Non-empty unique step list; `len <= max_function_calls - 1`. |
+| `pulses`         | Non-empty unique step list.                                  |
 | `periodic`       | `period > 0`; `0 <= offset < period`.                        |
 | `window`         | `start < end`.                                               |
 | `seasonal`       | Numeric `period != 0` (strings accepted as parameter names). |

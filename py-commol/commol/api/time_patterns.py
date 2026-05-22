@@ -57,7 +57,7 @@ class AddGroupFn(Protocol):
         schedule: "TimePattern",
         *,
         source_compartment: str | None = None,
-        absolute: bool = False,
+        absolute: bool | None = None,
     ) -> "TimePattern": ...
 
 
@@ -188,7 +188,7 @@ class _AddGroupDescriptor:
                 schedule: "TimePattern",
                 *,
                 source_compartment: str | None = None,
-                absolute: bool = False,
+                absolute: bool | None = None,
             ) -> "TimePattern":
                 empty = _ScheduleTimePattern()
                 return empty._append_group(
@@ -207,7 +207,7 @@ class _AddGroupDescriptor:
                 schedule: "TimePattern",  # noqa: ARG001
                 *,
                 source_compartment: str | None = None,  # noqa: ARG001
-                absolute: bool = False,  # noqa: ARG001
+                absolute: bool | None = None,  # noqa: ARG001
             ) -> "TimePattern":
                 raise TypeError(
                     "add_group on a single TimePattern is only valid as a "
@@ -224,7 +224,7 @@ class _AddGroupDescriptor:
             schedule: "TimePattern",
             *,
             source_compartment: str | None = None,
-            absolute: bool = False,
+            absolute: bool | None = None,
         ) -> "TimePattern":
             return schedule_instance._append_group(
                 conditions,
@@ -714,7 +714,7 @@ class _GroupEntry(BaseModel):
     """Pairs a pattern with its absolute-flow flag inside a schedule."""
 
     pattern: TimePattern
-    absolute: bool = False
+    absolute: bool | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -753,7 +753,7 @@ class _ScheduleTimePattern(TimePattern):
         schedule: TimePattern,
         *,
         source_compartment: str | None,
-        absolute: bool = False,
+        absolute: bool | None = None,
     ) -> "_ScheduleTimePattern":
         if not conditions:
             raise ValueError(
@@ -792,7 +792,7 @@ class _ScheduleTimePattern(TimePattern):
                 "The default rate is applied to every unmatched compartment, "
                 "so binding it to one compartment is almost certainly a bug."
             )
-        self.patterns.append(_GroupEntry(pattern=pattern, absolute=False))
+        self.patterns.append(_GroupEntry(pattern=pattern, absolute=None))
         self._has_default = True
         return self
 
@@ -809,7 +809,8 @@ class _ScheduleTimePattern(TimePattern):
         for entry in self.patterns:
             if entry.pattern.conditions:
                 d = entry.pattern.to_stratified_rate()
-                d["absolute"] = entry.absolute
+                if entry.absolute is not None:
+                    d["absolute"] = entry.absolute
                 result.append(d)
         return result if result else None
 

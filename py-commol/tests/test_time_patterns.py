@@ -1,14 +1,17 @@
-"""
-Unit and integration tests for TimePattern.
+"""Unit and integration tests for TimePattern."""
 
-Unit tests inspect the generated formula strings directly.
-Integration tests feed patterns into an abstract A→B simulation.
-"""
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
 from commol import ModelBuilder, Simulation, TimePattern
+from commol.api.model_builder import (
+    StratificationFractionDict,
+    StratificationFractionsDict,
+)
+from commol.api.time_patterns import ConditionDict, StratifiedRateDict
+from commol.context.model import Model
 from commol.utils.security import SecurityConfig, SecurityError
 
 
@@ -17,7 +20,10 @@ from commol.utils.security import SecurityConfig, SecurityError
 # ---------------------------------------------------------------------------
 
 
-def _run_ab(rate: str, *, steps: int = 20, pop: int = 1000) -> dict:
+SimulationResult = dict[str, list[float]]
+
+
+def _run_ab(rate: str, *, steps: int = 20, pop: int = 1000) -> SimulationResult:
     """Run a simple A→B model with the given rate formula and return results."""
     model = (
         ModelBuilder("AB")
@@ -36,7 +42,7 @@ def _run_ab(rate: str, *, steps: int = 20, pop: int = 1000) -> dict:
     return Simulation(model).run(steps)
 
 
-def _net_flow(result: dict, step: int) -> float:
+def _net_flow(result: SimulationResult, step: int) -> float:
     """Return how much left A between step-1 and step."""
     return result["A"][step - 1] - result["A"][step]
 
@@ -333,14 +339,14 @@ class TestCombine:
 
     def test_combine_propagates_conditions(self):
         """combine of grouped patterns preserves the shared group binding."""
-        conds = [{"stratification": "group", "category": "cat1"}]
+        conds = [_cond("group", "cat1")]
         a = TimePattern.pulse(at=1, amount=0.1).for_group(conds)
         b = TimePattern.pulse(at=2, amount=0.2).for_group(conds)
         result = TimePattern.combine(a, b)
         assert result.conditions == conds
 
     def test_combine_propagates_source_compartment(self):
-        conds = [{"stratification": "group", "category": "cat1"}]
+        conds = [_cond("group", "cat1")]
         a = TimePattern.pulse(at=1, amount=0.1).for_group(
             conds, source_compartment="A_cat1"
         )
@@ -351,17 +357,13 @@ class TestCombine:
         assert result.source_compartment == "A_cat1"
 
     def test_combine_rejects_inconsistent_conditions(self):
-        a = TimePattern.pulse(at=1, amount=0.1).for_group(
-            [{"stratification": "group", "category": "cat1"}]
-        )
-        b = TimePattern.pulse(at=2, amount=0.2).for_group(
-            [{"stratification": "group", "category": "cat2"}]
-        )
+        a = TimePattern.pulse(at=1, amount=0.1).for_group([_cond("group", "cat1")])
+        b = TimePattern.pulse(at=2, amount=0.2).for_group([_cond("group", "cat2")])
         with pytest.raises(ValueError, match="conditions"):
             TimePattern.combine(a, b)
 
     def test_combine_rejects_inconsistent_source_compartment(self):
-        conds = [{"stratification": "group", "category": "cat1"}]
+        conds = [_cond("group", "cat1")]
         a = TimePattern.pulse(at=1, amount=0.1).for_group(
             conds, source_compartment="A_cat1"
         )
@@ -453,20 +455,18 @@ class TestForGroup:
 
 class TestToStratifiedRate:
     def test_without_source_compartment(self):
-        p = TimePattern.pulse(at=5, amount=0.1).for_group(
-            [{"stratification": "age", "category": "elderly"}]
-        )
+        p = TimePattern.pulse(at=5, amount=0.1).for_group([_cond("age", "elderly")])
         sr = p.to_stratified_rate()
-        assert sr["conditions"] == [{"stratification": "age", "category": "elderly"}]
-        assert "S_" not in sr["rate"]
+        assert sr["conditions"] == [_cond("age", "elderly")]
+        assert "S_" not in _rate_string(sr)
 
     def test_with_source_compartment(self):
         p = TimePattern.pulse(at=5, amount=0.1).for_group(
-            [{"stratification": "age", "category": "elderly"}],
+            [_cond("age", "elderly")],
             source_compartment="S_elderly",
         )
         sr = p.to_stratified_rate()
-        assert "S_elderly" in sr["rate"]
+        assert "S_elderly" in _rate_string(sr)
 
     def test_no_conditions_gives_empty_list(self):
         p = TimePattern.pulse(at=5, amount=0.1)
@@ -755,11 +755,25 @@ class TestSecurityValidation:
 # ---------------------------------------------------------------------------
 
 
-def _cond(stratification: str, category: str, *, to: str | None = None) -> dict:
-    d: dict = {"stratification": stratification, "category": category}
+def _cond(
+    stratification: str, category: str, *, to: str | None = None
+) -> ConditionDict:
+    d: ConditionDict = {"stratification": stratification, "category": category}
     if to is not None:
         d["to"] = to
     return d
+
+
+def _stratified_rates(rate: TimePattern) -> list[StratifiedRateDict]:
+    srs = rate._builder_stratified_rates()
+    assert srs is not None
+    return srs
+
+
+def _rate_string(stratified_rate: StratifiedRateDict) -> str:
+    rate = stratified_rate["rate"]
+    assert isinstance(rate, str)
+    return rate
 
 
 def _make_schedule_ab(
@@ -768,10 +782,16 @@ def _make_schedule_ab(
     categories: list[str] | None = None,
     steps: int = 20,
     pop: int = 1000,
-) -> dict:
+) -> SimulationResult:
     """Run A→B model with one stratification 'group' and a TimePattern rate."""
     if categories is None:
         categories = ["cat1", "cat2"]
+    fractions: list[StratificationFractionDict] = []
+    for category in categories:
+        fractions.append({"category": category, "fraction": 1.0 / len(categories)})
+    stratification_fractions: list[StratificationFractionsDict] = [
+        {"stratification": "group", "fractions": fractions}
+    ]
     model = (
         ModelBuilder("AB")
         .add_bin("A", "Source")
@@ -784,15 +804,7 @@ def _make_schedule_ab(
                 {"bin": "A", "fraction": 1.0},
                 {"bin": "B", "fraction": 0.0},
             ],
-            stratification_fractions=[
-                {
-                    "stratification": "group",
-                    "fractions": [
-                        {"category": c, "fraction": 1.0 / len(categories)}
-                        for c in categories
-                    ],
-                }
-            ],
+            stratification_fractions=stratification_fractions,
         )
         .build("DifferenceEquations")
     )
@@ -812,7 +824,6 @@ class TestScheduleUnit:
             {
                 "conditions": [_cond("group", "cat1")],
                 "rate": str(TimePattern.pulse(at=5, amount=0.1)),
-                "absolute": False,
             }
         ]
         assert rate._builder_rate() is None
@@ -825,7 +836,7 @@ class TestScheduleUnit:
             conditions=[_cond("group", "cat2")],
             schedule=TimePattern.pulse(at=10, amount=0.2),
         )
-        srs = rate._builder_stratified_rates()
+        srs = _stratified_rates(rate)
         assert len(srs) == 2
         assert srs[0]["conditions"] == [_cond("group", "cat1")]
         assert srs[1]["conditions"] == [_cond("group", "cat2")]
@@ -836,7 +847,9 @@ class TestScheduleUnit:
             schedule=TimePattern.pulse(at=5, amount=0.1),
         ).set_default(TimePattern.from_formula("0.01"))
         assert rate._builder_rate() is not None
-        assert "0.01" in rate._builder_rate()
+        builder_rate = rate._builder_rate()
+        assert isinstance(builder_rate, str)
+        assert "0.01" in builder_rate
 
     def test_add_group_on_single_pattern_raises(self):
         """Single TimePatterns reject instance-level add_group (use the class)."""
@@ -896,8 +909,9 @@ class TestScheduleUnit:
 
     def test_malformed_condition_missing_keys_raises(self):
         with pytest.raises(ValueError, match="missing required key"):
+            bad_condition: dict[str, str] = {"strat": "g", "cat": "c1"}
             TimePattern.add_group(
-                conditions=[{"strat": "g", "cat": "c1"}],  # typo'd keys
+                conditions=cast(list[ConditionDict], [bad_condition]),
                 schedule=TimePattern.from_formula("0.1"),
             )
 
@@ -926,8 +940,16 @@ class TestScheduleUnit:
             schedule=TimePattern.from_formula("0.1"),
             source_compartment="A_cat1",
         )
-        srs = rate._builder_stratified_rates()
-        assert "A_cat1" in srs[0]["rate"]
+        srs = _stratified_rates(rate)
+        assert "A_cat1" in _rate_string(srs[0])
+
+    def test_default_absolute_is_inferred(self):
+        rate = TimePattern.add_group(
+            conditions=[_cond("group", "cat1")],
+            schedule=TimePattern.from_formula("0.001 * N"),
+        )
+        srs = _stratified_rates(rate)
+        assert "absolute" not in srs[0]
 
     def test_explicit_absolute_false_is_preserved(self):
         rate = TimePattern.add_group(
@@ -935,7 +957,7 @@ class TestScheduleUnit:
             schedule=TimePattern.from_formula("0.001 * N"),
             absolute=False,
         )
-        srs = rate._builder_stratified_rates()
+        srs = _stratified_rates(rate)
         assert srs[0]["absolute"] is False
 
     def test_absolute_true_is_preserved(self):
@@ -944,7 +966,7 @@ class TestScheduleUnit:
             schedule=TimePattern.pulse(at=5, amount=1.0),
             absolute=True,
         )
-        srs = rate._builder_stratified_rates()
+        srs = _stratified_rates(rate)
         assert srs[0]["absolute"] is True
 
 
@@ -1040,16 +1062,34 @@ class TestScheduleIntegration:
             )
             assert total == pytest.approx(1000.0, abs=1e-4)
 
+    def test_mixed_absolute_and_relative_groups(self):
+        rate = TimePattern.add_group(
+            conditions=[_cond("group", "cat1")],
+            schedule=TimePattern.pulse(at=5, amount=10.0),
+            absolute=True,
+        ).add_group(
+            conditions=[_cond("group", "cat2")],
+            schedule=TimePattern.pulse(at=5, amount=0.1),
+            absolute=False,
+        )
+
+        result = _make_schedule_ab(rate, steps=10, pop=1000)
+        cat1_flow = result["A_cat1"][5] - result["A_cat1"][6]
+        cat2_flow = result["A_cat2"][5] - result["A_cat2"][6]
+
+        assert cat1_flow == pytest.approx(10.0, rel=1e-6)
+        assert cat2_flow == pytest.approx(50.0, rel=1e-6)
+
 
 class TestAddTransitionAcceptsTimePattern:
     """ModelBuilder.add_transition reads a TimePattern directly via `rate=`."""
 
-    def _build_ab(self, **kwargs) -> dict:
+    def _build_ab(self, rate: str | float | TimePattern | None) -> Model:
         return (
             ModelBuilder("AB")
             .add_bin("A", "Source")
             .add_bin("B", "Sink")
-            .add_transition("flow", ["A"], ["B"], **kwargs)
+            .add_transition("flow", ["A"], ["B"], rate=rate)
             .set_initial_conditions(
                 population_size=1000,
                 bin_fractions=[
