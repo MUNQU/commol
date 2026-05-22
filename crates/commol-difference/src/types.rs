@@ -8,8 +8,8 @@ pub(crate) struct TransitionFlow {
     pub(crate) source_index: usize,
     pub(crate) target_index: usize,
     pub(crate) rate_expression: RateMathExpression,
-    /// Whether the rate references compartment variables (absolute vs per-capita)
-    pub(crate) references_compartments: bool,
+    /// Whether the rate expression is an absolute flow rather than a per-capita rate.
+    pub(crate) is_absolute_flow: bool,
 }
 
 /// Pre-computed time-series parameter for O(log N) step lookup.
@@ -101,4 +101,49 @@ pub struct DifferenceEquations {
     pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
     /// Parameters defined as empirical time series; evaluated via binary search each step
     pub(crate) series_parameters: Vec<TimeSeriesParameter>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pulse_series_only_fires_on_listed_steps() {
+        let series =
+            TimeSeriesParameter::new("x".to_string(), vec![(5, 2.0), (1, 1.0)], SeriesMode::Pulse);
+
+        assert_eq!(series.evaluate(0), 0.0);
+        assert_eq!(series.evaluate(1), 1.0);
+        assert_eq!(series.evaluate(2), 0.0);
+        assert_eq!(series.evaluate(5), 2.0);
+    }
+
+    #[test]
+    fn step_function_series_holds_last_value() {
+        let series = TimeSeriesParameter::new(
+            "x".to_string(),
+            vec![(10, 3.0), (3, 1.5)],
+            SeriesMode::StepFunction,
+        );
+
+        assert_eq!(series.evaluate(2), 0.0);
+        assert_eq!(series.evaluate(3), 1.5);
+        assert_eq!(series.evaluate(9), 1.5);
+        assert_eq!(series.evaluate(10), 3.0);
+        assert_eq!(series.evaluate(20), 3.0);
+    }
+
+    #[test]
+    fn linear_series_interpolates_between_points() {
+        let series = TimeSeriesParameter::new(
+            "x".to_string(),
+            vec![(10, 10.0), (0, 0.0)],
+            SeriesMode::Linear,
+        );
+
+        assert_eq!(series.evaluate(0), 0.0);
+        assert_eq!(series.evaluate(5), 5.0);
+        assert_eq!(series.evaluate(10), 10.0);
+        assert_eq!(series.evaluate(11), 0.0);
+    }
 }

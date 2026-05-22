@@ -103,7 +103,7 @@ impl DifferenceEquations {
                 }
             };
 
-            let flow = if flow_info.references_compartments {
+            let flow = if flow_info.is_absolute_flow {
                 // Absolute rate: use directly
                 rate
             } else {

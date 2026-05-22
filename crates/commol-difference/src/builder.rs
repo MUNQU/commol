@@ -71,8 +71,8 @@ impl DifferenceEquations {
         let initial_population = population.clone();
 
         // Pre-compute subpopulation mappings for stratifications
-        // (must be done before transition flows, as references_compartments
-        // detection needs to know about subpopulation variable names)
+        // (must be done before transition flows, as absolute-flow inference
+        // needs to know about subpopulation variable names)
         let subpopulation_mappings = build_subpopulation_mappings(
             &compartments,
             &model.population.stratifications,
@@ -327,7 +327,7 @@ fn build_transition_flows(
                             // stratified rate's explicit flag takes precedence;
                             // otherwise infer from whether the expression references
                             // any compartment or subpopulation variable.
-                            let references_compartments =
+                            let is_absolute_flow =
                                 match matched.stratified_rate.and_then(|sr| sr.absolute) {
                                     Some(abs) => abs,
                                     None => {
@@ -343,7 +343,7 @@ fn build_transition_flows(
                                 source_index,
                                 target_index,
                                 rate_expression,
-                                references_compartments,
+                                is_absolute_flow,
                             });
                         }
                     }

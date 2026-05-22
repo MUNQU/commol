@@ -292,11 +292,16 @@ class ModelBuilder:
                     "time-series list."
                 )
             param_value = value
+        self._ensure_parameter_id_available(id)
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
+
+    def _ensure_parameter_id_available(self, id: str) -> None:
+        if any(parameter.id == id for parameter in self._parameters):
+            raise ValueError(f"Parameter id '{id}' already exists")
 
     def _register_ts_pattern(
         self,
@@ -325,6 +330,7 @@ class ModelBuilder:
         else:
             param_name = f"_ts_{self._ts_counter}"
             self._ts_counter += 1
+        self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,

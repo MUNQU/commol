@@ -809,8 +809,7 @@ class _ScheduleTimePattern(TimePattern):
         for entry in self.patterns:
             if entry.pattern.conditions:
                 d = entry.pattern.to_stratified_rate()
-                if entry.absolute:
-                    d["absolute"] = True
+                d["absolute"] = entry.absolute
                 result.append(d)
         return result if result else None
 

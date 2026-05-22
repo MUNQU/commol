@@ -132,6 +132,24 @@ class TestPulses:
             TimePattern.pulses(at=[1, 2], amount=[0.1, "1, 0"])
 
 
+class TestTimeSeriesParameterValue:
+    def test_time_series_parameter_rejects_empty_data(self):
+        with pytest.raises(ValidationError, match="at least one point"):
+            ModelBuilder("M").add_parameter("x", [], mode="pulse")
+
+    def test_time_series_parameter_rejects_negative_steps(self):
+        with pytest.raises(ValidationError, match="non-negative"):
+            ModelBuilder("M").add_parameter("x", [(-1, 1.0)], mode="pulse")
+
+    def test_time_series_parameter_rejects_duplicate_steps(self):
+        with pytest.raises(ValidationError, match="unique"):
+            ModelBuilder("M").add_parameter("x", [(1, 1.0), (1, 2.0)], mode="pulse")
+
+    def test_duplicate_user_parameter_id_raises_immediately(self):
+        with pytest.raises(ValueError, match="already exists"):
+            ModelBuilder("M").add_parameter("x", 1.0).add_parameter("x", 2.0)
+
+
 # ---------------------------------------------------------------------------
 # periodic — unit tests
 # ---------------------------------------------------------------------------
@@ -794,6 +812,7 @@ class TestScheduleUnit:
             {
                 "conditions": [_cond("group", "cat1")],
                 "rate": str(TimePattern.pulse(at=5, amount=0.1)),
+                "absolute": False,
             }
         ]
         assert rate._builder_rate() is None
@@ -909,6 +928,24 @@ class TestScheduleUnit:
         )
         srs = rate._builder_stratified_rates()
         assert "A_cat1" in srs[0]["rate"]
+
+    def test_explicit_absolute_false_is_preserved(self):
+        rate = TimePattern.add_group(
+            conditions=[_cond("group", "cat1")],
+            schedule=TimePattern.from_formula("0.001 * N"),
+            absolute=False,
+        )
+        srs = rate._builder_stratified_rates()
+        assert srs[0]["absolute"] is False
+
+    def test_absolute_true_is_preserved(self):
+        rate = TimePattern.add_group(
+            conditions=[_cond("group", "cat1")],
+            schedule=TimePattern.pulse(at=5, amount=1.0),
+            absolute=True,
+        )
+        srs = rate._builder_stratified_rates()
+        assert srs[0]["absolute"] is True
 
 
 class TestScheduleIntegration:
@@ -1049,5 +1086,20 @@ class TestAddTransitionAcceptsTimePattern:
                     ["B"],
                     rate=TimePattern.pulse(at=5, amount=0.1),
                     stratified_rates=[{"conditions": [], "rate": "0.0"}],
+                )
+            )
+
+    def test_generated_time_series_parameter_collision_raises(self):
+        with pytest.raises(ValueError, match="already exists"):
+            (
+                ModelBuilder("AB")
+                .add_bin("A", "Source")
+                .add_bin("B", "Sink")
+                .add_parameter("_ts_0", 1.0)
+                .add_transition(
+                    "flow",
+                    ["A"],
+                    ["B"],
+                    rate=TimePattern.pulse(at=5, amount=0.1),
                 )
             )

@@ -1,3 +1,5 @@
+import math
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -16,6 +18,26 @@ class TimeSeriesValue(BaseModel):
 
     data: list[tuple[int, float]]
     mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
+
+    @field_validator("data")
+    @classmethod
+    def validate_data(cls, value: list[tuple[int, float]]) -> list[tuple[int, float]]:
+        """Validate time-series points before they reach the Rust engine."""
+        if not value:
+            raise ValueError("Time-series data must contain at least one point")
+
+        steps: list[int] = []
+        for step, amount in value:
+            if step < 0:
+                raise ValueError("Time-series steps must be non-negative")
+            if not math.isfinite(amount):
+                raise ValueError("Time-series values must be finite")
+            steps.append(step)
+
+        if len(steps) != len(set(steps)):
+            raise ValueError("Time-series steps must be unique")
+
+        return value
 
 
 class Parameter(BaseModel):
