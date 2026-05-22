@@ -1,6 +1,23 @@
 from pydantic import BaseModel, Field, field_validator
 
 
+class TimeSeriesValue(BaseModel):
+    """
+    An empirical time series for a parameter value.
+
+    Attributes
+    ----------
+    data : list[tuple[int, float]]
+        (step, value) pairs. Need not be pre-sorted; the engine sorts them.
+    mode : str
+        Interpolation mode: ``"pulse"`` (non-zero only at listed steps),
+        ``"step_function"`` (zero-order hold), or ``"linear"`` (interpolation).
+    """
+
+    data: list[tuple[int, float]]
+    mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
+
+
 class Parameter(BaseModel):
     """
     Defines a global model parameter.
@@ -9,12 +26,13 @@ class Parameter(BaseModel):
     ----------
     id : str
         The identifier of the parameter.
-    value : float | str | None
+    value : float | str | TimeSeriesValue | None
         Value of the parameter. Can be:
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
                special variables (N, N_category, step/t, pi, e), or contain
                mathematical expressions
+        - TimeSeriesValue: An empirical time series evaluated via binary search
         - None: Indicates that the parameter needs to be calibrated before use
     description : str | None
         A human-readable description of the parameter.
@@ -24,11 +42,12 @@ class Parameter(BaseModel):
     """
 
     id: str = Field(default=..., description="Identifier of the parameter.")
-    value: float | str | None = Field(
+    value: float | str | TimeSeriesValue | None = Field(
         default=...,
         description=(
             "Value of the parameter. Can be a float (constant), "
-            "str (formula), or None (requires calibration)."
+            "str (formula), TimeSeriesValue (empirical series), "
+            "or None (requires calibration)."
         ),
     )
     description: str | None = Field(
@@ -41,9 +60,11 @@ class Parameter(BaseModel):
 
     @field_validator("value")
     @classmethod
-    def validate_value(cls, value: float | str | None) -> float | str | None:
+    def validate_value(
+        cls, value: float | str | TimeSeriesValue | None
+    ) -> float | str | TimeSeriesValue | None:
         """Validate the parameter value."""
-        if value is None:
+        if value is None or isinstance(value, TimeSeriesValue):
             return value
         if isinstance(value, (int, float)):
             return float(value)

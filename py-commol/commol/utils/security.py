@@ -9,12 +9,12 @@ import unicodedata
 class SecurityConfig:
     """Configuration for security validation."""
 
-    max_expression_length: int = 500
+    max_expression_length: int = 10000
     max_nesting_depth: int = 10
     max_variable_name_length: int = 50
     max_numeric_value: float = 1e12
-    max_function_calls: int = 20
-    max_complexity_score: int = 100
+    max_function_calls: int = 500
+    max_complexity_score: int = 1000
 
 
 class SecurityError(ValueError):
@@ -674,8 +674,11 @@ class ExpressionSecurityValidator:
                 )
             )
 
-        # Check for repeated patterns that might indicate attack attempts
-        if len(set(expression)) < len(expression) * 0.1 and len(expression) > 200:
+        # Check for repeated patterns that might indicate attack attempts.
+        # Threshold is an absolute minimum of 10 unique characters so that
+        # legitimate repeated-structure formulas (e.g. long pulse schedules)
+        # are not incorrectly flagged.
+        if len(set(expression)) < 10 and len(expression) > 200:
             raise SecurityError("Suspicious repetitive pattern")
 
         # Check for very long identifiers (potential buffer overflow attempts)

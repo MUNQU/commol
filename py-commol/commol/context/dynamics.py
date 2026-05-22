@@ -119,6 +119,14 @@ class StratifiedRate(BaseModel):
     rate: str = Field(
         default=..., description="Rate expression for matching compartments"
     )
+    absolute: bool | None = Field(
+        default=None,
+        description=(
+            "When True, the flow is treated as absolute (not multiplied by source "
+            "population). When None, inferred from whether the rate references "
+            "any compartment variable."
+        ),
+    )
 
     @field_validator("conditions")
     @classmethod
