@@ -118,5 +118,6 @@ site/
 
 ## Local files
 CLAUDE.md
+AGENT.md
 example.py
-flu.py
+flu/
