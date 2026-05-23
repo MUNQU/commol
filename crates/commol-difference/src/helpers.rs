@@ -80,9 +80,10 @@ pub(crate) fn extract_stratifications(
         // Check if this stratification applies given already-extracted categories
         let applies = match &stratification.conditions {
             None => true,
-            Some(conds) => conds
-                .iter()
-                .all(|c| result.get(&c.stratification) == Some(&c.category)),
+            Some(conds) => conds.iter().all(|c| match &c.category {
+                Some(cat) => result.get(&c.stratification) == Some(cat),
+                None => true,
+            }),
         };
 
         if applies && token_index < tokens.len() {
@@ -137,31 +138,37 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
 
     let stratified_rates = transition.stratified_rates.as_ref().unwrap();
 
-    // Find the best match (most specific)
+    // Find the best match (most specific). Target-only overrides have zero
+    // source-filtering conditions, so they must still win when no more
+    // specific source-filtering rate matches.
     let mut best_match: Option<&StratifiedRate> = None;
-    let mut best_match_count = 0;
+    let mut best_match_count: Option<usize> = None;
 
     for stratified_rate in stratified_rates {
         let mut matches = true;
         let mut match_count = 0;
 
-        // Check if all conditions in this stratified rate match
+        // Check if all conditions in this stratified rate match.
+        // Conditions with category=None are target-only overrides: they never
+        // filter source compartments and do not contribute to specificity.
         for condition in &stratified_rate.conditions {
-            match stratification_values.get(&condition.stratification) {
-                Some(actual_category) if actual_category == &condition.category => {
-                    match_count += 1;
-                }
-                _ => {
-                    matches = false;
-                    break;
+            if let Some(cat) = &condition.category {
+                match stratification_values.get(&condition.stratification) {
+                    Some(actual_category) if actual_category == cat => {
+                        match_count += 1;
+                    }
+                    _ => {
+                        matches = false;
+                        break;
+                    }
                 }
             }
         }
 
         // If this matches and is more specific than previous best, use it
-        if matches && match_count > best_match_count {
+        if matches && best_match_count.is_none_or(|count| match_count > count) {
             best_match = Some(stratified_rate);
-            best_match_count = match_count;
+            best_match_count = Some(match_count);
         }
     }
 
@@ -235,9 +242,10 @@ pub(crate) fn compute_target_with_category_overrides(
         // (evaluated against target's accumulated categories so far)
         let applies = match &strat.conditions {
             None => true,
-            Some(conds) => conds
-                .iter()
-                .all(|c| target_applied.get(&c.stratification) == Some(&c.category)),
+            Some(conds) => conds.iter().all(|c| match &c.category {
+                Some(cat) => target_applied.get(&c.stratification) == Some(cat),
+                None => true,
+            }),
         };
 
         if applies && let Some(cat) = effective_cat {
@@ -285,4 +293,37 @@ pub(crate) fn replace_bin_in_rate(rate: &str, bin_name: &str, replacement: &str)
         i += 1;
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use commol_core::{StratificationCondition, StratifiedRate};
+
+    #[test]
+    fn target_only_stratified_rate_can_match() {
+        let transition = Transition {
+            id: "route".to_string(),
+            source: vec!["A".to_string()],
+            target: vec!["B".to_string()],
+            rate: None,
+            stratified_rates: Some(vec![StratifiedRate {
+                conditions: vec![StratificationCondition {
+                    stratification: "group".to_string(),
+                    category: None,
+                    to: Some("g2".to_string()),
+                }],
+                rate: "1.0".to_string(),
+                absolute: None,
+            }]),
+            condition: None,
+            per_compartment: None,
+        };
+
+        let stratification_values = HashMap::from([("group".to_string(), "g1".to_string())]);
+        let matched = get_rate_string_for_compartment(&transition, &stratification_values)
+            .expect("target-only rate should match");
+
+        assert_eq!(matched.rate_string, "1.0");
+    }
 }

@@ -268,7 +268,7 @@ impl PyTransition {
                         .map(|(stratification, category, to)| {
                             commol_core::StratificationCondition {
                                 stratification,
-                                category,
+                                category: Some(category),
                                 to,
                             }
                         })

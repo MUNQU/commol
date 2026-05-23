@@ -1,6 +1,7 @@
 //! Simulation methods for running the difference equations engine.
 
-use crate::types::DifferenceEquations;
+use crate::types::{DifferenceEquations, VarSlot};
+use commol_core::RateMathExpression;
 use std::collections::HashMap;
 
 // Cached parameter names to avoid string allocations
@@ -45,9 +46,13 @@ impl DifferenceEquations {
         self.expression_context
             .set_parameter_str(PARAM_T, self.current_step);
 
-        // Use optimized index-based compartment update (avoids cloning strings)
-        self.expression_context
-            .set_compartments_by_index(&self.population);
+        // Only evalexpr fallback/formula-parameter paths need compartment
+        // values in the expression context. JIT-resolved transition formulas
+        // read compartment values directly from `population`.
+        if self.requires_compartment_context {
+            self.expression_context
+                .set_compartments_by_index(&self.population);
+        }
 
         // Compute subpopulation totals using pre-computed mappings (if any)
         for mapping in &self.subpopulation_mappings {
@@ -86,21 +91,101 @@ impl DifferenceEquations {
         }
 
         // Use pre-computed transition flows - much faster!
+        // Stack buffer for the JIT input vector — most rate expressions
+        // reference <= 16 variables.
+        let mut jit_buf = [0.0_f64; 16];
         for flow_info in &self.transition_flows {
-            let source_population = self.population[flow_info.source_index];
+            let source_population = flow_info
+                .source_index
+                .map(|i| self.population[i])
+                .unwrap_or(0.0);
 
-            // Evaluate the pre-parsed rate expression (use cached context)
-            let rate = match flow_info
-                .rate_expression
-                .evaluate(&mut self.expression_context)
-            {
-                Ok(rate_value) => rate_value,
-                Err(error) => {
-                    return Err(format!(
-                        "Failed to evaluate rate for transition from {} to {}: {}",
-                        flow_info.source_index, flow_info.target_index, error
-                    ));
+            let rate = match (&flow_info.rate_expression, &flow_info.resolved_slots) {
+                // Fast path: JIT-compiled formula with pre-resolved slots.
+                // Fill the buffer using direct compartment/Step indexing plus
+                // one HashMap probe per parameter, then call the JIT directly.
+                (RateMathExpression::Formula(expr), Some(slots)) => {
+                    let n = slots.len();
+                    let values: &mut [f64] = if n <= jit_buf.len() {
+                        &mut jit_buf[..n]
+                    } else {
+                        // Rare: fall back to heap for very wide expressions.
+                        let mut heap = vec![0.0; n];
+                        for (i, slot) in slots.iter().enumerate() {
+                            heap[i] = resolve_slot(
+                                slot,
+                                &self.population,
+                                &self.expression_context,
+                                self.current_step,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "Failed to evaluate rate for transition from {:?} to {:?}: {}",
+                                    flow_info.source_index, flow_info.target_index, error
+                                )
+                            })?;
+                        }
+                        match expr.call_jit_with_buffer(&heap) {
+                            Ok(v) => {
+                                let r = v;
+                                let flow = if flow_info.is_absolute_flow {
+                                    r
+                                } else {
+                                    source_population * r
+                                };
+                                if let Some(src) = flow_info.source_index {
+                                    self.compartment_flows[src] -= flow;
+                                }
+                                if let Some(tgt) = flow_info.target_index {
+                                    self.compartment_flows[tgt] += flow;
+                                }
+                                continue;
+                            }
+                            Err(error) => {
+                                return Err(format!(
+                                    "Failed to evaluate rate for transition from {:?} to {:?}: {}",
+                                    flow_info.source_index, flow_info.target_index, error
+                                ));
+                            }
+                        }
+                    };
+                    for (i, slot) in slots.iter().enumerate() {
+                        values[i] = resolve_slot(
+                            slot,
+                            &self.population,
+                            &self.expression_context,
+                            self.current_step,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "Failed to evaluate rate for transition from {:?} to {:?}: {}",
+                                flow_info.source_index, flow_info.target_index, error
+                            )
+                        })?;
+                    }
+                    match expr.call_jit_with_buffer(values) {
+                        Ok(v) => v,
+                        Err(error) => {
+                            return Err(format!(
+                                "Failed to evaluate rate for transition from {:?} to {:?}: {}",
+                                flow_info.source_index, flow_info.target_index, error
+                            ));
+                        }
+                    }
                 }
+                // Slow path: constant, single parameter, or evalexpr fallback.
+                _ => match flow_info
+                    .rate_expression
+                    .evaluate(&mut self.expression_context)
+                {
+                    Ok(rate_value) => rate_value,
+                    Err(error) => {
+                        return Err(format!(
+                            "Failed to evaluate rate for transition from {:?} to {:?}: {}",
+                            flow_info.source_index, flow_info.target_index, error
+                        ));
+                    }
+                },
             };
 
             let flow = if flow_info.is_absolute_flow {
@@ -111,8 +196,12 @@ impl DifferenceEquations {
                 source_population * rate
             };
 
-            self.compartment_flows[flow_info.source_index] -= flow;
-            self.compartment_flows[flow_info.target_index] += flow;
+            if let Some(src) = flow_info.source_index {
+                self.compartment_flows[src] -= flow;
+            }
+            if let Some(tgt) = flow_info.target_index {
+                self.compartment_flows[tgt] += flow;
+            }
         }
 
         // Apply the calculated flows to the population vector.
@@ -170,20 +259,98 @@ impl DifferenceEquations {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
         let total_steps = (num_steps + 1) as usize;
+        let num_compartments = self.population.len();
 
-        // Ensure buffer has correct capacity
-        buffer.clear();
-        buffer.reserve(total_steps);
+        // Keep existing row allocations alive across repeated calls. This is
+        // especially important for calibration, where the same buffer is reused
+        // for hundreds or thousands of full simulations.
+        if buffer.len() < total_steps {
+            buffer.reserve(total_steps - buffer.len());
+            while buffer.len() < total_steps {
+                buffer.push(vec![0.0; num_compartments]);
+            }
+        } else if buffer.len() > total_steps {
+            buffer.truncate(total_steps);
+        }
+
+        for row in buffer.iter_mut() {
+            if row.len() != num_compartments {
+                row.resize(num_compartments, 0.0);
+            }
+        }
 
         // Store initial state (t=0)
-        buffer.push(self.population.clone());
+        buffer[0].copy_from_slice(&self.population);
 
-        for _ in 0..num_steps {
+        for row in buffer.iter_mut().take(total_steps).skip(1) {
             self.step()?;
-            buffer.push(self.population.clone());
+            row.copy_from_slice(&self.population);
         }
 
         Ok(())
+    }
+
+    /// Run through the largest requested step while recording only selected
+    /// steps. `time_steps` must be sorted and deduplicated by the caller.
+    pub fn run_at_steps_into_buffer(
+        &mut self,
+        time_steps: &[u32],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        let num_compartments = self.population.len();
+
+        if buffer.len() < time_steps.len() {
+            buffer.reserve(time_steps.len() - buffer.len());
+            while buffer.len() < time_steps.len() {
+                buffer.push(vec![0.0; num_compartments]);
+            }
+        } else if buffer.len() > time_steps.len() {
+            buffer.truncate(time_steps.len());
+        }
+
+        for row in buffer.iter_mut() {
+            if row.len() != num_compartments {
+                row.resize(num_compartments, 0.0);
+            }
+        }
+
+        let mut next_record_idx = 0;
+        while next_record_idx < time_steps.len() && time_steps[next_record_idx] == 0 {
+            buffer[next_record_idx].copy_from_slice(&self.population);
+            next_record_idx += 1;
+        }
+
+        let Some(&max_step) = time_steps.last() else {
+            return Ok(());
+        };
+
+        for step in 1..=max_step {
+            self.step()?;
+            while next_record_idx < time_steps.len() && time_steps[next_record_idx] == step {
+                buffer[next_record_idx].copy_from_slice(&self.population);
+                next_record_idx += 1;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Resolve a pre-computed `VarSlot` to its current numeric value. Compartments
+/// and the step alias are O(1); parameters fall back to a single HashMap probe.
+#[inline]
+fn resolve_slot(
+    slot: &VarSlot,
+    population: &[f64],
+    ctx: &commol_core::MathExpressionContext,
+    current_step: f64,
+) -> Result<f64, String> {
+    match slot {
+        VarSlot::Compartment(idx) => Ok(population[*idx]),
+        VarSlot::Step => Ok(current_step),
+        VarSlot::Parameter(name) => ctx
+            .get_parameter(name)
+            .ok_or_else(|| format!("Variable '{}' not found", name)),
     }
 }
 
@@ -209,7 +376,7 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 
     fn reset(&mut self) {
         // Reset population to initial state
-        self.population = self.initial_population.clone();
+        self.population.copy_from_slice(&self.initial_population);
         // Reset step counter
         self.current_step = 0.0;
     }
@@ -235,6 +402,14 @@ impl commol_core::SimulationEngine for DifferenceEquations {
     ) -> Result<(), String> {
         // Delegate to optimized implementation
         DifferenceEquations::run_into_buffer(self, num_steps, buffer)
+    }
+
+    fn run_at_steps_into_buffer(
+        &mut self,
+        time_steps: &[u32],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        DifferenceEquations::run_at_steps_into_buffer(self, time_steps, buffer)
     }
 
     fn set_initial_condition(
@@ -328,6 +503,55 @@ mod tests {
         }
     }
 
+    fn make_missing_parameter_model() -> Model {
+        Model {
+            name: "AB_missing_parameter".to_string(),
+            description: None,
+            version: None,
+            parameters: vec![],
+            population: Population {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "Source".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "Sink".to_string(),
+                    },
+                ],
+                stratifications: vec![],
+                transitions: vec![],
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![
+                        BinFraction {
+                            bin: "A".to_string(),
+                            fraction: Some(1.0),
+                        },
+                        BinFraction {
+                            bin: "B".to_string(),
+                            fraction: Some(0.0),
+                        },
+                    ],
+                    stratification_fractions: vec![],
+                },
+            },
+            dynamics: Dynamics {
+                typology: ModelTypes::DifferenceEquations,
+                transitions: vec![Transition {
+                    id: "flow".to_string(),
+                    source: vec!["A".to_string()],
+                    target: vec!["B".to_string()],
+                    rate: Some(RateMathExpression::from_string("missing * A".to_string())),
+                    stratified_rates: None,
+                    condition: None,
+                    per_compartment: None,
+                }],
+            },
+        }
+    }
+
     #[test]
     fn test_periodic_rate_fires_at_exact_steps() {
         // A→B model where rate fires at step 0 and step 7 (period=7).
@@ -379,5 +603,16 @@ mod tests {
                 a[k] + b[k]
             );
         }
+    }
+
+    #[test]
+    fn jit_fast_path_reports_missing_parameters() {
+        let model = make_missing_parameter_model();
+        let mut engine = DifferenceEquations::from_model(&model);
+        let error = engine
+            .step()
+            .expect_err("missing parameter must not be treated as zero");
+
+        assert!(error.contains("Variable 'missing' not found"));
     }
 }

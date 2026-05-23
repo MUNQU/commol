@@ -5,7 +5,7 @@ use crate::helpers::{
     get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
 };
 use crate::types::{
-    DifferenceEquations, SubpopulationMapping, TimeSeriesParameter, TransitionFlow,
+    DifferenceEquations, SubpopulationMapping, TimeSeriesParameter, TransitionFlow, VarSlot,
 };
 use commol_core::{MathExpressionContext, Model, RateMathExpression};
 use std::collections::{HashMap, HashSet};
@@ -73,7 +73,7 @@ impl DifferenceEquations {
         // Pre-compute subpopulation mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subpopulation variable names)
-        let subpopulation_mappings = build_subpopulation_mappings(
+        let mut subpopulation_mappings = build_subpopulation_mappings(
             &compartments,
             &model.population.stratifications,
             &model.population.bins,
@@ -93,6 +93,32 @@ impl DifferenceEquations {
             &subpopulation_param_names,
         );
 
+        let used_context_variables =
+            collect_used_context_variables(&transition_flows, &formula_parameters);
+        subpopulation_mappings
+            .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
+
+        // Pre-allocate every parameter slot the per-step loop will touch so
+        // `set_parameter_str` can update in place without allocating a fresh
+        // `String` each call.
+        expression_context.reserve_parameters(
+            std::iter::once("N".to_string())
+                .chain(std::iter::once("t".to_string()))
+                .chain(
+                    subpopulation_mappings
+                        .iter()
+                        .map(|m| m.parameter_name.clone()),
+                )
+                .chain(series_parameters.iter().map(|s| s.parameter_name.clone()))
+                .chain(formula_parameters.iter().map(|(name, _)| name.clone())),
+        );
+
+        let requires_compartment_context = !formula_parameters.is_empty()
+            || transition_flows.iter().any(|flow| {
+                matches!(flow.rate_expression, RateMathExpression::Formula(_))
+                    && flow.resolved_slots.is_none()
+            });
+
         // Initialize compartment flows buffer
         let num_compartments = compartments.len();
         let compartment_flows = vec![0.0; num_compartments];
@@ -108,6 +134,7 @@ impl DifferenceEquations {
             subpopulation_mappings,
             formula_parameters,
             series_parameters,
+            requires_compartment_context,
         }
     }
 }
@@ -120,9 +147,10 @@ fn stratification_conditions_met(
 ) -> bool {
     match conditions {
         None => true,
-        Some(conds) => conds
-            .iter()
-            .all(|c| applied.get(&c.stratification) == Some(&c.category)),
+        Some(conds) => conds.iter().all(|c| match &c.category {
+            Some(cat) => applied.get(&c.stratification) == Some(cat),
+            None => true,
+        }),
     }
 }
 
@@ -265,11 +293,76 @@ fn build_transition_flows(
     let mut transition_flows = Vec::new();
 
     for transition in &model.dynamics.transitions {
-        if !transition.source.is_empty() && !transition.target.is_empty() {
+        let source_empty = transition.source.is_empty();
+        let target_empty = transition.target.is_empty();
+
+        if source_empty && target_empty {
+            continue;
+        }
+
+        if source_empty {
+            // Source-less transition: add to target compartments from outside the system.
+            // Rate is always treated as absolute (no source population to multiply by).
+            let target_bin = &transition.target[0];
+            for (i, compartment_name) in compartments.iter().enumerate() {
+                if compartment_name.starts_with(target_bin) {
+                    let stratification_values =
+                        extract_stratifications(compartment_name, target_bin, stratifications);
+                    if let Some(matched) =
+                        get_rate_string_for_compartment(transition, &stratification_values)
+                    {
+                        let rate_expression =
+                            RateMathExpression::from_string(matched.rate_string.clone());
+                        let resolved_slots = resolve_jit_slots(&rate_expression, compartment_map);
+                        transition_flows.push(TransitionFlow {
+                            source_index: None,
+                            target_index: Some(i),
+                            rate_expression,
+                            is_absolute_flow: true,
+                            resolved_slots,
+                        });
+                    }
+                }
+            }
+        } else if target_empty {
+            // Target-less transition: remove from source compartments out of the system.
+            let source_bin = &transition.source[0];
+            for (i, compartment_name) in compartments.iter().enumerate() {
+                if compartment_name.starts_with(source_bin) {
+                    let stratification_values =
+                        extract_stratifications(compartment_name, source_bin, stratifications);
+                    if let Some(matched) =
+                        get_rate_string_for_compartment(transition, &stratification_values)
+                    {
+                        let rate_expression =
+                            RateMathExpression::from_string(matched.rate_string.clone());
+                        let is_absolute_flow =
+                            match matched.stratified_rate.and_then(|sr| sr.absolute) {
+                                Some(abs) => abs,
+                                None => {
+                                    let rate_variables = rate_expression.get_variables();
+                                    rate_variables.iter().any(|v| {
+                                        compartment_map.contains_key(v)
+                                            || subpopulation_names.contains(v)
+                                    })
+                                }
+                            };
+                        let resolved_slots = resolve_jit_slots(&rate_expression, compartment_map);
+                        transition_flows.push(TransitionFlow {
+                            source_index: Some(i),
+                            target_index: None,
+                            rate_expression,
+                            is_absolute_flow,
+                            resolved_slots,
+                        });
+                    }
+                }
+            }
+        } else {
+            // Normal transition: move from source to target compartments.
             let source_bin = &transition.source[0];
             let target_bin = &transition.target[0];
 
-            // Process each compartment
             for (i, compartment_name) in compartments.iter().enumerate() {
                 if compartment_name.starts_with(source_bin) {
                     let source_index = i;
@@ -339,11 +432,15 @@ fn build_transition_flows(
                                     }
                                 };
 
+                            let resolved_slots =
+                                resolve_jit_slots(&rate_expression, compartment_map);
+
                             transition_flows.push(TransitionFlow {
-                                source_index,
-                                target_index,
+                                source_index: Some(source_index),
+                                target_index: Some(target_index),
                                 rate_expression,
                                 is_absolute_flow,
+                                resolved_slots,
                             });
                         }
                     }
@@ -489,4 +586,60 @@ fn build_subpopulation_mappings(
     }
 
     mappings
+}
+
+fn collect_used_context_variables(
+    transition_flows: &[TransitionFlow],
+    formula_parameters: &[(String, RateMathExpression)],
+) -> HashSet<String> {
+    let mut variables = HashSet::new();
+
+    for flow in transition_flows {
+        if let Some(slots) = &flow.resolved_slots {
+            for slot in slots {
+                if let VarSlot::Parameter(name) = slot {
+                    variables.insert(name.clone());
+                }
+            }
+        } else {
+            variables.extend(flow.rate_expression.get_variables());
+        }
+    }
+
+    for (_, expression) in formula_parameters {
+        variables.extend(expression.get_variables());
+    }
+
+    variables
+}
+
+/// Resolve the input variables of a JIT-compiled rate expression to direct
+/// storage slots (compartment index, parameter name, or step alias) so the
+/// per-step inner loop can fill the JIT input buffer without HashMap probes
+/// for compartments. Returns `None` for non-JIT rates (constants, single
+/// parameter references, or evalexpr fallbacks) — those have a fast path
+/// of their own.
+fn resolve_jit_slots(
+    rate_expression: &RateMathExpression,
+    compartment_map: &HashMap<String, usize>,
+) -> Option<Vec<VarSlot>> {
+    let expr = match rate_expression {
+        RateMathExpression::Formula(expr) => expr,
+        _ => return None,
+    };
+    let names = expr.jit_variable_names()?;
+    Some(
+        names
+            .iter()
+            .map(|name| {
+                if let Some(&idx) = compartment_map.get(name) {
+                    VarSlot::Compartment(idx)
+                } else if name == "step" || name == "t" {
+                    VarSlot::Step
+                } else {
+                    VarSlot::Parameter(name.clone())
+                }
+            })
+            .collect(),
+    )
 }

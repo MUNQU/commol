@@ -2,14 +2,39 @@
 
 use commol_core::{MathExpressionContext, RateMathExpression, SeriesMode};
 
+/// Pre-resolved storage location for a JIT-compiled rate's input variable.
+///
+/// Built once at engine compile time and reused on every simulation step so the
+/// inner loop avoids HashMap lookups for variables whose location is already
+/// known (compartments map to a direct `Vec` index; the step alias is a single
+/// scalar). Parameter lookups still go through the HashMap because their
+/// storage is name-keyed in `MathExpressionContext`.
+#[derive(Clone)]
+pub(crate) enum VarSlot {
+    /// Direct index into the engine's `population` vector.
+    Compartment(usize),
+    /// Look up by name in `MathExpressionContext.parameters` (covers user
+    /// parameters, formula parameters, time-series, subpopulation totals,
+    /// base bin sums, and partial bin-strat sums).
+    Parameter(String),
+    /// The simulation's current step counter (also exposed as `t`).
+    Step,
+}
+
 /// Pre-computed transition flow information for performance
 #[derive(Clone)]
 pub(crate) struct TransitionFlow {
-    pub(crate) source_index: usize,
-    pub(crate) target_index: usize,
+    /// `None` for source-less transitions.
+    pub(crate) source_index: Option<usize>,
+    /// `None` for target-less transitions.
+    pub(crate) target_index: Option<usize>,
     pub(crate) rate_expression: RateMathExpression,
     /// Whether the rate expression is an absolute flow rather than a per-capita rate.
     pub(crate) is_absolute_flow: bool,
+    /// Pre-resolved input slots for the JIT path. `Some` when the rate is a
+    /// JIT-compiled formula whose variables we could resolve at build time;
+    /// `None` for `Parameter` / `Constant` rates and for `evalexpr` fallbacks.
+    pub(crate) resolved_slots: Option<Vec<VarSlot>>,
 }
 
 /// Pre-computed time-series parameter for O(log N) step lookup.
@@ -101,6 +126,10 @@ pub struct DifferenceEquations {
     pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
     /// Parameters defined as empirical time series; evaluated via binary search each step
     pub(crate) series_parameters: Vec<TimeSeriesParameter>,
+    /// Whether any per-step expression still needs compartment values in the
+    /// expression context. JIT-resolved transition formulas read compartments
+    /// directly from `population` and do not need this HashMap update.
+    pub(crate) requires_compartment_context: bool,
 }
 
 #[cfg(test)]

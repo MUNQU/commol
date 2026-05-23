@@ -81,9 +81,15 @@ impl MathExpressionContext {
         self.cache_dirty = true;
     }
 
-    /// Set a parameter value by string reference (avoids allocation)
+    /// Set a parameter value by string reference (avoids allocation in the
+    /// common case where the key already exists).
     pub fn set_parameter_str(&mut self, name: &str, value: f64) {
-        self.parameters.insert(name.to_string(), value);
+        match self.parameters.get_mut(name) {
+            Some(slot) => *slot = value,
+            None => {
+                self.parameters.insert(name.to_string(), value);
+            }
+        }
 
         // Update cached context directly if it exists
         if let Some(ref mut ctx) = self.cached_evalexpr_context {
@@ -91,6 +97,15 @@ impl MathExpressionContext {
         } else {
             self.cache_dirty = true;
         }
+    }
+
+    /// Pre-allocate parameter slots so subsequent `set_parameter_str` calls hit
+    /// the existing-key branch and avoid allocating a fresh `String` each step.
+    pub fn reserve_parameters(&mut self, names: impl IntoIterator<Item = String>) {
+        for name in names {
+            self.parameters.entry(name).or_insert(0.0);
+        }
+        self.cache_dirty = true;
     }
 
     /// Set multiple parameters

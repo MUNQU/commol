@@ -58,22 +58,43 @@ impl Clone for JITFunction {
 impl JITFunction {
     /// Call the JIT-compiled function with a context
     pub fn call(&self, context: &MathExpressionContext) -> Result<f64, MathExpressionError> {
-        // Prepare a flat array of variable values
-        let mut values = vec![0.0; self.variable_names.len()];
+        // Use a stack buffer for the common case (<= STACK_VARS variables) to
+        // avoid heap allocation on the hot path. Most rate expressions in
+        // compartment models reference only a handful of variables.
+        const STACK_VARS: usize = 16;
+        let n = self.variable_names.len();
+        let mut stack_buf = [0.0_f64; STACK_VARS];
+        let mut heap_buf: Vec<f64>;
+        let values: &mut [f64] = if n <= STACK_VARS {
+            &mut stack_buf[..n]
+        } else {
+            heap_buf = vec![0.0; n];
+            &mut heap_buf[..]
+        };
 
         for (i, name) in self.variable_names.iter().enumerate() {
-            let value = if name == "step" || name == "t" {
+            // Preferred order: precomputed parameter (includes N, N_*, base bin
+            // totals, and partial bin-strat sums that the engine updates once
+            // per step), then compartment values, then the special step alias,
+            // and only then the expensive on-demand recomputation fallback.
+            //
+            // The recomputation paths are kept so that callers using the JIT
+            // standalone (without a DifferenceEquations engine) still work.
+            let value = if let Some(v) = context.parameters.get(name).copied() {
+                v
+            } else if let Some(v) = context.compartments.get(name).copied() {
+                v
+            } else if name == "step" || name == "t" {
                 context.step
             } else if name == "N" {
-                // Sum all compartments in sorted order for deterministic floating-point results.
-                // HashMap iteration order is non-deterministic, and floating-point addition
-                // is not associative, so summing in different orders produces different results.
+                // Fallback: sum all compartments in sorted order for
+                // deterministic floating-point results.
                 let mut sorted_values: Vec<f64> = context.compartments.values().copied().collect();
                 sorted_values.sort_by(|a, b| a.total_cmp(b));
                 sorted_values.iter().sum()
             } else if name.starts_with("N_") {
-                // Stratified population sum in sorted order for deterministic results
-                let suffix = &name[1..]; // Keep "_age_young" etc.
+                // Fallback: stratified population sum in sorted order.
+                let suffix = &name[1..];
                 let mut filtered_values: Vec<f64> = context
                     .compartments
                     .iter()
@@ -83,11 +104,7 @@ impl JITFunction {
                 filtered_values.sort_by(|a, b| a.total_cmp(b));
                 filtered_values.iter().sum()
             } else {
-                // Try parameter first, then compartment
-                context
-                    .get_parameter(name)
-                    .or_else(|| context.compartments.get(name).copied())
-                    .ok_or_else(|| MathExpressionError::VariableNotFound(name.clone()))?
+                return Err(MathExpressionError::VariableNotFound(name.clone()));
             };
 
             values[i] = value;
@@ -102,6 +119,23 @@ impl JITFunction {
     /// Get the list of variables used by this function
     pub fn variables(&self) -> &[String] {
         &self.variable_names
+    }
+
+    /// Invoke the JIT-compiled function with a pre-filled value buffer.
+    ///
+    /// The caller is responsible for filling `buffer` in the same order as
+    /// `self.variable_names`. This skips the name-keyed HashMap resolution
+    /// performed by `call`, so the difference-equations engine can short-circuit
+    /// to direct compartment/parameter access via pre-resolved slots.
+    pub fn call_with_buffer(&self, buffer: &[f64]) -> Result<f64, MathExpressionError> {
+        if buffer.len() != self.variable_names.len() {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "JIT buffer length mismatch: expected {}, got {}",
+                self.variable_names.len(),
+                buffer.len()
+            )));
+        }
+        Ok((self.func_ptr)(buffer.as_ptr()))
     }
 }
 

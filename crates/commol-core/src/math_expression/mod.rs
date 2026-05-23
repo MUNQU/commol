@@ -297,6 +297,28 @@ impl MathExpression {
     pub fn get_variables(&self) -> Vec<String> {
         get_variables(&self.preprocessed)
     }
+
+    /// If this expression was JIT-compiled, return the JIT function's variable
+    /// names (in the order required by `call_jit_with_buffer`). Returns `None`
+    /// when JIT compilation fell back to evalexpr.
+    pub fn jit_variable_names(&self) -> Option<&[String]> {
+        match &self.compiled {
+            CompiledExpr::Jit(jit_fn) => Some(jit_fn.variables()),
+            CompiledExpr::Generic(_) => None,
+        }
+    }
+
+    /// Invoke the JIT path with a pre-filled value buffer. The buffer must be
+    /// laid out in the order returned by `jit_variable_names`. Returns `Err`
+    /// when the expression is not JIT-compiled.
+    pub fn call_jit_with_buffer(&self, buffer: &[f64]) -> Result<f64, MathExpressionError> {
+        match &self.compiled {
+            CompiledExpr::Jit(jit_fn) => jit_fn.call_with_buffer(buffer),
+            CompiledExpr::Generic(_) => Err(MathExpressionError::InvalidExpression(
+                "expression is not JIT-compiled".to_string(),
+            )),
+        }
+    }
 }
 
 /// Represents different types of rate expressions

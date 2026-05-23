@@ -154,6 +154,33 @@ pub trait SimulationEngine: Clone {
         Ok(())
     }
 
+    /// Run the simulation through the largest requested step, recording only
+    /// selected time steps into a reusable buffer.
+    ///
+    /// `time_steps` must be sorted in ascending order and contain unique values.
+    /// The output rows are aligned with `time_steps`, not with absolute time.
+    fn run_at_steps_into_buffer(
+        &mut self,
+        time_steps: &[u32],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        let Some(&max_step) = time_steps.last() else {
+            buffer.clear();
+            return Ok(());
+        };
+
+        let results = self.run(max_step)?;
+        buffer.clear();
+        buffer.reserve(time_steps.len());
+        for &step in time_steps {
+            let row = results
+                .get(step as usize)
+                .ok_or_else(|| format!("Missing simulation result for step {}", step))?;
+            buffer.push(row.clone());
+        }
+        Ok(())
+    }
+
     /// Set the initial condition for a specific compartment.
     ///
     /// This method allows modifying the initial population value for a compartment,

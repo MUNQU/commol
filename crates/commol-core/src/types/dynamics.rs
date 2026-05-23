@@ -15,10 +15,17 @@ pub enum ModelTypes {
 /// When `to` is set, the matched category in the source compartment is replaced
 /// with the `to` category in the target compartment name. This enables
 /// cross-category transitions within the same bin (e.g., aging: y60 → oe60).
+///
+/// When `category` is `None`, the condition acts as a target-only override:
+/// it does not filter source compartments but still contributes a `to` category
+/// to the computed target compartment name. This is required when the source
+/// compartment lacks a stratification that the target compartment must have
+/// (e.g., an `A_cat0` compartment routing into an `A_cat1_sub0` compartment).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StratificationCondition {
     pub stratification: String,
-    pub category: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
 }
