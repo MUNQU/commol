@@ -122,14 +122,31 @@ class ProbabilisticCalibrator:
         """
         model_param_ids = {p.id for p in self.simulation.model_definition.parameters}
         model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
+        stratifications = self.simulation.model_definition.population.stratifications
+        model_binary_stratification_categories = {
+            category
+            for stratification in stratifications
+            if len(stratification.categories) == 2
+            for category in stratification.categories
+        }
+        engine_compartment_ids = set(self.simulation.engine.compartments)
 
-        self._validate_calibration_parameters(model_param_ids, model_bin_ids)
-        self._validate_observed_data(model_bin_ids)
+        self._validate_calibration_parameters(
+            model_param_ids,
+            model_bin_ids,
+            model_binary_stratification_categories,
+            engine_compartment_ids,
+        )
+        self._validate_observed_data(engine_compartment_ids)
 
         logger.debug("Input validation passed")
 
     def _validate_calibration_parameters(
-        self, model_param_ids: set[str], model_bin_ids: set[str]
+        self,
+        model_param_ids: set[str],
+        model_bin_ids: set[str],
+        model_binary_stratification_categories: set[str],
+        engine_compartment_ids: set[str],
     ) -> None:
         """Validate that calibration parameters exist in the model."""
         for param in self.problem.parameters:
@@ -144,19 +161,27 @@ class ProbabilisticCalibrator:
                     )
 
             if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if param.id not in model_bin_ids:
+                if (
+                    param.id not in model_bin_ids
+                    and param.id not in model_binary_stratification_categories
+                    and param.id not in engine_compartment_ids
+                ):
                     raise ValueError(
                         f"Initial condition parameter '{param.id}' not found in model "
-                        f"bins. Available bins: {sorted(model_bin_ids)}"
+                        f"bins, stratification categories, or expanded compartments. "
+                        f"Available bins: {sorted(model_bin_ids)}. "
+                        f"Available binary stratification categories: "
+                        f"{sorted(model_binary_stratification_categories)}. "
+                        f"Available compartments: {sorted(engine_compartment_ids)}"
                     )
 
-    def _validate_observed_data(self, model_bin_ids: set[str]) -> None:
+    def _validate_observed_data(self, engine_compartment_ids: set[str]) -> None:
         """Validate that observed data compartments exist and have valid steps."""
         for obs in self.problem.observed_data:
-            if obs.compartment not in model_bin_ids:
+            if obs.compartment not in engine_compartment_ids:
                 raise ValueError(
                     f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model. Available compartments: {sorted(model_bin_ids)}"
+                    f"model. Available compartments: {sorted(engine_compartment_ids)}"
                 )
 
         if self.problem.observed_data:
@@ -375,9 +400,7 @@ class ProbabilisticCalibrator:
 
         max_time_step = max(obs.step for obs in self.problem.observed_data)
         time_steps = max_time_step + 1
-        compartment_ids = [
-            bin.id for bin in self.simulation.model_definition.population.bins
-        ]
+        compartment_ids = list(self.simulation.engine.compartments)
 
         # Build full ParetoSolution objects for each solution in the Pareto front
         pareto_solutions = []

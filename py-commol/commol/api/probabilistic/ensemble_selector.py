@@ -48,8 +48,8 @@ class EnsembleSelector:
         self.problem = problem
         self.seed = seed
         self._compartment_name_to_idx = {
-            bin.id: idx
-            for idx, bin in enumerate(simulation.model_definition.population.bins)
+            compartment: idx
+            for idx, compartment in enumerate(simulation.engine.compartments)
         }
 
     def select_ensemble(

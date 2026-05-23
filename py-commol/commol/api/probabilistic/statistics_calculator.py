@@ -136,8 +136,8 @@ class StatisticsCalculator:
         }
 
         compartment_idx_map = {
-            bin.id: idx
-            for idx, bin in enumerate(self.simulation.model_definition.population.bins)
+            compartment: idx
+            for idx, compartment in enumerate(self.simulation.engine.compartments)
         }
 
         for predictions_per_param_set in all_predictions_raw:

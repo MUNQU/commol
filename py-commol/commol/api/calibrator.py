@@ -430,6 +430,13 @@ class Calibrator:
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
         model_bin_ids = {b.id for b in model.population.bins}
+        model_binary_stratification_categories = {
+            category
+            for stratification in model.population.stratifications
+            if len(stratification.categories) == 2
+            for category in stratification.categories
+        }
+        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -440,10 +447,19 @@ class Calibrator:
                         f"{sorted(model_param_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if param.id not in model_bin_ids:
+                if (
+                    param.id not in model_bin_ids
+                    and param.id not in model_binary_stratification_categories
+                    and param.id not in engine_compartment_ids
+                ):
                     raise ValueError(
                         f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins. Available bins: {sorted(model_bin_ids)}"
+                        f"model bins, stratification categories, or expanded "
+                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
+                        f"Available binary stratification categories: "
+                        f"{sorted(model_binary_stratification_categories)}. "
+                        f"Available compartments: "
+                        f"{sorted(engine_compartment_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
@@ -496,13 +512,13 @@ class Calibrator:
         ValueError
             If observed data contains invalid compartments or negative time steps.
         """
-        model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
+        compartment_names = set(self._engine.compartments)
 
         for obs in self.problem.observed_data:
-            if obs.compartment not in model_bin_ids:
+            if obs.compartment not in compartment_names:
                 raise ValueError(
                     f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model. Available compartments: {sorted(model_bin_ids)}"
+                    f"model. Available compartments: {sorted(compartment_names)}"
                 )
 
         if self.problem.observed_data:
