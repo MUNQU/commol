@@ -69,6 +69,7 @@ class SimulationPlotter:
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
+        show_legend: bool = True,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -97,6 +98,8 @@ class SimulationPlotter:
             style, palette, context). If None, uses defaults.
         bins : list[str] | None
             List of bin IDs to plot. If None, plots all bins.
+        show_legend : bool
+            Whether to show the legend on each subplot. Default True.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -124,6 +127,7 @@ class SimulationPlotter:
             scale_values,
             calibration_result,
             kwargs,
+            show_legend,
         )
         self._finalize_series_plot(axes, bins_to_plot, output_file, config)
 
@@ -305,6 +309,7 @@ class SimulationPlotter:
         scale_values: dict[str, float] | None,
         calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
         kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
     ) -> None:
         """
         Plot series data for all bins across subplots.
@@ -323,6 +328,7 @@ class SimulationPlotter:
                     scale_values or {},
                     calibration_result,
                     dict(kwargs),
+                    show_legend,
                 )
             else:
                 self._plot_bin_series(
@@ -331,6 +337,7 @@ class SimulationPlotter:
                     observed_by_bin.get(bin_id, []),
                     scale_values or {},
                     dict(kwargs),
+                    show_legend,
                 )
 
     def _finalize_series_plot(
@@ -432,6 +439,7 @@ class SimulationPlotter:
         observed: list[ObservedDataPoint],
         scale_values: dict[str, float],
         plot_kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
     ) -> None:
         """
         Plot time series for a single bin on given axes.
@@ -445,6 +453,7 @@ class SimulationPlotter:
             "y": values,
             "ax": ax,
             "label": "Simulation",
+            "legend": show_legend,
         }
         params.update(plot_kwargs)
 
@@ -470,6 +479,7 @@ class SimulationPlotter:
                 s=30,
                 alpha=0.7,
                 zorder=5,
+                legend=show_legend,
             )
 
         # Get bin unit from model for label
@@ -487,7 +497,8 @@ class SimulationPlotter:
         ax.set_xlabel("Step")
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        ax.legend()
+        if show_legend:
+            ax.legend()
         ax.grid(True, alpha=0.3)
 
     def _plot_bin_series_probabilistic(
@@ -498,6 +509,7 @@ class SimulationPlotter:
         scale_values: dict[str, float],
         prob_result: ProbabilisticCalibrationResult,
         plot_kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
     ) -> None:
         """
         Plot time series for a single bin with probabilistic confidence intervals.
@@ -521,6 +533,7 @@ class SimulationPlotter:
             "y": median_values,
             "ax": ax,
             "label": "Median Prediction",
+            "legend": show_legend,
         }
         params.update(plot_kwargs)
 
@@ -533,7 +546,7 @@ class SimulationPlotter:
             ci_lower,
             ci_upper,
             alpha=0.3,
-            label="95% CI",
+            label="95% CI" if show_legend else "_nolegend_",
         )
 
         # Overlay observed data if available
@@ -555,6 +568,7 @@ class SimulationPlotter:
                 s=30,
                 alpha=0.7,
                 zorder=5,
+                legend=show_legend,
             )
 
         # Get bin unit from model for label
@@ -572,7 +586,8 @@ class SimulationPlotter:
         ax.set_xlabel("Step")
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        ax.legend()
+        if show_legend:
+            ax.legend()
         ax.grid(True, alpha=0.3)
 
     def _plot_bin_cumulative_probabilistic(
