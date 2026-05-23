@@ -120,9 +120,12 @@ class Population(BaseModel):
                                 )
                             )
 
-                        # Validate category exists
+                        # Validate category exists (None = target-only override, skip)
                         strat = strat_map[condition.stratification]
-                        if condition.category not in strat.categories:
+                        if (
+                            condition.category is not None
+                            and condition.category not in strat.categories
+                        ):
                             raise ValueError(
                                 (
                                     f"In transition '{transition.id}', stratified rate "

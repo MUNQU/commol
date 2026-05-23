@@ -80,3 +80,24 @@ class Stratification(BaseModel):
             )
 
         return self
+
+    @model_validator(mode="after")
+    def validate_conditions_have_categories(self) -> Self:
+        """
+        Enforces that stratification expansion conditions filter by category.
+        """
+        if self.conditions is None:
+            return self
+
+        for condition in self.conditions:
+            if condition.category is None:
+                raise ValueError(
+                    (
+                        f"Condition for stratification '{self.id}' referencing "
+                        f"'{condition.stratification}' must include a category. "
+                        "Category-less conditions are only valid for transition "
+                        "target overrides."
+                    )
+                )
+
+        return self

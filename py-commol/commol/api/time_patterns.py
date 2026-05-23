@@ -29,10 +29,15 @@ class ConditionDict(TypedDict):
 
     Also re-exported by :mod:`commol.api.model_builder` as
     ``StratificationConditionDict``.
+
+    ``category`` is optional. When omitted the condition acts as a target-only
+    override: it does not filter source compartments and does not count toward
+    match specificity, but its ``to`` value is used when constructing the target
+    compartment name.
     """
 
     stratification: str
-    category: str
+    category: NotRequired[str]
     to: NotRequired[str]
 
 
@@ -129,16 +134,12 @@ def _enforce_length_cap(formula: str, config: SecurityConfig | None) -> None:
 
 def _copy_condition(c: ConditionDict) -> ConditionDict:
     """Shallow-copy a ConditionDict while preserving its TypedDict type."""
-    copy: ConditionDict = {
-        "stratification": c["stratification"],
-        "category": c["category"],
-    }
+    copy: ConditionDict = {"stratification": c["stratification"]}
+    if "category" in c:
+        copy["category"] = c["category"]
     if "to" in c:
         copy["to"] = c["to"]
     return copy
-
-
-_REQUIRED_CONDITION_KEYS = ("stratification", "category")
 
 
 def _condition_key(
@@ -149,12 +150,11 @@ def _condition_key(
         return frozenset()
     keys: list[tuple[str, str, str]] = []
     for c in conditions:
-        for required in _REQUIRED_CONDITION_KEYS:
-            if required not in c:
-                raise ValueError(
-                    f"Condition is missing required key {required!r}: {c!r}"
-                )
-        keys.append((c["stratification"], c["category"], c.get("to", "")))
+        if "stratification" not in c:
+            raise ValueError(
+                f"Condition is missing required key 'stratification': {c!r}"
+            )
+        keys.append((c["stratification"], c.get("category", ""), c.get("to", "")))
     return frozenset(keys)
 
 

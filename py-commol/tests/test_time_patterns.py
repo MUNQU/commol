@@ -1044,6 +1044,50 @@ class TestScheduleIntegration:
             total = result["A_s0"][t] + result["A_s1"][t]
             assert total == pytest.approx(1000.0, abs=1e-4)
 
+    def test_target_only_override_without_category_routes_flow(self):
+        """A target-only condition can match without filtering source categories."""
+        model = (
+            ModelBuilder("target_only")
+            .add_bin("A", "Source")
+            .add_bin("B", "Target")
+            .add_stratification("group", ["g1", "g2"])
+            .add_transition(
+                "route",
+                ["A"],
+                ["B"],
+                stratified_rates=[
+                    {
+                        "conditions": [{"stratification": "group", "to": "g2"}],
+                        "rate": 1.0,
+                    }
+                ],
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 1.0},
+                    {"bin": "B", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "group",
+                        "fractions": [
+                            {"category": "g1", "fraction": 0.5},
+                            {"category": "g2", "fraction": 0.5},
+                        ],
+                    }
+                ],
+            )
+            .build("DifferenceEquations")
+        )
+
+        result = Simulation(model).run(1)
+
+        assert result["A_g1"][1] == pytest.approx(0.0)
+        assert result["A_g2"][1] == pytest.approx(0.0)
+        assert result["B_g1"][1] == pytest.approx(0.0)
+        assert result["B_g2"][1] == pytest.approx(1000.0)
+
     def test_population_conservation(self):
         rate = TimePattern.add_group(
             conditions=[_cond("group", "cat1")],

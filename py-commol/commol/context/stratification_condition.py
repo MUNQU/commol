@@ -22,7 +22,14 @@ class StratificationCondition(BaseModel):
     """
 
     stratification: str = Field(default=..., description="ID of the stratification")
-    category: str = Field(default=..., description="Category within the stratification")
+    category: str | None = Field(
+        default=None,
+        description=(
+            "Category within the stratification. When None, the condition acts as a "
+            "target-only override: it does not filter source compartments but still "
+            "contributes a 'to' category to the computed target compartment name."
+        ),
+    )
     to: str | None = Field(
         default=None,
         description=(

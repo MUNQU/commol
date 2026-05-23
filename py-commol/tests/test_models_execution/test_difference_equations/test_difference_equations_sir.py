@@ -907,6 +907,23 @@ class TestConditionalStratification:
                 )
             )
 
+    def test_stratification_condition_without_category_raises_error(self):
+        """
+        Category-less conditions are only valid for transition target overrides,
+        not for deciding whether a stratification expands compartments.
+        """
+        with pytest.raises(ValueError, match="must include a 'category'"):
+            (
+                ModelBuilder(name="invalid", version="1.0")
+                .add_bin(id="A", name="Compartment A")
+                .add_stratification(id="group", categories=["cat0", "cat1"])
+                .add_stratification(
+                    id="subgroup",
+                    categories=["sub0", "sub1"],
+                    conditions=[{"stratification": "group"}],
+                )
+            )
+
     def test_no_conditions_produces_full_cartesian_product(self):
         """
         Without conditions, behavior is unchanged: full Cartesian product.

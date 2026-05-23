@@ -207,6 +207,13 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
+                if "category" not in cond:
+                    raise ValueError(
+                        f"Stratification '{id}': condition on "
+                        f"'{cond['stratification']}' must include a 'category'. "
+                        "Category-less conditions are only valid for transition "
+                        "target overrides."
+                    )
                 if cond["stratification"] not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
@@ -322,8 +329,12 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c["category"] for c in conditions)
-            tgt_cats = "_".join(c.get("to", c["category"]) for c in conditions)
+            src_cats = "_".join(c["category"] for c in conditions if "category" in c)
+            tgt_cats = "_".join(
+                c["to"] if "to" in c else c["category"]
+                for c in conditions
+                if "to" in c or "category" in c
+            )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
             param_name = f"{transition_id}_{src}_to_{tgt}"
