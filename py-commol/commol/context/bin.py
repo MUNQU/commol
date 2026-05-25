@@ -35,3 +35,10 @@ class Bin(BaseModel):
     @override
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Bin) and self.id == other.id
+
+
+class Accumulator(BaseModel):
+    """A cumulative event counter tracked as output but not as population state."""
+
+    id: str = Field(..., description="Identifier of the accumulator.")
+    name: str = Field(..., description="Descriptive, human-readable name.")

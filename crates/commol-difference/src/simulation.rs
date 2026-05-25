@@ -19,6 +19,32 @@ impl DifferenceEquations {
         self.compartments.clone()
     }
 
+    /// Get all simulation output names: state compartments followed by accumulators.
+    pub fn output_names(&self) -> Vec<String> {
+        self.output_names.clone()
+    }
+
+    fn output_len(&self) -> usize {
+        self.population.len() + self.accumulators.len()
+    }
+
+    fn output_row(&self) -> Vec<f64> {
+        let mut row = Vec::with_capacity(self.output_len());
+        row.extend_from_slice(&self.population);
+        row.extend_from_slice(&self.accumulators);
+        row
+    }
+
+    fn copy_output_row(&self, row: &mut Vec<f64>) {
+        let output_len = self.output_len();
+        if row.len() != output_len {
+            row.resize(output_len, 0.0);
+        }
+        let population_len = self.population.len();
+        row[..population_len].copy_from_slice(&self.population);
+        row[population_len..].copy_from_slice(&self.accumulators);
+    }
+
     /// Execute a single simulation step.
     ///
     /// This method:
@@ -139,6 +165,9 @@ impl DifferenceEquations {
                                 if let Some(tgt) = flow_info.target_index {
                                     self.compartment_flows[tgt] += flow;
                                 }
+                                for &accumulator_idx in &flow_info.accumulator_indices {
+                                    self.accumulators[accumulator_idx] += flow;
+                                }
                                 continue;
                             }
                             Err(error) => {
@@ -202,6 +231,9 @@ impl DifferenceEquations {
             if let Some(tgt) = flow_info.target_index {
                 self.compartment_flows[tgt] += flow;
             }
+            for &accumulator_idx in &flow_info.accumulator_indices {
+                self.accumulators[accumulator_idx] += flow;
+            }
         }
 
         // Apply the calculated flows to the population vector.
@@ -230,11 +262,11 @@ impl DifferenceEquations {
         let mut steps = Vec::with_capacity(num_steps as usize + 1);
 
         // Store initial state (t=0)
-        steps.push(self.population.clone());
+        steps.push(self.output_row());
 
         for _ in 0..num_steps {
             self.step()?;
-            steps.push(self.population.clone());
+            steps.push(self.output_row());
         }
 
         Ok(steps)
@@ -259,7 +291,7 @@ impl DifferenceEquations {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
         let total_steps = (num_steps + 1) as usize;
-        let num_compartments = self.population.len();
+        let output_len = self.output_len();
 
         // Keep existing row allocations alive across repeated calls. This is
         // especially important for calibration, where the same buffer is reused
@@ -267,24 +299,24 @@ impl DifferenceEquations {
         if buffer.len() < total_steps {
             buffer.reserve(total_steps - buffer.len());
             while buffer.len() < total_steps {
-                buffer.push(vec![0.0; num_compartments]);
+                buffer.push(vec![0.0; output_len]);
             }
         } else if buffer.len() > total_steps {
             buffer.truncate(total_steps);
         }
 
         for row in buffer.iter_mut() {
-            if row.len() != num_compartments {
-                row.resize(num_compartments, 0.0);
+            if row.len() != output_len {
+                row.resize(output_len, 0.0);
             }
         }
 
         // Store initial state (t=0)
-        buffer[0].copy_from_slice(&self.population);
+        self.copy_output_row(&mut buffer[0]);
 
         for row in buffer.iter_mut().take(total_steps).skip(1) {
             self.step()?;
-            row.copy_from_slice(&self.population);
+            self.copy_output_row(row);
         }
 
         Ok(())
@@ -297,26 +329,26 @@ impl DifferenceEquations {
         time_steps: &[u32],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
-        let num_compartments = self.population.len();
+        let output_len = self.output_len();
 
         if buffer.len() < time_steps.len() {
             buffer.reserve(time_steps.len() - buffer.len());
             while buffer.len() < time_steps.len() {
-                buffer.push(vec![0.0; num_compartments]);
+                buffer.push(vec![0.0; output_len]);
             }
         } else if buffer.len() > time_steps.len() {
             buffer.truncate(time_steps.len());
         }
 
         for row in buffer.iter_mut() {
-            if row.len() != num_compartments {
-                row.resize(num_compartments, 0.0);
+            if row.len() != output_len {
+                row.resize(output_len, 0.0);
             }
         }
 
         let mut next_record_idx = 0;
         while next_record_idx < time_steps.len() && time_steps[next_record_idx] == 0 {
-            buffer[next_record_idx].copy_from_slice(&self.population);
+            self.copy_output_row(&mut buffer[next_record_idx]);
             next_record_idx += 1;
         }
 
@@ -327,7 +359,7 @@ impl DifferenceEquations {
         for step in 1..=max_step {
             self.step()?;
             while next_record_idx < time_steps.len() && time_steps[next_record_idx] == step {
-                buffer[next_record_idx].copy_from_slice(&self.population);
+                self.copy_output_row(&mut buffer[next_record_idx]);
                 next_record_idx += 1;
             }
         }
@@ -370,6 +402,10 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         self.compartments.clone()
     }
 
+    fn output_names(&self) -> Vec<String> {
+        DifferenceEquations::output_names(self)
+    }
+
     fn population(&self) -> Vec<f64> {
         self.population.clone()
     }
@@ -377,6 +413,8 @@ impl commol_core::SimulationEngine for DifferenceEquations {
     fn reset(&mut self) {
         // Reset population to initial state
         self.population.copy_from_slice(&self.initial_population);
+        self.accumulators
+            .copy_from_slice(&self.initial_accumulators);
         // Reset step counter
         self.current_step = 0.0;
     }
@@ -469,6 +507,7 @@ mod tests {
                         name: "Sink".to_string(),
                     },
                 ],
+                accumulators: vec![],
                 stratifications: vec![],
                 transitions: vec![],
                 initial_conditions: InitialConditions {
@@ -492,6 +531,7 @@ mod tests {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
+                    accumulators: vec![],
                     rate: Some(RateMathExpression::from_string(
                         "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
                     )),
@@ -520,6 +560,7 @@ mod tests {
                         name: "Sink".to_string(),
                     },
                 ],
+                accumulators: vec![],
                 stratifications: vec![],
                 transitions: vec![],
                 initial_conditions: InitialConditions {
@@ -543,6 +584,7 @@ mod tests {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
                     target: vec!["B".to_string()],
+                    accumulators: vec![],
                     rate: Some(RateMathExpression::from_string("missing * A".to_string())),
                     stratified_rates: None,
                     condition: None,

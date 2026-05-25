@@ -91,16 +91,22 @@ pub struct PyPopulation {
 #[pymethods]
 impl PyPopulation {
     #[new]
-    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None))]
+    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None, accumulators=None))]
     fn new(
         bins: Vec<PyBin>,
         stratifications: Vec<PyStratification>,
         initial_conditions: PyInitialConditions,
         transitions: Option<Vec<PyTransition>>,
+        accumulators: Option<Vec<PyAccumulator>>,
     ) -> Self {
         Self {
             inner: commol_core::Population {
                 bins: bins.into_iter().map(|ds| ds.inner).collect(),
+                accumulators: accumulators
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|accumulator| accumulator.inner)
+                    .collect(),
                 stratifications: stratifications.into_iter().map(|s| s.inner).collect(),
                 transitions: transitions
                     .unwrap_or_default()
@@ -108,6 +114,27 @@ impl PyPopulation {
                     .map(|t| t.inner)
                     .collect(),
                 initial_conditions: initial_conditions.inner,
+            },
+        }
+    }
+}
+
+/// Wrapper for commol_core::Accumulator
+#[pyclass(name = "Accumulator")]
+#[derive(Clone)]
+pub struct PyAccumulator {
+    pub inner: commol_core::types::Accumulator,
+}
+
+#[pymethods]
+impl PyAccumulator {
+    #[new]
+    #[pyo3(signature = (id, name=None))]
+    fn new(id: String, name: Option<String>) -> Self {
+        Self {
+            inner: commol_core::types::Accumulator {
+                id: id.clone(),
+                name: name.unwrap_or(id),
             },
         }
     }
@@ -248,7 +275,7 @@ pub struct PyTransition {
 #[pymethods]
 impl PyTransition {
     #[new]
-    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None, per_compartment=None))]
+    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None, per_compartment=None, accumulators=None))]
     fn new(
         id: String,
         source: Vec<String>,
@@ -256,6 +283,7 @@ impl PyTransition {
         rate: Option<String>,
         stratified_rates: Option<StratifiedRatesInput>,
         per_compartment: Option<bool>,
+        accumulators: Option<Vec<String>>,
     ) -> Self {
         let rate = rate.map(commol_core::RateMathExpression::from_string);
 
@@ -284,6 +312,7 @@ impl PyTransition {
                 id,
                 source,
                 target,
+                accumulators: accumulators.unwrap_or_default(),
                 rate,
                 stratified_rates,
                 condition: None,
@@ -373,6 +402,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModel>()?;
     m.add_class::<PyPopulation>()?;
     m.add_class::<PyBin>()?;
+    m.add_class::<PyAccumulator>()?;
     m.add_class::<PyStratification>()?;
     m.add_class::<PyInitialConditions>()?;
     m.add_class::<PyDynamics>()?;

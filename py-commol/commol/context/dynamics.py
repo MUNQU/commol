@@ -205,6 +205,10 @@ class Transition(BaseModel):
     id: str = Field(default=..., description="Id of the transition.")
     source: list[str] = Field(default=..., description="Origin compartments.")
     target: list[str] = Field(default=..., description="Destination compartments.")
+    accumulators: list[str] = Field(
+        default_factory=list,
+        description="Cumulative event counters incremented by this transition flow.",
+    )
 
     rate: str | None = Field(
         None,

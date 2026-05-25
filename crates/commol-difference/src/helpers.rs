@@ -306,6 +306,7 @@ mod tests {
             id: "route".to_string(),
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
+            accumulators: vec![],
             rate: None,
             stratified_rates: Some(vec![StratifiedRate {
                 conditions: vec![StratificationCondition {

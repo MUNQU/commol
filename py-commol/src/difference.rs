@@ -65,6 +65,12 @@ impl PyDifferenceEquations {
         self.inner.compartments()
     }
 
+    /// Get the list of simulation output names, including accumulators.
+    #[getter]
+    fn output_names(&self) -> Vec<String> {
+        self.inner.output_names()
+    }
+
     /// Reset the simulation to initial conditions
     fn reset(&mut self) {
         use commol_core::SimulationEngine;

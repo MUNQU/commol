@@ -45,6 +45,8 @@ pub struct Transition {
     pub id: String,
     pub source: Vec<String>,
     pub target: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accumulators: Vec<String>,
     pub rate: Option<RateMathExpression>,
     pub stratified_rates: Option<Vec<StratifiedRate>>,
     /// Conditional logic for when this transition should be active.

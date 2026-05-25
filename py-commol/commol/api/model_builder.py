@@ -11,7 +11,7 @@ from commol.api.time_patterns import (
     _ScheduleTimePattern,
 )
 from commol.constants import LogicOperators, ModelTypes
-from commol.context.bin import Bin
+from commol.context.bin import Accumulator, Bin
 from commol.context.dynamics import (
     Condition,
     Dynamics,
@@ -129,6 +129,7 @@ class ModelBuilder:
         self._bin_unit: str | None = bin_unit
 
         self._bins: list[Bin] = []
+        self._accumulators: list[Accumulator] = []
         self._stratifications: list[Stratification] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
@@ -164,6 +165,12 @@ class ModelBuilder:
         final_unit = unit if unit is not None else self._bin_unit
         self._bins.append(Bin(id=id, name=name, unit=final_unit))
         logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+        return self
+
+    def add_accumulator(self, id: str, name: str) -> Self:
+        """Add a cumulative event counter to the model outputs."""
+        self._accumulators.append(Accumulator(id=id, name=name))
+        logging.info(f"Added accumulator: id='{id}', name='{name}'")
         return self
 
     def add_stratification(
@@ -363,6 +370,7 @@ class ModelBuilder:
         stratified_rates: list[StratifiedRateDict] | None = None,
         condition: Condition | None = None,
         per_compartment: bool | None = None,
+        accumulators: list[str] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -523,6 +531,7 @@ class ModelBuilder:
                 id=id,
                 source=source,
                 target=target,
+                accumulators=accumulators or [],
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
                 condition=condition,
@@ -978,6 +987,7 @@ class ModelBuilder:
 
         population = Population(
             bins=self._bins,
+            accumulators=self._accumulators,
             stratifications=self._stratifications,
             transitions=self._transitions,
             initial_conditions=self._initial_conditions,

@@ -67,6 +67,14 @@ pub trait SimulationEngine: Clone {
     /// For a stratified model: `vec!["S_child", "S_adult", "I_child", "I_adult", ...]`
     fn compartments(&self) -> Vec<String>;
 
+    /// Get the names of all simulation output columns.
+    ///
+    /// By default this is the same as `compartments()`. Engines with tracked
+    /// non-population outputs, such as accumulators, should append those names here.
+    fn output_names(&self) -> Vec<String> {
+        self.compartments()
+    }
+
     /// Get the current population state across all compartments.
     ///
     /// Returns a vector where `result[i]` is the population in compartment `i`,

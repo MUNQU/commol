@@ -28,6 +28,8 @@ pub(crate) struct TransitionFlow {
     pub(crate) source_index: Option<usize>,
     /// `None` for target-less transitions.
     pub(crate) target_index: Option<usize>,
+    /// Accumulator output indices incremented by this transition flow.
+    pub(crate) accumulator_indices: Vec<usize>,
     pub(crate) rate_expression: RateMathExpression,
     /// Whether the rate expression is an absolute flow rather than a per-capita rate.
     pub(crate) is_absolute_flow: bool,
@@ -103,6 +105,18 @@ pub(crate) struct SubpopulationMapping {
     pub(crate) parameter_name: String,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct AccumulatorOutputRef {
+    pub(crate) accumulator_id: String,
+    pub(crate) categories: Vec<Option<String>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct GeneratedAccumulatorOutput {
+    pub(crate) name: String,
+    pub(crate) output_ref: AccumulatorOutputRef,
+}
+
 /// Difference equations simulation engine.
 ///
 /// This struct represents a compiled compartment model using difference equations
@@ -111,11 +125,14 @@ pub(crate) struct SubpopulationMapping {
 #[derive(Clone)]
 pub struct DifferenceEquations {
     pub(crate) compartments: Vec<String>,
+    pub(crate) output_names: Vec<String>,
     pub(crate) population: Vec<f64>,
+    pub(crate) accumulators: Vec<f64>,
     pub(crate) expression_context: MathExpressionContext,
     pub(crate) current_step: f64,
     /// Store initial state for reset functionality
     pub(crate) initial_population: Vec<f64>,
+    pub(crate) initial_accumulators: Vec<f64>,
     /// Pre-computed transition flows for performance
     pub(crate) transition_flows: Vec<TransitionFlow>,
     /// Reusable buffer for compartment flows to avoid allocations

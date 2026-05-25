@@ -182,6 +182,53 @@ When **all parameters have units**, the model will automatically validate dimens
 - Ensure values are realistic for your model
 - Specify units for automatic validation (recommended)
 
+## Adding Accumulators
+
+Accumulators are cumulative counters that track the total flow through one or more transitions over time. They appear in simulation output but are not part of the population (they never subtract from compartment values).
+
+```python
+builder.add_accumulator(
+    id="cum_ab",    # Required: unique identifier
+    name="Cumulative A→B events"  # Required: display name
+)
+```
+
+To increment an accumulator, add it to the `accumulators` list of one or more transitions:
+
+```python
+builder.add_transition(
+    id="flow_ab",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N",
+    accumulators=["cum_ab"],  # incremented by every A→B flow
+)
+```
+
+Multiple transitions can share an accumulator, and one transition can increment multiple accumulators:
+
+```python
+builder.add_accumulator(id="total_out", name="Total outflow from A")
+builder.add_accumulator(id="cum_ab",    name="Cumulative A→B")
+
+builder.add_transition(
+    id="flow_ab",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N",
+    accumulators=["cum_ab", "total_out"],
+)
+builder.add_transition(
+    id="flow_ac",
+    source=["A"],
+    target=["C"],
+    rate="k2",
+    accumulators=["total_out"],
+)
+```
+
+With stratifications, accumulators are expanded identically to bins. `cum_ab` with a stratification `group=[g1, g2]` produces output columns `cum_ab_g1` and `cum_ab_g2`.
+
 ## Adding Transitions
 
 Transitions move populations between states.

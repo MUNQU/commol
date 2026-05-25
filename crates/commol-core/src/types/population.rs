@@ -9,6 +9,13 @@ pub struct Bin {
     pub name: String,
 }
 
+/// A cumulative event counter tracked by the engine but excluded from population totals.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Accumulator {
+    pub id: String,
+    pub name: String,
+}
+
 /// A stratification dimension with its categories
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Stratification {
@@ -59,6 +66,8 @@ pub struct InitialConditions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Population {
     pub bins: Vec<Bin>,
+    #[serde(default)]
+    pub accumulators: Vec<Accumulator>,
     pub stratifications: Vec<Stratification>,
     pub transitions: Vec<Transition>,
     pub initial_conditions: InitialConditions,

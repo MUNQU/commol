@@ -5,7 +5,8 @@ use crate::helpers::{
     get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
 };
 use crate::types::{
-    DifferenceEquations, SubpopulationMapping, TimeSeriesParameter, TransitionFlow, VarSlot,
+    AccumulatorOutputRef, DifferenceEquations, GeneratedAccumulatorOutput, SubpopulationMapping,
+    TimeSeriesParameter, TransitionFlow, VarSlot,
 };
 use commol_core::{MathExpressionContext, Model, RateMathExpression};
 use std::collections::{HashMap, HashSet};
@@ -27,8 +28,23 @@ impl DifferenceEquations {
     ///
     /// A new `DifferenceEquations` instance ready for simulation.
     pub fn from_model(model: &Model) -> Self {
-        // Generate all compartment combinations
+        // Generate all compartment and accumulator output combinations
         let (compartments, compartment_map) = generate_compartments(model);
+        let accumulator_outputs = generate_accumulators(model);
+        let accumulator_names: Vec<String> = accumulator_outputs
+            .iter()
+            .map(|output| output.name.clone())
+            .collect();
+        let accumulator_map: HashMap<AccumulatorOutputRef, usize> = accumulator_outputs
+            .iter()
+            .enumerate()
+            .map(|(idx, output)| (output.output_ref.clone(), idx))
+            .collect();
+        let output_names: Vec<String> = compartments
+            .iter()
+            .chain(&accumulator_names)
+            .cloned()
+            .collect();
 
         // Initialize population distribution
         let population = initialize_population(model, &compartments);
@@ -89,6 +105,7 @@ impl DifferenceEquations {
             model,
             &compartments,
             &compartment_map,
+            &accumulator_map,
             &model.population.stratifications,
             &subpopulation_param_names,
         );
@@ -125,10 +142,13 @@ impl DifferenceEquations {
 
         Self {
             compartments,
+            output_names,
             population,
+            accumulators: vec![0.0; accumulator_map.len()],
             expression_context,
             current_step: 0.0,
             initial_population,
+            initial_accumulators: vec![0.0; accumulator_map.len()],
             transition_flows,
             compartment_flows,
             subpopulation_mappings,
@@ -202,6 +222,65 @@ fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>)
         .collect();
 
     (compartments, compartment_map)
+}
+
+fn accumulator_output_ref(
+    accumulator_id: String,
+    applied: &HashMap<String, String>,
+    stratifications: &[commol_core::Stratification],
+) -> AccumulatorOutputRef {
+    AccumulatorOutputRef {
+        accumulator_id,
+        categories: stratifications
+            .iter()
+            .map(|stratification| applied.get(&stratification.id).cloned())
+            .collect(),
+    }
+}
+
+fn generate_accumulators(model: &Model) -> Vec<GeneratedAccumulatorOutput> {
+    let mut partials: Vec<(String, String, HashMap<String, String>)> = model
+        .population
+        .accumulators
+        .iter()
+        .map(|a| (a.id.clone(), a.id.clone(), HashMap::new()))
+        .collect();
+
+    for stratification in &model.population.stratifications {
+        let mut new_partials: Vec<(String, String, HashMap<String, String>)> = Vec::new();
+
+        for (accumulator_id, name, applied) in partials {
+            if stratification_conditions_met(&stratification.conditions, &applied) {
+                for cat in &stratification.categories {
+                    let mut new_applied = applied.clone();
+                    new_applied.insert(stratification.id.clone(), cat.clone());
+                    new_partials.push((
+                        accumulator_id.clone(),
+                        format!("{}_{}", name, cat),
+                        new_applied,
+                    ));
+                }
+            } else {
+                new_partials.push((accumulator_id, name, applied));
+            }
+        }
+
+        partials = new_partials;
+    }
+
+    partials
+        .into_iter()
+        .map(
+            |(accumulator_id, name, applied)| GeneratedAccumulatorOutput {
+                name,
+                output_ref: accumulator_output_ref(
+                    accumulator_id,
+                    &applied,
+                    &model.population.stratifications,
+                ),
+            },
+        )
+        .collect()
 }
 
 /// Initialize population distribution across compartments.
@@ -287,6 +366,7 @@ fn build_transition_flows(
     model: &Model,
     compartments: &[String],
     compartment_map: &HashMap<String, usize>,
+    accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
     stratifications: &[commol_core::Stratification],
     subpopulation_names: &HashSet<String>,
 ) -> Vec<TransitionFlow> {
@@ -317,6 +397,15 @@ fn build_transition_flows(
                         transition_flows.push(TransitionFlow {
                             source_index: None,
                             target_index: Some(i),
+                            accumulator_indices: accumulator_indices_for_transition(
+                                transition,
+                                target_bin,
+                                compartment_name,
+                                &stratification_values,
+                                stratifications,
+                                accumulator_map,
+                                matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
+                            ),
                             rate_expression,
                             is_absolute_flow: true,
                             resolved_slots,
@@ -351,6 +440,15 @@ fn build_transition_flows(
                         transition_flows.push(TransitionFlow {
                             source_index: Some(i),
                             target_index: None,
+                            accumulator_indices: accumulator_indices_for_transition(
+                                transition,
+                                source_bin,
+                                compartment_name,
+                                &stratification_values,
+                                stratifications,
+                                accumulator_map,
+                                matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
+                            ),
                             rate_expression,
                             is_absolute_flow,
                             resolved_slots,
@@ -409,7 +507,7 @@ fn build_transition_flows(
                                 );
                                 modified
                             } else {
-                                matched.rate_string
+                                matched.rate_string.clone()
                             };
 
                             // Parse the rate expression once
@@ -438,6 +536,15 @@ fn build_transition_flows(
                             transition_flows.push(TransitionFlow {
                                 source_index: Some(source_index),
                                 target_index: Some(target_index),
+                                accumulator_indices: accumulator_indices_for_transition(
+                                    transition,
+                                    source_bin,
+                                    compartment_name,
+                                    &stratification_values,
+                                    stratifications,
+                                    accumulator_map,
+                                    matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
+                                ),
                                 rate_expression,
                                 is_absolute_flow,
                                 resolved_slots,
@@ -450,6 +557,89 @@ fn build_transition_flows(
     }
 
     transition_flows
+}
+
+fn accumulator_indices_for_transition(
+    transition: &commol_core::Transition,
+    _source_bin: &str,
+    _source_compartment_name: &str,
+    stratification_values: &HashMap<String, String>,
+    stratifications: &[commol_core::Stratification],
+    accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
+    matched_conditions: Option<&[commol_core::StratificationCondition]>,
+) -> Vec<usize> {
+    transition
+        .accumulators
+        .iter()
+        .filter_map(|accumulator_id| {
+            let output_ref = if let Some(conditions) = matched_conditions {
+                if has_category_overrides(conditions) {
+                    accumulator_output_ref_with_category_overrides(
+                        accumulator_id.clone(),
+                        stratification_values,
+                        stratifications,
+                        conditions,
+                    )
+                } else {
+                    accumulator_output_ref(
+                        accumulator_id.clone(),
+                        stratification_values,
+                        stratifications,
+                    )
+                }
+            } else {
+                accumulator_output_ref(
+                    accumulator_id.clone(),
+                    stratification_values,
+                    stratifications,
+                )
+            };
+            accumulator_map.get(&output_ref).copied()
+        })
+        .collect()
+}
+
+fn accumulator_output_ref_with_category_overrides(
+    accumulator_id: String,
+    stratification_values: &HashMap<String, String>,
+    stratifications: &[commol_core::Stratification],
+    conditions: &[commol_core::StratificationCondition],
+) -> AccumulatorOutputRef {
+    let override_map: HashMap<&str, &str> = conditions
+        .iter()
+        .filter_map(|condition| {
+            condition
+                .to
+                .as_ref()
+                .map(|target| (condition.stratification.as_str(), target.as_str()))
+        })
+        .collect();
+    let mut target_applied: HashMap<String, String> = HashMap::new();
+
+    for stratification in stratifications {
+        let effective_category = override_map
+            .get(stratification.id.as_str())
+            .map(|category| (*category).to_string())
+            .or_else(|| stratification_values.get(&stratification.id).cloned());
+
+        let applies = match &stratification.conditions {
+            None => true,
+            Some(conditions) => conditions
+                .iter()
+                .all(|condition| match &condition.category {
+                    Some(category) => {
+                        target_applied.get(&condition.stratification) == Some(category)
+                    }
+                    None => true,
+                }),
+        };
+
+        if applies && let Some(category) = effective_category {
+            target_applied.insert(stratification.id.clone(), category);
+        }
+    }
+
+    accumulator_output_ref(accumulator_id, &target_applied, stratifications)
 }
 
 /// Build pre-computed subpopulation mappings for stratifications.

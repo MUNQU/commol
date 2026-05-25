@@ -60,6 +60,40 @@ for t, state in enumerate(results):
 
 **Best for**: Matrix operations, comparing states, exporting to CSV
 
+## Accumulator Outputs
+
+If the model defines [accumulators](core-concepts.md#accumulators), they appear as extra columns in the simulation output alongside compartments. Accumulator columns start at 0 and grow monotonically; they are never subtracted from.
+
+```python
+model = (
+    ModelBuilder("Model with accumulator")
+    .add_bin("A", "State A")
+    .add_bin("B", "State B")
+    .add_accumulator("cum_ab", "Cumulative A→B")
+    .add_parameter("k1", 0.1)
+    .add_transition("flow", ["A"], ["B"], rate="k1", accumulators=["cum_ab"])
+    .set_initial_conditions(1000, [{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}])
+    .build("DifferenceEquations")
+)
+
+sim = Simulation(model)
+results = sim.run(100)
+
+# Population outputs
+a_values = results["A"]     # decreasing
+b_values = results["B"]     # increasing
+
+# Accumulator — equals total flow into B since t=0
+cum = results["cum_ab"]
+```
+
+To enumerate all output names (compartments + accumulators), use `simulation.simulation_outputs`:
+
+```python
+print(simulation.simulation_outputs)
+# ['A', 'B', 'cum_ab']
+```
+
 ## Working with Stratified Results
 
 When you use stratifications, your simulation results contain separate time series for each stratified compartment. Understanding how to navigate, access, and aggregate these results is essential for analysis.

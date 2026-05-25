@@ -44,6 +44,11 @@ class Simulation:
         self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
 
         self._compartments: list[str] = self._engine.compartments
+        self._simulation_outputs: list[str] = getattr(
+            self._engine,
+            "output_names",
+            self._compartments,
+        )
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
@@ -157,11 +162,11 @@ class Simulation:
         elif output_format == "dict_of_lists":
             logging.info("Transposing raw results to 'dict_of_lists' format.")
             if not raw_results:
-                return {c: [] for c in self._compartments}
+                return {c: [] for c in self._simulation_outputs}
             transposed_results = zip(*raw_results)
             return {
-                compartment: list(values)
-                for compartment, values in zip(self._compartments, transposed_results)
+                column: list(values)
+                for column, values in zip(self._simulation_outputs, transposed_results)
             }
 
         else:
@@ -171,3 +176,8 @@ class Simulation:
     def engine(self) -> "DifferenceEquationsProtocol":
         """Get the underlying simulation engine."""
         return self._engine
+
+    @property
+    def simulation_outputs(self) -> list[str]:
+        """Names of the columns returned by simulation runs."""
+        return self._simulation_outputs

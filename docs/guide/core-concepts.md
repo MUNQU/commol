@@ -209,6 +209,44 @@ builder.add_transition(
 )
 ```
 
+## Accumulators
+
+Accumulators are cumulative event counters that are tracked as simulation outputs but are **not part of the population**. Unlike compartments, the value accumulated is never subtracted — it only grows as transitions fire.
+
+A common use case is cumulative incidence: total number of events that have occurred since time zero.
+
+```python
+# Define an accumulator
+builder.add_accumulator(id="cum_events", name="Cumulative events A→B")
+
+# Attach it to a transition — every flow from A to B increments the accumulator
+builder.add_transition(
+    id="transfer",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N",
+    accumulators=["cum_events"]
+)
+```
+
+After running the simulation, accumulator values appear in the output alongside compartments:
+
+```python
+results = simulation.run(100)
+# results["cum_events"] contains the cumulative total at each step
+```
+
+With stratifications, accumulators are expanded identically to bins:
+
+```
+Accumulator: cum_events
+Stratification: group = [g1, g2]
+
+Output columns: cum_events_g1, cum_events_g2
+```
+
+Accumulators are reset to 0 when the simulation is reset.
+
 ## Initial Conditions
 
 Initial conditions define the starting state of your model:
@@ -253,10 +291,11 @@ A typical workflow:
 1. **Define compartments** - What states exist in your model?
 2. **Add stratifications** (optional) - What subgroups matter?
 3. **Define parameters** - What rates and constants?
-4. **Create transitions** - How do populations flow between compartments?
-5. **Set initial conditions** - What's the starting state?
-6. **Build the model** - Validate and construct
-7. **Run simulation** - Execute and analyze
+4. **Add accumulators** (optional) - What cumulative counters do you need?
+5. **Create transitions** - How do populations flow between compartments?
+6. **Set initial conditions** - What's the starting state?
+7. **Build the model** - Validate and construct
+8. **Run simulation** - Execute and analyze
 
 ## Next Steps
 
