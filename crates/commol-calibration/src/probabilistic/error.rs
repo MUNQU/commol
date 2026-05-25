@@ -22,15 +22,15 @@ pub enum CalibrationError {
     )]
     InsufficientCandidates { required: usize, actual: usize },
 
-    /// NSGA-II solver creation failed.
-    #[error("Failed to create NSGA-II solver: {0}")]
-    NsgaSolverCreation(String),
+    /// Ensemble solver creation failed.
+    #[error("Failed to create ensemble solver: {0}")]
+    SolverCreation(String),
 
-    /// NSGA-II optimization failed.
-    #[error("NSGA-II optimization failed: {0}")]
-    NsgaOptimization(String),
+    /// Ensemble selection failed.
+    #[error("Ensemble selection failed: {0}")]
+    EnsembleSelectionFailed(String),
 
-    /// No population in the NSGA-II final state.
+    /// No population in the final solver state.
     #[error("No population in final state")]
     EmptyPopulation,
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.api.probabilistic.calibration_runner import CalibrationRunner
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
@@ -51,6 +52,7 @@ class StatisticsCalculator:
         self.simulation = simulation
         self.problem = problem
         self.confidence_level = confidence_level
+        self._calibration_runner = CalibrationRunner(simulation, problem, seed=0)
 
     def calculate_parameter_statistics(
         self,
@@ -94,69 +96,84 @@ class StatisticsCalculator:
     def generate_ensemble_predictions(
         self,
         ensemble_params: list[CalibrationEvaluation],
-        compartment_ids: list[str],
+        simulation_output_ids: list[str],
         time_steps: int,
     ) -> dict[str, list[list[float]]]:
-        """Generate predictions for each ensemble member in parallel using Rust.
+        """Generate or reuse predictions for each ensemble member.
 
         Parameters
         ----------
         ensemble_params : list[CalibrationEvaluation]
             List of parameter sets in the ensemble
-        compartment_ids : list[str]
-            List of compartment IDs to generate predictions for
+        simulation_output_ids : list[str]
+            List of simulation output IDs to generate predictions for
         time_steps : int
             Number of time steps to simulate
 
         Returns
         -------
         dict[str, list[list[float]]]
-            Dictionary mapping compartment IDs to list of prediction trajectories
+            Dictionary mapping simulation output IDs to prediction trajectories
         """
-        param_names = ensemble_params[0].parameter_names
+        cached_predictions = [ep.predictions for ep in ensemble_params]
+        n_outputs = len(self.simulation.simulation_outputs)
+        if all(
+            predictions is not None
+            and len(predictions) == time_steps
+            and all(len(step) >= n_outputs for step in predictions)
+            for predictions in cached_predictions
+        ):
+            all_predictions_raw = [
+                predictions
+                for predictions in cached_predictions
+                if predictions is not None
+            ]
+        else:
+            parameter_sets = [ep.parameters for ep in ensemble_params]
+            all_predictions_raw = (
+                commol_rs.calibration.generate_calibrated_predictions_parallel(
+                    self.simulation.engine,
+                    self._calibration_runner.build_rust_observed_data(),
+                    self._calibration_runner.build_rust_parameters(),
+                    self._calibration_runner.build_rust_constraints(),
+                    self._calibration_runner.build_loss_config(),
+                    self._calibration_runner.initial_population_size(),
+                    parameter_sets,
+                    time_steps,
+                )
+            )
 
-        # Extract parameter sets
-        parameter_sets = [ep.parameters for ep in ensemble_params]
-
-        # Call Rust function to generate all predictions in parallel
-        all_predictions_raw = commol_rs.calibration.generate_predictions_parallel(
-            self.simulation.engine,
-            parameter_sets,
-            param_names,
-            time_steps,
-        )
-
-        # Reorganize predictions by compartment
+        # Reorganize predictions by simulation output.
         # all_predictions_raw is list[list[list[float]]] where:
         # - outer list: one per parameter set
         # - middle list: one per time step
-        # - inner list: one per compartment
+        # - inner list: one per simulation output
         all_predictions: dict[str, list[list[float]]] = {
-            comp_id: [] for comp_id in compartment_ids
+            output_id: [] for output_id in simulation_output_ids
         }
 
-        compartment_idx_map = {
-            compartment: idx
-            for idx, compartment in enumerate(self.simulation.engine.compartments)
+        simulation_output_idx_map = {
+            output_id: idx
+            for idx, output_id in enumerate(self.simulation.simulation_outputs)
         }
 
         for predictions_per_param_set in all_predictions_raw:
             # predictions_per_param_set is list[list[float]]
-            # where [time_step][compartment_idx]
-            for comp_id in compartment_ids:
-                comp_idx = compartment_idx_map[comp_id]
+            # where [time_step][simulation_output_idx]
+            for output_id in simulation_output_ids:
+                output_idx = simulation_output_idx_map[output_id]
                 trajectory = [
-                    predictions_per_param_set[t][comp_idx]
+                    predictions_per_param_set[t][output_idx]
                     for t in range(len(predictions_per_param_set))
                 ]
-                all_predictions[comp_id].append(trajectory)
+                all_predictions[output_id].append(trajectory)
 
         return all_predictions
 
     def calculate_prediction_intervals(
         self,
         all_predictions: dict[str, list[list[float]]],
-        compartment_ids: list[str],
+        simulation_output_ids: list[str],
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], dict[str, list[float]]]:
         """Calculate median and confidence intervals from ensemble predictions.
 
@@ -164,8 +181,8 @@ class StatisticsCalculator:
         ----------
         all_predictions : dict[str, list[list[float]]]
             Dictionary mapping compartment IDs to list of prediction trajectories
-        compartment_ids : list[str]
-            List of compartment IDs
+        simulation_output_ids : list[str]
+            List of simulation output IDs
 
         Returns
         -------
@@ -179,13 +196,13 @@ class StatisticsCalculator:
         ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
         ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
 
-        for comp_id in compartment_ids:
-            predictions_array = np.array(all_predictions[comp_id])
-            prediction_median[comp_id] = np.median(predictions_array, axis=0).tolist()
-            prediction_ci_lower[comp_id] = np.percentile(
+        for output_id in simulation_output_ids:
+            predictions_array = np.array(all_predictions[output_id])
+            prediction_median[output_id] = np.median(predictions_array, axis=0).tolist()
+            prediction_ci_lower[output_id] = np.percentile(
                 predictions_array, ci_lower_percentile, axis=0
             ).tolist()
-            prediction_ci_upper[comp_id] = np.percentile(
+            prediction_ci_upper[output_id] = np.percentile(
                 predictions_array, ci_upper_percentile, axis=0
             ).tolist()
 
@@ -222,8 +239,19 @@ class StatisticsCalculator:
             if comp_id in prediction_ci_lower and step < len(
                 prediction_ci_lower[comp_id]
             ):
-                ci_lower = prediction_ci_lower[comp_id][step]
-                ci_upper = prediction_ci_upper[comp_id][step]
+                if obs.window_steps is None:
+                    ci_lower = prediction_ci_lower[comp_id][step]
+                    ci_upper = prediction_ci_upper[comp_id][step]
+                else:
+                    previous_step = step - obs.window_steps
+                    ci_lower = (
+                        prediction_ci_lower[comp_id][step]
+                        - prediction_ci_upper[comp_id][previous_step]
+                    )
+                    ci_upper = (
+                        prediction_ci_upper[comp_id][step]
+                        - prediction_ci_lower[comp_id][previous_step]
+                    )
 
                 if ci_lower <= observed_value <= ci_upper:
                     points_in_ci += 1

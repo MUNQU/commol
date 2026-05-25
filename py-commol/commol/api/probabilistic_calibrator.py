@@ -7,6 +7,7 @@ the probabilistic calibration workflow using focused helper classes.
 import logging
 import random
 import secrets
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
         CalibrationResultWithHistoryProtocol,
         EnsembleSelectionResultProtocol,
+        ParetoSolutionProtocol,
     )
     from commol.context.calibration import CalibrationProblem
 
@@ -36,13 +38,13 @@ class ProbabilisticCalibrator:
     """Probabilistic calibration that finds an ensemble of parameter sets.
 
     This calibrator performs multiple calibration runs, clusters the results,
-    and uses NSGA-II to find an optimal ensemble that balances narrow confidence
-    intervals with good coverage of observed data.
+    and uses ensemble selection to find an optimal ensemble that balances
+    narrow confidence intervals with good coverage of observed data.
 
     The workflow is orchestrated using focused helper classes:
     - CalibrationRunner: Runs multiple calibrations in parallel
     - EvaluationProcessor: Handles deduplication, filtering, and clustering
-    - EnsembleSelector: Runs NSGA-II ensemble selection
+    - EnsembleSelector: Runs ensemble selection
     - StatisticsCalculator: Computes ensemble statistics and predictions
 
     Parameters
@@ -100,6 +102,9 @@ class ProbabilisticCalibrator:
             silhouette_excellent_threshold=self.config.clustering.silhouette_excellent_threshold,
             kmeans_max_iter=self.config.clustering.kmeans_max_iter,
             kmeans_algorithm=self.config.clustering.kmeans_algorithm,
+            max_k=self.config.clustering.max_k,
+            silhouette_sample_size=self.config.clustering.silhouette_sample_size,
+            minibatch_kmeans_threshold=self.config.clustering.minibatch_kmeans_threshold,
         )
         self._ensemble_selector = EnsembleSelector(
             simulation, problem, seed=ensemble_seed
@@ -130,6 +135,7 @@ class ProbabilisticCalibrator:
             for category in stratification.categories
         }
         engine_compartment_ids = set(self.simulation.engine.compartments)
+        simulation_output_ids = set(self.simulation.simulation_outputs)
 
         self._validate_calibration_parameters(
             model_param_ids,
@@ -137,7 +143,8 @@ class ProbabilisticCalibrator:
             model_binary_stratification_categories,
             engine_compartment_ids,
         )
-        self._validate_observed_data(engine_compartment_ids)
+        self._validate_observed_data(simulation_output_ids)
+        self._warn_constraint_time_steps_beyond_observations()
 
         logger.debug("Input validation passed")
 
@@ -175,13 +182,14 @@ class ProbabilisticCalibrator:
                         f"Available compartments: {sorted(engine_compartment_ids)}"
                     )
 
-    def _validate_observed_data(self, engine_compartment_ids: set[str]) -> None:
-        """Validate that observed data compartments exist and have valid steps."""
+    def _validate_observed_data(self, simulation_output_ids: set[str]) -> None:
+        """Validate that observed data targets exist and have valid steps."""
         for obs in self.problem.observed_data:
-            if obs.compartment not in engine_compartment_ids:
+            if obs.compartment not in simulation_output_ids:
                 raise ValueError(
                     f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model. Available compartments: {sorted(engine_compartment_ids)}"
+                    f"model simulation outputs. Available outputs: "
+                    f"{sorted(simulation_output_ids)}"
                 )
 
         if self.problem.observed_data:
@@ -190,6 +198,21 @@ class ProbabilisticCalibrator:
                 raise ValueError(
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
+                )
+
+    def _warn_constraint_time_steps_beyond_observations(self) -> None:
+        """Warn when time-dependent constraints extend beyond observed data."""
+        if not self.problem.observed_data:
+            return
+
+        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        for constraint in self.problem.constraints:
+            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+                logger.warning(
+                    "Constraint '%s' has time_steps beyond the maximum observed "
+                    "step (%s); simulation will be extended to evaluate them.",
+                    constraint.id,
+                    max_observed_step,
                 )
 
     def run(self) -> ProbabilisticCalibrationResult:
@@ -209,28 +232,67 @@ class ProbabilisticCalibrator:
         logger.info(
             f"Starting probabilistic calibration with {self.config.n_runs} runs"
         )
+        total_start = perf_counter()
+        stage_timings: dict[str, float] = {}
+        stage_counts: dict[str, int] = {}
 
         # Run multiple calibrations
+        stage_start = perf_counter()
         all_results = self._run_calibrations()
+        stage_timings["calibration_runs_seconds"] = perf_counter() - stage_start
+        stage_counts["n_runs"] = len(all_results)
+        stage_counts["n_retained_evaluations"] = self._count_retained_evaluations(
+            all_results
+        )
 
         # Process evaluations (collect, deduplicate, filter)
+        stage_start = perf_counter()
         unique_evaluations = self._process_evaluations(all_results)
+        stage_timings["evaluation_processing_seconds"] = perf_counter() - stage_start
+        stage_counts["n_unique_evaluations"] = len(unique_evaluations)
 
         # Cluster and select representatives
+        stage_start = perf_counter()
         representatives, optimal_k = self._cluster_and_select_representatives(
             unique_evaluations
         )
+        stage_timings["clustering_and_representative_selection_seconds"] = (
+            perf_counter() - stage_start
+        )
+        stage_counts["n_clusters"] = optimal_k
+        stage_counts["n_representatives"] = len(representatives)
 
-        # Run NSGA-II ensemble selection
-        rust_ensemble_result = self._select_ensemble(representatives)
+        # Run ensemble selection
+        stage_start = perf_counter()
+        rust_ensemble_result, representatives = self._select_ensemble(representatives)
+        stage_timings["prediction_generation_and_ensemble_selection_seconds"] = (
+            perf_counter() - stage_start
+        )
+        stage_counts["n_generated_prediction_points"] = self._count_prediction_points(
+            representatives
+        )
+        stage_counts["pareto_front_size"] = len(rust_ensemble_result.pareto_front)
+        stage_counts["selected_ensemble_size"] = len(
+            rust_ensemble_result.selected_ensemble
+        )
 
         # Build final result with statistics
+        stage_start = perf_counter()
         result = self._build_result(
             representatives=representatives,
             rust_ensemble_result=rust_ensemble_result,
             n_runs=len(all_results),
             n_unique=len(unique_evaluations),
             n_clusters=optimal_k,
+            stage_timings=stage_timings,
+            stage_counts=stage_counts,
+            result_stage_start=stage_start,
+            total_start=total_start,
+        )
+
+        logger.debug(
+            "Probabilistic calibration stage timings: "
+            f"{result.stage_timings}; counts: {result.stage_counts}"
         )
 
         # Log parameter intervals for selected ensemble
@@ -251,11 +313,37 @@ class ProbabilisticCalibrator:
 
         return result
 
+    @staticmethod
+    def _count_retained_evaluations(
+        all_results: list["CalibrationResultWithHistoryProtocol"],
+    ) -> int:
+        """Count retained evaluations returned by all calibration runs."""
+        count = 0
+        for result in all_results:
+            if hasattr(result, "evaluations") and len(result.evaluations) > 0:
+                count += len(result.evaluations)
+            else:
+                count += 1
+        return count
+
+    @staticmethod
+    def _count_prediction_points(
+        representatives: list[CalibrationEvaluation],
+    ) -> int:
+        """Count generated prediction scalar values attached to representatives."""
+        total = 0
+        for rep in representatives:
+            if rep.predictions:
+                total += sum(len(step) for step in rep.predictions)
+        return total
+
     def _run_calibrations(self) -> list["CalibrationResultWithHistoryProtocol"]:
         """Run multiple calibration attempts."""
         logger.info("Running multiple calibration attempts...")
         all_results = self._calibration_runner.run_multiple(
             n_runs=self.config.n_runs,
+            evaluation_retention=self.config.evaluation_processing.evaluation_retention,
+            top_k_per_run=self.config.evaluation_processing.top_k_per_run,
         )
         logger.info(
             f"Completed {len(all_results)} successful calibration runs "
@@ -348,14 +436,20 @@ class ProbabilisticCalibrator:
 
     def _select_ensemble(
         self, representatives: list[CalibrationEvaluation]
-    ) -> "EnsembleSelectionResultProtocol":
-        """Run NSGA-II ensemble selection."""
-        logger.info("Running NSGA-II ensemble selection...")
+    ) -> tuple["EnsembleSelectionResultProtocol", list[CalibrationEvaluation]]:
+        """Run ensemble selection."""
+        logger.info(
+            "Running %s ensemble selection...",
+            self.config.ensemble_selection.ensemble_algorithm,
+        )
 
-        rust_ensemble_result = self._ensemble_selector.select_ensemble(
+        (
+            rust_ensemble_result,
+            representatives_with_predictions,
+        ) = self._ensemble_selector.select_ensemble_with_predictions(
             representatives=representatives,
-            nsga_population_size=self.config.ensemble_selection.nsga_population_size,
-            nsga_generations=self.config.ensemble_selection.nsga_generations,
+            population_size=self.config.ensemble_selection.population_size,
+            generations=self.config.ensemble_selection.generations,
             confidence_level=self.config.confidence_level,
             pareto_preference=self.config.ensemble_selection.pareto_preference,
             ensemble_size_mode=self.config.ensemble_selection.ensemble_size_mode,
@@ -364,7 +458,9 @@ class ProbabilisticCalibrator:
             ensemble_size_max=self.config.ensemble_selection.ensemble_size_max,
             ci_margin_factor=self.config.ensemble_selection.ci_margin_factor,
             ci_sample_sizes=self.config.ensemble_selection.ci_sample_sizes,
-            nsga_crossover_probability=self.config.ensemble_selection.nsga_crossover_probability,
+            crossover_probability=self.config.ensemble_selection.crossover_probability,
+            ci_width_scope=self.config.ensemble_selection.ci_width_scope,
+            ensemble_algorithm=self.config.ensemble_selection.ensemble_algorithm,
         )
 
         # Log ensemble size information based on mode
@@ -385,7 +481,7 @@ class ProbabilisticCalibrator:
                 f"Selected ensemble of {ensemble_size} parameter sets (automatic)"
             )
 
-        return rust_ensemble_result
+        return rust_ensemble_result, representatives_with_predictions
 
     def _build_result(
         self,
@@ -394,76 +490,134 @@ class ProbabilisticCalibrator:
         n_runs: int,
         n_unique: int,
         n_clusters: int,
+        stage_timings: dict[str, float] | None = None,
+        stage_counts: dict[str, int] | None = None,
+        result_stage_start: float | None = None,
+        total_start: float | None = None,
     ) -> ProbabilisticCalibrationResult:
-        """Calculate statistics and build final result with full Pareto front."""
-        logger.info("Building complete Pareto front with statistics...")
+        """Calculate statistics and build final result."""
+        result_detail = self.config.result_detail
+        logger.info("Building probabilistic result with detail mode: %s", result_detail)
 
         max_time_step = max(obs.step for obs in self.problem.observed_data)
         time_steps = max_time_step + 1
-        compartment_ids = list(self.simulation.engine.compartments)
+        simulation_output_ids = list(self.simulation.simulation_outputs)
 
-        # Build full ParetoSolution objects for each solution in the Pareto front
-        pareto_solutions = []
-        for rust_sol in rust_ensemble_result.pareto_front:
-            # Extract parameter sets for this solution
-            solution_params = [representatives[i] for i in rust_sol.selected_indices]
+        selected_rust_solution = rust_ensemble_result.pareto_front[
+            rust_ensemble_result.selected_pareto_index
+        ]
+        selected_solution = self._build_full_pareto_solution(
+            rust_sol=selected_rust_solution,
+            representatives=representatives,
+            simulation_output_ids=simulation_output_ids,
+            time_steps=time_steps,
+        )
 
-            # Calculate statistics for this solution
-            param_stats = self._statistics_calculator.calculate_parameter_statistics(
-                solution_params
-            )
-
-            # Generate predictions for this solution
-            all_preds = self._statistics_calculator.generate_ensemble_predictions(
-                solution_params, compartment_ids, time_steps
-            )
-
-            # Calculate prediction intervals
-            pred_median, pred_ci_lower, pred_ci_upper = (
-                self._statistics_calculator.calculate_prediction_intervals(
-                    all_preds, compartment_ids
+        if result_detail == "full":
+            pareto_solutions = [
+                (
+                    selected_solution
+                    if idx == rust_ensemble_result.selected_pareto_index
+                    else self._build_full_pareto_solution(
+                        rust_sol=rust_sol,
+                        representatives=representatives,
+                        simulation_output_ids=simulation_output_ids,
+                        time_steps=time_steps,
+                    )
                 )
-            )
-
-            # Calculate coverage metrics
-            cov_pct, avg_ci = self._statistics_calculator.calculate_coverage_metrics(
-                pred_ci_lower, pred_ci_upper
-            )
-
-            # Convert to parameter dicts
-            param_dicts = [ep.to_dict() for ep in solution_params]
-
-            # Create complete ParetoSolution
-            pareto_sol = ParetoSolution(
-                ensemble_size=rust_sol.ensemble_size,
-                selected_indices=rust_sol.selected_indices,
-                ensemble_parameters=param_dicts,
-                parameter_statistics=param_stats,
-                prediction_median=pred_median,
-                prediction_ci_lower=pred_ci_lower,
-                prediction_ci_upper=pred_ci_upper,
-                coverage_percentage=cov_pct,
-                average_ci_width=avg_ci,
-                ci_width=rust_sol.ci_width,
-                coverage=rust_sol.coverage,
-                size_penalty=rust_sol.size_penalty,
-            )
-            pareto_solutions.append(pareto_sol)
-
-        # The selected ensemble is the one at selected_pareto_index
-        selected_solution = pareto_solutions[rust_ensemble_result.selected_pareto_index]
+                for idx, rust_sol in enumerate(rust_ensemble_result.pareto_front)
+            ]
+            selected_pareto_index = rust_ensemble_result.selected_pareto_index
+        elif result_detail == "pareto_summary":
+            pareto_solutions = [
+                self._build_summary_pareto_solution(rust_sol)
+                for rust_sol in rust_ensemble_result.pareto_front
+            ]
+            selected_pareto_index = rust_ensemble_result.selected_pareto_index
+        else:
+            pareto_solutions = [selected_solution]
+            selected_pareto_index = 0
 
         logger.info(
             f"Coverage: {selected_solution.coverage_percentage:.2f}%, "
             f"Average CI width: {selected_solution.average_ci_width:.4f}"
         )
 
+        final_stage_timings = dict(stage_timings or {})
+        if result_stage_start is not None:
+            final_stage_timings["result_construction_seconds"] = (
+                perf_counter() - result_stage_start
+            )
+        if total_start is not None:
+            final_stage_timings["total_seconds"] = perf_counter() - total_start
+
         return ProbabilisticCalibrationResult(
             selected_ensemble=selected_solution,
             pareto_front=pareto_solutions,
-            selected_pareto_index=rust_ensemble_result.selected_pareto_index,
+            selected_pareto_index=selected_pareto_index,
             n_runs_performed=n_runs,
             n_unique_evaluations=n_unique,
             n_clusters_used=n_clusters,
             confidence_level=self.config.confidence_level,
+            stage_timings=final_stage_timings,
+            stage_counts=stage_counts or {},
+        )
+
+    def _build_full_pareto_solution(
+        self,
+        rust_sol: "ParetoSolutionProtocol",
+        representatives: list[CalibrationEvaluation],
+        simulation_output_ids: list[str],
+        time_steps: int,
+    ) -> ParetoSolution:
+        """Build a Pareto solution with parameter stats and prediction intervals."""
+        solution_params = [representatives[i] for i in rust_sol.selected_indices]
+        param_stats = self._statistics_calculator.calculate_parameter_statistics(
+            solution_params
+        )
+        all_preds = self._statistics_calculator.generate_ensemble_predictions(
+            solution_params, simulation_output_ids, time_steps
+        )
+        pred_median, pred_ci_lower, pred_ci_upper = (
+            self._statistics_calculator.calculate_prediction_intervals(
+                all_preds, simulation_output_ids
+            )
+        )
+        cov_pct, avg_ci = self._statistics_calculator.calculate_coverage_metrics(
+            pred_ci_lower, pred_ci_upper
+        )
+
+        return ParetoSolution(
+            ensemble_size=rust_sol.ensemble_size,
+            selected_indices=rust_sol.selected_indices,
+            ensemble_parameters=[ep.to_dict() for ep in solution_params],
+            parameter_statistics=param_stats,
+            prediction_median=pred_median,
+            prediction_ci_lower=pred_ci_lower,
+            prediction_ci_upper=pred_ci_upper,
+            coverage_percentage=cov_pct,
+            average_ci_width=avg_ci,
+            ci_width=rust_sol.ci_width,
+            coverage=rust_sol.coverage,
+            size_penalty=rust_sol.size_penalty,
+        )
+
+    @staticmethod
+    def _build_summary_pareto_solution(
+        rust_sol: "ParetoSolutionProtocol",
+    ) -> ParetoSolution:
+        """Build a compact Pareto solution containing objective summary only."""
+        return ParetoSolution(
+            ensemble_size=rust_sol.ensemble_size,
+            selected_indices=rust_sol.selected_indices,
+            ensemble_parameters=[],
+            parameter_statistics={},
+            prediction_median={},
+            prediction_ci_lower={},
+            prediction_ci_upper={},
+            coverage_percentage=rust_sol.coverage * 100.0,
+            average_ci_width=rust_sol.ci_width,
+            ci_width=rust_sol.ci_width,
+            coverage=rust_sol.coverage,
+            size_penalty=rust_sol.size_penalty,
         )

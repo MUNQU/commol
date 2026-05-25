@@ -1,7 +1,7 @@
 //! Ensemble size constraint modes.
 //!
 //! This module defines how ensemble size constraints are handled during
-//! NSGA-II optimization.
+//! Ensemble selection.
 
 /// Ensemble size constraint mode.
 #[derive(Debug, Clone)]

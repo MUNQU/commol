@@ -60,6 +60,12 @@ class ProbEvaluationFilterConfig(BaseModel):
     min_evaluations_required : int
         Minimum number of unique evaluations required for analysis (default: 5).
         Calibration fails if fewer unique evaluations remain after deduplication.
+    evaluation_retention : Literal["all", "best_per_run", "top_k_per_run"]
+        Amount of optimizer history retained from each run before crossing the
+        Python/Rust boundary.
+    top_k_per_run : int | None
+        Number of evaluations retained per run when evaluation_retention is
+        "top_k_per_run".
     """
 
     deduplication_tolerance: float = Field(
@@ -78,6 +84,33 @@ class ProbEvaluationFilterConfig(BaseModel):
         ge=1,
         description="Minimum number of unique evaluations required for analysis",
     )
+    evaluation_retention: Literal["all", "best_per_run", "top_k_per_run"] = Field(
+        default="all",
+        description="Optimizer evaluation history retention mode",
+    )
+    top_k_per_run: int | None = Field(
+        default=None,
+        ge=1,
+        description="Number of evaluations to retain per run for top_k_per_run mode",
+    )
+
+    @model_validator(mode="after")
+    def validate_evaluation_retention(self) -> Self:
+        """Validate evaluation retention configuration."""
+        if self.evaluation_retention == "top_k_per_run" and self.top_k_per_run is None:
+            raise ValueError(
+                "top_k_per_run must be specified when "
+                "evaluation_retention='top_k_per_run'"
+            )
+        if (
+            self.evaluation_retention != "top_k_per_run"
+            and self.top_k_per_run is not None
+        ):
+            raise ValueError(
+                "top_k_per_run should only be set when "
+                "evaluation_retention='top_k_per_run'"
+            )
+        return self
 
 
 class ProbClusteringConfig(BaseModel):
@@ -108,6 +141,13 @@ class ProbClusteringConfig(BaseModel):
         Maximum iterations for K-means clustering (default: 100).
     kmeans_algorithm : Literal["lloyd", "elkan", "auto", "full"]
         K-means algorithm variant (default: "elkan", faster for dense data).
+    max_k : int
+        Maximum K tested during automatic silhouette search.
+    silhouette_sample_size : int | None
+        Deterministic sample size used for silhouette scoring when the
+        evaluation set is large.
+    minibatch_kmeans_threshold : int | None
+        Use MiniBatchKMeans at or above this evaluation count.
     """
 
     n_clusters: int | None = Field(
@@ -145,6 +185,21 @@ class ProbClusteringConfig(BaseModel):
     kmeans_algorithm: Literal["lloyd", "elkan", "auto", "full"] = Field(
         default="elkan", description="K-means algorithm variant"
     )
+    max_k: int = Field(
+        default=10,
+        ge=2,
+        description="Maximum K to test during automatic silhouette search",
+    )
+    silhouette_sample_size: int | None = Field(
+        default=None,
+        ge=2,
+        description="Sample size for silhouette scoring",
+    )
+    minibatch_kmeans_threshold: int | None = Field(
+        default=None,
+        ge=1,
+        description="Evaluation count threshold for MiniBatchKMeans",
+    )
 
 
 class ProbRepresentativeConfig(BaseModel):
@@ -158,7 +213,7 @@ class ProbRepresentativeConfig(BaseModel):
     ----------
     max_representatives : int
         Maximum total representatives across all clusters (default: 1500).
-        These become candidates for NSGA-II ensemble selection.
+        These become candidates for ensemble selection.
     percentage_elite_cluster_selection : float
         Fraction [0.0, 1.0] of best solutions by loss to include from each
         cluster before diversity selection (default: 0.1).
@@ -192,7 +247,7 @@ class ProbRepresentativeConfig(BaseModel):
     max_representatives: int = Field(
         default=1000,
         gt=0,
-        description="Maximum total representatives for NSGA-II ensemble selection",
+        description="Maximum total representatives for ensemble selection",
     )
     percentage_elite_cluster_selection: float = Field(
         default=0.1,
@@ -235,14 +290,14 @@ class ProbRepresentativeConfig(BaseModel):
 
 class ProbEnsembleConfig(BaseModel):
     """
-    Configuration for NSGA-II ensemble selection.
+    Configuration for ensemble selection.
 
     Controls the multi-objective optimization that selects an optimal ensemble
     of parameter sets balancing narrow confidence intervals with good data coverage.
 
-    NSGA-II Optimization
-    --------------------
-    The algorithm optimizes two objectives:
+    Ensemble Objective
+    ------------------
+    Selection algorithms optimize two objectives:
     - Minimize CI width (narrow intervals = more precise predictions)
     - Maximize coverage (intervals contain observed data points)
 
@@ -258,12 +313,12 @@ class ProbEnsembleConfig(BaseModel):
 
     Attributes
     ----------
-    nsga_population_size : int
-        NSGA-II population size (default: 100, must be > 3).
-    nsga_generations : int
-        Number of NSGA-II generations (default: 100).
-    nsga_crossover_probability : float
-        Crossover probability (default: 0.9).
+    population_size : int
+        Population size for population-based algorithms (default: 100).
+    generations : int
+        Iteration count for iterative algorithms (default: 100).
+    crossover_probability : float
+        Crossover probability for algorithms that use crossover (default: 0.9).
         Higher values encourage more exploration through recombination.
     pareto_preference : float
         Preference for selecting from Pareto front (default: 0.5).
@@ -295,16 +350,25 @@ class ProbEnsembleConfig(BaseModel):
         maximum CI width bounds. The algorithm tests random ensembles of these
         sizes to find the widest possible CI, ensuring proper normalization.
         Larger sizes explore wider CIs but increase computation time.
+    ci_width_scope : Literal["observed_points", "observed_steps_all_compartments",
+        "full_trajectory"]
+        Prediction points included in the CI width objective. Compact scopes are
+        faster but intentionally change the ensemble-selection objective.
+    ensemble_algorithm : Literal["greedy_local_search", "nsga2"]
+        Algorithm used for ensemble subset selection.
     """
 
-    nsga_population_size: int = Field(
-        default=100, gt=3, description="NSGA-II population size"
+    population_size: int = Field(
+        default=100, gt=3, description="Population size for population-based algorithms"
     )
-    nsga_generations: int = Field(
-        default=100, gt=0, description="NSGA-II number of generations"
+    generations: int = Field(
+        default=100, gt=0, description="Iteration count for iterative algorithms"
     )
-    nsga_crossover_probability: float = Field(
-        default=0.9, ge=0.0, le=1.0, description="NSGA-II crossover probability"
+    crossover_probability: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Crossover probability for algorithms that use crossover",
     )
     pareto_preference: float = Field(
         default=0.5,
@@ -333,6 +397,18 @@ class ProbEnsembleConfig(BaseModel):
     ci_sample_sizes: list[int] = Field(
         default=[10, 20, 50, 100],
         description="Sample sizes for CI width estimation",
+    )
+    ci_width_scope: Literal[
+        "observed_points",
+        "observed_steps_all_compartments",
+        "full_trajectory",
+    ] = Field(
+        default="full_trajectory",
+        description="Prediction scope used for the CI width objective",
+    )
+    ensemble_algorithm: Literal["greedy_local_search", "nsga2"] = Field(
+        default="nsga2",
+        description="Algorithm used for ensemble subset selection",
     )
 
     @model_validator(mode="after")
@@ -410,7 +486,7 @@ class ProbabilisticCalibrationConfig(BaseModel):
     2. Evaluation Processing: Deduplication and filtering
     3. Clustering: Group similar solutions
     4. Representative Selection: Pick diverse solutions from clusters
-    5. Ensemble Selection: NSGA-II multi-objective optimization
+    5. Ensemble Selection: ensemble subset selection
     6. Statistics: Calculate confidence intervals and coverage
 
     Attributes
@@ -425,10 +501,13 @@ class ProbabilisticCalibrationConfig(BaseModel):
     representative_selection : ProbRepresentativeConfig
         Configuration for selecting representatives from clusters
     ensemble_selection : ProbEnsembleConfig
-        Configuration for NSGA-II ensemble selection
+        Configuration for ensemble selection
     confidence_level : float
         Confidence interval level (default: 0.95 for 95% CI).
         Must be in range (0.0, 1.0).
+    result_detail : Literal["selected_only", "pareto_summary", "full"]
+        Controls how much Pareto-front detail is materialized in the Python
+        result (default: "full" for compatibility).
     """
 
     n_runs: int = Field(
@@ -448,13 +527,20 @@ class ProbabilisticCalibrationConfig(BaseModel):
     )
     ensemble_selection: ProbEnsembleConfig = Field(
         default_factory=ProbEnsembleConfig,
-        description="Configuration for NSGA-II ensemble selection",
+        description="Configuration for ensemble selection",
     )
     confidence_level: float = Field(
         default=0.95,
         gt=0.0,
         lt=1.0,
         description="Confidence interval level (e.g., 0.95 for 95% CI)",
+    )
+    result_detail: Literal["selected_only", "pareto_summary", "full"] = Field(
+        default="full",
+        description=(
+            "Amount of Pareto-front result detail to build: selected_only, "
+            "pareto_summary, or full"
+        ),
     )
 
 
@@ -570,7 +656,7 @@ class ProbabilisticCalibrationResult(BaseModel):
     selected_ensemble : ParetoSolution
         The optimal ensemble solution selected based on pareto_preference
     pareto_front : list[ParetoSolution]
-        All Pareto-optimal ensemble solutions from NSGA-II optimization
+        All Pareto-optimal ensemble solutions from ensemble selection
         These represent different trade-offs between CI width and coverage
     selected_pareto_index : int
         Index in pareto_front of the selected solution
@@ -582,13 +668,17 @@ class ProbabilisticCalibrationResult(BaseModel):
         Number of clusters identified in parameter space
     confidence_level : float
         Confidence level used for interval calculation (e.g., 0.95 for 95% CI)
+    stage_timings : dict[str, float]
+        Wall-clock timings in seconds for major probabilistic calibration stages.
+    stage_counts : dict[str, int]
+        Counts associated with major stages, useful for performance diagnostics.
     """
 
     selected_ensemble: ParetoSolution = Field(
         description="The optimal ensemble solution selected based on preference"
     )
     pareto_front: list[ParetoSolution] = Field(
-        description="All Pareto-optimal ensemble solutions from NSGA-II"
+        description="All Pareto-optimal ensemble solutions from ensemble selection"
     )
     selected_pareto_index: int = Field(
         description="Index in pareto_front of the selected solution"
@@ -600,4 +690,12 @@ class ProbabilisticCalibrationResult(BaseModel):
     n_clusters_used: int = Field(description="Number of clusters identified")
     confidence_level: float = Field(
         description="Confidence level used (e.g., 0.95 for 95% CI)"
+    )
+    stage_timings: dict[str, float] = Field(
+        default_factory=dict,
+        description="Wall-clock timings in seconds for major calibration stages",
+    )
+    stage_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Counts associated with major calibration stages",
     )

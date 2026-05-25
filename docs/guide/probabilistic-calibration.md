@@ -40,14 +40,21 @@ Select diverse representatives from each cluster through a two-stage process:
 
 The two-stage approach balances solution quality (elite selection) with diversity (spatial selection), ensuring the final representatives capture both performance and parameter space coverage.
 
-#### 6. NSGA-II Ensemble Optimization
+#### 6. Ensemble Selection
 
-Use NSGA-II multi-objective optimization to select the final parameters set ensemble. NSGA-II treats ensemble selection as a combinatorial optimization problem, where each candidate solution represents a subset of representative parameter sets. The algorithm simultaneously optimizes two competing objectives by evaluating the population statistics that would result from each ensemble:
+Use the configured ensemble-selection algorithm to select the final parameter-set ensemble. Selection treats each candidate solution as a subset of representative parameter sets and optimizes the population statistics that would result from each ensemble:
 
 - **Minimize confidence interval width**: Select ensembles whose population statistics produce narrow confidence intervals, indicating precise predictions
 - **Maximize data coverage**: Select ensembles whose prediction intervals span and capture the observed data points, ensuring the uncertainty estimates are realistic and reliable
 
 The Pareto front contains ensembles that optimally balance these trade-offs. You can control the preference: favor narrow intervals (precision), high coverage (reliability), or a balanced trade-off.
+
+Two ensemble-selection algorithms are available:
+
+- **Greedy local search** (`ensemble_algorithm="greedy_local_search"`): Builds and improves a subset with add, remove, and swap moves. It is the recommended choice for large candidate sets when you want predictable runtime, especially with fixed or bounded ensemble sizes.
+- **NSGA-II** (`ensemble_algorithm="nsga2"`): Uses a population-based multi-objective search. It can explore a broader set of ensemble-size and objective trade-offs, at higher runtime cost.
+
+Both algorithms use the same objective model and Pareto preference rule. The algorithm choice changes how candidate ensembles are searched, not the meaning of coverage, confidence-interval width, or size policy.
 
 #### 7. Statistical Analysis and Predictions
 
@@ -235,6 +242,22 @@ print(f"Clusters identified: {result.n_clusters_used}")
 print(f"Confidence level: {result.confidence_level}")
 ```
 
+### Stage Timings and Counts
+
+The result exposes wall-clock timings and item counts per stage for performance diagnostics:
+
+```python
+# Wall-clock seconds per stage
+for stage, seconds in result.stage_timings.items():
+    print(f"{stage}: {seconds:.2f}s")
+
+# Item counts per stage (runs, evaluations, candidates, etc.)
+for stage, count in result.stage_counts.items():
+    print(f"{stage}: {count}")
+```
+
+Typical stage names: `"calibration_runs"`, `"deduplication"`, `"clustering"`, `"representative_selection"`, `"ensemble_selection"`. These are informational and may change across versions.
+
 ## Visualizing Results
 
 The `SimulationPlotter` provides visualization support for probabilistic calibration results, displaying predictions with confidence interval bands.
@@ -313,8 +336,9 @@ Probabilistic calibration is configured through the `CalibrationProblem.probabil
 - **evaluation_processing**: Deduplication and filtering settings
 - **clustering**: Clustering parameters
 - **representative_selection**: Selecting diverse solutions from clusters
-- **ensemble_selection**: NSGA-II ensemble optimization
+- **ensemble_selection**: ensemble selection
 - **confidence_level**: Confidence interval level (e.g., 0.95 for 95% CI)
+- **result_detail**: How much Pareto-front data to materialise in the Python result
 
 The random seed is set at the **CalibrationProblem level** (`problem.seed`), not within the configuration.
 
@@ -339,6 +363,16 @@ Confidence level for prediction and parameter intervals (e.g., 0.95 = 95% confid
 - **Higher values (0.99)**: Wider intervals, more conservative for critical decisions
 
 **When to adjust**: Use higher values (0.99) for safety-critical applications or regulatory compliance. Use lower values (0.90) when you need tighter bounds and can tolerate more uncertainty.
+
+#### result_detail ("selected_only" | "pareto_summary" | "full", default: "full")
+
+Controls how much Pareto-front detail is materialised in the `ProbabilisticCalibrationResult`:
+
+- **"full"**: Materialise all Pareto-front solutions with complete prediction trajectories (default, compatible with all plotting helpers).
+- **"pareto_summary"**: Include all Pareto solutions but without per-step predictions — suitable for inspecting the Pareto front structure without large memory cost.
+- **"selected_only"**: Only materialise the single selected ensemble solution.
+
+**When to adjust**: Use `"pareto_summary"` or `"selected_only"` for large runs where materialising full trajectories for hundreds of Pareto solutions is slow or memory-intensive.
 
 ### Evaluation Processing Parameters (ProbEvaluationFilterConfig)
 
@@ -367,6 +401,20 @@ Fraction of best solutions by loss to retain before clustering. For example, 0.3
 Minimum number of unique evaluations required after deduplication. Calibration fails if fewer remain.
 
 **When to adjust**: Decrease for quick tests with few runs. Increase to ensure statistical validity for production use.
+
+**evaluation_retention** ("all" | "best_per_run" | "top_k_per_run", default: "all")
+
+Controls how much optimizer evaluation history is retained from each run before aggregation. Reducing retention lowers memory usage and speeds up post-processing for large runs.
+
+- **"all"**: Keep every recorded evaluation from every run (default, full data).
+- **"best_per_run"**: Keep only the single best evaluation from each run.
+- **"top_k_per_run"**: Keep the `top_k_per_run` best evaluations by loss from each run.
+
+**When to adjust**: Set to `"top_k_per_run"` with a value of 100–500 for large multi-run calibrations to reduce memory and post-processing cost.
+
+**top_k_per_run** (int | None, default: None)
+
+Number of evaluations to retain per run when `evaluation_retention="top_k_per_run"`. Must be set when using that mode and must be ≥ 1.
 
 ### Clustering Parameters (ProbClusteringConfig)
 
@@ -403,17 +451,35 @@ Maximum iterations for K-means algorithm.
 
 K-means algorithm variant. "elkan" is typically faster for dense data.
 
+**max_k** (int, default: 10, must be ≥ 2)
+
+Maximum number of clusters tested during automatic silhouette search. The search tries k = 2, 3, ..., max_k and selects the k with the best silhouette score.
+
+**When to adjust**: Decrease for faster clustering when you expect few distinct solution groups. Increase for complex parameter spaces with many distinct modes.
+
+**silhouette_sample_size** (int | None, default: None)
+
+Fixed sample size used for silhouette scoring when the evaluation set is large. `None` uses all evaluations. Sampling makes clustering faster for very large evaluation sets.
+
+**When to adjust**: Set to 500–2000 when evaluation sets exceed tens of thousands to keep clustering fast.
+
+**minibatch_kmeans_threshold** (int | None, default: None)
+
+Switch to MiniBatchKMeans when the evaluation count meets or exceeds this threshold. `None` always uses standard KMeans. MiniBatchKMeans is faster for large datasets but may produce slightly different cluster boundaries.
+
+**When to adjust**: Set to 5000–10000 when working with large calibration runs to reduce clustering time.
+
 ### Representative Selection Parameters (ProbRepresentativeConfig)
 
 **max_representatives** (int, default: 1000)
 
-Maximum total representatives across all clusters to select as candidates for NSGA-II ensemble selection.
+Maximum total representatives across all clusters to select as candidates for ensemble selection.
 
-- **Lower values (500-800)**: Faster NSGA-II execution, may miss diversity
+- **Lower values (500-800)**: Faster ensemble selection, may miss diversity
 - **Default value (1000)**: Good balance for most problems
 - **Higher values (1500+)**: More thorough ensemble optimization, slower
 
-**When to adjust**: Decrease if NSGA-II is too slow. Increase for very complex parameter spaces with many clusters.
+**When to adjust**: Decrease if ensemble selection is too slow. Increase for very complex parameter spaces with many clusters.
 
 **percentage_elite_cluster_selection** (float, default: 0.1, range: [0.0, 1.0])
 
@@ -468,9 +534,9 @@ Weight for stratum fit vs quality in latin_hypercube selection. Higher values pr
 
 How to determine ensemble size:
 
-- **"automatic"**: NSGA-II optimizes size within min/max bounds
+- **"automatic"**: ensemble selection optimizes size within min/max bounds
 - **"fixed"**: Use exact `ensemble_size` value
-- **"bounded"**: NSGA-II optimizes within specified range
+- **"bounded"**: ensemble selection optimizes within specified range
 
 **ensemble_size** (int | None, required for "fixed" mode)
 
@@ -484,17 +550,24 @@ Minimum ensemble size when mode="bounded". Must be ≥ 2. Not used for "automati
 
 Maximum ensemble size when mode="bounded". Must be ≥ ensemble_size_min. Not used for "automatic" or "fixed" modes.
 
-**nsga_population_size** (int, default: 100, must be > 3)
+**ensemble_algorithm** ("greedy_local_search" | "nsga2", default: "nsga2")
 
-NSGA-II population size. More individuals explore more ensemble combinations but increase runtime.
+Algorithm used to select the final ensemble from representative parameter sets:
 
-**nsga_generations** (int, default: 100)
+- **"greedy_local_search"**: Fast subset search with add, remove, and swap moves. Best for large candidate pools and fixed or bounded ensemble sizes.
+- **"nsga2"**: Population-based multi-objective search. Best when you want broader exploration of the Pareto front and can spend more runtime.
 
-Number of NSGA-II generations. More generations improve solution quality but increase runtime.
+**population_size** (int, default: 100, must be > 3)
 
-**nsga_crossover_probability** (float, default: 0.9, range: [0.0, 1.0])
+Population size for population-based algorithms such as `"nsga2"`. More individuals explore more ensemble combinations but increase runtime. Ignored by `"greedy_local_search"`.
 
-Probability of crossover in NSGA-II. Higher values encourage more exploration.
+**generations** (int, default: 100)
+
+Iteration count for iterative algorithms such as `"nsga2"`. More generations improve solution quality but increase runtime. Ignored by `"greedy_local_search"`.
+
+**crossover_probability** (float, default: 0.9, range: [0.0, 1.0])
+
+Crossover probability for algorithms that use crossover, currently `"nsga2"`. Higher values encourage more exploration. Ignored by `"greedy_local_search"`.
 
 **pareto_preference** (float, default: 0.5, range: [0.0, 1.0])
 
@@ -541,6 +614,7 @@ problem.probabilistic_config = ProbabilisticCalibrationConfig(
     ),
     ensemble_selection=ProbEnsembleConfig(
         ensemble_size_mode="automatic",
+        ensemble_algorithm="greedy_local_search",
         pareto_preference=0.5,
     ),
 )

@@ -49,15 +49,16 @@ impl PyObservedDataPoint {
     ///     weight: Optional weight for this observation (default: 1.0)
     ///     scale_id: Optional scale parameter ID to apply to model output
     #[new]
-    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None))]
+    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None, window_steps=None))]
     fn new(
         step: u32,
         compartment: String,
         value: f64,
         weight: Option<f64>,
         scale_id: Option<String>,
+        window_steps: Option<u32>,
     ) -> Self {
-        let inner = match (weight, scale_id) {
+        let mut inner = match (weight, scale_id) {
             (Some(w), Some(s)) => commol_calibration::ObservedDataPoint::with_weight_and_scale(
                 step,
                 compartment,
@@ -73,6 +74,7 @@ impl PyObservedDataPoint {
             }
             (None, None) => commol_calibration::ObservedDataPoint::new(step, compartment, value),
         };
+        inner.window_steps = window_steps;
         Self { inner }
     }
 
@@ -1133,6 +1135,7 @@ fn calibrate_with_history(
 /// Returns:
 ///     List of CalibrationResultWithHistory for each successful run
 #[pyfunction]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, n_runs, seed, evaluation_retention="all", top_k_per_run=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_multiple_calibrations(
     engine: &PyDifferenceEquations,
@@ -1144,6 +1147,8 @@ fn run_multiple_calibrations(
     initial_population_size: u64,
     n_runs: usize,
     seed: u64,
+    evaluation_retention: &str,
+    top_k_per_run: Option<usize>,
 ) -> PyResult<Vec<PyCalibrationResultWithHistory>> {
     // Convert to Rust types
     let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
@@ -1162,12 +1167,32 @@ fn run_multiple_calibrations(
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
 
+    let evaluation_retention = match evaluation_retention {
+        "all" => commol_calibration::EvaluationRetention::All,
+        "best_per_run" => commol_calibration::EvaluationRetention::BestPerRun,
+        "top_k_per_run" => {
+            let k = top_k_per_run.ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "top_k_per_run must be specified when evaluation_retention='top_k_per_run'",
+                )
+            })?;
+            commol_calibration::EvaluationRetention::TopKPerRun(k)
+        }
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid evaluation_retention: '{}'. Must be 'all', 'best_per_run', or 'top_k_per_run'",
+                evaluation_retention
+            )));
+        }
+    };
+
     // Run multiple calibrations in parallel
     let results = commol_calibration::run_multiple_calibrations(
         &base_problem,
         &optimization_config.inner,
         n_runs,
         seed,
+        evaluation_retention,
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -1178,16 +1203,16 @@ fn run_multiple_calibrations(
         .collect())
 }
 
-/// Select optimal ensemble using NSGA-II (for probabilistic calibration)
+/// Select optimal ensemble for probabilistic calibration.
 ///
-/// Uses NSGA-II multi-objective optimization to find a Pareto-optimal ensemble
-/// of parameter sets that balances narrow confidence intervals with good coverage.
+/// Uses the configured algorithm to find an ensemble of parameter sets that
+/// balances narrow confidence intervals with good coverage.
 ///
 /// Args:
 ///     candidates: List of CalibrationEvaluation objects with predictions
 ///     observed_data_tuples: List of (time_step, compartment_idx, value) tuples
-///     population_size: NSGA-II population size
-///     generations: Number of NSGA-II generations
+///     population_size: Population size for population-based ensemble algorithms
+///     generations: Iteration count for iterative ensemble algorithms
 ///     confidence_level: Confidence level for CI calculation (e.g., 0.95)
 ///     seed: Random seed for reproducibility
 ///     pareto_preference: Preference for Pareto front selection (0.0-1.0)
@@ -1197,12 +1222,12 @@ fn run_multiple_calibrations(
 ///     ensemble_size_max: Maximum ensemble size (required if mode='bounded', otherwise None)
 ///     ci_margin_factor: Safety margin factor for CI width bounds (default: 0.1)
 ///     ci_sample_sizes: Sample sizes for CI bounds estimation (default: [10, 20, 50, 100])
-///     nsga_crossover_probability: NSGA-II crossover probability (default: 0.9)
+///     crossover_probability: Crossover probability for algorithms that use crossover (default: 0.9)
 ///
 /// Returns:
 ///     EnsembleSelectionResult containing selected ensemble and Pareto front
 #[pyfunction]
-#[pyo3(signature = (candidates, observed_data_tuples, population_size, generations, confidence_level, seed, pareto_preference, ensemble_size_mode, ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, ci_margin_factor=0.1, ci_sample_sizes=None, nsga_crossover_probability=0.9))]
+#[pyo3(signature = (candidates, observed_data_tuples, population_size, generations, confidence_level, seed, pareto_preference, ensemble_size_mode, ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, ci_margin_factor=0.1, ci_sample_sizes=None, crossover_probability=0.9, ci_width_scope="full_trajectory", ensemble_algorithm="nsga2"))]
 #[allow(clippy::too_many_arguments)]
 fn select_optimal_ensemble(
     candidates: Vec<PyCalibrationEvaluation>,
@@ -1218,7 +1243,9 @@ fn select_optimal_ensemble(
     ensemble_size_max: Option<usize>,
     ci_margin_factor: f64,
     ci_sample_sizes: Option<Vec<usize>>,
-    nsga_crossover_probability: f64,
+    crossover_probability: f64,
+    ci_width_scope: &str,
+    ensemble_algorithm: &str,
 ) -> PyResult<PyEnsembleSelectionResult> {
     // Convert Python CalibrationEvaluation to Rust
     let rust_candidates: Vec<_> = candidates.into_iter().map(|e| e.inner).collect();
@@ -1273,11 +1300,40 @@ fn select_optimal_ensemble(
         }
     };
 
+    let ci_width_scope = match ci_width_scope {
+        "observed_points" => commol_calibration::CIWidthScope::ObservedPoints,
+        "observed_steps_all_compartments" => {
+            commol_calibration::CIWidthScope::ObservedStepsAllCompartments
+        }
+        "full_trajectory" => commol_calibration::CIWidthScope::FullTrajectory,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid ci_width_scope: '{}'. Must be 'observed_points', \
+                 'observed_steps_all_compartments', or 'full_trajectory'",
+                ci_width_scope
+            )));
+        }
+    };
+
+    let ensemble_algorithm = match ensemble_algorithm {
+        "greedy_local_search" => commol_calibration::EnsembleAlgorithm::GreedyLocalSearch,
+        "nsga2" => commol_calibration::EnsembleAlgorithm::Nsga2,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid ensemble_algorithm: '{}'. Must be 'greedy_local_search' or 'nsga2'",
+                ensemble_algorithm
+            )));
+        }
+    };
+
     // Build ensemble selection config from parameters
     let ensemble_config = commol_calibration::EnsembleSelectionConfig {
         ci_margin_factor,
         ci_sample_sizes: ci_sample_sizes.unwrap_or_else(|| vec![10, 20, 50, 100]),
-        nsga_crossover_probability,
+        crossover_probability,
+        ci_width_scope,
+        ensemble_algorithm,
+        parallel_objective_threshold: 512,
         // Use defaults for cluster representative parameters (not used in select_optimal_ensemble)
         k_neighbors_min: 5,
         k_neighbors_max: 10,
@@ -1295,7 +1351,7 @@ fn select_optimal_ensemble(
         ensemble_config: &ensemble_config,
     };
 
-    // Run NSGA-II ensemble selection
+    // Run ensemble selection
     let result = commol_calibration::select_optimal_ensemble(
         rust_candidates,
         observed_data_tuples,
@@ -1370,6 +1426,99 @@ fn generate_predictions_parallel(
     Ok(predictions)
 }
 
+/// Generate predictions for calibration parameter sets, including calibrated
+/// initial conditions.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn generate_calibrated_predictions_parallel(
+    engine: &PyDifferenceEquations,
+    observed_data: Vec<PyObservedDataPoint>,
+    parameters: Vec<PyCalibrationParameter>,
+    constraints: Vec<PyCalibrationConstraint>,
+    loss_config: &PyLossConfig,
+    initial_population_size: u64,
+    parameter_sets: Vec<Vec<f64>>,
+    time_steps: u32,
+) -> PyResult<Vec<Vec<Vec<f64>>>> {
+    let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
+    let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
+    let problem = commol_calibration::CalibrationProblem::new(
+        engine.inner().clone(),
+        rust_observed_data,
+        rust_parameters,
+        rust_constraints,
+        loss_config.inner,
+        initial_population_size,
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+
+    let predictions = commol_calibration::generate_calibrated_predictions_parallel(
+        &problem,
+        parameter_sets,
+        time_steps,
+    )
+    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+    Ok(predictions)
+}
+
+/// Generate compact predictions for selected metric points.
+#[pyfunction]
+fn generate_predictions_at_points_parallel(
+    engine: &PyDifferenceEquations,
+    parameter_sets: Vec<Vec<f64>>,
+    parameter_names: Vec<String>,
+    metric_points: Vec<(u32, usize)>,
+) -> PyResult<Vec<Vec<f64>>> {
+    let predictions = commol_calibration::generate_predictions_at_points_parallel(
+        engine.inner(),
+        parameter_sets,
+        parameter_names,
+        metric_points,
+    )
+    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+    Ok(predictions)
+}
+
+/// Generate compact predictions for calibration parameter sets, including
+/// calibrated initial conditions.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn generate_calibrated_predictions_at_points_parallel(
+    engine: &PyDifferenceEquations,
+    observed_data: Vec<PyObservedDataPoint>,
+    parameters: Vec<PyCalibrationParameter>,
+    constraints: Vec<PyCalibrationConstraint>,
+    loss_config: &PyLossConfig,
+    initial_population_size: u64,
+    parameter_sets: Vec<Vec<f64>>,
+    metric_points: Vec<(u32, usize)>,
+) -> PyResult<Vec<Vec<f64>>> {
+    let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
+    let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
+    let problem = commol_calibration::CalibrationProblem::new(
+        engine.inner().clone(),
+        rust_observed_data,
+        rust_parameters,
+        rust_constraints,
+        loss_config.inner,
+        initial_population_size,
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+
+    let predictions = commol_calibration::generate_calibrated_predictions_at_points_parallel(
+        &problem,
+        parameter_sets,
+        metric_points,
+    )
+    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+    Ok(predictions)
+}
+
 /// Select cluster representatives using Rust for performance
 ///
 /// Args:
@@ -1413,7 +1562,10 @@ fn select_cluster_representatives(
         // CI parameters not used in cluster representatives
         ci_margin_factor: 0.1,
         ci_sample_sizes: vec![10, 20, 50, 100],
-        nsga_crossover_probability: 0.9,
+        crossover_probability: 0.9,
+        ci_width_scope: commol_calibration::CIWidthScope::FullTrajectory,
+        ensemble_algorithm: commol_calibration::EnsembleAlgorithm::Nsga2,
+        parallel_objective_threshold: 512,
         // Cluster representative parameters
         k_neighbors_min,
         k_neighbors_max,
@@ -1468,6 +1620,18 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(select_optimal_ensemble, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;
     m.add_function(wrap_pyfunction!(generate_predictions_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        generate_calibrated_predictions_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        generate_predictions_at_points_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        generate_calibrated_predictions_at_points_parallel,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(select_cluster_representatives, m)?)?;
     Ok(())
 }

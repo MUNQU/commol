@@ -374,6 +374,8 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         n_runs: int,
         seed: int,
+        evaluation_retention: str = "all",
+        top_k_per_run: int | None = None,
     ) -> list[CalibrationResultWithHistoryProtocol]: ...
     def select_optimal_ensemble(
         self,
@@ -390,7 +392,9 @@ class CalibrationModule(Protocol):
         ensemble_size_max: int | None = None,
         ci_margin_factor: float = 0.1,
         ci_sample_sizes: list[int] | None = None,
-        nsga_crossover_probability: float = 0.9,
+        crossover_probability: float = 0.9,
+        ci_width_scope: str = "full_trajectory",
+        ensemble_algorithm: str = "nsga2",
     ) -> EnsembleSelectionResultProtocol: ...
     def deduplicate_evaluations(
         self,
@@ -404,6 +408,35 @@ class CalibrationModule(Protocol):
         parameter_names: list[str],
         time_steps: int,
     ) -> list[list[list[float]]]: ...
+    def generate_calibrated_predictions_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        initial_population_size: int,
+        parameter_sets: list[list[float]],
+        time_steps: int,
+    ) -> list[list[list[float]]]: ...
+    def generate_predictions_at_points_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameter_sets: list[list[float]],
+        parameter_names: list[str],
+        metric_points: list[tuple[int, int]],
+    ) -> list[list[float]]: ...
+    def generate_calibrated_predictions_at_points_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        initial_population_size: int,
+        parameter_sets: list[list[float]],
+        metric_points: list[tuple[int, int]],
+    ) -> list[list[float]]: ...
     def select_cluster_representatives(
         self,
         evaluations: list[CalibrationEvaluationProtocol],

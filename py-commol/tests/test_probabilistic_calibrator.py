@@ -127,8 +127,8 @@ class TestProbabilisticCalibrator:
                 percentage_elite_cluster_selection=0.1,
             ),
             ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=50,
-                nsga_generations=5000,
+                population_size=50,
+                generations=5000,
                 ensemble_size_mode="bounded",
                 ensemble_size_min=10,
                 ensemble_size_max=30,
@@ -315,8 +315,8 @@ class TestProbabilisticCalibrator:
                 percentage_elite_cluster_selection=0.1,
             ),
             ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=50,
-                nsga_generations=5000,
+                population_size=50,
+                generations=5000,
                 ensemble_size_mode="bounded",
                 ensemble_size_min=10,
                 ensemble_size_max=30,
@@ -647,8 +647,8 @@ class TestProbabilisticCalibratorSelectionMethods:
                 cluster_selection_method=selection_method,
             ),
             ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=10,
-                nsga_generations=10,
+                population_size=10,
+                generations=10,
             ),
         )
         base_problem.seed = SEED
@@ -683,8 +683,8 @@ class TestProbabilisticCalibratorSelectionMethods:
 
         # Build ensemble selection config based on size_mode
         ensemble_config = ProbEnsembleConfig(
-            nsga_population_size=10,
-            nsga_generations=10,
+            population_size=10,
+            generations=10,
             ensemble_size_mode=size_mode,
             **size_config,
         )

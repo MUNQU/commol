@@ -59,6 +59,8 @@ class CalibrationRunner:
     def run_multiple(
         self,
         n_runs: int,
+        evaluation_retention: str = "all",
+        top_k_per_run: int | None = None,
     ) -> list["CalibrationResultWithHistoryProtocol"]:
         """Run multiple calibration attempts in parallel using Rust.
 
@@ -79,48 +81,12 @@ class CalibrationRunner:
         """
         logger.info(f"Running {n_runs} calibrations in parallel")
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            commol_rs.calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-            )
-            for point in self.problem.observed_data
-        ]
-
-        # Convert parameters to Rust types
-        rust_parameters = [
-            commol_rs.calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
-
-        # Convert constraints to Rust types
-        rust_constraints = [
-            commol_rs.calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
-
-        # Convert loss and optimization configs
-        rust_loss_config = self._build_loss_config()
+        rust_observed_data = self.build_rust_observed_data()
+        rust_parameters = self.build_rust_parameters()
+        rust_constraints = self.build_rust_constraints()
+        rust_loss_config = self.build_loss_config()
         rust_optimization_config = self._build_optimization_config()
-
-        # Get initial population size
-        initial_population_size = self._get_initial_population_size()
+        initial_population_size = self.initial_population_size()
 
         # Call Rust function for parallel execution
         try:
@@ -134,11 +100,61 @@ class CalibrationRunner:
                 initial_population_size,
                 n_runs,
                 self.seed,
+                evaluation_retention,
+                top_k_per_run,
             )
             logger.info(f"Completed {len(results)}/{n_runs} calibrations successfully")
             return results
         except Exception as e:
             raise RuntimeError(f"Parallel calibrations failed: {e}") from e
+
+    def build_rust_observed_data(self):
+        """Convert observed data to Rust types."""
+        return [
+            commol_rs.calibration.ObservedDataPoint(
+                step=point.step,
+                compartment=point.compartment,
+                value=point.value,
+                weight=point.weight,
+                scale_id=point.scale_id,
+                window_steps=point.window_steps,
+            )
+            for point in self.problem.observed_data
+        ]
+
+    def build_rust_parameters(self):
+        """Convert calibration parameters to Rust types."""
+        return [
+            commol_rs.calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
+    def build_rust_constraints(self):
+        """Convert calibration constraints to Rust types."""
+        return [
+            commol_rs.calibration.CalibrationConstraint(
+                id=constraint.id,
+                expression=constraint.expression,
+                description=constraint.description,
+                weight=constraint.weight,
+                time_steps=constraint.time_steps,
+            )
+            for constraint in self.problem.constraints
+        ]
+
+    def build_loss_config(self) -> "LossConfigProtocol":
+        """Convert the configured Python loss function to Rust."""
+        return self._build_loss_config()
+
+    def initial_population_size(self) -> int:
+        """Return the model initial population size used by Rust calibration."""
+        return self._get_initial_population_size()
 
     def _to_rust_parameter_type(
         self, param_type: str

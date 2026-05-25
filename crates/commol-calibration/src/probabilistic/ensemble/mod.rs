@@ -1,4 +1,4 @@
-//! Ensemble selection using NSGA-II multi-objective optimization.
+//! Ensemble selection algorithms.
 //!
 //! This module provides functionality for selecting an optimal ensemble of
 //! parameter sets that balances narrow confidence intervals with good coverage

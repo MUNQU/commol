@@ -22,6 +22,69 @@ calibrator = Calibrator(simulation, problem)
 result = calibrator.run_probabilistic()
 ```
 
+## Performance Controls
+
+Large probabilistic runs can reduce post-processing cost with opt-in compact
+settings:
+
+```python
+from commol import ProbabilisticCalibrationConfig
+from commol.context.probabilistic_calibration import (
+    ProbClusteringConfig,
+    ProbEnsembleConfig,
+    ProbEvaluationFilterConfig,
+)
+
+problem.probabilistic_config = ProbabilisticCalibrationConfig(
+    result_detail="pareto_summary",
+    evaluation_processing=ProbEvaluationFilterConfig(
+        evaluation_retention="top_k_per_run",
+        top_k_per_run=200,
+    ),
+    clustering=ProbClusteringConfig(
+        max_k=8,
+        silhouette_sample_size=1000,
+        minibatch_kmeans_threshold=5000,
+    ),
+    ensemble_selection=ProbEnsembleConfig(
+        ci_width_scope="observed_points",
+        ensemble_algorithm="greedy_local_search",
+        ensemble_size_mode="fixed",
+        ensemble_size=50,
+    ),
+)
+```
+
+`result_detail="full"` and `ci_width_scope="full_trajectory"` preserve the
+original exhaustive behavior. Compact CI width scopes intentionally change the
+ensemble-selection objective by evaluating uncertainty on fewer prediction
+points.
+
+### Ensemble Selection Algorithms
+
+`ProbEnsembleConfig.ensemble_algorithm` chooses the algorithm used to build the
+final ensemble from the representative candidates:
+
+- `greedy_local_search`: starts from a subset and improves it with add, remove,
+  and swap moves. This is usually the fastest choice for fixed or bounded
+  ensemble sizes and scales well when many representative candidates are
+  available.
+- `nsga2`: uses a population-based multi-objective search. It explores a wider
+  set of ensemble sizes and trade-offs, which can be useful when you want a
+  richer Pareto front and can spend more runtime.
+
+Both algorithms optimize the same ensemble objectives: narrower confidence
+intervals, higher observed-data coverage, and the configured ensemble-size
+policy. Shared Pareto preference logic then selects the reported ensemble from
+the generated front.
+
+Algorithm-specific tuning:
+
+- `population_size`, `generations`, and `crossover_probability` affect
+  `nsga2`.
+- `greedy_local_search` primarily uses the ensemble-size settings and the same
+  objective configuration; population and crossover settings are ignored.
+
 ## Related Classes
 
 ### ProbabilisticCalibrationConfig
@@ -151,7 +214,7 @@ members: - collect_evaluations - deduplicate - filter_by_loss_percentile - find_
 
 ### EnsembleSelector
 
-Runs NSGA-II multi-objective optimization for ensemble selection.
+Selects the final parameter-set ensemble from representative candidates.
 
 ::: commol.api.probabilistic.ensemble_selector.EnsembleSelector
 options:

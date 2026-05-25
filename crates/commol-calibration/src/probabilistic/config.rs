@@ -1,14 +1,26 @@
-//! Configuration for ensemble selection algorithms.
-//!
-//! This module provides the `EnsembleSelectionConfig` struct which contains
-//! all configurable parameters for NSGA-II ensemble selection and cluster
-//! representative selection algorithms.
+//! Configuration for ensemble selection and representative selection.
 
-/// Configuration for ensemble selection algorithms.
-///
-/// This struct contains all configurable parameters for the NSGA-II ensemble
-/// selection and cluster representative selection algorithms. All values have
-/// sensible defaults matching the previous hardcoded behavior.
+/// Prediction points used for the confidence-interval width objective.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CIWidthScope {
+    /// Use only observed time/compartment points.
+    ObservedPoints,
+    /// Use all compartments at time steps that have observations.
+    ObservedStepsAllCompartments,
+    /// Use the full generated trajectory.
+    FullTrajectory,
+}
+
+/// Algorithm used for ensemble subset selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnsembleAlgorithm {
+    /// Greedy subset selection with local search.
+    GreedyLocalSearch,
+    /// NSGA-II multi-objective optimization.
+    Nsga2,
+}
+
+/// Configuration for ensemble selection and representative selection algorithms.
 #[derive(Debug, Clone)]
 pub struct EnsembleSelectionConfig {
     /// Safety margin factor for CI width bounds normalization (default: 0.1).
@@ -18,8 +30,17 @@ pub struct EnsembleSelectionConfig {
     /// Sample sizes to try when estimating CI width bounds (default: [10, 20, 50, 100]).
     pub ci_sample_sizes: Vec<usize>,
 
-    /// NSGA-II crossover probability (default: 0.9).
-    pub nsga_crossover_probability: f64,
+    /// Crossover probability for algorithms that use crossover (default: 0.9).
+    pub crossover_probability: f64,
+
+    /// Prediction scope for the CI width objective.
+    pub ci_width_scope: CIWidthScope,
+
+    /// Ensemble subset-selection algorithm.
+    pub ensemble_algorithm: EnsembleAlgorithm,
+
+    /// Minimum metric points before objective percentile evaluation uses Rayon.
+    pub parallel_objective_threshold: usize,
 
     /// Minimum k for k-nearest neighbors in density estimation (default: 5).
     pub k_neighbors_min: usize,
@@ -39,7 +60,10 @@ impl Default for EnsembleSelectionConfig {
         Self {
             ci_margin_factor: 0.1,
             ci_sample_sizes: vec![10, 20, 50, 100],
-            nsga_crossover_probability: 0.9,
+            crossover_probability: 0.9,
+            ci_width_scope: CIWidthScope::FullTrajectory,
+            ensemble_algorithm: EnsembleAlgorithm::Nsga2,
+            parallel_objective_threshold: 512,
             k_neighbors_min: 5,
             k_neighbors_max: 10,
             sparsity_weight: 2.0,
@@ -66,9 +90,27 @@ impl EnsembleSelectionConfig {
         self
     }
 
-    /// Set NSGA-II crossover probability.
-    pub fn with_nsga_crossover_probability(mut self, probability: f64) -> Self {
-        self.nsga_crossover_probability = probability;
+    /// Set crossover probability.
+    pub fn with_crossover_probability(mut self, probability: f64) -> Self {
+        self.crossover_probability = probability;
+        self
+    }
+
+    /// Set the prediction scope for the CI width objective.
+    pub fn with_ci_width_scope(mut self, scope: CIWidthScope) -> Self {
+        self.ci_width_scope = scope;
+        self
+    }
+
+    /// Set the ensemble subset-selection algorithm.
+    pub fn with_ensemble_algorithm(mut self, algorithm: EnsembleAlgorithm) -> Self {
+        self.ensemble_algorithm = algorithm;
+        self
+    }
+
+    /// Set the metric-point threshold for parallel objective evaluation.
+    pub fn with_parallel_objective_threshold(mut self, threshold: usize) -> Self {
+        self.parallel_objective_threshold = threshold;
         self
     }
 

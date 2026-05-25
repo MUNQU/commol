@@ -75,10 +75,12 @@ pub use optimization::{
     OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
 };
 pub use probabilistic::{
-    deduplicate_evaluations, generate_predictions_parallel, run_multiple_calibrations,
-    select_cluster_representatives, select_optimal_ensemble, ClusterRepresentativeConfig,
-    EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, OptimalEnsembleConfig,
-    ParetoSolution,
+    deduplicate_evaluations, generate_calibrated_predictions_at_points_parallel,
+    generate_calibrated_predictions_parallel, generate_predictions_at_points_parallel,
+    generate_predictions_parallel, run_multiple_calibrations, select_cluster_representatives,
+    select_optimal_ensemble, CIWidthScope, ClusterRepresentativeConfig, EnsembleAlgorithm,
+    EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, EvaluationRetention,
+    OptimalEnsembleConfig, ParetoSolution,
 };
 pub use probabilistic::{CalibrationError, CalibrationResult as CalibrationResultType};
 pub use types::{

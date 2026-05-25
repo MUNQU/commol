@@ -12,6 +12,17 @@ use commol_core::SimulationEngine;
 
 use super::error::{CalibrationError, CalibrationResult};
 
+/// How much optimizer evaluation history to retain after each calibration run.
+#[derive(Debug, Clone)]
+pub enum EvaluationRetention {
+    /// Keep every recorded evaluation.
+    All,
+    /// Keep only the best evaluation from each run.
+    BestPerRun,
+    /// Keep the top-k evaluations by loss from each run.
+    TopKPerRun(usize),
+}
+
 /// Run multiple calibration attempts in parallel with different seeds.
 ///
 /// This function runs N calibration attempts in parallel, each with a different
@@ -34,6 +45,7 @@ pub fn run_multiple_calibrations<E: SimulationEngine + Send + Sync>(
     optimization_config: &OptimizationConfig,
     n_runs: usize,
     seed: u64,
+    evaluation_retention: EvaluationRetention,
 ) -> CalibrationResult<Vec<CalibrationResultWithHistory>> {
     // Generate indexed seeds for each run
     // The index is used to restore deterministic order after parallel execution
@@ -57,7 +69,11 @@ pub fn run_multiple_calibrations<E: SimulationEngine + Send + Sync>(
                 }
 
                 // Run optimization with history tracking
-                (idx, optimize_with_history(problem_clone, opt_config))
+                let result = optimize_with_history(problem_clone, opt_config).map(|mut result| {
+                    apply_evaluation_retention(&mut result, &evaluation_retention);
+                    result
+                });
+                (idx, result)
             })
             .collect();
 
@@ -94,6 +110,45 @@ pub fn run_multiple_calibrations<E: SimulationEngine + Send + Sync>(
     }
 
     Ok(successful_results)
+}
+
+fn apply_evaluation_retention(
+    result: &mut CalibrationResultWithHistory,
+    retention: &EvaluationRetention,
+) {
+    match retention {
+        EvaluationRetention::All => {}
+        EvaluationRetention::BestPerRun => {
+            if let Some(best) = result
+                .evaluations
+                .iter()
+                .min_by(|a, b| {
+                    a.loss
+                        .partial_cmp(&b.loss)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .cloned()
+            {
+                result.evaluations = vec![best];
+            }
+        }
+        EvaluationRetention::TopKPerRun(k) => {
+            if *k == 0 || result.evaluations.len() <= *k {
+                return;
+            }
+            result.evaluations.select_nth_unstable_by(*k, |a, b| {
+                a.loss
+                    .partial_cmp(&b.loss)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            result.evaluations.truncate(*k);
+            result.evaluations.sort_by(|a, b| {
+                a.loss
+                    .partial_cmp(&b.loss)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+    }
 }
 
 /// Internal error type for parallel prediction generation.
@@ -157,6 +212,183 @@ pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
 
     // Collect successful results
     let mut all_predictions = Vec::new();
+    for result in predictions {
+        match result {
+            Ok(pred) => all_predictions.push(pred),
+            Err(PredictionError::ParameterSetFailed { name, reason }) => {
+                return Err(CalibrationError::ParameterSetFailed { name, reason });
+            }
+            Err(PredictionError::SimulationFailed(reason)) => {
+                return Err(CalibrationError::SimulationFailed(reason));
+            }
+        }
+    }
+
+    Ok(all_predictions)
+}
+
+/// Generate predictions for calibration parameter sets, applying both model
+/// parameters and calibrated initial conditions.
+pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Sync>(
+    base_problem: &CalibrationProblem<E>,
+    parameter_sets: Vec<Vec<f64>>,
+    time_steps: u32,
+) -> CalibrationResult<Vec<Vec<Vec<f64>>>> {
+    let predictions: Vec<Result<Vec<Vec<f64>>, PredictionError>> = parameter_sets
+        .par_iter()
+        .map(|params| {
+            let mut engine = base_problem.configured_engine(params).map_err(|reason| {
+                PredictionError::ParameterSetFailed {
+                    name: "calibration_parameters".to_string(),
+                    reason,
+                }
+            })?;
+
+            engine
+                .run(time_steps)
+                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))
+        })
+        .collect();
+
+    collect_prediction_results(predictions)
+}
+
+/// Generate compact predictions for selected `(time_step, compartment_idx)` points.
+pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync>(
+    base_engine: &E,
+    parameter_sets: Vec<Vec<f64>>,
+    parameter_names: Vec<String>,
+    metric_points: Vec<(u32, usize)>,
+) -> CalibrationResult<Vec<Vec<f64>>> {
+    let mut time_steps: Vec<u32> = metric_points.iter().map(|&(step, _)| step).collect();
+    time_steps.sort_unstable();
+    time_steps.dedup();
+
+    let point_time_indices: Vec<usize> = metric_points
+        .iter()
+        .map(|&(step, _)| {
+            time_steps
+                .binary_search(&step)
+                .expect("metric point time step must be present")
+        })
+        .collect();
+
+    let predictions: Vec<Result<Vec<f64>, PredictionError>> = parameter_sets
+        .par_iter()
+        .map(|params| {
+            let mut engine = base_engine.clone();
+            engine.reset();
+
+            for (param_name, &param_value) in parameter_names.iter().zip(params.iter()) {
+                engine.set_parameter(param_name, param_value).map_err(|e| {
+                    PredictionError::ParameterSetFailed {
+                        name: param_name.clone(),
+                        reason: e.to_string(),
+                    }
+                })?;
+            }
+
+            let mut sparse_results = Vec::with_capacity(time_steps.len());
+            engine
+                .run_at_steps_into_buffer(&time_steps, &mut sparse_results)
+                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
+
+            metric_points
+                .iter()
+                .zip(&point_time_indices)
+                .map(|(&(_, compartment_idx), &time_idx)| {
+                    sparse_results
+                        .get(time_idx)
+                        .and_then(|row| row.get(compartment_idx))
+                        .copied()
+                        .ok_or_else(|| {
+                            PredictionError::SimulationFailed(format!(
+                                "Missing compact prediction at sparse row {} compartment {}",
+                                time_idx, compartment_idx
+                            ))
+                        })
+                })
+                .collect()
+        })
+        .collect();
+
+    let mut all_predictions = Vec::new();
+    for result in predictions {
+        match result {
+            Ok(pred) => all_predictions.push(pred),
+            Err(PredictionError::ParameterSetFailed { name, reason }) => {
+                return Err(CalibrationError::ParameterSetFailed { name, reason });
+            }
+            Err(PredictionError::SimulationFailed(reason)) => {
+                return Err(CalibrationError::SimulationFailed(reason));
+            }
+        }
+    }
+
+    Ok(all_predictions)
+}
+
+/// Generate compact predictions for calibration parameter sets, applying both
+/// model parameters and calibrated initial conditions.
+pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + Send + Sync>(
+    base_problem: &CalibrationProblem<E>,
+    parameter_sets: Vec<Vec<f64>>,
+    metric_points: Vec<(u32, usize)>,
+) -> CalibrationResult<Vec<Vec<f64>>> {
+    let mut time_steps: Vec<u32> = metric_points.iter().map(|&(step, _)| step).collect();
+    time_steps.sort_unstable();
+    time_steps.dedup();
+
+    let point_time_indices: Vec<usize> = metric_points
+        .iter()
+        .map(|&(step, _)| {
+            time_steps
+                .binary_search(&step)
+                .expect("metric point time step must be present")
+        })
+        .collect();
+
+    let predictions: Vec<Result<Vec<f64>, PredictionError>> = parameter_sets
+        .par_iter()
+        .map(|params| {
+            let mut engine = base_problem.configured_engine(params).map_err(|reason| {
+                PredictionError::ParameterSetFailed {
+                    name: "calibration_parameters".to_string(),
+                    reason,
+                }
+            })?;
+
+            let mut sparse_results = Vec::with_capacity(time_steps.len());
+            engine
+                .run_at_steps_into_buffer(&time_steps, &mut sparse_results)
+                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
+
+            metric_points
+                .iter()
+                .zip(&point_time_indices)
+                .map(|(&(_, compartment_idx), &time_idx)| {
+                    sparse_results
+                        .get(time_idx)
+                        .and_then(|row| row.get(compartment_idx))
+                        .copied()
+                        .ok_or_else(|| {
+                            PredictionError::SimulationFailed(format!(
+                                "Missing compact prediction at sparse row {} compartment {}",
+                                time_idx, compartment_idx
+                            ))
+                        })
+                })
+                .collect()
+        })
+        .collect();
+
+    collect_prediction_results(predictions)
+}
+
+fn collect_prediction_results<T>(
+    predictions: Vec<Result<T, PredictionError>>,
+) -> CalibrationResult<Vec<T>> {
+    let mut all_predictions = Vec::with_capacity(predictions.len());
     for result in predictions {
         match result {
             Ok(pred) => all_predictions.push(pred),

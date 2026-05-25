@@ -81,6 +81,7 @@ pub fn select_by_latin_hypercube(
 
     // For each sample, determine which stratum it should come from in each dimension
     let mut selected_indices = Vec::with_capacity(n_remaining);
+    let mut selected_mask = vec![false; evaluations.len()];
 
     for sample_idx in 0..n_remaining {
         // Get the target stratum for each dimension
@@ -93,7 +94,7 @@ pub fn select_by_latin_hypercube(
 
         for &cand_global_idx in candidates.iter() {
             // Skip if already selected
-            if selected_indices.contains(&cand_global_idx) {
+            if selected_mask[cand_global_idx] {
                 continue;
             }
 
@@ -144,6 +145,7 @@ pub fn select_by_latin_hypercube(
             }
         }
 
+        selected_mask[best_candidate_idx] = true;
         selected_indices.push(best_candidate_idx);
     }
 
