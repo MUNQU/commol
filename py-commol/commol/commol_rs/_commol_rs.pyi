@@ -81,6 +81,8 @@ class DifferenceEquationsProtocol(Protocol):
     def population(self) -> list[float]: ...
     @property
     def compartments(self) -> list[str]: ...
+    @property
+    def output_names(self) -> list[str]: ...
 
 class DifferenceModule(Protocol):
     DifferenceEquations: type[DifferenceEquationsProtocol]
@@ -93,6 +95,7 @@ class ObservedDataPointProtocol(Protocol):
         value: float,
         weight: float | None = None,
         scale_id: str | None = None,
+        window_steps: int | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...

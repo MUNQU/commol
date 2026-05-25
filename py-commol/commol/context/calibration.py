@@ -51,6 +51,22 @@ class ObservedDataPoint(BaseModel):
         default=None,
         description="Optional scale parameter ID to apply to model output",
     )
+    window_steps: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Optional window length for cumulative-output observations. "
+            "When set, prediction is value(step) - value(step - window_steps)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_window_steps(self) -> Self:
+        if self.window_steps is not None and self.window_steps > self.step:
+            raise ValueError(
+                f"window_steps ({self.window_steps}) must be <= step ({self.step})"
+            )
+        return self
 
 
 class CalibrationParameter(BaseModel):

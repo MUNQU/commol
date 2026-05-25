@@ -157,6 +157,12 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Row index in `observed_time_steps` for each observed data point
     observed_time_indices: Vec<usize>,
 
+    /// Optional previous row index for windowed cumulative-output observations.
+    observed_previous_time_indices: Vec<Option<usize>>,
+
+    /// Row indices in `observed_time_steps` for each time-dependent constraint.
+    constraint_time_indices: Vec<Option<Vec<usize>>>,
+
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
 
@@ -170,9 +176,6 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 
     /// Loss function configuration
     loss_config: LossConfig,
-
-    /// Maximum time step in observed data (cached for performance)
-    max_time_step: u32,
 
     /// Pre-allocated buffer for simulation results (reused across evaluations)
     /// Wrapped in RwLock to allow thread-safe mutation in cost() method
@@ -205,7 +208,7 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
     fn clone(&self) -> Self {
         // Pre-allocate result buffer for the clone
-        let buffer_capacity = (self.max_time_step + 1) as usize;
+        let buffer_capacity = self.observed_time_steps.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
         Self {
@@ -214,11 +217,12 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             observed_compartment_indices: self.observed_compartment_indices.clone(),
             observed_time_steps: self.observed_time_steps.clone(),
             observed_time_indices: self.observed_time_indices.clone(),
+            observed_previous_time_indices: self.observed_previous_time_indices.clone(),
+            constraint_time_indices: self.constraint_time_indices.clone(),
             parameters: self.parameters.clone(),
             parameter_initial_condition_targets: self.parameter_initial_condition_targets.clone(),
             observed_scale_indices: self.observed_scale_indices.clone(),
             loss_config: self.loss_config,
-            max_time_step: self.max_time_step,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: self.initial_population_size,
             constraints: self.constraints.clone(),
@@ -267,30 +271,46 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             return Err("No calibration parameters provided".to_string());
         }
 
-        // Build compartment name to index mapping
-        let compartments = base_engine.compartments();
-        let compartment_map: std::collections::HashMap<&str, usize> = compartments
+        // Build output name to index mapping for observations. Outputs include
+        // state compartments and non-population outputs such as accumulators.
+        let output_names = base_engine.output_names();
+        let output_map: std::collections::HashMap<&str, usize> = output_names
             .iter()
             .enumerate()
             .map(|(idx, name)| (name.as_str(), idx))
             .collect();
 
-        // Validate compartment names and convert to indices
+        // Validate observed output names and convert to indices
         let mut observed_compartment_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
-            match compartment_map.get(obs.compartment.as_str()) {
+            if let Some(window_steps) = obs.window_steps {
+                if window_steps > obs.time_step {
+                    return Err(format!(
+                        "Observation '{}' at step {} has window_steps={} before simulation start",
+                        obs.compartment, obs.time_step, window_steps
+                    ));
+                }
+            }
+
+            match output_map.get(obs.compartment.as_str()) {
                 Some(&idx) => observed_compartment_indices.push(idx),
                 None => {
                     return Err(format!(
-                        "Invalid compartment name '{}' (available: {})",
+                        "Invalid observed output name '{}' (available: {})",
                         obs.compartment,
-                        compartments.join(", ")
+                        output_names.join(", ")
                     ));
                 }
             }
         }
 
         // Build compartment indices for calibration parameters
+        let compartments = base_engine.compartments();
+        let compartment_map: std::collections::HashMap<&str, usize> = compartments
+            .iter()
+            .enumerate()
+            .map(|(idx, name)| (name.as_str(), idx))
+            .collect();
         let initial_population = base_engine.population();
         let mut parameter_initial_condition_targets = Vec::with_capacity(parameters.len());
         for param in &parameters {
@@ -381,31 +401,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
-        // Find maximum time step to avoid recomputing in each cost evaluation
-        let max_time_step = observed_data
-            .iter()
-            .map(|obs| obs.time_step)
-            .max()
-            .unwrap_or(100);
-
-        let mut observed_time_steps: Vec<u32> =
-            observed_data.iter().map(|obs| obs.time_step).collect();
-        observed_time_steps.sort_unstable();
-        observed_time_steps.dedup();
-
-        let observed_time_indices: Vec<usize> = observed_data
-            .iter()
-            .map(|obs| {
-                observed_time_steps
-                    .binary_search(&obs.time_step)
-                    .expect("observed time step must be present")
-            })
-            .collect();
-
-        // Pre-allocate result buffer for performance
-        let buffer_capacity = (max_time_step + 1) as usize;
-        let result_buffer = Vec::with_capacity(buffer_capacity);
-
         // Compile and validate constraints
         let compiled_constraints: Vec<MathExpression> = constraints
             .iter()
@@ -421,6 +416,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         let mut parameter_constraint_indices = Vec::new();
         let mut time_dependent_constraint_indices = Vec::new();
+        let mut simulation_time_steps: Vec<u32> = observed_data
+            .iter()
+            .flat_map(|obs| {
+                std::iter::once(obs.time_step).chain(
+                    obs.window_steps
+                        .map(|window_steps| obs.time_step - window_steps),
+                )
+            })
+            .collect();
 
         for (idx, constraint) in constraints.iter().enumerate() {
             let expr = &compiled_constraints[idx];
@@ -461,33 +465,70 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
             }
 
-            // Validate time steps are within simulation range
+            // Add sparse constraint time steps to the simulation schedule.
             if let Some(ref time_steps) = constraint.time_steps {
-                for &ts in time_steps {
-                    if ts > max_time_step {
-                        return Err(format!(
-                            "Constraint '{}' has time step {} exceeding max observed time step {}",
-                            constraint.id, ts, max_time_step
-                        ));
-                    }
-                }
+                simulation_time_steps.extend(time_steps.iter().copied());
                 time_dependent_constraint_indices.push(idx);
             } else {
                 parameter_constraint_indices.push(idx);
             }
         }
 
+        simulation_time_steps.sort_unstable();
+        simulation_time_steps.dedup();
+
+        let observed_time_indices: Vec<usize> = observed_data
+            .iter()
+            .map(|obs| {
+                simulation_time_steps
+                    .binary_search(&obs.time_step)
+                    .expect("observed time step must be present")
+            })
+            .collect();
+
+        let observed_previous_time_indices: Vec<Option<usize>> = observed_data
+            .iter()
+            .map(|obs| {
+                obs.window_steps.map(|window_steps| {
+                    simulation_time_steps
+                        .binary_search(&(obs.time_step - window_steps))
+                        .expect("window previous time step must be present")
+                })
+            })
+            .collect();
+
+        let constraint_time_indices: Vec<Option<Vec<usize>>> = constraints
+            .iter()
+            .map(|constraint| {
+                constraint.time_steps.as_ref().map(|time_steps| {
+                    time_steps
+                        .iter()
+                        .map(|time_step| {
+                            simulation_time_steps
+                                .binary_search(time_step)
+                                .expect("constraint time step must be present")
+                        })
+                        .collect()
+                })
+            })
+            .collect();
+
+        // Pre-allocate result buffer for performance
+        let buffer_capacity = simulation_time_steps.len();
+        let result_buffer = Vec::with_capacity(buffer_capacity);
+
         Ok(Self {
             base_engine,
             observed_data,
             observed_compartment_indices,
-            observed_time_steps,
+            observed_time_steps: simulation_time_steps,
             observed_time_indices,
+            observed_previous_time_indices,
+            constraint_time_indices,
             parameters,
             parameter_initial_condition_targets,
             observed_scale_indices,
             loss_config,
-            max_time_step,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: initial_population_size as f64,
             constraints,
@@ -709,65 +750,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         corrected
     }
 
-    /// Calculate loss between simulation results and observed data
-    fn calculate_loss(&self, simulation_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
-        let observation_iter = || {
-            self.observed_data
-                .iter()
-                .zip(&self.observed_compartment_indices)
-                .zip(&self.observed_scale_indices)
-                .filter_map(|((obs, &compartment_idx), &scale_idx)| {
-                    let time_idx = obs.time_step as usize;
-                    simulation_results.get(time_idx).map(|step_data| {
-                        let predicted = step_data[compartment_idx];
-                        // Apply scale if present
-                        let scaled_predicted = if let Some(param_idx) = scale_idx {
-                            predicted * param_values[param_idx]
-                        } else {
-                            predicted
-                        };
-                        (obs, scaled_predicted)
-                    })
-                })
-        };
-
-        match self.loss_config {
-            LossConfig::SumSquaredError | LossConfig::WeightedSSE => observation_iter()
-                .map(|(obs, predicted)| {
-                    let error = (obs.value - predicted) * obs.weight;
-                    error * error
-                })
-                .sum(),
-
-            LossConfig::RootMeanSquaredError => {
-                let (sum_squared_error, count) = observation_iter()
-                    .map(|(obs, predicted)| {
-                        let error = obs.value - predicted;
-                        error * error
-                    })
-                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
-
-                if count > 0 {
-                    (sum_squared_error / count as f64).sqrt()
-                } else {
-                    0.0
-                }
-            }
-
-            LossConfig::MeanAbsoluteError => {
-                let (total_error, count) = observation_iter()
-                    .map(|(obs, predicted)| (obs.value - predicted).abs())
-                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
-
-                if count > 0 {
-                    total_error / count as f64
-                } else {
-                    0.0
-                }
-            }
-        }
-    }
-
     /// Calculate loss from a sparse result matrix whose rows are aligned with
     /// `self.observed_time_steps`.
     fn calculate_sparse_loss(&self, observed_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
@@ -777,17 +759,30 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .zip(&self.observed_compartment_indices)
                 .zip(&self.observed_scale_indices)
                 .zip(&self.observed_time_indices)
-                .filter_map(|(((obs, &compartment_idx), &scale_idx), &time_idx)| {
-                    observed_results.get(time_idx).map(|step_data| {
-                        let predicted = step_data[compartment_idx];
-                        let scaled_predicted = if let Some(param_idx) = scale_idx {
-                            predicted * param_values[param_idx]
-                        } else {
-                            predicted
-                        };
-                        (obs, scaled_predicted)
-                    })
-                })
+                .zip(&self.observed_previous_time_indices)
+                .filter_map(
+                    |((((obs, &compartment_idx), &scale_idx), &time_idx), &previous_time_idx)| {
+                        observed_results.get(time_idx).map(|step_data| {
+                            let current = step_data[compartment_idx];
+                            let predicted = if let Some(previous_time_idx) = previous_time_idx {
+                                let previous = observed_results
+                                    .get(previous_time_idx)
+                                    .and_then(|row| row.get(compartment_idx))
+                                    .copied()
+                                    .unwrap_or(0.0);
+                                current - previous
+                            } else {
+                                current
+                            };
+                            let scaled_predicted = if let Some(param_idx) = scale_idx {
+                                predicted * param_values[param_idx]
+                            } else {
+                                predicted
+                            };
+                            (obs, scaled_predicted)
+                        })
+                    },
+                )
         };
 
         match self.loss_config {
@@ -851,6 +846,91 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             ));
         }
         Ok(())
+    }
+
+    /// Build an engine clone with calibration parameters applied exactly as in
+    /// objective evaluation, including calibrated initial conditions.
+    pub fn configured_engine(&self, param_values: &[f64]) -> Result<E, String> {
+        self.validate_parameter_count(param_values)?;
+        let clamped_params = self.clamp_to_bounds(param_values);
+        let (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum) =
+            self.calculate_auto_corrected_parameters(&clamped_params);
+
+        if fixed_initial_conditions_sum + calibrated_initial_conditions_sum > 1.0 {
+            return Err(
+                "Invalid initial-condition fractions: fixed + calibrated values exceed 1.0"
+                    .to_string(),
+            );
+        }
+
+        let mut engine = self.base_engine.clone();
+        engine.reset();
+
+        for ((value, param), target) in corrected_params
+            .iter()
+            .zip(&self.parameters)
+            .zip(&self.parameter_initial_condition_targets)
+        {
+            match param.parameter_type {
+                CalibrationParameterType::Parameter => {
+                    engine
+                        .set_parameter(&param.id, *value)
+                        .map_err(|e| format!("Failed to set parameter '{}': {}", param.id, e))?;
+                }
+                CalibrationParameterType::InitialCondition => {
+                    let target = target
+                        .as_ref()
+                        .expect("InitialCondition must have a target");
+
+                    match target {
+                        InitialConditionTarget::PopulationFraction { entries } => {
+                            for &(idx, weight) in entries {
+                                engine
+                                    .set_initial_condition(
+                                        idx,
+                                        *value * weight * self.initial_population_size,
+                                    )
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                            }
+                        }
+                        InitialConditionTarget::PairedCategoryFraction { pairs } => {
+                            let current_population = engine.population();
+                            for &(category_idx, complement_idx) in pairs {
+                                let pair_total = current_population[category_idx]
+                                    + current_population[complement_idx];
+                                engine
+                                    .set_initial_condition(category_idx, *value * pair_total)
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                                engine
+                                    .set_initial_condition(
+                                        complement_idx,
+                                        (1.0 - *value) * pair_total,
+                                    )
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                            }
+                        }
+                    }
+                }
+                CalibrationParameterType::Scale => {}
+            }
+        }
+
+        Ok(engine)
     }
 
     /// Calculate base penalty value for constraint violations
@@ -951,10 +1031,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .time_steps
                 .as_ref()
                 .expect("Time-dependent constraint must have time_steps");
+            let time_indices = self.constraint_time_indices[constraint_idx]
+                .as_ref()
+                .expect("Time-dependent constraint must have row indices");
 
-            for &time_step in time_steps {
-                let time_idx = time_step as usize;
-
+            for (&time_step, &time_idx) in time_steps.iter().zip(time_indices) {
                 // Get compartment values at this time step
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
@@ -1114,41 +1195,23 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .write()
             .expect("Failed to acquire write lock on result_buffer");
 
+        engine
+            .run_at_steps_into_buffer(&self.observed_time_steps, &mut buffer)
+            .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
+
+        // Check for numerical instability (NaN or infinity values)
+        let has_invalid_values = buffer
+            .iter()
+            .any(|step| step.iter().any(|&value| !value.is_finite()));
+
+        if has_invalid_values {
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty);
+        }
+
         let loss = if self.time_dependent_constraint_indices.is_empty() {
-            engine
-                .run_at_steps_into_buffer(&self.observed_time_steps, &mut buffer)
-                .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
-
-            // Check for numerical instability (NaN or infinity values)
-            let has_invalid_values = buffer
-                .iter()
-                .any(|step| step.iter().any(|&value| !value.is_finite()));
-
-            if has_invalid_values {
-                let base_penalty = self.calculate_base_penalty();
-                return Ok(base_penalty);
-            }
-
             self.calculate_sparse_loss(&buffer, &corrected_params)
         } else {
-            engine
-                .run_into_buffer(self.max_time_step, &mut buffer)
-                .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
-
-            // Check for numerical instability (NaN or infinity values)
-            let has_invalid_values = buffer
-                .iter()
-                .any(|step| step.iter().any(|&value| !value.is_finite()));
-
-            if has_invalid_values {
-                // Return a penalty value proportional to the worst-case realistic loss
-                // Calculate penalty as: (max observed value)^2 * num_observations * penalty_factor
-                // This ensures the penalty is large enough to discourage invalid parameters
-                // but not so large that it causes numerical issues
-                let base_penalty = self.calculate_base_penalty();
-                return Ok(base_penalty);
-            }
-
             // Evaluate time-dependent constraints using simulation results
             let time_constraint_penalty = self
                 .evaluate_time_dependent_constraints(&clamped_params, &buffer)
@@ -1161,7 +1224,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             }
 
             // Calculate and return loss (use corrected params for scale parameters)
-            self.calculate_loss(&buffer, &corrected_params)
+            self.calculate_sparse_loss(&buffer, &corrected_params)
         };
 
         // Check if loss itself is invalid (defensive programming)

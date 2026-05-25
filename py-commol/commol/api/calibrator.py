@@ -76,6 +76,7 @@ class Calibrator:
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
         self._validate_observed_data()
+        self._warn_constraint_time_steps_beyond_observations()
 
     def run(self) -> CalibrationResult:
         """
@@ -118,6 +119,7 @@ class Calibrator:
                 value=point.value,
                 weight=point.weight,
                 scale_id=point.scale_id,
+                window_steps=point.window_steps,
             )
             for point in self.problem.observed_data
         ]
@@ -219,6 +221,7 @@ class Calibrator:
                 value=point.value,
                 weight=point.weight,
                 scale_id=point.scale_id,
+                window_steps=point.window_steps,
             )
             for point in self.problem.observed_data
         ]
@@ -512,13 +515,14 @@ class Calibrator:
         ValueError
             If observed data contains invalid compartments or negative time steps.
         """
-        compartment_names = set(self._engine.compartments)
+        simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            if obs.compartment not in compartment_names:
+            if obs.compartment not in simulation_output_names:
                 raise ValueError(
                     f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model. Available compartments: {sorted(compartment_names)}"
+                    f"model simulation outputs. Available outputs: "
+                    f"{sorted(simulation_output_names)}"
                 )
 
         if self.problem.observed_data:
@@ -527,6 +531,21 @@ class Calibrator:
                 raise ValueError(
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
+                )
+
+    def _warn_constraint_time_steps_beyond_observations(self) -> None:
+        """Warn when time-dependent constraints extend beyond observed data."""
+        if not self.problem.observed_data:
+            return
+
+        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        for constraint in self.problem.constraints:
+            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+                logger.warning(
+                    "Constraint '%s' has time_steps beyond the maximum observed "
+                    "step (%s); simulation will be extended to evaluate them.",
+                    constraint.id,
+                    max_observed_step,
                 )
 
     def run_probabilistic(self):

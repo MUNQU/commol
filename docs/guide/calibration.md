@@ -708,6 +708,78 @@ else:
 
 **Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.update_parameters(result.best_parameters)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
 
+## Calibrating Against Cumulative Outputs
+
+When your observed data represents incremental counts over a period (e.g., new events recorded each week), you can calibrate against [accumulator](core-concepts.md#accumulators) outputs using the `window_steps` parameter on `ObservedDataPoint`.
+
+`window_steps=W` tells the calibration engine that the observation at step `t` corresponds to the **accumulated change** from step `t - W` to step `t`:
+
+```
+predicted_at(t) = accumulator(t) - accumulator(t - W)
+```
+
+### Example: Windowed Calibration
+
+```python
+from commol import ModelBuilder, Simulation, Calibrator
+from commol.context.calibration import (
+    ObservedDataPoint,
+    CalibrationParameter,
+    CalibrationProblem,
+    ParticleSwarmConfig,
+)
+
+# Model with an accumulator tracking flows A→B
+model = (
+    ModelBuilder("Model")
+    .add_bin("A", "State A")
+    .add_bin("B", "State B")
+    .add_accumulator("cum_ab", "Cumulative A→B")
+    .add_parameter("k1", None)       # to calibrate
+    .add_transition("flow", ["A"], ["B"], rate="k1 * A * B / N",
+                    accumulators=["cum_ab"])
+    .set_initial_conditions(10000, [
+        {"bin": "A", "fraction": 0.99},
+        {"bin": "B", "fraction": 0.01},
+    ])
+    .build("DifferenceEquations")
+)
+
+# Weekly incidence data: new A→B events each 7-step window
+weekly_new_ab = [45, 82, 130, 174, 205, 190, 160, 118, 85, 55]
+observed_data = [
+    ObservedDataPoint(
+        step=7 * (i + 1),
+        compartment="cum_ab",
+        value=val,
+        window_steps=7,  # compare week-over-week change
+    )
+    for i, val in enumerate(weekly_new_ab)
+]
+
+parameters = [
+    CalibrationParameter(id="k1", parameter_type="parameter",
+                         min_bound=0.0, max_bound=1.0)
+]
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=parameters,
+    constraints=[],
+    optimization_config=ParticleSwarmConfig(num_particles=30, max_iterations=500),
+)
+
+calibrator = Calibrator(Simulation(model), problem)
+result = calibrator.run()
+print(f"k1 = {result.best_parameters['k1']:.4f}, loss = {result.final_loss:.2f}")
+```
+
+### Rules for `window_steps`
+
+- `window_steps` must be ≤ the observation step (`step ≥ window_steps`).
+- The compartment must be a simulation output (a compartment or an accumulator).
+- `window_steps` can be combined with `scale_id`.
+- Multiple observations at different steps can use different `window_steps` values.
+
 ## Best Practices
 
 ### 1. Choose Appropriate Bounds

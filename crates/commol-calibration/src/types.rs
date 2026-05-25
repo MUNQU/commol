@@ -34,6 +34,10 @@ pub struct ObservedDataPoint {
     /// before computing the loss. Useful when observed data is in different units or
     /// there's an unknown proportionality constant.
     pub scale_id: Option<String>,
+
+    /// Optional window size for cumulative-output observations.
+    /// When set, the predicted value is output(time_step) - output(time_step - window_steps).
+    pub window_steps: Option<u32>,
 }
 
 impl ObservedDataPoint {
@@ -45,6 +49,7 @@ impl ObservedDataPoint {
             value,
             weight: 1.0,
             scale_id: None,
+            window_steps: None,
         }
     }
 
@@ -56,6 +61,7 @@ impl ObservedDataPoint {
             value,
             weight,
             scale_id: None,
+            window_steps: None,
         }
     }
 
@@ -67,6 +73,7 @@ impl ObservedDataPoint {
             value,
             weight: 1.0,
             scale_id: Some(scale_id),
+            window_steps: None,
         }
     }
 
@@ -84,6 +91,19 @@ impl ObservedDataPoint {
             value,
             weight,
             scale_id: Some(scale_id),
+            window_steps: None,
+        }
+    }
+
+    /// Create a windowed observation for a cumulative output.
+    pub fn with_window(time_step: u32, compartment: String, value: f64, window_steps: u32) -> Self {
+        Self {
+            time_step,
+            compartment,
+            value,
+            weight: 1.0,
+            scale_id: None,
+            window_steps: Some(window_steps),
         }
     }
 }
