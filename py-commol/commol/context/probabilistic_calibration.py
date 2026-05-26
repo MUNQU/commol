@@ -634,6 +634,18 @@ class ParetoSolution(BaseModel):
     prediction_ci_upper: dict[str, list[float]] = Field(
         description="Upper bound of confidence interval for each compartment over time"
     )
+    windowed_prediction_median: dict[str, list[float]] = Field(
+        default_factory=dict,
+        description="Correct windowed median for outputs with windowed observations",
+    )
+    windowed_prediction_ci_lower: dict[str, list[float]] = Field(
+        default_factory=dict,
+        description="Correct windowed lower CI for outputs with windowed observations",
+    )
+    windowed_prediction_ci_upper: dict[str, list[float]] = Field(
+        default_factory=dict,
+        description="Correct windowed upper CI for outputs with windowed observations",
+    )
     coverage_percentage: float = Field(
         description="Percentage of observed data points within confidence intervals"
     )

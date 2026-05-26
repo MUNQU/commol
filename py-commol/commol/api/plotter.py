@@ -590,9 +590,20 @@ class SimulationPlotter:
 
         windowed_median = self._apply_windows(median_values, observed)
         if windowed_median is not None:
-            time_steps, plot_median = windowed_median
-            _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
-            _, plot_ci_upper = self._apply_windows(ci_upper, observed)  # type: ignore[misc]
+            time_steps, _ = windowed_median
+            win_med = prob_result.selected_ensemble.windowed_prediction_median
+            if win_med and bin_id in win_med:
+                plot_median = win_med[bin_id]
+                plot_ci_lower = (
+                    prob_result.selected_ensemble.windowed_prediction_ci_lower[bin_id]
+                )
+                plot_ci_upper = (
+                    prob_result.selected_ensemble.windowed_prediction_ci_upper[bin_id]
+                )
+            else:
+                _, plot_median = windowed_median
+                _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
+                _, plot_ci_upper = self._apply_windows(ci_upper, observed)  # type: ignore[misc]
         else:
             time_steps = list(range(len(median_values)))
             plot_median = median_values

@@ -208,6 +208,58 @@ class StatisticsCalculator:
 
         return prediction_median, prediction_ci_lower, prediction_ci_upper
 
+    def calculate_windowed_prediction_intervals(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+    ) -> tuple[dict[str, list[float]], dict[str, list[float]], dict[str, list[float]]]:
+        """Calculate median and CI from windowed (per-period) trajectories.
+
+        For outputs with windowed observations, computes the windowed value
+        (series[t] - series[t - window_steps]) per ensemble member *before*
+        taking percentiles, so the resulting CI is the percentile of differences
+        rather than the difference of percentiles.
+
+        Returns empty dicts if no observed data has window_steps set.
+        """
+        window_steps_by_output: dict[str, int] = {}
+        for obs in self.problem.observed_data:
+            if (
+                obs.window_steps is not None
+                and obs.compartment not in window_steps_by_output
+            ):
+                window_steps_by_output[obs.compartment] = obs.window_steps
+
+        prediction_median: dict[str, list[float]] = {}
+        prediction_ci_lower: dict[str, list[float]] = {}
+        prediction_ci_upper: dict[str, list[float]] = {}
+
+        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
+        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+
+        for output_id, window_steps in window_steps_by_output.items():
+            if output_id not in all_predictions:
+                continue
+            trajectories = all_predictions[output_id]
+            series_len = len(trajectories[0]) if trajectories else 0
+            steps = list(range(window_steps, series_len, window_steps))
+            if not steps:
+                continue
+            windowed = np.array(
+                [
+                    [traj[t] - traj[t - window_steps] for t in steps]
+                    for traj in trajectories
+                ]
+            )
+            prediction_median[output_id] = np.median(windowed, axis=0).tolist()
+            prediction_ci_lower[output_id] = np.percentile(
+                windowed, ci_lower_percentile, axis=0
+            ).tolist()
+            prediction_ci_upper[output_id] = np.percentile(
+                windowed, ci_upper_percentile, axis=0
+            ).tolist()
+
+        return prediction_median, prediction_ci_lower, prediction_ci_upper
+
     def calculate_coverage_metrics(
         self,
         prediction_ci_lower: dict[str, list[float]],
