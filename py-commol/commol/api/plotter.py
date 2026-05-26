@@ -332,9 +332,9 @@ class SimulationPlotter:
         Create figure and axes array for series plotting.
         """
         layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
-        )
+        rows, cols = layout
+        figsize = (cols * 4.5, rows * 3.5 + 1.0)
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=config.dpi)
 
         # Ensure axes is always a flat array
         if layout[0] == 1 and layout[1] == 1:
