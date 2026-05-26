@@ -1,6 +1,7 @@
 import logging
 import math
 from collections import defaultdict
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
@@ -70,6 +71,9 @@ class SimulationPlotter:
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
         show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -128,6 +132,9 @@ class SimulationPlotter:
             calibration_result,
             kwargs,
             show_legend,
+            step_to_label,
+            tick_every,
+            x_label,
         )
         self._finalize_series_plot(axes, bins_to_plot, output_file, config)
 
@@ -213,6 +220,20 @@ class SimulationPlotter:
         if config.context:
             sns.set_context(config.context)
             logger.debug(f"Applied Seaborn context: {config.context}")
+
+    @staticmethod
+    def _apply_x_labels(
+        ax: "Axes",
+        time_steps: list[int],
+        step_to_label: Callable[[int], str],
+        tick_every: int | None,
+    ) -> None:
+        if tick_every is not None:
+            ticks = [t for t in time_steps if t % tick_every == 0]
+        else:
+            ticks = time_steps
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([step_to_label(t) for t in ticks], rotation=45, ha="right")
 
     def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
         """
@@ -332,6 +353,9 @@ class SimulationPlotter:
         calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
         kwargs: dict[str, str | int | float | bool | None],
         show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot series data for all bins across subplots.
@@ -351,6 +375,9 @@ class SimulationPlotter:
                     calibration_result,
                     dict(kwargs),
                     show_legend,
+                    step_to_label,
+                    tick_every,
+                    x_label,
                 )
             else:
                 self._plot_bin_series(
@@ -360,6 +387,9 @@ class SimulationPlotter:
                     scale_values or {},
                     dict(kwargs),
                     show_legend,
+                    step_to_label,
+                    tick_every,
+                    x_label,
                 )
 
     def _finalize_series_plot(
@@ -462,6 +492,9 @@ class SimulationPlotter:
         scale_values: dict[str, float],
         plot_kwargs: dict[str, str | int | float | bool | None],
         show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot time series for a single bin on given axes.
@@ -520,9 +553,11 @@ class SimulationPlotter:
         unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
         bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
 
-        ax.set_xlabel("Step")
+        ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
+        if step_to_label:
+            self._apply_x_labels(ax, time_steps, step_to_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
@@ -536,6 +571,9 @@ class SimulationPlotter:
         prob_result: ProbabilisticCalibrationResult,
         plot_kwargs: dict[str, str | int | float | bool | None],
         show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot time series for a single bin with probabilistic confidence intervals.
@@ -617,9 +655,11 @@ class SimulationPlotter:
         unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
         bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
 
-        ax.set_xlabel("Step")
+        ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
+        if step_to_label:
+            self._apply_x_labels(ax, time_steps, step_to_label, tick_every)
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
