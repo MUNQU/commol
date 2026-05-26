@@ -230,6 +230,28 @@ class SimulationPlotter:
             rows = math.ceil(num_bins / cols)
             return (rows, cols)
 
+    @staticmethod
+    def _apply_windows(
+        series: list[float],
+        observed: list[ObservedDataPoint],
+    ) -> tuple[list[int], list[float]] | None:
+        """
+        Return (steps, values) where each value is
+        series[step] - series[step - window_steps].
+
+        The simulation line covers every multiple of window_steps across the full
+        series, so the plot starts at step window_steps rather than the first
+        observation step.
+
+        Returns None if no observed point has window_steps set.
+        """
+        window_steps = next((p.window_steps for p in observed if p.window_steps), None)
+        if window_steps is None:
+            return None
+        steps = list(range(window_steps, len(series), window_steps))
+        values = [series[t] - series[t - window_steps] for t in steps]
+        return steps, values
+
     def _group_observed_data(
         self, observed_data: list[ObservedDataPoint] | None
     ) -> dict[str, list[ObservedDataPoint]]:
@@ -444,8 +466,12 @@ class SimulationPlotter:
         """
         Plot time series for a single bin on given axes.
         """
-        time_steps = list(range(len(self.results[bin_id])))
-        values = self.results[bin_id]
+        windowed = self._apply_windows(self.results[bin_id], observed)
+        if windowed is not None:
+            time_steps, values = windowed
+        else:
+            time_steps = list(range(len(self.results[bin_id])))
+            values = self.results[bin_id]
 
         # Build parameters for lineplot
         params = {
@@ -520,17 +546,25 @@ class SimulationPlotter:
             )
             return
 
-        time_steps = list(
-            range(len(prob_result.selected_ensemble.prediction_median[bin_id]))
-        )
         median_values = prob_result.selected_ensemble.prediction_median[bin_id]
         ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
         ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
 
+        windowed_median = self._apply_windows(median_values, observed)
+        if windowed_median is not None:
+            time_steps, plot_median = windowed_median
+            _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
+            _, plot_ci_upper = self._apply_windows(ci_upper, observed)  # type: ignore[misc]
+        else:
+            time_steps = list(range(len(median_values)))
+            plot_median = median_values
+            plot_ci_lower = ci_lower
+            plot_ci_upper = ci_upper
+
         # Build parameters for lineplot (median)
         params = {
             "x": time_steps,
-            "y": median_values,
+            "y": plot_median,
             "ax": ax,
             "label": "Median Prediction",
             "legend": show_legend,
@@ -543,8 +577,8 @@ class SimulationPlotter:
         # Plot confidence interval as filled area
         ax.fill_between(
             time_steps,
-            ci_lower,
-            ci_upper,
+            plot_ci_lower,
+            plot_ci_upper,
             alpha=0.3,
             label="95% CI" if show_legend else "_nolegend_",
         )
