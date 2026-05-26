@@ -200,6 +200,15 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Indices of time-dependent constraints (with time_steps, evaluated at specified times during simulation)
     time_dependent_constraint_indices: Vec<usize>,
 
+    /// Pre-computed prefix → compartment-index mappings for constraint evaluation.
+    ///
+    /// A prefix referenced in a constraint expression resolves to the total
+    /// population of all compartments that share that prefix. This covers full bin
+    /// names (aggregating over all strata) as well as partial stratification
+    /// specifications (aggregating over the remaining unspecified strata),
+    /// consistent with how such names behave everywhere else in the model.
+    bin_aggregates: Vec<(String, Vec<usize>)>,
+
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
 }
@@ -230,9 +239,34 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             evaluations: RwLock::new(Vec::new()), // Each clone gets fresh evaluation history
             parameter_constraint_indices: self.parameter_constraint_indices.clone(),
             time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
+            bin_aggregates: self.bin_aggregates.clone(),
             _phantom: PhantomData,
         }
     }
+}
+
+/// Build a mapping from partial compartment name prefixes to the indices of all
+/// compartments that share that prefix.
+///
+/// Every prefix formed by taking a compartment name up to any of its underscore
+/// separators is a candidate key. A key is retained only when two or more
+/// compartments share it, making it useful for aggregation. This covers both
+/// full bin names (aggregating over all strata) and partial stratification
+/// specifications (aggregating over the remaining unspecified strata).
+fn compute_bin_aggregates(compartment_names: &[String]) -> Vec<(String, Vec<usize>)> {
+    let mut map: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+    for (idx, name) in compartment_names.iter().enumerate() {
+        let mut pos = 0;
+        while let Some(rel) = name[pos..].find('_') {
+            let prefix = name[..pos + rel].to_string();
+            map.entry(prefix).or_default().push(idx);
+            pos += rel + 1;
+        }
+    }
+    let mut result: Vec<(String, Vec<usize>)> =
+        map.into_iter().filter(|(_, v)| v.len() > 1).collect();
+    result.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    result
 }
 
 impl<E: SimulationEngine> CalibrationProblem<E> {
@@ -517,6 +551,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let buffer_capacity = simulation_time_steps.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
+        let bin_aggregates = compute_bin_aggregates(&compartments);
+
         Ok(Self {
             base_engine,
             observed_data,
@@ -536,6 +572,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             evaluations: RwLock::new(Vec::new()),
             parameter_constraint_indices,
             time_dependent_constraint_indices,
+            bin_aggregates,
             _phantom: PhantomData,
         })
     }
@@ -1040,6 +1077,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
+                    // Inject bin totals so bare bin names resolve to the sum across
+                    // all strata, overriding any calibration parameter with the same name.
+                    for (bin_name, indices) in &self.bin_aggregates {
+                        let total: f64 = indices.iter().map(|&i| step_data[i]).sum();
+                        context.set_parameter_str(bin_name, total);
+                    }
                     context.set_step(time_step as f64);
 
                     match expr.evaluate(&mut context) {
