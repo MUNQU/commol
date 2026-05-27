@@ -13,12 +13,46 @@ use commol_core::{MathExpressionContext, RateMathExpression, SeriesMode};
 pub(crate) enum VarSlot {
     /// Direct index into the engine's `population` vector.
     Compartment(usize),
+    /// Direct index into `MathExpressionContext`'s parameter value storage.
+    ParameterIndex(usize),
     /// Look up by name in `MathExpressionContext.parameters` (covers user
     /// parameters, formula parameters, time-series, subpopulation totals,
     /// base bin sums, and partial bin-strat sums).
     Parameter(String),
     /// The simulation's current step counter (also exposed as `t`).
     Step,
+}
+
+#[derive(Clone)]
+pub(crate) enum FastRateExpression {
+    Constant(f64),
+    Slot(VarSlot),
+    Mul2(VarSlot, VarSlot),
+    Mul3(VarSlot, VarSlot, VarSlot),
+    OneMinusMul3 {
+        subtract: VarSlot,
+        factor: VarSlot,
+        value: VarSlot,
+    },
+    MulAddDiv {
+        first: VarSlot,
+        second: VarSlot,
+        add_left: VarSlot,
+        add_right: VarSlot,
+        denominator: VarSlot,
+    },
+    Program(Vec<FastRateOp>),
+}
+
+#[derive(Clone)]
+pub(crate) enum FastRateOp {
+    Constant(f64),
+    Slot(VarSlot),
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Neg,
 }
 
 /// Pre-computed transition flow information for performance
@@ -31,6 +65,10 @@ pub(crate) struct TransitionFlow {
     /// Accumulator output indices incremented by this transition flow.
     pub(crate) accumulator_indices: Vec<usize>,
     pub(crate) rate_expression: RateMathExpression,
+    /// Direct evaluator for common arithmetic-only rates. This avoids JIT call
+    /// overhead for simple transition expressions and falls back to
+    /// `rate_expression` for unsupported formulas.
+    pub(crate) fast_rate_expression: Option<FastRateExpression>,
     /// Whether the rate expression is an absolute flow rather than a per-capita rate.
     pub(crate) is_absolute_flow: bool,
     /// Pre-resolved input slots for the JIT path. `Some` when the rate is a
@@ -43,16 +81,23 @@ pub(crate) struct TransitionFlow {
 #[derive(Clone)]
 pub(crate) struct TimeSeriesParameter {
     pub(crate) parameter_name: String,
+    pub(crate) parameter_index: usize,
     /// Sorted by step for binary search.
     data: Vec<(u64, f64)>,
     mode: SeriesMode,
 }
 
 impl TimeSeriesParameter {
-    pub(crate) fn new(parameter_name: String, mut data: Vec<(u64, f64)>, mode: SeriesMode) -> Self {
+    pub(crate) fn new(
+        parameter_name: String,
+        parameter_index: usize,
+        mut data: Vec<(u64, f64)>,
+        mode: SeriesMode,
+    ) -> Self {
         data.sort_unstable_by_key(|(step, _)| *step);
         Self {
             parameter_name,
+            parameter_index,
             data,
             mode,
         }
@@ -103,6 +148,17 @@ pub(crate) struct SubpopulationMapping {
     pub(crate) contributing_compartment_indices: Vec<usize>,
     /// Parameter name for this subpopulation (e.g., "N_young")
     pub(crate) parameter_name: String,
+    /// Index into `MathExpressionContext`'s parameter value storage, filled in
+    /// after parameter slots have been reserved.
+    pub(crate) parameter_index: usize,
+}
+
+/// Subpopulation mapping with only the structural data known before
+/// parameter slot reservation. The builder converts this into a
+/// [`SubpopulationMapping`] once the expression context indices exist.
+pub(crate) struct SubpopulationLayout {
+    pub(crate) contributing_compartment_indices: Vec<usize>,
+    pub(crate) parameter_name: String,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -143,6 +199,8 @@ pub struct DifferenceEquations {
     pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
     /// Parameters defined as empirical time series; evaluated via binary search each step
     pub(crate) series_parameters: Vec<TimeSeriesParameter>,
+    pub(crate) n_parameter_index: usize,
+    pub(crate) t_parameter_index: usize,
     /// Whether any per-step expression still needs compartment values in the
     /// expression context. JIT-resolved transition formulas read compartments
     /// directly from `population` and do not need this HashMap update.
@@ -155,8 +213,12 @@ mod tests {
 
     #[test]
     fn pulse_series_only_fires_on_listed_steps() {
-        let series =
-            TimeSeriesParameter::new("x".to_string(), vec![(5, 2.0), (1, 1.0)], SeriesMode::Pulse);
+        let series = TimeSeriesParameter::new(
+            "x".to_string(),
+            0,
+            vec![(5, 2.0), (1, 1.0)],
+            SeriesMode::Pulse,
+        );
 
         assert_eq!(series.evaluate(0), 0.0);
         assert_eq!(series.evaluate(1), 1.0);
@@ -168,6 +230,7 @@ mod tests {
     fn step_function_series_holds_last_value() {
         let series = TimeSeriesParameter::new(
             "x".to_string(),
+            0,
             vec![(10, 3.0), (3, 1.5)],
             SeriesMode::StepFunction,
         );
@@ -183,6 +246,7 @@ mod tests {
     fn linear_series_interpolates_between_points() {
         let series = TimeSeriesParameter::new(
             "x".to_string(),
+            0,
             vec![(10, 10.0), (0, 0.0)],
             SeriesMode::Linear,
         );

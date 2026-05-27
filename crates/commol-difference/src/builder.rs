@@ -5,11 +5,23 @@ use crate::helpers::{
     get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
 };
 use crate::types::{
-    AccumulatorOutputRef, DifferenceEquations, GeneratedAccumulatorOutput, SubpopulationMapping,
-    TimeSeriesParameter, TransitionFlow, VarSlot,
+    AccumulatorOutputRef, DifferenceEquations, FastRateExpression, FastRateOp,
+    GeneratedAccumulatorOutput, SubpopulationLayout, SubpopulationMapping, TimeSeriesParameter,
+    TransitionFlow, VarSlot,
 };
+use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
+use commol_core::math_expression::jit::parser::parse_expression;
 use commol_core::{MathExpressionContext, Model, RateMathExpression};
 use std::collections::{HashMap, HashSet};
+
+/// Time-series parameter payload collected before parameter slots are
+/// reserved, so the final [`TimeSeriesParameter`] can be constructed with the
+/// correct index up front.
+struct TimeSeriesPayload {
+    name: String,
+    data: Vec<(u64, f64)>,
+    mode: commol_core::SeriesMode,
+}
 
 impl DifferenceEquations {
     /// Create a new DifferenceEquations instance from a model.
@@ -53,7 +65,10 @@ impl DifferenceEquations {
         // Formula parameters will be evaluated on each step
         let mut constant_parameters: HashMap<String, f64> = HashMap::new();
         let mut formula_parameters: Vec<(String, RateMathExpression)> = Vec::new();
-        let mut series_parameters: Vec<TimeSeriesParameter> = Vec::new();
+        // Collect time-series payloads first; final struct construction happens
+        // after parameter slots are reserved so indices can be filled in once,
+        // up front, instead of being patched in afterwards.
+        let mut series_payloads: Vec<TimeSeriesPayload> = Vec::new();
 
         for p in &model.parameters {
             match &p.value {
@@ -65,11 +80,11 @@ impl DifferenceEquations {
                     formula_parameters.push((p.id.clone(), rate_expr));
                 }
                 Some(commol_core::ParameterValue::TimeSeries { data, mode }) => {
-                    series_parameters.push(TimeSeriesParameter::new(
-                        p.id.clone(),
-                        data.clone(),
-                        mode.clone(),
-                    ));
+                    series_payloads.push(TimeSeriesPayload {
+                        name: p.id.clone(),
+                        data: data.clone(),
+                        mode: mode.clone(),
+                    });
                 }
                 None => {
                     // Parameter needs calibration - skip it for now
@@ -89,15 +104,61 @@ impl DifferenceEquations {
         // Pre-compute subpopulation mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subpopulation variable names)
-        let mut subpopulation_mappings = build_subpopulation_mappings(
+        let subpopulation_layout = build_subpopulation_mappings(
             &compartments,
             &model.population.stratifications,
             &model.population.bins,
         );
 
-        let subpopulation_param_names: HashSet<String> = subpopulation_mappings
+        let subpopulation_param_names: HashSet<String> = subpopulation_layout
             .iter()
             .map(|m| m.parameter_name.clone())
+            .collect();
+
+        // Pre-allocate every parameter slot the per-step loop will touch so
+        // `set_parameter_str` can update in place and JIT input resolution can
+        // use direct indexed parameter reads where possible.
+        expression_context.reserve_parameters(
+            std::iter::once("N".to_string())
+                .chain(std::iter::once("t".to_string()))
+                .chain(model.parameters.iter().map(|p| p.id.clone()))
+                .chain(
+                    subpopulation_layout
+                        .iter()
+                        .map(|m| m.parameter_name.clone()),
+                )
+                .chain(series_payloads.iter().map(|payload| payload.name.clone()))
+                .chain(formula_parameters.iter().map(|(name, _)| name.clone())),
+        );
+        let n_parameter_index = expression_context
+            .parameter_index("N")
+            .expect("N parameter slot must be reserved");
+        let t_parameter_index = expression_context
+            .parameter_index("t")
+            .expect("t parameter slot must be reserved");
+
+        let mut subpopulation_mappings: Vec<SubpopulationMapping> = subpopulation_layout
+            .into_iter()
+            .map(|layout| {
+                let parameter_index = expression_context
+                    .parameter_index(&layout.parameter_name)
+                    .expect("subpopulation parameter slot must be reserved");
+                SubpopulationMapping {
+                    contributing_compartment_indices: layout.contributing_compartment_indices,
+                    parameter_name: layout.parameter_name,
+                    parameter_index,
+                }
+            })
+            .collect();
+
+        let series_parameters: Vec<TimeSeriesParameter> = series_payloads
+            .into_iter()
+            .map(|payload| {
+                let parameter_index = expression_context
+                    .parameter_index(&payload.name)
+                    .expect("time-series parameter slot must be reserved");
+                TimeSeriesParameter::new(payload.name, parameter_index, payload.data, payload.mode)
+            })
             .collect();
 
         // Pre-compute all transition flows
@@ -108,6 +169,7 @@ impl DifferenceEquations {
             &accumulator_map,
             &model.population.stratifications,
             &subpopulation_param_names,
+            &expression_context,
         );
 
         let used_context_variables =
@@ -115,25 +177,16 @@ impl DifferenceEquations {
         subpopulation_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
-        // Pre-allocate every parameter slot the per-step loop will touch so
-        // `set_parameter_str` can update in place without allocating a fresh
-        // `String` each call.
-        expression_context.reserve_parameters(
-            std::iter::once("N".to_string())
-                .chain(std::iter::once("t".to_string()))
-                .chain(
-                    subpopulation_mappings
-                        .iter()
-                        .map(|m| m.parameter_name.clone()),
-                )
-                .chain(series_parameters.iter().map(|s| s.parameter_name.clone()))
-                .chain(formula_parameters.iter().map(|(name, _)| name.clone())),
-        );
-
+        // The HashMap-backed compartment context is only needed when an
+        // expression must fall back to evalexpr. Both the JIT path (via
+        // `resolved_slots`) and the fast path (via `fast_rate_expression`)
+        // read compartment values directly from `population`, so they do
+        // not require the HashMap to be kept up to date.
         let requires_compartment_context = !formula_parameters.is_empty()
             || transition_flows.iter().any(|flow| {
                 matches!(flow.rate_expression, RateMathExpression::Formula(_))
                     && flow.resolved_slots.is_none()
+                    && flow.fast_rate_expression.is_none()
             });
 
         // Initialize compartment flows buffer
@@ -154,6 +207,8 @@ impl DifferenceEquations {
             subpopulation_mappings,
             formula_parameters,
             series_parameters,
+            n_parameter_index,
+            t_parameter_index,
             requires_compartment_context,
         }
     }
@@ -369,6 +424,7 @@ fn build_transition_flows(
     accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
     stratifications: &[commol_core::Stratification],
     subpopulation_names: &HashSet<String>,
+    expression_context: &MathExpressionContext,
 ) -> Vec<TransitionFlow> {
     let mut transition_flows = Vec::new();
 
@@ -393,7 +449,16 @@ fn build_transition_flows(
                     {
                         let rate_expression =
                             RateMathExpression::from_string(matched.rate_string.clone());
-                        let resolved_slots = resolve_jit_slots(&rate_expression, compartment_map);
+                        let resolved_slots = resolve_jit_slots(
+                            &rate_expression,
+                            compartment_map,
+                            expression_context,
+                        );
+                        let fast_rate_expression = build_fast_rate_expression(
+                            &rate_expression,
+                            compartment_map,
+                            expression_context,
+                        );
                         transition_flows.push(TransitionFlow {
                             source_index: None,
                             target_index: Some(i),
@@ -407,6 +472,7 @@ fn build_transition_flows(
                                 matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
                             ),
                             rate_expression,
+                            fast_rate_expression,
                             is_absolute_flow: true,
                             resolved_slots,
                         });
@@ -436,7 +502,16 @@ fn build_transition_flows(
                                     })
                                 }
                             };
-                        let resolved_slots = resolve_jit_slots(&rate_expression, compartment_map);
+                        let resolved_slots = resolve_jit_slots(
+                            &rate_expression,
+                            compartment_map,
+                            expression_context,
+                        );
+                        let fast_rate_expression = build_fast_rate_expression(
+                            &rate_expression,
+                            compartment_map,
+                            expression_context,
+                        );
                         transition_flows.push(TransitionFlow {
                             source_index: Some(i),
                             target_index: None,
@@ -450,6 +525,7 @@ fn build_transition_flows(
                                 matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
                             ),
                             rate_expression,
+                            fast_rate_expression,
                             is_absolute_flow,
                             resolved_slots,
                         });
@@ -530,8 +606,16 @@ fn build_transition_flows(
                                     }
                                 };
 
-                            let resolved_slots =
-                                resolve_jit_slots(&rate_expression, compartment_map);
+                            let resolved_slots = resolve_jit_slots(
+                                &rate_expression,
+                                compartment_map,
+                                expression_context,
+                            );
+                            let fast_rate_expression = build_fast_rate_expression(
+                                &rate_expression,
+                                compartment_map,
+                                expression_context,
+                            );
 
                             transition_flows.push(TransitionFlow {
                                 source_index: Some(source_index),
@@ -546,6 +630,7 @@ fn build_transition_flows(
                                     matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
                                 ),
                                 rate_expression,
+                                fast_rate_expression,
                                 is_absolute_flow,
                                 resolved_slots,
                             });
@@ -655,7 +740,7 @@ fn build_subpopulation_mappings(
     compartments: &[String],
     stratifications: &[commol_core::Stratification],
     bins: &[commol_core::Bin],
-) -> Vec<SubpopulationMapping> {
+) -> Vec<SubpopulationLayout> {
     if stratifications.is_empty() {
         return Vec::new();
     }
@@ -706,9 +791,9 @@ fn build_subpopulation_mappings(
     }
 
     // Convert subpopulation mappings to vector
-    let mut mappings: Vec<SubpopulationMapping> = subpopulation_map
+    let mut mappings: Vec<SubpopulationLayout> = subpopulation_map
         .into_iter()
-        .map(|(combination_name, indices)| SubpopulationMapping {
+        .map(|(combination_name, indices)| SubpopulationLayout {
             contributing_compartment_indices: indices,
             parameter_name: format!("N_{}", combination_name),
         })
@@ -717,7 +802,7 @@ fn build_subpopulation_mappings(
     // Add base compartment mappings
     // These use the bin name directly (S, I, R) instead of N_ prefix
     for (bin_name, indices) in base_compartment_map {
-        mappings.push(SubpopulationMapping {
+        mappings.push(SubpopulationLayout {
             contributing_compartment_indices: indices,
             parameter_name: bin_name,
         });
@@ -768,7 +853,7 @@ fn build_subpopulation_mappings(
         }
 
         for (var_name, indices) in bin_strat_partial_map {
-            mappings.push(SubpopulationMapping {
+            mappings.push(SubpopulationLayout {
                 contributing_compartment_indices: indices,
                 parameter_name: var_name,
             });
@@ -785,15 +870,7 @@ fn collect_used_context_variables(
     let mut variables = HashSet::new();
 
     for flow in transition_flows {
-        if let Some(slots) = &flow.resolved_slots {
-            for slot in slots {
-                if let VarSlot::Parameter(name) = slot {
-                    variables.insert(name.clone());
-                }
-            }
-        } else {
-            variables.extend(flow.rate_expression.get_variables());
-        }
+        variables.extend(flow.rate_expression.get_variables());
     }
 
     for (_, expression) in formula_parameters {
@@ -812,6 +889,7 @@ fn collect_used_context_variables(
 fn resolve_jit_slots(
     rate_expression: &RateMathExpression,
     compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
 ) -> Option<Vec<VarSlot>> {
     let expr = match rate_expression {
         RateMathExpression::Formula(expr) => expr,
@@ -821,15 +899,314 @@ fn resolve_jit_slots(
     Some(
         names
             .iter()
-            .map(|name| {
-                if let Some(&idx) = compartment_map.get(name) {
-                    VarSlot::Compartment(idx)
-                } else if name == "step" || name == "t" {
-                    VarSlot::Step
-                } else {
-                    VarSlot::Parameter(name.clone())
-                }
-            })
+            .map(|name| resolve_var_slot(name, compartment_map, expression_context))
             .collect(),
     )
+}
+
+fn build_fast_rate_expression(
+    rate_expression: &RateMathExpression,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<FastRateExpression> {
+    let mut ops = Vec::new();
+    match rate_expression {
+        RateMathExpression::Constant(value) => return Some(FastRateExpression::Constant(*value)),
+        RateMathExpression::Parameter(name) => {
+            return Some(FastRateExpression::Slot(resolve_var_slot(
+                name,
+                compartment_map,
+                expression_context,
+            )));
+        }
+        RateMathExpression::Formula(expr) => {
+            let ast = parse_expression(expr.preprocessed()).ok()?;
+            if let Some(specialized) =
+                specialized_fast_expr(&ast, compartment_map, expression_context)
+            {
+                return Some(specialized);
+            }
+            push_fast_ops_from_ast(&ast, compartment_map, expression_context, &mut ops)?;
+        }
+    }
+    Some(FastRateExpression::Program(ops))
+}
+
+fn specialized_fast_expr(
+    expr: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<FastRateExpression> {
+    match expr {
+        Expr::BinaryOp {
+            op: BinaryOperator::Mul,
+            left,
+            right,
+        } => {
+            if let Some((a, b, c)) = match_mul3(left, right, compartment_map, expression_context) {
+                return Some(FastRateExpression::Mul3(a, b, c));
+            }
+            if let Some((subtract, factor, value)) =
+                match_one_minus_mul3(left, right, compartment_map, expression_context)
+            {
+                return Some(FastRateExpression::OneMinusMul3 {
+                    subtract,
+                    factor,
+                    value,
+                });
+            }
+            let left = slot_from_ast(left, compartment_map, expression_context)?;
+            let right = slot_from_ast(right, compartment_map, expression_context)?;
+            Some(FastRateExpression::Mul2(left, right))
+        }
+        Expr::BinaryOp {
+            op: BinaryOperator::Div,
+            left,
+            right,
+        } => match_mul_add_div(left, right, compartment_map, expression_context).map(
+            |(first, second, add_left, add_right, denominator)| FastRateExpression::MulAddDiv {
+                first,
+                second,
+                add_left,
+                add_right,
+                denominator,
+            },
+        ),
+        Expr::Variable(name) => Some(FastRateExpression::Slot(resolve_var_slot(
+            name,
+            compartment_map,
+            expression_context,
+        ))),
+        Expr::Constant(value) => Some(FastRateExpression::Constant(*value)),
+        _ => None,
+    }
+}
+
+fn match_mul3(
+    left: &Expr,
+    right: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<(VarSlot, VarSlot, VarSlot)> {
+    if let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left: inner_left,
+        right: inner_right,
+    } = left
+    {
+        return Some((
+            slot_from_ast(inner_left, compartment_map, expression_context)?,
+            slot_from_ast(inner_right, compartment_map, expression_context)?,
+            slot_from_ast(right, compartment_map, expression_context)?,
+        ));
+    }
+
+    if let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left: inner_left,
+        right: inner_right,
+    } = right
+    {
+        return Some((
+            slot_from_ast(left, compartment_map, expression_context)?,
+            slot_from_ast(inner_left, compartment_map, expression_context)?,
+            slot_from_ast(inner_right, compartment_map, expression_context)?,
+        ));
+    }
+
+    None
+}
+
+fn match_one_minus_mul3(
+    left: &Expr,
+    right: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<(VarSlot, VarSlot, VarSlot)> {
+    if let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left: inner_left,
+        right: inner_right,
+    } = left
+    {
+        if let Some(subtract) = match_one_minus(inner_left, compartment_map, expression_context) {
+            return Some((
+                subtract,
+                slot_from_ast(inner_right, compartment_map, expression_context)?,
+                slot_from_ast(right, compartment_map, expression_context)?,
+            ));
+        }
+        if let Some(subtract) = match_one_minus(inner_right, compartment_map, expression_context) {
+            return Some((
+                subtract,
+                slot_from_ast(inner_left, compartment_map, expression_context)?,
+                slot_from_ast(right, compartment_map, expression_context)?,
+            ));
+        }
+    }
+
+    if let Some(subtract) = match_one_minus(left, compartment_map, expression_context)
+        && let Expr::BinaryOp {
+            op: BinaryOperator::Mul,
+            left: inner_left,
+            right: inner_right,
+        } = right
+    {
+        return Some((
+            subtract,
+            slot_from_ast(inner_left, compartment_map, expression_context)?,
+            slot_from_ast(inner_right, compartment_map, expression_context)?,
+        ));
+    }
+
+    None
+}
+
+fn match_one_minus(
+    expr: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<VarSlot> {
+    if let Expr::BinaryOp {
+        op: BinaryOperator::Sub,
+        left,
+        right,
+    } = expr
+        && matches!(left.as_ref(), Expr::Constant(value) if *value == 1.0)
+    {
+        return slot_from_ast(right, compartment_map, expression_context);
+    }
+    None
+}
+
+fn match_mul_add_div(
+    numerator: &Expr,
+    denominator: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<(VarSlot, VarSlot, VarSlot, VarSlot, VarSlot)> {
+    let denominator = slot_from_ast(denominator, compartment_map, expression_context)?;
+    let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left,
+        right,
+    } = numerator
+    else {
+        return None;
+    };
+
+    let (first, second, add_expr) = if let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left: inner_left,
+        right: inner_right,
+    } = left.as_ref()
+    {
+        (
+            slot_from_ast(inner_left, compartment_map, expression_context)?,
+            slot_from_ast(inner_right, compartment_map, expression_context)?,
+            right.as_ref(),
+        )
+    } else if let Expr::BinaryOp {
+        op: BinaryOperator::Mul,
+        left: inner_left,
+        right: inner_right,
+    } = right.as_ref()
+    {
+        (
+            slot_from_ast(inner_left, compartment_map, expression_context)?,
+            slot_from_ast(inner_right, compartment_map, expression_context)?,
+            left.as_ref(),
+        )
+    } else {
+        return None;
+    };
+
+    let Expr::BinaryOp {
+        op: BinaryOperator::Add,
+        left: add_left,
+        right: add_right,
+    } = add_expr
+    else {
+        return None;
+    };
+
+    Some((
+        first,
+        second,
+        slot_from_ast(add_left, compartment_map, expression_context)?,
+        slot_from_ast(add_right, compartment_map, expression_context)?,
+        denominator,
+    ))
+}
+
+fn slot_from_ast(
+    expr: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> Option<VarSlot> {
+    match expr {
+        Expr::Variable(name) => Some(resolve_var_slot(name, compartment_map, expression_context)),
+        _ => None,
+    }
+}
+
+fn push_fast_ops_from_ast(
+    expr: &Expr,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+    ops: &mut Vec<FastRateOp>,
+) -> Option<()> {
+    match expr {
+        Expr::Constant(value) => ops.push(FastRateOp::Constant(*value)),
+        Expr::Variable(name) => ops.push(FastRateOp::Slot(resolve_var_slot(
+            name,
+            compartment_map,
+            expression_context,
+        ))),
+        Expr::UnaryOp { op, operand } => match op {
+            UnaryOperator::Neg => {
+                push_fast_ops_from_ast(operand, compartment_map, expression_context, ops)?;
+                ops.push(FastRateOp::Neg);
+            }
+            UnaryOperator::Not => return None,
+        },
+        Expr::BinaryOp { op, left, right } => {
+            push_fast_ops_from_ast(left, compartment_map, expression_context, ops)?;
+            push_fast_ops_from_ast(right, compartment_map, expression_context, ops)?;
+            match op {
+                BinaryOperator::Add => ops.push(FastRateOp::Add),
+                BinaryOperator::Sub => ops.push(FastRateOp::Sub),
+                BinaryOperator::Mul => ops.push(FastRateOp::Mul),
+                BinaryOperator::Div => ops.push(FastRateOp::Div),
+                BinaryOperator::Mod
+                | BinaryOperator::Pow
+                | BinaryOperator::Lt
+                | BinaryOperator::Gt
+                | BinaryOperator::Le
+                | BinaryOperator::Ge
+                | BinaryOperator::Eq
+                | BinaryOperator::Ne
+                | BinaryOperator::And
+                | BinaryOperator::Or => return None,
+            }
+        }
+        Expr::FunctionCall { .. } | Expr::Conditional { .. } => return None,
+    }
+    Some(())
+}
+
+fn resolve_var_slot(
+    name: &str,
+    compartment_map: &HashMap<String, usize>,
+    expression_context: &MathExpressionContext,
+) -> VarSlot {
+    if let Some(&idx) = compartment_map.get(name) {
+        VarSlot::Compartment(idx)
+    } else if name == "step" || name == "t" {
+        VarSlot::Step
+    } else if let Some(idx) = expression_context.parameter_index(name) {
+        VarSlot::ParameterIndex(idx)
+    } else {
+        VarSlot::Parameter(name.to_string())
+    }
 }

@@ -298,6 +298,12 @@ impl MathExpression {
         get_variables(&self.preprocessed)
     }
 
+    /// Get the preprocessed formula string (Python operators normalised,
+    /// transcendental functions prefixed).
+    pub fn preprocessed(&self) -> &str {
+        &self.preprocessed
+    }
+
     /// If this expression was JIT-compiled, return the JIT function's variable
     /// names (in the order required by `call_jit_with_buffer`). Returns `None`
     /// when JIT compilation fell back to evalexpr.
