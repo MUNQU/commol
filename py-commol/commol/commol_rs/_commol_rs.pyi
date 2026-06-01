@@ -96,6 +96,7 @@ class ObservedDataPointProtocol(Protocol):
         weight: float | None = None,
         scale_id: str | None = None,
         window_steps: int | None = None,
+        compartments: list[str] | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...

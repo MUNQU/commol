@@ -22,6 +22,10 @@ pub struct ObservedDataPoint {
     /// Name of the compartment being observed
     pub compartment: String,
 
+    /// Optional list of output names to sum before comparison.
+    /// When omitted, `compartment` is used as the single observed output.
+    pub compartments: Option<Vec<String>>,
+
     /// Observed value (e.g., number of infected individuals)
     pub value: f64,
 
@@ -46,6 +50,7 @@ impl ObservedDataPoint {
         Self {
             time_step,
             compartment,
+            compartments: None,
             value,
             weight: 1.0,
             scale_id: None,
@@ -58,6 +63,7 @@ impl ObservedDataPoint {
         Self {
             time_step,
             compartment,
+            compartments: None,
             value,
             weight,
             scale_id: None,
@@ -70,6 +76,7 @@ impl ObservedDataPoint {
         Self {
             time_step,
             compartment,
+            compartments: None,
             value,
             weight: 1.0,
             scale_id: Some(scale_id),
@@ -88,6 +95,7 @@ impl ObservedDataPoint {
         Self {
             time_step,
             compartment,
+            compartments: None,
             value,
             weight,
             scale_id: Some(scale_id),
@@ -100,6 +108,7 @@ impl ObservedDataPoint {
         Self {
             time_step,
             compartment,
+            compartments: None,
             value,
             weight: 1.0,
             scale_id: None,

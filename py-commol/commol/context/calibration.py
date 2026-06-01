@@ -28,7 +28,10 @@ class ObservedDataPoint(BaseModel):
     step : int
         Time step of the observation
     compartment : str
-        Name of the compartment being observed
+        Name of the compartment being observed, or a display name for aggregate
+        observations when compartments is set
+    compartments : list[str] | None
+        Optional output names to sum before comparing with this observation
     value : float
         Observed value
     weight : float
@@ -40,6 +43,10 @@ class ObservedDataPoint(BaseModel):
     step: int = Field(default=..., ge=0, description="Time step of the observation")
     compartment: str = Field(
         default=..., min_length=1, description="Name of the compartment being observed"
+    )
+    compartments: list[str] | None = Field(
+        default=None,
+        description="Optional output names to sum before comparison",
     )
     value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
@@ -67,6 +74,12 @@ class ObservedDataPoint(BaseModel):
                 f"window_steps ({self.window_steps}) must be <= step ({self.step})"
             )
         return self
+
+    @field_validator("compartments")
+    def validate_compartments(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and not v:
+            raise ValueError("compartments must be non-empty when provided")
+        return v
 
 
 class CalibrationParameter(BaseModel):

@@ -424,6 +424,27 @@ result = calibrator.run()
 model.update_parameters(result.best_parameters)
 ```
 
+### Aggregate Observations
+
+Use `compartments` when a single observation corresponds to the sum of multiple
+simulation outputs. The `compartment` field remains the label used for grouping
+and plotting; the outputs listed in `compartments` are summed before loss,
+coverage, and plotting comparisons.
+
+```python
+observed_data = [
+    ObservedDataPoint(
+        step=10,
+        compartment="reported_total",
+        compartments=["B_g1", "B_g2"],
+        value=72.0,
+    ),
+]
+```
+
+Aggregate observations can reference compartments or accumulator outputs. They
+can also be combined with `scale_id` and `window_steps`.
+
 ### Calibrating Stratified Models
 
 Calibrate parameters specific to individual stratification categories:

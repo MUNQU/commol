@@ -82,3 +82,11 @@ options:
 show_root_heading: true
 show_source: true
 heading_level: 3
+
+## Calibration Observations
+
+::: commol.context.calibration.ObservedDataPoint
+options:
+show_root_heading: true
+show_source: true
+heading_level: 3

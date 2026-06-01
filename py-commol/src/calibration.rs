@@ -49,7 +49,7 @@ impl PyObservedDataPoint {
     ///     weight: Optional weight for this observation (default: 1.0)
     ///     scale_id: Optional scale parameter ID to apply to model output
     #[new]
-    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None, window_steps=None))]
+    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None, window_steps=None, compartments=None))]
     fn new(
         step: u32,
         compartment: String,
@@ -57,6 +57,7 @@ impl PyObservedDataPoint {
         weight: Option<f64>,
         scale_id: Option<String>,
         window_steps: Option<u32>,
+        compartments: Option<Vec<String>>,
     ) -> Self {
         let mut inner = match (weight, scale_id) {
             (Some(w), Some(s)) => commol_calibration::ObservedDataPoint::with_weight_and_scale(
@@ -75,6 +76,7 @@ impl PyObservedDataPoint {
             (None, None) => commol_calibration::ObservedDataPoint::new(step, compartment, value),
         };
         inner.window_steps = window_steps;
+        inner.compartments = compartments;
         Self { inner }
     }
 

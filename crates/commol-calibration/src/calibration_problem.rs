@@ -148,8 +148,9 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Observed data points to fit against
     observed_data: Vec<ObservedDataPoint>,
 
-    /// Indices of observed compartments in the engine's compartment vector
-    observed_compartment_indices: Vec<usize>,
+    /// Indices of observed outputs in the engine's output vector.
+    /// Each observation may sum one or more outputs before comparison.
+    observed_output_indices: Vec<Vec<usize>>,
 
     /// Sorted, deduplicated observation time steps for sparse loss evaluation
     observed_time_steps: Vec<u32>,
@@ -223,7 +224,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
         Self {
             base_engine: self.base_engine.clone(),
             observed_data: self.observed_data.clone(),
-            observed_compartment_indices: self.observed_compartment_indices.clone(),
+            observed_output_indices: self.observed_output_indices.clone(),
             observed_time_steps: self.observed_time_steps.clone(),
             observed_time_indices: self.observed_time_indices.clone(),
             observed_previous_time_indices: self.observed_previous_time_indices.clone(),
@@ -314,8 +315,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .map(|(idx, name)| (name.as_str(), idx))
             .collect();
 
-        // Validate observed output names and convert to indices
-        let mut observed_compartment_indices = Vec::with_capacity(observed_data.len());
+        // Validate observed output names and convert to indices.
+        let mut observed_output_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
             if let Some(window_steps) = obs.window_steps {
                 if window_steps > obs.time_step {
@@ -326,16 +327,33 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
             }
 
-            match output_map.get(obs.compartment.as_str()) {
-                Some(&idx) => observed_compartment_indices.push(idx),
-                None => {
-                    return Err(format!(
-                        "Invalid observed output name '{}' (available: {})",
-                        obs.compartment,
-                        output_names.join(", ")
-                    ));
+            let observed_outputs: Vec<&str> = obs.compartments.as_ref().map_or_else(
+                || vec![obs.compartment.as_str()],
+                |compartments| compartments.iter().map(String::as_str).collect(),
+            );
+            if observed_outputs.is_empty() {
+                return Err(format!(
+                    "Observation '{}' at step {} has an empty compartments list",
+                    obs.compartment, obs.time_step
+                ));
+            }
+
+            let mut indices = Vec::with_capacity(observed_outputs.len());
+            for output_name in observed_outputs {
+                match output_map.get(output_name) {
+                    Some(&idx) => indices.push(idx),
+                    None => {
+                        return Err(format!(
+                            "Invalid observed output name '{}' for observation '{}' \
+                            (available: {})",
+                            output_name,
+                            obs.compartment,
+                            output_names.join(", ")
+                        ));
+                    }
                 }
             }
+            observed_output_indices.push(indices);
         }
 
         // Build compartment indices for calibration parameters
@@ -556,7 +574,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         Ok(Self {
             base_engine,
             observed_data,
-            observed_compartment_indices,
+            observed_output_indices,
             observed_time_steps: simulation_time_steps,
             observed_time_indices,
             observed_previous_time_indices,
@@ -793,19 +811,25 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let observation_iter = || {
             self.observed_data
                 .iter()
-                .zip(&self.observed_compartment_indices)
+                .zip(&self.observed_output_indices)
                 .zip(&self.observed_scale_indices)
                 .zip(&self.observed_time_indices)
                 .zip(&self.observed_previous_time_indices)
                 .filter_map(
-                    |((((obs, &compartment_idx), &scale_idx), &time_idx), &previous_time_idx)| {
+                    |((((obs, output_indices), &scale_idx), &time_idx), &previous_time_idx)| {
                         observed_results.get(time_idx).map(|step_data| {
-                            let current = step_data[compartment_idx];
+                            let current: f64 =
+                                output_indices.iter().map(|&idx| step_data[idx]).sum();
                             let predicted = if let Some(previous_time_idx) = previous_time_idx {
-                                let previous = observed_results
+                                let previous: f64 = observed_results
                                     .get(previous_time_idx)
-                                    .and_then(|row| row.get(compartment_idx))
-                                    .copied()
+                                    .map(|row| {
+                                        output_indices
+                                            .iter()
+                                            .filter_map(|&idx| row.get(idx))
+                                            .copied()
+                                            .sum()
+                                    })
                                     .unwrap_or(0.0);
                                 current - previous
                             } else {

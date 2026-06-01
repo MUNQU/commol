@@ -120,6 +120,7 @@ class Calibrator:
                 weight=point.weight,
                 scale_id=point.scale_id,
                 window_steps=point.window_steps,
+                compartments=point.compartments,
             )
             for point in self.problem.observed_data
         ]
@@ -222,6 +223,7 @@ class Calibrator:
                 weight=point.weight,
                 scale_id=point.scale_id,
                 window_steps=point.window_steps,
+                compartments=point.compartments,
             )
             for point in self.problem.observed_data
         ]
@@ -518,11 +520,17 @@ class Calibrator:
         simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            if obs.compartment not in simulation_output_names:
+            observed_outputs = obs.compartments or [obs.compartment]
+            missing_outputs = [
+                output
+                for output in observed_outputs
+                if output not in simulation_output_names
+            ]
+            if missing_outputs:
                 raise ValueError(
-                    f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model simulation outputs. Available outputs: "
-                    f"{sorted(simulation_output_names)}"
+                    f"Observed data output(s) {missing_outputs} for observation "
+                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"Available outputs: {sorted(simulation_output_names)}"
                 )
 
         if self.problem.observed_data:
