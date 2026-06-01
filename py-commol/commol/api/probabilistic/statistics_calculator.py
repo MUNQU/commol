@@ -221,13 +221,16 @@ class StatisticsCalculator:
 
         Returns empty dicts if no observed data has window_steps set.
         """
-        window_steps_by_output: dict[str, int] = {}
+        window_observations: dict[str, tuple[int, list[str]]] = {}
         for obs in self.problem.observed_data:
             if (
                 obs.window_steps is not None
-                and obs.compartment not in window_steps_by_output
+                and obs.compartment not in window_observations
             ):
-                window_steps_by_output[obs.compartment] = obs.window_steps
+                window_observations[obs.compartment] = (
+                    obs.window_steps,
+                    obs.compartments or [obs.compartment],
+                )
 
         prediction_median: dict[str, list[float]] = {}
         prediction_ci_lower: dict[str, list[float]] = {}
@@ -236,10 +239,22 @@ class StatisticsCalculator:
         ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
         ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
 
-        for output_id, window_steps in window_steps_by_output.items():
-            if output_id not in all_predictions:
+        for output_id, (window_steps, component_ids) in window_observations.items():
+            if any(
+                component_id not in all_predictions for component_id in component_ids
+            ):
                 continue
-            trajectories = all_predictions[output_id]
+            first_component = all_predictions[component_ids[0]]
+            trajectories = [
+                [
+                    sum(
+                        all_predictions[component_id][run_idx][step_idx]
+                        for component_id in component_ids
+                    )
+                    for step_idx in range(len(first_component[run_idx]))
+                ]
+                for run_idx in range(len(first_component))
+            ]
             series_len = len(trajectories[0]) if trajectories else 0
             steps = list(range(window_steps, series_len, window_steps))
             if not steps:
@@ -264,6 +279,8 @@ class StatisticsCalculator:
         self,
         prediction_ci_lower: dict[str, list[float]],
         prediction_ci_upper: dict[str, list[float]],
+        all_predictions: dict[str, list[list[float]]] | None = None,
+        ensemble_params: list[CalibrationEvaluation] | None = None,
     ) -> tuple[float, float]:
         """Calculate coverage percentage and average CI width.
 
@@ -273,36 +290,59 @@ class StatisticsCalculator:
             Lower CI bounds for each compartment
         prediction_ci_upper : dict[str, list[float]]
             Upper CI bounds for each compartment
+        all_predictions : dict[str, list[list[float]]] | None
+            Optional selected-member trajectories. When provided, observation-level
+            intervals are computed from member predictions directly, preserving
+            aggregate, windowed, and scale-parameter correlations.
+        ensemble_params : list[CalibrationEvaluation] | None
+            Selected ensemble parameter sets, required for scaled observations.
 
         Returns
         -------
         tuple[float, float]
             Tuple of (coverage_percentage, average_ci_width)
         """
+        if all_predictions is not None and ensemble_params is not None:
+            return self._calculate_observation_level_coverage(
+                all_predictions,
+                ensemble_params,
+            )
+
         points_in_ci = 0
         total_points = len(self.problem.observed_data)
         total_ci_width = 0.0
 
         for obs in self.problem.observed_data:
             comp_id = obs.compartment
+            component_ids = obs.compartments or [comp_id]
             step = obs.step
             observed_value = obs.value
 
-            if comp_id in prediction_ci_lower and step < len(
-                prediction_ci_lower[comp_id]
+            if all(
+                component_id in prediction_ci_lower
+                and step < len(prediction_ci_lower[component_id])
+                for component_id in component_ids
             ):
                 if obs.window_steps is None:
-                    ci_lower = prediction_ci_lower[comp_id][step]
-                    ci_upper = prediction_ci_upper[comp_id][step]
+                    ci_lower = sum(
+                        prediction_ci_lower[component_id][step]
+                        for component_id in component_ids
+                    )
+                    ci_upper = sum(
+                        prediction_ci_upper[component_id][step]
+                        for component_id in component_ids
+                    )
                 else:
                     previous_step = step - obs.window_steps
-                    ci_lower = (
-                        prediction_ci_lower[comp_id][step]
-                        - prediction_ci_upper[comp_id][previous_step]
+                    ci_lower = sum(
+                        prediction_ci_lower[component_id][step]
+                        - prediction_ci_upper[component_id][previous_step]
+                        for component_id in component_ids
                     )
-                    ci_upper = (
-                        prediction_ci_upper[comp_id][step]
-                        - prediction_ci_lower[comp_id][previous_step]
+                    ci_upper = sum(
+                        prediction_ci_upper[component_id][step]
+                        - prediction_ci_lower[component_id][previous_step]
+                        for component_id in component_ids
                     )
 
                 if ci_lower <= observed_value <= ci_upper:
@@ -316,3 +356,89 @@ class StatisticsCalculator:
         average_ci_width = total_ci_width / total_points if total_points > 0 else 0.0
 
         return coverage_percentage, average_ci_width
+
+    def _calculate_observation_level_coverage(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+    ) -> tuple[float, float]:
+        points_in_ci = 0
+        total_points = len(self.problem.observed_data)
+        total_ci_width = 0.0
+
+        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
+        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+
+        for obs in self.problem.observed_data:
+            values = self._observation_member_values(
+                obs,
+                all_predictions,
+                ensemble_params,
+            )
+            if not values:
+                continue
+
+            ci_lower = float(np.percentile(values, ci_lower_percentile))
+            ci_upper = float(np.percentile(values, ci_upper_percentile))
+            if ci_lower <= obs.value <= ci_upper:
+                points_in_ci += 1
+            total_ci_width += ci_upper - ci_lower
+
+        coverage_percentage = (
+            (points_in_ci / total_points * 100) if total_points > 0 else 0.0
+        )
+        average_ci_width = total_ci_width / total_points if total_points > 0 else 0.0
+        return coverage_percentage, average_ci_width
+
+    def _observation_member_values(
+        self,
+        obs,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+    ) -> list[float]:
+        component_ids = obs.compartments or [obs.compartment]
+        if any(component_id not in all_predictions for component_id in component_ids):
+            return []
+
+        n_members = len(ensemble_params)
+        if any(
+            len(all_predictions[component_id]) < n_members
+            for component_id in component_ids
+        ):
+            return []
+
+        values = []
+        previous_step = (
+            obs.step - obs.window_steps if obs.window_steps is not None else None
+        )
+        for member_idx, params in enumerate(ensemble_params):
+            value = 0.0
+            for component_id in component_ids:
+                trajectory = all_predictions[component_id][member_idx]
+                if obs.step >= len(trajectory):
+                    return []
+                component_value = trajectory[obs.step]
+                if previous_step is not None:
+                    if previous_step >= len(trajectory):
+                        return []
+                    component_value -= trajectory[previous_step]
+                value += component_value
+            values.append(self._scale_observation_value(value, obs.scale_id, params))
+        return values
+
+    @staticmethod
+    def _scale_observation_value(
+        value: float,
+        scale_id: str | None,
+        params: CalibrationEvaluation,
+    ) -> float:
+        if scale_id is None:
+            return value
+        try:
+            scale_idx = params.parameter_names.index(scale_id)
+        except ValueError as exc:
+            raise ValueError(
+                f"Scale parameter '{scale_id}' is not present in calibration "
+                "evaluation parameter names."
+            ) from exc
+        return value * params.parameters[scale_idx]

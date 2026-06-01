@@ -328,6 +328,19 @@ plotter.plot_series(
 )
 ```
 
+### Aggregate, Scaled, and Windowed Observations
+
+Probabilistic calibration supports the same transformed observations as standard
+calibration. If an `ObservedDataPoint` sets `compartments`, the listed outputs are
+summed before ensemble coverage is evaluated. If it sets `scale_id`, each
+ensemble member applies its own scale parameter before comparison. If it sets
+`window_steps`, the interval uses the difference between the current output and
+the output `window_steps` earlier.
+
+When any of these transformations are present, ensemble selection compares
+observation-level predictions so that the selected ensemble is evaluated against
+the same quantity used by the calibration loss.
+
 ## Configuration Options
 
 Probabilistic calibration is configured through the `CalibrationProblem.probabilistic_config` field using a `ProbabilisticCalibrationConfig` object. The configuration includes:

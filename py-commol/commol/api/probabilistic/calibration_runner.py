@@ -118,6 +118,7 @@ class CalibrationRunner:
                 weight=point.weight,
                 scale_id=point.scale_id,
                 window_steps=point.window_steps,
+                compartments=point.compartments,
             )
             for point in self.problem.observed_data
         ]

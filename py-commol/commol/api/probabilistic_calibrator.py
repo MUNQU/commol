@@ -185,11 +185,17 @@ class ProbabilisticCalibrator:
     def _validate_observed_data(self, simulation_output_ids: set[str]) -> None:
         """Validate that observed data targets exist and have valid steps."""
         for obs in self.problem.observed_data:
-            if obs.compartment not in simulation_output_ids:
+            observed_outputs = obs.compartments or [obs.compartment]
+            missing_outputs = [
+                output
+                for output in observed_outputs
+                if output not in simulation_output_ids
+            ]
+            if missing_outputs:
                 raise ValueError(
-                    f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model simulation outputs. Available outputs: "
-                    f"{sorted(simulation_output_ids)}"
+                    f"Observed data output(s) {missing_outputs} for observation "
+                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"Available outputs: {sorted(simulation_output_ids)}"
                 )
 
         if self.problem.observed_data:
@@ -589,7 +595,10 @@ class ProbabilisticCalibrator:
             )
         )
         cov_pct, avg_ci = self._statistics_calculator.calculate_coverage_metrics(
-            pred_ci_lower, pred_ci_upper
+            pred_ci_lower,
+            pred_ci_upper,
+            all_predictions=all_preds,
+            ensemble_params=solution_params,
         )
 
         return ParetoSolution(

@@ -20,6 +20,11 @@ from commol.context.probabilistic_calibration import CalibrationEvaluation
 
 logger = logging.getLogger(__name__)
 
+MetricPoint = tuple[int, int]
+ObservedTuple = tuple[int, int, float]
+ObservationComponent = tuple[int, int | None]
+ObservationSpec = tuple[list[ObservationComponent], str | None]
+
 
 class EnsembleSelector:
     """Handles ensemble selection.
@@ -157,11 +162,8 @@ class EnsembleSelector:
         # Generate predictions for each representative in parallel. Compact scopes
         # only generate metric points needed by the selector; full output trajectories
         # are generated later for selected/full result detail.
-        if ci_width_scope == "full_trajectory":
-            if any(obs.window_steps is not None for obs in self.problem.observed_data):
-                raise ValueError(
-                    "Windowed observations require ci_width_scope='observed_points'."
-                )
+        requires_observation_level = self._requires_observation_level_selection()
+        if ci_width_scope == "full_trajectory" and not requires_observation_level:
             representatives_for_selection = self._generate_predictions(representatives)
             representatives_with_predictions = representatives_for_selection
             observed_data_tuples = [
@@ -174,13 +176,16 @@ class EnsembleSelector:
             ]
             selection_ci_width_scope = "full_trajectory"
         else:
-            metric_points, observed_data_tuples, window_observation_points = (
-                self._selection_metric_points_for_scope(ci_width_scope)
+            metric_scope = (
+                "observed_points" if requires_observation_level else ci_width_scope
+            )
+            metric_points, observed_data_tuples, observation_specs = (
+                self._selection_metric_points_for_scope(metric_scope)
             )
             representatives_for_selection = self._generate_compact_predictions(
                 representatives,
                 metric_points,
-                window_observation_points,
+                observation_specs,
             )
             representatives_with_predictions = representatives
             selection_ci_width_scope = "full_trajectory"
@@ -280,7 +285,7 @@ class EnsembleSelector:
     def _metric_points_for_scope(
         self,
         ci_width_scope: str,
-    ) -> tuple[list[tuple[int, int]], list[tuple[int, int, float]]]:
+    ) -> tuple[list[MetricPoint], list[ObservedTuple]]:
         metric_points, observed_data_tuples, _ = (
             self._selection_metric_points_for_scope(ci_width_scope)
         )
@@ -289,83 +294,117 @@ class EnsembleSelector:
     def _selection_metric_points_for_scope(
         self,
         ci_width_scope: str,
-    ) -> tuple[
-        list[tuple[int, int]],
-        list[tuple[int, int, float]],
-        list[tuple[int, int | None]] | None,
-    ]:
+    ) -> tuple[list[MetricPoint], list[ObservedTuple], list[ObservationSpec] | None]:
         """Build compact metric points and remapped observed tuples."""
-        has_windowed_observations = any(
-            obs.window_steps is not None for obs in self.problem.observed_data
+        metric_points = self._metric_points_for_ci_scope(ci_width_scope)
+        deduplicated_points, point_to_compact_idx = self._deduplicate_metric_points(
+            metric_points
         )
-        if has_windowed_observations and ci_width_scope != "observed_points":
-            raise ValueError(
-                "Windowed observations require ci_width_scope='observed_points'."
-            )
 
+        if not self._requires_observation_level_selection():
+            observed_tuples = self._raw_observed_tuples(point_to_compact_idx)
+            return deduplicated_points, observed_tuples, None
+
+        observed_tuples, observation_specs = self._observation_level_specs(
+            point_to_compact_idx
+        )
+        return deduplicated_points, observed_tuples, observation_specs
+
+    def _requires_observation_level_selection(self) -> bool:
+        """Return whether observations need aggregate/window/scale transforms."""
+        return any(
+            obs.window_steps is not None
+            or obs.compartments is not None
+            or obs.scale_id is not None
+            for obs in self.problem.observed_data
+        )
+
+    def _metric_points_for_ci_scope(self, ci_width_scope: str) -> list[MetricPoint]:
+        """Build metric points for a compact CI-width scope."""
         if ci_width_scope == "observed_points":
-            metric_points = []
-            for obs in self.problem.observed_data:
-                output_idx = self._simulation_output_to_idx[obs.compartment]
-                metric_points.append((obs.step, output_idx))
-                if obs.window_steps is not None:
-                    metric_points.append((obs.step - obs.window_steps, output_idx))
-        elif ci_width_scope == "observed_steps_all_compartments":
+            return self._observed_point_metric_points()
+        if ci_width_scope == "observed_steps_all_compartments":
             observed_steps = sorted({obs.step for obs in self.problem.observed_data})
-            metric_points = [
+            return [
                 (step, output_idx)
                 for step in observed_steps
                 for output_idx in range(len(self.simulation.simulation_outputs))
             ]
-        else:
-            raise ValueError(
-                "ci_width_scope must be 'observed_points', "
-                "'observed_steps_all_compartments', or 'full_trajectory'"
-            )
+        raise ValueError(
+            "ci_width_scope must be 'observed_points', "
+            "'observed_steps_all_compartments', or 'full_trajectory'"
+        )
 
-        point_to_compact_idx: dict[tuple[int, int], int] = {}
-        deduplicated_points: list[tuple[int, int]] = []
+    def _observed_point_metric_points(self) -> list[MetricPoint]:
+        """Build compact metric points for observed outputs only."""
+        metric_points = []
+        for obs in self.problem.observed_data:
+            output_ids = obs.compartments or [obs.compartment]
+            for output_id in output_ids:
+                output_idx = self._simulation_output_to_idx[output_id]
+                metric_points.append((obs.step, output_idx))
+                if obs.window_steps is not None:
+                    metric_points.append((obs.step - obs.window_steps, output_idx))
+        return metric_points
+
+    @staticmethod
+    def _deduplicate_metric_points(
+        metric_points: list[MetricPoint],
+    ) -> tuple[list[MetricPoint], dict[MetricPoint, int]]:
+        """Return metric points with stable deduplication and index mapping."""
+        point_to_compact_idx: dict[MetricPoint, int] = {}
+        deduplicated_points: list[MetricPoint] = []
         for point in metric_points:
             if point not in point_to_compact_idx:
                 point_to_compact_idx[point] = len(deduplicated_points)
                 deduplicated_points.append(point)
+        return deduplicated_points, point_to_compact_idx
 
-        if not has_windowed_observations:
-            observed_data_tuples = [
-                (
-                    point_to_compact_idx[
-                        (
-                            obs.step,
-                            self._simulation_output_to_idx[obs.compartment],
-                        )
-                    ],
-                    0,
-                    obs.value,
-                )
-                for obs in self.problem.observed_data
-            ]
-            return deduplicated_points, observed_data_tuples, None
-
-        observed_data_tuples: list[tuple[int, int, float]] = []
-        window_observation_points: list[tuple[int, int | None]] = []
-        for obs_index, obs in enumerate(self.problem.observed_data):
-            output_idx = self._simulation_output_to_idx[obs.compartment]
-            current_point_idx = point_to_compact_idx[(obs.step, output_idx)]
-            previous_point_idx = (
-                point_to_compact_idx[(obs.step - obs.window_steps, output_idx)]
-                if obs.window_steps is not None
-                else None
+    def _raw_observed_tuples(
+        self,
+        point_to_compact_idx: dict[MetricPoint, int],
+    ) -> list[ObservedTuple]:
+        """Build observed tuples that directly reference compact raw predictions."""
+        return [
+            (
+                point_to_compact_idx[
+                    (obs.step, self._simulation_output_to_idx[obs.compartment])
+                ],
+                0,
+                obs.value,
             )
-            observed_data_tuples.append((obs_index, 0, obs.value))
-            window_observation_points.append((current_point_idx, previous_point_idx))
+            for obs in self.problem.observed_data
+        ]
 
-        return deduplicated_points, observed_data_tuples, window_observation_points
+    def _observation_level_specs(
+        self,
+        point_to_compact_idx: dict[MetricPoint, int],
+    ) -> tuple[list[ObservedTuple], list[ObservationSpec]]:
+        """Build observed tuples and transform specs for observation-level rows."""
+        observed_data_tuples: list[ObservedTuple] = []
+        observation_specs: list[ObservationSpec] = []
+        for obs_index, obs in enumerate(self.problem.observed_data):
+            output_ids = obs.compartments or [obs.compartment]
+            observation_components = []
+            for output_id in output_ids:
+                output_idx = self._simulation_output_to_idx[output_id]
+                current_point_idx = point_to_compact_idx[(obs.step, output_idx)]
+                previous_point_idx = (
+                    point_to_compact_idx[(obs.step - obs.window_steps, output_idx)]
+                    if obs.window_steps is not None
+                    else None
+                )
+                observation_components.append((current_point_idx, previous_point_idx))
+            observed_data_tuples.append((obs_index, 0, obs.value))
+            observation_specs.append((observation_components, obs.scale_id))
+
+        return observed_data_tuples, observation_specs
 
     def _generate_compact_predictions(
         self,
         representatives: list[CalibrationEvaluation],
-        metric_points: list[tuple[int, int]],
-        window_observation_points: list[tuple[int, int | None]] | None = None,
+        metric_points: list[MetricPoint],
+        observation_specs: list[ObservationSpec] | None = None,
     ) -> list[CalibrationEvaluation]:
         """Generate compact predictions for representative parameter sets."""
         logger.info(
@@ -388,19 +427,30 @@ class EnsembleSelector:
 
         result: list[CalibrationEvaluation] = []
         for rep, predictions in zip(representatives, compact_predictions):
-            if window_observation_points is None:
+            if observation_specs is None:
                 compact_rows = [[value] for value in predictions]
             else:
+                parameter_indices = {
+                    param_id: idx for idx, param_id in enumerate(rep.parameter_names)
+                }
                 compact_rows = [
                     [
-                        predictions[current_idx]
-                        - (
-                            predictions[previous_idx]
-                            if previous_idx is not None
-                            else 0.0
+                        self._scale_observation_value(
+                            sum(
+                                predictions[current_idx]
+                                - (
+                                    predictions[previous_idx]
+                                    if previous_idx is not None
+                                    else 0.0
+                                )
+                                for current_idx, previous_idx in observation_components
+                            ),
+                            scale_id,
+                            rep.parameters,
+                            parameter_indices,
                         )
                     ]
-                    for current_idx, previous_idx in window_observation_points
+                    for observation_components, scale_id in observation_specs
                 ]
             result.append(
                 CalibrationEvaluation(
@@ -412,3 +462,21 @@ class EnsembleSelector:
             )
 
         return result
+
+    @staticmethod
+    def _scale_observation_value(
+        value: float,
+        scale_id: str | None,
+        parameters: list[float],
+        parameter_indices: dict[str, int],
+    ) -> float:
+        if scale_id is None:
+            return value
+        try:
+            scale_idx = parameter_indices[scale_id]
+        except KeyError as exc:
+            raise ValueError(
+                f"Scale parameter '{scale_id}' is not present in calibration "
+                "evaluation parameter names."
+            ) from exc
+        return value * parameters[scale_idx]

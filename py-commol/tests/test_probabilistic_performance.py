@@ -333,6 +333,259 @@ def test_compact_observed_point_predictions_match_full_predictions() -> None:
             )
 
 
+def test_compact_observed_point_predictions_apply_scale_parameters() -> None:
+    model = _generic_flow_model()
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(
+                step=1,
+                compartment="active",
+                value=50.0,
+                scale_id="reporting_rate",
+            )
+        ],
+        parameters=[
+            CalibrationParameter(
+                id="start_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="finish_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="reporting_rate",
+                parameter_type="scale",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
+    selector = EnsembleSelector(Simulation(model), problem, seed=42)
+    representatives = [
+        CalibrationEvaluation(
+            parameters=[0.1, 0.2, 0.5],
+            loss=1.0,
+            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
+        )
+    ]
+
+    metric_points, _, observation_specs = selector._selection_metric_points_for_scope(
+        "observed_points"
+    )
+    raw_representative = selector._generate_compact_predictions(
+        representatives,
+        metric_points,
+    )[0]
+    scaled_representative = selector._generate_compact_predictions(
+        representatives,
+        metric_points,
+        observation_specs,
+    )[0]
+
+    assert scaled_representative.predictions is not None
+    assert raw_representative.predictions is not None
+    assert scaled_representative.predictions[0][0] == (
+        raw_representative.predictions[0][0] * 0.5
+    )
+
+
+def test_default_selection_handles_aggregate_observation_display_name() -> None:
+    model = _generic_flow_model()
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(
+                step=1,
+                compartment="reported_total",
+                compartments=["active", "done"],
+                value=235.0,
+            )
+        ],
+        parameters=[
+            CalibrationParameter(
+                id="start_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="finish_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
+    selector = EnsembleSelector(Simulation(model), problem, seed=42)
+    representatives = [
+        CalibrationEvaluation(
+            parameters=[0.1, 0.2],
+            loss=1.0,
+            parameter_names=["start_rate", "finish_rate"],
+        ),
+        CalibrationEvaluation(
+            parameters=[0.2, 0.2],
+            loss=2.0,
+            parameter_names=["start_rate", "finish_rate"],
+        ),
+    ]
+
+    result, representatives_for_result = selector.select_ensemble_with_predictions(
+        representatives=representatives,
+        population_size=4,
+        generations=4,
+        confidence_level=0.95,
+        pareto_preference=0.5,
+        ensemble_size_mode="fixed",
+        ensemble_size=2,
+        ensemble_size_min=None,
+        ensemble_size_max=None,
+        ci_margin_factor=0.1,
+        ci_sample_sizes=[2],
+        crossover_probability=0.9,
+        ensemble_algorithm="greedy_local_search",
+    )
+
+    selected = result.pareto_front[result.selected_pareto_index]
+    assert representatives_for_result == representatives
+    assert selected.coverage == 1.0
+
+
+def test_default_selection_applies_scale_parameters_to_observations() -> None:
+    model = _generic_flow_model()
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(
+                step=1,
+                compartment="active",
+                value=100.0,
+                scale_id="reporting_rate",
+            )
+        ],
+        parameters=[
+            CalibrationParameter(
+                id="start_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="finish_rate",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="reporting_rate",
+                parameter_type="scale",
+                min_bound=0.1,
+                max_bound=1.0,
+            ),
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
+    selector = EnsembleSelector(Simulation(model), problem, seed=42)
+    representatives = [
+        CalibrationEvaluation(
+            parameters=[0.1, 0.2, 0.5],
+            loss=1.0,
+            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
+        ),
+        CalibrationEvaluation(
+            parameters=[0.2, 0.2, 0.5],
+            loss=2.0,
+            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
+        ),
+    ]
+
+    result, _ = selector.select_ensemble_with_predictions(
+        representatives=representatives,
+        population_size=4,
+        generations=4,
+        confidence_level=0.95,
+        pareto_preference=0.5,
+        ensemble_size_mode="fixed",
+        ensemble_size=2,
+        ensemble_size_min=None,
+        ensemble_size_max=None,
+        ci_margin_factor=0.1,
+        ci_sample_sizes=[2],
+        crossover_probability=0.9,
+        ensemble_algorithm="greedy_local_search",
+    )
+
+    selected = result.pareto_front[result.selected_pareto_index]
+    assert selected.coverage == 1.0
+
+
+def test_coverage_metrics_apply_scale_parameters_per_member() -> None:
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(
+                step=1,
+                compartment="active",
+                value=40.0,
+                scale_id="reporting_rate",
+            )
+        ],
+        parameters=[
+            CalibrationParameter(
+                id="reporting_rate",
+                parameter_type="scale",
+                min_bound=0.0,
+                max_bound=1.0,
+            )
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
+    calculator = StatisticsCalculator.__new__(StatisticsCalculator)
+    calculator.problem = problem
+    calculator.confidence_level = 0.95
+    ensemble_params = [
+        CalibrationEvaluation(
+            parameters=[0.1],
+            loss=1.0,
+            parameter_names=["reporting_rate"],
+        ),
+        CalibrationEvaluation(
+            parameters=[0.2],
+            loss=2.0,
+            parameter_names=["reporting_rate"],
+        ),
+        CalibrationEvaluation(
+            parameters=[0.3],
+            loss=3.0,
+            parameter_names=["reporting_rate"],
+        ),
+    ]
+    all_predictions = {
+        "active": [
+            [0.0, 100.0],
+            [0.0, 200.0],
+            [0.0, 300.0],
+        ]
+    }
+
+    coverage_percentage, _ = calculator.calculate_coverage_metrics(
+        {},
+        {},
+        all_predictions=all_predictions,
+        ensemble_params=ensemble_params,
+    )
+
+    assert coverage_percentage == 100.0
+
+
 def test_selector_coverage_matches_regenerated_full_result_coverage() -> None:
     model = _generic_flow_model()
     simulation = Simulation(model)
