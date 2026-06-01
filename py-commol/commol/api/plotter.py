@@ -89,14 +89,15 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay on corresponding bin subplots.
-            Observed data points with a scale_id will be unscaled for plotting using
-            scale values from the calibration_result.
+            Model predictions with a scale_id will be scaled for plotting using
+            scale values from the calibration_result, so observed values remain in
+            their original units.
         calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
             Scale values are extracted from best_parameters (CalibrationResult) or
-            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
-            data for comparison with model predictions.
+            parameter_statistics (ProbabilisticCalibrationResult) to scale model
+            predictions for comparison with observed data.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -297,6 +298,33 @@ class SimulationPlotter:
 
         return dict(grouped)
 
+    def _observed_component_ids(
+        self,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+    ) -> list[str]:
+        for point in observed:
+            if point.compartments:
+                return point.compartments
+        return [bin_id]
+
+    @staticmethod
+    def _sum_series(
+        results: dict[str, list[float]],
+        component_ids: list[str],
+    ) -> list[float]:
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in results
+        ]
+        if missing:
+            raise KeyError(f"Missing result series for aggregate components: {missing}")
+        return [
+            sum(results[component_id][idx] for component_id in component_ids)
+            for idx in range(len(results[component_ids[0]]))
+        ]
+
     def _extract_scale_values(
         self,
         calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
@@ -305,7 +333,8 @@ class SimulationPlotter:
         Extract scale values from calibration result.
 
         For CalibrationResult, returns best_parameters.
-        For ProbabilisticCalibrationResult, returns median values of scale parameters.
+        For ProbabilisticCalibrationResult, returns median values for all parameters.
+        The observed data scale_id decides which entries are used as scale values.
         """
         if calib_result is None:
             return None
@@ -320,10 +349,39 @@ class SimulationPlotter:
                     param_name,
                     stats,
                 ) in calib_result.selected_ensemble.parameter_statistics.items()
-                if param_name.startswith("scale_")
             }
 
         return None
+
+    @staticmethod
+    def _model_scale_for_observed(
+        observed: list[ObservedDataPoint],
+        scale_values: dict[str, float],
+    ) -> float:
+        scale_ids = {point.scale_id for point in observed if point.scale_id}
+        if not scale_ids:
+            return 1.0
+        if len(scale_ids) > 1:
+            logger.warning(
+                "Multiple scale_id values found for one plotted series; leaving "
+                "model predictions unscaled."
+            )
+            return 1.0
+
+        scale_id = next(iter(scale_ids))
+        if scale_id not in scale_values:
+            logger.warning(
+                f"Scale parameter '{scale_id}' not found in calibration result; "
+                "leaving model predictions unscaled."
+            )
+            return 1.0
+        return scale_values[scale_id]
+
+    @staticmethod
+    def _scale_series(values: list[float], scale: float) -> list[float]:
+        if scale == 1.0:
+            return values
+        return [value * scale for value in values]
 
     def _create_series_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
@@ -499,12 +557,18 @@ class SimulationPlotter:
         """
         Plot time series for a single bin on given axes.
         """
-        windowed = self._apply_windows(self.results[bin_id], observed)
+        component_ids = self._observed_component_ids(bin_id, observed)
+        series = self._sum_series(self.results, component_ids)
+        windowed = self._apply_windows(series, observed)
         if windowed is not None:
             time_steps, values = windowed
         else:
-            time_steps = list(range(len(self.results[bin_id])))
-            values = self.results[bin_id]
+            time_steps = list(range(len(series)))
+            values = series
+        values = self._scale_series(
+            values,
+            self._model_scale_for_observed(observed, scale_values),
+        )
 
         # Build parameters for lineplot
         params = {
@@ -522,13 +586,7 @@ class SimulationPlotter:
         # Overlay observed data if available
         if observed:
             obs_steps = [p.step for p in observed]
-            # Apply scale if observation has a scale_id
-            obs_values = [
-                p.value / scale_values[p.scale_id]
-                if p.scale_id and p.scale_id in scale_values
-                else p.value
-                for p in observed
-            ]
+            obs_values = [p.value for p in observed]
             sns.scatterplot(
                 x=obs_steps,
                 y=obs_values,
@@ -578,15 +636,31 @@ class SimulationPlotter:
         """
         Plot time series for a single bin with probabilistic confidence intervals.
         """
-        if bin_id not in prob_result.selected_ensemble.prediction_median:
+        component_ids = self._observed_component_ids(bin_id, observed)
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in prob_result.selected_ensemble.prediction_median
+        ]
+        if missing:
             logger.warning(
-                f"Bin '{bin_id}' not found in probabilistic result predictions"
+                f"Bin '{bin_id}' aggregate components not found in probabilistic "
+                f"result predictions: {missing}"
             )
             return
 
-        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
-        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
-        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+        median_values = self._sum_series(
+            prob_result.selected_ensemble.prediction_median,
+            component_ids,
+        )
+        ci_lower = self._sum_series(
+            prob_result.selected_ensemble.prediction_ci_lower,
+            component_ids,
+        )
+        ci_upper = self._sum_series(
+            prob_result.selected_ensemble.prediction_ci_upper,
+            component_ids,
+        )
 
         windowed_median = self._apply_windows(median_values, observed)
         if windowed_median is not None:
@@ -600,6 +674,18 @@ class SimulationPlotter:
                 plot_ci_upper = (
                     prob_result.selected_ensemble.windowed_prediction_ci_upper[bin_id]
                 )
+            elif win_med and all(
+                component_id in win_med for component_id in component_ids
+            ):
+                plot_median = self._sum_series(win_med, component_ids)
+                plot_ci_lower = self._sum_series(
+                    prob_result.selected_ensemble.windowed_prediction_ci_lower,
+                    component_ids,
+                )
+                plot_ci_upper = self._sum_series(
+                    prob_result.selected_ensemble.windowed_prediction_ci_upper,
+                    component_ids,
+                )
             else:
                 _, plot_median = windowed_median
                 _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
@@ -609,6 +695,11 @@ class SimulationPlotter:
             plot_median = median_values
             plot_ci_lower = ci_lower
             plot_ci_upper = ci_upper
+
+        model_scale = self._model_scale_for_observed(observed, scale_values)
+        plot_median = self._scale_series(plot_median, model_scale)
+        plot_ci_lower = self._scale_series(plot_ci_lower, model_scale)
+        plot_ci_upper = self._scale_series(plot_ci_upper, model_scale)
 
         # Build parameters for lineplot (median)
         params = {
@@ -635,13 +726,7 @@ class SimulationPlotter:
         # Overlay observed data if available
         if observed:
             obs_steps = [p.step for p in observed]
-            # Apply scale if observation has a scale_id
-            obs_values = [
-                p.value / scale_values[p.scale_id]
-                if p.scale_id and p.scale_id in scale_values
-                else p.value
-                for p in observed
-            ]
+            obs_values = [p.value for p in observed]
             sns.scatterplot(
                 x=obs_steps,
                 y=obs_values,

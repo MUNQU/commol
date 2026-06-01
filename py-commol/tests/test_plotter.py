@@ -131,9 +131,20 @@ class TestSimulationPlotter:
         )
 
         fig = plotter.plot_series(
-            observed_data=observed_data, calibration_result=calibration_result
+            observed_data=observed_data,
+            calibration_result=calibration_result,
+            bins=["I"],
         )
 
+        ax = fig.axes[0]
+        plotted_y = ax.lines[0].get_ydata()
+        assert plotted_y[10] == pytest.approx(results["I"][10] * scale_factor)
+        observed_offsets = max(
+            (collection.get_offsets() for collection in ax.collections),
+            key=len,
+        )
+        observed_y = observed_offsets[:, 1]
+        assert observed_y[1] == pytest.approx(results["I"][10] * scale_factor)
         assert fig is not None
         plt.close(fig)
 
