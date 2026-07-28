@@ -760,6 +760,8 @@ class _ScheduleTimePattern(TimePattern):
                 "'conditions' must be non-empty. "
                 "Use set_default() for the condition-free fallback."
             )
+        # Validate condition keys up front so malformed entries raise a clear
+        # ValueError before any other processing.
         key = _condition_key(conditions)
         pattern = schedule.for_group(conditions, source_compartment=source_compartment)
         for existing in self.patterns:
