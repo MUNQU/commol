@@ -49,25 +49,15 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.3)
     .add_parameter(id="gamma", value=0.1)
-    .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
-    )
-    .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma"
-    )
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
             {"bin": "S", "fraction": 0.99},
             {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
-        ]
+            {"bin": "R", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
@@ -101,30 +91,15 @@ model = (
     .add_parameter(id="gamma", value=0.2)
     .add_parameter(id="delta", value=0.1)
     .add_parameter(id="mu", value=0.01)
-    .add_transition(
-        id="infection",
-        source=["S"],
-        target=["L"],
-        rate="beta * S * I / N"
-    )
-    .add_transition(
-        id="progression",
-        source=["L"],
-        target=["I"],
-        rate="gamma * L"
-    )
-    .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="delta * I"
-    )
+    .add_transition(id="infection", source=["S"], target=["L"], rate="beta * S * I / N")
+    .add_transition(id="progression", source=["L"], target=["I"], rate="gamma * L")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="delta * I")
     # Single transition automatically expands to 4 separate removal transitions
     .add_transition(
         id="removal",
         source=["S", "L", "I", "R"],
         target=[],
-        rate="mu * $compartment"  # Expands to: mu*S, mu*L, mu*I, mu*R
+        rate="mu * $compartment",  # Expands to: mu*S, mu*L, mu*I, mu*R
     )
     .set_initial_conditions(
         population_size=1000,
@@ -132,8 +107,8 @@ model = (
             {"bin": "S", "fraction": 0.99},
             {"bin": "L", "fraction": 0.005},
             {"bin": "I", "fraction": 0.005},
-            {"bin": "R", "fraction": 0.0}
-        ]
+            {"bin": "R", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
@@ -187,14 +162,9 @@ model = (
         source=["S"],
         target=["I"],
         rate="beta * S * I / N",
-        per_compartment=True
+        per_compartment=True,
     )
-    .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma"
-    )
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=10000,
         bin_fractions=[
@@ -203,11 +173,14 @@ model = (
             {"bin": "R", "fraction": 0.0},
         ],
         stratification_fractions=[
-            {"stratification": "age", "fractions": [
-                {"category": "young", "fraction": 0.6},
-                {"category": "old", "fraction": 0.4},
-            ]}
-        ]
+            {
+                "stratification": "age",
+                "fractions": [
+                    {"category": "young", "fraction": 0.6},
+                    {"category": "old", "fraction": 0.4},
+                ],
+            }
+        ],
     )
     .build(typology="DifferenceEquations")
 )
@@ -249,25 +222,15 @@ model = (
     .add_bin(id="R", name="Recovered")
     .add_parameter(id="beta", value=0.5, unit="1/day")
     .add_parameter(id="gamma", value=0.1, unit="1/day")
-    .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
-    )
-    .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
-    )
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
             {"bin": "S", "fraction": 0.99},
             {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
-        ]
+            {"bin": "R", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
@@ -309,27 +272,17 @@ model = (
     .add_bin(id="S", name="Susceptible")
     .add_bin(id="I", name="Infected")
     .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)   # To be calibrated
+    .add_parameter(id="beta", value=None)  # To be calibrated
     .add_parameter(id="gamma", value=None)  # To be calibrated
-    .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
-    )
-    .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
-    )
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
             {"bin": "S", "fraction": 0.99},
             {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
-        ]
+            {"bin": "R", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
@@ -351,7 +304,7 @@ parameters = [
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
-        initial_guess=0.3
+        initial_guess=0.3,
     ),
     CalibrationParameter(
         id="gamma",
@@ -362,11 +315,7 @@ parameters = [
 ]
 
 # Configure optimization algorithm (config type determines the algorithm)
-pso_config = ParticleSwarmConfig(
-    num_particles=40,
-    max_iterations=300,
-    verbose=True
-)
+pso_config = ParticleSwarmConfig(num_particles=40, max_iterations=300, verbose=True)
 
 # Configure calibration problem
 problem = CalibrationProblem(
@@ -408,29 +357,20 @@ observed_data = [
         step=idx,
         compartment="I",
         value=cases,
-        scale_id="reporting_rate"  # Links to scale parameter
+        scale_id="reporting_rate",  # Links to scale parameter
     )
     for idx, cases in enumerate(reported_cases)
 ]
 
 parameters = [
     CalibrationParameter(
-        id="beta",
-        parameter_type="parameter",
-        min_bound=0.1,
-        max_bound=1.0
+        id="beta", parameter_type="parameter", min_bound=0.1, max_bound=1.0
     ),
     CalibrationParameter(
-        id="gamma",
-        parameter_type="parameter",
-        min_bound=0.05,
-        max_bound=0.5
+        id="gamma", parameter_type="parameter", min_bound=0.05, max_bound=0.5
     ),
     CalibrationParameter(
-        id="reporting_rate",
-        parameter_type="scale",
-        min_bound=0.01,
-        max_bound=1.0
+        id="reporting_rate", parameter_type="scale", min_bound=0.01, max_bound=1.0
     ),
 ]
 
@@ -489,8 +429,8 @@ from commol import ProbabilisticCalibrationConfig
 
 # Configure probabilistic calibration
 prob_config = ProbabilisticCalibrationConfig(
-    n_runs=20,          # Number of independent calibration runs
-    confidence_level=0.95
+    n_runs=20,  # Number of independent calibration runs
+    confidence_level=0.95,
 )
 
 problem = CalibrationProblem(
