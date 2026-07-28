@@ -264,6 +264,50 @@ class TestSimulationPlotter:
         assert grouped["I"][0].step == 10
         assert grouped["I"][1].step == 20
 
+    def test_apply_x_labels_anchors_ticks_to_first_plotted_step(
+        self, simulation_results
+    ):
+        """Ticks follow the series' own grid, not the absolute step 0."""
+        simulation, results = simulation_results
+        plotter = SimulationPlotter(simulation, results)
+        _fig, ax = plt.subplots()
+
+        # A windowed series: plotted steps are window ends, starting at the
+        # window width rather than at 0.
+        window = 7
+        time_steps = list(range(window, 8 * window + 1, window))
+        plotter._apply_x_labels(ax, time_steps, str, tick_every=2 * window)
+
+        ticks = list(ax.get_xticks())
+        assert ticks == [window, 3 * window, 5 * window, 7 * window]
+        assert all(tick in time_steps for tick in ticks)
+        plt.close(_fig)
+
+    def test_apply_x_labels_without_tick_every_labels_all_steps(
+        self, simulation_results
+    ):
+        """Every plotted step is labelled when no tick interval is given."""
+        simulation, results = simulation_results
+        plotter = SimulationPlotter(simulation, results)
+        _fig, ax = plt.subplots()
+
+        time_steps = [5, 10, 15]
+        plotter._apply_x_labels(ax, time_steps, str, tick_every=None)
+
+        assert list(ax.get_xticks()) == time_steps
+        plt.close(_fig)
+
+    def test_apply_x_labels_with_empty_series(self, simulation_results):
+        """An empty series produces no ticks instead of an index error."""
+        simulation, results = simulation_results
+        plotter = SimulationPlotter(simulation, results)
+        _fig, ax = plt.subplots()
+
+        plotter._apply_x_labels(ax, [], str, tick_every=4)
+
+        assert list(ax.get_xticks()) == []
+        plt.close(_fig)
+
     def test_plot_series_with_kwargs(self, simulation_results):
         """Test that additional kwargs are passed to seaborn.lineplot."""
         simulation, results = simulation_results

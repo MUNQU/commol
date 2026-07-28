@@ -229,8 +229,17 @@ class SimulationPlotter:
         step_to_label: Callable[[int], str],
         tick_every: int | None,
     ) -> None:
-        if tick_every is not None:
-            ticks = [t for t in time_steps if t % tick_every == 0]
+        """
+        Label the x axis at every `tick_every` steps.
+
+        The tick grid is phased to the first plotted step rather than to the
+        absolute step 0: for a windowed series the plotted steps are window
+        ends, so anchoring at 0 would put ticks on steps that carry no plotted
+        point and hand `step_to_label` a step outside the series' convention.
+        """
+        if tick_every is not None and time_steps:
+            anchor = time_steps[0]
+            ticks = [t for t in time_steps if (t - anchor) % tick_every == 0]
         else:
             ticks = time_steps
         ax.set_xticks(ticks)
