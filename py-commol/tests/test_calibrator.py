@@ -214,6 +214,82 @@ class TestCalibrator:
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
 
+    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae", "weighted_sse"])
+    @pytest.mark.parametrize("normalize", [False, True])
+    def test_loss_config_carries_normalization_flag(
+        self, model: Model, loss_function: str, normalize: bool
+    ):
+        """The problem's normalize_observations must reach the Rust LossConfig."""
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(step=0, compartment="I", value=10.0)],
+            parameters=[
+                CalibrationParameter(
+                    id="beta",
+                    parameter_type="parameter",
+                    min_bound=0.0,
+                    max_bound=1.0,
+                )
+            ],
+            loss_function=loss_function,
+            normalize_observations=normalize,
+            optimization_config=NelderMeadConfig(max_iterations=1, verbose=False),
+        )
+
+        loss_config = Calibrator(Simulation(model), problem)._build_loss_config()
+
+        assert loss_config.normalize_observations is normalize
+
+    def test_normalization_changes_deterministic_loss(self, model: Model):
+        """
+        Enabling normalization must change the loss the deterministic calibrator
+        minimizes, since each residual is divided by its series' RMS.
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Bias the targets so no parameter choice drives the residuals to zero,
+        # otherwise both losses collapse to 0 and cannot be told apart.
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i] + 25.0)
+            for i in range(100)
+        ]
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        def final_loss(normalize: bool) -> float:
+            problem = CalibrationProblem(
+                observed_data=observed_data,
+                parameters=parameters,
+                loss_function="sse",
+                normalize_observations=normalize,
+                optimization_config=ParticleSwarmConfig(
+                    max_iterations=50, verbose=False
+                ),
+                seed=SEED,
+            )
+            return Calibrator(simulation, problem).run().final_loss
+
+        raw_loss = final_loss(normalize=False)
+        normalized_loss = final_loss(normalize=True)
+
+        rms = math.sqrt(
+            sum(point.value**2 for point in observed_data) / len(observed_data)
+        )
+        assert rms > 1.0
+        assert normalized_loss < raw_loss
+
     def test_parameter_with_none_value(self):
         """Test that Parameter can be created with None value."""
         param = Parameter(id="beta", value=None)

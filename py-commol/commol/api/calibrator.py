@@ -298,15 +298,18 @@ class Calibrator:
         loss_func = self.problem.loss_function
 
         if loss_func == LossFunction.SSE:
-            return rust_calibration.LossConfig.sse()
+            loss_config = rust_calibration.LossConfig.sse()
         elif loss_func == LossFunction.RMSE:
-            return rust_calibration.LossConfig.rmse()
+            loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
-            return rust_calibration.LossConfig.mae()
+            loss_config = rust_calibration.LossConfig.mae()
         elif loss_func == LossFunction.WEIGHTED_SSE:
-            return rust_calibration.LossConfig.weighted_sse()
+            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
+
+        # Per-series normalization is orthogonal to the chosen metric.
+        return loss_config.normalized(self.problem.normalize_observations)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""

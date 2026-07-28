@@ -175,6 +175,14 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// None if no scale is applied, Some(param_idx) if a scale parameter should be applied
     observed_scale_indices: Vec<Option<usize>>,
 
+    /// Per-series normalization factors (parallel to observed_data vec).
+    ///
+    /// Each entry is `1 / rms` of its series' observed values, used by the
+    /// [`LossConfig::NormalizedSSE`] loss so that series of very different
+    /// magnitudes contribute comparably. Always `1.0` for series whose observed
+    /// values are all (near) zero. Ignored by every other loss configuration.
+    observed_normalization: Vec<f64>,
+
     /// Loss function configuration
     loss_config: LossConfig,
 
@@ -237,6 +245,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             parameters: self.parameters.clone(),
             parameter_initial_condition_targets: self.parameter_initial_condition_targets.clone(),
             observed_scale_indices: self.observed_scale_indices.clone(),
+            observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: self.initial_population_size,
@@ -274,6 +283,52 @@ fn compute_bin_aggregates(compartment_names: &[String]) -> Vec<(String, Vec<usiz
         map.into_iter().filter(|(_, v)| v.len() > 1).collect();
     result.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
     result
+}
+
+/// Compute per-observation normalization factors (parallel to `observed_data`).
+///
+/// Observations are grouped by series (`compartment` label) and each factor is
+/// `1 / rms` of that series' observed values, so a residual equal to the series'
+/// typical magnitude contributes comparably across series. Series whose values
+/// are all (near) zero get a factor of `1.0`. When `enabled` is `false`, every
+/// factor is `1.0`, leaving all loss metrics unchanged.
+///
+/// This must stay consistent with the Python-side `series_normalization_factors`
+/// used during fit-gated ensemble selection.
+fn compute_observation_normalization(
+    observed_data: &[ObservedDataPoint],
+    enabled: bool,
+) -> Vec<f64> {
+    if !enabled {
+        return vec![1.0; observed_data.len()];
+    }
+
+    let mut series_sum_squares: std::collections::HashMap<&str, (f64, usize)> =
+        std::collections::HashMap::new();
+    for obs in observed_data {
+        let entry = series_sum_squares
+            .entry(obs.compartment.as_str())
+            .or_insert((0.0, 0));
+        entry.0 += obs.value * obs.value;
+        entry.1 += 1;
+    }
+
+    observed_data
+        .iter()
+        .map(|obs| {
+            let (sum_squares, count) = series_sum_squares[obs.compartment.as_str()];
+            let rms = if count > 0 {
+                (sum_squares / count as f64).sqrt()
+            } else {
+                0.0
+            };
+            if rms > f64::EPSILON {
+                1.0 / rms
+            } else {
+                1.0
+            }
+        })
+        .collect()
 }
 
 impl<E: SimulationEngine> CalibrationProblem<E> {
@@ -469,6 +524,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
+        // Observation normalization is disabled by default (factors are all
+        // 1.0, a no-op in every loss metric). Callers opt in via
+        // `with_observation_normalization`.
+        let observed_normalization = compute_observation_normalization(&observed_data, false);
+
         // Compile and validate constraints
         let compiled_constraints: Vec<MathExpression> = constraints
             .iter()
@@ -610,6 +670,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             parameters,
             parameter_initial_condition_targets,
             observed_scale_indices,
+            observed_normalization,
             loss_config,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: initial_population_size as f64,
@@ -622,6 +683,21 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             non_population_outputs,
             _phantom: PhantomData,
         })
+    }
+
+    /// Enable or disable per-series observation normalization.
+    ///
+    /// When enabled, each residual is multiplied by `1 / rms` of its series'
+    /// observed values before the configured loss metric is applied, so that
+    /// series measured on very different scales contribute comparably to the
+    /// loss. This is orthogonal to the choice of metric and applies to all of them.
+    ///
+    /// Disabled by default. When disabled, the factors are all `1.0`, leaving
+    /// every metric unchanged.
+    pub fn with_observation_normalization(mut self, enabled: bool) -> Self {
+        self.observed_normalization =
+            compute_observation_normalization(&self.observed_data, enabled);
+        self
     }
 
     /// Get the number of parameters being calibrated
@@ -844,8 +920,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .zip(&self.observed_scale_indices)
                 .zip(&self.observed_time_indices)
                 .zip(&self.observed_previous_time_indices)
+                .zip(&self.observed_normalization)
                 .filter_map(
-                    |((((obs, output_indices), &scale_idx), &time_idx), &previous_time_idx)| {
+                    |(
+                        ((((obs, output_indices), &scale_idx), &time_idx), &previous_time_idx),
+                        &normalization,
+                    )| {
                         observed_results.get(time_idx).map(|step_data| {
                             let current: f64 =
                                 output_indices.iter().map(|&idx| step_data[idx]).sum();
@@ -869,24 +949,28 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                             } else {
                                 predicted
                             };
-                            (obs, scaled_predicted)
+                            (obs, scaled_predicted, normalization)
                         })
                     },
                 )
         };
 
+        // `normalization` is the per-series factor (1.0 unless observation
+        // normalization is enabled). It is applied to every metric so that
+        // series of very different magnitudes contribute comparably to any error
+        // measurement, not just to a single dedicated loss variant.
         match self.loss_config {
             LossConfig::SumSquaredError | LossConfig::WeightedSSE => observation_iter()
-                .map(|(obs, predicted)| {
-                    let error = (obs.value - predicted) * obs.weight;
+                .map(|(obs, predicted, normalization)| {
+                    let error = (obs.value - predicted) * obs.weight * normalization;
                     error * error
                 })
                 .sum(),
 
             LossConfig::RootMeanSquaredError => {
                 let (sum_squared_error, count) = observation_iter()
-                    .map(|(obs, predicted)| {
-                        let error = obs.value - predicted;
+                    .map(|(obs, predicted, normalization)| {
+                        let error = (obs.value - predicted) * normalization;
                         error * error
                     })
                     .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
@@ -900,7 +984,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
             LossConfig::MeanAbsoluteError => {
                 let (total_error, count) = observation_iter()
-                    .map(|(obs, predicted)| (obs.value - predicted).abs())
+                    .map(|(obs, predicted, normalization)| {
+                        ((obs.value - predicted) * normalization).abs()
+                    })
                     .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
 
                 if count > 0 {

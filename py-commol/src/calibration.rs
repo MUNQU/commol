@@ -203,6 +203,8 @@ impl PyCalibrationConstraint {
 #[derive(Clone)]
 pub struct PyLossConfig {
     pub inner: commol_calibration::LossConfig,
+    /// Whether to apply per-series observation normalization to the metric.
+    pub normalize_observations: bool,
 }
 
 #[pymethods]
@@ -212,6 +214,7 @@ impl PyLossConfig {
     fn sse() -> Self {
         Self {
             inner: commol_calibration::LossConfig::SumSquaredError,
+            normalize_observations: false,
         }
     }
 
@@ -220,6 +223,7 @@ impl PyLossConfig {
     fn rmse() -> Self {
         Self {
             inner: commol_calibration::LossConfig::RootMeanSquaredError,
+            normalize_observations: false,
         }
     }
 
@@ -228,6 +232,7 @@ impl PyLossConfig {
     fn mae() -> Self {
         Self {
             inner: commol_calibration::LossConfig::MeanAbsoluteError,
+            normalize_observations: false,
         }
     }
 
@@ -236,7 +241,27 @@ impl PyLossConfig {
     fn weighted_sse() -> Self {
         Self {
             inner: commol_calibration::LossConfig::WeightedSSE,
+            normalize_observations: false,
         }
+    }
+
+    /// Return a copy with per-series observation normalization enabled or disabled.
+    ///
+    /// Normalization is orthogonal to the metric: each residual is divided by the
+    /// RMS of its series' observed values, so series of very different magnitudes
+    /// contribute comparably to whichever error measurement is selected.
+    #[pyo3(signature = (enabled=true))]
+    fn normalized(&self, enabled: bool) -> Self {
+        Self {
+            inner: self.inner,
+            normalize_observations: enabled,
+        }
+    }
+
+    /// Whether per-series observation normalization is enabled.
+    #[getter]
+    fn normalize_observations(&self) -> bool {
+        self.normalize_observations
     }
 }
 
@@ -1041,7 +1066,8 @@ fn calibrate(
         loss_config.inner,
         initial_population_size,
     )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
+    .with_observation_normalization(loss_config.normalize_observations);
 
     // Check if verbose mode is enabled
     let verbose = match &optimization_config.inner {
@@ -1108,7 +1134,8 @@ fn calibrate_with_history(
         loss_config.inner,
         initial_population_size,
     )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
+    .with_observation_normalization(loss_config.normalize_observations);
 
     // Run optimization with history tracking
     let result =
@@ -1167,7 +1194,8 @@ fn run_multiple_calibrations(
         loss_config.inner,
         initial_population_size,
     )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
+    .with_observation_normalization(loss_config.normalize_observations);
 
     let evaluation_retention = match evaluation_retention {
         "all" => commol_calibration::EvaluationRetention::All,
@@ -1453,7 +1481,8 @@ fn generate_calibrated_predictions_parallel(
         loss_config.inner,
         initial_population_size,
     )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
+    .with_observation_normalization(loss_config.normalize_observations);
 
     let predictions = commol_calibration::generate_calibrated_predictions_parallel(
         &problem,
@@ -1509,7 +1538,8 @@ fn generate_calibrated_predictions_at_points_parallel(
         loss_config.inner,
         initial_population_size,
     )
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
+    .with_observation_normalization(loss_config.normalize_observations);
 
     let predictions = commol_calibration::generate_calibrated_predictions_at_points_parallel(
         &problem,

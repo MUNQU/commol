@@ -909,6 +909,9 @@ class CalibrationProblem(BaseModel):
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
         Loss function to use for measuring fit quality (default: "sse")
+    normalize_observations : bool
+        When True, divide each residual by the RMS of its observation series
+        before applying the loss metric (default: False).
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     probabilistic_config : ProbabilisticCalibrationConfig | None
@@ -939,6 +942,15 @@ class CalibrationProblem(BaseModel):
     loss_function: str = Field(
         default=LossFunction.SSE,
         description="Loss function to use for measuring fit quality",
+    )
+    normalize_observations: bool = Field(
+        default=False,
+        description=(
+            "Normalize each residual by the RMS of its observation series before "
+            "applying the loss metric. Keeps series measured on very different "
+            "scales comparable in both the optimization loss and fit-gated "
+            "ensemble selection."
+        ),
     )
     optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
         default=..., description="Optimization algorithm configuration"
