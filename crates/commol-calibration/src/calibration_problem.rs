@@ -210,6 +210,11 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// consistent with how such names behave everywhere else in the model.
     bin_aggregates: Vec<(String, Vec<usize>)>,
 
+    /// Outputs that are not population compartments (accumulators), as
+    /// `(name, row index)`. These are injected by name during constraint
+    /// evaluation so they resolve without counting towards `N`.
+    non_population_outputs: Vec<(String, usize)>,
+
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
 }
@@ -241,6 +246,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             parameter_constraint_indices: self.parameter_constraint_indices.clone(),
             time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
             bin_aggregates: self.bin_aggregates.clone(),
+            non_population_outputs: self.non_population_outputs.clone(),
             _phantom: PhantomData,
         }
     }
@@ -313,6 +319,16 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .iter()
             .enumerate()
             .map(|(idx, name)| (name.as_str(), idx))
+            .collect();
+
+        // Aggregate prefixes over every output, so a constraint can name a bare bin
+        // or a bare accumulator and get the total across strata. Indices address
+        // full output rows, matching the rows that time-dependent constraints are
+        // evaluated against.
+        let output_aggregates = compute_bin_aggregates(&output_names);
+        let output_aggregate_names: std::collections::HashSet<&str> = output_aggregates
+            .iter()
+            .map(|(name, _)| name.as_str())
             .collect();
 
         // Validate observed output names and convert to indices.
@@ -499,11 +515,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
 
                 let is_parameter = param_ids.contains_key(var.as_str());
-                let is_compartment = compartment_map.contains_key(var.as_str());
+                // Constraints resolve against every simulation output, so they can
+                // reference accumulators as well as state compartments, plus any
+                // aggregate prefix of either.
+                let is_compartment = output_map.contains_key(var.as_str())
+                    || output_aggregate_names.contains(var.as_str());
 
                 if !is_parameter && !is_compartment {
                     return Err(format!(
-                        "Constraint '{}' references unknown variable '{}' (not a parameter or compartment)",
+                        "Constraint '{}' references unknown variable '{}' (not a parameter or simulation output)",
                         constraint.id, var
                     ));
                 }
@@ -569,7 +589,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let buffer_capacity = simulation_time_steps.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
-        let bin_aggregates = compute_bin_aggregates(&compartments);
+        let bin_aggregates = output_aggregates;
+        // Outputs past the population block are accumulators; keep their row
+        // indices so constraints can name them individually.
+        let non_population_outputs: Vec<(String, usize)> = output_names
+            .iter()
+            .enumerate()
+            .skip(compartments.len())
+            .map(|(idx, name)| (name.clone(), idx))
+            .collect();
 
         Ok(Self {
             base_engine,
@@ -591,6 +619,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             parameter_constraint_indices,
             time_dependent_constraint_indices,
             bin_aggregates,
+            non_population_outputs,
             _phantom: PhantomData,
         })
     }
@@ -1073,7 +1102,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Create context with parameter values
         let mut context = MathExpressionContext::new();
 
-        // Initialize compartment names
+        // Only population compartments are registered, so `N` stays the population
+        // total. Accumulators live further along each result row and are injected by
+        // name below, alongside the aggregates.
         let compartment_names = self.base_engine.compartments();
         context.init_compartments(compartment_names);
 
@@ -1101,6 +1132,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
+                    // Accumulators are not registered as compartments (they must not
+                    // count towards `N`), so inject them by name.
+                    for (name, idx) in &self.non_population_outputs {
+                        context.set_parameter_str(name, step_data[*idx]);
+                    }
                     // Inject bin totals so bare bin names resolve to the sum across
                     // all strata, overriding any calibration parameter with the same name.
                     for (bin_name, indices) in &self.bin_aggregates {

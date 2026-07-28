@@ -72,8 +72,11 @@ impl MathExpressionContext {
                         .ok();
                 }
             }
-            // Update N (total population)
-            let total_pop: f64 = values.iter().sum();
+            // Update N (total population). Callers may pass a wider row than the
+            // registered compartments (simulation outputs append accumulators after
+            // the population), so only the registered compartments count towards N
+            // — matching the assignment loop above.
+            let total_pop: f64 = values.iter().take(self.compartment_names.len()).sum();
             ctx.set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
                 .ok();
         } else {
