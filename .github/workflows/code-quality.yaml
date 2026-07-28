@@ -28,33 +28,32 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
 
       - name: Install dependencies
-        run: |
-          poetry install --extras dev
+        run: uv sync --locked --extra dev
 
       - name: Build Rust extension
-        run: |
-          poetry run maturin develop --release
+        run: uv run maturin develop --release
 
       - name: Run Ruff linting
-        run: poetry run ruff check .
+        run: uv run ruff check .
 
       - name: Run Ruff formatting check
-        run: poetry run ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Run Vulture dead code detection
-        run: poetry run vulture commol .vulture_allowlist.py --min-confidence 80
+        run: uv run vulture commol .vulture_allowlist.py --min-confidence 80
 
       - name: Run ty type checking
-        run: poetry run ty check commol
+        run: uv run ty check commol
 
       - name: Run pytest
-        run: poetry run pytest --cov=commol --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=commol --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6

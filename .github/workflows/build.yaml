@@ -31,20 +31,23 @@ jobs:
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - name: Install Poetry
-              run: pip install poetry
+            - name: Install uv
+              uses: astral-sh/setup-uv@v9
+              with:
+                  enable-cache: true
+                  cache-dependency-glob: py-commol/uv.lock
 
             - name: Install Python dependencies
               working-directory: ./py-commol
-              run: poetry install --extras dev
+              run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
 
             - name: Build and install for testing (maturin develop)
               working-directory: ./py-commol
-              run: poetry run maturin develop --release
+              run: uv run maturin develop --release
 
             - name: Run tests
               working-directory: ./py-commol
-              run: poetry run pytest
+              run: uv run pytest
 
             - name: Clean Rust extension before wheel build
               working-directory: ./py-commol

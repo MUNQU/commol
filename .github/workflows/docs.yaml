@@ -28,26 +28,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
         with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('py-commol/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
 
       - name: Install dependencies
-        run: |
-          poetry install --extras docs --no-root
+        run: uv sync --locked --extra docs --no-install-project
 
       - name: Build documentation
         working-directory: ./py-commol
-        run: poetry run mkdocs build --strict -f ../mkdocs.yaml
+        run: uv run --no-sync mkdocs build --strict -f ../mkdocs.yaml
 
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v7
@@ -71,23 +63,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
         with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('py-commol/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
 
       - name: Install dependencies
         working-directory: ./py-commol
-        run: |
-          poetry install --extras docs --no-root
+        run: uv sync --locked --extra docs --no-install-project
 
       - name: Configure Git
         run: |
@@ -98,11 +82,11 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ./py-commol
         run: |
-          poetry run mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
-          poetry run mike set-default --push latest --config-file ../mkdocs.yaml
+          uv run --no-sync mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
+          uv run --no-sync mike set-default --push latest --config-file ../mkdocs.yaml
 
       - name: Deploy development documentation (develop branch)
         if: github.ref == 'refs/heads/develop'
         working-directory: ./py-commol
         run: |
-          poetry run mike deploy --push --update-aliases dev --config-file ../mkdocs.yaml
+          uv run --no-sync mike deploy --push --update-aliases dev --config-file ../mkdocs.yaml

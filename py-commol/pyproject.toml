@@ -45,12 +45,6 @@ Documentation = "https://munqu.github.io/commol"
 Repository = "https://github.com/MUNQU/commol"
 "Bug Tracker" = "https://github.com/MUNQU/commol/issues"
 
-# Poetry-specific configuration
-[tool.poetry]
-version = "0.0.0"  # Placeholder for Poetry compatibility - maturin uses dynamic version from Cargo.toml
-packages = [{include = "commol"}]
-requires-poetry = ">=2.2"
-
 # Build system
 [build-system]
 requires = ["maturin>=1.9.1,<1.10.0"]
