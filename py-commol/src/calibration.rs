@@ -761,89 +761,6 @@ impl PyOptimizationConfig {
     }
 }
 
-/// Information about a Pareto front solution
-#[pyclass(name = "ParetoSolution")]
-#[derive(Clone)]
-pub struct PyParetoSolution {
-    pub inner: commol_calibration::ParetoSolution,
-}
-
-#[pymethods]
-impl PyParetoSolution {
-    #[getter]
-    fn ensemble_size(&self) -> usize {
-        self.inner.ensemble_size
-    }
-
-    #[getter]
-    fn ci_width(&self) -> f64 {
-        self.inner.ci_width
-    }
-
-    #[getter]
-    fn coverage(&self) -> f64 {
-        self.inner.coverage
-    }
-
-    #[getter]
-    fn size_penalty(&self) -> f64 {
-        self.inner.size_penalty
-    }
-
-    #[getter]
-    fn selected_indices(&self) -> Vec<usize> {
-        self.inner.selected_indices.clone()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "ParetoSolution(size={}, ci_width={:.6}, coverage={:.4}, penalty={:.2})",
-            self.inner.ensemble_size,
-            self.inner.ci_width,
-            self.inner.coverage,
-            self.inner.size_penalty
-        )
-    }
-}
-
-/// Result from ensemble selection including Pareto front
-#[pyclass(name = "EnsembleSelectionResult")]
-#[derive(Clone)]
-pub struct PyEnsembleSelectionResult {
-    pub inner: commol_calibration::EnsembleSelectionResult,
-}
-
-#[pymethods]
-impl PyEnsembleSelectionResult {
-    #[getter]
-    fn selected_ensemble(&self) -> Vec<usize> {
-        self.inner.selected_ensemble.clone()
-    }
-
-    #[getter]
-    fn pareto_front(&self) -> Vec<PyParetoSolution> {
-        self.inner
-            .pareto_front
-            .iter()
-            .map(|sol| PyParetoSolution { inner: sol.clone() })
-            .collect()
-    }
-
-    #[getter]
-    fn selected_pareto_index(&self) -> usize {
-        self.inner.selected_pareto_index
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "EnsembleSelectionResult(selected_size={}, pareto_front_size={}, selected_index={})",
-            self.inner.selected_ensemble.len(),
-            self.inner.pareto_front.len(),
-            self.inner.selected_pareto_index
-        )
-    }
-}
-
 /// Calibration evaluation (single optimization run)
 #[pyclass(name = "CalibrationEvaluation")]
 #[derive(Clone)]
@@ -884,6 +801,102 @@ impl PyCalibrationEvaluation {
             "CalibrationEvaluation(loss={:.6}, num_params={})",
             self.inner.loss,
             self.inner.parameters.len()
+        )
+    }
+}
+
+/// Compact Pareto-front solution returned by ensemble selection.
+#[pyclass(name = "ParetoSolution")]
+#[derive(Clone)]
+pub struct PyParetoSolution {
+    pub inner: commol_calibration::ParetoSolution,
+}
+
+#[pymethods]
+impl PyParetoSolution {
+    #[getter]
+    fn ensemble_size(&self) -> usize {
+        self.inner.ensemble_size
+    }
+
+    #[getter]
+    fn ci_width(&self) -> f64 {
+        self.inner.ci_width
+    }
+
+    #[getter]
+    fn coverage(&self) -> f64 {
+        self.inner.coverage
+    }
+
+    #[getter]
+    fn central_loss(&self) -> f64 {
+        self.inner.central_loss
+    }
+
+    #[getter]
+    fn selected_indices(&self) -> Vec<usize> {
+        self.inner.selected_indices.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "ParetoSolution(size={}, ci_width={:.6}, coverage={:.4})",
+            self.inner.ensemble_size, self.inner.ci_width, self.inner.coverage
+        )
+    }
+}
+
+/// Result returned by compact ensemble selection.
+#[pyclass(name = "EnsembleSelectionResult")]
+#[derive(Clone)]
+pub struct PyEnsembleSelectionResult {
+    pub inner: commol_calibration::EnsembleSelectionResult,
+}
+
+#[pymethods]
+impl PyEnsembleSelectionResult {
+    #[getter]
+    fn selected_ensemble(&self) -> Vec<usize> {
+        self.inner.selected_ensemble.clone()
+    }
+
+    #[getter]
+    fn pareto_front(&self) -> Vec<PyParetoSolution> {
+        self.inner
+            .pareto_front
+            .iter()
+            .map(|solution| PyParetoSolution {
+                inner: solution.clone(),
+            })
+            .collect()
+    }
+
+    #[getter]
+    fn selected_pareto_index(&self) -> Option<usize> {
+        self.inner.selected_pareto_index
+    }
+
+    #[getter]
+    fn ci_width(&self) -> f64 {
+        self.inner.ci_width
+    }
+
+    #[getter]
+    fn coverage(&self) -> f64 {
+        self.inner.coverage
+    }
+
+    #[getter]
+    fn diagnostics(&self) -> HashMap<String, f64> {
+        self.inner.diagnostics.iter().cloned().collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "EnsembleSelectionResult(selected_size={}, pareto_front_size={})",
+            self.inner.selected_ensemble.len(),
+            self.inner.pareto_front.len()
         )
     }
 }
@@ -1233,166 +1246,6 @@ fn run_multiple_calibrations(
         .collect())
 }
 
-/// Select optimal ensemble for probabilistic calibration.
-///
-/// Uses the configured algorithm to find an ensemble of parameter sets that
-/// balances narrow confidence intervals with good coverage.
-///
-/// Args:
-///     candidates: List of CalibrationEvaluation objects with predictions
-///     observed_data_tuples: List of (time_step, compartment_idx, value) tuples
-///     population_size: Population size for population-based ensemble algorithms
-///     generations: Iteration count for iterative ensemble algorithms
-///     confidence_level: Confidence level for CI calculation (e.g., 0.95)
-///     seed: Random seed for reproducibility
-///     pareto_preference: Preference for Pareto front selection (0.0-1.0)
-///     ensemble_size_mode: Mode for determining ensemble size ("fixed", "bounded", or "automatic")
-///     ensemble_size: Fixed ensemble size (required if mode='fixed', otherwise None)
-///     ensemble_size_min: Minimum ensemble size (required if mode='bounded', otherwise None)
-///     ensemble_size_max: Maximum ensemble size (required if mode='bounded', otherwise None)
-///     ci_margin_factor: Safety margin factor for CI width bounds (default: 0.1)
-///     ci_sample_sizes: Sample sizes for CI bounds estimation (default: [10, 20, 50, 100])
-///     crossover_probability: Crossover probability for algorithms that use crossover (default: 0.9)
-///
-/// Returns:
-///     EnsembleSelectionResult containing selected ensemble and Pareto front
-#[pyfunction]
-#[pyo3(signature = (candidates, observed_data_tuples, population_size, generations, confidence_level, seed, pareto_preference, ensemble_size_mode, ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, ci_margin_factor=0.1, ci_sample_sizes=None, crossover_probability=0.9, ci_width_scope="full_trajectory", ensemble_algorithm="nsga2"))]
-#[allow(clippy::too_many_arguments)]
-fn select_optimal_ensemble(
-    candidates: Vec<PyCalibrationEvaluation>,
-    observed_data_tuples: Vec<(usize, usize, f64)>,
-    population_size: usize,
-    generations: usize,
-    confidence_level: f64,
-    seed: u64,
-    pareto_preference: f64,
-    ensemble_size_mode: &str,
-    ensemble_size: Option<usize>,
-    ensemble_size_min: Option<usize>,
-    ensemble_size_max: Option<usize>,
-    ci_margin_factor: f64,
-    ci_sample_sizes: Option<Vec<usize>>,
-    crossover_probability: f64,
-    ci_width_scope: &str,
-    ensemble_algorithm: &str,
-) -> PyResult<PyEnsembleSelectionResult> {
-    // Convert Python CalibrationEvaluation to Rust
-    let rust_candidates: Vec<_> = candidates.into_iter().map(|e| e.inner).collect();
-
-    // Parse ensemble size mode
-    let size_mode = match ensemble_size_mode {
-        "fixed" => {
-            let size = ensemble_size.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size must be specified when ensemble_size_mode='fixed'",
-                )
-            })?;
-            if size < 2 {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "ensemble_size must be >= 2, got {}",
-                    size
-                )));
-            }
-            commol_calibration::EnsembleSizeMode::Fixed { size }
-        }
-        "bounded" => {
-            let min = ensemble_size_min.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size_min must be specified when ensemble_size_mode='bounded'",
-                )
-            })?;
-            let max = ensemble_size_max.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "ensemble_size_max must be specified when ensemble_size_mode='bounded'",
-                )
-            })?;
-            if min < 2 {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "ensemble_size_min must be >= 2, got {}",
-                    min
-                )));
-            }
-            if max < min {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "ensemble_size_max ({}) must be >= ensemble_size_min ({})",
-                    max, min
-                )));
-            }
-            commol_calibration::EnsembleSizeMode::Bounded { min, max }
-        }
-        "automatic" => commol_calibration::EnsembleSizeMode::Automatic,
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid ensemble_size_mode: '{}'. Must be 'fixed', 'bounded', or 'automatic'",
-                ensemble_size_mode
-            )));
-        }
-    };
-
-    let ci_width_scope = match ci_width_scope {
-        "observed_points" => commol_calibration::CIWidthScope::ObservedPoints,
-        "observed_steps_all_compartments" => {
-            commol_calibration::CIWidthScope::ObservedStepsAllCompartments
-        }
-        "full_trajectory" => commol_calibration::CIWidthScope::FullTrajectory,
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid ci_width_scope: '{}'. Must be 'observed_points', \
-                 'observed_steps_all_compartments', or 'full_trajectory'",
-                ci_width_scope
-            )));
-        }
-    };
-
-    let ensemble_algorithm = match ensemble_algorithm {
-        "greedy_local_search" => commol_calibration::EnsembleAlgorithm::GreedyLocalSearch,
-        "nsga2" => commol_calibration::EnsembleAlgorithm::Nsga2,
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid ensemble_algorithm: '{}'. Must be 'greedy_local_search' or 'nsga2'",
-                ensemble_algorithm
-            )));
-        }
-    };
-
-    // Build ensemble selection config from parameters
-    let ensemble_config = commol_calibration::EnsembleSelectionConfig {
-        ci_margin_factor,
-        ci_sample_sizes: ci_sample_sizes.unwrap_or_else(|| vec![10, 20, 50, 100]),
-        crossover_probability,
-        ci_width_scope,
-        ensemble_algorithm,
-        parallel_objective_threshold: 512,
-        // Use defaults for cluster representative parameters (not used in select_optimal_ensemble)
-        k_neighbors_min: 5,
-        k_neighbors_max: 10,
-        sparsity_weight: 2.0,
-        stratum_fit_weight: 10.0,
-    };
-
-    let optimal_config = commol_calibration::OptimalEnsembleConfig {
-        population_size,
-        generations,
-        confidence_level,
-        seed,
-        pareto_preference,
-        size_mode,
-        ensemble_config: &ensemble_config,
-    };
-
-    // Run ensemble selection
-    let result = commol_calibration::select_optimal_ensemble(
-        rust_candidates,
-        observed_data_tuples,
-        &optimal_config,
-    )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-    // Return full result with Pareto front
-    Ok(PyEnsembleSelectionResult { inner: result })
-}
-
 /// Deduplicate calibration evaluations using grid-based spatial hashing
 ///
 /// This is a performance-critical operation that uses O(n) average-case
@@ -1551,6 +1404,120 @@ fn generate_calibrated_predictions_at_points_parallel(
     Ok(predictions)
 }
 
+/// Select an ensemble from compact observation-space predictions.
+#[pyfunction]
+#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="weighted_sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
+#[allow(clippy::too_many_arguments)]
+fn select_compact_ensemble(
+    candidates: Vec<PyCalibrationEvaluation>,
+    observed_values: Vec<f64>,
+    weights: Vec<f64>,
+    normalization: Vec<f64>,
+    series_ids: Vec<String>,
+    confidence_level: f64,
+    seed: u64,
+    central_loss_metric: &str,
+    ensemble_algorithm: &str,
+    ensemble_size_mode: &str,
+    ensemble_size: Option<usize>,
+    ensemble_size_min: Option<usize>,
+    ensemble_size_max: Option<usize>,
+    central_fit_max_loss_ratio: f64,
+    search_beam_width: usize,
+    population_size: usize,
+    generations: usize,
+    crossover_probability: f64,
+    pareto_preference: f64,
+) -> PyResult<PyEnsembleSelectionResult> {
+    let algorithm = match ensemble_algorithm {
+        "nsga2" => commol_calibration::EnsembleAlgorithm::Nsga2,
+        "greedy" | "greedy_local_search" => {
+            commol_calibration::EnsembleAlgorithm::GreedyLocalSearch
+        }
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid ensemble_algorithm: '{}'. Must be 'nsga2' or 'greedy_local_search'",
+                ensemble_algorithm
+            )));
+        }
+    };
+
+    // Keep the gate's central loss coherent with the optimizer's member loss:
+    // the same loss family is used on both sides of the fit gate.
+    let central_loss_metric = match central_loss_metric {
+        "sse" | "weighted_sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
+        "rmse" => commol_calibration::CentralLossMetric::RootMeanSquared,
+        "mae" => commol_calibration::CentralLossMetric::MeanAbsolute,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid central_loss_metric: '{}'. Must be 'sse', 'weighted_sse', \
+                 'rmse', or 'mae'",
+                central_loss_metric
+            )));
+        }
+    };
+
+    let size_mode = match ensemble_size_mode {
+        "fixed" => {
+            let size = ensemble_size.ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "ensemble_size must be specified for fixed ensemble size mode",
+                )
+            })?;
+            commol_calibration::EnsembleSizeMode::Fixed { size }
+        }
+        "bounded" => {
+            let min = ensemble_size_min.ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "ensemble_size_min must be specified for bounded ensemble size mode",
+                )
+            })?;
+            let max = ensemble_size_max.ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "ensemble_size_max must be specified for bounded ensemble size mode",
+                )
+            })?;
+            commol_calibration::EnsembleSizeMode::Bounded { min, max }
+        }
+        "automatic" => commol_calibration::EnsembleSizeMode::Automatic,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid ensemble_size_mode: '{}'. Must be 'fixed', 'bounded', or 'automatic'",
+                ensemble_size_mode
+            )));
+        }
+    };
+
+    let rust_candidates: Vec<_> = candidates
+        .into_iter()
+        .map(|candidate| candidate.inner)
+        .collect();
+    let config = commol_calibration::EnsembleSelectionConfig {
+        algorithm,
+        confidence_level,
+        seed,
+        size_mode,
+        central_loss_metric,
+        central_fit_max_loss_ratio,
+        search_beam_width,
+        population_size,
+        generations,
+        crossover_probability,
+        pareto_preference,
+    };
+    let result = commol_calibration::select_compact_ensemble(
+        rust_candidates,
+        observed_values,
+        weights,
+        normalization,
+        series_ids,
+        &config,
+    )
+    .map_err(|error| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string()))?;
+
+    Ok(PyEnsembleSelectionResult { inner: result })
+}
+
 /// Select cluster representatives using Rust for performance
 ///
 /// Args:
@@ -1590,15 +1557,7 @@ fn select_cluster_representatives(
     let rust_evaluations: Vec<_> = evaluations.into_iter().map(|e| e.inner).collect();
 
     // Build config from parameters
-    let config = commol_calibration::EnsembleSelectionConfig {
-        // CI parameters not used in cluster representatives
-        ci_margin_factor: 0.1,
-        ci_sample_sizes: vec![10, 20, 50, 100],
-        crossover_probability: 0.9,
-        ci_width_scope: commol_calibration::CIWidthScope::FullTrajectory,
-        ensemble_algorithm: commol_calibration::EnsembleAlgorithm::Nsga2,
-        parallel_objective_threshold: 512,
-        // Cluster representative parameters
+    let config = commol_calibration::RepresentativeSelectionConfig {
         k_neighbors_min,
         k_neighbors_max,
         sparsity_weight,
@@ -1612,7 +1571,7 @@ fn select_cluster_representatives(
         selection_method,
         quality_temperature,
         seed,
-        ensemble_config: &config,
+        representative_config: &config,
     };
 
     let indices = commol_calibration::select_cluster_representatives(
@@ -1649,7 +1608,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
-    m.add_function(wrap_pyfunction!(select_optimal_ensemble, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;
     m.add_function(wrap_pyfunction!(generate_predictions_parallel, m)?)?;
     m.add_function(wrap_pyfunction!(
@@ -1664,6 +1622,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         generate_calibrated_predictions_at_points_parallel,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(select_compact_ensemble, m)?)?;
     m.add_function(wrap_pyfunction!(select_cluster_representatives, m)?)?;
     Ok(())
 }

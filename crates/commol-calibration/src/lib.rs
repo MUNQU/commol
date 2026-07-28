@@ -78,9 +78,9 @@ pub use probabilistic::{
     deduplicate_evaluations, generate_calibrated_predictions_at_points_parallel,
     generate_calibrated_predictions_parallel, generate_predictions_at_points_parallel,
     generate_predictions_parallel, run_multiple_calibrations, select_cluster_representatives,
-    select_optimal_ensemble, CIWidthScope, ClusterRepresentativeConfig, EnsembleAlgorithm,
+    select_compact_ensemble, CentralLossMetric, ClusterRepresentativeConfig, EnsembleAlgorithm,
     EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, EvaluationRetention,
-    OptimalEnsembleConfig, ParetoSolution,
+    ParetoSolution, RepresentativeSelectionConfig,
 };
 pub use probabilistic::{CalibrationError, CalibrationResult as CalibrationResultType};
 pub use types::{

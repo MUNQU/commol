@@ -10,4 +10,3 @@ CalibrationParameterTypeProtocol
 CalibrationResultWithHistoryProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
-EnsembleSelectionResultProtocol

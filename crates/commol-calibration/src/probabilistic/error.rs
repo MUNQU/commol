@@ -16,32 +16,6 @@ pub enum CalibrationError {
     #[error("Evaluations count ({evaluations}) doesn't match labels count ({labels})")]
     EvaluationLabelMismatch { evaluations: usize, labels: usize },
 
-    /// Not enough candidates for ensemble selection.
-    #[error(
-        "Need at least {required} candidate parameter sets for ensemble selection, got {actual}"
-    )]
-    InsufficientCandidates { required: usize, actual: usize },
-
-    /// Ensemble solver creation failed.
-    #[error("Failed to create ensemble solver: {0}")]
-    SolverCreation(String),
-
-    /// Ensemble selection failed.
-    #[error("Ensemble selection failed: {0}")]
-    EnsembleSelectionFailed(String),
-
-    /// No population in the final solver state.
-    #[error("No population in final state")]
-    EmptyPopulation,
-
-    /// Empty Pareto front after optimization.
-    #[error("Empty Pareto front")]
-    EmptyParetoFront,
-
-    /// Selected ensemble has no parameter sets.
-    #[error("Selected solution has no parameter sets")]
-    EmptyEnsemble,
-
     /// Failed to set a parameter value.
     #[error("Failed to set parameter '{name}': {reason}")]
     ParameterSetFailed { name: String, reason: String },
@@ -49,6 +23,10 @@ pub enum CalibrationError {
     /// Simulation failed during prediction generation.
     #[error("Simulation failed: {0}")]
     SimulationFailed(String),
+
+    /// Ensemble subset selection failed.
+    #[error("Ensemble selection failed: {0}")]
+    EnsembleSelectionFailed(String),
 }
 
 /// Result type alias for probabilistic calibration operations.

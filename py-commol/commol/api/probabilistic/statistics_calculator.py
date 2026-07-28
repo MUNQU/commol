@@ -11,6 +11,10 @@ import numpy as np
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
+from commol.api.probabilistic.normalization import (
+    central_fit_loss,
+    series_normalization_factors,
+)
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
@@ -211,6 +215,7 @@ class StatisticsCalculator:
     def calculate_windowed_prediction_intervals(
         self,
         all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], dict[str, list[float]]]:
         """Calculate median and CI from windowed (per-period) trajectories.
 
@@ -221,7 +226,7 @@ class StatisticsCalculator:
 
         Returns empty dicts if no observed data has window_steps set.
         """
-        window_observations: dict[str, tuple[int, list[str]]] = {}
+        window_observations: dict[str, tuple[int, list[str], str | None]] = {}
         for obs in self.problem.observed_data:
             if (
                 obs.window_steps is not None
@@ -230,6 +235,7 @@ class StatisticsCalculator:
                 window_observations[obs.compartment] = (
                     obs.window_steps,
                     obs.compartments or [obs.compartment],
+                    obs.scale_id,
                 )
 
         prediction_median: dict[str, list[float]] = {}
@@ -239,22 +245,32 @@ class StatisticsCalculator:
         ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
         ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
 
-        for output_id, (window_steps, component_ids) in window_observations.items():
+        for output_id, (
+            window_steps,
+            component_ids,
+            scale_id,
+        ) in window_observations.items():
             if any(
                 component_id not in all_predictions for component_id in component_ids
             ):
                 continue
             first_component = all_predictions[component_ids[0]]
-            trajectories = [
-                [
+            trajectories = []
+            for run_idx in range(len(first_component)):
+                trajectory = [
                     sum(
                         all_predictions[component_id][run_idx][step_idx]
                         for component_id in component_ids
                     )
                     for step_idx in range(len(first_component[run_idx]))
                 ]
-                for run_idx in range(len(first_component))
-            ]
+                if scale_id is not None:
+                    scale_idx = ensemble_params[run_idx].parameter_names.index(scale_id)
+                    trajectory = [
+                        value * ensemble_params[run_idx].parameters[scale_idx]
+                        for value in trajectory
+                    ]
+                trajectories.append(trajectory)
             series_len = len(trajectories[0]) if trajectories else 0
             steps = list(range(window_steps, series_len, window_steps))
             if not steps:
@@ -274,6 +290,77 @@ class StatisticsCalculator:
             ).tolist()
 
         return prediction_median, prediction_ci_lower, prediction_ci_upper
+
+    def calculate_central_loss(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+    ) -> float:
+        """Evaluate the memberwise-median prediction with the optimizer's loss.
+
+        Uses the same loss function and per-series normalization as the
+        optimization loss and the fit-gated selection gate, so the reported
+        central loss is comparable to the member losses it is gated against.
+        """
+        normalization = series_normalization_factors(
+            self.problem.observed_data,
+            self.problem.normalize_observations,
+        )
+        residuals: list[float] = []
+        weights: list[float] = []
+        factors: list[float] = []
+        for observation in self.problem.observed_data:
+            values = self._observation_member_values(
+                observation,
+                all_predictions,
+                ensemble_params,
+            )
+            if not values:
+                continue
+            residuals.append(float(np.median(values)) - observation.value)
+            weights.append(observation.weight)
+            factors.append(normalization[observation.compartment])
+        return central_fit_loss(residuals, weights, factors, self.problem.loss_function)
+
+    def calculate_observation_diagnostics(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+    ) -> dict[str, dict[str, float]]:
+        """Return coverage and interval width separately for each data series."""
+        lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
+        upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        totals: dict[str, dict[str, float]] = {}
+
+        for observation in self.problem.observed_data:
+            values = self._observation_member_values(
+                observation,
+                all_predictions,
+                ensemble_params,
+            )
+            if not values:
+                continue
+            lower = float(np.percentile(values, lower_percentile))
+            upper = float(np.percentile(values, upper_percentile))
+            diagnostics = totals.setdefault(
+                observation.compartment,
+                {"n_points": 0.0, "covered_points": 0.0, "total_ci_width": 0.0},
+            )
+            diagnostics["n_points"] += 1.0
+            diagnostics["covered_points"] += float(lower <= observation.value <= upper)
+            diagnostics["total_ci_width"] += upper - lower
+
+        return {
+            series: {
+                "n_points": values["n_points"],
+                "coverage_percentage": (
+                    values["covered_points"] / values["n_points"] * 100.0
+                ),
+                "average_ci_width": values["total_ci_width"] / values["n_points"],
+            }
+            for series, values in totals.items()
+            if values["n_points"] > 0.0
+        }
 
     def calculate_coverage_metrics(
         self,

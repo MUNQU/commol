@@ -3,41 +3,6 @@
 //! This module provides shared utility functions used across the probabilistic
 //! calibration submodules.
 
-/// Calculate a percentile from an unsorted mutable buffer using order statistics.
-///
-/// This uses linear interpolation while avoiding a full sort. The buffer order
-/// is not preserved.
-pub fn percentile_unstable(values: &mut [f64], p: f64) -> f64 {
-    if values.is_empty() {
-        return 0.0;
-    }
-
-    if values.len() == 1 {
-        return values[0];
-    }
-
-    let n = values.len();
-    let idx = (p / 100.0) * (n - 1) as f64;
-    let lower_idx = idx.floor() as usize;
-    let upper_idx = idx.ceil() as usize;
-
-    let lower = select_value(values, lower_idx);
-    if lower_idx == upper_idx {
-        lower
-    } else {
-        let upper = select_value(values, upper_idx);
-        let weight = idx - lower_idx as f64;
-        lower * (1.0 - weight) + upper * weight
-    }
-}
-
-fn select_value(values: &mut [f64], index: usize) -> f64 {
-    let (_, value, _) = values.select_nth_unstable_by(index, |a, b| {
-        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-    });
-    *value
-}
-
 /// Calculate Euclidean distance between two parameter vectors in normalized space.
 ///
 /// Normalizes by parameter ranges to give equal weight to all parameters.

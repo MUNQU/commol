@@ -4,9 +4,8 @@
 //! of probabilistic calibration:
 //!
 //! 1. **Parallel execution** of multiple calibration runs ([`calibration`])
-//! 2. **Ensemble selection** ([`ensemble`])
-//! 3. **Cluster-based representative selection** ([`clustering`])
-//! 4. **Evaluation deduplication** ([`deduplication`])
+//! 2. **Cluster-based representative selection** ([`clustering`])
+//! 3. **Evaluation deduplication** ([`deduplication`])
 //!
 //! Python orchestrates the overall workflow using sklearn for K-means clustering,
 //! while Rust handles the computationally intensive operations.
@@ -14,10 +13,9 @@
 //! # Module Structure
 //!
 //! - [`error`] - Error types for probabilistic calibration
-//! - [`config`] - Configuration for ensemble selection algorithms
+//! - [`config`] - Configuration for representative selection algorithms
 //! - [`calibration`] - Parallel calibration and prediction generation
 //! - [`deduplication`] - Grid-based spatial deduplication
-//! - [`ensemble`] - ensemble subset selection algorithms
 //! - [`clustering`] - Cluster representative selection with various methods
 //! - [`utils`] - Shared utility functions
 
@@ -36,10 +34,10 @@ pub use calibration::{
     run_multiple_calibrations, EvaluationRetention,
 };
 pub use clustering::{select_cluster_representatives, ClusterRepresentativeConfig};
-pub use config::{CIWidthScope, EnsembleAlgorithm, EnsembleSelectionConfig};
+pub use config::RepresentativeSelectionConfig;
 pub use deduplication::deduplicate_evaluations;
 pub use ensemble::{
-    select_optimal_ensemble, EnsembleSelectionResult, EnsembleSizeMode, OptimalEnsembleConfig,
-    ParetoSolution,
+    select_compact_ensemble, CentralLossMetric, EnsembleAlgorithm, EnsembleSelectionConfig,
+    EnsembleSelectionResult, EnsembleSizeMode, ParetoSolution,
 };
 pub use error::{CalibrationError, CalibrationResult};

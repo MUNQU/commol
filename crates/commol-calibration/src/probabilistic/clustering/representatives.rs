@@ -13,7 +13,7 @@ use super::methods::{
     maximin::MaximinConfig, select_by_crowding_distance, select_by_latin_hypercube,
     select_by_maximin_distance,
 };
-use crate::probabilistic::config::EnsembleSelectionConfig;
+use crate::probabilistic::config::RepresentativeSelectionConfig;
 use crate::probabilistic::error::{CalibrationError, CalibrationResult};
 use crate::probabilistic::utils::calculate_elite_count;
 use crate::types::CalibrationEvaluation;
@@ -26,7 +26,7 @@ pub struct ClusterRepresentativeConfig<'a> {
     pub selection_method: &'a str,
     pub quality_temperature: f64,
     pub seed: u64,
-    pub ensemble_config: &'a EnsembleSelectionConfig,
+    pub representative_config: &'a RepresentativeSelectionConfig,
 }
 
 /// Select diverse representatives from clustered evaluations.
@@ -152,7 +152,7 @@ pub fn select_cluster_representatives(
                     n_elite,
                     n_remaining,
                     &mut rng,
-                    config.ensemble_config.stratum_fit_weight,
+                    config.representative_config.stratum_fit_weight,
                 )
             }
             "maximin_distance" => {
@@ -161,9 +161,9 @@ pub fn select_cluster_representatives(
                     n_elite,
                     n_remaining,
                     quality_temperature: config.quality_temperature,
-                    k_neighbors_min: config.ensemble_config.k_neighbors_min,
-                    k_neighbors_max: config.ensemble_config.k_neighbors_max,
-                    sparsity_weight: config.ensemble_config.sparsity_weight,
+                    k_neighbors_min: config.representative_config.k_neighbors_min,
+                    k_neighbors_max: config.representative_config.k_neighbors_max,
+                    sparsity_weight: config.representative_config.sparsity_weight,
                 };
                 select_by_maximin_distance(
                     &evaluations,

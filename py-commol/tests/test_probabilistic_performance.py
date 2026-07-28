@@ -1,668 +1,331 @@
-from types import SimpleNamespace
+import numpy as np
 
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
-    Model,
-    ModelBuilder,
     ObservedDataPoint,
     ParticleSwarmConfig,
-    Simulation,
 )
-from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
 from commol.api.probabilistic.ensemble_selector import EnsembleSelector
+from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
+from commol.api.probabilistic.normalization import central_fit_loss
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
-from commol.commol_rs import _commol_rs as commol_rs
-from commol.constants import ModelTypes
+from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
     ProbClusteringConfig,
-    ProbEnsembleConfig,
     ProbEvaluationFilterConfig,
+    ProbGreedyLocalSearchConfig,
+    ProbNsga2Config,
     ProbabilisticCalibrationConfig,
 )
 
 
-def _generic_flow_model() -> Model:
-    builder = (
-        ModelBuilder(name="Generic Flow", version="1.0")
-        .add_bin(id="waiting", name="Waiting")
-        .add_bin(id="active", name="Active")
-        .add_bin(id="done", name="Done")
-        .add_parameter(id="start_rate", value=0.1)
-        .add_parameter(id="finish_rate", value=0.2)
-        .add_transition(
-            id="start",
-            source=["waiting"],
-            target=["active"],
-            rate="start_rate * waiting",
-        )
-        .add_transition(
-            id="finish",
-            source=["active"],
-            target=["done"],
-            rate="finish_rate * active",
-        )
-        .set_initial_conditions(
-            population_size=1000,
-            bin_fractions=[
-                {"bin": "waiting", "fraction": 0.9},
-                {"bin": "active", "fraction": 0.1},
-                {"bin": "done", "fraction": 0.0},
-            ],
-        )
-    )
-    return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-
-
-def test_statistics_calculator_reuses_cached_predictions() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=1, compartment="active", value=18.0)],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            )
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    calculator = StatisticsCalculator(Simulation(model), problem)
-    ensemble_params = [
-        CalibrationEvaluation(
-            parameters=[0.1],
-            loss=1.0,
-            parameter_names=["start_rate"],
-            predictions=[
-                [900.0, 100.0, 0.0],
-                [890.0, 90.0, 20.0],
-            ],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2],
-            loss=2.0,
-            parameter_names=["start_rate"],
-            predictions=[
-                [880.0, 120.0, 0.0],
-                [860.0, 110.0, 30.0],
-            ],
-        ),
-    ]
-
-    predictions = calculator.generate_ensemble_predictions(
-        ensemble_params,
-        ["waiting", "active", "done"],
-        time_steps=2,
-    )
-
-    assert predictions["waiting"] == [[900.0, 890.0], [880.0, 860.0]]
-    assert predictions["active"] == [[100.0, 90.0], [120.0, 110.0]]
-    assert predictions["done"] == [[0.0, 20.0], [0.0, 30.0]]
-
-
-def test_statistics_calculator_rejects_compact_cached_predictions(monkeypatch) -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=1, compartment="active", value=18.0)],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            )
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    calculator = StatisticsCalculator(Simulation(model), problem)
-    ensemble_params = [
-        CalibrationEvaluation(
-            parameters=[0.1],
-            loss=1.0,
-            parameter_names=["start_rate"],
-            predictions=[[100.0], [90.0]],
-        )
-    ]
-
-    def fake_generate_calibrated_predictions_parallel(*_args):
-        return [[[900.0, 100.0, 0.0], [890.0, 90.0, 20.0]]]
-
-    monkeypatch.setattr(
-        commol_rs.calibration,
-        "generate_calibrated_predictions_parallel",
-        fake_generate_calibrated_predictions_parallel,
-    )
-
-    predictions = calculator.generate_ensemble_predictions(
-        ensemble_params,
-        ["waiting", "active", "done"],
-        time_steps=2,
-    )
-
-    assert predictions["done"] == [[0.0, 20.0]]
-
-
-def test_result_detail_pareto_summary_skips_heavy_pareto_payloads() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=1, compartment="active", value=18.0)],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            )
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    problem.probabilistic_config = ProbabilisticCalibrationConfig(
-        result_detail="pareto_summary"
-    )
-    calibrator = ProbabilisticCalibrator(Simulation(model), problem)
-    representatives = [
-        CalibrationEvaluation(
-            parameters=[0.1],
-            loss=1.0,
-            parameter_names=["start_rate"],
-            predictions=[
-                [900.0, 100.0, 0.0],
-                [890.0, 90.0, 20.0],
-            ],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2],
-            loss=2.0,
-            parameter_names=["start_rate"],
-            predictions=[
-                [880.0, 120.0, 0.0],
-                [860.0, 110.0, 30.0],
-            ],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.3],
-            loss=3.0,
-            parameter_names=["start_rate"],
-            predictions=[
-                [870.0, 130.0, 0.0],
-                [840.0, 140.0, 20.0],
-            ],
-        ),
-    ]
-    rust_result = SimpleNamespace(
-        pareto_front=[
-            SimpleNamespace(
-                ensemble_size=2,
-                selected_indices=[0, 1],
-                ci_width=0.1,
-                coverage=1.0,
-                size_penalty=0.0,
-            ),
-            SimpleNamespace(
-                ensemble_size=2,
-                selected_indices=[1, 2],
-                ci_width=0.2,
-                coverage=0.5,
-                size_penalty=0.0,
-            ),
-        ],
-        selected_pareto_index=0,
-        selected_ensemble=[0, 1],
-    )
-
-    result = calibrator._build_result(
-        representatives=representatives,
-        rust_ensemble_result=rust_result,
-        n_runs=2,
-        n_unique=3,
-        n_clusters=1,
-        stage_timings={"calibration_runs_seconds": 0.01},
-        stage_counts={"n_representatives": 3},
-    )
-
-    assert result.selected_ensemble.parameter_statistics
-    assert result.selected_ensemble.prediction_median
-    assert result.pareto_front[0].parameter_statistics == {}
-    assert result.pareto_front[0].prediction_median == {}
-    assert result.pareto_front[1].ensemble_parameters == []
-    assert result.selected_pareto_index == 0
-    assert result.stage_timings["calibration_runs_seconds"] == 0.01
-    assert result.stage_counts["n_representatives"] == 3
-
-
-def test_result_detail_selected_only_keeps_selected_solution_only() -> None:
-    config = ProbabilisticCalibrationConfig(result_detail="selected_only")
-    assert config.result_detail == "selected_only"
-
-
-def test_performance_config_modes_validate() -> None:
-    eval_config = ProbEvaluationFilterConfig(
-        evaluation_retention="top_k_per_run",
-        top_k_per_run=5,
-    )
-    ensemble_config = ProbEnsembleConfig(ci_width_scope="observed_points")
-    clustering_config = ProbClusteringConfig(
-        max_k=4,
-        silhouette_sample_size=20,
-        minibatch_kmeans_threshold=100,
-    )
-
-    assert eval_config.top_k_per_run == 5
-    assert ensemble_config.ci_width_scope == "observed_points"
-    assert clustering_config.max_k == 4
-
-
-def test_compact_prediction_generation_returns_metric_points() -> None:
-    model = _generic_flow_model()
-    simulation = Simulation(model)
-
-    predictions = commol_rs.calibration.generate_predictions_at_points_parallel(
-        simulation.engine,
-        parameter_sets=[[0.1, 0.2], [0.2, 0.2]],
-        parameter_names=["start_rate", "finish_rate"],
-        metric_points=[(0, 1), (1, 1)],
-    )
-
-    assert len(predictions) == 2
-    assert len(predictions[0]) == 2
-
-
-def test_compact_observed_point_predictions_match_full_predictions() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
+def _problem() -> CalibrationProblem:
+    return CalibrationProblem(
         observed_data=[
-            ObservedDataPoint(step=0, compartment="waiting", value=900.0),
-            ObservedDataPoint(step=1, compartment="active", value=110.0),
-            ObservedDataPoint(step=2, compartment="done", value=40.0),
+            ObservedDataPoint(step=0, compartment="reported", value=10.5),
+            ObservedDataPoint(step=1, compartment="reported", value=19.5),
+            ObservedDataPoint(step=0, compartment="admissions", value=5.0),
         ],
         parameters=[
             CalibrationParameter(
-                id="start_rate",
+                id="rate",
                 parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="finish_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
+            )
         ],
         loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
     )
-    simulation = Simulation(model)
-    selector = EnsembleSelector(simulation, problem, seed=42)
-    representatives = [
-        CalibrationEvaluation(
-            parameters=[0.1, 0.2],
-            loss=1.0,
-            parameter_names=["start_rate", "finish_rate"],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2, 0.2],
-            loss=2.0,
-            parameter_names=["start_rate", "finish_rate"],
-        ),
-    ]
 
-    metric_points, _ = selector._metric_points_for_scope("observed_points")
-    compact_representatives = selector._generate_compact_predictions(
-        representatives,
-        metric_points,
-    )
-    full_predictions = commol_rs.calibration.generate_predictions_parallel(
-        simulation.engine,
-        [rep.parameters for rep in representatives],
-        representatives[0].parameter_names,
-        3,
+
+def _evaluation(loss: float, values: list[float]) -> CalibrationEvaluation:
+    return CalibrationEvaluation(
+        parameters=[loss],
+        loss=loss,
+        parameter_names=["rate"],
+        predictions=[[value] for value in values],
     )
 
-    for rep_idx, compact_rep in enumerate(compact_representatives):
-        assert compact_rep.predictions is not None
-        for point_idx, (step, compartment_idx) in enumerate(metric_points):
-            assert (
-                compact_rep.predictions[point_idx][0]
-                == full_predictions[rep_idx][step][compartment_idx]
-            )
 
-
-def test_compact_observed_point_predictions_apply_scale_parameters() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
+def _normalized_weight_problem(case_weight: float) -> CalibrationProblem:
+    """Two equally scaled series with an explicit relative case weight."""
+    return CalibrationProblem(
         observed_data=[
             ObservedDataPoint(
-                step=1,
-                compartment="active",
-                value=50.0,
-                scale_id="reporting_rate",
-            )
-        ],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="finish_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="reporting_rate",
-                parameter_type="scale",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    selector = EnsembleSelector(Simulation(model), problem, seed=42)
-    representatives = [
-        CalibrationEvaluation(
-            parameters=[0.1, 0.2, 0.5],
-            loss=1.0,
-            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
-        )
-    ]
-
-    metric_points, _, observation_specs = selector._selection_metric_points_for_scope(
-        "observed_points"
-    )
-    raw_representative = selector._generate_compact_predictions(
-        representatives,
-        metric_points,
-    )[0]
-    scaled_representative = selector._generate_compact_predictions(
-        representatives,
-        metric_points,
-        observation_specs,
-    )[0]
-
-    assert scaled_representative.predictions is not None
-    assert raw_representative.predictions is not None
-    assert scaled_representative.predictions[0][0] == (
-        raw_representative.predictions[0][0] * 0.5
-    )
-
-
-def test_default_selection_handles_aggregate_observation_display_name() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
-        observed_data=[
-            ObservedDataPoint(
-                step=1,
-                compartment="reported_total",
-                compartments=["active", "done"],
-                value=235.0,
-            )
-        ],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="finish_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    selector = EnsembleSelector(Simulation(model), problem, seed=42)
-    representatives = [
-        CalibrationEvaluation(
-            parameters=[0.1, 0.2],
-            loss=1.0,
-            parameter_names=["start_rate", "finish_rate"],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2, 0.2],
-            loss=2.0,
-            parameter_names=["start_rate", "finish_rate"],
-        ),
-    ]
-
-    result, representatives_for_result = selector.select_ensemble_with_predictions(
-        representatives=representatives,
-        population_size=4,
-        generations=4,
-        confidence_level=0.95,
-        pareto_preference=0.5,
-        ensemble_size_mode="fixed",
-        ensemble_size=2,
-        ensemble_size_min=None,
-        ensemble_size_max=None,
-        ci_margin_factor=0.1,
-        ci_sample_sizes=[2],
-        crossover_probability=0.9,
-        ensemble_algorithm="greedy_local_search",
-    )
-
-    selected = result.pareto_front[result.selected_pareto_index]
-    assert representatives_for_result == representatives
-    assert selected.coverage == 1.0
-
-
-def test_default_selection_applies_scale_parameters_to_observations() -> None:
-    model = _generic_flow_model()
-    problem = CalibrationProblem(
-        observed_data=[
-            ObservedDataPoint(
-                step=1,
-                compartment="active",
+                step=0,
+                compartment="reported",
                 value=100.0,
-                scale_id="reporting_rate",
-            )
-        ],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
+                weight=case_weight,
             ),
-            CalibrationParameter(
-                id="finish_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="reporting_rate",
-                parameter_type="scale",
-                min_bound=0.1,
-                max_bound=1.0,
-            ),
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-    )
-    selector = EnsembleSelector(Simulation(model), problem, seed=42)
-    representatives = [
-        CalibrationEvaluation(
-            parameters=[0.1, 0.2, 0.5],
-            loss=1.0,
-            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2, 0.2, 0.5],
-            loss=2.0,
-            parameter_names=["start_rate", "finish_rate", "reporting_rate"],
-        ),
-    ]
-
-    result, _ = selector.select_ensemble_with_predictions(
-        representatives=representatives,
-        population_size=4,
-        generations=4,
-        confidence_level=0.95,
-        pareto_preference=0.5,
-        ensemble_size_mode="fixed",
-        ensemble_size=2,
-        ensemble_size_min=None,
-        ensemble_size_max=None,
-        ci_margin_factor=0.1,
-        ci_sample_sizes=[2],
-        crossover_probability=0.9,
-        ensemble_algorithm="greedy_local_search",
-    )
-
-    selected = result.pareto_front[result.selected_pareto_index]
-    assert selected.coverage == 1.0
-
-
-def test_coverage_metrics_apply_scale_parameters_per_member() -> None:
-    problem = CalibrationProblem(
-        observed_data=[
             ObservedDataPoint(
-                step=1,
-                compartment="active",
-                value=40.0,
-                scale_id="reporting_rate",
-            )
+                step=0,
+                compartment="admissions",
+                value=10.0,
+                weight=1.0,
+            ),
         ],
         parameters=[
             CalibrationParameter(
-                id="reporting_rate",
-                parameter_type="scale",
+                id="rate",
+                parameter_type="parameter",
                 min_bound=0.0,
                 max_bound=1.0,
             )
         ],
         loss_function="sse",
+        normalize_observations=True,
         optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
     )
-    calculator = StatisticsCalculator.__new__(StatisticsCalculator)
-    calculator.problem = problem
-    calculator.confidence_level = 0.95
-    ensemble_params = [
-        CalibrationEvaluation(
-            parameters=[0.1],
-            loss=1.0,
-            parameter_names=["reporting_rate"],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.2],
-            loss=2.0,
-            parameter_names=["reporting_rate"],
-        ),
-        CalibrationEvaluation(
-            parameters=[0.3],
-            loss=3.0,
-            parameter_names=["reporting_rate"],
-        ),
+
+
+def test_relative_loss_gate_keeps_distinct_near_optimal_candidates() -> None:
+    evaluations = [
+        _evaluation(10.0, [10.0, 20.0, 5.0]),
+        _evaluation(12.5, [9.0, 19.0, 5.0]),
+        _evaluation(13.0, [8.0, 18.0, 4.0]),
     ]
-    all_predictions = {
-        "active": [
-            [0.0, 100.0],
-            [0.0, 200.0],
-            [0.0, 300.0],
-        ]
+
+    retained = EvaluationProcessor.filter_by_relative_loss(evaluations, 1.25)
+
+    assert [evaluation.loss for evaluation in retained] == [10.0, 12.5]
+
+
+def test_prediction_feature_space_is_validated_and_standardized() -> None:
+    evaluations = [
+        _evaluation(1.0, [10.0, 20.0, 5.0]),
+        _evaluation(2.0, [11.0, 22.0, 5.0]),
+    ]
+    processor = EvaluationProcessor(seed=42)
+    vectors = np.array([[0.0, 10.0], [2.0, 14.0]])
+
+    assert processor.find_optimal_k(evaluations, vectors) == 1
+    labels = processor.cluster_evaluations(evaluations, 1, vectors)
+    assert labels == [0, 0]
+
+
+def test_representative_selection_accepts_prediction_space_features() -> None:
+    """Representative diversity can be computed in observed-prediction space."""
+    evaluations = [
+        _evaluation(1.0, [10.0, 20.0, 5.0]),
+        _evaluation(1.1, [11.0, 21.0, 5.0]),
+        _evaluation(1.2, [12.0, 22.0, 5.0]),
+    ]
+    processor = EvaluationProcessor(seed=42)
+
+    selected = processor.select_representatives(
+        evaluations=evaluations,
+        cluster_labels=[0, 0, 0],
+        max_representatives=2,
+        elite_fraction=0.0,
+        strategy="equal",
+        selection_method="maximin_distance",
+        quality_temperature=1.0,
+        k_neighbors_min=1,
+        k_neighbors_max=2,
+        sparsity_weight=2.0,
+        stratum_fit_weight=10.0,
+        feature_vectors=np.array([[0.0, 0.0], [0.0, 1.0], [0.0, 10.0]]),
+    )
+
+    assert len(selected) == 2
+    assert set(selected).issubset({0, 1, 2})
+
+
+def test_prediction_novel_tail_selection_prefers_new_observed_shapes() -> None:
+    """Tail candidates are admitted for prediction novelty, not just count."""
+    selected = EvaluationProcessor.select_prediction_novel_candidates(
+        selected_indices=[0],
+        candidate_indices=[1, 2, 3],
+        feature_vectors=np.array(
+            [
+                [0.0, 0.0],
+                [0.1, 0.0],
+                [3.0, 0.0],
+                [0.0, 4.0],
+            ]
+        ),
+        max_candidates=2,
+    )
+
+    assert selected == [3, 2]
+
+
+def test_prediction_novel_tail_selection_can_start_without_core() -> None:
+    """If no core representative exists, start from the prediction-space edge."""
+    selected = EvaluationProcessor.select_prediction_novel_candidates(
+        selected_indices=[],
+        candidate_indices=[0, 1, 2],
+        feature_vectors=np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [10.0, 0.0],
+            ]
+        ),
+        max_candidates=2,
+    )
+
+    assert selected == [2, 0]
+
+
+def test_tail_mode_keeps_core_selection_inside_core_loss_gate() -> None:
+    """The wider tail band must not bypass the core representative pool cap."""
+    calibrator = ProbabilisticCalibrator.__new__(ProbabilisticCalibrator)
+    calibrator.config = ProbabilisticCalibrationConfig(
+        evaluation_processing=ProbEvaluationFilterConfig(
+            max_loss_ratio=1.25,
+            tail_max_loss_ratio=2.0,
+            tail_max_representatives=2,
+        )
+    )
+    evaluations = [
+        _evaluation(10.0, [10.0, 20.0, 5.0]),
+        _evaluation(12.5, [11.0, 20.0, 5.0]),
+        _evaluation(15.0, [30.0, 20.0, 5.0]),
+        _evaluation(20.0, [-10.0, 20.0, 5.0]),
+    ]
+
+    assert calibrator._core_evaluation_indices(evaluations) == [0, 1]
+
+
+def _greedy_selector() -> EnsembleSelector:
+    selector = EnsembleSelector.__new__(EnsembleSelector)
+    object.__setattr__(selector, "problem", _problem())
+    object.__setattr__(selector, "seed", 42)
+    return selector
+
+
+def test_greedy_selection_rejects_wide_bad_trajectory() -> None:
+    """The fit gate keeps a wide, poorly-fitting member out of the ensemble."""
+    selector = _greedy_selector()
+    representatives = [
+        _evaluation(1.0, [10.0, 20.0, 5.0]),
+        _evaluation(1.1, [11.0, 19.0, 5.0]),
+        _evaluation(100.0, [100.0, 100.0, 100.0]),
+    ]
+
+    result = selector._select_compact_ensemble(
+        representatives,
+        confidence_level=0.95,
+        selection_config=ProbGreedyLocalSearchConfig(
+            ensemble_size_mode="fixed",
+            ensemble_size=2,
+            central_fit_max_loss_ratio=1.5,
+            search_beam_width=8,
+        ),
+    )
+
+    assert result.selected_indices == [0, 1]
+    assert result.ensemble_size == 2
+    assert result.pareto_front is None
+    assert result.diagnostics["n_single_additions_rejected_by_central_fit"] == 1.0
+
+
+def test_greedy_selection_can_cross_an_infeasible_single_member_bridge() -> None:
+    """Opposite CI tails may be jointly feasible although neither is alone."""
+    selector = _greedy_selector()
+    representatives = [
+        _evaluation(1.0, [10.0, 20.0, 5.0]),
+        _evaluation(1.1, [30.0, 20.0, 5.0]),
+        _evaluation(1.1, [-10.0, 20.0, 5.0]),
+    ]
+
+    result = selector._select_compact_ensemble(
+        representatives,
+        confidence_level=0.95,
+        selection_config=ProbGreedyLocalSearchConfig(
+            ensemble_size_mode="fixed",
+            ensemble_size=3,
+            central_fit_max_loss_ratio=1.25,
+            search_beam_width=8,
+        ),
+    )
+
+    assert result.selected_indices == [0, 1, 2]
+    assert result.ensemble_size == 3
+    assert result.diagnostics["n_single_additions_rejected_by_central_fit"] == 2.0
+
+
+def test_central_fit_loss_matches_configured_metric() -> None:
+    """The central loss reproduces each optimizer loss formula (gate coherence)."""
+    residuals = [3.0, 3.0]
+    weights = [1.0, 1.0]
+    normalization = [1.0, 1.0]
+
+    assert np.isclose(central_fit_loss(residuals, weights, normalization, "sse"), 18.0)
+    assert np.isclose(
+        central_fit_loss(residuals, weights, normalization, "weighted_sse"), 18.0
+    )
+    assert np.isclose(central_fit_loss(residuals, weights, normalization, "rmse"), 3.0)
+    assert np.isclose(central_fit_loss(residuals, weights, normalization, "mae"), 3.0)
+
+
+def test_normalized_central_loss_respects_explicit_relative_series_weights() -> None:
+    """After RMS normalization, weights control relative series importance."""
+    predictions = {"reported": [[110.0]], "admissions": [[11.0]]}
+    ensemble = [CalibrationEvaluation([0.5], 1.0, ["rate"])]
+
+    calculator = StatisticsCalculator.__new__(StatisticsCalculator)
+    calculator.confidence_level = 0.95
+
+    calculator.problem = _normalized_weight_problem(1.0)
+    equal_weight_loss = calculator.calculate_central_loss(predictions, ensemble)
+
+    calculator.problem = _normalized_weight_problem(0.1)
+    low_case_weight_loss = calculator.calculate_central_loss(predictions, ensemble)
+
+    assert np.isclose(equal_weight_loss, 0.02)
+    assert np.isclose(low_case_weight_loss, 0.0101)
+
+
+def test_ensemble_selection_configs_expose_both_algorithms() -> None:
+    config = ProbGreedyLocalSearchConfig(
+        ensemble_size_mode="bounded",
+        ensemble_size_min=2,
+        ensemble_size_max=4,
+        central_fit_max_loss_ratio=1.5,
+        search_beam_width=12,
+    )
+    clustering = ProbClusteringConfig(feature_space="observed_predictions")
+    filtering = ProbEvaluationFilterConfig(
+        max_loss_ratio=1.25,
+        tail_max_loss_ratio=2.0,
+        tail_max_representatives=25,
+    )
+    result_config = ProbabilisticCalibrationConfig(include_ensemble_candidates=True)
+
+    assert config.central_fit_max_loss_ratio == 1.5
+    assert config.search_beam_width == 12
+    assert isinstance(config, ProbGreedyLocalSearchConfig)
+    assert isinstance(
+        ProbabilisticCalibrationConfig().ensemble_selection,
+        ProbNsga2Config,
+    )
+    assert clustering.feature_space == "observed_predictions"
+    assert filtering.max_loss_ratio == 1.25
+    assert filtering.tail_max_loss_ratio == 2.0
+    assert filtering.tail_max_representatives == 25
+    assert result_config.include_ensemble_candidates is True
+
+
+def test_observation_diagnostics_reports_each_series() -> None:
+    calculator = StatisticsCalculator.__new__(StatisticsCalculator)
+    calculator.problem = _problem()
+    calculator.confidence_level = 0.95
+    ensemble = [
+        CalibrationEvaluation([1.0], 1.0, ["rate"]),
+        CalibrationEvaluation([1.0], 1.1, ["rate"]),
+    ]
+    predictions = {
+        "reported": [[10.0, 20.0], [11.0, 19.0]],
+        "admissions": [[5.0], [5.0]],
     }
 
-    coverage_percentage, _ = calculator.calculate_coverage_metrics(
-        {},
-        {},
-        all_predictions=all_predictions,
-        ensemble_params=ensemble_params,
-    )
+    diagnostics = calculator.calculate_observation_diagnostics(predictions, ensemble)
 
-    assert coverage_percentage == 100.0
-
-
-def test_selector_coverage_matches_regenerated_full_result_coverage() -> None:
-    model = _generic_flow_model()
-    simulation = Simulation(model)
-    parameter_sets = [[0.1, 0.2], [0.2, 0.2], [0.3, 0.2]]
-    parameter_names = ["start_rate", "finish_rate"]
-    full_predictions = commol_rs.calibration.generate_predictions_parallel(
-        simulation.engine,
-        parameter_sets,
-        parameter_names,
-        2,
-    )
-    active_idx = simulation.engine.compartments.index("active")
-    observed_value = full_predictions[1][1][active_idx]
-    problem = CalibrationProblem(
-        observed_data=[
-            ObservedDataPoint(step=1, compartment="active", value=observed_value),
-        ],
-        parameters=[
-            CalibrationParameter(
-                id="start_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="finish_rate",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ],
-        loss_function="sse",
-        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
-        probabilistic_config=ProbabilisticCalibrationConfig(
-            result_detail="selected_only",
-            ensemble_selection=ProbEnsembleConfig(
-                ensemble_algorithm="greedy_local_search",
-                ensemble_size_mode="fixed",
-                ensemble_size=3,
-                ci_width_scope="observed_points",
-            ),
-        ),
-    )
-    representatives = [
-        CalibrationEvaluation(
-            parameters=params,
-            loss=float(idx),
-            parameter_names=parameter_names,
-        )
-        for idx, params in enumerate(parameter_sets)
-    ]
-    selector = EnsembleSelector(simulation, problem, seed=42)
-    rust_result, representatives_for_result = selector.select_ensemble_with_predictions(
-        representatives=representatives,
-        population_size=4,
-        generations=4,
-        confidence_level=0.95,
-        pareto_preference=0.5,
-        ensemble_size_mode="fixed",
-        ensemble_size=3,
-        ensemble_size_min=None,
-        ensemble_size_max=None,
-        ci_margin_factor=0.1,
-        ci_sample_sizes=[3],
-        crossover_probability=0.9,
-        ci_width_scope="observed_points",
-        ensemble_algorithm="greedy_local_search",
-    )
-    calibrator = ProbabilisticCalibrator(simulation, problem)
-    result = calibrator._build_result(
-        representatives=representatives_for_result,
-        rust_ensemble_result=rust_result,
-        n_runs=1,
-        n_unique=len(representatives),
-        n_clusters=1,
-    )
-    selected_rust_solution = rust_result.pareto_front[rust_result.selected_pareto_index]
-
-    assert selected_rust_solution.coverage == 1.0
-    assert result.selected_ensemble.coverage_percentage == 100.0
+    assert diagnostics["reported"]["n_points"] == 2.0
+    assert diagnostics["reported"]["coverage_percentage"] == 100.0
+    assert diagnostics["admissions"]["coverage_percentage"] == 100.0

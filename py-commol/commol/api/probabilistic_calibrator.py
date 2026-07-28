@@ -10,23 +10,29 @@ import secrets
 from time import perf_counter
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
     from commol.commol_rs._commol_rs import (
         CalibrationResultWithHistoryProtocol,
-        EnsembleSelectionResultProtocol,
-        ParetoSolutionProtocol,
     )
     from commol.context.calibration import CalibrationProblem
 
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
-from commol.api.probabilistic.ensemble_selector import EnsembleSelector
+from commol.api.probabilistic.ensemble_selector import (
+    EnsembleSelector,
+    FitGatedSelection,
+)
 from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
 from commol.context.constants import CalibrationParameterType
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
-    ParetoSolution,
+    EnsembleCandidate,
+    EnsembleSolution,
+    ProbGreedyLocalSearchConfig,
+    ProbNsga2Config,
     ProbabilisticCalibrationConfig,
     ProbabilisticCalibrationResult,
 )
@@ -236,13 +242,15 @@ class ProbabilisticCalibrator:
             If calibration or ensemble selection fails.
         """
         logger.info(
-            f"Starting probabilistic calibration with {self.config.n_runs} runs"
+            "Starting probabilistic calibration: %d runs across a 5-stage pipeline",
+            self.config.n_runs,
         )
         total_start = perf_counter()
         stage_timings: dict[str, float] = {}
         stage_counts: dict[str, int] = {}
 
-        # Run multiple calibrations
+        # Stage 1: run multiple calibrations
+        logger.info("[1/5] Running %d independent calibrations...", self.config.n_runs)
         stage_start = perf_counter()
         all_results = self._run_calibrations()
         stage_timings["calibration_runs_seconds"] = perf_counter() - stage_start
@@ -250,50 +258,95 @@ class ProbabilisticCalibrator:
         stage_counts["n_retained_evaluations"] = self._count_retained_evaluations(
             all_results
         )
-
-        # Process evaluations (collect, deduplicate, filter)
-        stage_start = perf_counter()
-        unique_evaluations = self._process_evaluations(all_results)
-        stage_timings["evaluation_processing_seconds"] = perf_counter() - stage_start
-        stage_counts["n_unique_evaluations"] = len(unique_evaluations)
-
-        # Cluster and select representatives
-        stage_start = perf_counter()
-        representatives, optimal_k = self._cluster_and_select_representatives(
-            unique_evaluations
+        logger.info(
+            "[1/5] Calibrations done in %.2fs: %d runs, %d retained evaluations",
+            stage_timings["calibration_runs_seconds"],
+            len(all_results),
+            stage_counts["n_retained_evaluations"],
         )
+
+        # Stage 2: process evaluations (collect, deduplicate, filter)
+        logger.info("[2/5] Collecting, deduplicating and filtering evaluations...")
+        stage_start = perf_counter()
+        unique_evaluations, evaluation_counts = self._process_evaluations(all_results)
+        stage_timings["evaluation_processing_seconds"] = perf_counter() - stage_start
+        stage_counts.update(evaluation_counts)
+        logger.info(
+            "[2/5] Evaluation processing done in %.2fs: %d unique candidates",
+            stage_timings["evaluation_processing_seconds"],
+            len(unique_evaluations),
+        )
+
+        # Stage 3: cluster and select representatives
+        logger.info("[3/5] Clustering candidates and selecting representatives...")
+        stage_start = perf_counter()
+        (
+            representatives,
+            optimal_k,
+            representative_counts,
+        ) = self._cluster_and_select_representatives(unique_evaluations)
         stage_timings["clustering_and_representative_selection_seconds"] = (
             perf_counter() - stage_start
         )
         stage_counts["n_clusters"] = optimal_k
         stage_counts["n_representatives"] = len(representatives)
+        stage_counts.update(representative_counts)
+        logger.info(
+            "[3/5] Clustering done in %.2fs: %d clusters, %d representatives",
+            stage_timings["clustering_and_representative_selection_seconds"],
+            optimal_k,
+            len(representatives),
+        )
+        ensemble_candidates = (
+            [
+                EnsembleCandidate(
+                    parameters=representative.to_dict(),
+                    loss=representative.loss,
+                )
+                for representative in representatives
+            ]
+            if self.config.include_ensemble_candidates
+            else None
+        )
 
-        # Run ensemble selection
+        # Stage 4: run ensemble selection
+        logger.info("[4/5] Generating predictions and selecting the ensemble...")
         stage_start = perf_counter()
-        rust_ensemble_result, representatives = self._select_ensemble(representatives)
+        selection, representatives = self._select_ensemble(representatives)
         stage_timings["prediction_generation_and_ensemble_selection_seconds"] = (
             perf_counter() - stage_start
         )
-        stage_counts["n_generated_prediction_points"] = self._count_prediction_points(
-            representatives
+        stage_counts["n_selection_observation_values"] = len(representatives) * len(
+            self.problem.observed_data
         )
-        stage_counts["pareto_front_size"] = len(rust_ensemble_result.pareto_front)
-        stage_counts["selected_ensemble_size"] = len(
-            rust_ensemble_result.selected_ensemble
+        stage_counts["selected_ensemble_size"] = selection.ensemble_size
+        stage_counts["pareto_front_size"] = len(selection.pareto_front or [])
+        logger.info(
+            "[4/5] Ensemble selection done in %.2fs: %s backend, ensemble size %d",
+            stage_timings["prediction_generation_and_ensemble_selection_seconds"],
+            selection.algorithm,
+            selection.ensemble_size,
         )
 
-        # Build final result with statistics
+        # Stage 5: build final result with statistics
+        logger.info("[5/5] Computing ensemble statistics and prediction intervals...")
         stage_start = perf_counter()
         result = self._build_result(
             representatives=representatives,
-            rust_ensemble_result=rust_ensemble_result,
+            selection=selection,
             n_runs=len(all_results),
             n_unique=len(unique_evaluations),
             n_clusters=optimal_k,
             stage_timings=stage_timings,
             stage_counts=stage_counts,
+            ensemble_candidates=ensemble_candidates,
             result_stage_start=stage_start,
             total_start=total_start,
+        )
+        logger.info(
+            "[5/5] Statistics done in %.2fs: %d ensemble members",
+            result.stage_timings.get("result_construction_seconds", 0.0),
+            result.selected_ensemble.ensemble_size,
         )
 
         logger.debug(
@@ -332,17 +385,6 @@ class ProbabilisticCalibrator:
                 count += 1
         return count
 
-    @staticmethod
-    def _count_prediction_points(
-        representatives: list[CalibrationEvaluation],
-    ) -> int:
-        """Count generated prediction scalar values attached to representatives."""
-        total = 0
-        for rep in representatives:
-            if rep.predictions:
-                total += sum(len(step) for step in rep.predictions)
-        return total
-
     def _run_calibrations(self) -> list["CalibrationResultWithHistoryProtocol"]:
         """Run multiple calibration attempts."""
         logger.info("Running multiple calibration attempts...")
@@ -359,7 +401,7 @@ class ProbabilisticCalibrator:
 
     def _process_evaluations(
         self, all_results: list["CalibrationResultWithHistoryProtocol"]
-    ) -> list[CalibrationEvaluation]:
+    ) -> tuple[list[CalibrationEvaluation], dict[str, int]]:
         """Collect, deduplicate, and filter evaluations."""
         logger.info("Collecting and deduplicating evaluations...")
 
@@ -368,6 +410,9 @@ class ProbabilisticCalibrator:
 
         # Deduplicate
         unique_evaluations = self._evaluation_processor.deduplicate(all_evaluations)
+        counts = {
+            "n_unique_evaluations_before_filters": len(unique_evaluations),
+        }
         logger.info(
             f"Collected {len(all_evaluations)} evaluations, "
             f"{len(unique_evaluations)} unique after deduplication"
@@ -384,6 +429,46 @@ class ProbabilisticCalibrator:
                 f"{self.config.evaluation_processing.loss_percentile_filter * 100:.0f}"
                 f"% by loss: {len(unique_evaluations)} evaluations remaining"
             )
+        counts["n_evaluations_after_percentile_filter"] = len(unique_evaluations)
+
+        evaluation_config = self.config.evaluation_processing
+        max_loss_ratio = evaluation_config.max_loss_ratio
+        relative_loss_ratio = max_loss_ratio
+        if (
+            evaluation_config.tail_max_representatives > 0
+            and evaluation_config.tail_max_loss_ratio is not None
+        ):
+            relative_loss_ratio = max(
+                ratio
+                for ratio in (
+                    max_loss_ratio,
+                    evaluation_config.tail_max_loss_ratio,
+                )
+                if ratio is not None
+            )
+
+        if relative_loss_ratio is not None:
+            unique_evaluations = self._evaluation_processor.filter_by_relative_loss(
+                unique_evaluations,
+                relative_loss_ratio,
+            )
+            logger.info(
+                "Applied relative-loss gate (<= %.3fx best): %s evaluations remaining",
+                relative_loss_ratio,
+                len(unique_evaluations),
+            )
+        counts["n_evaluations_after_relative_loss_filter"] = len(unique_evaluations)
+        if max_loss_ratio is not None:
+            core_evaluations = self._evaluation_processor.filter_by_relative_loss(
+                unique_evaluations,
+                max_loss_ratio,
+            )
+            counts["n_core_evaluations_after_relative_loss_filter"] = len(
+                core_evaluations
+            )
+            counts["n_tail_evaluations_after_relative_loss_filter"] = len(
+                unique_evaluations
+            ) - len(core_evaluations)
 
         # Validate minimum evaluations
         if (
@@ -397,32 +482,66 @@ class ProbabilisticCalibrator:
                 "deduplication_tolerance."
             )
 
-        return unique_evaluations
+        counts["n_unique_evaluations"] = len(unique_evaluations)
+        return unique_evaluations, counts
 
     def _cluster_and_select_representatives(
         self, evaluations: list[CalibrationEvaluation]
-    ) -> tuple[list[CalibrationEvaluation], int]:
+    ) -> tuple[list[CalibrationEvaluation], int, dict[str, int]]:
         """Cluster evaluations and select representatives."""
-        logger.info("Clustering parameter space...")
+        logger.info("Clustering calibration candidates...")
+        counts: dict[str, int] = {}
+
+        all_feature_vectors: np.ndarray | None = None
+        if self.config.clustering.feature_space == "observed_predictions":
+            observation_predictions = (
+                self._ensemble_selector.generate_observation_predictions(evaluations)
+            )
+            all_feature_vectors = np.asarray(
+                [
+                    [step[0] for step in evaluation.predictions or []]
+                    for evaluation in observation_predictions
+                ],
+                dtype=float,
+            )
+            all_feature_vectors = self._standardize_feature_vectors(all_feature_vectors)
+        else:
+            all_feature_vectors = self._standardize_feature_vectors(
+                EvaluationProcessor._feature_vectors(evaluations, None)
+            )
+
+        core_indices = self._core_evaluation_indices(evaluations)
+        core_evaluations = [evaluations[index] for index in core_indices]
+        feature_vectors = (
+            all_feature_vectors[core_indices]
+            if self.config.clustering.feature_space == "observed_predictions"
+            else None
+        )
+        counts["n_core_candidate_evaluations"] = len(core_evaluations)
 
         # Determine number of clusters
         if self.config.clustering.n_clusters is not None:
             optimal_k = self.config.clustering.n_clusters
             logger.info(f"Using user-specified number of clusters: {optimal_k}")
         else:
-            optimal_k = self._evaluation_processor.find_optimal_k(evaluations)
+            optimal_k = self._evaluation_processor.find_optimal_k(
+                core_evaluations,
+                feature_vectors=feature_vectors,
+            )
             logger.info(
                 f"Automatically determined optimal number of clusters: {optimal_k}"
             )
 
         # Cluster evaluations
         cluster_labels = self._evaluation_processor.cluster_evaluations(
-            evaluations, optimal_k
+            core_evaluations,
+            optimal_k,
+            feature_vectors=feature_vectors,
         )
 
         # Select representatives from clusters
-        representative_indices = self._evaluation_processor.select_representatives(
-            evaluations=evaluations,
+        core_representative_indices = self._evaluation_processor.select_representatives(
+            evaluations=core_evaluations,
             cluster_labels=cluster_labels,
             max_representatives=self.config.representative_selection.max_representatives,
             elite_fraction=self.config.representative_selection.percentage_elite_cluster_selection,
@@ -433,44 +552,123 @@ class ProbabilisticCalibrator:
             k_neighbors_max=self.config.representative_selection.k_neighbors_max,
             sparsity_weight=self.config.representative_selection.sparsity_weight,
             stratum_fit_weight=self.config.representative_selection.stratum_fit_weight,
+            feature_vectors=feature_vectors,
         )
+        representative_indices = [
+            core_indices[index] for index in core_representative_indices
+        ]
+        counts["n_core_representatives"] = len(representative_indices)
+
+        tail_indices = self._select_prediction_novel_tail_indices(
+            evaluations=evaluations,
+            selected_indices=representative_indices,
+            feature_vectors=all_feature_vectors,
+        )
+        if tail_indices:
+            representative_indices = [
+                *representative_indices,
+                *[
+                    tail_index
+                    for tail_index in tail_indices
+                    if tail_index not in representative_indices
+                ],
+            ]
+            logger.info(
+                "Added %s prediction-novel tail representatives",
+                len(tail_indices),
+            )
+        counts["n_tail_representatives"] = len(tail_indices)
 
         representatives = [evaluations[i] for i in representative_indices]
         logger.info(f"Selected {len(representatives)} representative parameter sets")
 
-        return representatives, optimal_k
+        return representatives, optimal_k, counts
+
+    def _core_evaluation_indices(
+        self, evaluations: list[CalibrationEvaluation]
+    ) -> list[int]:
+        """Return indices admitted to the core representative selection pool."""
+        evaluation_config = self.config.evaluation_processing
+        if (
+            evaluation_config.tail_max_representatives <= 0
+            or evaluation_config.max_loss_ratio is None
+            or evaluation_config.tail_max_loss_ratio is None
+        ):
+            return list(range(len(evaluations)))
+
+        best_loss = min(evaluation.loss for evaluation in evaluations)
+        threshold = best_loss * evaluation_config.max_loss_ratio + np.finfo(float).eps
+        return [
+            index
+            for index, evaluation in enumerate(evaluations)
+            if evaluation.loss <= threshold
+        ]
+
+    def _select_prediction_novel_tail_indices(
+        self,
+        evaluations: list[CalibrationEvaluation],
+        selected_indices: list[int],
+        feature_vectors: np.ndarray,
+    ) -> list[int]:
+        """Select wider-loss candidates that add observed-prediction diversity."""
+        evaluation_config = self.config.evaluation_processing
+        if (
+            evaluation_config.tail_max_representatives <= 0
+            or evaluation_config.max_loss_ratio is None
+            or evaluation_config.tail_max_loss_ratio is None
+        ):
+            return []
+
+        best_loss = min(evaluation.loss for evaluation in evaluations)
+        core_threshold = (
+            best_loss * evaluation_config.max_loss_ratio + np.finfo(float).eps
+        )
+        tail_threshold = (
+            best_loss * evaluation_config.tail_max_loss_ratio + np.finfo(float).eps
+        )
+        tail_candidate_indices = [
+            index
+            for index, evaluation in enumerate(evaluations)
+            if core_threshold < evaluation.loss <= tail_threshold
+            and index not in selected_indices
+        ]
+
+        return self._evaluation_processor.select_prediction_novel_candidates(
+            selected_indices=selected_indices,
+            candidate_indices=tail_candidate_indices,
+            feature_vectors=feature_vectors,
+            max_candidates=evaluation_config.tail_max_representatives,
+        )
 
     def _select_ensemble(
         self, representatives: list[CalibrationEvaluation]
-    ) -> tuple["EnsembleSelectionResultProtocol", list[CalibrationEvaluation]]:
+    ) -> tuple[FitGatedSelection, list[CalibrationEvaluation]]:
         """Run ensemble selection."""
+        selection_config = self.config.ensemble_selection
+        if isinstance(selection_config, ProbNsga2Config):
+            algorithm_name = "nsga2"
+        elif isinstance(selection_config, ProbGreedyLocalSearchConfig):
+            algorithm_name = "greedy_local_search"
+        else:
+            raise TypeError(
+                f"Unsupported ensemble selection config: {type(selection_config)!r}"
+            )
         logger.info(
             "Running %s ensemble selection...",
-            self.config.ensemble_selection.ensemble_algorithm,
+            algorithm_name,
         )
 
         (
-            rust_ensemble_result,
+            ensemble_result,
             representatives_with_predictions,
         ) = self._ensemble_selector.select_ensemble_with_predictions(
             representatives=representatives,
-            population_size=self.config.ensemble_selection.population_size,
-            generations=self.config.ensemble_selection.generations,
             confidence_level=self.config.confidence_level,
-            pareto_preference=self.config.ensemble_selection.pareto_preference,
-            ensemble_size_mode=self.config.ensemble_selection.ensemble_size_mode,
-            ensemble_size=self.config.ensemble_selection.ensemble_size,
-            ensemble_size_min=self.config.ensemble_selection.ensemble_size_min,
-            ensemble_size_max=self.config.ensemble_selection.ensemble_size_max,
-            ci_margin_factor=self.config.ensemble_selection.ci_margin_factor,
-            ci_sample_sizes=self.config.ensemble_selection.ci_sample_sizes,
-            crossover_probability=self.config.ensemble_selection.crossover_probability,
-            ci_width_scope=self.config.ensemble_selection.ci_width_scope,
-            ensemble_algorithm=self.config.ensemble_selection.ensemble_algorithm,
+            selection_config=selection_config,
         )
 
         # Log ensemble size information based on mode
-        ensemble_size = len(rust_ensemble_result.selected_ensemble)
+        ensemble_size = ensemble_result.ensemble_size
         if self.config.ensemble_selection.ensemble_size_mode == "fixed":
             logger.info(
                 f"Selected ensemble of {ensemble_size} parameter sets "
@@ -487,62 +685,44 @@ class ProbabilisticCalibrator:
                 f"Selected ensemble of {ensemble_size} parameter sets (automatic)"
             )
 
-        return rust_ensemble_result, representatives_with_predictions
+        return ensemble_result, representatives_with_predictions
+
+    @staticmethod
+    def _standardize_feature_vectors(feature_vectors: np.ndarray) -> np.ndarray:
+        """Standardize feature columns for distance-based diversity selection."""
+        if feature_vectors.ndim != 2 or feature_vectors.shape[1] == 0:
+            raise ValueError(
+                "Observed-prediction clustering requires one feature per observation"
+            )
+        means = feature_vectors.mean(axis=0)
+        scales = feature_vectors.std(axis=0)
+        scales[scales <= np.finfo(float).eps] = 1.0
+        return (feature_vectors - means) / scales
 
     def _build_result(
         self,
         representatives: list[CalibrationEvaluation],
-        rust_ensemble_result: "EnsembleSelectionResultProtocol",
+        selection: FitGatedSelection,
         n_runs: int,
         n_unique: int,
         n_clusters: int,
         stage_timings: dict[str, float] | None = None,
         stage_counts: dict[str, int] | None = None,
+        ensemble_candidates: list[EnsembleCandidate] | None = None,
         result_stage_start: float | None = None,
         total_start: float | None = None,
     ) -> ProbabilisticCalibrationResult:
         """Calculate statistics and build final result."""
-        result_detail = self.config.result_detail
-        logger.info("Building probabilistic result with detail mode: %s", result_detail)
-
         max_time_step = max(obs.step for obs in self.problem.observed_data)
         time_steps = max_time_step + 1
         simulation_output_ids = list(self.simulation.simulation_outputs)
 
-        selected_rust_solution = rust_ensemble_result.pareto_front[
-            rust_ensemble_result.selected_pareto_index
-        ]
-        selected_solution = self._build_full_pareto_solution(
-            rust_sol=selected_rust_solution,
+        selected_solution = self._build_ensemble_solution(
+            selection=selection,
             representatives=representatives,
             simulation_output_ids=simulation_output_ids,
             time_steps=time_steps,
         )
-
-        if result_detail == "full":
-            pareto_solutions = [
-                (
-                    selected_solution
-                    if idx == rust_ensemble_result.selected_pareto_index
-                    else self._build_full_pareto_solution(
-                        rust_sol=rust_sol,
-                        representatives=representatives,
-                        simulation_output_ids=simulation_output_ids,
-                        time_steps=time_steps,
-                    )
-                )
-                for idx, rust_sol in enumerate(rust_ensemble_result.pareto_front)
-            ]
-            selected_pareto_index = rust_ensemble_result.selected_pareto_index
-        elif result_detail == "pareto_summary":
-            pareto_solutions = [
-                self._build_summary_pareto_solution(rust_sol)
-                for rust_sol in rust_ensemble_result.pareto_front
-            ]
-            selected_pareto_index = rust_ensemble_result.selected_pareto_index
-        else:
-            pareto_solutions = [selected_solution]
-            selected_pareto_index = 0
 
         logger.info(
             f"Coverage: {selected_solution.coverage_percentage:.2f}%, "
@@ -559,25 +739,27 @@ class ProbabilisticCalibrator:
 
         return ProbabilisticCalibrationResult(
             selected_ensemble=selected_solution,
-            pareto_front=pareto_solutions,
-            selected_pareto_index=selected_pareto_index,
+            selection_algorithm=selection.algorithm,
+            pareto_front=selection.pareto_front,
+            selected_pareto_index=selection.selected_pareto_index,
             n_runs_performed=n_runs,
             n_unique_evaluations=n_unique,
             n_clusters_used=n_clusters,
             confidence_level=self.config.confidence_level,
             stage_timings=final_stage_timings,
             stage_counts=stage_counts or {},
+            ensemble_candidates=ensemble_candidates,
         )
 
-    def _build_full_pareto_solution(
+    def _build_ensemble_solution(
         self,
-        rust_sol: "ParetoSolutionProtocol",
+        selection: FitGatedSelection,
         representatives: list[CalibrationEvaluation],
         simulation_output_ids: list[str],
         time_steps: int,
-    ) -> ParetoSolution:
-        """Build a Pareto solution with parameter stats and prediction intervals."""
-        solution_params = [representatives[i] for i in rust_sol.selected_indices]
+    ) -> EnsembleSolution:
+        """Build the selected solution with parameter and prediction statistics."""
+        solution_params = [representatives[i] for i in selection.selected_indices]
         param_stats = self._statistics_calculator.calculate_parameter_statistics(
             solution_params
         )
@@ -591,7 +773,8 @@ class ProbabilisticCalibrator:
         )
         win_median, win_ci_lower, win_ci_upper = (
             self._statistics_calculator.calculate_windowed_prediction_intervals(
-                all_preds
+                all_preds,
+                solution_params,
             )
         )
         cov_pct, avg_ci = self._statistics_calculator.calculate_coverage_metrics(
@@ -600,10 +783,21 @@ class ProbabilisticCalibrator:
             all_predictions=all_preds,
             ensemble_params=solution_params,
         )
+        point_member = min(solution_params, key=lambda evaluation: evaluation.loss)
+        central_loss = self._statistics_calculator.calculate_central_loss(
+            all_preds,
+            solution_params,
+        )
+        observation_diagnostics = (
+            self._statistics_calculator.calculate_observation_diagnostics(
+                all_preds,
+                solution_params,
+            )
+        )
 
-        return ParetoSolution(
-            ensemble_size=rust_sol.ensemble_size,
-            selected_indices=rust_sol.selected_indices,
+        return EnsembleSolution(
+            ensemble_size=selection.ensemble_size,
+            selected_indices=selection.selected_indices,
             ensemble_parameters=[ep.to_dict() for ep in solution_params],
             parameter_statistics=param_stats,
             prediction_median=pred_median,
@@ -614,27 +808,11 @@ class ProbabilisticCalibrator:
             windowed_prediction_ci_upper=win_ci_upper,
             coverage_percentage=cov_pct,
             average_ci_width=avg_ci,
-            ci_width=rust_sol.ci_width,
-            coverage=rust_sol.coverage,
-            size_penalty=rust_sol.size_penalty,
-        )
-
-    @staticmethod
-    def _build_summary_pareto_solution(
-        rust_sol: "ParetoSolutionProtocol",
-    ) -> ParetoSolution:
-        """Build a compact Pareto solution containing objective summary only."""
-        return ParetoSolution(
-            ensemble_size=rust_sol.ensemble_size,
-            selected_indices=rust_sol.selected_indices,
-            ensemble_parameters=[],
-            parameter_statistics={},
-            prediction_median={},
-            prediction_ci_lower={},
-            prediction_ci_upper={},
-            coverage_percentage=rust_sol.coverage * 100.0,
-            average_ci_width=rust_sol.ci_width,
-            ci_width=rust_sol.ci_width,
-            coverage=rust_sol.coverage,
-            size_penalty=rust_sol.size_penalty,
+            ci_width=selection.ci_width,
+            coverage=selection.coverage,
+            point_parameters=point_member.to_dict(),
+            point_loss=point_member.loss,
+            central_loss=central_loss,
+            observation_diagnostics=observation_diagnostics,
+            selection_diagnostics=selection.diagnostics,
         )

@@ -314,7 +314,7 @@ class ParetoSolutionProtocol(Protocol):
     @property
     def coverage(self) -> float: ...
     @property
-    def size_penalty(self) -> float: ...
+    def central_loss(self) -> float: ...
     @property
     def selected_indices(self) -> list[int]: ...
 
@@ -324,7 +324,13 @@ class EnsembleSelectionResultProtocol(Protocol):
     @property
     def pareto_front(self) -> list[ParetoSolutionProtocol]: ...
     @property
-    def selected_pareto_index(self) -> int: ...
+    def selected_pareto_index(self) -> int | None: ...
+    @property
+    def ci_width(self) -> float: ...
+    @property
+    def coverage(self) -> float: ...
+    @property
+    def diagnostics(self) -> dict[str, float]: ...
 
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
@@ -346,7 +352,6 @@ class CalibrationModule(Protocol):
     CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
     ParetoSolution: type[ParetoSolutionProtocol]
     EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
-
     def calibrate(
         self,
         engine: DifferenceEquationsProtocol,
@@ -381,25 +386,6 @@ class CalibrationModule(Protocol):
         evaluation_retention: str = "all",
         top_k_per_run: int | None = None,
     ) -> list[CalibrationResultWithHistoryProtocol]: ...
-    def select_optimal_ensemble(
-        self,
-        candidates: list[CalibrationEvaluationProtocol],
-        observed_data_tuples: list[tuple[int, int, float]],
-        population_size: int,
-        generations: int,
-        confidence_level: float,
-        seed: int,
-        pareto_preference: float,
-        ensemble_size_mode: str,
-        ensemble_size: int | None = None,
-        ensemble_size_min: int | None = None,
-        ensemble_size_max: int | None = None,
-        ci_margin_factor: float = 0.1,
-        ci_sample_sizes: list[int] | None = None,
-        crossover_probability: float = 0.9,
-        ci_width_scope: str = "full_trajectory",
-        ensemble_algorithm: str = "nsga2",
-    ) -> EnsembleSelectionResultProtocol: ...
     def deduplicate_evaluations(
         self,
         evaluations: list[CalibrationEvaluationProtocol],
@@ -441,6 +427,28 @@ class CalibrationModule(Protocol):
         parameter_sets: list[list[float]],
         metric_points: list[tuple[int, int]],
     ) -> list[list[float]]: ...
+    def select_compact_ensemble(
+        self,
+        candidates: list[CalibrationEvaluationProtocol],
+        observed_values: list[float],
+        weights: list[float],
+        normalization: list[float],
+        series_ids: list[str],
+        confidence_level: float,
+        seed: int,
+        central_loss_metric: str = "weighted_sse",
+        ensemble_algorithm: str = "nsga2",
+        ensemble_size_mode: str = "automatic",
+        ensemble_size: int | None = None,
+        ensemble_size_min: int | None = None,
+        ensemble_size_max: int | None = None,
+        central_fit_max_loss_ratio: float = 1.25,
+        search_beam_width: int = 32,
+        population_size: int = 100,
+        generations: int = 100,
+        crossover_probability: float = 0.9,
+        pareto_preference: float = 0.5,
+    ) -> EnsembleSelectionResultProtocol: ...
     def select_cluster_representatives(
         self,
         evaluations: list[CalibrationEvaluationProtocol],

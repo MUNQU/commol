@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 @dataclass
@@ -41,6 +41,13 @@ class CalibrationEvaluation:
         return {name: self.parameters[i] for i, name in enumerate(self.parameter_names)}
 
 
+class EnsembleCandidate(BaseModel):
+    """A calibrated candidate available to final ensemble selection."""
+
+    parameters: dict[str, float]
+    loss: float
+
+
 class ProbEvaluationFilterConfig(BaseModel):
     """
     Configuration for processing calibration evaluations.
@@ -66,6 +73,17 @@ class ProbEvaluationFilterConfig(BaseModel):
     top_k_per_run : int | None
         Number of evaluations retained per run when evaluation_retention is
         "top_k_per_run".
+    max_loss_ratio : float | None
+        Optional maximum loss relative to the best retained evaluation. Set this
+        to exclude optimizer states that are too poor to represent calibrated
+        uncertainty.
+    tail_max_loss_ratio : float | None
+        Optional broader maximum loss ratio for prediction-novel tail candidates.
+        When enabled with ``tail_max_representatives``, evaluations beyond
+        ``max_loss_ratio`` but within this wider band may be admitted only if
+        they add observed-prediction diversity.
+    tail_max_representatives : int
+        Maximum number of additional prediction-novel tail representatives.
     """
 
     deduplication_tolerance: float = Field(
@@ -93,6 +111,35 @@ class ProbEvaluationFilterConfig(BaseModel):
         ge=1,
         description="Number of evaluations to retain per run for top_k_per_run mode",
     )
+    model_config = ConfigDict(extra="forbid")
+
+    max_loss_ratio: float | None = Field(
+        default=None,
+        ge=1.0,
+        description=(
+            "Optional maximum loss relative to the best retained evaluation. "
+            "When set, only statistically/plausibly near-optimal evaluations are "
+            "allowed into clustering and ensemble selection."
+        ),
+    )
+    tail_max_loss_ratio: float | None = Field(
+        default=None,
+        ge=1.0,
+        description=(
+            "Optional broader maximum loss ratio for prediction-novel tail "
+            "candidates. When set with tail_max_representatives > 0, candidates "
+            "outside max_loss_ratio but inside this band can be added after "
+            "representative selection if they add observed-prediction diversity."
+        ),
+    )
+    tail_max_representatives: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Maximum number of additional prediction-novel tail representatives "
+            "to add from tail_max_loss_ratio."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_evaluation_retention(self) -> Self:
@@ -110,15 +157,32 @@ class ProbEvaluationFilterConfig(BaseModel):
                 "top_k_per_run should only be set when "
                 "evaluation_retention='top_k_per_run'"
             )
+        if self.tail_max_representatives > 0 and self.tail_max_loss_ratio is None:
+            raise ValueError(
+                "tail_max_loss_ratio must be specified when "
+                "tail_max_representatives > 0"
+            )
+        if self.tail_max_representatives > 0 and self.max_loss_ratio is None:
+            raise ValueError(
+                "max_loss_ratio must be specified when tail_max_representatives > 0"
+            )
+        if (
+            self.max_loss_ratio is not None
+            and self.tail_max_loss_ratio is not None
+            and self.tail_max_loss_ratio < self.max_loss_ratio
+        ):
+            raise ValueError(
+                "tail_max_loss_ratio must be greater than or equal to max_loss_ratio"
+            )
         return self
 
 
 class ProbClusteringConfig(BaseModel):
     """
-    Configuration for clustering parameter space.
+    Configuration for clustering calibration candidates.
 
-    Clusters similar parameter sets together to identify distinct solution regions
-    and enable diverse representative selection.
+    Clusters parameter vectors or transformed observed predictions to identify
+    distinct calibrated behaviours and enable diverse representative selection.
 
     Attributes
     ----------
@@ -149,6 +213,8 @@ class ProbClusteringConfig(BaseModel):
     minibatch_kmeans_threshold : int | None
         Use MiniBatchKMeans at or above this evaluation count.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     n_clusters: int | None = Field(
         default=None,
@@ -200,6 +266,14 @@ class ProbClusteringConfig(BaseModel):
         ge=1,
         description="Evaluation count threshold for MiniBatchKMeans",
     )
+    feature_space: Literal["parameters", "observed_predictions"] = Field(
+        default="parameters",
+        description=(
+            "Feature space used for clustering. observed_predictions clusters "
+            "the transformed quantities that are actually calibrated, preserving "
+            "distinct predicted shapes rather than merely distinct parameter values."
+        ),
+    )
 
 
 class ProbRepresentativeConfig(BaseModel):
@@ -243,6 +317,8 @@ class ProbRepresentativeConfig(BaseModel):
         Weight for stratum fit vs quality in latin_hypercube (default: 10.0).
         Higher values prioritize space-filling over quality.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     max_representatives: int = Field(
         default=1000,
@@ -288,94 +364,23 @@ class ProbRepresentativeConfig(BaseModel):
     )
 
 
-class ProbEnsembleConfig(BaseModel):
-    """
-    Configuration for ensemble selection.
-
-    Controls the multi-objective optimization that selects an optimal ensemble
-    of parameter sets balancing narrow confidence intervals with good data coverage.
-
-    Ensemble Objective
-    ------------------
-    Selection algorithms optimize two objectives:
-    - Minimize CI width (narrow intervals = more precise predictions)
-    - Maximize coverage (intervals contain observed data points)
-
-    To normalize the CI width objective, the algorithm establishes bounds by:
-    1. Computing minimum CI width using the 2 most similar candidates
-    2. Computing maximum CI width by testing random samples of different sizes
-       specified in ci_sample_sizes (e.g., ensembles of 10, 20, 50, 100 members)
-    3. Adding a safety margin (ci_margin_factor) to avoid edge cases
-
-    These bounds ensure proper scaling during Pareto optimization, allowing
-    meaningful comparison between narrow but precise vs. wide but comprehensive
-    confidence intervals.
+class ProbEnsembleSizeConfig(BaseModel):
+    """Common ensemble-size configuration shared by selection algorithms.
 
     Attributes
     ----------
-    population_size : int
-        Population size for population-based algorithms (default: 100).
-    generations : int
-        Iteration count for iterative algorithms (default: 100).
-    crossover_probability : float
-        Crossover probability for algorithms that use crossover (default: 0.9).
-        Higher values encourage more exploration through recombination.
-    pareto_preference : float
-        Preference for selecting from Pareto front (default: 0.5).
-        0.0 = prefer narrow CI width (minimize uncertainty).
-        1.0 = prefer high coverage (maximize data fit).
-        0.5 = balanced trade-off (knee point).
     ensemble_size_mode : Literal["fixed", "bounded", "automatic"]
         Mode for determining ensemble size (default: "automatic").
-        "fixed": use exact ensemble_size.
-        "bounded": optimize within [ensemble_size_min, ensemble_size_max].
-        "automatic": automatically determine optimal size.
     ensemble_size : int | None
-        Fixed ensemble size (required if mode="fixed", must be >= 2).
+        Fixed ensemble size (required if mode="fixed").
     ensemble_size_min : int | None
-        Minimum ensemble size (required if mode="bounded", must be >= 2).
-        Not used for "automatic" or "fixed" modes.
+        Minimum ensemble size (required if mode="bounded").
     ensemble_size_max : int | None
-        Maximum ensemble size
-        (required if mode="bounded", must be >= ensemble_size_min).
-        Not used for "automatic" or "fixed" modes.
-    ci_margin_factor : float
-        Safety margin for CI width bounds normalization (default: 0.1).
-        Adds a buffer (e.g., 10%) to min/max CI width bounds to avoid
-        numerical edge cases during optimization. Higher values provide
-        more conservative bounds.
-    ci_sample_sizes : list[int]
-        Sample sizes for CI width estimation (default: [10, 20, 50, 100]).
-        Used to explore how CI width varies with ensemble size when computing
-        maximum CI width bounds. The algorithm tests random ensembles of these
-        sizes to find the widest possible CI, ensuring proper normalization.
-        Larger sizes explore wider CIs but increase computation time.
-    ci_width_scope : Literal["observed_points", "observed_steps_all_compartments",
-        "full_trajectory"]
-        Prediction points included in the CI width objective. Compact scopes are
-        faster but intentionally change the ensemble-selection objective.
-    ensemble_algorithm : Literal["greedy_local_search", "nsga2"]
-        Algorithm used for ensemble subset selection.
+        Maximum ensemble size (required if mode="bounded").
     """
 
-    population_size: int = Field(
-        default=100, gt=3, description="Population size for population-based algorithms"
-    )
-    generations: int = Field(
-        default=100, gt=0, description="Iteration count for iterative algorithms"
-    )
-    crossover_probability: float = Field(
-        default=0.9,
-        ge=0.0,
-        le=1.0,
-        description="Crossover probability for algorithms that use crossover",
-    )
-    pareto_preference: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Preference for Pareto front selection (0=narrow CI, 1=coverage)",
-    )
+    model_config = ConfigDict(extra="forbid")
+
     ensemble_size_mode: Literal["fixed", "bounded", "automatic"] = Field(
         default="automatic", description="Mode for determining ensemble size"
     )
@@ -388,46 +393,21 @@ class ProbEnsembleConfig(BaseModel):
     ensemble_size_max: int | None = Field(
         default=None, ge=2, description="Maximum ensemble size (for mode='bounded')"
     )
-    ci_margin_factor: float = Field(
-        default=0.1,
-        ge=0.0,
-        le=1.0,
-        description="Safety margin for CI width bounds normalization",
-    )
-    ci_sample_sizes: list[int] = Field(
-        default=[10, 20, 50, 100],
-        description="Sample sizes for CI width estimation",
-    )
-    ci_width_scope: Literal[
-        "observed_points",
-        "observed_steps_all_compartments",
-        "full_trajectory",
-    ] = Field(
-        default="full_trajectory",
-        description="Prediction scope used for the CI width objective",
-    )
-    ensemble_algorithm: Literal["greedy_local_search", "nsga2"] = Field(
-        default="nsga2",
-        description="Algorithm used for ensemble subset selection",
-    )
 
     @model_validator(mode="after")
     def validate_ensemble_size_config(self) -> Self:
         """Validate ensemble size configuration."""
-        valid_modes = {"fixed", "bounded", "automatic"}
-        if self.ensemble_size_mode not in valid_modes:
-            raise ValueError(
-                f"Invalid ensemble_size_mode: '{self.ensemble_size_mode}'. "
-                f"Must be one of: {', '.join(sorted(valid_modes))}"
-            )
-
         if self.ensemble_size_mode == "fixed":
             self._validate_fixed_mode()
         elif self.ensemble_size_mode == "bounded":
             self._validate_bounded_mode()
         elif self.ensemble_size_mode == "automatic":
             self._validate_automatic_mode()
-
+        else:
+            raise ValueError(
+                f"Invalid ensemble_size_mode: '{self.ensemble_size_mode}'. "
+                "Must be one of: automatic, bounded, fixed"
+            )
         return self
 
     def _validate_fixed_mode(self) -> None:
@@ -436,8 +416,6 @@ class ProbEnsembleConfig(BaseModel):
             raise ValueError(
                 "ensemble_size must be specified when ensemble_size_mode='fixed'"
             )
-        if self.ensemble_size < 2:
-            raise ValueError(f"ensemble_size must be >= 2, got {self.ensemble_size}")
         if self.ensemble_size_min is not None or self.ensemble_size_max is not None:
             raise ValueError(
                 "ensemble_size_min and ensemble_size_max should not be set "
@@ -454,10 +432,6 @@ class ProbEnsembleConfig(BaseModel):
             raise ValueError(
                 "ensemble_size_max must be specified when ensemble_size_mode='bounded'"
             )
-        if self.ensemble_size_min < 2:
-            raise ValueError(
-                f"ensemble_size_min must be >= 2, got {self.ensemble_size_min}"
-            )
         if self.ensemble_size_max < self.ensemble_size_min:
             raise ValueError(
                 f"ensemble_size_max ({self.ensemble_size_max}) must be >= "
@@ -471,6 +445,55 @@ class ProbEnsembleConfig(BaseModel):
                 "ensemble_size_min and ensemble_size_max should not be set "
                 "when ensemble_size_mode='automatic'"
             )
+
+
+class ProbNsga2Config(ProbEnsembleSizeConfig):
+    """Configuration for the NSGA-II ensemble-selection algorithm.
+
+    This is the default selection configuration. It balances compact
+    observation-space interval width and observed-data coverage.
+    """
+
+    population_size: int = Field(
+        default=100, gt=3, description="NSGA-II population size"
+    )
+    generations: int = Field(
+        default=100, gt=0, description="Number of NSGA-II generations"
+    )
+    crossover_probability: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="NSGA-II crossover probability",
+    )
+    pareto_preference: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="NSGA-II preference for narrow intervals versus coverage",
+    )
+
+
+class ProbGreedyLocalSearchConfig(ProbEnsembleSizeConfig):
+    """Configuration for the fit-gated greedy local-search algorithm."""
+
+    central_fit_max_loss_ratio: float = Field(
+        default=1.25,
+        ge=1.0,
+        description=(
+            "Maximum central loss (the ensemble median scored with the problem's "
+            "loss function) relative to the best selected member. The ensemble is "
+            "rejected when it exceeds this limit."
+        ),
+    )
+    search_beam_width: int = Field(
+        default=32,
+        ge=2,
+        description=(
+            "Partial ensembles retained per size during fit-gated beam search. "
+            "Larger values improve combinatorial coverage at higher cost."
+        ),
+    )
 
 
 class ProbabilisticCalibrationConfig(BaseModel):
@@ -492,23 +515,23 @@ class ProbabilisticCalibrationConfig(BaseModel):
     Attributes
     ----------
     n_runs : int
-        Number of independent calibration runs to perform (default: 50).
+        Number of independent calibration runs to perform (default: 10).
         More runs provide better parameter space exploration but take longer.
     evaluation_processing : ProbEvaluationFilterConfig
         Configuration for evaluation deduplication and filtering
     clustering : ProbClusteringConfig
-        Configuration for clustering parameter space
+        Configuration for clustering calibration candidates
     representative_selection : ProbRepresentativeConfig
         Configuration for selecting representatives from clusters
-    ensemble_selection : ProbEnsembleConfig
-        Configuration for ensemble selection
+    ensemble_selection : ProbNsga2Config | ProbGreedyLocalSearchConfig
+        Configuration for the selected ensemble algorithm. NSGA-II is the
+        default; use the greedy configuration to select the alternate backend.
     confidence_level : float
         Confidence interval level (default: 0.95 for 95% CI).
         Must be in range (0.0, 1.0).
-    result_detail : Literal["selected_only", "pareto_summary", "full"]
-        Controls how much Pareto-front detail is materialized in the Python
-        result (default: "full" for compatibility).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     n_runs: int = Field(
         default=10, gt=0, description="Number of calibration runs to perform"
@@ -519,14 +542,14 @@ class ProbabilisticCalibrationConfig(BaseModel):
     )
     clustering: ProbClusteringConfig = Field(
         default_factory=ProbClusteringConfig,
-        description="Configuration for clustering parameter space",
+        description="Configuration for clustering calibration candidates",
     )
     representative_selection: ProbRepresentativeConfig = Field(
         default_factory=ProbRepresentativeConfig,
         description="Configuration for representative selection",
     )
-    ensemble_selection: ProbEnsembleConfig = Field(
-        default_factory=ProbEnsembleConfig,
+    ensemble_selection: ProbNsga2Config | ProbGreedyLocalSearchConfig = Field(
+        default_factory=ProbNsga2Config,
         description="Configuration for ensemble selection",
     )
     confidence_level: float = Field(
@@ -535,11 +558,11 @@ class ProbabilisticCalibrationConfig(BaseModel):
         lt=1.0,
         description="Confidence interval level (e.g., 0.95 for 95% CI)",
     )
-    result_detail: Literal["selected_only", "pareto_summary", "full"] = Field(
-        default="full",
+    include_ensemble_candidates: bool = Field(
+        default=False,
         description=(
-            "Amount of Pareto-front result detail to build: selected_only, "
-            "pareto_summary, or full"
+            "Include the parameter sets and losses available to final ensemble "
+            "selection in the calibration result."
         ),
     )
 
@@ -579,7 +602,17 @@ class ParameterSetStatistics(BaseModel):
     max: float = Field(description="Maximum value in ensemble")
 
 
-class ParetoSolution(BaseModel):
+class EnsembleSelectionSummary(BaseModel):
+    """Compact summary of one candidate ensemble from NSGA-II."""
+
+    ensemble_size: int = Field(description="Number of selected parameter sets")
+    selected_indices: list[int] = Field(description="Selected candidate indices")
+    ci_width: float = Field(description="Standardized confidence interval width")
+    coverage: float = Field(description="Observed-point coverage")
+    central_loss: float = Field(description="Central median-prediction loss")
+
+
+class EnsembleSolution(BaseModel):
     """
     A complete ensemble solution with statistics and predictions.
 
@@ -608,11 +641,21 @@ class ParetoSolution(BaseModel):
     average_ci_width : float
         Average width of confidence intervals across time and compartments
     ci_width : float
-        Normalized confidence interval width objective [0, 1] used in optimization
+        Mean observed-data interval width normalized by observation magnitude.
     coverage : float
         Normalized coverage objective [0, 1] used in optimization
-    size_penalty : float
-        Size constraint penalty applied during optimization [0, infinity]
+    point_parameters : dict[str, float]
+        Parameters of the lowest-loss selected member. This is the only
+        parameter dictionary suitable for constructing a single point model.
+    point_loss : float
+        Calibration loss of point_parameters.
+    central_loss : float
+        The memberwise-median prediction scored with the problem's loss function
+        (the same loss the members were fit with), comparable to point_loss.
+    observation_diagnostics : dict[str, dict[str, float]]
+        Per-observation-series coverage and interval-width diagnostics.
+    selection_diagnostics : dict[str, float]
+        Candidate-search diagnostics produced by the selected backend.
     """
 
     ensemble_size: int = Field(description="Number of parameter sets in this ensemble")
@@ -650,28 +693,42 @@ class ParetoSolution(BaseModel):
         description="Percentage of observed data points within confidence intervals"
     )
     average_ci_width: float = Field(description="Average width of confidence intervals")
-    ci_width: float = Field(description="Normalized CI width objective [0, 1]")
+    ci_width: float = Field(
+        description=(
+            "Mean observed-data interval width normalized by observation magnitude"
+        )
+    )
     coverage: float = Field(description="Normalized coverage objective [0, 1]")
-    size_penalty: float = Field(description="Size constraint penalty [0, infinity]")
+    point_parameters: dict[str, float] = Field(
+        description="Parameters of the lowest-loss selected ensemble member"
+    )
+    point_loss: float = Field(description="Loss of the selected point member")
+    central_loss: float = Field(
+        description=(
+            "Memberwise-median prediction scored with the problem's loss function"
+        )
+    )
+    observation_diagnostics: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Coverage and interval diagnostics grouped by observation series",
+    )
+    selection_diagnostics: dict[str, float] = Field(
+        default_factory=dict,
+        description="Ensemble selection diagnostics",
+    )
 
 
 class ProbabilisticCalibrationResult(BaseModel):
     """
     Complete result from probabilistic calibration with ensemble analysis.
 
-    Contains the selected optimal ensemble solution, all Pareto-optimal
-    solutions from multi-objective optimization, and metadata about the
-    calibration process.
+    Contains the selected ensemble solution and metadata about the calibration
+    and selection process.
 
     Attributes
     ----------
-    selected_ensemble : ParetoSolution
-        The optimal ensemble solution selected based on pareto_preference
-    pareto_front : list[ParetoSolution]
-        All Pareto-optimal ensemble solutions from ensemble selection
-        These represent different trade-offs between CI width and coverage
-    selected_pareto_index : int
-        Index in pareto_front of the selected solution
+    selected_ensemble : EnsembleSolution
+        The selected ensemble solution.
     n_runs_performed : int
         Number of calibration runs performed
     n_unique_evaluations : int
@@ -686,14 +743,19 @@ class ProbabilisticCalibrationResult(BaseModel):
         Counts associated with major stages, useful for performance diagnostics.
     """
 
-    selected_ensemble: ParetoSolution = Field(
-        description="The optimal ensemble solution selected based on preference"
+    selected_ensemble: EnsembleSolution = Field(
+        description="The selected ensemble solution"
     )
-    pareto_front: list[ParetoSolution] = Field(
-        description="All Pareto-optimal ensemble solutions from ensemble selection"
+    selection_algorithm: Literal["nsga2", "greedy_local_search"] = Field(
+        default="nsga2", description="Algorithm used for ensemble subset selection"
     )
-    selected_pareto_index: int = Field(
-        description="Index in pareto_front of the selected solution"
+    pareto_front: list[EnsembleSelectionSummary] | None = Field(
+        default=None,
+        description="Compact NSGA-II Pareto-front summaries, when available",
+    )
+    selected_pareto_index: int | None = Field(
+        default=None,
+        description="Selected index in pareto_front for NSGA-II",
     )
     n_runs_performed: int = Field(description="Number of calibration runs performed")
     n_unique_evaluations: int = Field(
@@ -710,4 +772,11 @@ class ProbabilisticCalibrationResult(BaseModel):
     stage_counts: dict[str, int] = Field(
         default_factory=dict,
         description="Counts associated with major calibration stages",
+    )
+    ensemble_candidates: list[EnsembleCandidate] | None = Field(
+        default=None,
+        description=(
+            "Calibrated candidates passed to final ensemble selection, when "
+            "include_ensemble_candidates is enabled."
+        ),
     )

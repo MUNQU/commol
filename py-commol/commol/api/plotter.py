@@ -96,8 +96,8 @@ class SimulationPlotter:
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
             Scale values are extracted from best_parameters (CalibrationResult) or
-            parameter_statistics (ProbabilisticCalibrationResult) to scale model
-            predictions for comparison with observed data.
+            the lowest-loss selected member (ProbabilisticCalibrationResult) to
+            scale model predictions for comparison with observed data.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -171,8 +171,8 @@ class SimulationPlotter:
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
             Scale values are extracted from best_parameters (CalibrationResult) or
-            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
-            data for comparison with model predictions.
+            the lowest-loss selected member (ProbabilisticCalibrationResult) to
+            unscale observed data for comparison with model predictions.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -352,13 +352,7 @@ class SimulationPlotter:
             return calib_result.best_parameters
 
         if isinstance(calib_result, ProbabilisticCalibrationResult):
-            return {
-                param_name: stats.median
-                for (
-                    param_name,
-                    stats,
-                ) in calib_result.selected_ensemble.parameter_statistics.items()
-            }
+            return calib_result.selected_ensemble.point_parameters
 
         return None
 
@@ -672,10 +666,12 @@ class SimulationPlotter:
         )
 
         windowed_median = self._apply_windows(median_values, observed)
+        uses_memberwise_windowed_prediction = False
         if windowed_median is not None:
             time_steps, _ = windowed_median
             win_med = prob_result.selected_ensemble.windowed_prediction_median
             if win_med and bin_id in win_med:
+                uses_memberwise_windowed_prediction = True
                 plot_median = win_med[bin_id]
                 plot_ci_lower = (
                     prob_result.selected_ensemble.windowed_prediction_ci_lower[bin_id]
@@ -686,6 +682,7 @@ class SimulationPlotter:
             elif win_med and all(
                 component_id in win_med for component_id in component_ids
             ):
+                uses_memberwise_windowed_prediction = True
                 plot_median = self._sum_series(win_med, component_ids)
                 plot_ci_lower = self._sum_series(
                     prob_result.selected_ensemble.windowed_prediction_ci_lower,
@@ -705,7 +702,11 @@ class SimulationPlotter:
             plot_ci_lower = ci_lower
             plot_ci_upper = ci_upper
 
-        model_scale = self._model_scale_for_observed(observed, scale_values)
+        model_scale = (
+            1.0
+            if uses_memberwise_windowed_prediction
+            else self._model_scale_for_observed(observed, scale_values)
+        )
         plot_median = self._scale_series(plot_median, model_scale)
         plot_ci_lower = self._scale_series(plot_ci_lower, model_scale)
         plot_ci_upper = self._scale_series(plot_ci_upper, model_scale)

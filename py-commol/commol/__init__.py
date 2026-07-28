@@ -20,12 +20,15 @@ from commol.context.calibration import (
 )
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
+    EnsembleSolution,
+    EnsembleSelectionSummary,
     ParameterSetStatistics,
     ProbabilisticCalibrationConfig,
     ProbabilisticCalibrationResult,
     ProbClusteringConfig,
-    ProbEnsembleConfig,
     ProbEvaluationFilterConfig,
+    ProbGreedyLocalSearchConfig,
+    ProbNsga2Config,
     ProbRepresentativeConfig,
 )
 from commol.context.visualization import PlotConfig
@@ -46,6 +49,8 @@ def add_stderr_logger(level: int = logging.INFO) -> logging.StreamHandler[TextIO
 __all__ = [
     "CalibrationConstraint",
     "CalibrationEvaluation",
+    "EnsembleSolution",
+    "EnsembleSelectionSummary",
     "CalibrationParameter",
     "CalibrationProblem",
     "CalibrationResult",
@@ -60,8 +65,9 @@ __all__ = [
     "ProbabilisticCalibrationConfig",
     "ProbabilisticCalibrationResult",
     "ProbClusteringConfig",
-    "ProbEnsembleConfig",
     "ProbEvaluationFilterConfig",
+    "ProbGreedyLocalSearchConfig",
+    "ProbNsga2Config",
     "ProbRepresentativeConfig",
     "Simulation",
     "SimulationPlotter",
