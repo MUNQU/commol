@@ -80,6 +80,7 @@ nav:
       - Core Concepts: guide/core-concepts.md
       - Building Models: guide/building-models.md
       - Mathematical Expressions: guide/mathematical-expressions.md
+      - Time Patterns: guide/time-patterns.md
       - Running Simulations: guide/simulations.md
       - Model Calibration: guide/calibration.md
       - Probabilistic Calibration: guide/probabilistic-calibration.md
@@ -87,6 +88,7 @@ nav:
   - API Reference:
       - Model Builder: api/model-builder.md
       - Simulation: api/simulation.md
+      - Time Patterns: api/time-patterns.md
       - Calibrator: api/calibrator.md
       - Probabilistic Calibrator: api/probabilistic-calibrator.md
   - Advanced:

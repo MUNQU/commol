@@ -6,6 +6,9 @@ on:
     pull_request:
         branches: [main, develop]
 
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
     test-and-build:
         name: Test and Build on ${{ matrix.os }} ${{ matrix.target }} (Python ${{ matrix.python-version }})
@@ -21,27 +24,30 @@ jobs:
                       target: aarch64
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
             - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v6
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - name: Install Poetry
-              run: pip install poetry
+            - name: Install uv
+              uses: astral-sh/setup-uv@v9.0.0
+              with:
+                  enable-cache: true
+                  cache-dependency-glob: py-commol/uv.lock
 
             - name: Install Python dependencies
               working-directory: ./py-commol
-              run: poetry install --extras dev
+              run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
 
             - name: Build and install for testing (maturin develop)
               working-directory: ./py-commol
-              run: poetry run maturin develop --release
+              run: uv run maturin develop --release
 
             - name: Run tests
               working-directory: ./py-commol
-              run: poetry run pytest
+              run: uv run pytest
 
             - name: Clean Rust extension before wheel build
               working-directory: ./py-commol
@@ -58,7 +64,7 @@ jobs:
                   manylinux: ${{ matrix.os == 'ubuntu-latest' && 'auto' || '' }}
 
             - name: Upload wheel artifacts
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: wheels-${{ matrix.os }}-${{ matrix.target }}-py${{ matrix.python-version }}
                   path: dist/*.whl

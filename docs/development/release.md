@@ -18,7 +18,7 @@ Incremented for incompatible API changes:
 Incremented for backwards-compatible new features:
 
 - New functionality added
-- New disease states, stratifications, or transition types
+- New compartment states, stratifications, or transition types
 - Performance improvements without API changes
 - Deprecation notices (without removal)
 - Example: Adding new mathematical functions, new model types
@@ -150,7 +150,7 @@ git push origin vX.Y.Z
 
 ## Installation
 
-pip install epimodel==X.Y.Z
+pip install commol==X.Y.Z
 
 ## Full Changelog
 
@@ -186,7 +186,7 @@ python -m venv test_env
 source test_env/bin/activate  # or test_env\Scripts\activate on Windows
 
 # Install the new version
-pip install epimodel==X.Y.Z
+pip install commol==X.Y.Z
 
 # Verify it works
 python -c "from commol import ModelBuilder; print('Success!')"
@@ -201,19 +201,19 @@ from commol import ModelBuilder, Simulation
 # Run a quick test
 model = (
     ModelBuilder(name="Test")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)
-    .add_parameter(id="gamma", value=0.1)
-    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
-    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
@@ -221,7 +221,7 @@ model = (
 
 sim = Simulation(model)
 results = sim.run(num_steps=100)
-print(f"Final infected: {results['I'][-1]:.0f}")
+print(f"Final B: {results['B'][-1]:.0f}")
 ```
 
 ### Step 5: Sync Branches
@@ -277,7 +277,7 @@ To enable automated PyPI publishing, configure trusted publishing:
 3. Navigate to "Publishing" section
 4. Add GitHub as a trusted publisher:
    - **Owner**: MUNQU
-   - **Repository**: epimodel
+   - **Repository**: commol
    - **Workflow**: release.yml
    - **Environment**: pypi
 

@@ -12,11 +12,11 @@ readme = "README.md"
 requires-python = ">=3.12.0"
 
 dependencies = [
-    "cffi (>=2.0,<3.0)",
-    "numpy (>=2.4.0,<3.0)",
-    "pint (>=0.25.2,<0.26.0)",
-    "pydantic (>=2.0,<3.0)",
-    "scikit-learn (>=1.8,<2.0)",
+    "cffi (>=2.1.0,<3.0)",
+    "numpy (>=2.5.1,<3.0)",
+    "pint (>=0.25.3,<0.26.0)",
+    "pydantic (>=2.13.4,<3.0)",
+    "scikit-learn (>=1.9.0,<2.0)",
     "seaborn (>=0.13.2,<0.14.0)",
 ]
 
@@ -29,14 +29,14 @@ dev = [
     "ruff (>=0.12,<0.13)",
     "twine (>=6.2.0,<7.0.0)",
     "ty (>=0.0.9,<0.0.10)",
-    "vulture (>=2.14,<3.0)",
+    "vulture (>=2.16,<3.0)",
 ]
 docs = [
-    "mike>=2.0,<3.0",
+    "mike>=2.2.0,<3.0",
     "mkdocs>=1.6,<2.0",
     "mkdocstrings[python]>=0.26,<1.0",
-    "mkdocs-autorefs>=1.2,<2.0",
-    "mkdocs-material>=9.5,<10.0",
+    "mkdocs-autorefs>=1.4.4,<2.0",
+    "mkdocs-material>=9.7.6,<10.0",
 ]
 
 [project.urls]
@@ -44,12 +44,6 @@ Homepage = "https://github.com/MUNQU/commol"
 Documentation = "https://munqu.github.io/commol"
 Repository = "https://github.com/MUNQU/commol"
 "Bug Tracker" = "https://github.com/MUNQU/commol/issues"
-
-# Poetry-specific configuration
-[tool.poetry]
-version = "0.0.0"  # Placeholder for Poetry compatibility - maturin uses dynamic version from Cargo.toml
-packages = [{include = "commol"}]
-requires-poetry = ">=2.2"
 
 # Build system
 [build-system]

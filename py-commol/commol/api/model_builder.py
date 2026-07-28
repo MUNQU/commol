@@ -2,8 +2,16 @@ import copy
 import logging
 from typing import Literal, Self, TypedDict, cast
 
+from commol.api.time_patterns import (
+    ConditionDict as StratificationConditionDict,
+    StratifiedRateDict,
+    TimePattern,
+    _ComputedTimePattern,
+    _GroupEntry,
+    _ScheduleTimePattern,
+)
 from commol.constants import LogicOperators, ModelTypes
-from commol.context.bin import Bin
+from commol.context.bin import Accumulator, Bin
 from commol.context.dynamics import (
     Condition,
     Dynamics,
@@ -19,7 +27,7 @@ from commol.context.initial_conditions import (
     StratificationFractions,
 )
 from commol.context.model import Model
-from commol.context.parameter import Parameter
+from commol.context.parameter import Parameter, TimeSeriesValue
 from commol.context.population import Population
 from commol.context.stratification import Stratification
 
@@ -62,20 +70,6 @@ class StratificationFractionsDict(TypedDict):
     fractions: list[StratificationFractionDict]
 
 
-class StratificationConditionDict(TypedDict):
-    """Type definition for a stratification condition in a stratified rate."""
-
-    stratification: str
-    category: str
-
-
-class StratifiedRateDict(TypedDict):
-    """Type definition for a stratified rate."""
-
-    conditions: list[StratificationConditionDict]
-    rate: str | float
-
-
 class ModelBuilder:
     """
     A programmatic interface for building compartment models.
@@ -93,8 +87,8 @@ class ModelBuilder:
         The model description.
     _version : str | None
         The model version.
-    _disease_states : list[Bin]
-        List of bins in the model.
+    _bins : list[Bin]
+        List of bins (compartments) in the model.
     _stratifications : list[Stratification]
         List of population stratifications.
     _transitions : list[Transition]
@@ -135,10 +129,12 @@ class ModelBuilder:
         self._bin_unit: str | None = bin_unit
 
         self._bins: list[Bin] = []
+        self._accumulators: list[Accumulator] = []
         self._stratifications: list[Stratification] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
+        self._ts_counter: int = 0
 
         logging.info(
             (
@@ -171,7 +167,19 @@ class ModelBuilder:
         logging.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
-    def add_stratification(self, id: str, categories: list[str]) -> Self:
+    def add_accumulator(self, id: str, name: str) -> Self:
+        """Add a cumulative event counter to the model outputs."""
+        self._accumulators.append(Accumulator(id=id, name=name))
+        logging.info(f"Added accumulator: id='{id}', name='{name}'")
+        return self
+
+    def add_stratification(
+        self,
+        id: str,
+        categories: list[str],
+        description: str | None = None,
+        conditions: list[StratificationConditionDict] | None = None,
+    ) -> Self:
         """
         Add a population stratification to the model.
 
@@ -181,22 +189,67 @@ class ModelBuilder:
             Unique identifier for the stratification.
         categories : list[str]
             list of category identifiers within this stratification.
+        description : str | None, default=None
+            Human-readable description of the stratification.
+        conditions : list[dict] | None, default=None
+            When set, this stratification only expands compartments whose
+            already-applied categories satisfy ALL conditions. Each dict must
+            contain "stratification" and "category" keys referencing a
+            stratification declared before this one.
+
+            Example: only apply vaccination stratification to oe60 age group::
+
+                conditions = [{"stratification": "age", "category": "oe60"}]
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            If any condition references a stratification not yet declared.
         """
-        self._stratifications.append(Stratification(id=id, categories=categories))
+        if conditions:
+            declared_ids = {s.id for s in self._stratifications}
+            for cond in conditions:
+                if "category" not in cond:
+                    raise ValueError(
+                        f"Stratification '{id}': condition on "
+                        f"'{cond['stratification']}' must include a 'category'. "
+                        "Category-less conditions are only valid for transition "
+                        "target overrides."
+                    )
+                if cond["stratification"] not in declared_ids:
+                    raise ValueError(
+                        f"Stratification '{id}': condition references "
+                        f"'{cond['stratification']}' which has not been declared yet. "
+                        "Conditions may only reference stratifications declared before "
+                        "this one."
+                    )
+
+        condition_objects = (
+            [StratificationCondition(**c) for c in conditions] if conditions else None
+        )
+        self._stratifications.append(
+            Stratification(
+                id=id,
+                categories=categories,
+                description=description,
+                conditions=condition_objects,
+            )
+        )
         logging.info(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_parameter(
         self,
         id: str,
-        value: float | str | None,
+        value: float | str | list[tuple[int, float]] | None,
         description: str | None = None,
         unit: str | None = None,
+        mode: str | None = None,
     ) -> Self:
         """
         Add a global parameter to the model.
@@ -205,46 +258,119 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float | str | None
+        value : float | str | list[tuple[int, float]] | None
             Value of the parameter. Can be:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
                    special variables (N, N_category, step/t, pi, e), or contain
                    mathematical expressions (e.g., "beta * 2", "N_young / N")
+            - list[tuple[int, float]]: Empirical time series as (step, value) pairs;
+                   requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
-
-            Special variables available in formulas:
-            - N: Total population (automatically calculated)
-            - N_{category}: Population in specific category (e.g., N_young, N_old)
-            - N_{cat1}_{cat2}: Population in category combinations
-            - step or t: Current simulation step
-            - pi, e: Mathematical constants
 
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
             Unit of the parameter (e.g., "1/day", "dimensionless", "person").
             Used for unit consistency checking in equations.
+        mode : str | None, default=None
+            Required when ``value`` is a list of (step, value) pairs. Selects the
+            interpolation mode: ``"pulse"`` (non-zero only at listed steps),
+            ``"step_function"`` (zero-order hold from last listed step), or
+            ``"linear"`` (interpolation between adjacent listed steps).
 
         Returns
         -------
         ModelBuilder
             Self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is a list but ``mode`` is not provided, or if
+            ``mode`` is provided without a list ``value``.
         """
+        if isinstance(value, list):
+            if mode is None:
+                raise ValueError(
+                    f"Parameter '{id}': 'mode' is required when 'value' is a "
+                    "time-series list. Use mode='pulse', 'step_function', or 'linear'."
+                )
+            param_value: float | str | TimeSeriesValue | None = TimeSeriesValue(
+                data=value, mode=mode
+            )
+        else:
+            if mode is not None:
+                raise ValueError(
+                    f"Parameter '{id}': 'mode' is only valid when 'value' is a "
+                    "time-series list."
+                )
+            param_value = value
+        self._ensure_parameter_id_available(id)
         self._parameters.append(
-            Parameter(id=id, value=value, description=description, unit=unit)
+            Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logging.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
+
+    def _ensure_parameter_id_available(self, id: str) -> None:
+        if any(parameter.id == id for parameter in self._parameters):
+            raise ValueError(f"Parameter id '{id}' already exists")
+
+    def _register_ts_pattern(
+        self,
+        pattern: TimePattern,
+        *,
+        transition_id: str = "",
+        source_bin: str = "",
+        target_bin: str = "",
+    ) -> TimePattern:
+        """Auto-register a TimeSeries parameter for pulse-type patterns.
+
+        If ``pattern`` has numeric pulse data, registers a ``TimeSeries``
+        parameter and returns a ``_ComputedTimePattern`` whose formula is the
+        generated parameter name. Otherwise returns ``pattern`` unchanged.
+        """
+        data = pattern._as_time_series_data()
+        if data is None:
+            return pattern
+        conditions = pattern.conditions
+        if transition_id and conditions:
+            src_cats = "_".join(c["category"] for c in conditions if "category" in c)
+            tgt_cats = "_".join(
+                c["to"] if "to" in c else c["category"]
+                for c in conditions
+                if "to" in c or "category" in c
+            )
+            src = f"{source_bin}_{src_cats}" if source_bin else src_cats
+            tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
+            param_name = f"{transition_id}_{src}_to_{tgt}"
+        else:
+            param_name = f"_ts_{self._ts_counter}"
+            self._ts_counter += 1
+        self._ensure_parameter_id_available(param_name)
+        self._parameters.append(
+            Parameter(
+                id=param_name,
+                value=TimeSeriesValue(data=data, mode="pulse"),
+            )
+        )
+        return _ComputedTimePattern(
+            computed_formula=param_name,
+            conditions=conditions,
+            source_compartment=pattern.source_compartment,
+        )
 
     def add_transition(
         self,
         id: str,
         source: list[str],
         target: list[str],
-        rate: str | float | None = None,
+        rate: "str | float | TimePattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
         condition: Condition | None = None,
+        per_compartment: bool | None = None,
+        accumulators: list[str] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -252,45 +378,15 @@ class ModelBuilder:
         This method supports two distinct behaviors:
 
         When you specify multiple sources without the $compartment placeholder,
-        a SINGLE transition is created that affects all sources simultaneously.
+        a single transition is created that affects all sources simultaneously.
         The rate is evaluated ONCE per time step, and that value is applied to
         all source compartments at once.
-
-        Example:
-            .add_transition(
-                id="interaction",
-                source=["S", "I"],
-                target=["I", "I"],
-                rate="beta * S * I"
-            )
-
-        This creates ONE transition where:
-        - The rate "beta * S * I" is calculated once
-        - That rate removes from both S and I simultaneously
-        - That rate adds to I twice (once per target entry)
-        - Resulting equations:
-          dS/dt = ... - (beta*S*I)
-          dI/dt = ... - (beta*S*I) + 2*(beta*S*I) = ... + (beta*S*I)
 
         When you use the $compartment placeholder in the rate formula with multiple
         sources, the system automatically expands this into multiple independent
         transitions - one for each source compartment. Each transition has its own
         rate calculation where $compartment is replaced with the actual compartment
         name.
-
-        Example:
-            .add_transition(
-                id="death",
-                source=["S", "L", "I", "R"],
-                target=[],
-                rate="d * $compartment"
-            )
-
-        This automatically expands to FOUR separate transitions:
-        - Transition 1: S -> [] with rate "d * S"
-        - Transition 2: L -> [] with rate "d * L"
-        - Transition 3: I -> [] with rate "d * I"
-        - Transition 4: R -> [] with rate "d * R"
 
         Each transition's rate is evaluated independently, giving per-compartment
         dynamics. This is ideal for processes like per-capita death rates, where the
@@ -326,10 +422,10 @@ class ModelBuilder:
             Default mathematical formula, parameter reference, or constant value for
             the transition rate. Used when no stratified rate matches.
             Can be:
-            - A parameter reference (e.g., "beta")
-            - A constant value (e.g., "0.5" or 0.5)
-            - A mathematical formula (e.g., "beta * S * I / N")
-            - A formula with $compartment placeholder (e.g., "d * $compartment")
+            - A parameter reference
+            - A constant value
+            - A mathematical formula
+            - A formula with $compartment placeholder
 
             Special variables available in formulas:
             - N: Total population (automatically calculated)
@@ -346,6 +442,13 @@ class ModelBuilder:
         condition : Condition| None, default=None
             Logical conditions that must be met for the transition.
 
+        per_compartment : bool | None, default=None
+            When True, base compartment names in the rate
+            expression are automatically replaced with the specific stratified
+            compartment name for each expanded transition flow. This ensures
+            each subpopulation transitions based on its own compartment value
+            rather than the total across all subpopulations.
+
         Returns
         -------
         ModelBuilder
@@ -357,33 +460,44 @@ class ModelBuilder:
             - If $compartment is used with only one source compartment
             - If $compartment is used with multiple targets
             - If rate is None when using $compartment
-
-        Examples
-        --------
-        Standard single transition affecting multiple sources:
-        >>> builder.add_transition(
-        ...     id="infection",
-        ...     source=["S", "I"],
-        ...     target=["I", "I"],
-        ...     rate="beta * S * I / N",
-        ... )
-
-        Expanded transitions using $compartment (creates 4 separate transitions):
-        >>> builder.add_transition(
-        ...     id="death",
-        ...     source=["S", "L", "I", "R"],
-        ...     target=[],
-        ...     rate="d * $compartment",
-        ... )
-
-        Per-compartment flow with target:
-        >>> builder.add_transition(
-        ...     id="treatment",
-        ...     source=["I_mild", "I_severe"],
-        ...     target=["R"],
-        ...     rate="treatment_rate * $compartment",
-        ... )
         """
+        # If `rate` is a TimePattern, extract its rate string and stratified
+        # rates and route them into the existing pipeline. A TimePattern fully
+        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # alongside it is a conflict.
+        if isinstance(rate, TimePattern):
+            if stratified_rates is not None:
+                raise ValueError(
+                    f"Transition '{id}': pass either a TimePattern as `rate=` "
+                    "or `stratified_rates=`, not both."
+                )
+            src_bin = source[0] if source else ""
+            tgt_bin = target[0] if target else ""
+            if isinstance(rate, _ScheduleTimePattern):
+                resolved = rate.model_copy(
+                    update={
+                        "patterns": [
+                            _GroupEntry(
+                                pattern=self._register_ts_pattern(
+                                    entry.pattern,
+                                    transition_id=id,
+                                    source_bin=src_bin,
+                                    target_bin=tgt_bin,
+                                ),
+                                absolute=entry.absolute,
+                            )
+                            for entry in rate.patterns
+                        ]
+                    }
+                )
+                rate = resolved
+            else:
+                rate = self._register_ts_pattern(
+                    rate, transition_id=id, source_bin=src_bin, target_bin=tgt_bin
+                )
+            stratified_rates = rate._builder_stratified_rates()
+            rate = rate._builder_rate()
+
         # Convert rate to string if numeric
         if isinstance(rate, int) or isinstance(rate, float):
             rate = str(rate)
@@ -405,7 +519,11 @@ class ModelBuilder:
                     StratificationCondition(**cond) for cond in rate_dict["conditions"]
                 ]
                 stratified_rates_objects.append(
-                    StratifiedRate(conditions=conditions, rate=str(rate_dict["rate"]))
+                    StratifiedRate(
+                        conditions=conditions,
+                        rate=str(rate_dict["rate"]),
+                        absolute=rate_dict.get("absolute"),
+                    )
                 )
 
         self._transitions.append(
@@ -413,9 +531,11 @@ class ModelBuilder:
                 id=id,
                 source=source,
                 target=target,
+                accumulators=accumulators or [],
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
                 condition=condition,
+                per_compartment=per_compartment,
             )
         )
         logging.info(
@@ -764,7 +884,7 @@ class ModelBuilder:
             "name": self._name,
             "description": self._description,
             "version": self._version,
-            "disease_states_count": len(self._bins),
+            "bins_count": len(self._bins),
             "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],
@@ -867,6 +987,7 @@ class ModelBuilder:
 
         population = Population(
             bins=self._bins,
+            accumulators=self._accumulators,
             stratifications=self._stratifications,
             transitions=self._transitions,
             initial_conditions=self._initial_conditions,

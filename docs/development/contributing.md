@@ -76,22 +76,22 @@ cargo clippy --all-targets --all-features
 - Use descriptive test names
 
 ```python
-def test_model_builder_creates_valid_sir_model():
-    """Test that ModelBuilder creates a valid SIR model."""
+def test_model_builder_creates_valid_model():
+    """Test that ModelBuilder creates a valid model."""
     model = (
-        ModelBuilder(name="Test SIR")
-        .add_bin(id="S", name="Susceptible")
+        ModelBuilder(name="Test Model")
+        .add_bin(id="A", name="State A")
         # ... rest of model
         .build("DifferenceEquations")
     )
-    assert model.name == "Test SIR"
+    assert model.name == "Test Model"
 ```
 
 Run tests:
 
 ```bash
 cd py-commol
-poetry run pytest -v --cov=epimodel
+poetry run pytest -v --cov=commol
 ```
 
 #### Rust Tests

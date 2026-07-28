@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "develop"
-  - package-ecosystem: "pip" # Python dependencies
+  - package-ecosystem: "uv" # Python dependencies
     directory: "/py-commol" # Location of Python package manifests
     schedule:
       interval: "weekly"

@@ -1,4 +1,4 @@
-//! Python bindings for epimodel-difference (discrete-time solver).
+//! Python bindings for commol-difference (discrete-time solver).
 
 use crate::core::PyModel;
 use pyo3::prelude::*;
@@ -63,6 +63,12 @@ impl PyDifferenceEquations {
     #[getter]
     fn compartments(&self) -> Vec<String> {
         self.inner.compartments()
+    }
+
+    /// Get the list of simulation output names, including accumulators.
+    #[getter]
+    fn output_names(&self) -> Vec<String> {
+        self.inner.output_names()
     }
 
     /// Reset the simulation to initial conditions

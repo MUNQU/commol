@@ -7,6 +7,7 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
+from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
 PREFIX_SEPARATOR: str = ":"
@@ -100,22 +101,6 @@ class Condition(BaseModel):
     rules: list[Rule]
 
 
-class StratificationCondition(BaseModel):
-    """
-    Specifies a category within a stratification for rate matching.
-
-    Attributes
-    ----------
-    stratification : str
-        The ID of the stratification (e.g., "age", "location")
-    category : str
-        The category within that stratification (e.g., "young", "urban")
-    """
-
-    stratification: str = Field(default=..., description="ID of the stratification")
-    category: str = Field(default=..., description="Category within the stratification")
-
-
 class StratifiedRate(BaseModel):
     """
     Defines a rate for specific stratification categories.
@@ -133,6 +118,14 @@ class StratifiedRate(BaseModel):
     )
     rate: str = Field(
         default=..., description="Rate expression for matching compartments"
+    )
+    absolute: bool | None = Field(
+        default=None,
+        description=(
+            "When True, the flow is treated as absolute (not multiplied by source "
+            "population). When None, inferred from whether the rate references "
+            "any compartment variable."
+        ),
     )
 
     @field_validator("conditions")
@@ -212,6 +205,10 @@ class Transition(BaseModel):
     id: str = Field(default=..., description="Id of the transition.")
     source: list[str] = Field(default=..., description="Origin compartments.")
     target: list[str] = Field(default=..., description="Destination compartments.")
+    accumulators: list[str] = Field(
+        default_factory=list,
+        description="Cumulative event counters incremented by this transition flow.",
+    )
 
     rate: str | None = Field(
         None,
@@ -229,6 +226,15 @@ class Transition(BaseModel):
 
     condition: Condition | None = Field(
         default=None, description="Logical restrictions for the transition."
+    )
+
+    per_compartment: bool | None = Field(
+        default=None,
+        description=(
+            "When True, base compartment names in the rate expression "
+            "are replaced with the specific stratified compartment name "
+            "for each expanded transition flow."
+        ),
     )
 
     @field_validator("rate", mode="before")

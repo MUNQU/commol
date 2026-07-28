@@ -11,7 +11,7 @@ class ConditionProtocol(Protocol):
     logic: LogicOperators
     rules: list[RuleProtocol]
 
-class DiseaseStateProtocol(Protocol):
+class BinProtocol(Protocol):
     id: str
     name: str
 
@@ -50,11 +50,11 @@ class StratificationFractionsProtocol(Protocol):
 
 class InitialConditionsProtocol(Protocol):
     population_size: int
-    disease_state_fraction: dict[str, float]
+    bin_fraction: dict[str, float]
     stratification_fractions: list[StratificationFractionsProtocol]
 
 class PopulationProtocol(Protocol):
-    disease_states: list[DiseaseStateProtocol]
+    bins: list[BinProtocol]
     stratifications: list[StratificationProtocol]
     transitions: list[TransitionProtocol]
     initial_conditions: InitialConditionsProtocol
@@ -81,6 +81,8 @@ class DifferenceEquationsProtocol(Protocol):
     def population(self) -> list[float]: ...
     @property
     def compartments(self) -> list[str]: ...
+    @property
+    def output_names(self) -> list[str]: ...
 
 class DifferenceModule(Protocol):
     DifferenceEquations: type[DifferenceEquationsProtocol]
@@ -93,6 +95,8 @@ class ObservedDataPointProtocol(Protocol):
         value: float,
         weight: float | None = None,
         scale_id: str | None = None,
+        window_steps: int | None = None,
+        compartments: list[str] | None = None,
     ) -> None: ...
     @property
     def time_step(self) -> int: ...
@@ -155,6 +159,9 @@ class LossConfigProtocol(Protocol):
     def mae() -> LossConfigProtocol: ...
     @staticmethod
     def weighted_sse() -> LossConfigProtocol: ...
+    def normalized(self, enabled: bool = True) -> LossConfigProtocol: ...
+    @property
+    def normalize_observations(self) -> bool: ...
 
 class NelderMeadConfigProtocol(Protocol):
     def __init__(
@@ -307,7 +314,7 @@ class ParetoSolutionProtocol(Protocol):
     @property
     def coverage(self) -> float: ...
     @property
-    def size_penalty(self) -> float: ...
+    def central_loss(self) -> float: ...
     @property
     def selected_indices(self) -> list[int]: ...
 
@@ -317,7 +324,13 @@ class EnsembleSelectionResultProtocol(Protocol):
     @property
     def pareto_front(self) -> list[ParetoSolutionProtocol]: ...
     @property
-    def selected_pareto_index(self) -> int: ...
+    def selected_pareto_index(self) -> int | None: ...
+    @property
+    def ci_width(self) -> float: ...
+    @property
+    def coverage(self) -> float: ...
+    @property
+    def diagnostics(self) -> dict[str, float]: ...
 
 class CalibrationModule(Protocol):
     ObservedDataPoint: type[ObservedDataPointProtocol]
@@ -339,7 +352,6 @@ class CalibrationModule(Protocol):
     CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
     ParetoSolution: type[ParetoSolutionProtocol]
     EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
-
     def calibrate(
         self,
         engine: DifferenceEquationsProtocol,
@@ -371,24 +383,9 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         n_runs: int,
         seed: int,
+        evaluation_retention: str = "all",
+        top_k_per_run: int | None = None,
     ) -> list[CalibrationResultWithHistoryProtocol]: ...
-    def select_optimal_ensemble(
-        self,
-        candidates: list[CalibrationEvaluationProtocol],
-        observed_data_tuples: list[tuple[int, int, float]],
-        population_size: int,
-        generations: int,
-        confidence_level: float,
-        seed: int,
-        pareto_preference: float,
-        ensemble_size_mode: str,
-        ensemble_size: int | None = None,
-        ensemble_size_min: int | None = None,
-        ensemble_size_max: int | None = None,
-        ci_margin_factor: float = 0.1,
-        ci_sample_sizes: list[int] | None = None,
-        nsga_crossover_probability: float = 0.9,
-    ) -> EnsembleSelectionResultProtocol: ...
     def deduplicate_evaluations(
         self,
         evaluations: list[CalibrationEvaluationProtocol],
@@ -401,6 +398,57 @@ class CalibrationModule(Protocol):
         parameter_names: list[str],
         time_steps: int,
     ) -> list[list[list[float]]]: ...
+    def generate_calibrated_predictions_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        initial_population_size: int,
+        parameter_sets: list[list[float]],
+        time_steps: int,
+    ) -> list[list[list[float]]]: ...
+    def generate_predictions_at_points_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameter_sets: list[list[float]],
+        parameter_names: list[str],
+        metric_points: list[tuple[int, int]],
+    ) -> list[list[float]]: ...
+    def generate_calibrated_predictions_at_points_parallel(
+        self,
+        engine: DifferenceEquationsProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        parameters: list[CalibrationParameterProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+        loss_config: LossConfigProtocol,
+        initial_population_size: int,
+        parameter_sets: list[list[float]],
+        metric_points: list[tuple[int, int]],
+    ) -> list[list[float]]: ...
+    def select_compact_ensemble(
+        self,
+        candidates: list[CalibrationEvaluationProtocol],
+        observed_values: list[float],
+        weights: list[float],
+        normalization: list[float],
+        series_ids: list[str],
+        confidence_level: float,
+        seed: int,
+        central_loss_metric: str = "weighted_sse",
+        ensemble_algorithm: str = "nsga2",
+        ensemble_size_mode: str = "automatic",
+        ensemble_size: int | None = None,
+        ensemble_size_min: int | None = None,
+        ensemble_size_max: int | None = None,
+        central_fit_max_loss_ratio: float = 1.25,
+        search_beam_width: int = 32,
+        population_size: int = 100,
+        generations: int = 100,
+        crossover_probability: float = 0.9,
+        pareto_preference: float = 0.5,
+    ) -> EnsembleSelectionResultProtocol: ...
     def select_cluster_representatives(
         self,
         evaluations: list[CalibrationEvaluationProtocol],
@@ -435,7 +483,7 @@ class RateMathExpressionProtocol(Protocol):
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
     Population: type[PopulationProtocol]
-    DiseaseState: type[DiseaseStateProtocol]
+    Bin: type[BinProtocol]
     Stratification: type[StratificationProtocol]
     StratificationCondition: type[StratificationConditionProtocol]
     StratifiedRate: type[StratifiedRateProtocol]
@@ -453,7 +501,7 @@ class CoreModule(Protocol):
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]
 
-class RustEpiModelModule(Protocol):
+class RustCommolModule(Protocol):
     core: CoreModule
     difference: DifferenceModule
     calibration: CalibrationModule
@@ -461,4 +509,4 @@ class RustEpiModelModule(Protocol):
 core: CoreModule
 difference: DifferenceModule
 calibration: CalibrationModule
-rust_epimodel: RustEpiModelModule
+rust_commol: RustCommolModule

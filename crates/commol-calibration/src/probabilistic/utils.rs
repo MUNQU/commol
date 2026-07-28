@@ -3,36 +3,6 @@
 //! This module provides shared utility functions used across the probabilistic
 //! calibration submodules.
 
-/// Calculate percentile of sorted values using linear interpolation.
-///
-/// # Arguments
-/// * `sorted_values` - Slice of values sorted in ascending order
-/// * `p` - Percentile to calculate (0-100)
-///
-/// # Returns
-/// The interpolated percentile value
-pub fn percentile(sorted_values: &[f64], p: f64) -> f64 {
-    if sorted_values.is_empty() {
-        return 0.0;
-    }
-
-    if sorted_values.len() == 1 {
-        return sorted_values[0];
-    }
-
-    let n = sorted_values.len();
-    let idx = (p / 100.0) * (n - 1) as f64;
-    let lower_idx = idx.floor() as usize;
-    let upper_idx = idx.ceil() as usize;
-
-    if lower_idx == upper_idx {
-        sorted_values[lower_idx]
-    } else {
-        let weight = idx - lower_idx as f64;
-        sorted_values[lower_idx] * (1.0 - weight) + sorted_values[upper_idx] * weight
-    }
-}
-
 /// Calculate Euclidean distance between two parameter vectors in normalized space.
 ///
 /// Normalizes by parameter ranges to give equal weight to all parameters.

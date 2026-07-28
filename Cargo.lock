@@ -32,7 +32,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 [[package]]
 name = "argmin"
 version = "0.11.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#6e9164f7ef3f4158d965807ad071ad68b4a252a0"
+source = "git+https://github.com/MUNQU/argmin?branch=development#70560a33e454aa6347b78e1dd8821c15c3c93bf4"
 dependencies = [
  "anyhow",
  "argmin-math",
@@ -48,7 +48,7 @@ dependencies = [
 [[package]]
 name = "argmin-math"
 version = "0.5.1"
-source = "git+https://github.com/MUNQU/argmin?branch=development#6e9164f7ef3f4158d965807ad071ad68b4a252a0"
+source = "git+https://github.com/MUNQU/argmin?branch=development#70560a33e454aa6347b78e1dd8821c15c3c93bf4"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -62,7 +62,7 @@ dependencies = [
 [[package]]
 name = "argmin-observer-slog"
 version = "0.2.0"
-source = "git+https://github.com/MUNQU/argmin?branch=development#6e9164f7ef3f4158d965807ad071ad68b4a252a0"
+source = "git+https://github.com/MUNQU/argmin?branch=development#70560a33e454aa6347b78e1dd8821c15c3c93bf4"
 dependencies = [
  "anyhow",
  "argmin",
@@ -535,7 +535,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]

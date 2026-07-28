@@ -1,6 +1,6 @@
 # Mathematical Expressions
 
-Commol supports rich mathematical expressions in transition rates, enabling complex and realistic disease dynamics.
+Commol supports rich mathematical expressions in transition rates, enabling complex and realistic model dynamics.
 
 ## Basic Syntax
 
@@ -8,10 +8,10 @@ Transition rates are specified as **string expressions** that are evaluated duri
 
 ```python
 .add_transition(
-    id="infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * S * I / N"  # Mathematical expression as a string
+    id="flow_AB",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N"  # Mathematical expression as a string
 )
 ```
 
@@ -19,36 +19,36 @@ Transition rates are specified as **string expressions** that are evaluated duri
 
 ### Basic Operations
 
-| Operation      | Operator | Example                | Description       |
-| -------------- | -------- | ---------------------- | ----------------- |
-| Addition       | `+`      | `"alpha + beta"`       | Sum of two values |
-| Subtraction    | `-`      | `"alpha - beta"`       | Difference        |
-| Multiplication | `*`      | `"beta * S"`           | Product           |
-| Division       | `/`      | `"I / N"`              | Division          |
-| Exponentiation | `**`     | `"beta ** 2"`          | Power             |
-| Parentheses    | `()`     | `"(alpha + beta) * I"` | Grouping          |
+| Operation      | Operator | Example             | Description       |
+| -------------- | -------- | ------------------- | ----------------- |
+| Addition       | `+`      | `"k1 + k2"`         | Sum of two values |
+| Subtraction    | `-`      | `"k1 - k2"`         | Difference        |
+| Multiplication | `*`      | `"k1 * A"`          | Product           |
+| Division       | `/`      | `"B / N"`           | Division          |
+| Exponentiation | `**`     | `"k1 ** 2"`         | Power             |
+| Parentheses    | `()`     | `"(k1 + k2) * B"`   | Grouping          |
 
 ### Examples
 
 ```python
-rate = "beta * S * I"           # Multiply transmission rate by populations
-rate = "gamma + delta"          # Add two parameters
-rate = "beta / N"               # Divide by total population
-rate = "(beta + gamma) / 2"     # Average with parentheses
-rate = "beta ** 2"              # Square a value
+rate = "k1 * A * B"            # Multiply rate by two compartment populations
+rate = "k1 + k2"               # Sum of two parameters
+rate = "k1 / N"                # Divide by total population
+rate = "(k1 + k2) / 2"         # Average with parentheses
+rate = "k1 ** 2"               # Square a parameter value
 ```
 
 ## Available Variables
 
-### Disease State Variables
+### Compartment Variables
 
-Reference any disease state by its ID:
+Reference any compartment by its ID:
 
 ```python
-# In a model with states S, I, R
-rate = "beta * S * I"    # Use S and I populations
-rate = "gamma * I"       # Use I population
-rate = "0.01 * R"        # Use R population
+# In a model with compartments A, B, C
+rate = "k1 * A * B"    # Use A and B populations
+rate = "k2 * B"        # Use B population
+rate = "0.01 * C"      # Use C population
 ```
 
 ### Special Variables
@@ -65,10 +65,33 @@ rate = "0.01 * R"        # Use R population
 **Examples:**
 
 ```python
-rate = "beta * I / N"              # Frequency-dependent transmission
-rate = "beta * sin(2 * pi * t)"    # Periodic variation
-rate = "gamma * exp(-0.01 * step)" # Exponential decay over time
+rate = "k1 * B / N"               # Frequency-dependent flow
+rate = "k1 * sin(2 * pi * t)"     # Periodic variation
+rate = "k2 * exp(-0.01 * step)"   # Exponential decay over time
 ```
+
+### Subpopulation Variables
+
+When you use stratifications, Commol automatically creates several types of **subpopulation sum variables** that aggregate compartment populations. These are updated at every simulation step and can be used in any rate expression.
+
+#### Types of Subpopulation Variables
+
+Given a model with bins and stratifications, Commol generates:
+
+| Variable pattern                  | Description                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `N`                               | Total population across all compartments                                                          |
+| `N_{cat}`                         | Total population matching a stratification category (e.g., `N_young`)                             |
+| `N_{cat1_cat2}`                   | Total population matching an intersection of categories (e.g., `N_young_urban`)                   |
+| `{bin}`                           | Base bin total — sum of all stratified versions of a bin (e.g., `S` = sum of all `S_*`)           |
+| `{bin}_{cat}`                     | Partial bin sum — sum of all compartments for a bin matching a category subset (e.g., `S_young`)  |
+| `{bin}_{cat1}_{cat2}_{...}_{catN}` | Full stratified compartment name (e.g., `S_young_urban`) — the individual compartment population |
+
+**Partial bin sums** (e.g., `A_g1`) are available when the model has **two or more stratifications**. They represent the sum of a bin's compartments across one or more stratification categories, summing over the remaining dimensions. For instance, with stratifications `group` and `type`, the variable `A_g1` equals the sum of all `A` compartments where `group=g1`, regardless of type.
+
+Category suffixes in variable names must follow the **declaration order** of stratifications. For example, if `group` is declared before `type`, then `A_g1` (summing over type) is valid, but the intersection must be written as `A_g1_t1` (not `A_t1_g1`).
+
+**Note on conditional stratifications**: partial bin-sum and `N_*` variables are generated from the Cartesian product of all declared categories regardless of conditions. A combination that was never actually generated as a compartment (because conditions were not met) will always evaluate to 0 at runtime.
 
 ### The `$compartment` Placeholder
 
@@ -76,16 +99,16 @@ The `$compartment` special variable is a **template placeholder** that automatic
 
 ```python
 # Instead of writing repetitive code:
-.add_transition("death_S", ["S"], [], rate="d * S")
-.add_transition("death_I", ["I"], [], rate="d * I")
-.add_transition("death_R", ["R"], [], rate="d * R")
+.add_transition("outflow_A", ["A"], [], rate="mu * A")
+.add_transition("outflow_B", ["B"], [], rate="mu * B")
+.add_transition("outflow_C", ["C"], [], rate="mu * C")
 
 # Use $compartment to write it once:
 .add_transition(
-    id="death",
-    source=["S", "I", "R"],
+    id="outflow",
+    source=["A", "B", "C"],
     target=[],
-    rate="d * $compartment"  # Automatically expands
+    rate="mu * $compartment"  # Automatically expands
 )
 ```
 
@@ -97,37 +120,37 @@ The `$compartment` special variable is a **template placeholder** that automatic
 
 **Generated transitions:**
 
-- `death__S`: `rate = "d * S"`
-- `death__I`: `rate = "d * I"`
-- `death__R`: `rate = "d * R"`
+- `outflow__A`: `rate = "mu * A"`
+- `outflow__B`: `rate = "mu * B"`
+- `outflow__C`: `rate = "mu * C"`
 
 **Multiple occurrences in complex formulas:**
 
 ```python
-rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
+rate = "mu * $compartment * (1 + 0.1 * $compartment / N)"
 
 # Expands to:
-# death__S: "d * S * (1 + 0.1 * S / N)"
-# death__I: "d * I * (1 + 0.1 * I / N)"
-# death__R: "d * R * (1 + 0.1 * R / N)"
+# outflow__A: "mu * A * (1 + 0.1 * A / N)"
+# outflow__B: "mu * B * (1 + 0.1 * B / N)"
+# outflow__C: "mu * C * (1 + 0.1 * C / N)"
 ```
 
 **With stratified rates:**
 
 ```python
 .add_transition(
-    id="death",
-    source=["S", "I", "R"],
+    id="outflow",
+    source=["A", "B", "C"],
     target=[],
-    rate="d_base * $compartment",
+    rate="mu_base * $compartment",
     stratified_rates=[
         {
-            "conditions": [{"stratification": "age", "category": "young"}],
-            "rate": "d_young * $compartment"
+            "conditions": [{"stratification": "group", "category": "g1"}],
+            "rate": "mu_g1 * $compartment"
         },
         {
-            "conditions": [{"stratification": "age", "category": "old"}],
-            "rate": "d_old * $compartment"
+            "conditions": [{"stratification": "group", "category": "g2"}],
+            "rate": "mu_g2 * $compartment"
         }
     ]
 )
@@ -135,8 +158,8 @@ rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
 
 **When to use:**
 
-- Per-capita rates that apply to multiple compartments (deaths, emigration)
-- Treatment transitions from multiple disease states to recovery
+- Per-capita rates that apply to multiple compartments
+- Transitions from multiple source compartments to a single target
 - Any time you need the same formula pattern applied to different compartments
 
 **When NOT to use:**
@@ -147,16 +170,32 @@ rate = "d * $compartment * (1 + 0.1 * $compartment / N)"
 
 See [Building Models - Using $compartment Placeholder](building-models.md#using-compartment-placeholder-for-per-compartment-rates) for more details.
 
+### The `per_compartment` Flag
+
+When a model uses stratifications, base compartment names in rate expressions (like `A`, `B`) resolve to the **sum** of all their stratified versions. The `per_compartment=True` flag on a transition changes this behavior, replacing base compartment names with the specific stratified compartment name for each expanded flow:
+
+```python
+# Without per_compartment: A means total A (A_g1 + A_g2 + ...)
+.add_transition(id="forward", source=["A"], target=["B"], rate="k1 * A")
+
+# With per_compartment: A is replaced with A_g1, A_g2, etc.
+.add_transition(id="forward", source=["A"], target=["B"], rate="k1 * A", per_compartment=True)
+```
+
+Both source and target bin names are replaced. Use this for transitions where each subgroup should evolve based on its own value, not for terms that explicitly depend on the total across all subgroups.
+
+See [Building Models - Per-Compartment Rates](building-models.md#per-compartment-rates-with-per_compartment) for detailed examples.
+
 ### Parameter References
 
 Reference any parameter by its ID:
 
 ```python
-.add_parameter(id="beta", value=0.3)
-.add_parameter(id="gamma", value=0.1)
+.add_parameter(id="k1", value=0.3)
+.add_parameter(id="k2", value=0.1)
 
-.add_transition(rate="beta * S * I / N")  # Uses beta parameter
-.add_transition(rate="gamma")             # Uses gamma parameter
+.add_transition(rate="k1 * A * B / N")  # Uses k1 parameter
+.add_transition(rate="k2")              # Uses k2 parameter
 ```
 
 ## Mathematical Functions
@@ -176,8 +215,8 @@ Reference any parameter by its ID:
 **Example:**
 
 ```python
-# Seasonal variation (peaks annually)
-rate = "beta * sin(2 * pi * step / 365)"
+# Periodic variation (annual cycle)
+rate = "k1 * sin(2 * pi * step / 365)"
 ```
 
 ### Exponential and Logarithmic
@@ -194,7 +233,7 @@ rate = "beta * sin(2 * pi * step / 365)"
 
 ```python
 # Exponential decay over time
-rate = "gamma * exp(-0.01 * step)"
+rate = "k2 * exp(-0.01 * step)"
 ```
 
 ### Power and Root
@@ -209,31 +248,31 @@ rate = "gamma * exp(-0.01 * step)"
 
 ```python
 # Square root relationship
-rate = "beta * sqrt(I)"
+rate = "k1 * sqrt(B)"
 ```
 
 ### Comparison Functions
 
 | Function    | Description           | Example               |
 | ----------- | --------------------- | --------------------- |
-| `max(a, b)` | Maximum of two values | `max(0, beta - 0.01)` |
-| `min(a, b)` | Minimum of two values | `min(gamma, 0.5)`     |
-| `abs(x)`    | Absolute value        | `abs(x)`              |
+| `max(a, b)` | Maximum of two values | `max(0, k1 - 0.01)` |
+| `min(a, b)` | Minimum of two values | `min(k2, 0.5)`      |
+| `abs(x)`    | Absolute value        | `abs(x)`             |
 
 **Example:**
 
 ```python
 # Ensure rate stays positive
-rate = "max(0, beta - 0.001 * step)"
+rate = "max(0, k1 - 0.001 * step)"
 ```
 
 ### Rounding Functions
 
-| Function   | Description      | Example            |
-| ---------- | ---------------- | ------------------ |
-| `floor(x)` | Round down       | `floor(beta * I)`  |
-| `ceil(x)`  | Round up         | `ceil(gamma * I)`  |
-| `round(x)` | Round to nearest | `round(alpha * I)` |
+| Function   | Description      | Example           |
+| ---------- | ---------------- | ----------------- |
+| `floor(x)` | Round down       | `floor(k1 * B)`   |
+| `ceil(x)`  | Round up         | `ceil(k2 * B)`    |
+| `round(x)` | Round to nearest | `round(k1 * B)`   |
 
 ### Hyperbolic Functions
 
@@ -254,33 +293,33 @@ Use `step` or `t` for time-varying rates:
 rate = "0.1 + 0.001 * step"
 
 # Exponential decay
-rate = "beta * exp(-0.01 * t)"
+rate = "k1 * exp(-0.01 * t)"
 
-# Seasonal pattern (annual cycle)
-rate = "beta * (1 + 0.3 * sin(2 * pi * step / 365))"
+# Periodic pattern (annual cycle)
+rate = "k1 * (1 + 0.3 * sin(2 * pi * step / 365))"
 ```
 
 ### Population-Dependent Rates
 
 ```python
-# Standard mass action
-rate = "beta * S * I"
+# Mass action
+rate = "k1 * A * B"
 
-# Frequency-dependent (normalized by population)
-rate = "beta * S * I / N"
+# Frequency-dependent (normalized by total population)
+rate = "k1 * A * B / N"
 
 # Saturation effect
-rate = "beta * I / (1 + I)"
+rate = "k1 * B / (1 + B)"
 ```
 
 ### Threshold Effects
 
 ```python
 # Activate when condition is met
-rate = "max(0, beta) * (I > 100)"  # Only when I > 100
+rate = "max(0, k1) * (B > 100)"  # Only when B > 100
 
-# Reduce transmission above threshold
-rate = "beta * min(1, 100 / I)"    # Reduces when I > 100
+# Reduce flow above threshold
+rate = "k1 * min(1, 100 / B)"   # Reduces when B > 100
 ```
 
 ### Composite Expressions
@@ -288,11 +327,11 @@ rate = "beta * min(1, 100 / I)"    # Reduces when I > 100
 Combine multiple effects:
 
 ```python
-# Seasonal transmission with saturation
-rate = "beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / (N + I)"
+# Periodic flow with saturation
+rate = "k1 * (1 + 0.3 * sin(2 * pi * t / 365)) * A * B / (N + B)"
 
-# Time-varying intervention
-rate = "beta * max(0.2, 1 - 0.01 * step) * S * I / N"
+# Time-varying rate with minimum
+rate = "k1 * max(0.2, 1 - 0.01 * step) * A * B / N"
 ```
 
 ## Operator Precedence
@@ -318,47 +357,47 @@ rate = "2 * 3 ** 4"       # = 162 (exponentiation before multiplication)
 ### 1. Use Meaningful Parameters
 
 ```python
-# Good: Clear parameter names
-.add_parameter(id="beta", value=0.3)
-rate = "beta * S * I / N"
+# Good: Named parameters
+.add_parameter(id="k1", value=0.3)
+rate = "k1 * A * B / N"
 
 # Avoid: Magic numbers
-rate = "0.3 * S * I / N"
+rate = "0.3 * A * B / N"
 ```
 
 ### 2. Prevent Division by Zero
 
 ```python
 # Good: Add small constant
-rate = "beta * I / (N + 1)"
+rate = "k1 * B / (N + 1)"
 
 # Good: Use max
-rate = "beta * I / max(N, 1)"
+rate = "k1 * B / max(N, 1)"
 ```
 
 ### 3. Keep Expressions Simple
 
 ```python
 # Good: Simple and readable
-rate = "beta * S * I / N"
+rate = "k1 * A * B / N"
 
 # Acceptable but complex:
-rate = "beta * (1 + 0.3 * sin(2 * pi * t / 365)) * S * I / N"
+rate = "k1 * (1 + 0.3 * sin(2 * pi * t / 365)) * A * B / N"
 
 # Better: Split into parameters
-.add_parameter(id="seasonal_beta", value="beta * (1 + 0.3 * sin(2 * pi * t / 365))")
-rate = "seasonal_beta * S * I / N"
+.add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * t / 365))")
+rate = "k1_periodic * A * B / N"
 ```
 
 ### 4. Document Complex Expressions
 
 ```python
 .add_transition(
-    id="seasonal_infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * (1 + 0.3 * sin(2 * pi * step / 365)) * S * I / N",
-    description="Infection with 30% seasonal amplitude, annual cycle"
+    id="periodic_flow",
+    source=["A"],
+    target=["B"],
+    rate="k1 * (1 + 0.3 * sin(2 * pi * step / 365)) * A * B / N",
+    description="Flow with 30% periodic amplitude, annual cycle"
 )
 ```
 
@@ -369,9 +408,9 @@ Commol validates all expressions for security:
 ### Safe Operations
 
 ```python
-rate = "beta * S * I / N"                    # Mathematical operations
+rate = "k1 * A * B / N"                      # Mathematical operations
 rate = "sin(2 * pi * t)"                     # Mathematical functions
-rate = "max(0, gamma - 0.01 * step)"        # Built-in functions
+rate = "max(0, k2 - 0.01 * step)"           # Built-in functions
 ```
 
 ### Blocked Operations
@@ -394,10 +433,10 @@ The parser:
 
 ### Expression Complexity
 
-- **Fast**: `"gamma"` (parameter lookup)
-- **Fast**: `"beta * I"` (simple arithmetic)
-- **Medium**: `"beta * S * I / N"` (multiple operations)
-- **Slower**: `"beta * exp(-0.01 * step) * sin(2 * pi * t / 365)"` (functions + operations)
+- **Fast**: `"k2"` (parameter lookup)
+- **Fast**: `"k1 * B"` (simple arithmetic)
+- **Medium**: `"k1 * A * B / N"` (multiple operations)
+- **Slower**: `"k1 * exp(-0.01 * step) * sin(2 * pi * t / 365)"` (functions + operations)
 
 ### Optimization Tips
 
@@ -405,21 +444,21 @@ The parser:
 
    ```python
    # Slower: recalculates each step
-   rate = "0.3 * S * I / 1000"
+   rate = "0.3 * A * B / 1000"
 
    # Faster: parameter lookup
-   .add_parameter(id="beta", value=0.3)
-   rate = "beta * S * I / N"
+   .add_parameter(id="k1", value=0.3)
+   rate = "k1 * A * B / N"
    ```
 
 2. **Simplify when possible**:
 
    ```python
    # Complex
-   rate = "beta * I / N + gamma * I / N"
+   rate = "k1 * B / N + k2 * B / N"
 
    # Simplified
-   rate = "(beta + gamma) * I / N"
+   rate = "(k1 + k2) * B / N"
    ```
 
 3. **Profile complex models**: Use `time` module to measure performance with different expressions.
@@ -439,15 +478,18 @@ The parser:
 
 ### All Available Variables
 
-| Variable           | Type  | Description                  |
-| ------------------ | ----- | ---------------------------- |
-| **Disease states** | float | Any state ID (S, I, R, etc.) |
-| **Parameters**     | float | Any parameter ID             |
-| `N`                | float | Total population             |
-| `step`             | int   | Current time step            |
-| `t`                | int   | Alias for step               |
-| `pi`               | float | π constant                   |
-| `e`                | float | e constant                   |
+| Variable                    | Type  | Description                                                            |
+| --------------------------- | ----- | ---------------------------------------------------------------------- |
+| **Compartments**            | float | Any full compartment name (e.g., `S`, `S_young`, `S_young_urban`)      |
+| **Parameters**              | float | Any parameter ID                                                       |
+| `N`                         | float | Total population                                                       |
+| `N_{cat}`, `N_{cat1_cat2}`  | float | Subpopulation totals by category (e.g., `N_young`, `N_young_urban`)    |
+| `{bin}`                     | float | Base bin total (e.g., `S` = sum of all `S_*` when stratified)          |
+| `{bin}_{cat}`               | float | Partial bin sum (e.g., `S_young`); requires 2+ stratifications         |
+| `step`                      | int   | Current time step                                                      |
+| `t`                         | int   | Alias for step                                                         |
+| `pi`                        | float | π constant                                                             |
+| `e`                         | float | e constant                                                             |
 
 ### All Operators
 
@@ -460,8 +502,33 @@ The parser:
 | `**`     | Exponentiation |
 | `()`     | Grouping       |
 
+## Time-Pattern Helpers
+
+For rate expressions that vary with the simulation step — single pulses,
+periodic events, sinusoidal seasonal forcing, sliding windows, Gaussian
+bumps, linear ramps, or arbitrary compositions — Commol provides the
+`TimePattern` class. It produces parenthesised, security-validated formula
+strings that compose safely with the rest of the expression vocabulary,
+and `add_transition` accepts a `TimePattern` directly via `rate=`:
+
+```python
+from commol import TimePattern
+
+rate = TimePattern.combine(
+    TimePattern.pulse(at=0, amount=0.3),
+    TimePattern.periodic(period=30, amount=0.05),
+    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+)
+builder.add_transition("flow", ["A"], ["B"], rate=rate)
+```
+
+`TimePattern` is the sole user-facing class — multi-group schedules are
+built by chaining `TimePattern.add_group(...)` calls. See
+[Time Patterns](time-patterns.md) for the full catalogue.
+
 ## Next Steps
 
 - [Building Models](building-models.md) - Use expressions in transitions
+- [Time Patterns](time-patterns.md) - Time-varying rate helpers
 - [Simulations](simulations.md) - Run models with mathematical expressions
 - [Examples](examples.md) - See complex expressions in complete models

@@ -67,6 +67,14 @@ pub trait SimulationEngine: Clone {
     /// For a stratified model: `vec!["S_child", "S_adult", "I_child", "I_adult", ...]`
     fn compartments(&self) -> Vec<String>;
 
+    /// Get the names of all simulation output columns.
+    ///
+    /// By default this is the same as `compartments()`. Engines with tracked
+    /// non-population outputs, such as accumulators, should append those names here.
+    fn output_names(&self) -> Vec<String> {
+        self.compartments()
+    }
+
     /// Get the current population state across all compartments.
     ///
     /// Returns a vector where `result[i]` is the population in compartment `i`,
@@ -151,6 +159,33 @@ pub trait SimulationEngine: Clone {
         let results = self.run(num_steps)?;
         buffer.clear();
         buffer.extend(results);
+        Ok(())
+    }
+
+    /// Run the simulation through the largest requested step, recording only
+    /// selected time steps into a reusable buffer.
+    ///
+    /// `time_steps` must be sorted in ascending order and contain unique values.
+    /// The output rows are aligned with `time_steps`, not with absolute time.
+    fn run_at_steps_into_buffer(
+        &mut self,
+        time_steps: &[u32],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        let Some(&max_step) = time_steps.last() else {
+            buffer.clear();
+            return Ok(());
+        };
+
+        let results = self.run(max_step)?;
+        buffer.clear();
+        buffer.reserve(time_steps.len());
+        for &step in time_steps {
+            let row = results
+                .get(step as usize)
+                .ok_or_else(|| format!("Missing simulation result for step {}", step))?;
+            buffer.push(row.clone());
+        }
         Ok(())
     }
 

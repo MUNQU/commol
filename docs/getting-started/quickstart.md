@@ -2,39 +2,39 @@
 
 This guide will help you build and run your first compartment model with Commol.
 
-## Your First SIR Model
+## Your First Compartment Model
 
-Let's create a basic SIR (Susceptible-Infected-Recovered) model:
+Let's create a basic 3-compartment model where entities flow from state A through B into C:
 
 ```python
 from commol import ModelBuilder, Simulation
 
 # Build the model
 model = (
-    ModelBuilder(name="Basic SIR", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.3)   # Transmission rate
-    .add_parameter(id="gamma", value=0.1)  # Recovery rate
+    ModelBuilder(name="Basic Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)   # Rate of A→B transition
+    .add_parameter(id="k2", value=0.1)   # Rate of B→C transition
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"  # Mathematical formula
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"  # Mathematical formula
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
@@ -45,9 +45,9 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 
 # Display results
-print(f"Susceptible at day 100: {results['S'][-1]:.0f}")
-print(f"Infected at day 100: {results['I'][-1]:.0f}")
-print(f"Recovered at day 100: {results['R'][-1]:.0f}")
+print(f"State A at step 100: {results['A'][-1]:.0f}")
+print(f"State B at step 100: {results['B'][-1]:.0f}")
+print(f"State C at step 100: {results['C'][-1]:.0f}")
 ```
 
 ## Understanding the Code
@@ -61,21 +61,21 @@ from commol import ModelBuilder, Simulation
 - `ModelBuilder`: Fluent API for constructing models
 - `Simulation`: Runs the model simulation
 
-### 2. Define Disease States
+### 2. Define Compartments
 
 ```python
-.add_bin(id="S", name="Susceptible")
-.add_bin(id="I", name="Infected")
-.add_bin(id="R", name="Recovered")
+.add_bin(id="A", name="State A")
+.add_bin(id="B", name="State B")
+.add_bin(id="C", name="State C")
 ```
 
-Disease states represent compartments in your model.
+Compartments (also called bins or states) represent the different states in your model.
 
 ### 3. Add Parameters
 
 ```python
-.add_parameter(id="beta", value=0.3)   # Transmission rate
-.add_parameter(id="gamma", value=0.1)  # Recovery rate
+.add_parameter(id="k1", value=0.3)   # Rate for A→B
+.add_parameter(id="k2", value=0.1)   # Rate for B→C
 ```
 
 Parameters are constants used in transition rate formulas.
@@ -84,10 +84,10 @@ Parameters are constants used in transition rate formulas.
 
 ```python
 .add_transition(
-    id="infection",
-    source=["S"],
-    target=["I"],
-    rate="beta * S * I / N"
+    id="t_ab",
+    source=["A"],
+    target=["B"],
+    rate="k1 * A * B / N"
 )
 ```
 
@@ -98,7 +98,11 @@ Transitions move populations between states using mathematical formulas.
 ```python
 .set_initial_conditions(
     population_size=1000,
-    bin_fractions={"S": 0.99, "I": 0.01, "R": 0.0}
+    bin_fractions=[
+        {"bin": "A", "fraction": 0.99},
+        {"bin": "B", "fraction": 0.01},
+        {"bin": "C", "fraction": 0.0}
+    ]
 )
 ```
 
@@ -118,30 +122,30 @@ Improve model safety by adding units to your parameters:
 
 ```python
 model = (
-    ModelBuilder(name="SIR with Units", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=0.5, unit="1/day")    # Rate per day
-    .add_parameter(id="gamma", value=0.1, unit="1/day")   # Rate per day
+    ModelBuilder(name="Model with Units", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3, unit="1/step")
+    .add_parameter(id="k2", value=0.1, unit="1/step")
     .add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / N"
+        id="t_ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / N"
     )
     .add_transition(
-        id="recovery",
-        source=["I"],
-        target=["R"],
-        rate="gamma * I"
+        id="t_bc",
+        source=["B"],
+        target=["C"],
+        rate="k2 * B"
     )
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
@@ -153,7 +157,7 @@ model.check_unit_consistency()
 
 **Benefits**:
 
-- Catches unit errors before simulation (e.g., mixing days and weeks)
+- Catches unit errors before simulation (e.g., mixing different time scales)
 - Validates mathematical functions receive correct dimensional arguments
 - Documents the physical meaning of parameters
 
@@ -177,31 +181,31 @@ from commol import (
 
 # Build model with unknown parameters
 calibration_model = (
-    ModelBuilder(name="SIR Calibration", version="1.0")
-    .add_bin(id="S", name="Susceptible")
-    .add_bin(id="I", name="Infected")
-    .add_bin(id="R", name="Recovered")
-    .add_parameter(id="beta", value=None)   # To be calibrated
-    .add_parameter(id="gamma", value=None)  # To be calibrated
-    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
-    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+    ModelBuilder(name="Calibration Model", version="1.0")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=None)   # To be calibrated
+    .add_parameter(id="k2", value=None)   # To be calibrated
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     )
     .build(typology="DifferenceEquations")
 )
 
-# Observed infected counts at different time steps
+# Observed values of compartment B at different time steps
 observed_data = [
-    ObservedDataPoint(step=10, compartment="I", value=45.2),
-    ObservedDataPoint(step=20, compartment="I", value=78.5),
-    ObservedDataPoint(step=30, compartment="I", value=62.3),
-    ObservedDataPoint(step=40, compartment="I", value=38.1),
+    ObservedDataPoint(step=10, compartment="B", value=45.2),
+    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(step=30, compartment="B", value=62.3),
+    ObservedDataPoint(step=40, compartment="B", value=38.1),
 ]
 
 # Create simulation (allowed with None values for calibration)
@@ -210,14 +214,14 @@ cal_simulation = Simulation(calibration_model)
 # Define parameters to calibrate with bounds and initial guesses
 parameters = [
     CalibrationParameter(
-        id="beta",
+        id="k1",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
         initial_guess=0.3
     ),
     CalibrationParameter(
-        id="gamma",
+        id="k2",
         parameter_type="parameter",
         min_bound=0.0,
         max_bound=1.0,
@@ -242,8 +246,8 @@ calibrator = Calibrator(cal_simulation, problem)
 result = calibrator.run()
 
 # Display and apply calibrated parameters
-print(f"Calibrated beta: {result.best_parameters['beta']:.4f}")
-print(f"Calibrated gamma: {result.best_parameters['gamma']:.4f}")
+print(f"Calibrated k1: {result.best_parameters['k1']:.4f}")
+print(f"Calibrated k2: {result.best_parameters['k2']:.4f}")
 print(f"Final loss: {result.final_loss:.6f}")
 
 # Update model with calibrated values
@@ -256,7 +260,7 @@ final_results = final_sim.run(num_steps=100)
 
 **Key concepts**:
 
-- `ObservedDataPoint`: Real-world measurements to fit against
+- `ObservedDataPoint`: Measurements to fit against
 - `CalibrationParameter`: Parameters to optimize with bounds
 - `loss_function`: How to measure fit quality ("sse", "rmse", "mae", etc.)
 - `optimization_config`: Optimization algorithm (ParticleSwarmConfig or NelderMeadConfig)

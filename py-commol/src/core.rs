@@ -1,4 +1,4 @@
-//! Python bindings for epimodel-core types.
+//! Python bindings for commol-core types.
 //!
 //! This module provides Python-accessible wrappers around core Rust types.
 
@@ -6,8 +6,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 
 /// Type alias for stratified rates: Vec<(conditions, rate_expression)>
-/// where conditions is Vec<(stratification_name, category_value)>
-type StratifiedRatesInput = Vec<(Vec<(String, String)>, String)>;
+/// where conditions is Vec<(stratification_name, category_value, optional_to_category)>
+type StratifiedRatesInput = Vec<(Vec<(String, String, Option<String>)>, String)>;
 
 /// Wrapper for commol_core::Model
 #[pyclass(name = "Model")]
@@ -91,16 +91,22 @@ pub struct PyPopulation {
 #[pymethods]
 impl PyPopulation {
     #[new]
-    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None))]
+    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None, accumulators=None))]
     fn new(
         bins: Vec<PyBin>,
         stratifications: Vec<PyStratification>,
         initial_conditions: PyInitialConditions,
         transitions: Option<Vec<PyTransition>>,
+        accumulators: Option<Vec<PyAccumulator>>,
     ) -> Self {
         Self {
             inner: commol_core::Population {
                 bins: bins.into_iter().map(|ds| ds.inner).collect(),
+                accumulators: accumulators
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|accumulator| accumulator.inner)
+                    .collect(),
                 stratifications: stratifications.into_iter().map(|s| s.inner).collect(),
                 transitions: transitions
                     .unwrap_or_default()
@@ -108,6 +114,27 @@ impl PyPopulation {
                     .map(|t| t.inner)
                     .collect(),
                 initial_conditions: initial_conditions.inner,
+            },
+        }
+    }
+}
+
+/// Wrapper for commol_core::Accumulator
+#[pyclass(name = "Accumulator")]
+#[derive(Clone)]
+pub struct PyAccumulator {
+    pub inner: commol_core::types::Accumulator,
+}
+
+#[pymethods]
+impl PyAccumulator {
+    #[new]
+    #[pyo3(signature = (id, name=None))]
+    fn new(id: String, name: Option<String>) -> Self {
+        Self {
+            inner: commol_core::types::Accumulator {
+                id: id.clone(),
+                name: name.unwrap_or(id),
             },
         }
     }
@@ -146,7 +173,11 @@ impl PyStratification {
     #[new]
     fn new(id: String, categories: Vec<String>) -> Self {
         Self {
-            inner: commol_core::Stratification { id, categories },
+            inner: commol_core::Stratification {
+                id,
+                categories,
+                conditions: None,
+            },
         }
     }
 }
@@ -244,13 +275,15 @@ pub struct PyTransition {
 #[pymethods]
 impl PyTransition {
     #[new]
-    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None))]
+    #[pyo3(signature = (id, source, target, rate=None, stratified_rates=None, per_compartment=None, accumulators=None))]
     fn new(
         id: String,
         source: Vec<String>,
         target: Vec<String>,
         rate: Option<String>,
         stratified_rates: Option<StratifiedRatesInput>,
+        per_compartment: Option<bool>,
+        accumulators: Option<Vec<String>>,
     ) -> Self {
         let rate = rate.map(commol_core::RateMathExpression::from_string);
 
@@ -260,14 +293,16 @@ impl PyTransition {
                 .map(|(conditions, rate_str)| commol_core::StratifiedRate {
                     conditions: conditions
                         .into_iter()
-                        .map(
-                            |(stratification, category)| commol_core::StratificationCondition {
+                        .map(|(stratification, category, to)| {
+                            commol_core::StratificationCondition {
                                 stratification,
-                                category,
-                            },
-                        )
+                                category: Some(category),
+                                to,
+                            }
+                        })
                         .collect(),
                     rate: rate_str,
+                    absolute: None,
                 })
                 .collect()
         });
@@ -277,9 +312,11 @@ impl PyTransition {
                 id,
                 source,
                 target,
+                accumulators: accumulators.unwrap_or_default(),
                 rate,
                 stratified_rates,
                 condition: None,
+                per_compartment,
             },
         }
     }
@@ -315,6 +352,9 @@ impl PyParameter {
         let value_str = match &self.inner.value {
             Some(commol_core::ParameterValue::Constant(v)) => format!("{}", v),
             Some(commol_core::ParameterValue::Formula(f)) => format!("'{}'", f),
+            Some(commol_core::ParameterValue::TimeSeries { data, mode }) => {
+                format!("TimeSeries(len={}, mode={:?})", data.len(), mode)
+            }
             None => "None".to_string(),
         };
         format!("Parameter(id='{}', value={})", self.inner.id, value_str)
@@ -362,6 +402,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModel>()?;
     m.add_class::<PyPopulation>()?;
     m.add_class::<PyBin>()?;
+    m.add_class::<PyAccumulator>()?;
     m.add_class::<PyStratification>()?;
     m.add_class::<PyInitialConditions>()?;
     m.add_class::<PyDynamics>()?;

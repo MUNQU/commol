@@ -8,7 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import silhouette_score
 
 from commol.commol_rs import _commol_rs as commol_rs
@@ -50,6 +50,12 @@ class EvaluationProcessor:
         Maximum iterations for K-means clustering
     kmeans_algorithm : str
         K-means algorithm to use
+    max_k : int
+        Maximum K tested during automatic silhouette search
+    silhouette_sample_size : int | None
+        Deterministic sample size for silhouette scoring
+    minibatch_kmeans_threshold : int | None
+        Use MiniBatchKMeans at or above this evaluation count
     """
 
     def __init__(
@@ -62,6 +68,9 @@ class EvaluationProcessor:
         silhouette_excellent_threshold: float = 0.7,
         kmeans_max_iter: int = 100,
         kmeans_algorithm: str = "elkan",
+        max_k: int = 10,
+        silhouette_sample_size: int | None = None,
+        minibatch_kmeans_threshold: int | None = None,
     ):
         self.deduplication_tolerance = deduplication_tolerance
         self.seed = seed
@@ -71,6 +80,30 @@ class EvaluationProcessor:
         self.silhouette_excellent_threshold = silhouette_excellent_threshold
         self.kmeans_max_iter = kmeans_max_iter
         self.kmeans_algorithm = kmeans_algorithm
+        self.max_k = max_k
+        self.silhouette_sample_size = silhouette_sample_size
+        self.minibatch_kmeans_threshold = minibatch_kmeans_threshold
+
+    def _build_kmeans(self, k: int, n_evaluations: int):
+        if (
+            self.minibatch_kmeans_threshold is not None
+            and k >= 1
+            and n_evaluations >= self.minibatch_kmeans_threshold
+        ):
+            return MiniBatchKMeans(
+                n_clusters=k,
+                random_state=self.seed,
+                n_init="auto",
+                max_iter=self.kmeans_max_iter,
+            )
+
+        return KMeans(
+            n_clusters=k,
+            random_state=self.seed,
+            n_init="auto",
+            max_iter=self.kmeans_max_iter,
+            algorithm=self.kmeans_algorithm,
+        )
 
     def collect_evaluations(
         self, results: list["CalibrationResultWithHistoryProtocol"]
@@ -90,11 +123,14 @@ class EvaluationProcessor:
         evaluations: list[CalibrationEvaluation] = []
 
         for idx, result in enumerate(results):
+            result_evaluations = (
+                list(result.evaluations) if hasattr(result, "evaluations") else []
+            )
             # Collect ALL evaluations from this run, not just the best one
             # This gives us a diverse set of parameter combinations explored during
             # optimization
-            if hasattr(result, "evaluations") and len(result.evaluations) > 0:
-                for eval_obj in result.evaluations:
+            if result_evaluations:
+                for eval_obj in result_evaluations:
                     evaluations.append(
                         CalibrationEvaluation(
                             parameters=list(eval_obj.parameters),
@@ -103,7 +139,7 @@ class EvaluationProcessor:
                         )
                     )
                 logger.debug(
-                    f"Run {idx + 1}: collected {len(result.evaluations)} evaluations, "
+                    f"Run {idx + 1}: collected {len(result_evaluations)} evaluations, "
                     f"best loss={result.final_loss:.6f}"
                 )
             else:
@@ -203,7 +239,107 @@ class EvaluationProcessor:
         # Return the best N%
         return sorted_evaluations[:n_to_keep]
 
-    def find_optimal_k(self, evaluations: list[CalibrationEvaluation]) -> int:
+    @staticmethod
+    def filter_by_relative_loss(
+        evaluations: list[CalibrationEvaluation],
+        max_loss_ratio: float | None,
+    ) -> list[CalibrationEvaluation]:
+        """Keep evaluations whose loss is plausibly close to the best fit.
+
+        Percentile filtering limits candidate count, but it does not guarantee
+        that retained candidates explain the observations. This gate is applied
+        after percentile filtering so uncertainty candidates remain calibrated
+        solutions rather than merely diverse optimizer states.
+        """
+        if not evaluations or max_loss_ratio is None:
+            return evaluations
+
+        best_loss = min(evaluation.loss for evaluation in evaluations)
+        # The epsilon term keeps the gate meaningful when the best loss is zero:
+        # a purely multiplicative threshold would then admit only exact zeros.
+        threshold = best_loss * max_loss_ratio + np.finfo(float).eps
+        return [
+            evaluation for evaluation in evaluations if evaluation.loss <= threshold
+        ]
+
+    @staticmethod
+    def select_prediction_novel_candidates(
+        selected_indices: list[int],
+        candidate_indices: list[int],
+        feature_vectors: np.ndarray,
+        max_candidates: int,
+    ) -> list[int]:
+        """Select tail candidates that maximize prediction-space novelty.
+
+        This is a deterministic farthest-point selector over the same feature
+        coordinates used for clustering. It is intended for controlled admission
+        of wider-loss candidates: candidates are considered only after they have
+        passed an explicit loss gate, and are retained only when they add new
+        observed-prediction shapes relative to the already selected core.
+        """
+        if max_candidates <= 0 or not candidate_indices:
+            return []
+
+        vectors = np.asarray(feature_vectors, dtype=float)
+        if vectors.ndim != 2:
+            raise ValueError("feature_vectors must be a two-dimensional array")
+        if vectors.shape[1] == 0:
+            raise ValueError("feature_vectors must contain at least one feature")
+
+        all_indices = selected_indices + candidate_indices
+        if any(index < 0 or index >= vectors.shape[0] for index in all_indices):
+            raise ValueError("selected_indices and candidate_indices must be in range")
+
+        selected = list(dict.fromkeys(selected_indices))
+        remaining = list(dict.fromkeys(candidate_indices))
+        chosen: list[int] = []
+
+        while remaining and len(chosen) < max_candidates:
+            scores = EvaluationProcessor._prediction_novelty_scores(
+                vectors, selected, remaining
+            )
+            next_index = max(
+                remaining,
+                key=lambda index: (scores[index], -index),
+            )
+            chosen.append(next_index)
+            selected.append(next_index)
+            remaining.remove(next_index)
+
+        return chosen
+
+    @staticmethod
+    def _prediction_novelty_scores(
+        vectors: np.ndarray,
+        selected: list[int],
+        remaining: list[int],
+    ) -> dict[int, float]:
+        """Score each remaining candidate by its distance to the selected core.
+
+        With a non-empty core the score is the squared distance to the nearest
+        selected member (farthest-point novelty). With no core yet, candidates
+        are scored by distance to the remaining candidates' centroid so the
+        first pick starts from the prediction-space edge.
+        """
+        if selected:
+            selected_vectors = vectors[selected]
+            return {
+                index: float(
+                    np.min(np.sum((selected_vectors - vectors[index]) ** 2, axis=1))
+                )
+                for index in remaining
+            }
+        centroid = np.mean(vectors[remaining], axis=0)
+        return {
+            index: float(np.sum((vectors[index] - centroid) ** 2))
+            for index in remaining
+        }
+
+    def find_optimal_k(
+        self,
+        evaluations: list[CalibrationEvaluation],
+        feature_vectors: np.ndarray | None = None,
+    ) -> int:
         """Automatically determine optimal number of clusters using silhouette analysis.
 
         Returns 1 if there's no clear clustering structure (all solutions are similar),
@@ -229,13 +365,10 @@ class EvaluationProcessor:
             )
             return 1
 
-        # Extract parameter vectors
-        param_vectors = np.array([e.parameters for e in evaluations])
+        vectors = self._feature_vectors(evaluations, feature_vectors)
 
         # Check if all solutions are essentially identical (no variance)
-        if np.allclose(
-            param_vectors.std(axis=0), 0, atol=self.identical_solutions_atol
-        ):
+        if np.allclose(vectors.std(axis=0), 0, atol=self.identical_solutions_atol):
             logger.info("All solutions are identical, using single cluster")
             return 1
 
@@ -243,7 +376,7 @@ class EvaluationProcessor:
         # Use a more conservative upper bound to reduce computation
         # Test K values up to sqrt(n)/2 or 10, whichever is smaller
         min_k = 2
-        max_k = min(max(2, int(np.sqrt(n_evaluations)) // 2), 10)
+        max_k = min(max(2, int(np.sqrt(n_evaluations)) // 2), self.max_k)
 
         # If we can't test multiple K values, return 1 cluster
         if min_k > max_k or n_evaluations < 2 * min_k:
@@ -259,20 +392,24 @@ class EvaluationProcessor:
 
         for k in k_range:
             try:
-                kmeans = KMeans(
-                    n_clusters=k,
-                    random_state=self.seed,
-                    n_init="auto",
-                    max_iter=self.kmeans_max_iter,
-                    algorithm=self.kmeans_algorithm,
-                )
-                labels = kmeans.fit_predict(param_vectors)
+                kmeans = self._build_kmeans(k, n_evaluations)
+                labels = kmeans.fit_predict(vectors)
 
                 # Silhouette score requires at least 2 clusters with samples
                 if len(np.unique(labels)) < 2:
                     silhouette_scores[k] = -1.0
                 else:
-                    score = silhouette_score(param_vectors, labels)
+                    sample_size = (
+                        min(self.silhouette_sample_size, n_evaluations)
+                        if self.silhouette_sample_size is not None
+                        else None
+                    )
+                    score = silhouette_score(
+                        vectors,
+                        labels,
+                        sample_size=sample_size,
+                        random_state=self.seed,
+                    )
                     silhouette_scores[k] = score
 
                     # Early stopping if excellent clustering found
@@ -313,6 +450,7 @@ class EvaluationProcessor:
         self,
         evaluations: list[CalibrationEvaluation],
         k: int,
+        feature_vectors: np.ndarray | None = None,
     ) -> list[int]:
         """Cluster evaluations using K-means.
 
@@ -335,12 +473,36 @@ class EvaluationProcessor:
             logger.info("Single cluster: all evaluations grouped together")
             return [0] * len(evaluations)
 
-        param_vectors = np.array([e.parameters for e in evaluations])
+        vectors = self._feature_vectors(evaluations, feature_vectors)
 
-        kmeans = KMeans(n_clusters=k, random_state=self.seed, n_init="auto")
-        labels = kmeans.fit_predict(param_vectors)
+        kmeans = self._build_kmeans(k, len(evaluations))
+        labels = kmeans.fit_predict(vectors)
 
         return list(labels)
+
+    @staticmethod
+    def _feature_vectors(
+        evaluations: list[CalibrationEvaluation],
+        feature_vectors: np.ndarray | None,
+    ) -> np.ndarray:
+        """Return validated feature vectors for clustering.
+
+        Clustering runs in parameter space when no vectors are supplied. Callers
+        may instead provide standardized transformed prediction vectors to
+        cluster by the shape of the predicted series.
+        """
+        if feature_vectors is None:
+            return np.array([evaluation.parameters for evaluation in evaluations])
+
+        vectors = np.asarray(feature_vectors, dtype=float)
+        if vectors.ndim != 2 or vectors.shape[0] != len(evaluations):
+            raise ValueError(
+                "feature_vectors must be a two-dimensional array with one row per "
+                "calibration evaluation"
+            )
+        if vectors.shape[1] == 0:
+            raise ValueError("feature_vectors must contain at least one feature")
+        return vectors
 
     def select_representatives(
         self,
@@ -355,6 +517,7 @@ class EvaluationProcessor:
         k_neighbors_max: int,
         sparsity_weight: float,
         stratum_fit_weight: float,
+        feature_vectors: np.ndarray | None = None,
     ) -> list[int]:
         """Select representative evaluations from clusters using Rust.
 
@@ -383,20 +546,29 @@ class EvaluationProcessor:
             Exponential weight for sparsity in density-aware selection
         stratum_fit_weight : float
             Weight for stratum fit quality vs diversity in Latin hypercube
+        feature_vectors : np.ndarray | None
+            Optional vectors used by the diversity selector. When supplied,
+            these must have one row per evaluation and replace raw parameter
+            vectors for representative-space distances.
 
         Returns
         -------
         list[int]
             Indices of selected representative evaluations
         """
-        # Convert to Rust types
+        vectors = self._feature_vectors(evaluations, feature_vectors)
+
+        # The Rust selector uses CalibrationEvaluation.parameters as its
+        # diversity coordinates. Substitute the supplied prediction features
+        # while retaining loss and row order, so returned indices still refer
+        # to the original calibration evaluations.
         rust_evaluations = [
             commol_rs.calibration.CalibrationEvaluation(
-                parameters=e.parameters,
+                parameters=vector.tolist(),
                 loss=e.loss,
                 predictions=e.predictions or [],
             )
-            for e in evaluations
+            for e, vector in zip(evaluations, vectors)
         ]
 
         return commol_rs.calibration.select_cluster_representatives(

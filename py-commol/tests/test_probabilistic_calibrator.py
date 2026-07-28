@@ -1,94 +1,80 @@
-import math
-from typing import Literal
+"""Integration tests for probabilistic calibration selection backends."""
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
-    Calibrator,
-    Model,
     ModelBuilder,
-    NelderMeadConfig,
     ObservedDataPoint,
     ParticleSwarmConfig,
-    Simulation,
 )
+from commol.api.calibrator import Calibrator
+from commol.api.simulation import Simulation
 from commol.constants import ModelTypes
 from commol.context.probabilistic_calibration import (
-    ProbabilisticCalibrationConfig,
     ProbClusteringConfig,
-    ProbEnsembleConfig,
     ProbEvaluationFilterConfig,
+    ProbGreedyLocalSearchConfig,
+    ProbNsga2Config,
+    ProbabilisticCalibrationConfig,
     ProbRepresentativeConfig,
 )
 
 SEED = 42
 
 
-class TestProbabilisticCalibrator:
-    @pytest.fixture(scope="class")
-    def model(self) -> Model:
-        """Create a simple SIR model for testing."""
-        builder = (
-            ModelBuilder(name="Test SIR", version="1.0")
-            .add_bin(id="S", name="Susceptible")
-            .add_bin(id="I", name="Infected")
-            .add_bin(id="R", name="Recovered")
-            .add_parameter(id="beta", value=0.3)
-            .add_parameter(id="gamma", value=0.1)
-            .add_transition(
-                id="infection",
-                source=["S"],
-                target=["I"],
-                rate="beta * S * I / N",
-            )
-            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "S", "fraction": 0.99},
-                    {"bin": "I", "fraction": 0.01},
-                    {"bin": "R", "fraction": 0.0},
-                ],
-            )
+@pytest.fixture(scope="module")
+def model():
+    return (
+        ModelBuilder(name="Test SIR", version="1.0")
+        .add_bin(id="S", name="Susceptible")
+        .add_bin(id="I", name="Infected")
+        .add_bin(id="R", name="Recovered")
+        .add_parameter(id="beta", value=0.3)
+        .add_parameter(id="gamma", value=0.1)
+        .add_transition(
+            id="infection",
+            source=["S"],
+            target=["I"],
+            rate="beta * S * I / N",
         )
-        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "S", "fraction": 0.99},
+                {"bin": "I", "fraction": 0.01},
+                {"bin": "R", "fraction": 0.0},
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
 
-    def test_probabilistic_calibration_with_pso(self, model: Model):
-        """
-        Test probabilistic calibration by perturbing model output and recovering
-        parameters with PSO optimization algorithm.
 
-        This test:
-        1. Runs the model with known parameters (beta=0.3, gamma=0.1)
-        2. Adds Gaussian noise to the Infected compartment trajectory
-        3. Uses probabilistic calibration (PSO) to recover the original parameters
-        4. Verifies that the true parameters fall within the confidence intervals
-        """
-        # Generate true values with known parameters
-        true_beta = 0.3
-        true_gamma = 0.1
-
-        simulation = Simulation(model)
-        true_results = simulation.run(50, output_format="dict_of_lists")
-
-        # Add Gaussian noise to create "observed" data
-        np.random.seed(SEED)
-        noise_std = 5.0  # Standard deviation of measurement noise
-
-        observed_data = []
-        for i in range(0, 50):
-            true_value = true_results["I"][i]
-            noisy_value = true_value + np.random.normal(0, noise_std)
-            noisy_value = max(0.0, noisy_value)
-            observed_data.append(
-                ObservedDataPoint(step=i, compartment="I", value=noisy_value)
-            )
-
-        # Define calibration parameters
-        parameters = [
+def _problem(
+    model,
+    ensemble_selection: ProbNsga2Config | ProbGreedyLocalSearchConfig | None = None,
+    *,
+    loss_function: str = "sse",
+    feature_space: str = "observed_predictions",
+) -> CalibrationProblem:
+    simulation = Simulation(model)
+    true_results = simulation.run(30, output_format="dict_of_lists")
+    noise = np.random.default_rng(SEED).normal(0.0, 3.0, size=30)
+    observations = [
+        ObservedDataPoint(
+            step=step,
+            compartment="I",
+            value=max(0.0, true_results["I"][step] + noise[step]),
+        )
+        for step in range(30)
+    ]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[
             CalibrationParameter(
                 id="beta",
                 parameter_type="parameter",
@@ -101,628 +87,209 @@ class TestProbabilisticCalibrator:
                 min_bound=0.0,
                 max_bound=0.5,
             ),
-        ]
-
-        # Create calibration problem with Particle Swarm
-        problem = CalibrationProblem(
-            observed_data=observed_data,
-            parameters=parameters,
-            loss_function="sse",
-            optimization_config=ParticleSwarmConfig(
-                num_particles=60,
-                max_iterations=1000,
-                verbose=False,
-            ),
-        )
-
-        # Configure probabilistic calibration using new structure
-        problem.probabilistic_config = ProbabilisticCalibrationConfig(
-            n_runs=10,
-            evaluation_processing=ProbEvaluationFilterConfig(
-                loss_percentile_filter=0.9,
-            ),
-            clustering=ProbClusteringConfig(n_clusters=10),
-            representative_selection=ProbRepresentativeConfig(
-                max_representatives=1000,
-                percentage_elite_cluster_selection=0.1,
-            ),
-            ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=50,
-                nsga_generations=5000,
-                ensemble_size_mode="bounded",
-                ensemble_size_min=10,
-                ensemble_size_max=30,
-            ),
-            confidence_level=0.95,
-        )
-        problem.seed = SEED
-
-        # Run probabilistic calibration
-        calibrator = Calibrator(simulation, problem)
-        result = calibrator.run_probabilistic()
-
-        # Verify results
-        assert result.selected_ensemble.ensemble_size >= 10, (
-            "Ensemble should contain 10 or more parameter sets"
-        )
-        assert result.selected_ensemble.ensemble_size <= 30, (
-            "Ensemble should contain 30 or less parameter sets"
-        )
-
-        assert result.n_runs_performed == 10, "Should have performed 10 runs"
-        assert result.n_unique_evaluations > 0, (
-            "Should have unique parameter evaluations"
-        )
-        assert result.n_clusters_used >= 1, (
-            "Should have at least one cluster (automatically determined)"
-        )
-
-        # Check that parameter statistics are reasonable
-        assert "beta" in result.selected_ensemble.parameter_statistics
-        assert "gamma" in result.selected_ensemble.parameter_statistics
-
-        beta_stats = result.selected_ensemble.parameter_statistics["beta"]
-        gamma_stats = result.selected_ensemble.parameter_statistics["gamma"]
-
-        # Check that statistics are within parameter bounds
-        assert 0.0 <= beta_stats.min <= beta_stats.max <= 1.0
-        assert 0.0 <= gamma_stats.min <= gamma_stats.max <= 0.5
-
-        # Check that mean is within the 95% CI
-        assert (
-            beta_stats.percentile_lower
-            <= beta_stats.mean
-            <= beta_stats.percentile_upper
-        )
-        assert (
-            gamma_stats.percentile_lower
-            <= gamma_stats.mean
-            <= gamma_stats.percentile_upper
-        )
-
-        # Check that predictions are provided for all compartments
-        assert "S" in result.selected_ensemble.prediction_median
-        assert "I" in result.selected_ensemble.prediction_median
-        assert "R" in result.selected_ensemble.prediction_median
-
-        assert "I" in result.selected_ensemble.prediction_ci_lower
-        assert "I" in result.selected_ensemble.prediction_ci_upper
-
-        # Check that prediction arrays have correct length
-        assert (
-            len(result.selected_ensemble.prediction_median["I"])
-            == len(problem.observed_data) + 1
-        )
-        assert (
-            len(result.selected_ensemble.prediction_ci_lower["I"])
-            == len(problem.observed_data) + 1
-        )
-        assert (
-            len(result.selected_ensemble.prediction_ci_upper["I"])
-            == len(problem.observed_data) + 1
-        )
-
-        # All prediction arrays should have the same length
-        assert len(result.selected_ensemble.prediction_median["I"]) == len(
-            result.selected_ensemble.prediction_ci_lower["I"]
-        )
-        assert len(result.selected_ensemble.prediction_median["I"]) == len(
-            result.selected_ensemble.prediction_ci_upper["I"]
-        )
-
-        # Check coverage
-        assert 80.0 <= result.selected_ensemble.coverage_percentage <= 100.0
-
-        # Verify that confidence intervals are ordered correctly
-        for time_step in range(len(result.selected_ensemble.prediction_median["I"])):
-            ci_lower = result.selected_ensemble.prediction_ci_lower["I"][time_step]
-            ci_median = result.selected_ensemble.prediction_median["I"][time_step]
-            ci_upper = result.selected_ensemble.prediction_ci_upper["I"][time_step]
-
-            assert ci_lower <= ci_median <= ci_upper, (
-                f"At time {time_step}: CI bounds are not ordered correctly "
-                f"(lower={ci_lower}, median={ci_median}, upper={ci_upper})"
-            )
-
-        # Check if true parameters are within the confidence intervals
-        assert math.isclose(beta_stats.mean, true_beta, abs_tol=0.05), (
-            f"Beta mean {beta_stats.mean:.4f} not close to true value "
-            f"{true_beta:.4f} (tolerance: 0.05)"
-        )
-        assert (
-            beta_stats.percentile_lower <= true_beta <= beta_stats.percentile_upper
-        ), (
-            f"True beta {true_beta:.4f} not in 95% CI "
-            f"[{beta_stats.percentile_lower:.4f}, {beta_stats.percentile_upper:.4f}]"
-        )
-
-        assert math.isclose(gamma_stats.mean, true_gamma, abs_tol=0.05), (
-            f"Gamma mean {gamma_stats.mean:.4f} not close to true value "
-            f"{true_gamma:.4f} (tolerance: 0.05)"
-        )
-        assert (
-            gamma_stats.percentile_lower <= true_gamma <= gamma_stats.percentile_upper
-        ), (
-            f"True gamma {true_gamma:.4f} not in 95% CI "
-            f"[{gamma_stats.percentile_lower:.4f}, {gamma_stats.percentile_upper:.4f}]"
-        )
-
-    def test_probabilistic_calibration_with_nelder_mead(self, model: Model):
-        """
-        Test probabilistic calibration by perturbing model output and recovering
-        parameters with NelderMead optimization algorithm.
-
-        This test:
-        1. Runs the model with known parameters (beta=0.3, gamma=0.1)
-        2. Adds Gaussian noise to the Infected compartment trajectory
-        3. Uses probabilistic calibration (Nelder Mead) to recover the original
-            parameters
-        4. Verifies that the true parameters fall within the confidence intervals
-        """
-        # Generate true values with known parameters
-        true_beta = 0.3
-        true_gamma = 0.1
-
-        simulation = Simulation(model)
-        true_results = simulation.run(50, output_format="dict_of_lists")
-
-        # Add Gaussian noise to create "observed" data
-        np.random.seed(SEED)
-        noise_std = 5.0  # Standard deviation of measurement noise
-
-        observed_data = []
-        for i in range(0, 50):
-            true_value = true_results["I"][i]
-            noisy_value = true_value + np.random.normal(0, noise_std)
-            noisy_value = max(0.0, noisy_value)
-            observed_data.append(
-                ObservedDataPoint(step=i, compartment="I", value=noisy_value)
-            )
-
-        # Define calibration parameters
-        parameters = [
-            CalibrationParameter(
-                id="beta",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-            CalibrationParameter(
-                id="gamma",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=0.5,
-            ),
-        ]
-
-        # Create calibration problem with Particle Swarm
-        problem = CalibrationProblem(
-            observed_data=observed_data,
-            parameters=parameters,
-            loss_function="sse",
-            optimization_config=NelderMeadConfig(),
-        )
-
-        # Configure probabilistic calibration using new structure
-        problem.probabilistic_config = ProbabilisticCalibrationConfig(
-            n_runs=10,
-            evaluation_processing=ProbEvaluationFilterConfig(
-                loss_percentile_filter=0.9,
-            ),
-            clustering=ProbClusteringConfig(n_clusters=10),
-            representative_selection=ProbRepresentativeConfig(
-                max_representatives=1000,
-                percentage_elite_cluster_selection=0.1,
-            ),
-            ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=50,
-                nsga_generations=5000,
-                ensemble_size_mode="bounded",
-                ensemble_size_min=10,
-                ensemble_size_max=30,
-            ),
-            confidence_level=0.95,
-        )
-        problem.seed = SEED
-
-        # Run probabilistic calibration
-        calibrator = Calibrator(simulation, problem)
-        result = calibrator.run_probabilistic()
-
-        # Verify results
-        assert result.selected_ensemble.ensemble_size >= 10, (
-            "Ensemble should contain 10 or more parameter sets"
-        )
-        assert result.selected_ensemble.ensemble_size <= 30, (
-            "Ensemble should contain 30 or less parameter sets"
-        )
-
-        assert result.n_runs_performed == 10, "Should have performed 10 runs"
-        assert result.n_unique_evaluations > 0, (
-            "Should have unique parameter evaluations"
-        )
-        assert result.n_clusters_used >= 1, (
-            "Should have at least one cluster (automatically determined)"
-        )
-
-        # Check that parameter statistics are reasonable
-        assert "beta" in result.selected_ensemble.parameter_statistics
-        assert "gamma" in result.selected_ensemble.parameter_statistics
-
-        beta_stats = result.selected_ensemble.parameter_statistics["beta"]
-        gamma_stats = result.selected_ensemble.parameter_statistics["gamma"]
-
-        # Check that statistics are within parameter bounds
-        assert 0.0 <= beta_stats.min <= beta_stats.max <= 1.0
-        assert 0.0 <= gamma_stats.min <= gamma_stats.max <= 0.5
-
-        # Check that mean is within the 95% CI
-        assert (
-            beta_stats.percentile_lower
-            <= beta_stats.mean
-            <= beta_stats.percentile_upper
-        )
-        assert (
-            gamma_stats.percentile_lower
-            <= gamma_stats.mean
-            <= gamma_stats.percentile_upper
-        )
-
-        # Check that predictions are provided for all compartments
-        assert "S" in result.selected_ensemble.prediction_median
-        assert "I" in result.selected_ensemble.prediction_median
-        assert "R" in result.selected_ensemble.prediction_median
-
-        assert "I" in result.selected_ensemble.prediction_ci_lower
-        assert "I" in result.selected_ensemble.prediction_ci_upper
-
-        # Check that prediction arrays have correct length
-        assert (
-            len(result.selected_ensemble.prediction_median["I"])
-            == len(problem.observed_data) + 1
-        )
-        assert (
-            len(result.selected_ensemble.prediction_ci_lower["I"])
-            == len(problem.observed_data) + 1
-        )
-        assert (
-            len(result.selected_ensemble.prediction_ci_upper["I"])
-            == len(problem.observed_data) + 1
-        )
-
-        # All prediction arrays should have the same length
-        assert len(result.selected_ensemble.prediction_median["I"]) == len(
-            result.selected_ensemble.prediction_ci_lower["I"]
-        )
-        assert len(result.selected_ensemble.prediction_median["I"]) == len(
-            result.selected_ensemble.prediction_ci_upper["I"]
-        )
-
-        # Check coverage
-        assert 80.0 <= result.selected_ensemble.coverage_percentage <= 100.0
-
-        # Verify that confidence intervals are ordered correctly
-        for time_step in range(len(result.selected_ensemble.prediction_median["I"])):
-            ci_lower = result.selected_ensemble.prediction_ci_lower["I"][time_step]
-            ci_median = result.selected_ensemble.prediction_median["I"][time_step]
-            ci_upper = result.selected_ensemble.prediction_ci_upper["I"][time_step]
-
-            assert ci_lower <= ci_median <= ci_upper, (
-                f"At time {time_step}: CI bounds are not ordered correctly "
-                f"(lower={ci_lower}, median={ci_median}, upper={ci_upper})"
-            )
-
-        # Check if true parameters are within the confidence intervals
-        assert math.isclose(beta_stats.mean, true_beta, abs_tol=0.05), (
-            f"Beta mean {beta_stats.mean:.4f} not close to true value "
-            f"{true_beta:.4f} (tolerance: 0.05)"
-        )
-        assert (
-            beta_stats.percentile_lower <= true_beta <= beta_stats.percentile_upper
-        ), (
-            f"True beta {true_beta:.4f} not in 95% CI "
-            f"[{beta_stats.percentile_lower:.4f}, {beta_stats.percentile_upper:.4f}]"
-        )
-
-        assert math.isclose(gamma_stats.mean, true_gamma, abs_tol=0.05), (
-            f"Gamma mean {gamma_stats.mean:.4f} not close to true value "
-            f"{true_gamma:.4f} (tolerance: 0.05)"
-        )
-        assert (
-            gamma_stats.percentile_lower <= true_gamma <= gamma_stats.percentile_upper
-        ), (
-            f"True gamma {true_gamma:.4f} not in 95% CI "
-            f"[{gamma_stats.percentile_lower:.4f}, {gamma_stats.percentile_upper:.4f}]"
-        )
-
-
-class TestProbabilisticCalibratorValidation:
-    """Tests for input validation in ProbabilisticCalibrator."""
-
-    @pytest.fixture(scope="class")
-    def model(self) -> Model:
-        """Create a simple SIR model for testing."""
-        builder = (
-            ModelBuilder(name="Test SIR", version="1.0")
-            .add_bin(id="S", name="Susceptible")
-            .add_bin(id="I", name="Infected")
-            .add_bin(id="R", name="Recovered")
-            .add_parameter(id="beta", value=0.3)
-            .add_parameter(id="gamma", value=0.1)
-            .add_transition(
-                id="infection",
-                source=["S"],
-                target=["I"],
-                rate="beta * S * I / N",
-            )
-            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "S", "fraction": 0.99},
-                    {"bin": "I", "fraction": 0.01},
-                    {"bin": "R", "fraction": 0.0},
-                ],
-            )
-        )
-        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-
-    def test_invalid_parameter_id(self, model: Model):
-        """Test that invalid parameter IDs raise ValueError."""
-        simulation = Simulation(model)
-
-        observed_data = [ObservedDataPoint(step=0, compartment="I", value=10.0)]
-
-        # Use a parameter ID that doesn't exist in the model
-        parameters = [
-            CalibrationParameter(
-                id="nonexistent_param",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ]
-
-        problem = CalibrationProblem(
-            observed_data=observed_data,
-            parameters=parameters,
-            loss_function="sse",
-            optimization_config=ParticleSwarmConfig(
-                num_particles=10, max_iterations=10
-            ),
-        )
-
-        with pytest.raises(ValueError, match="not found in model"):
-            Calibrator(simulation, problem)
-
-    def test_invalid_compartment_in_observed_data(self, model: Model):
-        """Test that invalid compartment in observed data raises ValueError."""
-        simulation = Simulation(model)
-
-        # Use a compartment that doesn't exist in the model
-        observed_data = [
-            ObservedDataPoint(step=0, compartment="nonexistent_compartment", value=10.0)
-        ]
-
-        parameters = [
-            CalibrationParameter(
-                id="beta",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ]
-
-        problem = CalibrationProblem(
-            observed_data=observed_data,
-            parameters=parameters,
-            loss_function="sse",
-            optimization_config=ParticleSwarmConfig(
-                num_particles=10, max_iterations=10
-            ),
-        )
-
-        with pytest.raises(ValueError, match="not found in model"):
-            Calibrator(simulation, problem)
-
-    def test_empty_parameters_raises_validation_error(self):
-        """Test that empty parameters list raises ValidationError from Pydantic."""
-        from pydantic import ValidationError
-
-        observed_data = [ObservedDataPoint(step=0, compartment="I", value=10.0)]
-
-        with pytest.raises(ValidationError, match="too_short"):
-            CalibrationProblem(
-                observed_data=observed_data,
-                parameters=[],  # Empty parameters
-                loss_function="sse",
-                optimization_config=ParticleSwarmConfig(
-                    num_particles=10, max_iterations=10
-                ),
-            )
-
-    def test_empty_observed_data_raises_validation_error(self):
-        """Test that empty observed data raises ValidationError from Pydantic."""
-        from pydantic import ValidationError
-
-        parameters = [
-            CalibrationParameter(
-                id="beta",
-                parameter_type="parameter",
-                min_bound=0.0,
-                max_bound=1.0,
-            ),
-        ]
-
-        with pytest.raises(ValidationError, match="too_short"):
-            CalibrationProblem(
-                observed_data=[],  # Empty observed data
-                parameters=parameters,
-                loss_function="sse",
-                optimization_config=ParticleSwarmConfig(
-                    num_particles=10, max_iterations=10
-                ),
-            )
-
-
-class TestProbabilisticCalibratorSelectionMethods:
-    """Tests for different selection methods and ensemble size modes."""
-
-    @pytest.fixture(scope="class")
-    def model(self) -> Model:
-        """Create a simple SIR model for testing."""
-        builder = (
-            ModelBuilder(name="Test SIR", version="1.0")
-            .add_bin(id="S", name="Susceptible")
-            .add_bin(id="I", name="Infected")
-            .add_bin(id="R", name="Recovered")
-            .add_parameter(id="beta", value=0.3)
-            .add_parameter(id="gamma", value=0.1)
-            .add_transition(
-                id="infection",
-                source=["S"],
-                target=["I"],
-                rate="beta * S * I / N",
-            )
-            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "S", "fraction": 0.99},
-                    {"bin": "I", "fraction": 0.01},
-                    {"bin": "R", "fraction": 0.0},
-                ],
-            )
-        )
-        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-
-    @pytest.fixture(scope="class")
-    def base_problem(self, model: Model):
-        """Create a base calibration problem."""
-        simulation = Simulation(model)
-        true_results = simulation.run(20, output_format="dict_of_lists")
-
-        observed_data = [
-            ObservedDataPoint(step=i, compartment="I", value=true_results["I"][i])
-            for i in range(0, 20, 5)
-        ]
-
-        parameters = [
-            CalibrationParameter(
-                id="beta",
-                parameter_type="parameter",
-                min_bound=0.1,
-                max_bound=0.5,
-            ),
-        ]
-
-        return CalibrationProblem(
-            observed_data=observed_data,
-            parameters=parameters,
-            loss_function="sse",
-            optimization_config=ParticleSwarmConfig(
-                num_particles=20, max_iterations=50, verbose=False
-            ),
-        )
-
-    @pytest.mark.parametrize(
-        "selection_method",
-        ["crowding_distance", "maximin_distance", "latin_hypercube"],
-    )
-    def test_cluster_selection_methods(
-        self,
-        model: Model,
-        base_problem: CalibrationProblem,
-        selection_method: Literal[
-            "crowding_distance", "maximin_distance", "latin_hypercube"
         ],
-    ):
-        """Test that different cluster selection methods work correctly."""
-        simulation = Simulation(model)
-
-        base_problem.probabilistic_config = ProbabilisticCalibrationConfig(
-            n_runs=8,
-            representative_selection=ProbRepresentativeConfig(
-                max_representatives=50,
-                cluster_selection_method=selection_method,
-            ),
-            ensemble_selection=ProbEnsembleConfig(
-                nsga_population_size=10,
-                nsga_generations=10,
-            ),
-        )
-        base_problem.seed = SEED
-
-        calibrator = Calibrator(simulation, base_problem)
-        result = calibrator.run_probabilistic()
-
-        assert result.selected_ensemble.ensemble_size > 0
-        assert "beta" in result.selected_ensemble.parameter_statistics
-        print(
-            f"\n{selection_method}: "
-            f"ensemble_size={result.selected_ensemble.ensemble_size}"
-        )
-
-    @pytest.mark.parametrize(
-        "size_mode,size_config",
-        [
-            ("fixed", {"ensemble_size": 5}),
-            ("bounded", {"ensemble_size_min": 3, "ensemble_size_max": 10}),
-            ("automatic", {}),
-        ],
+        loss_function=loss_function,
+        optimization_config=ParticleSwarmConfig(
+            num_particles=30,
+            max_iterations=200,
+            verbose=False,
+        ),
     )
-    def test_ensemble_size_modes(
-        self,
-        model: Model,
-        base_problem: CalibrationProblem,
-        size_mode: Literal["fixed", "bounded", "automatic"],
-        size_config: dict,
-    ):
-        """Test that different ensemble size modes work correctly."""
-        simulation = Simulation(model)
-
-        # Build ensemble selection config based on size_mode
-        ensemble_config = ProbEnsembleConfig(
-            nsga_population_size=10,
-            nsga_generations=10,
-            ensemble_size_mode=size_mode,
-            **size_config,
+    if ensemble_selection is None:
+        ensemble_selection = ProbNsga2Config(
+            ensemble_size_mode="bounded",
+            ensemble_size_min=4,
+            ensemble_size_max=10,
         )
+    problem.probabilistic_config = ProbabilisticCalibrationConfig(
+        n_runs=6,
+        evaluation_processing=ProbEvaluationFilterConfig(
+            loss_percentile_filter=0.1,
+            max_loss_ratio=1.5,
+        ),
+        clustering=ProbClusteringConfig(
+            n_clusters=4,
+            feature_space=feature_space,
+        ),
+        representative_selection=ProbRepresentativeConfig(
+            max_representatives=80,
+            cluster_selection_method="maximin_distance",
+        ),
+        ensemble_selection=ensemble_selection,
+        include_ensemble_candidates=True,
+    )
+    problem.seed = SEED
+    return problem
 
-        base_problem.probabilistic_config = ProbabilisticCalibrationConfig(
-            n_runs=8,
-            representative_selection=ProbRepresentativeConfig(
-                max_representatives=50,
-            ),
-            ensemble_selection=ensemble_config,
-        )
-        base_problem.seed = SEED
 
-        calibrator = Calibrator(simulation, base_problem)
-        result = calibrator.run_probabilistic()
+def test_fit_gated_calibration_preserves_central_fit(model) -> None:
+    problem = _problem(
+        model,
+        ProbGreedyLocalSearchConfig(
+            ensemble_size_mode="bounded",
+            ensemble_size_min=4,
+            ensemble_size_max=10,
+            central_fit_max_loss_ratio=1.5,
+        ),
+    )
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+    ensemble = result.selected_ensemble
 
-        assert result.selected_ensemble.ensemble_size > 0
+    assert 4 <= ensemble.ensemble_size <= 10
+    assert ensemble.point_loss > 0.0
+    assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
+    assert ensemble.point_parameters in ensemble.ensemble_parameters
+    assert ensemble.observation_diagnostics["I"]["n_points"] == 30.0
+    assert result.ensemble_candidates is not None
+    assert len(result.ensemble_candidates) == result.stage_counts["n_representatives"]
+    assert all(candidate.parameters for candidate in result.ensemble_candidates)
+    assert (
+        ensemble.selection_diagnostics["max_feasible_ensemble_size"]
+        >= ensemble.ensemble_size
+    )
+    assert len(ensemble.prediction_median["I"]) == 31
 
-        if size_mode == "fixed":
-            # Fixed mode should get close to the target size
-            # (may not be exact due to optimization constraints)
-            target = size_config["ensemble_size"]
-            print(
-                f"\nFixed mode: target={target}, "
-                f"actual={result.selected_ensemble.ensemble_size}"
+
+def test_nsga2_calibration_is_the_default_selection_backend(model) -> None:
+    result = Calibrator(Simulation(model), _problem(model)).run_probabilistic()
+
+    assert result.selection_algorithm == "nsga2"
+    assert result.selected_pareto_index is not None
+    assert result.pareto_front
+    assert result.stage_counts["pareto_front_size"] == len(result.pareto_front)
+
+
+def test_ensemble_configuration_defaults_to_nsga2() -> None:
+    config = ProbNsga2Config()
+
+    assert config.population_size == 100
+    assert config.generations == 100
+    assert config.pareto_preference == 0.5
+    assert isinstance(
+        ProbabilisticCalibrationConfig().ensemble_selection,
+        ProbNsga2Config,
+    )
+
+    with pytest.raises(ValidationError, match="ensemble_algorithm"):
+        ProbNsga2Config(ensemble_algorithm="unsupported")
+
+    with pytest.raises(ValidationError, match="central_fit_max_loss_ratio"):
+        ProbNsga2Config(central_fit_max_loss_ratio=1.5)
+
+    with pytest.raises(ValidationError, match="population_size"):
+        ProbGreedyLocalSearchConfig(population_size=100)
+
+    with pytest.raises(ValidationError, match="result_detail"):
+        ProbabilisticCalibrationConfig(result_detail="full")
+
+
+def test_invalid_observed_compartment_is_rejected(model) -> None:
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(
+                step=0,
+                compartment="not-a-model-output",
+                value=1.0,
             )
-
-        elif size_mode == "bounded":
-            # Bounded mode should be within the specified range
-            min_size = size_config["ensemble_size_min"]
-            max_size = size_config["ensemble_size_max"]
-            print(
-                f"\nBounded mode: range=[{min_size}, {max_size}], "
-                f"actual={result.selected_ensemble.ensemble_size}"
+        ],
+        parameters=[
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
             )
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
 
-        else:  # automatic
-            print(
-                "\nAutomatic mode: "
-                f"ensemble_size={result.selected_ensemble.ensemble_size}"
+    with pytest.raises(ValueError, match="not found in model"):
+        Calibrator(Simulation(model), problem)
+
+
+def _single_parameter_problem(loss_function: str) -> CalibrationProblem:
+    return CalibrationProblem(
+        observed_data=[ObservedDataPoint(step=0, compartment="I", value=1.0)],
+        parameters=[
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
             )
+        ],
+        loss_function=loss_function,
+        optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
+    )
+
+
+def test_probabilistic_config_accepts_any_loss_family() -> None:
+    """Every loss is allowed; the central-fit gate adapts to the chosen loss."""
+    for loss in ("sse", "weighted_sse", "rmse", "mae"):
+        problem = _single_parameter_problem(loss)
+        problem.probabilistic_config = ProbabilisticCalibrationConfig()
+        assert problem.probabilistic_config is not None
+
+
+def test_rmse_pipeline_gate_is_loss_coherent(model) -> None:
+    """The greedy central-fit gate scores the median with the members' RMSE loss."""
+    problem = _problem(
+        model,
+        ProbGreedyLocalSearchConfig(
+            ensemble_size_mode="automatic",
+            central_fit_max_loss_ratio=1.5,
+        ),
+        loss_function="rmse",
+    )
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+    ensemble = result.selected_ensemble
+
+    assert ensemble.point_loss > 0.0
+    # central_loss is an RMSE (root-mean), directly comparable to the member
+    # RMSE losses the gate constrains it against.
+    assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
+
+
+def test_mae_pipeline_runs_end_to_end(model) -> None:
+    """A mean-absolute-error loss selects a coherent ensemble end-to-end."""
+    problem = _problem(model, loss_function="mae")
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+
+    assert result.selected_ensemble.ensemble_size >= 4
+
+
+def test_parameter_feature_space_pipeline(model) -> None:
+    """Parameter-space clustering runs end-to-end with the NSGA-II backend."""
+    problem = _problem(model, feature_space="parameters")
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+
+    assert result.selection_algorithm == "nsga2"
+    assert 4 <= result.selected_ensemble.ensemble_size <= 10
+    assert len(result.selected_ensemble.prediction_median["I"]) == 31
+
+
+def test_greedy_automatic_size_mode_pipeline(model) -> None:
+    """The greedy backend selects a fit-gated ensemble under automatic sizing."""
+    problem = _problem(
+        model,
+        ProbGreedyLocalSearchConfig(
+            ensemble_size_mode="automatic",
+            central_fit_max_loss_ratio=1.5,
+        ),
+    )
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+    ensemble = result.selected_ensemble
+
+    assert result.selection_algorithm == "greedy_local_search"
+    assert result.pareto_front is None
+    assert ensemble.ensemble_size >= 2
+    assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
+
+
+def test_weighted_sse_loss_pipeline(model) -> None:
+    """A weighted-SSE loss is an accepted SSE-family loss for the pipeline."""
+    problem = _problem(model, loss_function="weighted_sse")
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+
+    assert result.selected_ensemble.ensemble_size >= 4

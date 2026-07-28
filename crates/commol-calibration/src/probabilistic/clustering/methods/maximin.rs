@@ -106,12 +106,16 @@ pub fn select_by_maximin_distance(
             continue;
         }
 
-        // Sort to find k nearest neighbors
-        distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
         // Use average distance to k nearest neighbors as density measure
         let k_actual = k_neighbors.min(distances.len());
-        let avg_k_distance: f64 = distances.iter().take(k_actual).sum::<f64>() / k_actual as f64;
+        let avg_k_distance: f64 = if k_actual == distances.len() {
+            distances.iter().sum::<f64>() / k_actual as f64
+        } else {
+            distances.select_nth_unstable_by(k_actual, |a, b| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            distances[..k_actual].iter().sum::<f64>() / k_actual as f64
+        };
 
         // Density = 1 / avg_distance (higher in dense regions)
         // Add small epsilon to avoid division by zero

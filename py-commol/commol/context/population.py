@@ -1,9 +1,9 @@
 import math
 from typing import Self
 
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from commol.context.bin import Bin
+from commol.context.bin import Accumulator, Bin
 from commol.context.dynamics import Transition
 from commol.context.initial_conditions import InitialConditions
 from commol.context.stratification import Stratification
@@ -15,7 +15,7 @@ class Population(BaseModel):
 
     Attributes
     ----------
-    disease_states : list[Bin]
+    bins : list[Bin]
         A list of compartments or states that make up the model.
     stratifications : list[Stratification]
         A list of categorical subdivisions of the population.
@@ -24,6 +24,7 @@ class Population(BaseModel):
     """
 
     bins: list[Bin]
+    accumulators: list[Accumulator] = Field(default_factory=list)
     stratifications: list[Stratification]
     transitions: list[Transition]
     initial_conditions: InitialConditions
@@ -120,9 +121,12 @@ class Population(BaseModel):
                                 )
                             )
 
-                        # Validate category exists
+                        # Validate category exists (None = target-only override, skip)
                         strat = strat_map[condition.stratification]
-                        if condition.category not in strat.categories:
+                        if (
+                            condition.category is not None
+                            and condition.category not in strat.categories
+                        ):
                             raise ValueError(
                                 (
                                     f"In transition '{transition.id}', stratified rate "

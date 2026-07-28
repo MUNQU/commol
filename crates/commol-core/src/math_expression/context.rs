@@ -14,6 +14,9 @@ use super::preprocessing::{
 #[derive(Debug, Clone)]
 pub struct MathExpressionContext {
     pub(crate) parameters: HashMap<String, f64>,
+    parameter_indices: HashMap<String, usize>,
+    parameter_names: Vec<String>,
+    parameter_values: Vec<Option<f64>>,
     pub(crate) compartments: HashMap<String, f64>,
     pub(crate) step: f64,
     /// Cached compartment names for index-based updates
@@ -29,6 +32,9 @@ impl MathExpressionContext {
     pub fn new() -> Self {
         Self {
             parameters: HashMap::new(),
+            parameter_indices: HashMap::new(),
+            parameter_names: Vec::new(),
+            parameter_values: Vec::new(),
             compartments: HashMap::new(),
             step: 0.0,
             compartment_names: Vec::new(),
@@ -66,8 +72,11 @@ impl MathExpressionContext {
                         .ok();
                 }
             }
-            // Update N (total population)
-            let total_pop: f64 = values.iter().sum();
+            // Update N (total population). Callers may pass a wider row than the
+            // registered compartments (simulation outputs append accumulators after
+            // the population), so only the registered compartments count towards N
+            // — matching the assignment loop above.
+            let total_pop: f64 = values.iter().take(self.compartment_names.len()).sum();
             ctx.set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
                 .ok();
         } else {
@@ -77,13 +86,23 @@ impl MathExpressionContext {
 
     /// Set a parameter value
     pub fn set_parameter(&mut self, name: String, value: f64) {
-        self.parameters.insert(name, value);
+        self.set_parameter_indexed(name, value);
         self.cache_dirty = true;
     }
 
-    /// Set a parameter value by string reference (avoids allocation)
+    /// Set a parameter value by string reference (avoids allocation in the
+    /// common case where the key already exists).
     pub fn set_parameter_str(&mut self, name: &str, value: f64) {
-        self.parameters.insert(name.to_string(), value);
+        if let Some(&idx) = self.parameter_indices.get(name) {
+            self.parameter_values[idx] = Some(value);
+            if let Some(slot) = self.parameters.get_mut(name) {
+                *slot = value;
+            } else {
+                self.parameters.insert(name.to_string(), value);
+            }
+        } else {
+            self.set_parameter_indexed(name.to_string(), value);
+        }
 
         // Update cached context directly if it exists
         if let Some(ref mut ctx) = self.cached_evalexpr_context {
@@ -93,9 +112,20 @@ impl MathExpressionContext {
         }
     }
 
+    /// Pre-allocate parameter slots so subsequent `set_parameter_str` calls hit
+    /// the existing-key branch and avoid allocating a fresh `String` each step.
+    pub fn reserve_parameters(&mut self, names: impl IntoIterator<Item = String>) {
+        for name in names {
+            self.reserve_parameter_index(name);
+        }
+        self.cache_dirty = true;
+    }
+
     /// Set multiple parameters
     pub fn set_parameters(&mut self, parameters: HashMap<String, f64>) {
-        self.parameters.extend(parameters);
+        for (name, value) in parameters {
+            self.set_parameter_indexed(name, value);
+        }
         self.cache_dirty = true;
     }
 
@@ -122,12 +152,74 @@ impl MathExpressionContext {
 
     /// Get a single parameter value by name
     pub fn get_parameter(&self, name: &str) -> Option<f64> {
-        self.parameters.get(name).copied()
+        self.parameter_indices
+            .get(name)
+            .and_then(|&idx| self.parameter_values.get(idx).and_then(|value| *value))
+    }
+
+    /// Get a stable parameter slot for direct indexed reads in hot paths.
+    pub fn parameter_index(&self, name: &str) -> Option<usize> {
+        self.parameter_indices.get(name).copied()
+    }
+
+    /// Get a parameter value by a previously resolved index.
+    pub fn get_parameter_by_index(&self, index: usize) -> Option<f64> {
+        self.parameter_values.get(index).and_then(|value| *value)
+    }
+
+    /// Set a parameter slot by a previously resolved index. Updates both the
+    /// indexed value storage and the name-keyed HashMap so that
+    /// `get_parameters()` and evalexpr fallback evaluation stay consistent.
+    /// Skips the per-call evalexpr context patch performed by
+    /// `set_parameter_str`; the next fallback evaluation will rebuild the
+    /// cache from the up-to-date HashMap.
+    pub fn set_parameter_by_index(&mut self, index: usize, value: f64) -> Result<(), String> {
+        let Some(slot) = self.parameter_values.get_mut(index) else {
+            return Err(format!("Parameter index '{}' not found", index));
+        };
+        *slot = Some(value);
+        let name = &self.parameter_names[index];
+        if let Some(map_slot) = self.parameters.get_mut(name) {
+            *map_slot = value;
+        } else {
+            self.parameters.insert(name.clone(), value);
+        }
+        self.cache_dirty = true;
+        Ok(())
     }
 
     /// Get a reference to all parameters
     pub fn get_parameters(&self) -> &HashMap<String, f64> {
         &self.parameters
+    }
+
+    fn set_parameter_indexed(&mut self, name: String, value: f64) {
+        if let Some(&idx) = self.parameter_indices.get(name.as_str()) {
+            self.parameter_values[idx] = Some(value);
+            if let Some(slot) = self.parameters.get_mut(name.as_str()) {
+                *slot = value;
+            } else {
+                self.parameters.insert(name, value);
+            }
+            return;
+        }
+
+        let idx = self.parameter_values.len();
+        self.parameter_indices.insert(name.clone(), idx);
+        self.parameter_names.push(name.clone());
+        self.parameter_values.push(Some(value));
+        self.parameters.insert(name, value);
+    }
+
+    fn reserve_parameter_index(&mut self, name: String) {
+        if self.parameter_indices.contains_key(name.as_str()) {
+            return;
+        }
+
+        let idx = self.parameter_values.len();
+        self.parameter_indices.insert(name.clone(), idx);
+        self.parameter_names.push(name);
+        self.parameter_values.push(None);
     }
 
     /// Get or rebuild the evalexpr context (uses cache when possible)

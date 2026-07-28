@@ -3,7 +3,7 @@
 //! Model-agnostic calibration and parameter estimation for compartment models.
 //!
 //! This crate provides tools for calibrating any model that implements the
-//! `SimulationEngine` trait from `epimodel-core`. It uses the `argmin` optimization
+//! `SimulationEngine` trait from `commol-core`. It uses the `argmin` optimization
 //! library to find parameter values that minimize the difference between model
 //! predictions and observed data.
 //!
@@ -75,10 +75,12 @@ pub use optimization::{
     OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
 };
 pub use probabilistic::{
-    deduplicate_evaluations, generate_predictions_parallel, run_multiple_calibrations,
-    select_cluster_representatives, select_optimal_ensemble, ClusterRepresentativeConfig,
-    EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, OptimalEnsembleConfig,
-    ParetoSolution,
+    deduplicate_evaluations, generate_calibrated_predictions_at_points_parallel,
+    generate_calibrated_predictions_parallel, generate_predictions_at_points_parallel,
+    generate_predictions_parallel, run_multiple_calibrations, select_cluster_representatives,
+    select_compact_ensemble, CentralLossMetric, ClusterRepresentativeConfig, EnsembleAlgorithm,
+    EnsembleSelectionConfig, EnsembleSelectionResult, EnsembleSizeMode, EvaluationRetention,
+    ParetoSolution, RepresentativeSelectionConfig,
 };
 pub use probabilistic::{CalibrationError, CalibrationResult as CalibrationResultType};
 pub use types::{

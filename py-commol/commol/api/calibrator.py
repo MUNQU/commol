@@ -76,6 +76,7 @@ class Calibrator:
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
         self._validate_observed_data()
+        self._warn_constraint_time_steps_beyond_observations()
 
     def run(self) -> CalibrationResult:
         """
@@ -118,6 +119,8 @@ class Calibrator:
                 value=point.value,
                 weight=point.weight,
                 scale_id=point.scale_id,
+                window_steps=point.window_steps,
+                compartments=point.compartments,
             )
             for point in self.problem.observed_data
         ]
@@ -219,6 +222,8 @@ class Calibrator:
                 value=point.value,
                 weight=point.weight,
                 scale_id=point.scale_id,
+                window_steps=point.window_steps,
+                compartments=point.compartments,
             )
             for point in self.problem.observed_data
         ]
@@ -293,15 +298,18 @@ class Calibrator:
         loss_func = self.problem.loss_function
 
         if loss_func == LossFunction.SSE:
-            return rust_calibration.LossConfig.sse()
+            loss_config = rust_calibration.LossConfig.sse()
         elif loss_func == LossFunction.RMSE:
-            return rust_calibration.LossConfig.rmse()
+            loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
-            return rust_calibration.LossConfig.mae()
+            loss_config = rust_calibration.LossConfig.mae()
         elif loss_func == LossFunction.WEIGHTED_SSE:
-            return rust_calibration.LossConfig.weighted_sse()
+            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
+
+        # Per-series normalization is orthogonal to the chosen metric.
+        return loss_config.normalized(self.problem.normalize_observations)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -430,6 +438,13 @@ class Calibrator:
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
         model_bin_ids = {b.id for b in model.population.bins}
+        model_binary_stratification_categories = {
+            category
+            for stratification in model.population.stratifications
+            if len(stratification.categories) == 2
+            for category in stratification.categories
+        }
+        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -440,10 +455,19 @@ class Calibrator:
                         f"{sorted(model_param_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if param.id not in model_bin_ids:
+                if (
+                    param.id not in model_bin_ids
+                    and param.id not in model_binary_stratification_categories
+                    and param.id not in engine_compartment_ids
+                ):
                     raise ValueError(
                         f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins. Available bins: {sorted(model_bin_ids)}"
+                        f"model bins, stratification categories, or expanded "
+                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
+                        f"Available binary stratification categories: "
+                        f"{sorted(model_binary_stratification_categories)}. "
+                        f"Available compartments: "
+                        f"{sorted(engine_compartment_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
@@ -496,13 +520,20 @@ class Calibrator:
         ValueError
             If observed data contains invalid compartments or negative time steps.
         """
-        model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
+        simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            if obs.compartment not in model_bin_ids:
+            observed_outputs = obs.compartments or [obs.compartment]
+            missing_outputs = [
+                output
+                for output in observed_outputs
+                if output not in simulation_output_names
+            ]
+            if missing_outputs:
                 raise ValueError(
-                    f"Observed data compartment '{obs.compartment}' not found in "
-                    f"model. Available compartments: {sorted(model_bin_ids)}"
+                    f"Observed data output(s) {missing_outputs} for observation "
+                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"Available outputs: {sorted(simulation_output_names)}"
                 )
 
         if self.problem.observed_data:
@@ -511,6 +542,21 @@ class Calibrator:
                 raise ValueError(
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
+                )
+
+    def _warn_constraint_time_steps_beyond_observations(self) -> None:
+        """Warn when time-dependent constraints extend beyond observed data."""
+        if not self.problem.observed_data:
+            return
+
+        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        for constraint in self.problem.constraints:
+            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+                logger.warning(
+                    "Constraint '%s' has time_steps beyond the maximum observed "
+                    "step (%s); simulation will be extended to evaluate them.",
+                    constraint.id,
+                    max_observed_step,
                 )
 
     def run_probabilistic(self):

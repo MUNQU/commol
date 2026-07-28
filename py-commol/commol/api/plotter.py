@@ -1,6 +1,7 @@
 import logging
 import math
 from collections import defaultdict
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
@@ -69,6 +70,10 @@ class SimulationPlotter:
         | None = None,
         config: PlotConfig | None = None,
         bins: list[str] | None = None,
+        show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
@@ -84,19 +89,22 @@ class SimulationPlotter:
             Path to save the figure. If None, figure is not saved (only returned).
         observed_data : list[ObservedDataPoint] | None
             Optional observed data points to overlay on corresponding bin subplots.
-            Observed data points with a scale_id will be unscaled for plotting using
-            scale values from the calibration_result.
+            Model predictions with a scale_id will be scaled for plotting using
+            scale values from the calibration_result, so observed values remain in
+            their original units.
         calibration_result : CalibrationResult | ProbabilisticCalibrationResult | None
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
             Scale values are extracted from best_parameters (CalibrationResult) or
-            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
-            data for comparison with model predictions.
+            the lowest-loss selected member (ProbabilisticCalibrationResult) to
+            scale model predictions for comparison with observed data.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
         bins : list[str] | None
             List of bin IDs to plot. If None, plots all bins.
+        show_legend : bool
+            Whether to show the legend on each subplot. Default True.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -124,6 +132,10 @@ class SimulationPlotter:
             scale_values,
             calibration_result,
             kwargs,
+            show_legend,
+            step_to_label,
+            tick_every,
+            x_label,
         )
         self._finalize_series_plot(axes, bins_to_plot, output_file, config)
 
@@ -159,8 +171,8 @@ class SimulationPlotter:
             Optional calibration result. If ProbabilisticCalibrationResult is provided,
             plots the median prediction with confidence interval bands.
             Scale values are extracted from best_parameters (CalibrationResult) or
-            parameter_statistics (ProbabilisticCalibrationResult) to unscale observed
-            data for comparison with model predictions.
+            the lowest-loss selected member (ProbabilisticCalibrationResult) to
+            unscale observed data for comparison with model predictions.
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
@@ -210,6 +222,29 @@ class SimulationPlotter:
             sns.set_context(config.context)
             logger.debug(f"Applied Seaborn context: {config.context}")
 
+    @staticmethod
+    def _apply_x_labels(
+        ax: "Axes",
+        time_steps: list[int],
+        step_to_label: Callable[[int], str],
+        tick_every: int | None,
+    ) -> None:
+        """
+        Label the x axis at every `tick_every` steps.
+
+        The tick grid is phased to the first plotted step rather than to the
+        absolute step 0: for a windowed series the plotted steps are window
+        ends, so anchoring at 0 would put ticks on steps that carry no plotted
+        point and hand `step_to_label` a step outside the series' convention.
+        """
+        if tick_every is not None and time_steps:
+            anchor = time_steps[0]
+            ticks = [t for t in time_steps if (t - anchor) % tick_every == 0]
+        else:
+            ticks = time_steps
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([step_to_label(t) for t in ticks], rotation=45, ha="right")
+
     def _calculate_layout(self, num_bins: int) -> tuple[int, int]:
         """
         Calculate optimal subplot layout (rows, cols) for given number of bins.
@@ -225,6 +260,28 @@ class SimulationPlotter:
             cols = math.ceil(math.sqrt(num_bins))
             rows = math.ceil(num_bins / cols)
             return (rows, cols)
+
+    @staticmethod
+    def _apply_windows(
+        series: list[float],
+        observed: list[ObservedDataPoint],
+    ) -> tuple[list[int], list[float]] | None:
+        """
+        Return (steps, values) where each value is
+        series[step] - series[step - window_steps].
+
+        The simulation line covers every multiple of window_steps across the full
+        series, so the plot starts at step window_steps rather than the first
+        observation step.
+
+        Returns None if no observed point has window_steps set.
+        """
+        window_steps = next((p.window_steps for p in observed if p.window_steps), None)
+        if window_steps is None:
+            return None
+        steps = list(range(window_steps, len(series), window_steps))
+        values = [series[t] - series[t - window_steps] for t in steps]
+        return steps, values
 
     def _group_observed_data(
         self, observed_data: list[ObservedDataPoint] | None
@@ -250,6 +307,33 @@ class SimulationPlotter:
 
         return dict(grouped)
 
+    def _observed_component_ids(
+        self,
+        bin_id: str,
+        observed: list[ObservedDataPoint],
+    ) -> list[str]:
+        for point in observed:
+            if point.compartments:
+                return point.compartments
+        return [bin_id]
+
+    @staticmethod
+    def _sum_series(
+        results: dict[str, list[float]],
+        component_ids: list[str],
+    ) -> list[float]:
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in results
+        ]
+        if missing:
+            raise KeyError(f"Missing result series for aggregate components: {missing}")
+        return [
+            sum(results[component_id][idx] for component_id in component_ids)
+            for idx in range(len(results[component_ids[0]]))
+        ]
+
     def _extract_scale_values(
         self,
         calib_result: CalibrationResult | ProbabilisticCalibrationResult | None,
@@ -258,7 +342,8 @@ class SimulationPlotter:
         Extract scale values from calibration result.
 
         For CalibrationResult, returns best_parameters.
-        For ProbabilisticCalibrationResult, returns median values of scale parameters.
+        For ProbabilisticCalibrationResult, returns median values for all parameters.
+        The observed data scale_id decides which entries are used as scale values.
         """
         if calib_result is None:
             return None
@@ -267,16 +352,39 @@ class SimulationPlotter:
             return calib_result.best_parameters
 
         if isinstance(calib_result, ProbabilisticCalibrationResult):
-            return {
-                param_name: stats.median
-                for (
-                    param_name,
-                    stats,
-                ) in calib_result.selected_ensemble.parameter_statistics.items()
-                if param_name.startswith("scale_")
-            }
+            return calib_result.selected_ensemble.point_parameters
 
         return None
+
+    @staticmethod
+    def _model_scale_for_observed(
+        observed: list[ObservedDataPoint],
+        scale_values: dict[str, float],
+    ) -> float:
+        scale_ids = {point.scale_id for point in observed if point.scale_id}
+        if not scale_ids:
+            return 1.0
+        if len(scale_ids) > 1:
+            logger.warning(
+                "Multiple scale_id values found for one plotted series; leaving "
+                "model predictions unscaled."
+            )
+            return 1.0
+
+        scale_id = next(iter(scale_ids))
+        if scale_id not in scale_values:
+            logger.warning(
+                f"Scale parameter '{scale_id}' not found in calibration result; "
+                "leaving model predictions unscaled."
+            )
+            return 1.0
+        return scale_values[scale_id]
+
+    @staticmethod
+    def _scale_series(values: list[float], scale: float) -> list[float]:
+        if scale == 1.0:
+            return values
+        return [value * scale for value in values]
 
     def _create_series_figure(
         self, config: PlotConfig, bins_to_plot: list[str]
@@ -285,9 +393,9 @@ class SimulationPlotter:
         Create figure and axes array for series plotting.
         """
         layout = config.layout or self._calculate_layout(len(bins_to_plot))
-        fig, axes = plt.subplots(
-            layout[0], layout[1], figsize=config.figsize, dpi=config.dpi
-        )
+        rows, cols = layout
+        figsize = (cols * 4.5, rows * 3.5 + 1.0)
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=config.dpi)
 
         # Ensure axes is always a flat array
         if layout[0] == 1 and layout[1] == 1:
@@ -305,6 +413,10 @@ class SimulationPlotter:
         scale_values: dict[str, float] | None,
         calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
         kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot series data for all bins across subplots.
@@ -323,6 +435,10 @@ class SimulationPlotter:
                     scale_values or {},
                     calibration_result,
                     dict(kwargs),
+                    show_legend,
+                    step_to_label,
+                    tick_every,
+                    x_label,
                 )
             else:
                 self._plot_bin_series(
@@ -331,6 +447,10 @@ class SimulationPlotter:
                     observed_by_bin.get(bin_id, []),
                     scale_values or {},
                     dict(kwargs),
+                    show_legend,
+                    step_to_label,
+                    tick_every,
+                    x_label,
                 )
 
     def _finalize_series_plot(
@@ -432,12 +552,26 @@ class SimulationPlotter:
         observed: list[ObservedDataPoint],
         scale_values: dict[str, float],
         plot_kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot time series for a single bin on given axes.
         """
-        time_steps = list(range(len(self.results[bin_id])))
-        values = self.results[bin_id]
+        component_ids = self._observed_component_ids(bin_id, observed)
+        series = self._sum_series(self.results, component_ids)
+        windowed = self._apply_windows(series, observed)
+        if windowed is not None:
+            time_steps, values = windowed
+        else:
+            time_steps = list(range(len(series)))
+            values = series
+        values = self._scale_series(
+            values,
+            self._model_scale_for_observed(observed, scale_values),
+        )
 
         # Build parameters for lineplot
         params = {
@@ -445,6 +579,7 @@ class SimulationPlotter:
             "y": values,
             "ax": ax,
             "label": "Simulation",
+            "legend": show_legend,
         }
         params.update(plot_kwargs)
 
@@ -454,13 +589,7 @@ class SimulationPlotter:
         # Overlay observed data if available
         if observed:
             obs_steps = [p.step for p in observed]
-            # Apply scale if observation has a scale_id
-            obs_values = [
-                p.value / scale_values[p.scale_id]
-                if p.scale_id and p.scale_id in scale_values
-                else p.value
-                for p in observed
-            ]
+            obs_values = [p.value for p in observed]
             sns.scatterplot(
                 x=obs_steps,
                 y=obs_values,
@@ -470,6 +599,7 @@ class SimulationPlotter:
                 s=30,
                 alpha=0.7,
                 zorder=5,
+                legend=show_legend,
             )
 
         # Get bin unit from model for label
@@ -484,10 +614,13 @@ class SimulationPlotter:
         unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
         bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
 
-        ax.set_xlabel("Step")
+        ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        ax.legend()
+        if step_to_label:
+            self._apply_x_labels(ax, time_steps, step_to_label, tick_every)
+        if show_legend:
+            ax.legend()
         ax.grid(True, alpha=0.3)
 
     def _plot_bin_series_probabilistic(
@@ -498,29 +631,93 @@ class SimulationPlotter:
         scale_values: dict[str, float],
         prob_result: ProbabilisticCalibrationResult,
         plot_kwargs: dict[str, str | int | float | bool | None],
+        show_legend: bool = True,
+        step_to_label: Callable[[int], str] | None = None,
+        tick_every: int | None = None,
+        x_label: str = "Step",
     ) -> None:
         """
         Plot time series for a single bin with probabilistic confidence intervals.
         """
-        if bin_id not in prob_result.selected_ensemble.prediction_median:
+        component_ids = self._observed_component_ids(bin_id, observed)
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in prob_result.selected_ensemble.prediction_median
+        ]
+        if missing:
             logger.warning(
-                f"Bin '{bin_id}' not found in probabilistic result predictions"
+                f"Bin '{bin_id}' aggregate components not found in probabilistic "
+                f"result predictions: {missing}"
             )
             return
 
-        time_steps = list(
-            range(len(prob_result.selected_ensemble.prediction_median[bin_id]))
+        median_values = self._sum_series(
+            prob_result.selected_ensemble.prediction_median,
+            component_ids,
         )
-        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
-        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
-        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+        ci_lower = self._sum_series(
+            prob_result.selected_ensemble.prediction_ci_lower,
+            component_ids,
+        )
+        ci_upper = self._sum_series(
+            prob_result.selected_ensemble.prediction_ci_upper,
+            component_ids,
+        )
+
+        windowed_median = self._apply_windows(median_values, observed)
+        uses_memberwise_windowed_prediction = False
+        if windowed_median is not None:
+            time_steps, _ = windowed_median
+            win_med = prob_result.selected_ensemble.windowed_prediction_median
+            if win_med and bin_id in win_med:
+                uses_memberwise_windowed_prediction = True
+                plot_median = win_med[bin_id]
+                plot_ci_lower = (
+                    prob_result.selected_ensemble.windowed_prediction_ci_lower[bin_id]
+                )
+                plot_ci_upper = (
+                    prob_result.selected_ensemble.windowed_prediction_ci_upper[bin_id]
+                )
+            elif win_med and all(
+                component_id in win_med for component_id in component_ids
+            ):
+                uses_memberwise_windowed_prediction = True
+                plot_median = self._sum_series(win_med, component_ids)
+                plot_ci_lower = self._sum_series(
+                    prob_result.selected_ensemble.windowed_prediction_ci_lower,
+                    component_ids,
+                )
+                plot_ci_upper = self._sum_series(
+                    prob_result.selected_ensemble.windowed_prediction_ci_upper,
+                    component_ids,
+                )
+            else:
+                _, plot_median = windowed_median
+                _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
+                _, plot_ci_upper = self._apply_windows(ci_upper, observed)  # type: ignore[misc]
+        else:
+            time_steps = list(range(len(median_values)))
+            plot_median = median_values
+            plot_ci_lower = ci_lower
+            plot_ci_upper = ci_upper
+
+        model_scale = (
+            1.0
+            if uses_memberwise_windowed_prediction
+            else self._model_scale_for_observed(observed, scale_values)
+        )
+        plot_median = self._scale_series(plot_median, model_scale)
+        plot_ci_lower = self._scale_series(plot_ci_lower, model_scale)
+        plot_ci_upper = self._scale_series(plot_ci_upper, model_scale)
 
         # Build parameters for lineplot (median)
         params = {
             "x": time_steps,
-            "y": median_values,
+            "y": plot_median,
             "ax": ax,
             "label": "Median Prediction",
+            "legend": show_legend,
         }
         params.update(plot_kwargs)
 
@@ -530,22 +727,16 @@ class SimulationPlotter:
         # Plot confidence interval as filled area
         ax.fill_between(
             time_steps,
-            ci_lower,
-            ci_upper,
+            plot_ci_lower,
+            plot_ci_upper,
             alpha=0.3,
-            label="95% CI",
+            label="95% CI" if show_legend else "_nolegend_",
         )
 
         # Overlay observed data if available
         if observed:
             obs_steps = [p.step for p in observed]
-            # Apply scale if observation has a scale_id
-            obs_values = [
-                p.value / scale_values[p.scale_id]
-                if p.scale_id and p.scale_id in scale_values
-                else p.value
-                for p in observed
-            ]
+            obs_values = [p.value for p in observed]
             sns.scatterplot(
                 x=obs_steps,
                 y=obs_values,
@@ -555,6 +746,7 @@ class SimulationPlotter:
                 s=30,
                 alpha=0.7,
                 zorder=5,
+                legend=show_legend,
             )
 
         # Get bin unit from model for label
@@ -569,10 +761,13 @@ class SimulationPlotter:
         unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
         bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
 
-        ax.set_xlabel("Step")
+        ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
         ax.set_title(f"{bin_name}")
-        ax.legend()
+        if step_to_label:
+            self._apply_x_labels(ax, time_steps, step_to_label, tick_every)
+        if show_legend:
+            ax.legend()
         ax.grid(True, alpha=0.3)
 
     def _plot_bin_cumulative_probabilistic(

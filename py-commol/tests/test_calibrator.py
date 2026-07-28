@@ -48,6 +48,94 @@ class TestCalibrator:
         )
         return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
+    @pytest.fixture(scope="class")
+    def model_with_accumulator(self) -> Model:
+        """SIR model whose cumulative infections are tracked in an accumulator."""
+        builder = (
+            ModelBuilder(name="Test SIR accumulator", version="1.0")
+            .add_bin(id="S", name="Susceptible")
+            .add_bin(id="I", name="Infected")
+            .add_bin(id="R", name="Recovered")
+            .add_accumulator(id="cumulative_infections", name="Cumulative infections")
+            .add_parameter(id="beta", value=0.1)
+            .add_parameter(id="gamma", value=0.05)
+            .add_transition(
+                id="infection",
+                source=["S"],
+                target=["I"],
+                rate="beta * S * I / N",
+                accumulators=["cumulative_infections"],
+            )
+            .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "S", "fraction": 0.99},
+                    {"bin": "I", "fraction": 0.01},
+                    {"bin": "R", "fraction": 0.0},
+                ],
+            )
+        )
+        return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+    def test_constraint_n_excludes_accumulators(self, model_with_accumulator: Model):
+        """
+        `N` in a constraint must be the population total only.
+
+        Accumulators are appended to each simulation output row after the
+        population compartments. If they were summed into `N`, a bound written as
+        a fraction of `N` would silently loosen as the accumulator grew.
+        """
+        simulation = Simulation(model_with_accumulator)
+        results = simulation.run(200, output_format="dict_of_lists")
+
+        cumulative = results["cumulative_infections"][-1]
+        population = sum(results[b][-1] for b in ("S", "I", "R"))
+        # The accumulator must be big enough that inflating N would be visible.
+        assert cumulative > 0.2 * population
+
+        max_fraction = 0.5
+        problem = CalibrationProblem(
+            observed_data=[
+                ObservedDataPoint(step=i, compartment="I", value=results["I"][i])
+                for i in range(200)
+            ],
+            parameters=[
+                CalibrationParameter(
+                    id="beta",
+                    parameter_type="parameter",
+                    min_bound=0.05,
+                    max_bound=1.0,
+                ),
+            ],
+            constraints=[
+                CalibrationConstraint(
+                    id="max_cumulative_infections",
+                    expression=f"{max_fraction} * N - cumulative_infections",
+                    description="Cumulative infections capped at half the population",
+                    time_steps=[200],
+                ),
+            ],
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(
+                num_particles=12, max_iterations=40, verbose=False
+            ),
+            seed=SEED,
+        )
+
+        result = Calibrator(simulation, problem).run()
+
+        model_with_accumulator.update_parameters(
+            {"beta": result.best_parameters["beta"]}
+        )
+        fitted = Simulation(model_with_accumulator).run(
+            200, output_format="dict_of_lists"
+        )
+        fitted_cumulative = fitted["cumulative_infections"][-1]
+        fitted_population = sum(fitted[b][-1] for b in ("S", "I", "R"))
+
+        assert fitted_cumulative <= max_fraction * fitted_population + 1e-6
+
     def test_model_calibration_nelder_mead(self, model: Model):
         """
         Test calibration of SIR model parameters using Nelder-Mead algorithm.
@@ -125,6 +213,82 @@ class TestCalibrator:
         # With seed, calibration is now deterministic and reproducible
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
+
+    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae", "weighted_sse"])
+    @pytest.mark.parametrize("normalize", [False, True])
+    def test_loss_config_carries_normalization_flag(
+        self, model: Model, loss_function: str, normalize: bool
+    ):
+        """The problem's normalize_observations must reach the Rust LossConfig."""
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(step=0, compartment="I", value=10.0)],
+            parameters=[
+                CalibrationParameter(
+                    id="beta",
+                    parameter_type="parameter",
+                    min_bound=0.0,
+                    max_bound=1.0,
+                )
+            ],
+            loss_function=loss_function,
+            normalize_observations=normalize,
+            optimization_config=NelderMeadConfig(max_iterations=1, verbose=False),
+        )
+
+        loss_config = Calibrator(Simulation(model), problem)._build_loss_config()
+
+        assert loss_config.normalize_observations is normalize
+
+    def test_normalization_changes_deterministic_loss(self, model: Model):
+        """
+        Enabling normalization must change the loss the deterministic calibrator
+        minimizes, since each residual is divided by its series' RMS.
+        """
+        simulation = Simulation(model)
+        results = simulation.run(100, output_format="dict_of_lists")
+
+        # Bias the targets so no parameter choice drives the residuals to zero,
+        # otherwise both losses collapse to 0 and cannot be told apart.
+        observed_data = [
+            ObservedDataPoint(step=i, compartment="I", value=results["I"][i] + 25.0)
+            for i in range(100)
+        ]
+        parameters = [
+            CalibrationParameter(
+                id="beta",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+            CalibrationParameter(
+                id="gamma",
+                parameter_type="parameter",
+                min_bound=0.0,
+                max_bound=1.0,
+            ),
+        ]
+
+        def final_loss(normalize: bool) -> float:
+            problem = CalibrationProblem(
+                observed_data=observed_data,
+                parameters=parameters,
+                loss_function="sse",
+                normalize_observations=normalize,
+                optimization_config=ParticleSwarmConfig(
+                    max_iterations=50, verbose=False
+                ),
+                seed=SEED,
+            )
+            return Calibrator(simulation, problem).run().final_loss
+
+        raw_loss = final_loss(normalize=False)
+        normalized_loss = final_loss(normalize=True)
+
+        rms = math.sqrt(
+            sum(point.value**2 for point in observed_data) / len(observed_data)
+        )
+        assert rms > 1.0
+        assert normalized_loss < raw_loss
 
     def test_parameter_with_none_value(self):
         """Test that Parameter can be created with None value."""

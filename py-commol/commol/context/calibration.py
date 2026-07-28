@@ -28,7 +28,10 @@ class ObservedDataPoint(BaseModel):
     step : int
         Time step of the observation
     compartment : str
-        Name of the compartment being observed
+        Name of the compartment being observed, or a display name for aggregate
+        observations when compartments is set
+    compartments : list[str] | None
+        Optional output names to sum before comparing with this observation
     value : float
         Observed value
     weight : float
@@ -41,6 +44,10 @@ class ObservedDataPoint(BaseModel):
     compartment: str = Field(
         default=..., min_length=1, description="Name of the compartment being observed"
     )
+    compartments: list[str] | None = Field(
+        default=None,
+        description="Optional output names to sum before comparison",
+    )
     value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
         default=1.0,
@@ -51,6 +58,28 @@ class ObservedDataPoint(BaseModel):
         default=None,
         description="Optional scale parameter ID to apply to model output",
     )
+    window_steps: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Optional window length for cumulative-output observations. "
+            "When set, prediction is value(step) - value(step - window_steps)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_window_steps(self) -> Self:
+        if self.window_steps is not None and self.window_steps > self.step:
+            raise ValueError(
+                f"window_steps ({self.window_steps}) must be <= step ({self.step})"
+            )
+        return self
+
+    @field_validator("compartments")
+    def validate_compartments(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and not v:
+            raise ValueError("compartments must be non-empty when provided")
+        return v
 
 
 class CalibrationParameter(BaseModel):
@@ -880,6 +909,9 @@ class CalibrationProblem(BaseModel):
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
         Loss function to use for measuring fit quality (default: "sse")
+    normalize_observations : bool
+        When True, divide each residual by the RMS of its observation series
+        before applying the loss metric (default: False).
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
     probabilistic_config : ProbabilisticCalibrationConfig | None
@@ -910,6 +942,15 @@ class CalibrationProblem(BaseModel):
     loss_function: str = Field(
         default=LossFunction.SSE,
         description="Loss function to use for measuring fit quality",
+    )
+    normalize_observations: bool = Field(
+        default=False,
+        description=(
+            "Normalize each residual by the RMS of its observation series before "
+            "applying the loss metric. Keeps series measured on very different "
+            "scales comparable in both the optimization loss and fit-gated "
+            "ensemble selection."
+        ),
     )
     optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
         default=..., description="Optimization algorithm configuration"

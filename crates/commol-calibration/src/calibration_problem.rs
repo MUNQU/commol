@@ -10,6 +10,105 @@ use crate::types::{
     LossConfig, ObservedDataPoint,
 };
 
+#[derive(Clone)]
+enum InitialConditionTarget {
+    PopulationFraction { entries: Vec<(usize, f64)> },
+    PairedCategoryFraction { pairs: Vec<(usize, usize)> },
+}
+
+impl InitialConditionTarget {
+    fn exact(index: usize) -> Self {
+        Self::PopulationFraction {
+            entries: vec![(index, 1.0)],
+        }
+    }
+
+    fn aggregate(indices: Vec<usize>, population: &[f64]) -> Self {
+        let total: f64 = indices.iter().map(|&idx| population[idx]).sum();
+        let weight = if total > 0.0 {
+            None
+        } else {
+            Some(1.0 / indices.len() as f64)
+        };
+
+        Self::PopulationFraction {
+            entries: indices
+                .into_iter()
+                .map(|idx| {
+                    let entry_weight = weight.unwrap_or(population[idx] / total);
+                    (idx, entry_weight)
+                })
+                .collect(),
+        }
+    }
+
+    fn paired_category(
+        category: &str,
+        compartment_map: &std::collections::HashMap<&str, usize>,
+    ) -> Result<Option<Self>, String> {
+        let mut pairs = Vec::new();
+        for (&name, &category_idx) in compartment_map {
+            let tokens: Vec<&str> = name.split('_').collect();
+            for (token_idx, token) in tokens.iter().enumerate() {
+                // Token 0 is the bin id. Category calibration targets only
+                // stratification suffix tokens.
+                if token_idx == 0 {
+                    continue;
+                }
+                if *token != category {
+                    continue;
+                }
+
+                let mut complement_indices = Vec::new();
+                for (&candidate_name, &candidate_idx) in compartment_map {
+                    let candidate_tokens: Vec<&str> = candidate_name.split('_').collect();
+                    if candidate_tokens.len() != tokens.len()
+                        || candidate_tokens[token_idx] == category
+                    {
+                        continue;
+                    }
+
+                    let same_except_category = tokens
+                        .iter()
+                        .enumerate()
+                        .all(|(idx, token)| idx == token_idx || candidate_tokens[idx] == *token);
+                    if same_except_category {
+                        complement_indices.push(candidate_idx);
+                    }
+                }
+
+                match complement_indices.as_slice() {
+                    [complement_idx] => pairs.push((category_idx, *complement_idx)),
+                    [] => return Ok(None),
+                    _ => {
+                        return Err(format!(
+                            "Initial condition category '{}' is ambiguous for compartment '{}': \
+                             expected exactly one complementary category, found {}",
+                            category,
+                            name,
+                            complement_indices.len()
+                        ));
+                    }
+                }
+            }
+        }
+
+        pairs.sort_unstable();
+        Ok((!pairs.is_empty()).then_some(Self::PairedCategoryFraction { pairs }))
+    }
+
+    fn covered_population_compartments(&self) -> Vec<usize> {
+        match self {
+            Self::PopulationFraction { entries } => entries.iter().map(|(idx, _)| *idx).collect(),
+            Self::PairedCategoryFraction { .. } => Vec::new(),
+        }
+    }
+
+    fn is_population_fraction(&self) -> bool {
+        matches!(self, Self::PopulationFraction { .. })
+    }
+}
+
 /// Generic calibration problem that works with any SimulationEngine implementation.
 ///
 /// This struct is model-agnostic and can work with DifferenceEquations,
@@ -49,25 +148,43 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Observed data points to fit against
     observed_data: Vec<ObservedDataPoint>,
 
-    /// Indices of observed compartments in the engine's compartment vector
-    observed_compartment_indices: Vec<usize>,
+    /// Indices of observed outputs in the engine's output vector.
+    /// Each observation may sum one or more outputs before comparison.
+    observed_output_indices: Vec<Vec<usize>>,
+
+    /// Sorted, deduplicated observation time steps for sparse loss evaluation
+    observed_time_steps: Vec<u32>,
+
+    /// Row index in `observed_time_steps` for each observed data point
+    observed_time_indices: Vec<usize>,
+
+    /// Optional previous row index for windowed cumulative-output observations.
+    observed_previous_time_indices: Vec<Option<usize>>,
+
+    /// Row indices in `observed_time_steps` for each time-dependent constraint.
+    constraint_time_indices: Vec<Option<Vec<usize>>>,
 
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
 
-    /// Compartment indices for initial condition parameters (parallel to parameters vec)
-    /// None for Parameter type, Some(index) for InitialCondition type
-    parameter_compartment_indices: Vec<Option<usize>>,
+    /// Initial-condition targets for calibration parameters (parallel to parameters vec).
+    /// None for non-initial-condition parameters.
+    parameter_initial_condition_targets: Vec<Option<InitialConditionTarget>>,
 
     /// Scale parameter indices for observed data points (parallel to observed_data vec)
     /// None if no scale is applied, Some(param_idx) if a scale parameter should be applied
     observed_scale_indices: Vec<Option<usize>>,
 
+    /// Per-series normalization factors (parallel to observed_data vec).
+    ///
+    /// Each entry is `1 / rms` of its series' observed values, used by the
+    /// [`LossConfig::NormalizedSSE`] loss so that series of very different
+    /// magnitudes contribute comparably. Always `1.0` for series whose observed
+    /// values are all (near) zero. Ignored by every other loss configuration.
+    observed_normalization: Vec<f64>,
+
     /// Loss function configuration
     loss_config: LossConfig,
-
-    /// Maximum time step in observed data (cached for performance)
-    max_time_step: u32,
 
     /// Pre-allocated buffer for simulation results (reused across evaluations)
     /// Wrapped in RwLock to allow thread-safe mutation in cost() method
@@ -92,6 +209,20 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Indices of time-dependent constraints (with time_steps, evaluated at specified times during simulation)
     time_dependent_constraint_indices: Vec<usize>,
 
+    /// Pre-computed prefix → compartment-index mappings for constraint evaluation.
+    ///
+    /// A prefix referenced in a constraint expression resolves to the total
+    /// population of all compartments that share that prefix. This covers full bin
+    /// names (aggregating over all strata) as well as partial stratification
+    /// specifications (aggregating over the remaining unspecified strata),
+    /// consistent with how such names behave everywhere else in the model.
+    bin_aggregates: Vec<(String, Vec<usize>)>,
+
+    /// Outputs that are not population compartments (accumulators), as
+    /// `(name, row index)`. These are injected by name during constraint
+    /// evaluation so they resolve without counting towards `N`.
+    non_population_outputs: Vec<(String, usize)>,
+
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
 }
@@ -100,18 +231,22 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
     fn clone(&self) -> Self {
         // Pre-allocate result buffer for the clone
-        let buffer_capacity = (self.max_time_step + 1) as usize;
+        let buffer_capacity = self.observed_time_steps.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
         Self {
             base_engine: self.base_engine.clone(),
             observed_data: self.observed_data.clone(),
-            observed_compartment_indices: self.observed_compartment_indices.clone(),
+            observed_output_indices: self.observed_output_indices.clone(),
+            observed_time_steps: self.observed_time_steps.clone(),
+            observed_time_indices: self.observed_time_indices.clone(),
+            observed_previous_time_indices: self.observed_previous_time_indices.clone(),
+            constraint_time_indices: self.constraint_time_indices.clone(),
             parameters: self.parameters.clone(),
-            parameter_compartment_indices: self.parameter_compartment_indices.clone(),
+            parameter_initial_condition_targets: self.parameter_initial_condition_targets.clone(),
             observed_scale_indices: self.observed_scale_indices.clone(),
+            observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
-            max_time_step: self.max_time_step,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: self.initial_population_size,
             constraints: self.constraints.clone(),
@@ -119,9 +254,81 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             evaluations: RwLock::new(Vec::new()), // Each clone gets fresh evaluation history
             parameter_constraint_indices: self.parameter_constraint_indices.clone(),
             time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
+            bin_aggregates: self.bin_aggregates.clone(),
+            non_population_outputs: self.non_population_outputs.clone(),
             _phantom: PhantomData,
         }
     }
+}
+
+/// Build a mapping from partial compartment name prefixes to the indices of all
+/// compartments that share that prefix.
+///
+/// Every prefix formed by taking a compartment name up to any of its underscore
+/// separators is a candidate key. A key is retained only when two or more
+/// compartments share it, making it useful for aggregation. This covers both
+/// full bin names (aggregating over all strata) and partial stratification
+/// specifications (aggregating over the remaining unspecified strata).
+fn compute_bin_aggregates(compartment_names: &[String]) -> Vec<(String, Vec<usize>)> {
+    let mut map: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+    for (idx, name) in compartment_names.iter().enumerate() {
+        let mut pos = 0;
+        while let Some(rel) = name[pos..].find('_') {
+            let prefix = name[..pos + rel].to_string();
+            map.entry(prefix).or_default().push(idx);
+            pos += rel + 1;
+        }
+    }
+    let mut result: Vec<(String, Vec<usize>)> =
+        map.into_iter().filter(|(_, v)| v.len() > 1).collect();
+    result.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    result
+}
+
+/// Compute per-observation normalization factors (parallel to `observed_data`).
+///
+/// Observations are grouped by series (`compartment` label) and each factor is
+/// `1 / rms` of that series' observed values, so a residual equal to the series'
+/// typical magnitude contributes comparably across series. Series whose values
+/// are all (near) zero get a factor of `1.0`. When `enabled` is `false`, every
+/// factor is `1.0`, leaving all loss metrics unchanged.
+///
+/// This must stay consistent with the Python-side `series_normalization_factors`
+/// used during fit-gated ensemble selection.
+fn compute_observation_normalization(
+    observed_data: &[ObservedDataPoint],
+    enabled: bool,
+) -> Vec<f64> {
+    if !enabled {
+        return vec![1.0; observed_data.len()];
+    }
+
+    let mut series_sum_squares: std::collections::HashMap<&str, (f64, usize)> =
+        std::collections::HashMap::new();
+    for obs in observed_data {
+        let entry = series_sum_squares
+            .entry(obs.compartment.as_str())
+            .or_insert((0.0, 0));
+        entry.0 += obs.value * obs.value;
+        entry.1 += 1;
+    }
+
+    observed_data
+        .iter()
+        .map(|obs| {
+            let (sum_squares, count) = series_sum_squares[obs.compartment.as_str()];
+            let rms = if count > 0 {
+                (sum_squares / count as f64).sqrt()
+            } else {
+                0.0
+            };
+            if rms > f64::EPSILON {
+                1.0 / rms
+            } else {
+                1.0
+            }
+        })
+        .collect()
 }
 
 impl<E: SimulationEngine> CalibrationProblem<E> {
@@ -160,54 +367,125 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             return Err("No calibration parameters provided".to_string());
         }
 
-        // Build compartment name to index mapping
+        // Build output name to index mapping for observations. Outputs include
+        // state compartments and non-population outputs such as accumulators.
+        let output_names = base_engine.output_names();
+        let output_map: std::collections::HashMap<&str, usize> = output_names
+            .iter()
+            .enumerate()
+            .map(|(idx, name)| (name.as_str(), idx))
+            .collect();
+
+        // Aggregate prefixes over every output, so a constraint can name a bare bin
+        // or a bare accumulator and get the total across strata. Indices address
+        // full output rows, matching the rows that time-dependent constraints are
+        // evaluated against.
+        let output_aggregates = compute_bin_aggregates(&output_names);
+        let output_aggregate_names: std::collections::HashSet<&str> = output_aggregates
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
+
+        // Validate observed output names and convert to indices.
+        let mut observed_output_indices = Vec::with_capacity(observed_data.len());
+        for obs in &observed_data {
+            if let Some(window_steps) = obs.window_steps {
+                if window_steps > obs.time_step {
+                    return Err(format!(
+                        "Observation '{}' at step {} has window_steps={} before simulation start",
+                        obs.compartment, obs.time_step, window_steps
+                    ));
+                }
+            }
+
+            let observed_outputs: Vec<&str> = obs.compartments.as_ref().map_or_else(
+                || vec![obs.compartment.as_str()],
+                |compartments| compartments.iter().map(String::as_str).collect(),
+            );
+            if observed_outputs.is_empty() {
+                return Err(format!(
+                    "Observation '{}' at step {} has an empty compartments list",
+                    obs.compartment, obs.time_step
+                ));
+            }
+
+            let mut indices = Vec::with_capacity(observed_outputs.len());
+            for output_name in observed_outputs {
+                match output_map.get(output_name) {
+                    Some(&idx) => indices.push(idx),
+                    None => {
+                        return Err(format!(
+                            "Invalid observed output name '{}' for observation '{}' \
+                            (available: {})",
+                            output_name,
+                            obs.compartment,
+                            output_names.join(", ")
+                        ));
+                    }
+                }
+            }
+            observed_output_indices.push(indices);
+        }
+
+        // Build compartment indices for calibration parameters
         let compartments = base_engine.compartments();
         let compartment_map: std::collections::HashMap<&str, usize> = compartments
             .iter()
             .enumerate()
             .map(|(idx, name)| (name.as_str(), idx))
             .collect();
-
-        // Validate compartment names and convert to indices
-        let mut observed_compartment_indices = Vec::with_capacity(observed_data.len());
-        for obs in &observed_data {
-            match compartment_map.get(obs.compartment.as_str()) {
-                Some(&idx) => observed_compartment_indices.push(idx),
-                None => {
-                    return Err(format!(
-                        "Invalid compartment name '{}' (available: {})",
-                        obs.compartment,
-                        compartments.join(", ")
-                    ));
-                }
-            }
-        }
-
-        // Build compartment indices for calibration parameters
-        let mut parameter_compartment_indices = Vec::with_capacity(parameters.len());
+        let initial_population = base_engine.population();
+        let mut parameter_initial_condition_targets = Vec::with_capacity(parameters.len());
         for param in &parameters {
             match param.parameter_type {
                 CalibrationParameterType::Parameter => {
-                    // No compartment index needed for regular parameters
-                    parameter_compartment_indices.push(None);
+                    // No initial-condition target needed for regular parameters
+                    parameter_initial_condition_targets.push(None);
                 }
                 CalibrationParameterType::InitialCondition => {
-                    // Look up compartment index by bin ID
-                    match compartment_map.get(param.id.as_str()) {
-                        Some(&idx) => parameter_compartment_indices.push(Some(idx)),
-                        None => {
+                    // Initial conditions may target an exact expanded compartment
+                    // (for example A_cat0) or an aggregate bin (for example A).
+                    if let Some(&idx) = compartment_map.get(param.id.as_str()) {
+                        parameter_initial_condition_targets
+                            .push(Some(InitialConditionTarget::exact(idx)));
+                    } else {
+                        let prefix = format!("{}_", param.id);
+                        let aggregate_indices: Vec<usize> = compartments
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(idx, name)| {
+                                (name == &param.id || name.starts_with(&prefix)).then_some(idx)
+                            })
+                            .collect();
+
+                        if aggregate_indices.is_empty() {
+                            if let Some(target) = InitialConditionTarget::paired_category(
+                                &param.id,
+                                &compartment_map,
+                            )? {
+                                parameter_initial_condition_targets.push(Some(target));
+                                continue;
+                            }
+
                             return Err(format!(
-                                "Invalid bin ID '{}' for initial condition calibration
+                                "Invalid bin or compartment ID '{}' for initial condition calibration
                                 (available: {})",
                                 param.id,
                                 compartments.join(", ")
                             ));
                         }
+
+                        parameter_initial_condition_targets.push(Some(
+                            InitialConditionTarget::aggregate(
+                                aggregate_indices,
+                                &initial_population,
+                            ),
+                        ));
                     }
                 }
                 CalibrationParameterType::Scale => {
-                    // No compartment index needed for scale parameters
-                    parameter_compartment_indices.push(None);
+                    // No initial-condition target needed for scale parameters
+                    parameter_initial_condition_targets.push(None);
                 }
             }
         }
@@ -246,16 +524,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
-        // Find maximum time step to avoid recomputing in each cost evaluation
-        let max_time_step = observed_data
-            .iter()
-            .map(|obs| obs.time_step)
-            .max()
-            .unwrap_or(100);
-
-        // Pre-allocate result buffer for performance
-        let buffer_capacity = (max_time_step + 1) as usize;
-        let result_buffer = Vec::with_capacity(buffer_capacity);
+        // Observation normalization is disabled by default (factors are all
+        // 1.0, a no-op in every loss metric). Callers opt in via
+        // `with_observation_normalization`.
+        let observed_normalization = compute_observation_normalization(&observed_data, false);
 
         // Compile and validate constraints
         let compiled_constraints: Vec<MathExpression> = constraints
@@ -272,6 +544,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         let mut parameter_constraint_indices = Vec::new();
         let mut time_dependent_constraint_indices = Vec::new();
+        let mut simulation_time_steps: Vec<u32> = observed_data
+            .iter()
+            .flat_map(|obs| {
+                std::iter::once(obs.time_step).chain(
+                    obs.window_steps
+                        .map(|window_steps| obs.time_step - window_steps),
+                )
+            })
+            .collect();
 
         for (idx, constraint) in constraints.iter().enumerate() {
             let expr = &compiled_constraints[idx];
@@ -294,11 +575,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
 
                 let is_parameter = param_ids.contains_key(var.as_str());
-                let is_compartment = compartment_map.contains_key(var.as_str());
+                // Constraints resolve against every simulation output, so they can
+                // reference accumulators as well as state compartments, plus any
+                // aggregate prefix of either.
+                let is_compartment = output_map.contains_key(var.as_str())
+                    || output_aggregate_names.contains(var.as_str());
 
                 if !is_parameter && !is_compartment {
                     return Err(format!(
-                        "Constraint '{}' references unknown variable '{}' (not a parameter or compartment)",
+                        "Constraint '{}' references unknown variable '{}' (not a parameter or simulation output)",
                         constraint.id, var
                     ));
                 }
@@ -312,31 +597,81 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
             }
 
-            // Validate time steps are within simulation range
+            // Add sparse constraint time steps to the simulation schedule.
             if let Some(ref time_steps) = constraint.time_steps {
-                for &ts in time_steps {
-                    if ts > max_time_step {
-                        return Err(format!(
-                            "Constraint '{}' has time step {} exceeding max observed time step {}",
-                            constraint.id, ts, max_time_step
-                        ));
-                    }
-                }
+                simulation_time_steps.extend(time_steps.iter().copied());
                 time_dependent_constraint_indices.push(idx);
             } else {
                 parameter_constraint_indices.push(idx);
             }
         }
 
+        simulation_time_steps.sort_unstable();
+        simulation_time_steps.dedup();
+
+        let observed_time_indices: Vec<usize> = observed_data
+            .iter()
+            .map(|obs| {
+                simulation_time_steps
+                    .binary_search(&obs.time_step)
+                    .expect("observed time step must be present")
+            })
+            .collect();
+
+        let observed_previous_time_indices: Vec<Option<usize>> = observed_data
+            .iter()
+            .map(|obs| {
+                obs.window_steps.map(|window_steps| {
+                    simulation_time_steps
+                        .binary_search(&(obs.time_step - window_steps))
+                        .expect("window previous time step must be present")
+                })
+            })
+            .collect();
+
+        let constraint_time_indices: Vec<Option<Vec<usize>>> = constraints
+            .iter()
+            .map(|constraint| {
+                constraint.time_steps.as_ref().map(|time_steps| {
+                    time_steps
+                        .iter()
+                        .map(|time_step| {
+                            simulation_time_steps
+                                .binary_search(time_step)
+                                .expect("constraint time step must be present")
+                        })
+                        .collect()
+                })
+            })
+            .collect();
+
+        // Pre-allocate result buffer for performance
+        let buffer_capacity = simulation_time_steps.len();
+        let result_buffer = Vec::with_capacity(buffer_capacity);
+
+        let bin_aggregates = output_aggregates;
+        // Outputs past the population block are accumulators; keep their row
+        // indices so constraints can name them individually.
+        let non_population_outputs: Vec<(String, usize)> = output_names
+            .iter()
+            .enumerate()
+            .skip(compartments.len())
+            .map(|(idx, name)| (name.clone(), idx))
+            .collect();
+
         Ok(Self {
             base_engine,
             observed_data,
-            observed_compartment_indices,
+            observed_output_indices,
+            observed_time_steps: simulation_time_steps,
+            observed_time_indices,
+            observed_previous_time_indices,
+            constraint_time_indices,
             parameters,
-            parameter_compartment_indices,
+            parameter_initial_condition_targets,
             observed_scale_indices,
+            observed_normalization,
             loss_config,
-            max_time_step,
             result_buffer: RwLock::new(result_buffer),
             initial_population_size: initial_population_size as f64,
             constraints,
@@ -344,8 +679,25 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             evaluations: RwLock::new(Vec::new()),
             parameter_constraint_indices,
             time_dependent_constraint_indices,
+            bin_aggregates,
+            non_population_outputs,
             _phantom: PhantomData,
         })
+    }
+
+    /// Enable or disable per-series observation normalization.
+    ///
+    /// When enabled, each residual is multiplied by `1 / rms` of its series'
+    /// observed values before the configured loss metric is applied, so that
+    /// series measured on very different scales contribute comparably to the
+    /// loss. This is orthogonal to the choice of metric and applies to all of them.
+    ///
+    /// Disabled by default. When disabled, the factors are all `1.0`, leaving
+    /// every metric unchanged.
+    pub fn with_observation_normalization(mut self, enabled: bool) -> Self {
+        self.observed_normalization =
+            compute_observation_normalization(&self.observed_data, enabled);
+        self
     }
 
     /// Get the number of parameters being calibrated
@@ -403,14 +755,16 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let num_compartments = self.base_engine.compartments().len();
         let mut calibrated_compartments = vec![false; num_compartments];
 
-        for (param, compartment_idx) in self
+        for (param, target) in self
             .parameters
             .iter()
-            .zip(&self.parameter_compartment_indices)
+            .zip(&self.parameter_initial_condition_targets)
         {
             if param.parameter_type == CalibrationParameterType::InitialCondition {
-                if let Some(idx) = compartment_idx {
-                    calibrated_compartments[*idx] = true;
+                if let Some(target) = target {
+                    for idx in target.covered_population_compartments() {
+                        calibrated_compartments[idx] = true;
+                    }
                 }
             }
         }
@@ -429,19 +783,24 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .parameters
             .iter()
             .enumerate()
-            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
+            .filter(|(idx, param)| {
+                param.parameter_type == CalibrationParameterType::InitialCondition
+                    && self.parameter_initial_condition_targets[*idx]
+                        .as_ref()
+                        .is_some_and(InitialConditionTarget::is_population_fraction)
+            })
             .map(|(idx, _)| idx)
             .collect();
 
         let num_initial_conditions_params = initial_conditions_params_indices.len();
-        let all_compartments_are_initial_conditions =
-            num_initial_conditions_params == num_compartments;
+        let all_compartments_are_initial_conditions = calibrated_compartments
+            .iter()
+            .all(|is_calibrated| *is_calibrated);
 
-        // Auto-calculate the last initial condition parameter if:
-        // 1. All compartments are initial conditions AND there are 2+ initial condition parameters, OR
-        // 2. There's exactly 1 initial condition parameter with fixed compartments (sum constraint)
-        let auto_calc_initial_conditions_idx = if (num_initial_conditions_params >= 2
-            && all_compartments_are_initial_conditions)
+        // Auto-calculate the last population-fraction initial condition when
+        // there is enough information for a remainder. Fixed compartments stay
+        // out of the optimizer and contribute through fixed_initial_conditions_sum.
+        let auto_calc_initial_conditions_idx = if num_initial_conditions_params >= 2
             || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
         {
             initial_conditions_params_indices.last().copied()
@@ -455,6 +814,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .enumerate()
             .filter(|(idx, _)| {
                 self.parameters[*idx].parameter_type == CalibrationParameterType::InitialCondition
+                    && self.parameter_initial_condition_targets[*idx]
+                        .as_ref()
+                        .is_some_and(InitialConditionTarget::is_population_fraction)
                     && Some(*idx) != auto_calc_initial_conditions_idx
             })
             .map(|(_, value)| value)
@@ -496,16 +858,27 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .parameters
             .iter()
             .enumerate()
-            .filter(|(_, param)| param.parameter_type == CalibrationParameterType::InitialCondition)
+            .filter(|(idx, param)| {
+                param.parameter_type == CalibrationParameterType::InitialCondition
+                    && self.parameter_initial_condition_targets[*idx]
+                        .as_ref()
+                        .is_some_and(InitialConditionTarget::is_population_fraction)
+            })
             .map(|(idx, _)| idx)
             .collect();
 
         let num_initial_conditions_params = initial_conditions_params_indices.len();
-        let all_compartments_are_initial_conditions =
-            num_initial_conditions_params == num_compartments;
+        let mut calibrated_compartments = vec![false; num_compartments];
+        for target in self.parameter_initial_condition_targets.iter().flatten() {
+            for idx in target.covered_population_compartments() {
+                calibrated_compartments[idx] = true;
+            }
+        }
+        let all_compartments_are_initial_conditions = calibrated_compartments
+            .iter()
+            .all(|is_calibrated| *is_calibrated);
 
-        let auto_calc_initial_conditions_idx = if (num_initial_conditions_params >= 2
-            && all_compartments_are_initial_conditions)
+        let auto_calc_initial_conditions_idx = if num_initial_conditions_params >= 2
             || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
         {
             initial_conditions_params_indices.last().copied()
@@ -537,40 +910,67 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         corrected
     }
 
-    /// Calculate loss between simulation results and observed data
-    fn calculate_loss(&self, simulation_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
+    /// Calculate loss from a sparse result matrix whose rows are aligned with
+    /// `self.observed_time_steps`.
+    fn calculate_sparse_loss(&self, observed_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
         let observation_iter = || {
             self.observed_data
                 .iter()
-                .zip(&self.observed_compartment_indices)
+                .zip(&self.observed_output_indices)
                 .zip(&self.observed_scale_indices)
-                .filter_map(|((obs, &compartment_idx), &scale_idx)| {
-                    let time_idx = obs.time_step as usize;
-                    simulation_results.get(time_idx).map(|step_data| {
-                        let predicted = step_data[compartment_idx];
-                        // Apply scale if present
-                        let scaled_predicted = if let Some(param_idx) = scale_idx {
-                            predicted * param_values[param_idx]
-                        } else {
-                            predicted
-                        };
-                        (obs, scaled_predicted)
-                    })
-                })
+                .zip(&self.observed_time_indices)
+                .zip(&self.observed_previous_time_indices)
+                .zip(&self.observed_normalization)
+                .filter_map(
+                    |(
+                        ((((obs, output_indices), &scale_idx), &time_idx), &previous_time_idx),
+                        &normalization,
+                    )| {
+                        observed_results.get(time_idx).map(|step_data| {
+                            let current: f64 =
+                                output_indices.iter().map(|&idx| step_data[idx]).sum();
+                            let predicted = if let Some(previous_time_idx) = previous_time_idx {
+                                let previous: f64 = observed_results
+                                    .get(previous_time_idx)
+                                    .map(|row| {
+                                        output_indices
+                                            .iter()
+                                            .filter_map(|&idx| row.get(idx))
+                                            .copied()
+                                            .sum()
+                                    })
+                                    .unwrap_or(0.0);
+                                current - previous
+                            } else {
+                                current
+                            };
+                            let scaled_predicted = if let Some(param_idx) = scale_idx {
+                                predicted * param_values[param_idx]
+                            } else {
+                                predicted
+                            };
+                            (obs, scaled_predicted, normalization)
+                        })
+                    },
+                )
         };
 
+        // `normalization` is the per-series factor (1.0 unless observation
+        // normalization is enabled). It is applied to every metric so that
+        // series of very different magnitudes contribute comparably to any error
+        // measurement, not just to a single dedicated loss variant.
         match self.loss_config {
             LossConfig::SumSquaredError | LossConfig::WeightedSSE => observation_iter()
-                .map(|(obs, predicted)| {
-                    let error = (obs.value - predicted) * obs.weight;
+                .map(|(obs, predicted, normalization)| {
+                    let error = (obs.value - predicted) * obs.weight * normalization;
                     error * error
                 })
                 .sum(),
 
             LossConfig::RootMeanSquaredError => {
                 let (sum_squared_error, count) = observation_iter()
-                    .map(|(obs, predicted)| {
-                        let error = obs.value - predicted;
+                    .map(|(obs, predicted, normalization)| {
+                        let error = (obs.value - predicted) * normalization;
                         error * error
                     })
                     .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
@@ -584,7 +984,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
             LossConfig::MeanAbsoluteError => {
                 let (total_error, count) = observation_iter()
-                    .map(|(obs, predicted)| (obs.value - predicted).abs())
+                    .map(|(obs, predicted, normalization)| {
+                        ((obs.value - predicted) * normalization).abs()
+                    })
                     .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
 
                 if count > 0 {
@@ -620,6 +1022,91 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             ));
         }
         Ok(())
+    }
+
+    /// Build an engine clone with calibration parameters applied exactly as in
+    /// objective evaluation, including calibrated initial conditions.
+    pub fn configured_engine(&self, param_values: &[f64]) -> Result<E, String> {
+        self.validate_parameter_count(param_values)?;
+        let clamped_params = self.clamp_to_bounds(param_values);
+        let (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum) =
+            self.calculate_auto_corrected_parameters(&clamped_params);
+
+        if fixed_initial_conditions_sum + calibrated_initial_conditions_sum > 1.0 {
+            return Err(
+                "Invalid initial-condition fractions: fixed + calibrated values exceed 1.0"
+                    .to_string(),
+            );
+        }
+
+        let mut engine = self.base_engine.clone();
+        engine.reset();
+
+        for ((value, param), target) in corrected_params
+            .iter()
+            .zip(&self.parameters)
+            .zip(&self.parameter_initial_condition_targets)
+        {
+            match param.parameter_type {
+                CalibrationParameterType::Parameter => {
+                    engine
+                        .set_parameter(&param.id, *value)
+                        .map_err(|e| format!("Failed to set parameter '{}': {}", param.id, e))?;
+                }
+                CalibrationParameterType::InitialCondition => {
+                    let target = target
+                        .as_ref()
+                        .expect("InitialCondition must have a target");
+
+                    match target {
+                        InitialConditionTarget::PopulationFraction { entries } => {
+                            for &(idx, weight) in entries {
+                                engine
+                                    .set_initial_condition(
+                                        idx,
+                                        *value * weight * self.initial_population_size,
+                                    )
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                            }
+                        }
+                        InitialConditionTarget::PairedCategoryFraction { pairs } => {
+                            let current_population = engine.population();
+                            for &(category_idx, complement_idx) in pairs {
+                                let pair_total = current_population[category_idx]
+                                    + current_population[complement_idx];
+                                engine
+                                    .set_initial_condition(category_idx, *value * pair_total)
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                                engine
+                                    .set_initial_condition(
+                                        complement_idx,
+                                        (1.0 - *value) * pair_total,
+                                    )
+                                    .map_err(|e| {
+                                        format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        )
+                                    })?;
+                            }
+                        }
+                    }
+                }
+                CalibrationParameterType::Scale => {}
+            }
+        }
+
+        Ok(engine)
     }
 
     /// Calculate base penalty value for constraint violations
@@ -701,7 +1188,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Create context with parameter values
         let mut context = MathExpressionContext::new();
 
-        // Initialize compartment names
+        // Only population compartments are registered, so `N` stays the population
+        // total. Accumulators live further along each result row and are injected by
+        // name below, alongside the aggregates.
         let compartment_names = self.base_engine.compartments();
         context.init_compartments(compartment_names);
 
@@ -720,14 +1209,26 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .time_steps
                 .as_ref()
                 .expect("Time-dependent constraint must have time_steps");
+            let time_indices = self.constraint_time_indices[constraint_idx]
+                .as_ref()
+                .expect("Time-dependent constraint must have row indices");
 
-            for &time_step in time_steps {
-                let time_idx = time_step as usize;
-
+            for (&time_step, &time_idx) in time_steps.iter().zip(time_indices) {
                 // Get compartment values at this time step
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
+                    // Accumulators are not registered as compartments (they must not
+                    // count towards `N`), so inject them by name.
+                    for (name, idx) in &self.non_population_outputs {
+                        context.set_parameter_str(name, step_data[*idx]);
+                    }
+                    // Inject bin totals so bare bin names resolve to the sum across
+                    // all strata, overriding any calibration parameter with the same name.
+                    for (bin_name, indices) in &self.bin_aggregates {
+                        let total: f64 = indices.iter().map(|&i| step_data[i]).sum();
+                        context.set_parameter_str(bin_name, total);
+                    }
                     context.set_step(time_step as f64);
 
                     match expr.evaluate(&mut context) {
@@ -808,10 +1309,10 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         }
 
         // Update parameters and initial conditions using corrected values
-        for ((value, param), compartment_idx) in corrected_params
+        for ((value, param), target) in corrected_params
             .iter()
             .zip(&self.parameters)
-            .zip(&self.parameter_compartment_indices)
+            .zip(&self.parameter_initial_condition_targets)
         {
             match param.parameter_type {
                 CalibrationParameterType::Parameter => {
@@ -821,20 +1322,54 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
                     })?;
                 }
                 CalibrationParameterType::InitialCondition => {
-                    let idx =
-                        compartment_idx.expect("InitialCondition must have compartment index");
+                    let target = target
+                        .as_ref()
+                        .expect("InitialCondition must have a target");
 
-                    // Use corrected value (auto-calculation already applied)
                     let fraction = *value;
-                    let absolute_population = fraction * self.initial_population_size;
-                    engine
-                        .set_initial_condition(idx, absolute_population)
-                        .map_err(|e| {
-                            Error::msg(format!(
-                                "Failed to set initial condition for '{}': {}",
-                                param.id, e
-                            ))
-                        })?;
+                    match target {
+                        InitialConditionTarget::PopulationFraction { entries } => {
+                            // Use corrected value (auto-calculation already applied).
+                            for &(idx, weight) in entries {
+                                let absolute_population =
+                                    fraction * weight * self.initial_population_size;
+                                engine
+                                    .set_initial_condition(idx, absolute_population)
+                                    .map_err(|e| {
+                                        Error::msg(format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        ))
+                                    })?;
+                            }
+                        }
+                        InitialConditionTarget::PairedCategoryFraction { pairs } => {
+                            let current_population = engine.population();
+                            for &(category_idx, complement_idx) in pairs {
+                                let pair_total = current_population[category_idx]
+                                    + current_population[complement_idx];
+                                engine
+                                    .set_initial_condition(category_idx, fraction * pair_total)
+                                    .map_err(|e| {
+                                        Error::msg(format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        ))
+                                    })?;
+                                engine
+                                    .set_initial_condition(
+                                        complement_idx,
+                                        (1.0 - fraction) * pair_total,
+                                    )
+                                    .map_err(|e| {
+                                        Error::msg(format!(
+                                            "Failed to set initial condition for '{}': {}",
+                                            param.id, e
+                                        ))
+                                    })?;
+                            }
+                        }
+                    }
                 }
                 CalibrationParameterType::Scale => {
                     // Scale parameters are not applied to the engine
@@ -848,8 +1383,9 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .result_buffer
             .write()
             .expect("Failed to acquire write lock on result_buffer");
+
         engine
-            .run_into_buffer(self.max_time_step, &mut buffer)
+            .run_at_steps_into_buffer(&self.observed_time_steps, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
 
         // Check for numerical instability (NaN or infinity values)
@@ -858,27 +1394,27 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .any(|step| step.iter().any(|&value| !value.is_finite()));
 
         if has_invalid_values {
-            // Return a penalty value proportional to the worst-case realistic loss
-            // Calculate penalty as: (max observed value)^2 * num_observations * penalty_factor
-            // This ensures the penalty is large enough to discourage invalid parameters
-            // but not so large that it causes numerical issues
             let base_penalty = self.calculate_base_penalty();
             return Ok(base_penalty);
         }
 
-        // Evaluate time-dependent constraints using simulation results
-        let time_constraint_penalty = self
-            .evaluate_time_dependent_constraints(&clamped_params, &buffer)
-            .map_err(Error::msg)?;
+        let loss = if self.time_dependent_constraint_indices.is_empty() {
+            self.calculate_sparse_loss(&buffer, &corrected_params)
+        } else {
+            // Evaluate time-dependent constraints using simulation results
+            let time_constraint_penalty = self
+                .evaluate_time_dependent_constraints(&clamped_params, &buffer)
+                .map_err(Error::msg)?;
 
-        if time_constraint_penalty > 0.0 {
-            // Compartment value constraints violated - return penalty
-            let base_penalty = self.calculate_base_penalty();
-            return Ok(base_penalty + time_constraint_penalty * base_penalty);
-        }
+            if time_constraint_penalty > 0.0 {
+                // Compartment value constraints violated - return penalty
+                let base_penalty = self.calculate_base_penalty();
+                return Ok(base_penalty + time_constraint_penalty * base_penalty);
+            }
 
-        // Calculate and return loss (use corrected params for scale parameters)
-        let loss = self.calculate_loss(&buffer, &corrected_params);
+            // Calculate and return loss (use corrected params for scale parameters)
+            self.calculate_sparse_loss(&buffer, &corrected_params)
+        };
 
         // Check if loss itself is invalid (defensive programming)
         if !loss.is_finite() {

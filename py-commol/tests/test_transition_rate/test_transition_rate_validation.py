@@ -421,8 +421,8 @@ class TestExpressionLimitsAndComplexity:
 
     def test_function_call_limits(self):
         """Test function call count limits."""
-        # Create expression with many function calls
-        many_functions = " + ".join([f"sin(x{i})" for i in range(30)])
+        # Create expression with more than max_function_calls (500) function calls
+        many_functions = " + ".join([f"sin(x{i})" for i in range(600)])
         with pytest.raises(SecurityError, match="Too many function calls"):
             validate_expression_security(many_functions)
 

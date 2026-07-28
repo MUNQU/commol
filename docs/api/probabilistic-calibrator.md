@@ -1,26 +1,87 @@
 # Probabilistic Calibration API
 
-!!! info "Unified API"
-Probabilistic calibration is accessed through the `Calibrator` class using the `run_probabilistic()` method. See the [Calibrator API](calibrator.md) for the complete API reference.
+Probabilistic calibration is invoked through `Calibrator.run_probabilistic()`.
+The default ensemble selector is NSGA-II; the fit-gated greedy local search is
+selected by passing `ProbGreedyLocalSearchConfig`.
 
-## Quick Reference
+Any `loss_function` (`sse`, `weighted_sse`, `rmse`, `mae`) is supported. The
+central-fit gate scores the ensemble median with the same loss the members were
+fit with, so both sides of the gate are always comparable. Set
+`normalize_observations=True` on the problem to keep series of different
+magnitudes comparable within that loss.
 
 ```python
-from commol import Calibrator, CalibrationProblem, ProbabilisticCalibrationConfig
-
-# Configure probabilistic calibration in the problem
-problem = CalibrationProblem(
-    observed_data=observed_data,
-    parameters=parameters,
-    loss_function="sse",
-    optimization_config=pso_config,
-    probabilistic_config=ProbabilisticCalibrationConfig(n_runs=20),
+from commol import Calibrator, CalibrationProblem
+from commol.context.probabilistic_calibration import (
+    ProbClusteringConfig,
+    ProbEvaluationFilterConfig,
+    ProbGreedyLocalSearchConfig,
+    ProbNsga2Config,
+    ProbabilisticCalibrationConfig,
 )
 
-# Use the unified Calibrator with run_probabilistic()
-calibrator = Calibrator(simulation, problem)
-result = calibrator.run_probabilistic()
+problem.probabilistic_config = ProbabilisticCalibrationConfig(
+    n_runs=50,
+    evaluation_processing=ProbEvaluationFilterConfig(
+        evaluation_retention="top_k_per_run",
+        top_k_per_run=100,
+        max_loss_ratio=1.25,
+        tail_max_loss_ratio=2.0,
+        tail_max_representatives=50,
+    ),
+    clustering=ProbClusteringConfig(feature_space="observed_predictions"),
+    ensemble_selection=ProbNsga2Config(
+        ensemble_size_mode="bounded",
+        ensemble_size_min=15,
+        ensemble_size_max=30,
+        population_size=100,
+        generations=100,
+        pareto_preference=0.5,
+    ),
+)
+result = Calibrator(simulation, problem).run_probabilistic()
 ```
+
+Use `ProbGreedyLocalSearchConfig` instead when the central-fit gate and beam
+search controls are required:
+
+```python
+ensemble_selection=ProbGreedyLocalSearchConfig(
+    ensemble_size_mode="bounded",
+    ensemble_size_min=15,
+    ensemble_size_max=30,
+    central_fit_max_loss_ratio=1.25,
+    search_beam_width=32,
+)
+```
+
+`max_loss_ratio` defines the core near-optimal pool. When
+`tail_max_loss_ratio` and `tail_max_representatives` are set, candidates outside
+the core pool but inside the wider loss band can be added only if they increase
+prediction-space diversity. `feature_space="observed_predictions"` clusters the
+actual calibrated quantities, including observation windows, aggregates, and
+member-specific scales. The greedy selector uses a bounded beam search,
+retaining temporary bridge subsets so complementary interval tails can be
+evaluated together. It maximizes minimum per-series coverage and breaks ties by
+interval width. It never accepts an ensemble whose memberwise-median loss
+exceeds `central_fit_max_loss_ratio` times the best member's loss. NSGA-II
+returns compact Pareto summaries balancing interval width and observed-data
+coverage; `pareto_preference` chooses the reported solution.
+
+Use `result.selected_ensemble.point_parameters` when a single parameterized
+model is needed. These parameters belong to a real, lowest-loss ensemble
+member. Parameter-wise medians are descriptive statistics only and must not be
+combined into a new model.
+
+`observation_diagnostics` reports coverage and average interval width separately
+for each observed series. This should be inspected alongside aggregate coverage.
+`selection_diagnostics` reports the candidate and subset-search limits that led
+to the final ensemble.
+
+`result.selection_algorithm` identifies the backend used. For NSGA-II,
+`result.pareto_front` contains lightweight summaries and
+`result.selected_pareto_index` identifies the selected summary. Greedy selection
+leaves the Pareto summary fields unset.
 
 ## Related Classes
 
@@ -42,9 +103,27 @@ show_source: false
 heading_level: 3
 show_docstring_attributes: true
 
-### ParetoSolution
+### ProbNsga2Config
 
-::: commol.context.probabilistic_calibration.ParetoSolution
+::: commol.context.probabilistic_calibration.ProbNsga2Config
+options:
+show_root_heading: true
+show_source: false
+heading_level: 3
+show_docstring_attributes: true
+
+### ProbGreedyLocalSearchConfig
+
+::: commol.context.probabilistic_calibration.ProbGreedyLocalSearchConfig
+options:
+show_root_heading: true
+show_source: false
+heading_level: 3
+show_docstring_attributes: true
+
+### EnsembleSolution
+
+::: commol.context.probabilistic_calibration.EnsembleSolution
 options:
 show_root_heading: true
 show_source: false
@@ -68,105 +147,3 @@ show_root_heading: true
 show_source: false
 heading_level: 3
 show_docstring_attributes: true
-
-## Visualization
-
-The `SimulationPlotter` class supports visualization of probabilistic calibration results with confidence intervals.
-
-### Plotting with ProbabilisticCalibrationResult
-
-When a `ProbabilisticCalibrationResult` is passed to `plot_series` or `plot_cumulative`, the plotter automatically displays:
-
-- **Median predictions** as the main line
-- **Confidence interval bands** as shaded regions
-- **Observed data** as scatter points
-
-```python
-from commol import SimulationPlotter
-
-# Create plotter with median predictions from selected ensemble
-plotter = SimulationPlotter(simulation, result.selected_ensemble.prediction_median)
-
-# Plot with confidence intervals
-fig = plotter.plot_series(
-    observed_data=observed_data,
-    calibration_result=result,
-    output_file="probabilistic_fit.png",
-)
-
-# Access the selected ensemble solution
-selected = result.selected_ensemble
-print(f"Ensemble size: {selected.ensemble_size}")
-print(f"Coverage: {selected.coverage_percentage:.2f}%")
-print(f"Parameter estimates: {selected.parameter_statistics}")
-
-# Explore alternative solutions on the Pareto front
-for i, solution in enumerate(result.pareto_front):
-    print(f"Solution {i}: size={solution.ensemble_size}, "
-          f"coverage={solution.coverage_percentage:.2f}%, "
-          f"CI width={solution.average_ci_width:.4f}")
-```
-
-### SimulationPlotter.plot_series
-
-::: commol.api.plotter.SimulationPlotter.plot_series
-options:
-show_root_heading: false
-show_source: false
-heading_level: 4
-
-### SimulationPlotter.plot_cumulative
-
-::: commol.api.plotter.SimulationPlotter.plot_cumulative
-options:
-show_root_heading: false
-show_source: false
-heading_level: 4
-
-## Helper Classes
-
-The probabilistic calibration workflow is orchestrated using focused helper classes:
-
-### CalibrationRunner
-
-Runs multiple calibrations in parallel with different random seeds.
-
-::: commol.api.probabilistic.calibration_runner.CalibrationRunner
-options:
-show_root_heading: true
-show_source: false
-heading_level: 3
-members: - run_multiple
-
-### EvaluationProcessor
-
-Handles deduplication, filtering, and clustering of calibration evaluations.
-
-::: commol.api.probabilistic.evaluation_processor.EvaluationProcessor
-options:
-show_root_heading: true
-show_source: false
-heading_level: 3
-members: - collect_evaluations - deduplicate - filter_by_loss_percentile - find_optimal_k - cluster_evaluations - select_representatives
-
-### EnsembleSelector
-
-Runs NSGA-II multi-objective optimization for ensemble selection.
-
-::: commol.api.probabilistic.ensemble_selector.EnsembleSelector
-options:
-show_root_heading: true
-show_source: false
-heading_level: 3
-members: - select_ensemble
-
-### StatisticsCalculator
-
-Computes ensemble statistics and predictions with confidence intervals.
-
-::: commol.api.probabilistic.statistics_calculator.StatisticsCalculator
-options:
-show_root_heading: true
-show_source: false
-heading_level: 3
-members: - calculate_parameter_statistics - generate_ensemble_predictions - calculate_prediction_intervals - calculate_coverage_metrics
