@@ -20,11 +20,16 @@ repos:
         pass_filenames: false
         types: [python]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.0
+    rev: v0.16.0
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+        # Scoped to what CI's `ruff format --check .` covers. README.md is listed
+        # explicitly because py-commol/README.md is a symlink to it: CI checks it
+        # through the symlink, so edits at the root must be checked here too.
+        files: ^(py-commol/|README\.md$)
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.11.33
     hooks:
