@@ -22,7 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "maturin (>=1.9.1,<1.10.0)",
+    "maturin>=1.9.1,<1.15.0",
     "pre-commit>=3.8,<5.0",
     "pytest (>=8.4,<9.0)",
     "pytest-cov>=6.2,<8.0",
@@ -47,7 +47,7 @@ Repository = "https://github.com/MUNQU/commol"
 
 # Build system
 [build-system]
-requires = ["maturin>=1.9.1,<1.10.0"]
+requires = ["maturin>=1.9.1,<1.15.0"]
 build-backend = "maturin"
 
 [tool.maturin]
