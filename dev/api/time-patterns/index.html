@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1061,12 +1061,12 @@
   <a href="#commol.api.time_patterns.TimePattern-functions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Functions
+        Methods:
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Functions">
+    <nav class="md-nav" aria-label="Methods:">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1698,12 +1698,12 @@
   <a href="#commol.api.time_patterns.TimePattern-functions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Functions
+        Methods:
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Functions">
+    <nav class="md-nav" aria-label="Methods:">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1887,6 +1887,7 @@
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
 
 
+
         <p>A time-varying expression usable as (or within) a transition rate.</p>
 <p>Instances are created exclusively via the factory classmethods (<code>pulse</code>,
 <code>periodic</code>, <code>window</code>, etc.). Each instance may carry stratification
@@ -1922,7 +1923,7 @@ further <code>add_group</code> and <code>set_default</code> calls on the returne
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-244">244</a></span>
 <span class="normal"><a href="#__codelineno-0-245">245</a></span>
@@ -2472,7 +2473,7 @@ further <code>add_group</code> and <code>set_default</code> calls on the returne
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -2505,7 +2506,7 @@ further <code>add_group</code> and <code>set_default</code> calls on the returne
 </div>
 
 
-<h3 id="commol.api.time_patterns.TimePattern-functions">Functions<a href="#commol.api.time_patterns.TimePattern-functions" class="headerlink" title="Permanent link">&para;</a></h3>
+<h3 id="commol.api.time_patterns.TimePattern-functions">Methods:<a href="#commol.api.time_patterns.TimePattern-functions" class="headerlink" title="Permanent link">&para;</a></h3>
 
 <div class="doc doc-object doc-function">
 
@@ -2523,7 +2524,7 @@ further <code>add_group</code> and <code>set_default</code> calls on the returne
         <p>Return a copy of this pattern restricted to a stratification sub-group.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-306">306</a></span>
 <span class="normal"><a href="#__codelineno-0-307">307</a></span>
@@ -2578,7 +2579,7 @@ formula alone (per-capita flow — the engine multiplies by the source
 compartment automatically).</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-321">321</a></span>
 <span class="normal"><a href="#__codelineno-0-322">322</a></span>
@@ -2635,7 +2636,7 @@ compartment automatically).</p>
         <p>Register the condition-free fallback pattern (schedules only).</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-361">361</a></span>
 <span class="normal"><a href="#__codelineno-0-362">362</a></span>
@@ -2674,7 +2675,7 @@ compartment automatically).</p>
         <p>Single-step pulse: rate = <code>amount</code> at step <code>at</code>, else 0.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-372">372</a></span>
 <span class="normal"><a href="#__codelineno-0-373">373</a></span>
@@ -2759,7 +2760,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-378">378</a></span>
 <span class="normal"><a href="#__codelineno-0-379">379</a></span>
@@ -2834,7 +2835,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
         <p>Periodic pulse every <code>period</code> steps starting at <code>offset</code>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-403">403</a></span>
 <span class="normal"><a href="#__codelineno-0-404">404</a></span>
@@ -2881,7 +2882,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
         <p>Constant rate <code>amount</code> for step in <code>[start, end)</code>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-414">414</a></span>
 <span class="normal"><a href="#__codelineno-0-415">415</a></span>
@@ -2928,7 +2929,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
         <p><code>baseline + amplitude * sin(2*pi*(t - phase) / period)</code>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-425">425</a></span>
 <span class="normal"><a href="#__codelineno-0-426">426</a></span>
@@ -2985,7 +2986,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
         <p>Gaussian bell pulse: <code>peak * exp(-(t - center)^2 / (2 * width^2))</code>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-441">441</a></span>
 <span class="normal"><a href="#__codelineno-0-442">442</a></span>
@@ -3030,7 +3031,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
         <p>Linear interpolation from <code>start_value</code> to <code>end_value</code> over <code>[start, end)</code>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-451">451</a></span>
 <span class="normal"><a href="#__codelineno-0-452">452</a></span>
@@ -3095,7 +3096,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
 </ul>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-467">467</a></span>
 <span class="normal"><a href="#__codelineno-0-468">468</a></span>
@@ -3186,7 +3187,7 @@ iterable of values with the same length as <code>at</code> — one per step.</p>
 through the full expression security validator.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/time_patterns.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-499">499</a></span>
 <span class="normal"><a href="#__codelineno-0-500">500</a></span>
@@ -3316,7 +3317,7 @@ through the full expression security validator.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

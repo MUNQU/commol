@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1285,12 +1285,12 @@
   <a href="#commol.context.probabilistic_calibration.CalibrationEvaluation-functions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Functions
+        Methods:
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Functions">
+    <nav class="md-nav" aria-label="Methods:">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1913,12 +1913,12 @@
   <a href="#commol.context.probabilistic_calibration.CalibrationEvaluation-functions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Functions
+        Methods:
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Functions">
+    <nav class="md-nav" aria-label="Methods:">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2055,6 +2055,7 @@ leaves the Pareto summary fields unset.</p>
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
 
 
+
         <p>Unified configuration for probabilistic calibration.</p>
 <p>This configuration groups all settings for the probabilistic calibration
 workflow, which finds an ensemble of parameter sets with uncertainty
@@ -2157,7 +2158,7 @@ Must be in range (0.0, 1.0).</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-499">499</a></span>
 <span class="normal"><a href="#__codelineno-0-500">500</a></span>
@@ -2301,7 +2302,7 @@ Must be in range (0.0, 1.0).</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -2340,6 +2341,7 @@ show_docstring_attributes: true</p>
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
 
 
         <p>Complete result from probabilistic calibration with ensemble analysis.</p>
@@ -2444,7 +2446,7 @@ and selection process.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-721">721</a></span>
 <span class="normal"><a href="#__codelineno-0-722">722</a></span>
@@ -2574,7 +2576,7 @@ and selection process.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -2615,6 +2617,7 @@ show_docstring_attributes: true</p>
               Bases: <code><span title="commol.context.probabilistic_calibration.ProbEnsembleSizeConfig">ProbEnsembleSizeConfig</span></code></p>
 
 
+
         <p>Configuration for the NSGA-II ensemble-selection algorithm.</p>
 <p>This is the default selection configuration. It balances compact
 observation-space interval width and observed-data coverage.</p>
@@ -2626,7 +2629,7 @@ observation-space interval width and observed-data coverage.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-450">450</a></span>
 <span class="normal"><a href="#__codelineno-0-451">451</a></span>
@@ -2682,7 +2685,7 @@ observation-space interval width and observed-data coverage.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -2723,6 +2726,7 @@ show_docstring_attributes: true</p>
               Bases: <code><span title="commol.context.probabilistic_calibration.ProbEnsembleSizeConfig">ProbEnsembleSizeConfig</span></code></p>
 
 
+
         <p>Configuration for the fit-gated greedy local-search algorithm.</p>
 
 
@@ -2732,7 +2736,7 @@ show_docstring_attributes: true</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-477">477</a></span>
 <span class="normal"><a href="#__codelineno-0-478">478</a></span>
@@ -2778,7 +2782,7 @@ show_docstring_attributes: true</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -2817,6 +2821,7 @@ show_docstring_attributes: true</p>
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
 
 
         <p>A complete ensemble solution with statistics and predictions.</p>
@@ -3023,7 +3028,7 @@ parameter dictionary suitable for constructing a single point model.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-615">615</a></span>
 <span class="normal"><a href="#__codelineno-0-616">616</a></span>
@@ -3237,7 +3242,7 @@ parameter dictionary suitable for constructing a single point model.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -3276,6 +3281,7 @@ show_docstring_attributes: true</p>
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
 
 
         <p>Statistics for a parameter across the ensemble.</p>
@@ -3378,7 +3384,7 @@ show_docstring_attributes: true</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-570">570</a></span>
 <span class="normal"><a href="#__codelineno-0-571">571</a></span>
@@ -3450,7 +3456,7 @@ show_docstring_attributes: true</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -3491,6 +3497,7 @@ show_docstring_attributes: true</p>
 
 
     <div class="doc doc-contents first">
+
 
 
         <p>A single calibration evaluation result.</p>
@@ -3562,7 +3569,7 @@ including the parameters, loss value, and optionally predictions.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-9"> 9</a></span>
 <span class="normal"><a href="#__codelineno-0-10">10</a></span>
@@ -3634,7 +3641,7 @@ including the parameters, loss value, and optionally predictions.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -3643,7 +3650,7 @@ including the parameters, loss value, and optionally predictions.</p>
 
 
 
-<h3 id="commol.context.probabilistic_calibration.CalibrationEvaluation-functions">Functions<a href="#commol.context.probabilistic_calibration.CalibrationEvaluation-functions" class="headerlink" title="Permanent link">&para;</a></h3>
+<h3 id="commol.context.probabilistic_calibration.CalibrationEvaluation-functions">Methods:<a href="#commol.context.probabilistic_calibration.CalibrationEvaluation-functions" class="headerlink" title="Permanent link">&para;</a></h3>
 
 <div class="doc doc-object doc-function">
 
@@ -3684,7 +3691,7 @@ including the parameters, loss value, and optionally predictions.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/context/probabilistic_calibration.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-33">33</a></span>
 <span class="normal"><a href="#__codelineno-0-34">34</a></span>
@@ -3802,7 +3809,7 @@ show_docstring_attributes: true</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
