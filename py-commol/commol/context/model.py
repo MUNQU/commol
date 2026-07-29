@@ -348,6 +348,46 @@ class Model(BaseModel):
 
         return subpopulation_n_vars
 
+    def get_outputs_by_source(self) -> dict[str, list[str]]:
+        """
+        Map each bin and accumulator id to the output names it expands into.
+
+        A bin or accumulator produces one output per combination of the
+        stratification categories that apply to it. Without stratifications it
+        produces a single output named after the id itself.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            Bin and accumulator ids, each mapped to its output names in
+            declaration order.
+        """
+        from commol.context._model.helpers import ModelCompartmentHelper
+
+        helper = ModelCompartmentHelper(self)
+        outputs: dict[str, list[str]] = {
+            source_id: []
+            for source_id in (
+                *(bin_item.id for bin_item in self.population.bins),
+                *(accumulator.id for accumulator in self.population.accumulators),
+            )
+        }
+        expanded = (
+            *helper.generate_compartments(),
+            *helper.generate_accumulator_outputs(),
+        )
+        for source_id, applied in expanded:
+            name = "_".join(
+                [source_id]
+                + [
+                    applied[stratification.id]
+                    for stratification in self.population.stratifications
+                    if stratification.id in applied
+                ]
+            )
+            outputs[source_id].append(name)
+        return outputs
+
     def _get_full_compartment_names(self) -> set[str]:
         """Returns all full stratified compartment names."""
         if not self.population.stratifications:

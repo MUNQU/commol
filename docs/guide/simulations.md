@@ -145,19 +145,33 @@ g1_t1_b = results["B_g1_t1"]
 g2_t2_b = results["B_g2_t2"]
 ```
 
-#### 3. Filter Compartments by Pattern
+#### 3. List the Outputs of a Bin or Accumulator
+
+`outputs_for` returns the outputs a bin or accumulator expands into:
 
 ```python
-# Get all B compartments
-b_keys = [key for key in results.keys() if key.startswith("B_")]
-print("B compartments:", b_keys)
+# Every output of bin B
+print(simulation.outputs_for("B"))
+# Output: ['B_g1', 'B_g2']
 
-# Get all g1 compartments
+# Several at once, keyed by the id they belong to
+grouped = simulation.group_outputs(["A", "B"])
+```
+
+!!! warning "Do not match output names by prefix"
+
+    `[k for k in results if k.startswith("B_")]` also matches any other output
+    whose name begins with `B_`, such as an accumulator declared as `B_events`.
+    It also breaks under conditional stratifications, where an output may carry
+    fewer category suffixes than its siblings. `outputs_for` resolves names from
+    the model structure, so neither case can go wrong.
+
+Filtering by *category* still requires matching names, since a category is not a
+declared output on its own:
+
+```python
+# Get all g1 outputs
 g1_keys = [key for key in results.keys() if "_g1" in key]
-print("g1 compartments:", g1_keys)
-
-# Get all t2 compartments (multi-stratification)
-t2_keys = [key for key in results.keys() if "_t2" in key]
 ```
 
 ### Aggregating Stratified Results
@@ -188,9 +202,16 @@ total_B = (
     np.array(results["B_g2_t2"])
 )
 
-# Or dynamically using pattern matching
-b_keys = [k for k in results.keys() if k.startswith("B_")]
-total_B = sum(np.array(results[k]) for k in b_keys)
+# Or let the simulation resolve the outputs of B
+total_B = simulation.total_series(results, ["B"])
+```
+
+`total_series` accepts several ids and sums all of their outputs together, which
+is how you total a set of bins:
+
+```python
+# Combined population of A and B at each step
+total_ab = simulation.total_series(results, ["A", "B"])
 ```
 
 #### Sum by Stratification Category

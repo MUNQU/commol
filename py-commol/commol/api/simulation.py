@@ -1,5 +1,6 @@
 import logging
 import time
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Literal, assert_never, overload
 
 if TYPE_CHECKING:
@@ -181,3 +182,90 @@ class Simulation:
     def simulation_outputs(self) -> list[str]:
         """Names of the columns returned by simulation runs."""
         return self._simulation_outputs
+
+    def outputs_for(self, source_id: str) -> list[str]:
+        """
+        Names of the outputs a bin or accumulator expands into.
+
+        Parameters
+        ----------
+        source_id : str
+            A bin id or an accumulator id.
+
+        Returns
+        -------
+        list[str]
+            Output names for that id, in the order the engine reports them.
+
+        Raises
+        ------
+        KeyError
+            If `source_id` is not a bin or accumulator of the model.
+        """
+        outputs = self.model_definition.get_outputs_by_source()
+        if source_id not in outputs:
+            raise KeyError(
+                f"'{source_id}' is not a bin or accumulator of model "
+                f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
+            )
+        return outputs[source_id]
+
+    def group_outputs(self, source_ids: Iterable[str]) -> dict[str, list[str]]:
+        """
+        Group output names by the bin or accumulator they belong to.
+
+        Parameters
+        ----------
+        source_ids : Iterable[str]
+            Bin and accumulator ids.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            Each id mapped to its output names, keeping the order given.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin or accumulator of the model.
+        """
+        return {source_id: self.outputs_for(source_id) for source_id in source_ids}
+
+    def total_series(
+        self,
+        results: Mapping[str, Sequence[float]],
+        source_ids: Iterable[str],
+    ) -> list[float]:
+        """
+        Sum the outputs of the given bins or accumulators at each step.
+
+        Parameters
+        ----------
+        results : Mapping[str, Sequence[float]]
+            Simulation results in `dict_of_lists` form.
+        source_ids : Iterable[str]
+            Bin and accumulator ids whose outputs are summed together.
+
+        Returns
+        -------
+        list[float]
+            One value per step.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin or accumulator of the model, or an expected
+            output is missing from `results`.
+        """
+        names = [
+            name for source_id in source_ids for name in self.outputs_for(source_id)
+        ]
+        missing = [name for name in names if name not in results]
+        if missing:
+            raise KeyError(f"Missing output series in results: {sorted(missing)}")
+        if not names:
+            return []
+        return [
+            sum(values)
+            for values in zip(*(results[name] for name in names), strict=True)
+        ]

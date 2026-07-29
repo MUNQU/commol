@@ -22,17 +22,18 @@ class ModelCompartmentHelper:
     # Compartment generation
     # ------------------------------------------------------------------
 
-    def generate_compartments(self) -> list[tuple[str, dict[str, str]]]:
-        """Generate all compartment combinations from bins and stratifications.
+    def expand_over_stratifications(
+        self, source_ids: list[str]
+    ) -> list[tuple[str, dict[str, str]]]:
+        """Expand ids across the stratifications that apply to each of them.
 
-        Each element is a 2-tuple ``(bin_id, applied_categories)`` where
+        Each element is a 2-tuple ``(source_id, applied_categories)`` where
         ``applied_categories`` maps each stratification ID that was actually
-        applied to this compartment to its chosen category.
+        applied to its chosen category. A conditional stratification is applied
+        only to ids whose already-applied categories satisfy its conditions.
         """
-        bin_ids = [state.id for state in self._model.population.bins]
-
         partials: list[tuple[str, dict[str, str]]] = [
-            (bin_id, {}) for bin_id in bin_ids
+            (source_id, {}) for source_id in source_ids
         ]
 
         for strat in self._model.population.stratifications:
@@ -50,6 +51,27 @@ class ModelCompartmentHelper:
             partials = new_partials
 
         return partials
+
+    def generate_compartments(self) -> list[tuple[str, dict[str, str]]]:
+        """Generate all compartment combinations from bins and stratifications.
+
+        Each element is a 2-tuple ``(bin_id, applied_categories)`` where
+        ``applied_categories`` maps each stratification ID that was actually
+        applied to this compartment to its chosen category.
+        """
+        return self.expand_over_stratifications(
+            [state.id for state in self._model.population.bins]
+        )
+
+    def generate_accumulator_outputs(self) -> list[tuple[str, dict[str, str]]]:
+        """Generate all accumulator output combinations.
+
+        Each element is a 2-tuple ``(accumulator_id, applied_categories)``,
+        following the same expansion as compartments.
+        """
+        return self.expand_over_stratifications(
+            [accumulator.id for accumulator in self._model.population.accumulators]
+        )
 
     def compartment_to_string(
         self, compartment: tuple[str, dict[str, str]], format: str
