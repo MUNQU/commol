@@ -122,10 +122,8 @@ during the beam search.
 
 ## Computing your own ensemble statistics
 
-The intervals commol reports all come from one definition of what a confidence
-level means. `ci_percentiles` exposes it, so a report you build yourself agrees
-with `parameter_statistics` and `prediction_ci_lower` / `prediction_ci_upper`
-instead of drifting from them.
+`ci_percentiles` maps a confidence level to the pair of percentile points used
+for every interval in the result:
 
 ```python
 from commol import ci_percentiles, member_statistics
@@ -147,9 +145,11 @@ statistic is a series reduced across members position by position.
 !!! warning "Reduce each member first"
 
     Compute the quantity you care about for each member, then pass those values
-    here. Taking percentile bands of the raw trajectories and reducing the bands
-    afterwards produces a difference of percentiles rather than a percentile of
-    members: the result describes no member of the ensemble and generally
-    overstates the interval. This ordering is why `windowed_prediction_ci_lower`
-    and `windowed_prediction_ci_upper` exist as separate fields rather than
-    being derived from the step-resolution bands.
+    to `member_statistics`. Taking percentile bands of the raw trajectories and
+    reducing the bands afterwards gives a difference of percentiles rather than
+    a percentile of members: an interval that no member of the ensemble
+    realizes, and generally a wider one.
+
+    Windowed quantities follow the same rule and are available directly as
+    `windowed_prediction_median`, `windowed_prediction_ci_lower` and
+    `windowed_prediction_ci_upper`.

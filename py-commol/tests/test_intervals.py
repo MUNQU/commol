@@ -1,4 +1,4 @@
-"""Tests for the shared confidence-interval conventions."""
+"""Tests for the confidence-interval helpers."""
 
 import numpy as np
 import pytest
@@ -49,7 +49,7 @@ class TestMemberStatistics:
         assert stats["min"] == pytest.approx([1.0, 10.0])
         assert stats["max"] == pytest.approx([3.0, 30.0])
 
-    def test_interval_uses_the_shared_percentile_points(self) -> None:
+    def test_interval_uses_the_percentile_points(self) -> None:
         values = list(np.linspace(0.0, 100.0, 401))
         lower_point, upper_point = ci_percentiles(0.9)
         stats = member_statistics(values, 0.9)
@@ -61,17 +61,8 @@ class TestMemberStatistics:
             float(np.percentile(values, upper_point))
         )
 
-    def test_interval_is_a_percentile_of_members_not_a_difference_of_percentiles(
-        self,
-    ) -> None:
-        """
-        Reducing each member before taking percentiles is the whole point.
-
-        Every member here is monotone increasing, so the spread of the *final
-        value* is bounded by the members' own final values. Differencing the
-        percentile bands of the raw trajectories instead would mix members and
-        report an interval no member realizes.
-        """
+    def test_interval_stays_within_the_range_of_member_values(self) -> None:
+        """Statistics of a reduced quantity are bounded by the member values."""
         members = [[0.0, float(scale), float(2 * scale)] for scale in (1, 2, 3, 4, 5)]
         final_values = [member[-1] for member in members]
 

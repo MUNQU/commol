@@ -1,10 +1,4 @@
-"""Confidence-interval conventions shared by every ensemble statistic.
-
-The mapping from a confidence level to a pair of percentile points is defined
-here and nowhere else. Every interval commol reports - parameter statistics,
-prediction bands, observation diagnostics, coverage metrics - goes through
-:func:`ci_percentiles`, so a single definition governs them all.
-"""
+"""Confidence-interval helpers for ensemble statistics."""
 
 from collections.abc import Sequence
 from typing import overload
@@ -22,15 +16,12 @@ def ci_percentiles(confidence_level: float) -> tuple[float, float]:
     Parameters
     ----------
     confidence_level : float
-        Confidence level of the interval, strictly between 0 and 1. This is the
-        same range accepted by
-        :attr:`~commol.ProbabilisticCalibrationConfig.confidence_level`.
+        Confidence level of the interval, strictly between 0 and 1.
 
     Returns
     -------
     tuple[float, float]
-        Lower and upper percentile points, on the 0-100 scale numpy expects.
-        A confidence level of 0.95 gives ``(2.5, 97.5)``.
+        Lower and upper percentile points, on the 0-100 scale.
 
     Raises
     ------
@@ -77,13 +68,8 @@ def member_statistics(
     """
     Spread of one quantity across the members of an ensemble.
 
-    Each member must already be reduced to the quantity of interest before
-    calling this. Reducing first and taking percentiles second is what makes
-    the interval a percentile of member values; taking percentiles first and
-    reducing second would instead produce a difference of percentiles, which
-    describes no member and generally overstates the interval. The same
-    ordering is used internally for every windowed and aggregate band commol
-    reports.
+    Each member must already be reduced to the quantity of interest, so that
+    the reported interval is a percentile of member values.
 
     Parameters
     ----------
@@ -91,9 +77,8 @@ def member_statistics(
         One entry per ensemble member. Entries may be scalars, in which case
         every returned statistic is a scalar, or equal-length series, in which
         case every returned statistic is a series reduced across members at
-        each position. Passing a numpy array is supported but loses the static
-        distinction between the two, since the rank is not known to a type
-        checker; pass a list of lists to keep it.
+        each position. A numpy array is accepted, but its rank is not visible
+        to a type checker; pass a list of lists for a precise return type.
     confidence_level : float
         Confidence level of the reported interval, strictly between 0 and 1.
 
