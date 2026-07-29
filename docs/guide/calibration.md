@@ -782,6 +782,30 @@ When your observed data represents incremental counts over a period (e.g., new e
 predicted_at(t) = accumulator(t) - accumulator(t - W)
 ```
 
+`windowed_totals` applies that same reduction outside the calibration, so a
+report can show the quantity the loss actually compared against:
+
+```python
+from commol import window_end_steps, windowed_totals
+
+results = simulation.run(num_steps=70)
+
+# Every complete window of the run
+weekly = simulation.windowed_totals(results, ["cum_ab"], 7)
+
+# Or exactly the steps the observations use
+steps = window_end_steps(7, 70)
+weekly = simulation.windowed_totals(results, ["cum_ab"], 7, steps)
+```
+
+`window_end_steps(W, num_steps)` lists the steps closing each complete window,
+dropping a trailing partial one. `windowed_totals` also accepts steps that are
+not multiples of the window, matching observations anchored anywhere.
+
+For a probabilistic run the ensemble equivalents are on the selected ensemble:
+`windowed_prediction_median`, `windowed_prediction_ci_lower` and
+`windowed_prediction_ci_upper`.
+
 ### Example: Windowed Calibration
 
 ```python

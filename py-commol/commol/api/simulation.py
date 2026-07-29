@@ -17,6 +17,7 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
+from commol.api.windows import windowed_totals
 from commol.constants import ModelTypes
 from commol.context.model import Model
 
@@ -269,3 +270,46 @@ class Simulation:
             sum(values)
             for values in zip(*(results[name] for name in names), strict=True)
         ]
+
+    def windowed_totals(
+        self,
+        results: Mapping[str, Sequence[float]],
+        source_ids: Iterable[str],
+        window_steps: int,
+        at_steps: Iterable[int] | None = None,
+    ) -> list[float]:
+        """
+        Amount the given accumulators gained over each window.
+
+        Parameters
+        ----------
+        results : Mapping[str, Sequence[float]]
+            Simulation results in `dict_of_lists` form.
+        source_ids : Iterable[str]
+            Accumulator ids whose outputs are summed before windowing.
+        window_steps : int
+            Length of one window, in simulation steps.
+        at_steps : Iterable[int] | None, optional
+            Steps at which windows close. Defaults to every complete window of
+            the run. Pass the observation steps to reproduce exactly the values
+            a calibration used.
+
+        Returns
+        -------
+        list[float]
+            One increment per window.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin or accumulator of the model, or an expected
+            output is missing from `results`.
+        ValueError
+            If `window_steps` is not positive, or a requested step has no
+            complete window inside the run.
+        """
+        return windowed_totals(
+            self.total_series(results, source_ids),
+            window_steps,
+            at_steps,
+        )

@@ -9,6 +9,8 @@ from commol.api import (
     TimePattern,
     ci_percentiles,
     member_statistics,
+    window_end_steps,
+    windowed_totals,
 )
 from commol.context import Model
 from commol.context.calibration import (
@@ -76,4 +78,6 @@ __all__ = [
     "TimePattern",
     "ci_percentiles",
     "member_statistics",
+    "window_end_steps",
+    "windowed_totals",
 ]
