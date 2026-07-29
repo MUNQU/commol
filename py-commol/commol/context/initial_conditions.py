@@ -1,5 +1,6 @@
 import math
-from typing import Mapping, Self
+from collections.abc import Iterable, Mapping
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -179,6 +180,64 @@ class InitialConditions(BaseModel):
             for stratification in self.stratification_fractions
             for fraction in stratification.fractions
         }
+
+    def get_category_fraction(self, category: str) -> float:
+        """
+        Get the fraction of a category within the group it subdivides.
+
+        Parameters
+        ----------
+        category : str
+            A stratification category name.
+
+        Returns
+        -------
+        float
+            The declared fraction, relative to the group the category's
+            stratification applies to rather than to the whole population.
+
+        Raises
+        ------
+        ValueError
+            If the category is not found.
+        """
+        for stratification in self.stratification_fractions:
+            for fraction in stratification.fractions:
+                if fraction.category == category:
+                    return fraction.fraction
+        raise ValueError(
+            f"Category '{category}' not found in initial conditions. "
+            f"Available categories: {sorted(self.get_categories_with_fractions())}"
+        )
+
+    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
+        """
+        Get the initial head count of a subgroup.
+
+        Category fractions are relative to the group their stratification
+        applies to, so the fractions of a nested chain of categories multiply.
+        Passing no categories gives the whole population.
+
+        Parameters
+        ----------
+        categories : Iterable[str], optional
+            Category names forming a chain from the whole population down to
+            the subgroup, outermost first.
+
+        Returns
+        -------
+        float
+            Number of individuals in the subgroup at step 0.
+
+        Raises
+        ------
+        ValueError
+            If a category is not found.
+        """
+        population = float(self.population_size)
+        for category in categories:
+            population *= self.get_category_fraction(category)
+        return population
 
     def _owning_stratification(self, category: str) -> StratificationFractions:
         """Return the stratification that declares a category."""

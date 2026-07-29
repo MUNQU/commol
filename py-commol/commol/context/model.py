@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from itertools import combinations, product
 from pathlib import Path
 from typing import Self
@@ -370,6 +370,69 @@ class Model(BaseModel):
                     subpopulation_n_vars.add(var_name)
 
         return subpopulation_n_vars
+
+    def get_conditioning_categories(self, stratification_id: str) -> tuple[str, ...]:
+        """
+        Get the categories a stratification is conditioned on.
+
+        An unconditional stratification subdivides the whole population and has
+        no conditioning categories. A conditional one subdivides only the
+        subgroup its conditions select, and its fractions are relative to that
+        subgroup rather than to the whole population.
+
+        Parameters
+        ----------
+        stratification_id : str
+            Id of a stratification of the model.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Categories selecting the subgroup this stratification subdivides,
+            empty for an unconditional stratification.
+
+        Raises
+        ------
+        ValueError
+            If the stratification is not found.
+        """
+        for stratification in self.population.stratifications:
+            if stratification.id == stratification_id:
+                return tuple(
+                    condition.category
+                    for condition in (stratification.conditions or [])
+                    if condition.category is not None
+                )
+        raise ValueError(
+            f"Stratification '{stratification_id}' not found in model "
+            f"'{self.name}'. Available: "
+            f"{sorted(s.id for s in self.population.stratifications)}"
+        )
+
+    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
+        """
+        Get the initial head count of a subgroup.
+
+        See
+        :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
+
+        Parameters
+        ----------
+        categories : Iterable[str], optional
+            Category names forming a chain from the whole population down to
+            the subgroup, outermost first.
+
+        Returns
+        -------
+        float
+            Number of individuals in the subgroup at step 0.
+
+        Raises
+        ------
+        ValueError
+            If a category is not found.
+        """
+        return self.population.initial_conditions.subgroup_population(categories)
 
     def get_outputs_by_source(self) -> dict[str, list[str]]:
         """

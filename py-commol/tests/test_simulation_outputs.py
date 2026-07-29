@@ -197,3 +197,79 @@ class TestTotalSeries:
 
         with pytest.raises(KeyError, match="not a bin or accumulator"):
             simulation.total_series(results, ["nope"])
+
+
+class TestSubgroupPopulation:
+    """
+    Head counts derived from fractions must match the populations the engine
+    builds, which multiplies bin and stratification fractions the same way.
+    """
+
+    def test_no_categories_is_the_whole_population(self) -> None:
+        simulation = _model()
+
+        assert simulation.model_definition.subgroup_population() == pytest.approx(
+            1000.0
+        )
+
+    def test_one_category_scales_by_its_fraction(self) -> None:
+        simulation = _model()
+
+        assert simulation.model_definition.subgroup_population(
+            ["group1"]
+        ) == pytest.approx(600.0)
+
+    def test_matches_the_engine_for_an_unconditional_stratification(self) -> None:
+        simulation = _model()
+        results = simulation.run(0)
+        model = simulation.model_definition
+
+        for category in ("group1", "group2"):
+            engine_total = sum(
+                results[name][0]
+                for name in simulation.simulation_outputs
+                if name.split("_")[1:2] == [category]
+            )
+            assert model.subgroup_population([category]) == pytest.approx(engine_total)
+
+    def test_matches_the_engine_for_a_nested_conditional_subgroup(self) -> None:
+        simulation = _model(conditional=True)
+        results = simulation.run(0)
+        model = simulation.model_definition
+
+        # `sub` applies only under group1, so its fractions are relative to it.
+        engine_total = sum(
+            results[name][0]
+            for name in simulation.simulation_outputs
+            if name.startswith(("A_group1_s1", "B_group1_s1"))
+        )
+
+        assert model.subgroup_population(["group1", "s1"]) == pytest.approx(
+            engine_total
+        )
+
+    def test_unknown_category_is_rejected(self) -> None:
+        simulation = _model()
+
+        with pytest.raises(ValueError, match="Category 'nope' not found"):
+            simulation.model_definition.subgroup_population(["nope"])
+
+
+class TestConditioningCategories:
+    def test_unconditional_stratification_has_none(self) -> None:
+        simulation = _model()
+
+        assert simulation.model_definition.get_conditioning_categories("group") == ()
+
+    def test_conditional_stratification_reports_its_condition(self) -> None:
+        simulation = _model(conditional=True)
+
+        assert simulation.model_definition.get_conditioning_categories("sub") == (
+            "group1",
+        )
+
+    def test_unknown_stratification_is_rejected(self) -> None:
+        simulation = _model()
+
+        with pytest.raises(ValueError, match="Stratification 'nope' not found"):
+            simulation.model_definition.get_conditioning_categories("nope")

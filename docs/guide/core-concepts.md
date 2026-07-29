@@ -164,6 +164,30 @@ between them would be undetermined.
 Both methods are also what [calibration](calibration.md) writes back when a bin
 fraction or a stratification split is fitted.
 
+#### Subgroup head counts
+
+Category fractions are relative to the group their stratification applies to, so
+a conditional stratification's fractions are *not* fractions of the whole
+population. `subgroup_population` composes the chain for you:
+
+```python
+model.subgroup_population()                    # whole population
+model.subgroup_population(["group1"])          # 10000 x 0.6
+model.subgroup_population(["group1", "sub1"])  # ... x the sub1 fraction
+```
+
+`get_conditioning_categories` reports which subgroup a stratification
+subdivides, empty when it applies to everyone:
+
+```python
+model.get_conditioning_categories("group")   # ()
+model.get_conditioning_categories("sub")     # ("group1",)
+```
+
+This is the same composition the engine uses to initialize compartments
+(`bin_fraction x stratification_fractions`), so the head counts agree with the
+populations a simulation starts from.
+
 ### Why Use Stratifications?
 
 Stratifications are useful when:
