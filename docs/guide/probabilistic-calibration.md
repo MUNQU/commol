@@ -152,4 +152,6 @@ statistic is a series reduced across members position by position.
 
     Windowed quantities follow the same rule and are available directly as
     `windowed_prediction_median`, `windowed_prediction_ci_lower` and
-    `windowed_prediction_ci_upper`.
+    `windowed_prediction_ci_upper`. Each value is taken at the step of a
+    windowed observation, using that observation's own `window_steps`;
+    `windowed_prediction_steps` lists those steps.

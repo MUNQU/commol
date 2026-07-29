@@ -771,7 +771,7 @@ class ProbabilisticCalibrator:
                 all_preds, simulation_output_ids
             )
         )
-        win_median, win_ci_lower, win_ci_upper = (
+        win_median, win_ci_lower, win_ci_upper, win_steps = (
             self._statistics_calculator.calculate_windowed_prediction_intervals(
                 all_preds,
                 solution_params,
@@ -803,6 +803,7 @@ class ProbabilisticCalibrator:
             prediction_median=pred_median,
             prediction_ci_lower=pred_ci_lower,
             prediction_ci_upper=pred_ci_upper,
+            windowed_prediction_steps=win_steps,
             windowed_prediction_median=win_median,
             windowed_prediction_ci_lower=win_ci_lower,
             windowed_prediction_ci_upper=win_ci_upper,

@@ -636,6 +636,8 @@ class EnsembleSolution(BaseModel):
         Lower bound of confidence interval for each compartment over time
     prediction_ci_upper : dict[str, list[float]]
         Upper bound of confidence interval for each compartment over time
+    windowed_prediction_steps : dict[str, list[int]]
+        Steps the windowed values are taken at, one per windowed observation
     coverage_percentage : float
         Percentage of observed data points within the confidence intervals
     average_ci_width : float
@@ -676,6 +678,13 @@ class EnsembleSolution(BaseModel):
     )
     prediction_ci_upper: dict[str, list[float]] = Field(
         description="Upper bound of confidence interval for each compartment over time"
+    )
+    windowed_prediction_steps: dict[str, list[int]] = Field(
+        default_factory=dict,
+        description=(
+            "Steps the windowed values are taken at, one entry per windowed "
+            "observation of the output, sorted by step"
+        ),
     )
     windowed_prediction_median: dict[str, list[float]] = Field(
         default_factory=dict,

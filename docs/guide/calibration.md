@@ -804,7 +804,8 @@ not multiples of the window, matching observations anchored anywhere.
 
 For a probabilistic run the ensemble equivalents are on the selected ensemble:
 `windowed_prediction_median`, `windowed_prediction_ci_lower` and
-`windowed_prediction_ci_upper`.
+`windowed_prediction_ci_upper`, with `windowed_prediction_steps` giving the step
+each value belongs to.
 
 ### Example: Windowed Calibration
 
