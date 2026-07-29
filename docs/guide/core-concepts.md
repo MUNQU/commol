@@ -140,6 +140,30 @@ builder.set_initial_conditions(
 | `C_g1`      | 10000 × 0.0 × 0.6 | 0             |
 | `C_g2`      | 10000 × 0.0 × 0.4 | 0             |
 
+#### Updating fractions after building
+
+Both kinds of fraction can be changed on a built model:
+
+```python
+model.update_initial_conditions({"A": 0.85, "B": 0.15})
+model.update_stratification_fractions({"g1": 0.7})   # g2 becomes 0.3
+```
+
+Within each stratification, at most one category may be omitted. The omitted
+category receives whatever remains of 1.0, so the fractions always sum to 1.0:
+
+```python
+model.update_stratification_fractions({"low": 0.2, "mid": 0.3})
+# a third category `high` becomes 0.5
+```
+
+Naming every category is also allowed, in which case the given values must
+already sum to 1.0. Omitting two or more categories raises, because the split
+between them would be undetermined.
+
+Both methods are also what [calibration](calibration.md) writes back when a bin
+fraction or a stratification split is fitted.
+
 ### Why Use Stratifications?
 
 Stratifications are useful when:

@@ -163,6 +163,111 @@ class InitialConditions(BaseModel):
         """
         return [bf.bin for bf in self.bin_fractions if bf.fraction is None]
 
+    def get_categories_with_fractions(self) -> set[str]:
+        """
+        Get the categories that have a declared initial fraction.
+
+        Returns
+        -------
+        set[str]
+            Category names collected from ``stratification_fractions``. A
+            category declared on a stratification but absent from the initial
+            conditions is not included.
+        """
+        return {
+            fraction.category
+            for stratification in self.stratification_fractions
+            for fraction in stratification.fractions
+        }
+
+    def _owning_stratification(self, category: str) -> StratificationFractions:
+        """Return the stratification that declares a category."""
+        for stratification in self.stratification_fractions:
+            if any(
+                fraction.category == category for fraction in stratification.fractions
+            ):
+                return stratification
+        raise ValueError(
+            f"Category '{category}' not found in initial conditions. "
+            f"Available categories: {sorted(self.get_categories_with_fractions())}"
+        )
+
+    def _apply_stratification_update(
+        self,
+        stratification: StratificationFractions,
+        named: Mapping[str, float],
+    ) -> None:
+        """Write the fractions of a single stratification."""
+        unnamed = [
+            fraction.category
+            for fraction in stratification.fractions
+            if fraction.category not in named
+        ]
+        total = sum(named.values())
+
+        if len(unnamed) > 1:
+            raise ValueError(
+                f"Cannot update stratification '{stratification.stratification}': "
+                f"categories {sorted(unnamed)} were left unnamed. At most one "
+                f"category may be omitted, so that it can take the remaining "
+                f"fraction."
+            )
+        if not unnamed and not math.isclose(total, 1.0, abs_tol=1e-6):
+            raise ValueError(
+                f"Fractions for stratification '{stratification.stratification}' "
+                f"must sum to 1.0, got {total:.6f}. Values: {dict(named)}"
+            )
+        if unnamed and total > 1.0 + 1e-6:
+            raise ValueError(
+                f"Fractions for stratification '{stratification.stratification}' "
+                f"sum to {total:.6f}, which would leave a negative fraction for "
+                f"'{unnamed[0]}'. Values: {dict(named)}"
+            )
+
+        remainder = max(0.0, 1.0 - total)
+        for fraction in stratification.fractions:
+            fraction.fraction = named.get(fraction.category, remainder)
+
+    def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Update stratification category fractions by category name.
+
+        Categories belonging to several stratifications may be given in one
+        call. Within each stratification, at most one category may be omitted;
+        the omitted category receives the remaining fraction so that the
+        stratification sums to 1.0. When every category is given, the values
+        must already sum to 1.0.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping category names to their new fraction values.
+            Each value must lie between 0.0 and 1.0.
+
+        Raises
+        ------
+        ValueError
+            If a category is not found, a value lies outside [0.0, 1.0], a
+            stratification has more than one category omitted, fully specified
+            values do not sum to 1.0, or the given values exceed 1.0.
+        """
+        for category, value in fractions.items():
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"Fraction for category '{category}' must be between 0.0 and "
+                    f"1.0, got {value}."
+                )
+
+        by_stratification: dict[str, dict[str, float]] = {}
+        for category, value in fractions.items():
+            owner = self._owning_stratification(category).stratification
+            by_stratification.setdefault(owner, {})[category] = value
+
+        for stratification in self.stratification_fractions:
+            named = by_stratification.get(stratification.stratification)
+            if named is not None:
+                self._apply_stratification_update(stratification, named)
+
     def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         """
         Update bin fractions by bin ID.

@@ -14,7 +14,7 @@ The calibration process involves:
 6. **Updating the model**: Applying calibrated values to your model
 
 !!! note "Working with Uncalibrated Parameters"
-Parameters and initial conditions can be set to `None` to indicate they need calibration. A `Simulation` can be created with `None` values for calibration purposes, but attempting to call `run()` on a simulation with uncalibrated values will raise a `ValueError`. After calibration, use `model.update_parameters(result.best_parameters)` or `model.update_initial_conditions(result.best_parameters)` to update your model with the calibrated values.
+Parameters and initial conditions can be set to `None` to indicate they need calibration. A `Simulation` can be created with `None` values for calibration purposes, but attempting to call `run()` on a simulation with uncalibrated values will raise a `ValueError`. After calibration, use `model.apply_calibration_parameters(result, problem)` to write every calibrated value back to the model at once. It routes each value by the `parameter_type` declared in the problem, so model parameters, bin fractions and stratification categories all land in the right place. `model.update_parameters(...)` and `model.update_initial_conditions(...)` remain available when you want to set one kind directly.
 
 ## Basic Example
 
@@ -727,7 +727,50 @@ else:
     print(f"Calibration did not converge: {result.termination_reason}")
 ```
 
-**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.update_parameters(result.best_parameters)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
+**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.apply_calibration_parameters(result, problem)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
+
+### Writing a result back to the model
+
+```python
+model.apply_calibration_parameters(result, problem)
+```
+
+This accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult`, or a bare
+mapping of parameter id to value (one ensemble member's parameters, for
+instance). For a probabilistic result it applies `point_parameters` of the
+selected ensemble, which is the only parameter set that describes a single
+calibrated model.
+
+Each value is routed by its declared `parameter_type`:
+
+| `parameter_type` | Written to |
+|---|---|
+| `parameter` | the model parameter of that id |
+| `initial_condition`, id is a bin | that bin's fraction |
+| `initial_condition`, id is a stratification category | that category's fraction, and the remaining category |
+| `scale` | nothing — it scales observations, not the model |
+
+!!! warning "Per-compartment initial conditions cannot be written back"
+
+    A calibration parameter naming an expanded compartment (`A_group1`) is
+    accepted by the calibrator, but the model stores initial conditions only as
+    bin and stratification fractions, so there is nowhere to put it.
+    `apply_calibration_parameters` raises rather than skipping it silently.
+
+#### Calibrated stratification splits
+
+An `initial_condition` parameter may name a category of a binary
+stratification, in which case calibration fits the split between the two
+categories. Writing it back sets the named category and leaves the other to take
+the remaining fraction:
+
+```python
+model.update_stratification_fractions({"group1": 0.25})
+# group1 -> 0.25, group2 -> 0.75
+```
+
+See [updating fractions after building](core-concepts.md#updating-fractions-after-building)
+for the general rule.
 
 ## Calibrating Against Cumulative Outputs
 

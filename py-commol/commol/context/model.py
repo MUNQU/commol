@@ -6,10 +6,29 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context.calibration import CalibrationProblem, CalibrationResult
+from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
 from commol.context.population import Population
+from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
 from commol.utils.security import get_expression_variables
+
+
+def _calibrated_values(
+    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
+) -> Mapping[str, float]:
+    """
+    Return the parameter values carried by a calibration outcome.
+
+    For a probabilistic result these are the point parameters of the selected
+    ensemble.
+    """
+    if isinstance(result, CalibrationResult):
+        return result.best_parameters
+    if isinstance(result, ProbabilisticCalibrationResult):
+        return result.selected_ensemble.point_parameters
+    return result
 
 
 class Model(BaseModel):
@@ -176,6 +195,103 @@ class Model(BaseModel):
             If a bin ID in the dictionary doesn't exist in the model.
         """
         self.population.initial_conditions.update_bin_fractions(bin_fractions)
+
+    def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Update initial stratification fractions for specified categories.
+
+        Within each stratification, at most one category may be omitted; the
+        omitted category receives the remaining fraction.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping category names to their new fraction values.
+
+        Raises
+        ------
+        ValueError
+            If a category doesn't exist in the model, a value lies outside
+            [0.0, 1.0], a stratification has more than one category omitted, or
+            the resulting fractions do not sum to 1.0.
+        """
+        self.population.initial_conditions.update_stratification_fractions(fractions)
+
+    def apply_calibration_parameters(
+        self,
+        result: CalibrationResult
+        | ProbabilisticCalibrationResult
+        | Mapping[str, float],
+        problem: CalibrationProblem,
+    ) -> None:
+        """
+        Write calibrated values back onto the model.
+
+        Each value is routed by the ``parameter_type`` declared for it in
+        ``problem``: ``parameter`` values update model parameters,
+        ``initial_condition`` values update bin fractions or stratification
+        category fractions, and ``scale`` values are ignored because they apply
+        to observations rather than to the model.
+
+        Parameters
+        ----------
+        result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
+            The calibration outcome, or a mapping of parameter id to value.
+            For a probabilistic result the point parameters of the selected
+            ensemble are applied.
+        problem : CalibrationProblem
+            The problem the result came from, used to resolve parameter types.
+
+        Raises
+        ------
+        ValueError
+            If an id is not declared in ``problem``, or if an initial condition
+            id refers to an expanded compartment, which the model definition
+            cannot represent.
+        """
+        values = _calibrated_values(result)
+        types = {param.id: param.parameter_type for param in problem.parameters}
+        unknown = sorted(set(values) - set(types))
+        if unknown:
+            raise ValueError(
+                f"Cannot apply values with no declared parameter type: {unknown}. "
+                f"Declared calibration parameters: {sorted(types)}"
+            )
+
+        bin_ids = {bin_item.id for bin_item in self.population.bins}
+        categories = self.population.initial_conditions.get_categories_with_fractions()
+
+        parameters: dict[str, float | None] = {}
+        bin_fractions: dict[str, float | None] = {}
+        stratification_fractions: dict[str, float] = {}
+
+        for param_id, value in values.items():
+            parameter_type = types[param_id]
+            if parameter_type == CalibrationParameterType.PARAMETER:
+                parameters[param_id] = value
+            elif parameter_type == CalibrationParameterType.SCALE:
+                continue
+            elif param_id in bin_ids:
+                bin_fractions[param_id] = value
+            elif param_id in categories:
+                stratification_fractions[param_id] = value
+            else:
+                raise ValueError(
+                    f"Initial condition '{param_id}' is neither a bin nor a "
+                    f"stratification category. Per-compartment initial "
+                    f"conditions can be calibrated but cannot be written back, "
+                    f"because the model defines initial conditions as bin and "
+                    f"stratification fractions only. Available bins: "
+                    f"{sorted(bin_ids)}. Available categories: "
+                    f"{sorted(categories)}"
+                )
+
+        if parameters:
+            self.update_parameters(parameters)
+        if bin_fractions:
+            self.update_initial_conditions(bin_fractions)
+        if stratification_fractions:
+            self.update_stratification_fractions(stratification_fractions)
 
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:
