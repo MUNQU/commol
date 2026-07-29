@@ -119,3 +119,37 @@ NSGA-II's compact trade-off summaries. For greedy selection,
 central-fit gate; it reports the candidate count, evaluated subsets, maximum
 feasible size, rejected singleton additions, and the best coverage encountered
 during the beam search.
+
+## Computing your own ensemble statistics
+
+The intervals commol reports all come from one definition of what a confidence
+level means. `ci_percentiles` exposes it, so a report you build yourself agrees
+with `parameter_statistics` and `prediction_ci_lower` / `prediction_ci_upper`
+instead of drifting from them.
+
+```python
+from commol import ci_percentiles, member_statistics
+
+lower_point, upper_point = ci_percentiles(0.95)  # (2.5, 97.5)
+```
+
+`member_statistics` reduces one quantity across the ensemble members and returns
+`mean`, `median`, `ci_lower`, `ci_upper`, `min` and `max`:
+
+```python
+final_values = [run["A"][-1] for run in ensemble_runs]
+stats = member_statistics(final_values, result.confidence_level)
+```
+
+Members may be scalars, as above, or equal-length series, in which case every
+statistic is a series reduced across members position by position.
+
+!!! warning "Reduce each member first"
+
+    Compute the quantity you care about for each member, then pass those values
+    here. Taking percentile bands of the raw trajectories and reducing the bands
+    afterwards produces a difference of percentiles rather than a percentile of
+    members: the result describes no member of the ensemble and generally
+    overstates the interval. This ordering is why `windowed_prediction_ci_lower`
+    and `windowed_prediction_ci_upper` exist as separate fields rather than
+    being derived from the step-resolution bands.

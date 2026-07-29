@@ -11,6 +11,7 @@ import numpy as np
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
+from commol.api.probabilistic.intervals import ci_percentiles
 from commol.api.probabilistic.normalization import (
     central_fit_loss,
     series_normalization_factors,
@@ -80,9 +81,7 @@ class StatisticsCalculator:
             for i, name in enumerate(param_names)
         }
 
-        # Calculate percentile bounds based on confidence level
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         param_statistics = {}
         for name, values in param_values.items():
@@ -197,8 +196,7 @@ class StatisticsCalculator:
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for output_id in simulation_output_ids:
             predictions_array = np.array(all_predictions[output_id])
@@ -242,8 +240,7 @@ class StatisticsCalculator:
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for output_id, (
             window_steps,
@@ -328,8 +325,7 @@ class StatisticsCalculator:
         ensemble_params: list[CalibrationEvaluation],
     ) -> dict[str, dict[str, float]]:
         """Return coverage and interval width separately for each data series."""
-        lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        lower_percentile, upper_percentile = ci_percentiles(self.confidence_level)
         totals: dict[str, dict[str, float]] = {}
 
         for observation in self.problem.observed_data:
@@ -453,8 +449,7 @@ class StatisticsCalculator:
         total_points = len(self.problem.observed_data)
         total_ci_width = 0.0
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for obs in self.problem.observed_data:
             values = self._observation_member_values(
