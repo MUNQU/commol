@@ -7,6 +7,8 @@ import pytest
 
 from commol.api.model_builder import ModelBuilder
 from commol.constants import ModelTypes
+from commol.context.model import Model
+from commol.context.parameter import TimeSeriesValue
 
 
 class TestModel:
@@ -2007,3 +2009,84 @@ class TestUpdateStratificationFractions:
         model.update_stratification_fractions({"group1": 0.25})
 
         assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
+
+
+def _round_trip_model(k1: float | None = 0.1, fraction: float | None = 1.0) -> Model:
+    """Two-bin model whose parameter and bin fraction may be uncalibrated."""
+    return (
+        ModelBuilder(name="RoundTrip", version="1.0", description="d")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="k1", value=k1)
+        .add_transition(id="flow", source=["A"], target=["B"], rate="k1")
+        .set_initial_conditions(
+            population_size=100,
+            bin_fractions=[
+                {"bin": "A", "fraction": fraction},
+                {"bin": "B", "fraction": 0.0},
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+class TestToJson:
+    def test_round_trips_to_an_equal_model(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+
+        assert Model.from_json(path) == model
+
+    def test_an_uncalibrated_parameter_round_trips(self, tmp_path: Path) -> None:
+        model = _round_trip_model(k1=None)
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        restored = Model.from_json(path)
+
+        assert restored == model
+        assert restored.get_uncalibrated_parameters() == ["k1"]
+
+    def test_an_uncalibrated_bin_fraction_round_trips(self, tmp_path: Path) -> None:
+        model = _round_trip_model(fraction=None)
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        restored = Model.from_json(path)
+
+        assert restored == model
+        assert restored.get_uncalibrated_initial_conditions() == ["A"]
+
+    def test_accepts_a_string_path(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        path = tmp_path / "model.json"
+
+        model.to_json(str(path))
+
+        assert Model.from_json(path) == model
+
+    def test_long_numeric_arrays_are_written_on_one_line(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        model.parameters[0].value = TimeSeriesValue(
+            data=[(step, float(step)) for step in range(20)]
+        )
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        text = path.read_text()
+
+        assert Model.from_json(path) == model
+        assert max(len(line) for line in text.splitlines()) > 100
+
+    def test_indent_is_configurable(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        wide = tmp_path / "wide.json"
+        narrow = tmp_path / "narrow.json"
+
+        model.to_json(wide, indent=8)
+        model.to_json(narrow, indent=2)
+
+        assert len(wide.read_text()) > len(narrow.read_text())
+        assert Model.from_json(wide) == Model.from_json(narrow)

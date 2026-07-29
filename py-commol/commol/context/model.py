@@ -6,6 +6,7 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context._model.serialization import render_json
 from commol.context.calibration import CalibrationProblem, CalibrationResult
 from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
@@ -91,6 +92,28 @@ class Model(BaseModel):
             json_data = f.read()
 
         return cls.model_validate_json(json_data)
+
+    def to_json(self, file_path: str | Path, indent: int = 2) -> None:
+        """
+        Save the model to a JSON file.
+
+        Every field is written, including those left unset, so the file always
+        reloads through :meth:`from_json` to an equal model.
+
+        Long numeric arrays, such as a time-series parameter, are written on a
+        single line.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path of the file to write.
+        indent : int, optional
+            Indentation width for nested structures.
+        """
+        payload = self.model_dump(mode="json")
+        Path(file_path).write_text(
+            render_json(payload, indent=indent), encoding="utf-8"
+        )
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:
