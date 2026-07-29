@@ -370,3 +370,103 @@ class TestSimulationPlotter:
         fig = plotter.plot_series(config=config)
         assert fig is not None
         plt.close(fig)
+
+
+class TestWindowedProbabilisticSeries:
+    """
+    Windowed ensemble bands are plotted against the steps they were taken at.
+
+    `windowed_prediction_*` is anchored at the observation steps, which need
+    not be every multiple of the window, so pairing it with a grid of multiples
+    would mismatch the axis.
+    """
+
+    def _model(self) -> Model:
+        return (
+            ModelBuilder(name="Windowed", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_accumulator(id="events", name="Events")
+            .add_parameter(id="k1", value=0.05)
+            .add_transition(
+                id="flow",
+                source=["A"],
+                target=["B"],
+                rate="k1",
+                accumulators=["events"],
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 1.0},
+                    {"bin": "B", "fraction": 0.0},
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+    def test_plots_when_observations_are_sparser_than_the_window_grid(self) -> None:
+        from commol.context.probabilistic_calibration import (
+            EnsembleSolution,
+            ProbabilisticCalibrationResult,
+        )
+
+        window = 5
+        simulation = Simulation(self._model())
+        results = simulation.run(40)
+        # Only three windows are observed, while the grid of multiples has eight.
+        steps = [10, 25, 40]
+        observed = [
+            ObservedDataPoint(
+                step=step,
+                compartment="events",
+                value=results["events"][step] - results["events"][step - window],
+                window_steps=window,
+            )
+            for step in steps
+        ]
+        windowed = [
+            results["events"][step] - results["events"][step - window] for step in steps
+        ]
+        ensemble = EnsembleSolution(
+            ensemble_size=1,
+            selected_indices=[0],
+            ensemble_parameters=[{"k1": 0.05}],
+            parameter_statistics={},
+            prediction_median={k: list(v) for k, v in results.items()},
+            prediction_ci_lower={k: list(v) for k, v in results.items()},
+            prediction_ci_upper={k: list(v) for k, v in results.items()},
+            windowed_prediction_steps={"events": steps},
+            windowed_prediction_median={"events": windowed},
+            windowed_prediction_ci_lower={"events": windowed},
+            windowed_prediction_ci_upper={"events": windowed},
+            coverage_percentage=100.0,
+            average_ci_width=0.0,
+            ci_width=0.0,
+            coverage=1.0,
+            point_parameters={"k1": 0.05},
+            point_loss=0.0,
+            central_loss=0.0,
+            observation_diagnostics={},
+            selection_diagnostics={},
+        )
+        result = ProbabilisticCalibrationResult(
+            selected_ensemble=ensemble,
+            selection_algorithm="nsga2",
+            n_runs_performed=1,
+            n_unique_evaluations=1,
+            n_clusters_used=1,
+            confidence_level=0.95,
+        )
+
+        plotter = SimulationPlotter(simulation, results)
+        figure = plotter.plot_series(
+            observed_data=observed, calibration_result=result, bins=["events"]
+        )
+
+        line = figure.axes[0].lines[0]
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == steps
+        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
+            windowed
+        )
+        plt.close(figure)

@@ -670,9 +670,11 @@ class SimulationPlotter:
         if windowed_median is not None:
             time_steps, _ = windowed_median
             win_med = prob_result.selected_ensemble.windowed_prediction_median
+            win_steps = prob_result.selected_ensemble.windowed_prediction_steps
             if win_med and bin_id in win_med:
                 uses_memberwise_windowed_prediction = True
                 plot_median = win_med[bin_id]
+                time_steps = win_steps.get(bin_id, time_steps)
                 plot_ci_lower = (
                     prob_result.selected_ensemble.windowed_prediction_ci_lower[bin_id]
                 )
@@ -684,6 +686,7 @@ class SimulationPlotter:
             ):
                 uses_memberwise_windowed_prediction = True
                 plot_median = self._sum_series(win_med, component_ids)
+                time_steps = win_steps.get(component_ids[0], time_steps)
                 plot_ci_lower = self._sum_series(
                     prob_result.selected_ensemble.windowed_prediction_ci_lower,
                     component_ids,
