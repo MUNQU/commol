@@ -308,6 +308,67 @@ model = builder.build(typology="DifferenceEquations")
 - Fast computation
 - Best for: Population-level modeling, policy analysis
 
+## Steps and Physical Time
+
+A model is defined purely in steps. Nothing in it records how long a step lasts,
+so a rate is always "per step" and a period is always a step count.
+
+`TimeScale` attaches a duration to a step, which turns physical quantities into
+the step counts and per-step rates a model needs:
+
+```python
+from commol import TimeScale
+
+scale = TimeScale(step_seconds=60 * 60)   # one hour per step
+
+scale.steps_per_day                        # 24
+scale.steps_per_week                       # 168
+scale.steps_from_days(3)                   # 72
+```
+
+If a period is not a whole number of steps, the conversion raises rather than
+rounding, which catches a step size that cannot express the periods a model
+relies on:
+
+```python
+daily = TimeScale(step_seconds=24 * 60 * 60)
+daily.steps_from_hours(1)   # ValueError: not a whole number of steps
+```
+
+### Converting rates
+
+Two conversions cover most transition rates:
+
+```python
+# Mean residence time of 4 days -> per-step rate
+scale.rate_from_mean_duration(4 * 24 * 60 * 60)
+
+# 0.3 probability accumulated over a week -> per-step rate
+scale.rate_from_probability(0.3, scale.steps_per_week)
+```
+
+`rate_from_mean_duration` returns `1 - exp(-step / duration)`, and
+`rate_from_probability` returns `1 - (1 - p) ** (1 / period_steps)`, so applying
+the latter over its period reproduces the original probability.
+
+### Window grids
+
+For a quantity reported per period, `window_start`, `window_end` and
+`window_index` give one grid usable in both directions:
+
+```python
+week = scale.steps_per_week
+
+scale.window_start(0, week)   # 0
+scale.window_end(0, week)     # 168, the start of window 1
+scale.window_index(168, week) # 0
+```
+
+`window_index` is the exact inverse of `window_end`, and returns the containing
+window for any step in between. A window covers `(start, end]`, which is the
+interval [windowed observations](calibration.md#calibrating-against-cumulative-outputs)
+are compared over.
+
 ## The Model Building Process
 
 A typical workflow:

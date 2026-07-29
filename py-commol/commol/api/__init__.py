@@ -4,6 +4,7 @@ from .plotter import SimulationPlotter
 from .probabilistic.intervals import ci_percentiles, member_statistics
 from .simulation import Simulation
 from .time_patterns import TimePattern
+from .time_scale import TimeScale
 from .windows import window_end_steps, windowed_totals
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "SimulationPlotter",
     "Simulation",
     "TimePattern",
+    "TimeScale",
     "ci_percentiles",
     "member_statistics",
     "window_end_steps",
