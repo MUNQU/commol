@@ -156,7 +156,7 @@ class SimulationPlotter:
         Plot cumulative (accumulated) simulation results with one subplot per bin.
 
         Creates a figure showing the running sum of each bin's values over time.
-        Useful for tracking total infections, deaths, or other accumulated quantities.
+        Useful for tracking totals, losses, or other accumulated quantities.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
         Parameters

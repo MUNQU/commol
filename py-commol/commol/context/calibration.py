@@ -199,11 +199,11 @@ class CalibrationConstraint(BaseModel):
     ...     description="Sum of rates <= 1.0",
     ... )
 
-    >>> # Time-dependent: Infected compartment <= 500 at specific time steps
+    >>> # Time-dependent: bin B stays at or below 500 at specific time steps
     >>> constraint = CalibrationConstraint(
-    ...     id="peak_infected",
-    ...     expression="500.0 - I",
-    ...     description="Peak infected never exceeds 500",
+    ...     id="peak_b",
+    ...     expression="500.0 - B",
+    ...     description="Peak B never exceeds 500",
     ...     time_steps=[10, 20, 30, 40, 50],
     ... )
     """
