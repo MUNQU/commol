@@ -3,6 +3,7 @@ from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 # Use non-interactive backend to prevent figures from displaying during tests
@@ -137,12 +138,13 @@ class TestSimulationPlotter:
         )
 
         ax = fig.axes[0]
-        plotted_y = ax.lines[0].get_ydata()
+        plotted_y = np.asarray(ax.lines[0].get_ydata(), dtype=float)
         assert plotted_y[10] == pytest.approx(results["I"][10] * scale_factor)
-        observed_offsets = max(
-            (collection.get_offsets() for collection in ax.collections),
-            key=len,
-        )
+        offsets = [
+            np.asarray(collection.get_offsets(), dtype=float)
+            for collection in ax.collections
+        ]
+        observed_offsets = offsets[int(np.argmax([len(offset) for offset in offsets]))]
         observed_y = observed_offsets[:, 1]
         assert observed_y[1] == pytest.approx(results["I"][10] * scale_factor)
         assert fig is not None

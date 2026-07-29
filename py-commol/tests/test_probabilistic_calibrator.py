@@ -1,5 +1,7 @@
 """Integration tests for probabilistic calibration selection backends."""
 
+from typing import Literal
+
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -59,7 +61,9 @@ def _problem(
     ensemble_selection: ProbNsga2Config | ProbGreedyLocalSearchConfig | None = None,
     *,
     loss_function: str = "sse",
-    feature_space: str = "observed_predictions",
+    feature_space: Literal["parameters", "observed_predictions"] = (
+        "observed_predictions"
+    ),
 ) -> CalibrationProblem:
     simulation = Simulation(model)
     true_results = simulation.run(30, output_format="dict_of_lists")
@@ -170,17 +174,19 @@ def test_ensemble_configuration_defaults_to_nsga2() -> None:
         ProbNsga2Config,
     )
 
+    # Each call below passes an argument the config does not declare, which is
+    # what `extra="forbid"` must reject.
     with pytest.raises(ValidationError, match="ensemble_algorithm"):
-        ProbNsga2Config(ensemble_algorithm="unsupported")
+        ProbNsga2Config(ensemble_algorithm="unsupported")  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="central_fit_max_loss_ratio"):
-        ProbNsga2Config(central_fit_max_loss_ratio=1.5)
+        ProbNsga2Config(central_fit_max_loss_ratio=1.5)  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="population_size"):
-        ProbGreedyLocalSearchConfig(population_size=100)
+        ProbGreedyLocalSearchConfig(population_size=100)  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="result_detail"):
-        ProbabilisticCalibrationConfig(result_detail="full")
+        ProbabilisticCalibrationConfig(result_detail="full")  # ty: ignore[unknown-argument]
 
 
 def test_invalid_observed_compartment_is_rejected(model) -> None:
