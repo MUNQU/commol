@@ -768,6 +768,48 @@ gains an `interval` block, and the report is preceded by `confidence_level`:
 Intervals are in the unit the entry was calibrated in, so for an initial
 condition that is its fraction, not its head count.
 
+### Reporting the run itself
+
+`simulation_report` renders the three blocks a calibrated run is judged on —
+the observed targets, the compartment series, and both readings of each
+accumulator — sharing one window axis so they can be read against each other:
+
+```python
+from commol import simulation_report
+
+report = simulation_report(
+    simulation,
+    results,
+    steps=[7 * (w + 1) for w in range(10)],
+    window_steps=7,
+    num_windows=10,
+    observed_data=problem.observed_data,
+    accumulators=["cum_ab"],
+)
+```
+
+`series` holds each compartment output sampled at `steps`. `accumulators` holds
+each accumulator as a `total`, a `windowed` reading (the per-window increment
+the loss compares against) and a `cumulative` reading sampled at `steps`, each
+given as a total and per output. `observed` pads every series to `num_windows`
+so it lines up index for index with `windowed`.
+
+Passing `ensemble_runs` and `confidence_level` turns every leaf into a
+`{mean, median, ci_lower, ci_upper, min, max}` block computed across members.
+**The layout is otherwise unchanged**, so one reader handles both a
+deterministic and a probabilistic run.
+
+The function returns only these blocks. Anything around them — a run label,
+axis labels, or summary figures meaningful to your domain — is yours to add:
+
+```python
+document = {
+    "kind": "calibration",
+    "steps": steps,
+    **simulation_report(...),
+}
+```
+
 ### Writing a result back to the model
 
 ```python

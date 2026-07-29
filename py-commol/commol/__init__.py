@@ -10,6 +10,7 @@ from commol.api import (
     TimeScale,
     applied_parameters_report,
     ci_percentiles,
+    simulation_report,
     member_statistics,
     window_end_steps,
     windowed_totals,
@@ -82,6 +83,7 @@ __all__ = [
     "applied_parameters_report",
     "ci_percentiles",
     "member_statistics",
+    "simulation_report",
     "window_end_steps",
     "windowed_totals",
 ]

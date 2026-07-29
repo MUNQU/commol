@@ -1,11 +1,17 @@
 """Structured reports of a calibrated model."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NotRequired, TypedDict
 
+import numpy as np
+
+from commol.api.probabilistic.intervals import member_statistics
+from commol.api.simulation import Simulation
+from commol.api.windows import windowed_totals
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
+    ObservedDataPoint,
     calibrated_values,
 )
 from commol.context.constants import CalibrationParameterType
@@ -268,3 +274,345 @@ def _initial_conditions_report(
                 parameter_statistics,
             )
     return report
+
+
+type ReportLeaf = float | list[float] | dict[str, float | list[float]]
+
+
+class ObservedSeries(TypedDict):
+    """One observed series on the reported window axis."""
+
+    values: list[float | None]
+    weights: NotRequired[list[float | None]]
+    compartments: NotRequired[list[str]]
+    scale_id: NotRequired[str]
+
+
+class WindowedAccumulator(TypedDict):
+    """One reading of an accumulator, as a total and per output."""
+
+    total: ReportLeaf
+    by_output: dict[str, ReportLeaf]
+
+
+class AccumulatorReport(TypedDict):
+    """Both readings of one accumulator."""
+
+    total: ReportLeaf
+    windowed: WindowedAccumulator
+    cumulative: WindowedAccumulator
+
+
+class SimulationReport(TypedDict):
+    """Observed data, compartment series and accumulators of a run."""
+
+    observed: dict[str, ObservedSeries]
+    series: dict[str, ReportLeaf]
+    accumulators: dict[str, AccumulatorReport]
+
+
+def _reduce(
+    reduce_fn: Callable[[Mapping[str, Sequence[float]]], float | list[float]],
+    results: Mapping[str, Sequence[float]],
+    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None,
+    confidence_level: float | None,
+) -> ReportLeaf:
+    """
+    One reported value, as a quantity or as the spread of that quantity.
+
+    A single run yields the quantity itself. An ensemble yields the same
+    quantity computed per member and reduced to statistics, so both layouts
+    differ only in what sits at the leaves.
+    """
+    if not ensemble_runs or confidence_level is None:
+        return reduce_fn(results)
+    members = np.asarray([reduce_fn(run) for run in ensemble_runs], dtype=float)
+    return member_statistics(members, confidence_level)
+
+
+def sample(series: Sequence[float], steps: Iterable[int]) -> list[float]:
+    """
+    Read a series at the given steps.
+
+    Compartment counts are instantaneous, so they are read at the step rather
+    than averaged over the interval leading to it.
+
+    Parameters
+    ----------
+    series : Sequence[float]
+        A series indexed by simulation step.
+    steps : Iterable[int]
+        Steps to read.
+
+    Returns
+    -------
+    list[float]
+        One value per step.
+    """
+    return [series[step] for step in steps]
+
+
+def observed_report(
+    observed_data: Iterable[ObservedDataPoint],
+    window_steps: int,
+    num_windows: int,
+) -> dict[str, ObservedSeries]:
+    """
+    Report the calibration targets on a window axis.
+
+    Each series becomes one array of `num_windows` entries, padded with null
+    where there is no observation, so it lines up index for index with the
+    windowed accumulator series. ``weights``, ``compartments`` and ``scale_id``
+    appear only on series that use them; a series whose weights are all 1.0
+    omits them.
+
+    Parameters
+    ----------
+    observed_data : Iterable[ObservedDataPoint]
+        The observations to report.
+    window_steps : int
+        Length of one window, in steps.
+    num_windows : int
+        Number of windows on the reported axis.
+
+    Returns
+    -------
+    dict[str, ObservedSeries]
+        One entry per observed series.
+    """
+    series: dict[str, ObservedSeries] = {}
+    for point in observed_data:
+        entry: ObservedSeries = series.setdefault(
+            point.compartment,
+            {
+                "values": [None] * num_windows,
+                "weights": [None] * num_windows,
+            },
+        )
+        window = max(point.step - 1, 0) // window_steps
+        if not 0 <= window < num_windows:
+            continue
+        entry["values"][window] = point.value
+        entry["weights"][window] = point.weight
+        if point.compartments:
+            entry["compartments"] = list(point.compartments)
+        if point.scale_id:
+            entry["scale_id"] = point.scale_id
+
+    for entry in series.values():
+        if all(weight in (None, 1.0) for weight in entry["weights"]):
+            del entry["weights"]
+    return series
+
+
+def series_report(
+    simulation: Simulation,
+    results: Mapping[str, Sequence[float]],
+    steps: Sequence[int],
+    accumulators: Iterable[str] = (),
+    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    confidence_level: float | None = None,
+) -> dict[str, ReportLeaf]:
+    """
+    Report every compartment series, sampled at the given steps.
+
+    Outputs belonging to the named accumulators are excluded, since they are
+    reported separately by :func:`accumulators_report`.
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The simulation the results came from.
+    results : Mapping[str, Sequence[float]]
+        Results in `dict_of_lists` form.
+    steps : Sequence[int]
+        Steps the series are sampled at.
+    accumulators : Iterable[str], optional
+        Accumulator ids whose outputs are left out.
+    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+        One results mapping per ensemble member.
+    confidence_level : float | None, optional
+        Confidence level of the reported intervals.
+
+    Returns
+    -------
+    dict[str, ReportLeaf]
+        One entry per compartment output, sorted by name.
+    """
+    excluded = {
+        name
+        for accumulator_id in accumulators
+        for name in simulation.outputs_for(accumulator_id)
+    }
+    return {
+        name: _reduce(
+            lambda run, output=name: sample(run[output], steps),
+            results,
+            ensemble_runs,
+            confidence_level,
+        )
+        for name in sorted(results)
+        if name not in excluded
+    }
+
+
+def accumulators_report(
+    simulation: Simulation,
+    results: Mapping[str, Sequence[float]],
+    accumulators: Iterable[str],
+    steps: Sequence[int],
+    window_steps: int,
+    num_windows: int,
+    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    confidence_level: float | None = None,
+) -> dict[str, AccumulatorReport]:
+    """
+    Report both readings of each accumulator.
+
+    ``windowed`` is the per-window increment the loss compares observations
+    against, so it stays on the window axis whatever `steps` are sampled and
+    lines up with :func:`observed_report`. ``cumulative`` follows `steps` like
+    the compartment series do. Both are given as a total and per output.
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The simulation the results came from.
+    results : Mapping[str, Sequence[float]]
+        Results in `dict_of_lists` form.
+    accumulators : Iterable[str]
+        Accumulator ids to report.
+    steps : Sequence[int]
+        Steps the cumulative series are sampled at.
+    window_steps : int
+        Length of one window, in steps.
+    num_windows : int
+        Number of windows on the reported axis.
+    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+        One results mapping per ensemble member.
+    confidence_level : float | None, optional
+        Confidence level of the reported intervals.
+
+    Returns
+    -------
+    dict[str, AccumulatorReport]
+        One entry per accumulator that has outputs.
+    """
+    anchors = [(window + 1) * window_steps for window in range(num_windows)]
+
+    def windowed(series: Sequence[float]) -> list[float]:
+        return windowed_totals(
+            series, window_steps, [step for step in anchors if step < len(series)]
+        )
+
+    block: dict[str, AccumulatorReport] = {}
+    for accumulator_id in accumulators:
+        outputs = simulation.outputs_for(accumulator_id)
+        if not outputs:
+            continue
+
+        def leaf(
+            reduce_fn: Callable[[Mapping[str, Sequence[float]]], float | list[float]],
+        ) -> ReportLeaf:
+            return _reduce(reduce_fn, results, ensemble_runs, confidence_level)
+
+        entry: AccumulatorReport = {
+            "total": leaf(lambda run, ids=outputs: sum(run[name][-1] for name in ids)),
+            "windowed": {
+                "total": leaf(
+                    lambda run, acc=accumulator_id: windowed(
+                        simulation.total_series(run, [acc])
+                    )
+                ),
+                "by_output": {
+                    name: leaf(lambda run, output=name: windowed(run[output]))
+                    for name in outputs
+                },
+            },
+            "cumulative": {
+                "total": leaf(
+                    lambda run, acc=accumulator_id: sample(
+                        simulation.total_series(run, [acc]), steps
+                    )
+                ),
+                "by_output": {
+                    name: leaf(lambda run, output=name: sample(run[output], steps))
+                    for name in outputs
+                },
+            },
+        }
+        block[accumulator_id] = entry
+    return block
+
+
+def simulation_report(
+    simulation: Simulation,
+    results: Mapping[str, Sequence[float]],
+    steps: Sequence[int],
+    window_steps: int,
+    num_windows: int,
+    observed_data: Iterable[ObservedDataPoint] = (),
+    accumulators: Iterable[str] = (),
+    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    confidence_level: float | None = None,
+) -> SimulationReport:
+    """
+    Report the observed data, compartment series and accumulators of a run.
+
+    The three blocks share one window axis, so the observed values, the
+    windowed accumulator increments and the sampled series can be read against
+    each other. With `ensemble_runs` every leaf becomes a
+    ``{mean, median, ci_lower, ci_upper, min, max}`` block computed across
+    members, and the layout is otherwise unchanged.
+
+    Callers add whatever envelope they need around these blocks, such as a run
+    label, axis labels or domain-specific summary figures.
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The simulation the results came from.
+    results : Mapping[str, Sequence[float]]
+        Results in `dict_of_lists` form.
+    steps : Sequence[int]
+        Steps the series and cumulative accumulators are sampled at.
+    window_steps : int
+        Length of one window, in steps.
+    num_windows : int
+        Number of windows on the observed and windowed axes.
+    observed_data : Iterable[ObservedDataPoint], optional
+        The calibration targets to report alongside the run.
+    accumulators : Iterable[str], optional
+        Accumulator ids to report.
+    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+        One results mapping per ensemble member.
+    confidence_level : float | None, optional
+        Confidence level of the reported intervals.
+
+    Returns
+    -------
+    SimulationReport
+        Keys ``observed``, ``series`` and ``accumulators``.
+    """
+    accumulator_ids = list(accumulators)
+    return {
+        "observed": observed_report(observed_data, window_steps, num_windows),
+        "series": series_report(
+            simulation,
+            results,
+            steps,
+            accumulator_ids,
+            ensemble_runs,
+            confidence_level,
+        ),
+        "accumulators": accumulators_report(
+            simulation,
+            results,
+            accumulator_ids,
+            steps,
+            window_steps,
+            num_windows,
+            ensemble_runs,
+            confidence_level,
+        ),
+    }
