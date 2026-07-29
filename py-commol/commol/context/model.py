@@ -7,29 +7,17 @@ from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
-from commol.context.calibration import CalibrationProblem, CalibrationResult
+from commol.context.calibration import (
+    CalibrationProblem,
+    CalibrationResult,
+    calibrated_values,
+)
 from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
 from commol.context.population import Population
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
 from commol.utils.security import get_expression_variables
-
-
-def _calibrated_values(
-    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
-) -> Mapping[str, float]:
-    """
-    Return the parameter values carried by a calibration outcome.
-
-    For a probabilistic result these are the point parameters of the selected
-    ensemble.
-    """
-    if isinstance(result, CalibrationResult):
-        return result.best_parameters
-    if isinstance(result, ProbabilisticCalibrationResult):
-        return result.selected_ensemble.point_parameters
-    return result
 
 
 class Model(BaseModel):
@@ -272,7 +260,7 @@ class Model(BaseModel):
             id refers to an expanded compartment, which the model definition
             cannot represent.
         """
-        values = _calibrated_values(result)
+        values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
         unknown = sorted(set(values) - set(types))
         if unknown:

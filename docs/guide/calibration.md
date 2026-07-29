@@ -729,6 +729,45 @@ else:
 
 **Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.apply_calibration_parameters(result, problem)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
 
+### Reporting what the calibration applied
+
+`applied_parameters_report` renders the calibrated model as a plain structure:
+every numeric parameter and every initial condition, each flagged with whether
+the calibration set it.
+
+```python
+from commol import applied_parameters_report
+
+report = applied_parameters_report(model, result, problem)
+```
+
+Initial conditions carry the `fraction` the model was built from, the head
+`value` it works out to, and the `group` that fraction is taken of — which for a
+[conditional stratification](core-concepts.md#subgroup-head-counts) is its
+conditioning categories rather than the whole population.
+
+Pass `problem` to include `scale` parameters, which are calibrated but have no
+place in the model. For a `ProbabilisticCalibrationResult` every entry also
+gains an `interval` block, and the report is preceded by `confidence_level`:
+
+```json
+{
+  "confidence_level": 0.95,
+  "parameters": {
+    "k1": {"value": 0.31, "calibrated": true,
+           "interval": {"mean": 0.31, "median": 0.31, "ci_lower": 0.28,
+                        "ci_upper": 0.34, "min": 0.27, "max": 0.35, "std": 0.02}}
+  },
+  "initial_conditions": {
+    "N": {"group": "population", "fraction": 1.0, "value": 10000.0,
+          "calibrated": false}
+  }
+}
+```
+
+Intervals are in the unit the entry was calibrated in, so for an initial
+condition that is its fraction, not its head count.
+
 ### Writing a result back to the model
 
 ```python
