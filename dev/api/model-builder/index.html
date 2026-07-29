@@ -1199,6 +1199,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../time-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../calibrator/" class="md-nav__link">
         
   
@@ -3015,9 +3043,9 @@ before building.</p>
 </span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a><span class="sd">            contain &quot;stratification&quot; and &quot;category&quot; keys referencing a</span>
 </span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a><span class="sd">            stratification declared before this one.</span>
 </span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>
-</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a><span class="sd">            Example: only apply vaccination stratification to oe60 age group::</span>
+</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a><span class="sd">            Example: only apply the `sub` stratification to `group1`::</span>
 </span><span id="__span-0-201"><a id="__codelineno-0-201" name="__codelineno-0-201"></a>
-</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a><span class="sd">                conditions = [{&quot;stratification&quot;: &quot;age&quot;, &quot;category&quot;: &quot;oe60&quot;}]</span>
+</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a><span class="sd">                conditions = [{&quot;stratification&quot;: &quot;group&quot;, &quot;category&quot;: &quot;group1&quot;}]</span>
 </span><span id="__span-0-203"><a id="__codelineno-0-203" name="__codelineno-0-203"></a>
 </span><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="sd">        Returns</span>
 </span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a><span class="sd">        -------</span>
@@ -4313,8 +4341,8 @@ model.check_unit_consistency().</p>
 already-applied categories satisfy ALL conditions. Each dict must
 contain "stratification" and "category" keys referencing a
 stratification declared before this one.</p>
-<p>Example: only apply vaccination stratification to oe60 age group::</p>
-<div class="language-text highlight"><pre><span></span><code>conditions = [{&quot;stratification&quot;: &quot;age&quot;, &quot;category&quot;: &quot;oe60&quot;}]
+<p>Example: only apply the <code>sub</code> stratification to <code>group1</code>::</p>
+<div class="language-text highlight"><pre><span></span><code>conditions = [{&quot;stratification&quot;: &quot;group&quot;, &quot;category&quot;: &quot;group1&quot;}]
 </code></pre></div>
               </div>
             </td>
@@ -4466,9 +4494,9 @@ stratification declared before this one.</p>
 </span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a><span class="sd">        contain &quot;stratification&quot; and &quot;category&quot; keys referencing a</span>
 </span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a><span class="sd">        stratification declared before this one.</span>
 </span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>
-</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a><span class="sd">        Example: only apply vaccination stratification to oe60 age group::</span>
+</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a><span class="sd">        Example: only apply the `sub` stratification to `group1`::</span>
 </span><span id="__span-0-201"><a id="__codelineno-0-201" name="__codelineno-0-201"></a>
-</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a><span class="sd">            conditions = [{&quot;stratification&quot;: &quot;age&quot;, &quot;category&quot;: &quot;oe60&quot;}]</span>
+</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a><span class="sd">            conditions = [{&quot;stratification&quot;: &quot;group&quot;, &quot;category&quot;: &quot;group1&quot;}]</span>
 </span><span id="__span-0-203"><a id="__codelineno-0-203" name="__codelineno-0-203"></a>
 </span><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="sd">    Returns</span>
 </span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a><span class="sd">    -------</span>

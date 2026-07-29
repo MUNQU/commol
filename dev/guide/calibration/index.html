@@ -1024,6 +1024,56 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reporting-what-the-calibration-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting what the calibration applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-the-run-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting the run itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-result-back-to-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a result back to the model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing a result back to the model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calibrated-stratification-splits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibrated stratification splits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1518,6 +1568,34 @@
     
   
     Time Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/time-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Scale
   
 
     
@@ -2171,6 +2249,56 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reporting-what-the-calibration-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting what the calibration applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-the-run-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting the run itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-result-back-to-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a result back to the model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing a result back to the model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calibrated-stratification-splits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibrated stratification splits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2505,7 +2633,7 @@
 <div class="admonition note">
 <p class="admonition-title">Working with Uncalibrated Parameters</p>
 </div>
-<p>Parameters and initial conditions can be set to <code>None</code> to indicate they need calibration. A <code>Simulation</code> can be created with <code>None</code> values for calibration purposes, but attempting to call <code>run()</code> on a simulation with uncalibrated values will raise a <code>ValueError</code>. After calibration, use <code>model.update_parameters(result.best_parameters)</code> or <code>model.update_initial_conditions(result.best_parameters)</code> to update your model with the calibrated values.</p>
+<p>Parameters and initial conditions can be set to <code>None</code> to indicate they need calibration. A <code>Simulation</code> can be created with <code>None</code> values for calibration purposes, but attempting to call <code>run()</code> on a simulation with uncalibrated values will raise a <code>ValueError</code>. After calibration, use <code>model.apply_calibration_parameters(result, problem)</code> to write every calibrated value back to the model at once. It routes each value by the <code>parameter_type</code> declared in the problem, so model parameters, bin fractions and stratification categories all land in the right place. <code>model.update_parameters(...)</code> and <code>model.update_initial_conditions(...)</code> remain available when you want to set one kind directly.</p>
 <h2 id="basic-example">Basic Example<a class="headerlink" href="#basic-example" title="Permanent link">&para;</a></h2>
 <p>Here's a simple calibration of a model's rate parameters. Parameters to be calibrated should be set to <code>None</code>, and initial guesses are provided in the <code>CalibrationParameter</code> configuration:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -3145,63 +3273,198 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 </span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a><span class="k">else</span><span class="p">:</span>
 </span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calibration did not converge: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">termination_reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Important</strong>: The <code>Calibrator</code> returns a <code>CalibrationResult</code> object containing the optimized parameter values, but does not automatically update your model. Use <code>model.update_parameters(result.best_parameters)</code> to update the model in place, then create a new <code>Simulation</code> object to run predictions with the calibrated parameters.</p>
+<p><strong>Important</strong>: The <code>Calibrator</code> returns a <code>CalibrationResult</code> object containing the optimized parameter values, but does not automatically update your model. Use <code>model.apply_calibration_parameters(result, problem)</code> to update the model in place, then create a new <code>Simulation</code> object to run predictions with the calibrated parameters.</p>
+<h3 id="reporting-what-the-calibration-applied">Reporting what the calibration applied<a class="headerlink" href="#reporting-what-the-calibration-applied" title="Permanent link">&para;</a></h3>
+<p><code>applied_parameters_report</code> renders the calibrated model as a plain structure:
+every numeric parameter and every initial condition, each flagged with whether
+the calibration set it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">applied_parameters_report</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">report</span> <span class="o">=</span> <span class="n">applied_parameters_report</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Initial conditions carry the <code>fraction</code> the model was built from, the head
+<code>value</code> it works out to, and the <code>group</code> that fraction is taken of — which for a
+<a href="../core-concepts/#subgroup-head-counts">conditional stratification</a> is its
+conditioning categories rather than the whole population.</p>
+<p>Pass <code>problem</code> to include <code>scale</code> parameters, which are calibrated but have no
+place in the model. For a <code>ProbabilisticCalibrationResult</code> every entry also
+gains an <code>interval</code> block, and the report is preceded by <code>confidence_level</code>:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">&quot;confidence_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nt">&quot;parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="nt">&quot;k1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.31</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">           </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;mean&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.31</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;median&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.31</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ci_lower&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.28</span><span class="p">,</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">                        </span><span class="nt">&quot;ci_upper&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.34</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.27</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.35</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;std&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.02</span><span class="p">}}</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span><span class="nt">&quot;initial_conditions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">    </span><span class="nt">&quot;N&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;group&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;population&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">10000.0</span><span class="p">,</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">          </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Intervals are in the unit the entry was calibrated in, so for an initial
+condition that is its fraction, not its head count.</p>
+<h3 id="reporting-the-run-itself">Reporting the run itself<a class="headerlink" href="#reporting-the-run-itself" title="Permanent link">&para;</a></h3>
+<p><code>simulation_report</code> renders the three blocks a calibrated run is judged on —
+the observed targets, the compartment series, and both readings of each
+accumulator — sharing one window axis so they can be read against each other:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulation_report</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">report</span> <span class="o">=</span> <span class="n">simulation_report</span><span class="p">(</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">simulation</span><span class="p">,</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">results</span><span class="p">,</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">steps</span><span class="o">=</span><span class="p">[</span><span class="mi">7</span> <span class="o">*</span> <span class="p">(</span><span class="n">w</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)],</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="n">window_steps</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    <span class="n">num_windows</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>series</code> holds each compartment output sampled at <code>steps</code>. <code>accumulators</code> holds
+each accumulator as a <code>total</code>, a <code>windowed</code> reading (the per-window increment
+the loss compares against) and a <code>cumulative</code> reading sampled at <code>steps</code>, each
+given as a total and per output. <code>observed</code> pads every series to <code>num_windows</code>
+so it lines up index for index with <code>windowed</code>.</p>
+<p>Passing <code>ensemble_runs</code> and <code>confidence_level</code> turns every leaf into a
+<code>{mean, median, ci_lower, ci_upper, min, max}</code> block computed across members.
+<strong>The layout is otherwise unchanged</strong>, so one reader handles both a
+deterministic and a probabilistic run.</p>
+<p>The function returns only these blocks. Anything around them — a run label,
+axis labels, or summary figures meaningful to your domain — is yours to add:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">document</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;calibration&quot;</span><span class="p">,</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="n">steps</span><span class="p">,</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="o">**</span><span class="n">simulation_report</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="writing-a-result-back-to-the-model">Writing a result back to the model<a class="headerlink" href="#writing-a-result-back-to-the-model" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">model</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span></code></pre></div>
+<p>This accepts a <code>CalibrationResult</code>, a <code>ProbabilisticCalibrationResult</code>, or a bare
+mapping of parameter id to value (one ensemble member's parameters, for
+instance). For a probabilistic result it applies <code>point_parameters</code> of the
+selected ensemble, which is the only parameter set that describes a single
+calibrated model.</p>
+<p>Each value is routed by its declared <code>parameter_type</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>parameter_type</code></th>
+<th>Written to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parameter</code></td>
+<td>the model parameter of that id</td>
+</tr>
+<tr>
+<td><code>initial_condition</code>, id is a bin</td>
+<td>that bin's fraction</td>
+</tr>
+<tr>
+<td><code>initial_condition</code>, id is a stratification category</td>
+<td>that category's fraction, and the remaining category</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>nothing — it scales observations, not the model</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Per-compartment initial conditions cannot be written back</p>
+<p>A calibration parameter naming an expanded compartment (<code>A_group1</code>) is
+accepted by the calibrator, but the model stores initial conditions only as
+bin and stratification fractions, so there is nowhere to put it.
+<code>apply_calibration_parameters</code> raises rather than skipping it silently.</p>
+</div>
+<h4 id="calibrated-stratification-splits">Calibrated stratification splits<a class="headerlink" href="#calibrated-stratification-splits" title="Permanent link">&para;</a></h4>
+<p>An <code>initial_condition</code> parameter may name a category of a binary
+stratification, in which case calibration fits the split between the two
+categories. Writing it back sets the named category and leaves the other to take
+the remaining fraction:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">model</span><span class="o">.</span><span class="n">update_stratification_fractions</span><span class="p">({</span><span class="s2">&quot;group1&quot;</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">})</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="c1"># group1 -&gt; 0.25, group2 -&gt; 0.75</span>
+</span></code></pre></div>
+<p>See <a href="../core-concepts/#updating-fractions-after-building">updating fractions after building</a>
+for the general rule.</p>
 <h2 id="calibrating-against-cumulative-outputs">Calibrating Against Cumulative Outputs<a class="headerlink" href="#calibrating-against-cumulative-outputs" title="Permanent link">&para;</a></h2>
 <p>When your observed data represents incremental counts over a period (e.g., new events recorded each week), you can calibrate against <a href="../core-concepts/#accumulators">accumulator</a> outputs using the <code>window_steps</code> parameter on <code>ObservedDataPoint</code>.</p>
 <p><code>window_steps=W</code> tells the calibration engine that the observation at step <code>t</code> corresponds to the <strong>accumulated change</strong> from step <code>t - W</code> to step <code>t</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>predicted_at(t) = accumulator(t) - accumulator(t - W)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>predicted_at(t) = accumulator(t) - accumulator(t - W)
 </span></code></pre></div>
+<p><code>windowed_totals</code> applies that same reduction outside the calibration, so a
+report can show the quantity the loss actually compared against:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end_steps</span><span class="p">,</span> <span class="n">windowed_totals</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="c1"># Every complete window of the run</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="c1"># Or exactly the steps the observations use</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="n">steps</span> <span class="o">=</span> <span class="n">window_end_steps</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">70</span><span class="p">)</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="n">weekly</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">windowed_totals</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="mi">7</span><span class="p">,</span> <span class="n">steps</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>window_end_steps(W, num_steps)</code> lists the steps closing each complete window,
+dropping a trailing partial one. <code>windowed_totals</code> also accepts steps that are
+not multiples of the window, matching observations anchored anywhere.</p>
+<p>For a probabilistic run the ensemble equivalents are on the selected ensemble:
+<code>windowed_prediction_median</code>, <code>windowed_prediction_ci_lower</code> and
+<code>windowed_prediction_ci_upper</code>, with <code>windowed_prediction_steps</code> giving the step
+each value belongs to.</p>
 <h3 id="example-windowed-calibration">Example: Windowed Calibration<a class="headerlink" href="#example-windowed-calibration" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">Calibrator</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.context.calibration</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">,</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="n">CalibrationParameter</span><span class="p">,</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="n">CalibrationProblem</span><span class="p">,</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="n">ParticleSwarmConfig</span><span class="p">,</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="p">)</span>
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="c1"># Model with an accumulator tracking flows A→B</span>
-</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="s2">&quot;Model&quot;</span><span class="p">)</span>
-</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;State A&quot;</span><span class="p">)</span>
-</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;State B&quot;</span><span class="p">)</span>
-</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>    <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="s2">&quot;Cumulative A→B&quot;</span><span class="p">)</span>
-</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>       <span class="c1"># to calibrate</span>
-</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">,</span>
-</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>                    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">])</span>
-</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span> <span class="p">[</span>
-</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">},</span>
-</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span>
-</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a>    <span class="p">])</span>
-</span><span id="__span-16-22"><a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
-</span><span id="__span-16-23"><a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a><span class="p">)</span>
-</span><span id="__span-16-24"><a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a>
-</span><span id="__span-16-25"><a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a><span class="c1"># Weekly incidence data: new A→B events each 7-step window</span>
-</span><span id="__span-16-26"><a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a><span class="n">weekly_new_ab</span> <span class="o">=</span> <span class="p">[</span><span class="mi">45</span><span class="p">,</span> <span class="mi">82</span><span class="p">,</span> <span class="mi">130</span><span class="p">,</span> <span class="mi">174</span><span class="p">,</span> <span class="mi">205</span><span class="p">,</span> <span class="mi">190</span><span class="p">,</span> <span class="mi">160</span><span class="p">,</span> <span class="mi">118</span><span class="p">,</span> <span class="mi">85</span><span class="p">,</span> <span class="mi">55</span><span class="p">]</span>
-</span><span id="__span-16-27"><a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-16-28"><a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span>
-</span><span id="__span-16-29"><a id="__codelineno-16-29" name="__codelineno-16-29" href="#__codelineno-16-29"></a>        <span class="n">step</span><span class="o">=</span><span class="mi">7</span> <span class="o">*</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
-</span><span id="__span-16-30"><a id="__codelineno-16-30" name="__codelineno-16-30" href="#__codelineno-16-30"></a>        <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span>
-</span><span id="__span-16-31"><a id="__codelineno-16-31" name="__codelineno-16-31" href="#__codelineno-16-31"></a>        <span class="n">value</span><span class="o">=</span><span class="n">val</span><span class="p">,</span>
-</span><span id="__span-16-32"><a id="__codelineno-16-32" name="__codelineno-16-32" href="#__codelineno-16-32"></a>        <span class="n">window_steps</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>  <span class="c1"># compare week-over-week change</span>
-</span><span id="__span-16-33"><a id="__codelineno-16-33" name="__codelineno-16-33" href="#__codelineno-16-33"></a>    <span class="p">)</span>
-</span><span id="__span-16-34"><a id="__codelineno-16-34" name="__codelineno-16-34" href="#__codelineno-16-34"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weekly_new_ab</span><span class="p">)</span>
-</span><span id="__span-16-35"><a id="__codelineno-16-35" name="__codelineno-16-35" href="#__codelineno-16-35"></a><span class="p">]</span>
-</span><span id="__span-16-36"><a id="__codelineno-16-36" name="__codelineno-16-36" href="#__codelineno-16-36"></a>
-</span><span id="__span-16-37"><a id="__codelineno-16-37" name="__codelineno-16-37" href="#__codelineno-16-37"></a><span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-16-38"><a id="__codelineno-16-38" name="__codelineno-16-38" href="#__codelineno-16-38"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
-</span><span id="__span-16-39"><a id="__codelineno-16-39" name="__codelineno-16-39" href="#__codelineno-16-39"></a>                         <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-</span><span id="__span-16-40"><a id="__codelineno-16-40" name="__codelineno-16-40" href="#__codelineno-16-40"></a><span class="p">]</span>
-</span><span id="__span-16-41"><a id="__codelineno-16-41" name="__codelineno-16-41" href="#__codelineno-16-41"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-16-42"><a id="__codelineno-16-42" name="__codelineno-16-42" href="#__codelineno-16-42"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-16-43"><a id="__codelineno-16-43" name="__codelineno-16-43" href="#__codelineno-16-43"></a>    <span class="n">parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
-</span><span id="__span-16-44"><a id="__codelineno-16-44" name="__codelineno-16-44" href="#__codelineno-16-44"></a>    <span class="n">constraints</span><span class="o">=</span><span class="p">[],</span>
-</span><span id="__span-16-45"><a id="__codelineno-16-45" name="__codelineno-16-45" href="#__codelineno-16-45"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">num_particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
-</span><span id="__span-16-46"><a id="__codelineno-16-46" name="__codelineno-16-46" href="#__codelineno-16-46"></a><span class="p">)</span>
-</span><span id="__span-16-47"><a id="__codelineno-16-47" name="__codelineno-16-47" href="#__codelineno-16-47"></a>
-</span><span id="__span-16-48"><a id="__codelineno-16-48" name="__codelineno-16-48" href="#__codelineno-16-48"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span>
-</span><span id="__span-16-49"><a id="__codelineno-16-49" name="__codelineno-16-49" href="#__codelineno-16-49"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-16-50"><a id="__codelineno-16-50" name="__codelineno-16-50" href="#__codelineno-16-50"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;k1 = </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, loss = </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">final_loss</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">Calibrator</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.context.calibration</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">,</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    <span class="n">CalibrationParameter</span><span class="p">,</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>    <span class="n">CalibrationProblem</span><span class="p">,</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="n">ParticleSwarmConfig</span><span class="p">,</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="p">)</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="c1"># Model with an accumulator tracking flows A→B</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="s2">&quot;Model&quot;</span><span class="p">)</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>    <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="s2">&quot;Cumulative A→B&quot;</span><span class="p">)</span>
+</span><span id="__span-23-15"><a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>       <span class="c1"># to calibrate</span>
+</span><span id="__span-23-16"><a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">,</span>
+</span><span id="__span-23-17"><a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>                    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">])</span>
+</span><span id="__span-23-18"><a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span> <span class="p">[</span>
+</span><span id="__span-23-19"><a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">},</span>
+</span><span id="__span-23-20"><a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span>
+</span><span id="__span-23-21"><a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a>    <span class="p">])</span>
+</span><span id="__span-23-22"><a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-23-23"><a id="__codelineno-23-23" name="__codelineno-23-23" href="#__codelineno-23-23"></a><span class="p">)</span>
+</span><span id="__span-23-24"><a id="__codelineno-23-24" name="__codelineno-23-24" href="#__codelineno-23-24"></a>
+</span><span id="__span-23-25"><a id="__codelineno-23-25" name="__codelineno-23-25" href="#__codelineno-23-25"></a><span class="c1"># Weekly incidence data: new A→B events each 7-step window</span>
+</span><span id="__span-23-26"><a id="__codelineno-23-26" name="__codelineno-23-26" href="#__codelineno-23-26"></a><span class="n">weekly_new_ab</span> <span class="o">=</span> <span class="p">[</span><span class="mi">45</span><span class="p">,</span> <span class="mi">82</span><span class="p">,</span> <span class="mi">130</span><span class="p">,</span> <span class="mi">174</span><span class="p">,</span> <span class="mi">205</span><span class="p">,</span> <span class="mi">190</span><span class="p">,</span> <span class="mi">160</span><span class="p">,</span> <span class="mi">118</span><span class="p">,</span> <span class="mi">85</span><span class="p">,</span> <span class="mi">55</span><span class="p">]</span>
+</span><span id="__span-23-27"><a id="__codelineno-23-27" name="__codelineno-23-27" href="#__codelineno-23-27"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-23-28"><a id="__codelineno-23-28" name="__codelineno-23-28" href="#__codelineno-23-28"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span>
+</span><span id="__span-23-29"><a id="__codelineno-23-29" name="__codelineno-23-29" href="#__codelineno-23-29"></a>        <span class="n">step</span><span class="o">=</span><span class="mi">7</span> <span class="o">*</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+</span><span id="__span-23-30"><a id="__codelineno-23-30" name="__codelineno-23-30" href="#__codelineno-23-30"></a>        <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span>
+</span><span id="__span-23-31"><a id="__codelineno-23-31" name="__codelineno-23-31" href="#__codelineno-23-31"></a>        <span class="n">value</span><span class="o">=</span><span class="n">val</span><span class="p">,</span>
+</span><span id="__span-23-32"><a id="__codelineno-23-32" name="__codelineno-23-32" href="#__codelineno-23-32"></a>        <span class="n">window_steps</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>  <span class="c1"># compare week-over-week change</span>
+</span><span id="__span-23-33"><a id="__codelineno-23-33" name="__codelineno-23-33" href="#__codelineno-23-33"></a>    <span class="p">)</span>
+</span><span id="__span-23-34"><a id="__codelineno-23-34" name="__codelineno-23-34" href="#__codelineno-23-34"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weekly_new_ab</span><span class="p">)</span>
+</span><span id="__span-23-35"><a id="__codelineno-23-35" name="__codelineno-23-35" href="#__codelineno-23-35"></a><span class="p">]</span>
+</span><span id="__span-23-36"><a id="__codelineno-23-36" name="__codelineno-23-36" href="#__codelineno-23-36"></a>
+</span><span id="__span-23-37"><a id="__codelineno-23-37" name="__codelineno-23-37" href="#__codelineno-23-37"></a><span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-23-38"><a id="__codelineno-23-38" name="__codelineno-23-38" href="#__codelineno-23-38"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+</span><span id="__span-23-39"><a id="__codelineno-23-39" name="__codelineno-23-39" href="#__codelineno-23-39"></a>                         <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-23-40"><a id="__codelineno-23-40" name="__codelineno-23-40" href="#__codelineno-23-40"></a><span class="p">]</span>
+</span><span id="__span-23-41"><a id="__codelineno-23-41" name="__codelineno-23-41" href="#__codelineno-23-41"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-23-42"><a id="__codelineno-23-42" name="__codelineno-23-42" href="#__codelineno-23-42"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-23-43"><a id="__codelineno-23-43" name="__codelineno-23-43" href="#__codelineno-23-43"></a>    <span class="n">parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
+</span><span id="__span-23-44"><a id="__codelineno-23-44" name="__codelineno-23-44" href="#__codelineno-23-44"></a>    <span class="n">constraints</span><span class="o">=</span><span class="p">[],</span>
+</span><span id="__span-23-45"><a id="__codelineno-23-45" name="__codelineno-23-45" href="#__codelineno-23-45"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">num_particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
+</span><span id="__span-23-46"><a id="__codelineno-23-46" name="__codelineno-23-46" href="#__codelineno-23-46"></a><span class="p">)</span>
+</span><span id="__span-23-47"><a id="__codelineno-23-47" name="__codelineno-23-47" href="#__codelineno-23-47"></a>
+</span><span id="__span-23-48"><a id="__codelineno-23-48" name="__codelineno-23-48" href="#__codelineno-23-48"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="n">problem</span><span class="p">)</span>
+</span><span id="__span-23-49"><a id="__codelineno-23-49" name="__codelineno-23-49" href="#__codelineno-23-49"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-23-50"><a id="__codelineno-23-50" name="__codelineno-23-50" href="#__codelineno-23-50"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;k1 = </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, loss = </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">final_loss</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="rules-for-window_steps">Rules for <code>window_steps</code><a class="headerlink" href="#rules-for-window_steps" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3213,30 +3476,30 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <h3 id="1-choose-appropriate-bounds">1. Choose Appropriate Bounds<a class="headerlink" href="#1-choose-appropriate-bounds" title="Permanent link">&para;</a></h3>
 <p>Set realistic bounds based on domain knowledge:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Too wide: allows unrealistic values</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">100.0</span><span class="p">)</span>  <span class="c1"># Bad</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Reasonable: based on expected parameter ranges</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>    <span class="c1"># Good</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Too wide: allows unrealistic values</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">100.0</span><span class="p">)</span>  <span class="c1"># Bad</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Reasonable: based on expected parameter ranges</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>    <span class="c1"># Good</span>
 </span></code></pre></div>
 <h3 id="2-provide-good-initial-guesses">2. Provide Good Initial Guesses<a class="headerlink" href="#2-provide-good-initial-guesses" title="Permanent link">&para;</a></h3>
 <p>Initial guesses can speed up convergence:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Without initial guess - optimizer uses midpoint</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">CalibrationParameter</span><span class="p">(</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="p">)</span>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="c1"># Provide informed starting point (recommended)</span>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="n">CalibrationParameter</span><span class="p">(</span>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
-</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>    <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
-</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="n">initial_guess</span><span class="o">=</span><span class="mf">0.4</span>  <span class="c1"># Based on prior knowledge</span>
-</span><span id="__span-18-16"><a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Without initial guess - optimizer uses midpoint</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">CalibrationParameter</span><span class="p">(</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="p">)</span>
+</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>
+</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="c1"># Provide informed starting point (recommended)</span>
+</span><span id="__span-25-10"><a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="n">CalibrationParameter</span><span class="p">(</span>
+</span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
+</span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>    <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+</span><span id="__span-25-13"><a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a>    <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+</span><span id="__span-25-14"><a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>    <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+</span><span id="__span-25-15"><a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>    <span class="n">initial_guess</span><span class="o">=</span><span class="mf">0.4</span>  <span class="c1"># Based on prior knowledge</span>
+</span><span id="__span-25-16"><a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="3-use-appropriate-loss-functions">3. Use Appropriate Loss Functions<a class="headerlink" href="#3-use-appropriate-loss-functions" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3251,19 +3514,19 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 </ul>
 <h3 id="5-validate-results">5. Validate Results<a class="headerlink" href="#5-validate-results" title="Permanent link">&para;</a></h3>
 <p>Always check plausibility of results:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="c1"># Check parameter values make sense</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Unusually high rate parameter&quot;</span><span class="p">)</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Check final loss</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">final_loss</span> <span class="o">&gt;</span> <span class="mi">1000</span><span class="p">:</span>
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Poor fit quality&quot;</span><span class="p">)</span>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>
-</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="c1"># Verify convergence</span>
-</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">converged</span><span class="p">:</span>
-</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Did not converge - </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">termination_reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="c1"># Check parameter values make sense</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Unusually high rate parameter&quot;</span><span class="p">)</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="c1"># Check final loss</span>
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">final_loss</span> <span class="o">&gt;</span> <span class="mi">1000</span><span class="p">:</span>
+</span><span id="__span-26-9"><a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Poor fit quality&quot;</span><span class="p">)</span>
+</span><span id="__span-26-10"><a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>
+</span><span id="__span-26-11"><a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a><span class="c1"># Verify convergence</span>
+</span><span id="__span-26-12"><a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">converged</span><span class="p">:</span>
+</span><span id="__span-26-13"><a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Did not converge - </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">termination_reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="calibration-not-converging">Calibration Not Converging<a class="headerlink" href="#calibration-not-converging" title="Permanent link">&para;</a></h3>
@@ -3287,209 +3550,209 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 <p>$$\text{Total Loss} = \text{Data Loss} + \sum_{i} w_i \cdot \max(0, -c_i)^2$$</p>
 <p>where $c_i$ is the constraint expression and $w_i$ is the constraint weight.</p>
 <h3 id="basic-constraint-example">Basic Constraint Example<a class="headerlink" href="#basic-constraint-example" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">CalibrationConstraint</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="c1"># Build model with parameters to calibrate</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Basic Model&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0&quot;</span><span class="p">)</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
-</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
-</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span>
-</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
-</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
-</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a>        <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span>
-</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>    <span class="p">)</span>
-</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span>
-</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
-</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span>
-</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a>        <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span>
-</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a>    <span class="p">)</span>
-</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">},</span>
-</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span>
-</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span>
-</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a>        <span class="p">]</span>
-</span><span id="__span-20-30"><a id="__codelineno-20-30" name="__codelineno-20-30" href="#__codelineno-20-30"></a>    <span class="p">)</span>
-</span><span id="__span-20-31"><a id="__codelineno-20-31" name="__codelineno-20-31" href="#__codelineno-20-31"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
-</span><span id="__span-20-32"><a id="__codelineno-20-32" name="__codelineno-20-32" href="#__codelineno-20-32"></a><span class="p">)</span>
-</span><span id="__span-20-33"><a id="__codelineno-20-33" name="__codelineno-20-33" href="#__codelineno-20-33"></a>
-</span><span id="__span-20-34"><a id="__codelineno-20-34" name="__codelineno-20-34" href="#__codelineno-20-34"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-20-35"><a id="__codelineno-20-35" name="__codelineno-20-35" href="#__codelineno-20-35"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">45.2</span><span class="p">),</span>
-</span><span id="__span-20-36"><a id="__codelineno-20-36" name="__codelineno-20-36" href="#__codelineno-20-36"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">78.5</span><span class="p">),</span>
-</span><span id="__span-20-37"><a id="__codelineno-20-37" name="__codelineno-20-37" href="#__codelineno-20-37"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">62.3</span><span class="p">),</span>
-</span><span id="__span-20-38"><a id="__codelineno-20-38" name="__codelineno-20-38" href="#__codelineno-20-38"></a><span class="p">]</span>
-</span><span id="__span-20-39"><a id="__codelineno-20-39" name="__codelineno-20-39" href="#__codelineno-20-39"></a>
-</span><span id="__span-20-40"><a id="__codelineno-20-40" name="__codelineno-20-40" href="#__codelineno-20-40"></a><span class="n">simulation</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-</span><span id="__span-20-41"><a id="__codelineno-20-41" name="__codelineno-20-41" href="#__codelineno-20-41"></a>
-</span><span id="__span-20-42"><a id="__codelineno-20-42" name="__codelineno-20-42" href="#__codelineno-20-42"></a><span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-20-43"><a id="__codelineno-20-43" name="__codelineno-20-43" href="#__codelineno-20-43"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span>
-</span><span id="__span-20-44"><a id="__codelineno-20-44" name="__codelineno-20-44" href="#__codelineno-20-44"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
-</span><span id="__span-20-45"><a id="__codelineno-20-45" name="__codelineno-20-45" href="#__codelineno-20-45"></a>        <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
-</span><span id="__span-20-46"><a id="__codelineno-20-46" name="__codelineno-20-46" href="#__codelineno-20-46"></a>        <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-20-47"><a id="__codelineno-20-47" name="__codelineno-20-47" href="#__codelineno-20-47"></a>        <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-20-48"><a id="__codelineno-20-48" name="__codelineno-20-48" href="#__codelineno-20-48"></a>    <span class="p">),</span>
-</span><span id="__span-20-49"><a id="__codelineno-20-49" name="__codelineno-20-49" href="#__codelineno-20-49"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span>
-</span><span id="__span-20-50"><a id="__codelineno-20-50" name="__codelineno-20-50" href="#__codelineno-20-50"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span>
-</span><span id="__span-20-51"><a id="__codelineno-20-51" name="__codelineno-20-51" href="#__codelineno-20-51"></a>        <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
-</span><span id="__span-20-52"><a id="__codelineno-20-52" name="__codelineno-20-52" href="#__codelineno-20-52"></a>        <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-20-53"><a id="__codelineno-20-53" name="__codelineno-20-53" href="#__codelineno-20-53"></a>        <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-</span><span id="__span-20-54"><a id="__codelineno-20-54" name="__codelineno-20-54" href="#__codelineno-20-54"></a>    <span class="p">),</span>
-</span><span id="__span-20-55"><a id="__codelineno-20-55" name="__codelineno-20-55" href="#__codelineno-20-55"></a><span class="p">]</span>
-</span><span id="__span-20-56"><a id="__codelineno-20-56" name="__codelineno-20-56" href="#__codelineno-20-56"></a>
-</span><span id="__span-20-57"><a id="__codelineno-20-57" name="__codelineno-20-57" href="#__codelineno-20-57"></a><span class="c1"># Add constraint: k1/k2 &lt;= 5, which is equivalent to 5 - k1/k2 &gt;= 0</span>
-</span><span id="__span-20-58"><a id="__codelineno-20-58" name="__codelineno-20-58" href="#__codelineno-20-58"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-20-59"><a id="__codelineno-20-59" name="__codelineno-20-59" href="#__codelineno-20-59"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-20-60"><a id="__codelineno-20-60" name="__codelineno-20-60" href="#__codelineno-20-60"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_bound&quot;</span><span class="p">,</span>
-</span><span id="__span-20-61"><a id="__codelineno-20-61" name="__codelineno-20-61" href="#__codelineno-20-61"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
-</span><span id="__span-20-62"><a id="__codelineno-20-62" name="__codelineno-20-62" href="#__codelineno-20-62"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &lt;= 5&quot;</span><span class="p">,</span>
-</span><span id="__span-20-63"><a id="__codelineno-20-63" name="__codelineno-20-63" href="#__codelineno-20-63"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-20-64"><a id="__codelineno-20-64" name="__codelineno-20-64" href="#__codelineno-20-64"></a>    <span class="p">)</span>
-</span><span id="__span-20-65"><a id="__codelineno-20-65" name="__codelineno-20-65" href="#__codelineno-20-65"></a><span class="p">]</span>
-</span><span id="__span-20-66"><a id="__codelineno-20-66" name="__codelineno-20-66" href="#__codelineno-20-66"></a>
-</span><span id="__span-20-67"><a id="__codelineno-20-67" name="__codelineno-20-67" href="#__codelineno-20-67"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-20-68"><a id="__codelineno-20-68" name="__codelineno-20-68" href="#__codelineno-20-68"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-20-69"><a id="__codelineno-20-69" name="__codelineno-20-69" href="#__codelineno-20-69"></a>    <span class="n">parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
-</span><span id="__span-20-70"><a id="__codelineno-20-70" name="__codelineno-20-70" href="#__codelineno-20-70"></a>    <span class="n">constraints</span><span class="o">=</span><span class="n">constraints</span><span class="p">,</span>  <span class="c1"># Add constraints here</span>
-</span><span id="__span-20-71"><a id="__codelineno-20-71" name="__codelineno-20-71" href="#__codelineno-20-71"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-20-72"><a id="__codelineno-20-72" name="__codelineno-20-72" href="#__codelineno-20-72"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">num_particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
-</span><span id="__span-20-73"><a id="__codelineno-20-73" name="__codelineno-20-73" href="#__codelineno-20-73"></a><span class="p">)</span>
-</span><span id="__span-20-74"><a id="__codelineno-20-74" name="__codelineno-20-74" href="#__codelineno-20-74"></a>
-</span><span id="__span-20-75"><a id="__codelineno-20-75" name="__codelineno-20-75" href="#__codelineno-20-75"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
-</span><span id="__span-20-76"><a id="__codelineno-20-76" name="__codelineno-20-76" href="#__codelineno-20-76"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-20-77"><a id="__codelineno-20-77" name="__codelineno-20-77" href="#__codelineno-20-77"></a>
-</span><span id="__span-20-78"><a id="__codelineno-20-78" name="__codelineno-20-78" href="#__codelineno-20-78"></a><span class="c1"># Verify constraint is satisfied</span>
-</span><span id="__span-20-79"><a id="__codelineno-20-79" name="__codelineno-20-79" href="#__codelineno-20-79"></a><span class="n">ratio</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s2">&quot;k2&quot;</span><span class="p">]</span>
-</span><span id="__span-20-80"><a id="__codelineno-20-80" name="__codelineno-20-80" href="#__codelineno-20-80"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calibrated k1/k2 ratio: </span><span class="si">{</span><span class="n">ratio</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Should be &lt;= 5</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">CalibrationConstraint</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="c1"># Build model with parameters to calibrate</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Basic Model&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0&quot;</span><span class="p">)</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
+</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-27-10"><a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-27-11"><a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-27-12"><a id="__codelineno-27-12" name="__codelineno-27-12" href="#__codelineno-27-12"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span>
+</span><span id="__span-27-13"><a id="__codelineno-27-13" name="__codelineno-27-13" href="#__codelineno-27-13"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-27-14"><a id="__codelineno-27-14" name="__codelineno-27-14" href="#__codelineno-27-14"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
+</span><span id="__span-27-15"><a id="__codelineno-27-15" name="__codelineno-27-15" href="#__codelineno-27-15"></a>        <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span>
+</span><span id="__span-27-16"><a id="__codelineno-27-16" name="__codelineno-27-16" href="#__codelineno-27-16"></a>    <span class="p">)</span>
+</span><span id="__span-27-17"><a id="__codelineno-27-17" name="__codelineno-27-17" href="#__codelineno-27-17"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-27-18"><a id="__codelineno-27-18" name="__codelineno-27-18" href="#__codelineno-27-18"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span>
+</span><span id="__span-27-19"><a id="__codelineno-27-19" name="__codelineno-27-19" href="#__codelineno-27-19"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
+</span><span id="__span-27-20"><a id="__codelineno-27-20" name="__codelineno-27-20" href="#__codelineno-27-20"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span>
+</span><span id="__span-27-21"><a id="__codelineno-27-21" name="__codelineno-27-21" href="#__codelineno-27-21"></a>        <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2 * B&quot;</span>
+</span><span id="__span-27-22"><a id="__codelineno-27-22" name="__codelineno-27-22" href="#__codelineno-27-22"></a>    <span class="p">)</span>
+</span><span id="__span-27-23"><a id="__codelineno-27-23" name="__codelineno-27-23" href="#__codelineno-27-23"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
+</span><span id="__span-27-24"><a id="__codelineno-27-24" name="__codelineno-27-24" href="#__codelineno-27-24"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-27-25"><a id="__codelineno-27-25" name="__codelineno-27-25" href="#__codelineno-27-25"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-27-26"><a id="__codelineno-27-26" name="__codelineno-27-26" href="#__codelineno-27-26"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">},</span>
+</span><span id="__span-27-27"><a id="__codelineno-27-27" name="__codelineno-27-27" href="#__codelineno-27-27"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span>
+</span><span id="__span-27-28"><a id="__codelineno-27-28" name="__codelineno-27-28" href="#__codelineno-27-28"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span>
+</span><span id="__span-27-29"><a id="__codelineno-27-29" name="__codelineno-27-29" href="#__codelineno-27-29"></a>        <span class="p">]</span>
+</span><span id="__span-27-30"><a id="__codelineno-27-30" name="__codelineno-27-30" href="#__codelineno-27-30"></a>    <span class="p">)</span>
+</span><span id="__span-27-31"><a id="__codelineno-27-31" name="__codelineno-27-31" href="#__codelineno-27-31"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-27-32"><a id="__codelineno-27-32" name="__codelineno-27-32" href="#__codelineno-27-32"></a><span class="p">)</span>
+</span><span id="__span-27-33"><a id="__codelineno-27-33" name="__codelineno-27-33" href="#__codelineno-27-33"></a>
+</span><span id="__span-27-34"><a id="__codelineno-27-34" name="__codelineno-27-34" href="#__codelineno-27-34"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-27-35"><a id="__codelineno-27-35" name="__codelineno-27-35" href="#__codelineno-27-35"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">45.2</span><span class="p">),</span>
+</span><span id="__span-27-36"><a id="__codelineno-27-36" name="__codelineno-27-36" href="#__codelineno-27-36"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">78.5</span><span class="p">),</span>
+</span><span id="__span-27-37"><a id="__codelineno-27-37" name="__codelineno-27-37" href="#__codelineno-27-37"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">62.3</span><span class="p">),</span>
+</span><span id="__span-27-38"><a id="__codelineno-27-38" name="__codelineno-27-38" href="#__codelineno-27-38"></a><span class="p">]</span>
+</span><span id="__span-27-39"><a id="__codelineno-27-39" name="__codelineno-27-39" href="#__codelineno-27-39"></a>
+</span><span id="__span-27-40"><a id="__codelineno-27-40" name="__codelineno-27-40" href="#__codelineno-27-40"></a><span class="n">simulation</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</span><span id="__span-27-41"><a id="__codelineno-27-41" name="__codelineno-27-41" href="#__codelineno-27-41"></a>
+</span><span id="__span-27-42"><a id="__codelineno-27-42" name="__codelineno-27-42" href="#__codelineno-27-42"></a><span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-27-43"><a id="__codelineno-27-43" name="__codelineno-27-43" href="#__codelineno-27-43"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span>
+</span><span id="__span-27-44"><a id="__codelineno-27-44" name="__codelineno-27-44" href="#__codelineno-27-44"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
+</span><span id="__span-27-45"><a id="__codelineno-27-45" name="__codelineno-27-45" href="#__codelineno-27-45"></a>        <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+</span><span id="__span-27-46"><a id="__codelineno-27-46" name="__codelineno-27-46" href="#__codelineno-27-46"></a>        <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-27-47"><a id="__codelineno-27-47" name="__codelineno-27-47" href="#__codelineno-27-47"></a>        <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-27-48"><a id="__codelineno-27-48" name="__codelineno-27-48" href="#__codelineno-27-48"></a>    <span class="p">),</span>
+</span><span id="__span-27-49"><a id="__codelineno-27-49" name="__codelineno-27-49" href="#__codelineno-27-49"></a>    <span class="n">CalibrationParameter</span><span class="p">(</span>
+</span><span id="__span-27-50"><a id="__codelineno-27-50" name="__codelineno-27-50" href="#__codelineno-27-50"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span>
+</span><span id="__span-27-51"><a id="__codelineno-27-51" name="__codelineno-27-51" href="#__codelineno-27-51"></a>        <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+</span><span id="__span-27-52"><a id="__codelineno-27-52" name="__codelineno-27-52" href="#__codelineno-27-52"></a>        <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-27-53"><a id="__codelineno-27-53" name="__codelineno-27-53" href="#__codelineno-27-53"></a>        <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+</span><span id="__span-27-54"><a id="__codelineno-27-54" name="__codelineno-27-54" href="#__codelineno-27-54"></a>    <span class="p">),</span>
+</span><span id="__span-27-55"><a id="__codelineno-27-55" name="__codelineno-27-55" href="#__codelineno-27-55"></a><span class="p">]</span>
+</span><span id="__span-27-56"><a id="__codelineno-27-56" name="__codelineno-27-56" href="#__codelineno-27-56"></a>
+</span><span id="__span-27-57"><a id="__codelineno-27-57" name="__codelineno-27-57" href="#__codelineno-27-57"></a><span class="c1"># Add constraint: k1/k2 &lt;= 5, which is equivalent to 5 - k1/k2 &gt;= 0</span>
+</span><span id="__span-27-58"><a id="__codelineno-27-58" name="__codelineno-27-58" href="#__codelineno-27-58"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-27-59"><a id="__codelineno-27-59" name="__codelineno-27-59" href="#__codelineno-27-59"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-27-60"><a id="__codelineno-27-60" name="__codelineno-27-60" href="#__codelineno-27-60"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_bound&quot;</span><span class="p">,</span>
+</span><span id="__span-27-61"><a id="__codelineno-27-61" name="__codelineno-27-61" href="#__codelineno-27-61"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
+</span><span id="__span-27-62"><a id="__codelineno-27-62" name="__codelineno-27-62" href="#__codelineno-27-62"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &lt;= 5&quot;</span><span class="p">,</span>
+</span><span id="__span-27-63"><a id="__codelineno-27-63" name="__codelineno-27-63" href="#__codelineno-27-63"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-27-64"><a id="__codelineno-27-64" name="__codelineno-27-64" href="#__codelineno-27-64"></a>    <span class="p">)</span>
+</span><span id="__span-27-65"><a id="__codelineno-27-65" name="__codelineno-27-65" href="#__codelineno-27-65"></a><span class="p">]</span>
+</span><span id="__span-27-66"><a id="__codelineno-27-66" name="__codelineno-27-66" href="#__codelineno-27-66"></a>
+</span><span id="__span-27-67"><a id="__codelineno-27-67" name="__codelineno-27-67" href="#__codelineno-27-67"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-27-68"><a id="__codelineno-27-68" name="__codelineno-27-68" href="#__codelineno-27-68"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-27-69"><a id="__codelineno-27-69" name="__codelineno-27-69" href="#__codelineno-27-69"></a>    <span class="n">parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
+</span><span id="__span-27-70"><a id="__codelineno-27-70" name="__codelineno-27-70" href="#__codelineno-27-70"></a>    <span class="n">constraints</span><span class="o">=</span><span class="n">constraints</span><span class="p">,</span>  <span class="c1"># Add constraints here</span>
+</span><span id="__span-27-71"><a id="__codelineno-27-71" name="__codelineno-27-71" href="#__codelineno-27-71"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-27-72"><a id="__codelineno-27-72" name="__codelineno-27-72" href="#__codelineno-27-72"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">num_particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
+</span><span id="__span-27-73"><a id="__codelineno-27-73" name="__codelineno-27-73" href="#__codelineno-27-73"></a><span class="p">)</span>
+</span><span id="__span-27-74"><a id="__codelineno-27-74" name="__codelineno-27-74" href="#__codelineno-27-74"></a>
+</span><span id="__span-27-75"><a id="__codelineno-27-75" name="__codelineno-27-75" href="#__codelineno-27-75"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
+</span><span id="__span-27-76"><a id="__codelineno-27-76" name="__codelineno-27-76" href="#__codelineno-27-76"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-27-77"><a id="__codelineno-27-77" name="__codelineno-27-77" href="#__codelineno-27-77"></a>
+</span><span id="__span-27-78"><a id="__codelineno-27-78" name="__codelineno-27-78" href="#__codelineno-27-78"></a><span class="c1"># Verify constraint is satisfied</span>
+</span><span id="__span-27-79"><a id="__codelineno-27-79" name="__codelineno-27-79" href="#__codelineno-27-79"></a><span class="n">ratio</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s2">&quot;k2&quot;</span><span class="p">]</span>
+</span><span id="__span-27-80"><a id="__codelineno-27-80" name="__codelineno-27-80" href="#__codelineno-27-80"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calibrated k1/k2 ratio: </span><span class="si">{</span><span class="n">ratio</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Should be &lt;= 5</span>
 </span></code></pre></div>
 <h3 id="types-of-constraints">Types of Constraints<a class="headerlink" href="#types-of-constraints" title="Permanent link">&para;</a></h3>
 <h4 id="1-parameter-relationship-constraints">1. Parameter Relationship Constraints<a class="headerlink" href="#1-parameter-relationship-constraints" title="Permanent link">&para;</a></h4>
 <p>Enforce mathematical relationships between parameters:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Forward rate must be faster than reverse rate</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k_forward_ge_reverse&quot;</span><span class="p">,</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k_forward - k_reverse&quot;</span><span class="p">,</span>
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Forward rate &gt;= reverse rate&quot;</span><span class="p">,</span>
-</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="p">)</span>
-</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
-</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="c1"># Birth rate limited relative to death rate</span>
-</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;birth_death_ratio&quot;</span><span class="p">,</span>
-</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;3.0 - birth_rate/death_rate&quot;</span><span class="p">,</span>
-</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Birth/death ratio &lt;= 3&quot;</span><span class="p">,</span>
-</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a><span class="p">)</span>
-</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>
-</span><span id="__span-21-15"><a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a><span class="c1"># Sum of transition probabilities must not exceed 1.0</span>
-</span><span id="__span-21-16"><a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-21-17"><a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;probability_sum&quot;</span><span class="p">,</span>
-</span><span id="__span-21-18"><a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;1.0 - (p_move + p_stay + p_exit)&quot;</span><span class="p">,</span>
-</span><span id="__span-21-19"><a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Total probability &lt;= 1.0&quot;</span><span class="p">,</span>
-</span><span id="__span-21-20"><a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Forward rate must be faster than reverse rate</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k_forward_ge_reverse&quot;</span><span class="p">,</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k_forward - k_reverse&quot;</span><span class="p">,</span>
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Forward rate &gt;= reverse rate&quot;</span><span class="p">,</span>
+</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="p">)</span>
+</span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>
+</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a><span class="c1"># Birth rate limited relative to death rate</span>
+</span><span id="__span-28-9"><a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-28-10"><a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;birth_death_ratio&quot;</span><span class="p">,</span>
+</span><span id="__span-28-11"><a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;3.0 - birth_rate/death_rate&quot;</span><span class="p">,</span>
+</span><span id="__span-28-12"><a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Birth/death ratio &lt;= 3&quot;</span><span class="p">,</span>
+</span><span id="__span-28-13"><a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a><span class="p">)</span>
+</span><span id="__span-28-14"><a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>
+</span><span id="__span-28-15"><a id="__codelineno-28-15" name="__codelineno-28-15" href="#__codelineno-28-15"></a><span class="c1"># Sum of transition probabilities must not exceed 1.0</span>
+</span><span id="__span-28-16"><a id="__codelineno-28-16" name="__codelineno-28-16" href="#__codelineno-28-16"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-28-17"><a id="__codelineno-28-17" name="__codelineno-28-17" href="#__codelineno-28-17"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;probability_sum&quot;</span><span class="p">,</span>
+</span><span id="__span-28-18"><a id="__codelineno-28-18" name="__codelineno-28-18" href="#__codelineno-28-18"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;1.0 - (p_move + p_stay + p_exit)&quot;</span><span class="p">,</span>
+</span><span id="__span-28-19"><a id="__codelineno-28-19" name="__codelineno-28-19" href="#__codelineno-28-19"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Total probability &lt;= 1.0&quot;</span><span class="p">,</span>
+</span><span id="__span-28-20"><a id="__codelineno-28-20" name="__codelineno-28-20" href="#__codelineno-28-20"></a><span class="p">)</span>
 </span></code></pre></div>
 <h4 id="2-ordering-constraints">2. Ordering Constraints<a class="headerlink" href="#2-ordering-constraints" title="Permanent link">&para;</a></h4>
 <p>Enforce relative ordering of parameters:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Production rate faster than defect rate</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;production_ordering&quot;</span><span class="p">,</span>
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;production_rate - defect_rate&quot;</span><span class="p">,</span>
-</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Production rate &gt;= defect rate&quot;</span><span class="p">,</span>
-</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="p">)</span>
-</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>
-</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="c1"># Inflow rate greater than outflow rate</span>
-</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow_order&quot;</span><span class="p">,</span>
-</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;inflow_rate - outflow_rate&quot;</span><span class="p">,</span>
-</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inflow &gt;= outflow&quot;</span><span class="p">,</span>
-</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="p">)</span>
-</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>
-</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="c1"># Fast decay rate exceeds slow decay rate</span>
-</span><span id="__span-22-16"><a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;decay_ordering&quot;</span><span class="p">,</span>
-</span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k_fast - k_slow&quot;</span><span class="p">,</span>
-</span><span id="__span-22-19"><a id="__codelineno-22-19" name="__codelineno-22-19" href="#__codelineno-22-19"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Fast decay &gt;= slow decay&quot;</span><span class="p">,</span>
-</span><span id="__span-22-20"><a id="__codelineno-22-20" name="__codelineno-22-20" href="#__codelineno-22-20"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Production rate faster than defect rate</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;production_ordering&quot;</span><span class="p">,</span>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;production_rate - defect_rate&quot;</span><span class="p">,</span>
+</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Production rate &gt;= defect rate&quot;</span><span class="p">,</span>
+</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="p">)</span>
+</span><span id="__span-29-7"><a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>
+</span><span id="__span-29-8"><a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="c1"># Inflow rate greater than outflow rate</span>
+</span><span id="__span-29-9"><a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-29-10"><a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow_order&quot;</span><span class="p">,</span>
+</span><span id="__span-29-11"><a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;inflow_rate - outflow_rate&quot;</span><span class="p">,</span>
+</span><span id="__span-29-12"><a id="__codelineno-29-12" name="__codelineno-29-12" href="#__codelineno-29-12"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inflow &gt;= outflow&quot;</span><span class="p">,</span>
+</span><span id="__span-29-13"><a id="__codelineno-29-13" name="__codelineno-29-13" href="#__codelineno-29-13"></a><span class="p">)</span>
+</span><span id="__span-29-14"><a id="__codelineno-29-14" name="__codelineno-29-14" href="#__codelineno-29-14"></a>
+</span><span id="__span-29-15"><a id="__codelineno-29-15" name="__codelineno-29-15" href="#__codelineno-29-15"></a><span class="c1"># Fast decay rate exceeds slow decay rate</span>
+</span><span id="__span-29-16"><a id="__codelineno-29-16" name="__codelineno-29-16" href="#__codelineno-29-16"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-29-17"><a id="__codelineno-29-17" name="__codelineno-29-17" href="#__codelineno-29-17"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;decay_ordering&quot;</span><span class="p">,</span>
+</span><span id="__span-29-18"><a id="__codelineno-29-18" name="__codelineno-29-18" href="#__codelineno-29-18"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k_fast - k_slow&quot;</span><span class="p">,</span>
+</span><span id="__span-29-19"><a id="__codelineno-29-19" name="__codelineno-29-19" href="#__codelineno-29-19"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Fast decay &gt;= slow decay&quot;</span><span class="p">,</span>
+</span><span id="__span-29-20"><a id="__codelineno-29-20" name="__codelineno-29-20" href="#__codelineno-29-20"></a><span class="p">)</span>
 </span></code></pre></div>
 <h4 id="3-time-dependent-constraints">3. Time-Dependent Constraints<a class="headerlink" href="#3-time-dependent-constraints" title="Permanent link">&para;</a></h4>
 <p>Constrain compartment values at specific time steps. These constraints can reference both parameters and compartment states:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Stock level must not exceed capacity</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;capacity_limit&quot;</span><span class="p">,</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;1000.0 - Stock&quot;</span><span class="p">,</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Stock never exceeds capacity&quot;</span><span class="p">,</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="p">)</span>
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>
-</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="c1"># Minimum product amount by time 30</span>
-</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;min_product&quot;</span><span class="p">,</span>
-</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;Product - 50.0&quot;</span><span class="p">,</span>
-</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;At least 50 units of product by step 30&quot;</span><span class="p">,</span>
-</span><span id="__span-23-14"><a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">30</span><span class="p">],</span>
-</span><span id="__span-23-15"><a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a><span class="p">)</span>
-</span><span id="__span-23-16"><a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>
-</span><span id="__span-23-17"><a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a><span class="c1"># Total amount must stay below threshold</span>
-</span><span id="__span-23-18"><a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-23-19"><a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;total_limit&quot;</span><span class="p">,</span>
-</span><span id="__span-23-20"><a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;100.0 - (A + B)&quot;</span><span class="p">,</span>
-</span><span id="__span-23-21"><a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Total A + B &lt;= 100&quot;</span><span class="p">,</span>
-</span><span id="__span-23-22"><a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">70</span><span class="p">],</span>
-</span><span id="__span-23-23"><a id="__codelineno-23-23" name="__codelineno-23-23" href="#__codelineno-23-23"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1"># Stock level must not exceed capacity</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;capacity_limit&quot;</span><span class="p">,</span>
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;1000.0 - Stock&quot;</span><span class="p">,</span>
+</span><span id="__span-30-5"><a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Stock never exceeds capacity&quot;</span><span class="p">,</span>
+</span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span>
+</span><span id="__span-30-7"><a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="p">)</span>
+</span><span id="__span-30-8"><a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>
+</span><span id="__span-30-9"><a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="c1"># Minimum product amount by time 30</span>
+</span><span id="__span-30-10"><a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-30-11"><a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;min_product&quot;</span><span class="p">,</span>
+</span><span id="__span-30-12"><a id="__codelineno-30-12" name="__codelineno-30-12" href="#__codelineno-30-12"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;Product - 50.0&quot;</span><span class="p">,</span>
+</span><span id="__span-30-13"><a id="__codelineno-30-13" name="__codelineno-30-13" href="#__codelineno-30-13"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;At least 50 units of product by step 30&quot;</span><span class="p">,</span>
+</span><span id="__span-30-14"><a id="__codelineno-30-14" name="__codelineno-30-14" href="#__codelineno-30-14"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">30</span><span class="p">],</span>
+</span><span id="__span-30-15"><a id="__codelineno-30-15" name="__codelineno-30-15" href="#__codelineno-30-15"></a><span class="p">)</span>
+</span><span id="__span-30-16"><a id="__codelineno-30-16" name="__codelineno-30-16" href="#__codelineno-30-16"></a>
+</span><span id="__span-30-17"><a id="__codelineno-30-17" name="__codelineno-30-17" href="#__codelineno-30-17"></a><span class="c1"># Total amount must stay below threshold</span>
+</span><span id="__span-30-18"><a id="__codelineno-30-18" name="__codelineno-30-18" href="#__codelineno-30-18"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-30-19"><a id="__codelineno-30-19" name="__codelineno-30-19" href="#__codelineno-30-19"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;total_limit&quot;</span><span class="p">,</span>
+</span><span id="__span-30-20"><a id="__codelineno-30-20" name="__codelineno-30-20" href="#__codelineno-30-20"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;100.0 - (A + B)&quot;</span><span class="p">,</span>
+</span><span id="__span-30-21"><a id="__codelineno-30-21" name="__codelineno-30-21" href="#__codelineno-30-21"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Total A + B &lt;= 100&quot;</span><span class="p">,</span>
+</span><span id="__span-30-22"><a id="__codelineno-30-22" name="__codelineno-30-22" href="#__codelineno-30-22"></a>    <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">70</span><span class="p">],</span>
+</span><span id="__span-30-23"><a id="__codelineno-30-23" name="__codelineno-30-23" href="#__codelineno-30-23"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Note</strong>: Time-dependent constraints are evaluated at each specified time step during each simulation run. This allows you to constrain the system dynamics, not just the parameters.</p>
 <h3 id="multiple-constraints">Multiple Constraints<a class="headerlink" href="#multiple-constraints" title="Permanent link">&para;</a></h3>
 <p>You can apply multiple constraints simultaneously:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="c1"># k1/k2 ratio must be between 2 and 5</span>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_min&quot;</span><span class="p">,</span>
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1/k2 - 2.0&quot;</span><span class="p">,</span>
-</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &gt;= 2&quot;</span><span class="p">,</span>
-</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>    <span class="p">),</span>
-</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_max&quot;</span><span class="p">,</span>
-</span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
-</span><span id="__span-24-12"><a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &lt;= 5&quot;</span><span class="p">,</span>
-</span><span id="__span-24-13"><a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-24-14"><a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>    <span class="p">),</span>
-</span><span id="__span-24-15"><a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>    <span class="c1"># k1 must be greater than k2</span>
-</span><span id="__span-24-16"><a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-24-17"><a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ordering&quot;</span><span class="p">,</span>
-</span><span id="__span-24-18"><a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - k2&quot;</span><span class="p">,</span>
-</span><span id="__span-24-19"><a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1 &gt;= k2&quot;</span><span class="p">,</span>
-</span><span id="__span-24-20"><a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-</span><span id="__span-24-21"><a id="__codelineno-24-21" name="__codelineno-24-21" href="#__codelineno-24-21"></a>    <span class="p">),</span>
-</span><span id="__span-24-22"><a id="__codelineno-24-22" name="__codelineno-24-22" href="#__codelineno-24-22"></a>    <span class="c1"># Peak B below 500</span>
-</span><span id="__span-24-23"><a id="__codelineno-24-23" name="__codelineno-24-23" href="#__codelineno-24-23"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-24-24"><a id="__codelineno-24-24" name="__codelineno-24-24" href="#__codelineno-24-24"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;peak_limit&quot;</span><span class="p">,</span>
-</span><span id="__span-24-25"><a id="__codelineno-24-25" name="__codelineno-24-25" href="#__codelineno-24-25"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;500.0 - B&quot;</span><span class="p">,</span>
-</span><span id="__span-24-26"><a id="__codelineno-24-26" name="__codelineno-24-26" href="#__codelineno-24-26"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Peak B &lt;= 500&quot;</span><span class="p">,</span>
-</span><span id="__span-24-27"><a id="__codelineno-24-27" name="__codelineno-24-27" href="#__codelineno-24-27"></a>        <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span>
-</span><span id="__span-24-28"><a id="__codelineno-24-28" name="__codelineno-24-28" href="#__codelineno-24-28"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>  <span class="c1"># Higher weight = stricter enforcement</span>
-</span><span id="__span-24-29"><a id="__codelineno-24-29" name="__codelineno-24-29" href="#__codelineno-24-29"></a>    <span class="p">),</span>
-</span><span id="__span-24-30"><a id="__codelineno-24-30" name="__codelineno-24-30" href="#__codelineno-24-30"></a><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>    <span class="c1"># k1/k2 ratio must be between 2 and 5</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_min&quot;</span><span class="p">,</span>
+</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1/k2 - 2.0&quot;</span><span class="p">,</span>
+</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &gt;= 2&quot;</span><span class="p">,</span>
+</span><span id="__span-31-7"><a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-31-8"><a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a>    <span class="p">),</span>
+</span><span id="__span-31-9"><a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-31-10"><a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_max&quot;</span><span class="p">,</span>
+</span><span id="__span-31-11"><a id="__codelineno-31-11" name="__codelineno-31-11" href="#__codelineno-31-11"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
+</span><span id="__span-31-12"><a id="__codelineno-31-12" name="__codelineno-31-12" href="#__codelineno-31-12"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 &lt;= 5&quot;</span><span class="p">,</span>
+</span><span id="__span-31-13"><a id="__codelineno-31-13" name="__codelineno-31-13" href="#__codelineno-31-13"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-31-14"><a id="__codelineno-31-14" name="__codelineno-31-14" href="#__codelineno-31-14"></a>    <span class="p">),</span>
+</span><span id="__span-31-15"><a id="__codelineno-31-15" name="__codelineno-31-15" href="#__codelineno-31-15"></a>    <span class="c1"># k1 must be greater than k2</span>
+</span><span id="__span-31-16"><a id="__codelineno-31-16" name="__codelineno-31-16" href="#__codelineno-31-16"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-31-17"><a id="__codelineno-31-17" name="__codelineno-31-17" href="#__codelineno-31-17"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ordering&quot;</span><span class="p">,</span>
+</span><span id="__span-31-18"><a id="__codelineno-31-18" name="__codelineno-31-18" href="#__codelineno-31-18"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - k2&quot;</span><span class="p">,</span>
+</span><span id="__span-31-19"><a id="__codelineno-31-19" name="__codelineno-31-19" href="#__codelineno-31-19"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1 &gt;= k2&quot;</span><span class="p">,</span>
+</span><span id="__span-31-20"><a id="__codelineno-31-20" name="__codelineno-31-20" href="#__codelineno-31-20"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+</span><span id="__span-31-21"><a id="__codelineno-31-21" name="__codelineno-31-21" href="#__codelineno-31-21"></a>    <span class="p">),</span>
+</span><span id="__span-31-22"><a id="__codelineno-31-22" name="__codelineno-31-22" href="#__codelineno-31-22"></a>    <span class="c1"># Peak B below 500</span>
+</span><span id="__span-31-23"><a id="__codelineno-31-23" name="__codelineno-31-23" href="#__codelineno-31-23"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-31-24"><a id="__codelineno-31-24" name="__codelineno-31-24" href="#__codelineno-31-24"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;peak_limit&quot;</span><span class="p">,</span>
+</span><span id="__span-31-25"><a id="__codelineno-31-25" name="__codelineno-31-25" href="#__codelineno-31-25"></a>        <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;500.0 - B&quot;</span><span class="p">,</span>
+</span><span id="__span-31-26"><a id="__codelineno-31-26" name="__codelineno-31-26" href="#__codelineno-31-26"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Peak B &lt;= 500&quot;</span><span class="p">,</span>
+</span><span id="__span-31-27"><a id="__codelineno-31-27" name="__codelineno-31-27" href="#__codelineno-31-27"></a>        <span class="n">time_steps</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span>
+</span><span id="__span-31-28"><a id="__codelineno-31-28" name="__codelineno-31-28" href="#__codelineno-31-28"></a>        <span class="n">weight</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>  <span class="c1"># Higher weight = stricter enforcement</span>
+</span><span id="__span-31-29"><a id="__codelineno-31-29" name="__codelineno-31-29" href="#__codelineno-31-29"></a>    <span class="p">),</span>
+</span><span id="__span-31-30"><a id="__codelineno-31-30" name="__codelineno-31-30" href="#__codelineno-31-30"></a><span class="p">]</span>
 </span></code></pre></div>
 <h3 id="constraint-weights">Constraint Weights<a class="headerlink" href="#constraint-weights" title="Permanent link">&para;</a></h3>
 <p>The <code>weight</code> parameter controls how strictly a constraint is enforced. Higher weights make violations more costly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Strict enforcement - large penalty for violations</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;critical_constraint&quot;</span><span class="p">,</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;10.0 - k1/k2&quot;</span><span class="p">,</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">weight</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>  <span class="c1"># High weight</span>
-</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="p">)</span>
-</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>
-</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="c1"># Soft enforcement - smaller penalty</span>
-</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-25-10"><a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;preferred_constraint&quot;</span><span class="p">,</span>
-</span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - k2&quot;</span><span class="p">,</span>
-</span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>    <span class="n">weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>  <span class="c1"># Low weight</span>
-</span><span id="__span-25-13"><a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Strict enforcement - large penalty for violations</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;critical_constraint&quot;</span><span class="p">,</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;10.0 - k1/k2&quot;</span><span class="p">,</span>
+</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>    <span class="n">weight</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>  <span class="c1"># High weight</span>
+</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="p">)</span>
+</span><span id="__span-32-7"><a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>
+</span><span id="__span-32-8"><a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a><span class="c1"># Soft enforcement - smaller penalty</span>
+</span><span id="__span-32-9"><a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-32-10"><a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;preferred_constraint&quot;</span><span class="p">,</span>
+</span><span id="__span-32-11"><a id="__codelineno-32-11" name="__codelineno-32-11" href="#__codelineno-32-11"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - k2&quot;</span><span class="p">,</span>
+</span><span id="__span-32-12"><a id="__codelineno-32-12" name="__codelineno-32-12" href="#__codelineno-32-12"></a>    <span class="n">weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>  <span class="c1"># Low weight</span>
+</span><span id="__span-32-13"><a id="__codelineno-32-13" name="__codelineno-32-13" href="#__codelineno-32-13"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>Default</strong>: <code>weight=1.0</code></p>
 <h3 id="best-practices-for-constraints">Best Practices for Constraints<a class="headerlink" href="#best-practices-for-constraints" title="Permanent link">&para;</a></h3>
@@ -3504,11 +3767,11 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 <p><strong>Use descriptive IDs and descriptions</strong>:</p>
 </li>
 </ol>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_upper_bound&quot;</span><span class="p">,</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 ratio must be &lt;= 5&quot;</span><span class="p">,</span>
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="n">CalibrationConstraint</span><span class="p">(</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_upper_bound&quot;</span><span class="p">,</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1/k2 ratio must be &lt;= 5&quot;</span><span class="p">,</span>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="p">)</span>
 </span></code></pre></div>
 <ol>
 <li><strong>Start with unit weights and adjust</strong>:</li>
@@ -3527,10 +3790,10 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 </li>
 <li>
 <p><strong>Validate constraint expressions</strong>:
-   <div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Test constraint expression with sample parameters</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="n">k1</span><span class="p">,</span> <span class="n">k2</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.1</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="n">ratio_constraint</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">-</span> <span class="n">k1</span><span class="o">/</span><span class="n">k2</span>
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ratio constraint value: </span><span class="si">{</span><span class="n">ratio_constraint</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Should be &gt;= 0 if satisfied</span>
+   <div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1"># Test constraint expression with sample parameters</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="n">k1</span><span class="p">,</span> <span class="n">k2</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.1</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">ratio_constraint</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">-</span> <span class="n">k1</span><span class="o">/</span><span class="n">k2</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ratio constraint value: </span><span class="si">{</span><span class="n">ratio_constraint</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Should be &gt;= 0 if satisfied</span>
 </span></code></pre></div></p>
 </li>
 </ol>
@@ -3550,11 +3813,11 @@ can also be combined with <code>scale_id</code> and <code>window_steps</code>.</
 <li>Check if constraints are realistic given the data</li>
 </ul>
 <p><strong>Example of conflicting constraints:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># These constraints conflict!</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;c1&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - 0.5&quot;</span><span class="p">),</span>  <span class="c1"># k1 &gt;= 0.5</span>
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;c2&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;0.4 - k1&quot;</span><span class="p">),</span>  <span class="c1"># k1 &lt;= 0.4</span>
-</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># These constraints conflict!</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;c1&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - 0.5&quot;</span><span class="p">),</span>  <span class="c1"># k1 &gt;= 0.5</span>
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>    <span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;c2&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;0.4 - k1&quot;</span><span class="p">),</span>  <span class="c1"># k1 &lt;= 0.4</span>
+</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>

@@ -743,6 +743,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Initial Conditions with Stratifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-fractions-after-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating fractions after building
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subgroup-head-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subgroup head counts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -878,6 +906,45 @@
     <span class="md-ellipsis">
       
         Difference Equations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps-and-physical-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steps and Physical Time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Steps and Physical Time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#converting-rates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Converting rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-grids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window grids
       
     </span>
   </a>
@@ -1246,6 +1313,34 @@
     
   
     Time Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/time-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Scale
   
 
     
@@ -1758,6 +1853,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Initial Conditions with Stratifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-fractions-after-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating fractions after building
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subgroup-head-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subgroup head counts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1893,6 +2016,45 @@
     <span class="md-ellipsis">
       
         Difference Equations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps-and-physical-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steps and Physical Time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Steps and Physical Time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#converting-rates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Converting rates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-grids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window grids
       
     </span>
   </a>
@@ -2087,6 +2249,37 @@
 </tr>
 </tbody>
 </table>
+<h4 id="updating-fractions-after-building">Updating fractions after building<a class="headerlink" href="#updating-fractions-after-building" title="Permanent link">&para;</a></h4>
+<p>Both kinds of fraction can be changed on a built model:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">model</span><span class="o">.</span><span class="n">update_initial_conditions</span><span class="p">({</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mf">0.85</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">})</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">model</span><span class="o">.</span><span class="n">update_stratification_fractions</span><span class="p">({</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">})</span>   <span class="c1"># g2 becomes 0.3</span>
+</span></code></pre></div>
+<p>Within each stratification, at most one category may be omitted. The omitted
+category receives whatever remains of 1.0, so the fractions always sum to 1.0:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">model</span><span class="o">.</span><span class="n">update_stratification_fractions</span><span class="p">({</span><span class="s2">&quot;low&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">&quot;mid&quot;</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">})</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># a third category `high` becomes 0.5</span>
+</span></code></pre></div>
+<p>Naming every category is also allowed, in which case the given values must
+already sum to 1.0. Omitting two or more categories raises, because the split
+between them would be undetermined.</p>
+<p>Both methods are also what <a href="../calibration/">calibration</a> writes back when a bin
+fraction or a stratification split is fitted.</p>
+<h4 id="subgroup-head-counts">Subgroup head counts<a class="headerlink" href="#subgroup-head-counts" title="Permanent link">&para;</a></h4>
+<p>Category fractions are relative to the group their stratification applies to, so
+a conditional stratification's fractions are <em>not</em> fractions of the whole
+population. <code>subgroup_population</code> composes the chain for you:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">model</span><span class="o">.</span><span class="n">subgroup_population</span><span class="p">()</span>                    <span class="c1"># whole population</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">model</span><span class="o">.</span><span class="n">subgroup_population</span><span class="p">([</span><span class="s2">&quot;group1&quot;</span><span class="p">])</span>          <span class="c1"># 10000 x 0.6</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">model</span><span class="o">.</span><span class="n">subgroup_population</span><span class="p">([</span><span class="s2">&quot;group1&quot;</span><span class="p">,</span> <span class="s2">&quot;sub1&quot;</span><span class="p">])</span>  <span class="c1"># ... x the sub1 fraction</span>
+</span></code></pre></div>
+<p><code>get_conditioning_categories</code> reports which subgroup a stratification
+subdivides, empty when it applies to everyone:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">model</span><span class="o">.</span><span class="n">get_conditioning_categories</span><span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">)</span>   <span class="c1"># ()</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">model</span><span class="o">.</span><span class="n">get_conditioning_categories</span><span class="p">(</span><span class="s2">&quot;sub&quot;</span><span class="p">)</span>     <span class="c1"># (&quot;group1&quot;,)</span>
+</span></code></pre></div>
+<p>This is the same composition the engine uses to initialize compartments
+(<code>bin_fraction x stratification_fractions</code>), so the head counts agree with the
+populations a simulation starts from.</p>
 <h3 id="why-use-stratifications">Why Use Stratifications?<a class="headerlink" href="#why-use-stratifications" title="Permanent link">&para;</a></h3>
 <p>Stratifications are useful when:</p>
 <ul>
@@ -2097,84 +2290,84 @@
 </ul>
 <h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
 <p>Parameters are global constants (or formulas) used throughout your model:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Forward rate constant&quot;</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Reverse rate constant&quot;</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Forward rate constant&quot;</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">)</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Reverse rate constant&quot;</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Parameters can be constants (<code>float</code>), formulas (<code>str</code>) that reference other parameters or special variables, or <code>None</code> when the value is to be determined by calibration.</p>
 <h2 id="transitions">Transitions<a class="headerlink" href="#transitions" title="Permanent link">&para;</a></h2>
 <p>Transitions define how populations move between compartments:</p>
 <h3 id="simple-transitions">Simple Transitions<a class="headerlink" href="#simple-transitions" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Constant-rate flow: A → B</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;forward&quot;</span><span class="p">,</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Constant-rate flow: A → B</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;forward&quot;</span><span class="p">,</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="formula-based-transitions">Formula-Based Transitions<a class="headerlink" href="#formula-based-transitions" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Population-dependent flow: A → B</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;transfer&quot;</span><span class="p">,</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Population-dependent flow: A → B</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;transfer&quot;</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="multi-source-transitions">Multi-Source Transitions<a class="headerlink" href="#multi-source-transitions" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Outflow from multiple states</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;outflow&quot;</span><span class="p">,</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Empty = removal from system</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;mu&quot;</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Outflow from multiple states</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;outflow&quot;</span><span class="p">,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Empty = removal from system</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;mu&quot;</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="accumulators">Accumulators<a class="headerlink" href="#accumulators" title="Permanent link">&para;</a></h2>
 <p>Accumulators are cumulative event counters that are tracked as simulation outputs but are <strong>not part of the population</strong>. Unlike compartments, the value accumulated is never subtracted — it only grows as transitions fire.</p>
 <p>A common use case is cumulative incidence: total number of events that have occurred since time zero.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Define an accumulator</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;cum_events&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative events A→B&quot;</span><span class="p">)</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Attach it to a transition — every flow from A to B increments the accumulator</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;transfer&quot;</span><span class="p">,</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">,</span>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_events&quot;</span><span class="p">]</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Define an accumulator</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;cum_events&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative events A→B&quot;</span><span class="p">)</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Attach it to a transition — every flow from A to B increments the accumulator</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">builder</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;transfer&quot;</span><span class="p">,</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">,</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>    <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cum_events&quot;</span><span class="p">]</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>After running the simulation, accumulator values appear in the output alongside compartments:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># results[&quot;cum_events&quot;] contains the cumulative total at each step</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="c1"># results[&quot;cum_events&quot;] contains the cumulative total at each step</span>
 </span></code></pre></div>
 <p>With stratifications, accumulators are expanded identically to bins:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Accumulator: cum_events
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>Stratification: group = [g1, g2]
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>Output columns: cum_events_g1, cum_events_g2
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Accumulator: cum_events
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Stratification: group = [g1, g2]
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>Output columns: cum_events_g1, cum_events_g2
 </span></code></pre></div>
 <p>Accumulators are reset to 0 when the simulation is reset.</p>
 <h2 id="initial-conditions">Initial Conditions<a class="headerlink" href="#initial-conditions" title="Permanent link">&para;</a></h2>
 <p>Initial conditions define the starting state of your model:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">builder</span><span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="p">]</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">builder</span><span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="p">]</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="validation-rules">Validation Rules<a class="headerlink" href="#validation-rules" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2185,7 +2378,7 @@
 </ul>
 <h2 id="model-types">Model Types<a class="headerlink" href="#model-types" title="Permanent link">&para;</a></h2>
 <p>Commol currently supports:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">model</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">model</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="difference-equations">Difference Equations<a class="headerlink" href="#difference-equations" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2194,6 +2387,49 @@
 <li>Fast computation</li>
 <li>Best for: Population-level modeling, policy analysis</li>
 </ul>
+<h2 id="steps-and-physical-time">Steps and Physical Time<a class="headerlink" href="#steps-and-physical-time" title="Permanent link">&para;</a></h2>
+<p>A model is defined purely in steps. Nothing in it records how long a step lasts,
+so a rate is always "per step" and a period is always a step count.</p>
+<p><code>TimeScale</code> attaches a duration to a step, which turns physical quantities into
+the step counts and per-step rates a model needs:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeScale</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="n">scale</span> <span class="o">=</span> <span class="n">TimeScale</span><span class="p">(</span><span class="n">step_seconds</span><span class="o">=</span><span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>   <span class="c1"># one hour per step</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="n">scale</span><span class="o">.</span><span class="n">steps_per_day</span>                        <span class="c1"># 24</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span>                       <span class="c1"># 168</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="n">scale</span><span class="o">.</span><span class="n">steps_from_days</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>                   <span class="c1"># 72</span>
+</span></code></pre></div>
+<p>If a period is not a whole number of steps, the conversion raises rather than
+rounding, which catches a step size that cannot express the periods a model
+relies on:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">daily</span> <span class="o">=</span> <span class="n">TimeScale</span><span class="p">(</span><span class="n">step_seconds</span><span class="o">=</span><span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">daily</span><span class="o">.</span><span class="n">steps_from_hours</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># ValueError: not a whole number of steps</span>
+</span></code></pre></div>
+<h3 id="converting-rates">Converting rates<a class="headerlink" href="#converting-rates" title="Permanent link">&para;</a></h3>
+<p>Two conversions cover most transition rates:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Mean residence time of 4 days -&gt; per-step rate</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">scale</span><span class="o">.</span><span class="n">rate_from_mean_duration</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># 0.3 probability accumulated over a week -&gt; per-step rate</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="n">scale</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>rate_from_mean_duration</code> returns <code>1 - exp(-step / duration)</code>, and
+<code>rate_from_probability</code> returns <code>1 - (1 - p) ** (1 / period_steps)</code>, so applying
+the latter over its period reproduces the original probability.</p>
+<h3 id="window-grids">Window grids<a class="headerlink" href="#window-grids" title="Permanent link">&para;</a></h3>
+<p>For a quantity reported per period, <code>window_start</code>, <code>window_end</code> and
+<code>window_index</code> give one grid usable in both directions:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">week</span> <span class="o">=</span> <span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">scale</span><span class="o">.</span><span class="n">window_start</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">)</span>   <span class="c1"># 0</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">scale</span><span class="o">.</span><span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">)</span>     <span class="c1"># 168, the start of window 1</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">scale</span><span class="o">.</span><span class="n">window_index</span><span class="p">(</span><span class="mi">168</span><span class="p">,</span> <span class="n">week</span><span class="p">)</span> <span class="c1"># 0</span>
+</span></code></pre></div>
+<p><code>window_index</code> is the exact inverse of <code>window_end</code>, and returns the containing
+window for any step in between. A window covers <code>(start, end]</code>, which is the
+interval <a href="../calibration/#calibrating-against-cumulative-outputs">windowed observations</a>
+are compared over.</p>
 <h2 id="the-model-building-process">The Model Building Process<a class="headerlink" href="#the-model-building-process" title="Permanent link">&para;</a></h2>
 <p>A typical workflow:</p>
 <ol>

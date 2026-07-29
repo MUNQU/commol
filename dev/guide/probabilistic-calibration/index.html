@@ -879,6 +879,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#computing-your-own-ensemble-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computing your own ensemble statistics
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1046,6 +1057,34 @@
     
   
     Time Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/time-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Scale
   
 
     
@@ -1526,6 +1565,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#computing-your-own-ensemble-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computing your own ensemble statistics
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1652,6 +1702,33 @@ NSGA-II's compact trade-off summaries. For greedy selection,
 central-fit gate; it reports the candidate count, evaluated subsets, maximum
 feasible size, rejected singleton additions, and the best coverage encountered
 during the beam search.</p>
+<h2 id="computing-your-own-ensemble-statistics">Computing your own ensemble statistics<a class="headerlink" href="#computing-your-own-ensemble-statistics" title="Permanent link">&para;</a></h2>
+<p><code>ci_percentiles</code> maps a confidence level to the pair of percentile points used
+for every interval in the result:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ci_percentiles</span><span class="p">,</span> <span class="n">member_statistics</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">lower_point</span><span class="p">,</span> <span class="n">upper_point</span> <span class="o">=</span> <span class="n">ci_percentiles</span><span class="p">(</span><span class="mf">0.95</span><span class="p">)</span>  <span class="c1"># (2.5, 97.5)</span>
+</span></code></pre></div>
+<p><code>member_statistics</code> reduces one quantity across the ensemble members and returns
+<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code> and <code>max</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">final_values</span> <span class="o">=</span> <span class="p">[</span><span class="n">run</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">run</span> <span class="ow">in</span> <span class="n">ensemble_runs</span><span class="p">]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">member_statistics</span><span class="p">(</span><span class="n">final_values</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">confidence_level</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Members may be scalars, as above, or equal-length series, in which case every
+statistic is a series reduced across members position by position.</p>
+<div class="admonition warning">
+<p class="admonition-title">Reduce each member first</p>
+<p>Compute the quantity you care about for each member, then pass those values
+to <code>member_statistics</code>. Taking percentile bands of the raw trajectories and
+reducing the bands afterwards gives a difference of percentiles rather than
+a percentile of members: an interval that no member of the ensemble
+realizes, and generally a wider one.</p>
+<p>Windowed quantities follow the same rule and are available directly as
+<code>windowed_prediction_median</code>, <code>windowed_prediction_ci_lower</code> and
+<code>windowed_prediction_ci_upper</code>. Each value is taken at the step of a
+windowed observation, using that observation's own <code>window_steps</code>;
+<code>windowed_prediction_steps</code> lists those steps.</p>
+</div>
 
 
 
