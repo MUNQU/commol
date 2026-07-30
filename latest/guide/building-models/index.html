@@ -1251,15 +1251,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#loading-from-json" class="md-nav__link">
+  <a href="#saving-and-loading-json" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Loading from JSON
+        Saving and Loading JSON
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Loading from JSON">
+    <nav class="md-nav" aria-label="Saving and Loading JSON">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1618,6 +1618,34 @@
     
   
     Time Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/time-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Scale
   
 
     
@@ -2610,15 +2638,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#loading-from-json" class="md-nav__link">
+  <a href="#saving-and-loading-json" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Loading from JSON
+        Saving and Loading JSON
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Loading from JSON">
+    <nav class="md-nav" aria-label="Saving and Loading JSON">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3470,12 +3498,17 @@
 </span><span id="__span-38-16"><a id="__codelineno-38-16" name="__codelineno-38-16" href="#__codelineno-38-16"></a>    <span class="n">condition</span><span class="o">=</span><span class="n">condition</span>
 </span><span id="__span-38-17"><a id="__codelineno-38-17" name="__codelineno-38-17" href="#__codelineno-38-17"></a><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="loading-from-json">Loading from JSON<a class="headerlink" href="#loading-from-json" title="Permanent link">&para;</a></h2>
-<p>Load pre-defined models from JSON files:</p>
+<h2 id="saving-and-loading-json">Saving and Loading JSON<a class="headerlink" href="#saving-and-loading-json" title="Permanent link">&para;</a></h2>
+<p>Load pre-defined models from JSON files, and save a model back:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Model</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>
 </span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s2">&quot;path/to/model.json&quot;</span><span class="p">)</span>
+</span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="n">model</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="s2">&quot;path/to/model.json&quot;</span><span class="p">)</span>
 </span></code></pre></div>
+<p><code>to_json</code> writes every field, so the file always reloads through <code>from_json</code> to
+an equal model, whether or not the model has been calibrated. Long numeric
+arrays, such as a <a href="#time-series-parameters">time-series parameter</a>, are written
+on one line to keep the file readable; <code>indent</code> controls the rest.</p>
 <h3 id="json-structure">JSON Structure<a class="headerlink" href="#json-structure" title="Permanent link">&para;</a></h3>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="p">{</span>
 </span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Three-State Model&quot;</span><span class="p">,</span>
