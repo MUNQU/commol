@@ -1532,3 +1532,167 @@ class TestCalibrator:
             time_steps=[10, 20, 30],
         )
         assert valid_time_constraint.expression == "500.0 - I"
+
+
+def _binary_stratified_model(group1_fraction: float = 0.5) -> Model:
+    """Model whose binary stratification split can itself be calibrated."""
+    return (
+        ModelBuilder(name="Stratified", version="1.0")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_stratification(id="group", categories=["group1", "group2"])
+        .add_parameter(id="k1", value=None)
+        .add_transition(
+            id="flow",
+            source=["A"],
+            target=["B"],
+            rate="k1 * A",
+            per_compartment=True,
+        )
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 1.0},
+                {"bin": "B", "fraction": 0.0},
+            ],
+            stratification_fractions=[
+                {
+                    "stratification": "group",
+                    "fractions": [
+                        {"category": "group1", "fraction": group1_fraction},
+                        {"category": "group2", "fraction": 1.0 - group1_fraction},
+                    ],
+                }
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+class TestApplyCalibrationParameters:
+    """
+    Writing a fitted stratification split back onto the model.
+
+    The engine applies a calibrated binary category by redistributing each
+    affected compartment pair as ``value`` and ``1 - value`` of the pair total.
+    The Python model instead stores the pair as two category fractions. These
+    are two expressions of one rule, in two languages, and they have to agree:
+    if they do not, the saved model does not reproduce the fit that was scored.
+    """
+
+    def _problem(self) -> CalibrationProblem:
+        truth = Simulation(_binary_stratified_model(0.3))
+        truth.model_definition.update_parameters({"k1": 0.2})
+        observed_series = Simulation(truth.model_definition).run(20)
+        observations = [
+            ObservedDataPoint(step=step, compartment=output, value=values[step])
+            for output, values in observed_series.items()
+            for step in range(1, 20)
+        ]
+        return CalibrationProblem(
+            observed_data=observations,
+            parameters=[
+                CalibrationParameter(
+                    id="k1",
+                    parameter_type="parameter",
+                    min_bound=0.01,
+                    max_bound=0.5,
+                ),
+                CalibrationParameter(
+                    id="group1",
+                    parameter_type="initial_condition",
+                    min_bound=0.05,
+                    max_bound=0.95,
+                ),
+            ],
+            loss_function="sse",
+            optimization_config=ParticleSwarmConfig(
+                num_particles=30,
+                max_iterations=150,
+            ),
+            seed=SEED,
+        )
+
+    def test_applied_model_reproduces_the_loss_the_optimizer_scored(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+
+        result = Calibrator(Simulation(model), problem).run()
+        model.apply_calibration_parameters(result, problem)
+
+        replayed = Simulation(model).run(20)
+        recomputed_loss = sum(
+            (replayed[point.compartment][point.step] - point.value) ** 2
+            for point in problem.observed_data
+        )
+
+        assert recomputed_loss == pytest.approx(result.final_loss, rel=1e-9)
+
+    def test_the_fitted_split_lands_in_the_model(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+
+        result = Calibrator(Simulation(model), problem).run()
+        model.apply_calibration_parameters(result, problem)
+
+        fractions = {
+            f.category: f.fraction
+            for s in model.population.initial_conditions.stratification_fractions
+            for f in s.fractions
+        }
+        assert fractions["group1"] == pytest.approx(result.best_parameters["group1"])
+        assert fractions["group2"] == pytest.approx(
+            1.0 - result.best_parameters["group1"]
+        )
+        assert model.parameters[0].value == pytest.approx(result.best_parameters["k1"])
+
+    def test_a_bare_mapping_is_accepted(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+
+        model.apply_calibration_parameters({"k1": 0.15, "group1": 0.4}, problem)
+
+        assert model.parameters[0].value == pytest.approx(0.15)
+        group = model.population.initial_conditions.stratification_fractions[0]
+        assert group.fractions[0].fraction == pytest.approx(0.4)
+
+    def test_scale_parameters_are_ignored(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+        problem.parameters.append(
+            CalibrationParameter(
+                id="reporting_rate",
+                parameter_type="scale",
+                min_bound=0.01,
+                max_bound=1.0,
+            )
+        )
+
+        model.apply_calibration_parameters({"k1": 0.15, "reporting_rate": 0.5}, problem)
+
+        assert model.parameters[0].value == pytest.approx(0.15)
+        assert [p.id for p in model.parameters] == ["k1"]
+
+    def test_undeclared_id_is_rejected(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+
+        with pytest.raises(ValueError, match="no declared parameter type"):
+            model.apply_calibration_parameters({"mystery": 0.15}, problem)
+
+    def test_per_compartment_initial_condition_is_rejected_not_silently_skipped(
+        self,
+    ) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+        problem.parameters.append(
+            CalibrationParameter(
+                id="A_group1",
+                parameter_type="initial_condition",
+                min_bound=0.0,
+                max_bound=1.0,
+            )
+        )
+
+        with pytest.raises(ValueError, match="cannot be written back"):
+            model.apply_calibration_parameters({"A_group1": 0.3}, problem)

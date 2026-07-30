@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from itertools import combinations, product
 from pathlib import Path
 from typing import Self
@@ -6,9 +6,17 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context._model.serialization import render_json
+from commol.context.calibration import (
+    CalibrationProblem,
+    CalibrationResult,
+    calibrated_values,
+)
+from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
 from commol.context.population import Population
+from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
 from commol.utils.security import get_expression_variables
 
 
@@ -72,6 +80,28 @@ class Model(BaseModel):
             json_data = f.read()
 
         return cls.model_validate_json(json_data)
+
+    def to_json(self, file_path: str | Path, indent: int = 2) -> None:
+        """
+        Save the model to a JSON file.
+
+        Every field is written, including those left unset, so the file always
+        reloads through :meth:`from_json` to an equal model.
+
+        Long numeric arrays, such as a time-series parameter, are written on a
+        single line.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path of the file to write.
+        indent : int, optional
+            Indentation width for nested structures.
+        """
+        payload = self.model_dump(mode="json")
+        Path(file_path).write_text(
+            render_json(payload, indent=indent), encoding="utf-8"
+        )
 
     @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:
@@ -177,6 +207,103 @@ class Model(BaseModel):
         """
         self.population.initial_conditions.update_bin_fractions(bin_fractions)
 
+    def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Update initial stratification fractions for specified categories.
+
+        Within each stratification, at most one category may be omitted; the
+        omitted category receives the remaining fraction.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping category names to their new fraction values.
+
+        Raises
+        ------
+        ValueError
+            If a category doesn't exist in the model, a value lies outside
+            [0.0, 1.0], a stratification has more than one category omitted, or
+            the resulting fractions do not sum to 1.0.
+        """
+        self.population.initial_conditions.update_stratification_fractions(fractions)
+
+    def apply_calibration_parameters(
+        self,
+        result: CalibrationResult
+        | ProbabilisticCalibrationResult
+        | Mapping[str, float],
+        problem: CalibrationProblem,
+    ) -> None:
+        """
+        Write calibrated values back onto the model.
+
+        Each value is routed by the ``parameter_type`` declared for it in
+        ``problem``: ``parameter`` values update model parameters,
+        ``initial_condition`` values update bin fractions or stratification
+        category fractions, and ``scale`` values are ignored because they apply
+        to observations rather than to the model.
+
+        Parameters
+        ----------
+        result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
+            The calibration outcome, or a mapping of parameter id to value.
+            For a probabilistic result the point parameters of the selected
+            ensemble are applied.
+        problem : CalibrationProblem
+            The problem the result came from, used to resolve parameter types.
+
+        Raises
+        ------
+        ValueError
+            If an id is not declared in ``problem``, or if an initial condition
+            id refers to an expanded compartment, which the model definition
+            cannot represent.
+        """
+        values = calibrated_values(result)
+        types = {param.id: param.parameter_type for param in problem.parameters}
+        unknown = sorted(set(values) - set(types))
+        if unknown:
+            raise ValueError(
+                f"Cannot apply values with no declared parameter type: {unknown}. "
+                f"Declared calibration parameters: {sorted(types)}"
+            )
+
+        bin_ids = {bin_item.id for bin_item in self.population.bins}
+        categories = self.population.initial_conditions.get_categories_with_fractions()
+
+        parameters: dict[str, float | None] = {}
+        bin_fractions: dict[str, float | None] = {}
+        stratification_fractions: dict[str, float] = {}
+
+        for param_id, value in values.items():
+            parameter_type = types[param_id]
+            if parameter_type == CalibrationParameterType.PARAMETER:
+                parameters[param_id] = value
+            elif parameter_type == CalibrationParameterType.SCALE:
+                continue
+            elif param_id in bin_ids:
+                bin_fractions[param_id] = value
+            elif param_id in categories:
+                stratification_fractions[param_id] = value
+            else:
+                raise ValueError(
+                    f"Initial condition '{param_id}' is neither a bin nor a "
+                    f"stratification category. Per-compartment initial "
+                    f"conditions can be calibrated but cannot be written back, "
+                    f"because the model defines initial conditions as bin and "
+                    f"stratification fractions only. Available bins: "
+                    f"{sorted(bin_ids)}. Available categories: "
+                    f"{sorted(categories)}"
+                )
+
+        if parameters:
+            self.update_parameters(parameters)
+        if bin_fractions:
+            self.update_initial_conditions(bin_fractions)
+        if stratification_fractions:
+            self.update_stratification_fractions(stratification_fractions)
+
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:
         """
@@ -231,6 +358,109 @@ class Model(BaseModel):
                     subpopulation_n_vars.add(var_name)
 
         return subpopulation_n_vars
+
+    def get_conditioning_categories(self, stratification_id: str) -> tuple[str, ...]:
+        """
+        Get the categories a stratification is conditioned on.
+
+        An unconditional stratification subdivides the whole population and has
+        no conditioning categories. A conditional one subdivides only the
+        subgroup its conditions select, and its fractions are relative to that
+        subgroup rather than to the whole population.
+
+        Parameters
+        ----------
+        stratification_id : str
+            Id of a stratification of the model.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Categories selecting the subgroup this stratification subdivides,
+            empty for an unconditional stratification.
+
+        Raises
+        ------
+        ValueError
+            If the stratification is not found.
+        """
+        for stratification in self.population.stratifications:
+            if stratification.id == stratification_id:
+                return tuple(
+                    condition.category
+                    for condition in (stratification.conditions or [])
+                    if condition.category is not None
+                )
+        raise ValueError(
+            f"Stratification '{stratification_id}' not found in model "
+            f"'{self.name}'. Available: "
+            f"{sorted(s.id for s in self.population.stratifications)}"
+        )
+
+    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
+        """
+        Get the initial head count of a subgroup.
+
+        See
+        :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
+
+        Parameters
+        ----------
+        categories : Iterable[str], optional
+            Category names forming a chain from the whole population down to
+            the subgroup, outermost first.
+
+        Returns
+        -------
+        float
+            Number of individuals in the subgroup at step 0.
+
+        Raises
+        ------
+        ValueError
+            If a category is not found.
+        """
+        return self.population.initial_conditions.subgroup_population(categories)
+
+    def get_outputs_by_source(self) -> dict[str, list[str]]:
+        """
+        Map each bin and accumulator id to the output names it expands into.
+
+        A bin or accumulator produces one output per combination of the
+        stratification categories that apply to it. Without stratifications it
+        produces a single output named after the id itself.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            Bin and accumulator ids, each mapped to its output names in
+            declaration order.
+        """
+        from commol.context._model.helpers import ModelCompartmentHelper
+
+        helper = ModelCompartmentHelper(self)
+        outputs: dict[str, list[str]] = {
+            source_id: []
+            for source_id in (
+                *(bin_item.id for bin_item in self.population.bins),
+                *(accumulator.id for accumulator in self.population.accumulators),
+            )
+        }
+        expanded = (
+            *helper.generate_compartments(),
+            *helper.generate_accumulator_outputs(),
+        )
+        for source_id, applied in expanded:
+            name = "_".join(
+                [source_id]
+                + [
+                    applied[stratification.id]
+                    for stratification in self.population.stratifications
+                    if stratification.id in applied
+                ]
+            )
+            outputs[source_id].append(name)
+        return outputs
 
     def _get_full_compartment_names(self) -> set[str]:
         """Returns all full stratified compartment names."""

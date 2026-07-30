@@ -11,6 +11,8 @@ import numpy as np
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
+from commol.api.probabilistic.intervals import ci_percentiles
+from commol.api.windows import windowed_totals
 from commol.api.probabilistic.normalization import (
     central_fit_loss,
     series_normalization_factors,
@@ -26,6 +28,23 @@ from commol.context.probabilistic_calibration import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _values_at_windows(
+    trajectory: list[float], windows: list[tuple[int, int]]
+) -> list[float]:
+    """Windowed value at each (step, window_steps) pair, in the order given."""
+    steps_by_window: dict[int, list[int]] = {}
+    for step, window_steps in windows:
+        steps_by_window.setdefault(window_steps, []).append(step)
+
+    values: dict[tuple[int, int], float] = {}
+    for window_steps, steps in steps_by_window.items():
+        for step, value in zip(
+            steps, windowed_totals(trajectory, window_steps, steps), strict=True
+        ):
+            values[(step, window_steps)] = value
+    return [values[window] for window in windows]
 
 
 class StatisticsCalculator:
@@ -80,9 +99,7 @@ class StatisticsCalculator:
             for i, name in enumerate(param_names)
         }
 
-        # Calculate percentile bounds based on confidence level
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         param_statistics = {}
         for name, values in param_values.items():
@@ -197,8 +214,7 @@ class StatisticsCalculator:
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for output_id in simulation_output_ids:
             predictions_array = np.array(all_predictions[output_id])
@@ -216,7 +232,12 @@ class StatisticsCalculator:
         self,
         all_predictions: dict[str, list[list[float]]],
         ensemble_params: list[CalibrationEvaluation],
-    ) -> tuple[dict[str, list[float]], dict[str, list[float]], dict[str, list[float]]]:
+    ) -> tuple[
+        dict[str, list[float]],
+        dict[str, list[float]],
+        dict[str, list[float]],
+        dict[str, list[int]],
+    ]:
         """Calculate median and CI from windowed (per-period) trajectories.
 
         For outputs with windowed observations, computes the windowed value
@@ -224,63 +245,64 @@ class StatisticsCalculator:
         taking percentiles, so the resulting CI is the percentile of differences
         rather than the difference of percentiles.
 
+        Each value is taken at the step of an observation, using that
+        observation's own window, so the result lines up with the observations
+        of that output sorted by step and matches what the loss compared
+        against.
+
+        Also returns the step each windowed value was taken at.
+
         Returns empty dicts if no observed data has window_steps set.
         """
-        window_observations: dict[str, tuple[int, list[str], str | None]] = {}
+        windowed_observations: dict[
+            str, tuple[list[str], str | None, list[tuple[int, int]]]
+        ] = {}
         for obs in self.problem.observed_data:
-            if (
-                obs.window_steps is not None
-                and obs.compartment not in window_observations
-            ):
-                window_observations[obs.compartment] = (
-                    obs.window_steps,
-                    obs.compartments or [obs.compartment],
-                    obs.scale_id,
-                )
+            if obs.window_steps is None:
+                continue
+            entry = windowed_observations.setdefault(
+                obs.compartment,
+                (obs.compartments or [obs.compartment], obs.scale_id, []),
+            )
+            entry[2].append((obs.step, obs.window_steps))
 
         prediction_median: dict[str, list[float]] = {}
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
+        prediction_steps: dict[str, list[int]] = {}
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for output_id, (
-            window_steps,
             component_ids,
             scale_id,
-        ) in window_observations.items():
+            observation_windows,
+        ) in windowed_observations.items():
             if any(
                 component_id not in all_predictions for component_id in component_ids
             ):
                 continue
-            first_component = all_predictions[component_ids[0]]
-            trajectories = []
-            for run_idx in range(len(first_component)):
-                trajectory = [
-                    sum(
-                        all_predictions[component_id][run_idx][step_idx]
-                        for component_id in component_ids
-                    )
-                    for step_idx in range(len(first_component[run_idx]))
-                ]
-                if scale_id is not None:
-                    scale_idx = ensemble_params[run_idx].parameter_names.index(scale_id)
-                    trajectory = [
-                        value * ensemble_params[run_idx].parameters[scale_idx]
-                        for value in trajectory
-                    ]
-                trajectories.append(trajectory)
-            series_len = len(trajectories[0]) if trajectories else 0
-            steps = list(range(window_steps, series_len, window_steps))
-            if not steps:
-                continue
-            windowed = np.array(
-                [
-                    [traj[t] - traj[t - window_steps] for t in steps]
-                    for traj in trajectories
-                ]
+            trajectories = self._component_trajectories(
+                all_predictions, ensemble_params, component_ids, scale_id
             )
+            if not trajectories:
+                continue
+
+            series_length = len(trajectories[0])
+            windows = sorted(
+                {
+                    (step, window_steps)
+                    for step, window_steps in observation_windows
+                    if step < series_length and step - window_steps >= 0
+                }
+            )
+            if not windows:
+                continue
+
+            windowed = np.array(
+                [_values_at_windows(trajectory, windows) for trajectory in trajectories]
+            )
+            prediction_steps[output_id] = [step for step, _ in windows]
             prediction_median[output_id] = np.median(windowed, axis=0).tolist()
             prediction_ci_lower[output_id] = np.percentile(
                 windowed, ci_lower_percentile, axis=0
@@ -289,7 +311,39 @@ class StatisticsCalculator:
                 windowed, ci_upper_percentile, axis=0
             ).tolist()
 
-        return prediction_median, prediction_ci_lower, prediction_ci_upper
+        return (
+            prediction_median,
+            prediction_ci_lower,
+            prediction_ci_upper,
+            prediction_steps,
+        )
+
+    def _component_trajectories(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+        component_ids: list[str],
+        scale_id: str | None,
+    ) -> list[list[float]]:
+        """Summed, optionally scaled trajectory of each ensemble member."""
+        first_component = all_predictions[component_ids[0]]
+        trajectories: list[list[float]] = []
+        for run_idx in range(len(first_component)):
+            trajectory = [
+                sum(
+                    all_predictions[component_id][run_idx][step_idx]
+                    for component_id in component_ids
+                )
+                for step_idx in range(len(first_component[run_idx]))
+            ]
+            if scale_id is not None:
+                scale_idx = ensemble_params[run_idx].parameter_names.index(scale_id)
+                trajectory = [
+                    value * ensemble_params[run_idx].parameters[scale_idx]
+                    for value in trajectory
+                ]
+            trajectories.append(trajectory)
+        return trajectories
 
     def calculate_central_loss(
         self,
@@ -328,8 +382,7 @@ class StatisticsCalculator:
         ensemble_params: list[CalibrationEvaluation],
     ) -> dict[str, dict[str, float]]:
         """Return coverage and interval width separately for each data series."""
-        lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        lower_percentile, upper_percentile = ci_percentiles(self.confidence_level)
         totals: dict[str, dict[str, float]] = {}
 
         for observation in self.problem.observed_data:
@@ -453,8 +506,7 @@ class StatisticsCalculator:
         total_points = len(self.problem.observed_data)
         total_ci_width = 0.0
 
-        ci_lower_percentile = (1.0 - self.confidence_level) / 2.0 * 100
-        ci_upper_percentile = (1.0 + self.confidence_level) / 2.0 * 100
+        ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for obs in self.problem.observed_data:
             values = self._observation_member_values(

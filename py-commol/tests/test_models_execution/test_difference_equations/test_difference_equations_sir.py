@@ -524,6 +524,7 @@ class TestConditionalStratification:
             return builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
         except ImportError:
             pytest.skip("Rust extension not built.")
+        assert False, "Should not be reached"
 
     def test_compartment_names_single_conditional(self):
         """

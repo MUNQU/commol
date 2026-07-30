@@ -854,15 +854,21 @@ builder.add_transition(
 )
 ```
 
-## Loading from JSON
+## Saving and Loading JSON
 
-Load pre-defined models from JSON files:
+Load pre-defined models from JSON files, and save a model back:
 
 ```python
 from commol import Model
 
 model = Model.from_json("path/to/model.json")
+model.to_json("path/to/model.json")
 ```
+
+`to_json` writes every field, so the file always reloads through `from_json` to
+an equal model, whether or not the model has been calibrated. Long numeric
+arrays, such as a [time-series parameter](#time-series-parameters), are written
+on one line to keep the file readable; `indent` controls the rest.
 
 ### JSON Structure
 

@@ -14,7 +14,7 @@ The calibration process involves:
 6. **Updating the model**: Applying calibrated values to your model
 
 !!! note "Working with Uncalibrated Parameters"
-Parameters and initial conditions can be set to `None` to indicate they need calibration. A `Simulation` can be created with `None` values for calibration purposes, but attempting to call `run()` on a simulation with uncalibrated values will raise a `ValueError`. After calibration, use `model.update_parameters(result.best_parameters)` or `model.update_initial_conditions(result.best_parameters)` to update your model with the calibrated values.
+Parameters and initial conditions can be set to `None` to indicate they need calibration. A `Simulation` can be created with `None` values for calibration purposes, but attempting to call `run()` on a simulation with uncalibrated values will raise a `ValueError`. After calibration, use `model.apply_calibration_parameters(result, problem)` to write every calibrated value back to the model at once. It routes each value by the `parameter_type` declared in the problem, so model parameters, bin fractions and stratification categories all land in the right place. `model.update_parameters(...)` and `model.update_initial_conditions(...)` remain available when you want to set one kind directly.
 
 ## Basic Example
 
@@ -727,7 +727,131 @@ else:
     print(f"Calibration did not converge: {result.termination_reason}")
 ```
 
-**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.update_parameters(result.best_parameters)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
+**Important**: The `Calibrator` returns a `CalibrationResult` object containing the optimized parameter values, but does not automatically update your model. Use `model.apply_calibration_parameters(result, problem)` to update the model in place, then create a new `Simulation` object to run predictions with the calibrated parameters.
+
+### Reporting what the calibration applied
+
+`applied_parameters_report` renders the calibrated model as a plain structure:
+every numeric parameter and every initial condition, each flagged with whether
+the calibration set it.
+
+```python
+from commol import applied_parameters_report
+
+report = applied_parameters_report(model, result, problem)
+```
+
+Initial conditions carry the `fraction` the model was built from, the head
+`value` it works out to, and the `group` that fraction is taken of — which for a
+[conditional stratification](core-concepts.md#subgroup-head-counts) is its
+conditioning categories rather than the whole population.
+
+Pass `problem` to include `scale` parameters, which are calibrated but have no
+place in the model. For a `ProbabilisticCalibrationResult` every entry also
+gains an `interval` block, and the report is preceded by `confidence_level`:
+
+```json
+{
+  "confidence_level": 0.95,
+  "parameters": {
+    "k1": {"value": 0.31, "calibrated": true,
+           "interval": {"mean": 0.31, "median": 0.31, "ci_lower": 0.28,
+                        "ci_upper": 0.34, "min": 0.27, "max": 0.35, "std": 0.02}}
+  },
+  "initial_conditions": {
+    "N": {"group": "population", "fraction": 1.0, "value": 10000.0,
+          "calibrated": false}
+  }
+}
+```
+
+Intervals are in the unit the entry was calibrated in, so for an initial
+condition that is its fraction, not its head count.
+
+### Reporting the run itself
+
+`simulation_report` renders the three blocks a calibrated run is judged on —
+the observed targets, the compartment series, and both readings of each
+accumulator — sharing one window axis so they can be read against each other:
+
+```python
+from commol import simulation_report
+
+report = simulation_report(
+    simulation,
+    results,
+    steps=[7 * (w + 1) for w in range(10)],
+    window_steps=7,
+    num_windows=10,
+    observed_data=problem.observed_data,
+    accumulators=["cum_ab"],
+)
+```
+
+`series` holds each compartment output sampled at `steps`. `accumulators` holds
+each accumulator as a `total`, a `windowed` reading (the per-window increment
+the loss compares against) and a `cumulative` reading sampled at `steps`, each
+given as a total and per output. `observed` pads every series to `num_windows`
+so it lines up index for index with `windowed`.
+
+Passing `ensemble_runs` and `confidence_level` turns every leaf into a
+`{mean, median, ci_lower, ci_upper, min, max}` block computed across members.
+**The layout is otherwise unchanged**, so one reader handles both a
+deterministic and a probabilistic run.
+
+The function returns only these blocks. Anything around them — a run label,
+axis labels, or summary figures meaningful to your domain — is yours to add:
+
+```python
+document = {
+    "kind": "calibration",
+    "steps": steps,
+    **simulation_report(...),
+}
+```
+
+### Writing a result back to the model
+
+```python
+model.apply_calibration_parameters(result, problem)
+```
+
+This accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult`, or a bare
+mapping of parameter id to value (one ensemble member's parameters, for
+instance). For a probabilistic result it applies `point_parameters` of the
+selected ensemble, which is the only parameter set that describes a single
+calibrated model.
+
+Each value is routed by its declared `parameter_type`:
+
+| `parameter_type` | Written to |
+|---|---|
+| `parameter` | the model parameter of that id |
+| `initial_condition`, id is a bin | that bin's fraction |
+| `initial_condition`, id is a stratification category | that category's fraction, and the remaining category |
+| `scale` | nothing — it scales observations, not the model |
+
+!!! warning "Per-compartment initial conditions cannot be written back"
+
+    A calibration parameter naming an expanded compartment (`A_group1`) is
+    accepted by the calibrator, but the model stores initial conditions only as
+    bin and stratification fractions, so there is nowhere to put it.
+    `apply_calibration_parameters` raises rather than skipping it silently.
+
+#### Calibrated stratification splits
+
+An `initial_condition` parameter may name a category of a binary
+stratification, in which case calibration fits the split between the two
+categories. Writing it back sets the named category and leaves the other to take
+the remaining fraction:
+
+```python
+model.update_stratification_fractions({"group1": 0.25})
+# group1 -> 0.25, group2 -> 0.75
+```
+
+See [updating fractions after building](core-concepts.md#updating-fractions-after-building)
+for the general rule.
 
 ## Calibrating Against Cumulative Outputs
 
@@ -738,6 +862,31 @@ When your observed data represents incremental counts over a period (e.g., new e
 ```
 predicted_at(t) = accumulator(t) - accumulator(t - W)
 ```
+
+`windowed_totals` applies that same reduction outside the calibration, so a
+report can show the quantity the loss actually compared against:
+
+```python
+from commol import window_end_steps, windowed_totals
+
+results = simulation.run(num_steps=70)
+
+# Every complete window of the run
+weekly = simulation.windowed_totals(results, ["cum_ab"], 7)
+
+# Or exactly the steps the observations use
+steps = window_end_steps(7, 70)
+weekly = simulation.windowed_totals(results, ["cum_ab"], 7, steps)
+```
+
+`window_end_steps(W, num_steps)` lists the steps closing each complete window,
+dropping a trailing partial one. `windowed_totals` also accepts steps that are
+not multiples of the window, matching observations anchored anywhere.
+
+For a probabilistic run the ensemble equivalents are on the selected ensemble:
+`windowed_prediction_median`, `windowed_prediction_ci_lower` and
+`windowed_prediction_ci_upper`, with `windowed_prediction_steps` giving the step
+each value belongs to.
 
 ### Example: Windowed Calibration
 

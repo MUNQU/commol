@@ -7,6 +7,13 @@ from commol.api import (
     Simulation,
     SimulationPlotter,
     TimePattern,
+    TimeScale,
+    applied_parameters_report,
+    ci_percentiles,
+    simulation_report,
+    member_statistics,
+    window_end_steps,
+    windowed_totals,
 )
 from commol.context import Model
 from commol.context.calibration import (
@@ -72,4 +79,11 @@ __all__ = [
     "Simulation",
     "SimulationPlotter",
     "TimePattern",
+    "TimeScale",
+    "applied_parameters_report",
+    "ci_percentiles",
+    "member_statistics",
+    "simulation_report",
+    "window_end_steps",
+    "windowed_totals",
 ]

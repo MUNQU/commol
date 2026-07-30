@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Self, overload, override
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
@@ -12,11 +13,14 @@ from commol.context.constants import (
     PSOMutationApplication,
     PSOMutationStrategy,
 )
-from commol.context.probabilistic_calibration import ProbabilisticCalibrationConfig
+from commol.context.probabilistic_calibration import (
+    ProbabilisticCalibrationConfig,
+    ProbabilisticCalibrationResult,
+)
 from commol.utils.security import validate_expression_security
 
 # Re-export for documentation
-__all__ = ["OptimizationAlgorithm"]
+__all__ = ["OptimizationAlgorithm", "calibrated_values"]
 
 
 class ObservedDataPoint(BaseModel):
@@ -195,11 +199,11 @@ class CalibrationConstraint(BaseModel):
     ...     description="Sum of rates <= 1.0",
     ... )
 
-    >>> # Time-dependent: Infected compartment <= 500 at specific time steps
+    >>> # Time-dependent: bin B stays at or below 500 at specific time steps
     >>> constraint = CalibrationConstraint(
-    ...     id="peak_infected",
-    ...     expression="500.0 - I",
-    ...     description="Peak infected never exceeds 500",
+    ...     id="peak_b",
+    ...     expression="500.0 - B",
+    ...     description="Peak B never exceeds 500",
     ...     time_steps=[10, 20, 30, 40, 50],
     ... )
     """
@@ -984,3 +988,27 @@ class CalibrationProblem(BaseModel):
             duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
             raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
         return self
+
+
+def calibrated_values(
+    result: "CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float]",
+) -> "Mapping[str, float]":
+    """
+    Return the parameter values carried by a calibration outcome.
+
+    Parameters
+    ----------
+    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
+        A calibration outcome, or a mapping of parameter id to value.
+
+    Returns
+    -------
+    Mapping[str, float]
+        The values. For a probabilistic result these are the point parameters
+        of the selected ensemble.
+    """
+    if isinstance(result, CalibrationResult):
+        return result.best_parameters
+    if isinstance(result, ProbabilisticCalibrationResult):
+        return result.selected_ensemble.point_parameters
+    return result

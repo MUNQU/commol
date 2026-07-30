@@ -1,5 +1,7 @@
 """Integration tests for probabilistic calibration selection backends."""
 
+from typing import Literal
+
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -59,7 +61,9 @@ def _problem(
     ensemble_selection: ProbNsga2Config | ProbGreedyLocalSearchConfig | None = None,
     *,
     loss_function: str = "sse",
-    feature_space: str = "observed_predictions",
+    feature_space: Literal["parameters", "observed_predictions"] = (
+        "observed_predictions"
+    ),
 ) -> CalibrationProblem:
     simulation = Simulation(model)
     true_results = simulation.run(30, output_format="dict_of_lists")
@@ -170,17 +174,19 @@ def test_ensemble_configuration_defaults_to_nsga2() -> None:
         ProbNsga2Config,
     )
 
+    # Each call below passes an argument the config does not declare, which is
+    # what `extra="forbid"` must reject.
     with pytest.raises(ValidationError, match="ensemble_algorithm"):
-        ProbNsga2Config(ensemble_algorithm="unsupported")
+        ProbNsga2Config(ensemble_algorithm="unsupported")  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="central_fit_max_loss_ratio"):
-        ProbNsga2Config(central_fit_max_loss_ratio=1.5)
+        ProbNsga2Config(central_fit_max_loss_ratio=1.5)  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="population_size"):
-        ProbGreedyLocalSearchConfig(population_size=100)
+        ProbGreedyLocalSearchConfig(population_size=100)  # ty: ignore[unknown-argument]
 
     with pytest.raises(ValidationError, match="result_detail"):
-        ProbabilisticCalibrationConfig(result_detail="full")
+        ProbabilisticCalibrationConfig(result_detail="full")  # ty: ignore[unknown-argument]
 
 
 def test_invalid_observed_compartment_is_rejected(model) -> None:
@@ -293,3 +299,81 @@ def test_weighted_sse_loss_pipeline(model) -> None:
     result = Calibrator(Simulation(model), problem).run_probabilistic()
 
     assert result.selected_ensemble.ensemble_size >= 4
+
+
+def _windowed_problem(model, steps: list[int], window: int) -> CalibrationProblem:
+    """Problem whose observations are windowed at the given steps."""
+    simulation = Simulation(model)
+    truth = simulation.run(max(steps))
+    observations = [
+        ObservedDataPoint(
+            step=step,
+            compartment="I",
+            value=truth["I"][step] - truth["I"][step - window],
+            window_steps=window,
+        )
+        for step in steps
+    ]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[
+            CalibrationParameter(
+                id="beta", parameter_type="parameter", min_bound=0.0, max_bound=1.0
+            ),
+        ],
+        loss_function="sse",
+        optimization_config=ParticleSwarmConfig(num_particles=10, max_iterations=20),
+    )
+    problem.probabilistic_config = ProbabilisticCalibrationConfig(
+        n_runs=3,
+        evaluation_processing=ProbEvaluationFilterConfig(min_evaluations_required=2),
+        clustering=ProbClusteringConfig(n_clusters=2),
+        representative_selection=ProbRepresentativeConfig(max_representatives=10),
+        ensemble_selection=ProbNsga2Config(
+            ensemble_size_mode="bounded", ensemble_size_min=2, ensemble_size_max=5
+        ),
+    )
+    problem.seed = SEED
+    return problem
+
+
+def test_windowed_bands_are_taken_at_the_observation_steps(model) -> None:
+    """
+    Windowed values are anchored where the observations are.
+
+    These steps are deliberately not multiples of the window, so a self-made
+    grid of multiples would produce a different number of values, at different
+    steps, from the ones the loss compared against.
+    """
+    steps = [9, 16, 23, 27]
+    window = 7
+    result = Calibrator(
+        Simulation(model), _windowed_problem(model, steps, window)
+    ).run_probabilistic()
+    ensemble = result.selected_ensemble
+
+    assert ensemble.windowed_prediction_steps["I"] == steps
+    assert len(ensemble.windowed_prediction_median["I"]) == len(steps)
+    assert len(ensemble.windowed_prediction_ci_lower["I"]) == len(steps)
+    assert len(ensemble.windowed_prediction_ci_upper["I"]) == len(steps)
+
+
+def test_windowed_median_matches_a_member_wise_reduction(model) -> None:
+    steps = [9, 16, 23, 27]
+    window = 7
+    problem = _windowed_problem(model, steps, window)
+    result = Calibrator(Simulation(model), problem).run_probabilistic()
+    ensemble = result.selected_ensemble
+
+    member_values: list[list[float]] = []
+    for parameters in ensemble.ensemble_parameters:
+        member = Simulation(model)
+        member.model_definition.apply_calibration_parameters(parameters, problem)
+        run = Simulation(member.model_definition).run(max(steps))
+        member_values.append([run["I"][s] - run["I"][s - window] for s in steps])
+
+    expected = [
+        float(np.median([values[i] for values in member_values]))
+        for i in range(len(steps))
+    ]
+    assert ensemble.windowed_prediction_median["I"] == pytest.approx(expected, rel=1e-9)

@@ -197,9 +197,9 @@ class ModelBuilder:
             contain "stratification" and "category" keys referencing a
             stratification declared before this one.
 
-            Example: only apply vaccination stratification to oe60 age group::
+            Example: only apply the `sub` stratification to `group1`::
 
-                conditions = [{"stratification": "age", "category": "oe60"}]
+                conditions = [{"stratification": "group", "category": "group1"}]
 
         Returns
         -------

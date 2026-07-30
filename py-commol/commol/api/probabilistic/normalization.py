@@ -54,12 +54,9 @@ def central_fit_loss(
 ) -> float:
     """Aggregate ensemble-median residuals with the optimizer's loss function.
 
-    This mirrors the Rust ``CentralLossMetric`` (and the ``LossConfig`` formulas
-    in ``calibration_problem.rs``) so the reported ``central_loss`` — and the
-    fit-gate it is compared against — measure error the same way the members
-    were fit. Each residual is first scaled by its per-series normalization
-    factor; the sum-of-squares family then additionally weights residuals, while
-    RMSE and MAE ignore weights, exactly as the optimizer does.
+    Each residual is scaled by its per-series normalization factor. The
+    sum-of-squares family then also applies the observation weights; RMSE and
+    MAE ignore them.
     """
     if not residuals:
         return 0.0

@@ -7,6 +7,8 @@ import pytest
 
 from commol.api.model_builder import ModelBuilder
 from commol.constants import ModelTypes
+from commol.context.model import Model
+from commol.context.parameter import TimeSeriesValue
 
 
 class TestModel:
@@ -1865,3 +1867,226 @@ class TestModel:
             "((1 - p_{h}) \\cdot \\gamma \\cdot I)\\]\n"
         )
         assert output == expected_output
+
+
+def _stratified_model():
+    """Two bins split by one binary and one ternary stratification."""
+    return (
+        ModelBuilder(name="Stratified", version="1.0")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_stratification(id="group", categories=["group1", "group2"])
+        .add_stratification(id="tier", categories=["low", "mid", "high"])
+        .add_parameter(id="k1", value=0.3)
+        .add_transition(id="flow", source=["A"], target=["B"], rate="k1")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 0.9},
+                {"bin": "B", "fraction": 0.1},
+            ],
+            stratification_fractions=[
+                {
+                    "stratification": "group",
+                    "fractions": [
+                        {"category": "group1", "fraction": 0.6},
+                        {"category": "group2", "fraction": 0.4},
+                    ],
+                },
+                {
+                    "stratification": "tier",
+                    "fractions": [
+                        {"category": "low", "fraction": 0.5},
+                        {"category": "mid", "fraction": 0.3},
+                        {"category": "high", "fraction": 0.2},
+                    ],
+                },
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+def _fractions_of(model, stratification_id: str) -> dict[str, float]:
+    for stratification in model.population.initial_conditions.stratification_fractions:
+        if stratification.stratification == stratification_id:
+            return {f.category: f.fraction for f in stratification.fractions}
+    raise AssertionError(f"stratification '{stratification_id}' not found")
+
+
+class TestUpdateStratificationFractions:
+    def test_writing_one_of_two_categories_fills_the_other(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"group1": 0.25})
+
+        assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
+
+    def test_writing_the_other_category_is_symmetric(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"group2": 0.25})
+
+        assert _fractions_of(model, "group") == {"group1": 0.75, "group2": 0.25}
+
+    def test_all_categories_of_a_ternary_stratification_can_be_set(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"low": 0.2, "mid": 0.3, "high": 0.5})
+
+        assert _fractions_of(model, "tier") == {"low": 0.2, "mid": 0.3, "high": 0.5}
+
+    def test_one_omitted_category_takes_the_remainder(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"low": 0.2, "mid": 0.3})
+
+        assert _fractions_of(model, "tier") == {"low": 0.2, "mid": 0.3, "high": 0.5}
+
+    def test_several_stratifications_update_in_one_call(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"group1": 0.25, "low": 0.1, "mid": 0.4})
+
+        assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
+        assert _fractions_of(model, "tier") == {"low": 0.1, "mid": 0.4, "high": 0.5}
+
+    def test_fractions_still_sum_to_one(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions(
+            {"group1": 0.123, "low": 0.077, "mid": 0.401}
+        )
+
+        assert sum(_fractions_of(model, "group").values()) == pytest.approx(1.0)
+        assert sum(_fractions_of(model, "tier").values()) == pytest.approx(1.0)
+
+    def test_two_omitted_categories_are_rejected(self) -> None:
+        model = _stratified_model()
+
+        with pytest.raises(ValueError, match="left unnamed"):
+            model.update_stratification_fractions({"low": 0.4})
+
+        assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
+
+    def test_fully_specified_values_must_sum_to_one(self) -> None:
+        model = _stratified_model()
+
+        with pytest.raises(ValueError, match="must sum to 1.0"):
+            model.update_stratification_fractions({"low": 0.2, "mid": 0.2, "high": 0.2})
+
+    def test_values_exceeding_one_are_rejected(self) -> None:
+        model = _stratified_model()
+
+        with pytest.raises(ValueError, match="negative fraction"):
+            model.update_stratification_fractions({"low": 0.7, "mid": 0.6})
+
+    def test_unknown_category_is_rejected_and_lists_available(self) -> None:
+        model = _stratified_model()
+
+        with pytest.raises(ValueError, match="Category 'nope' not found") as excinfo:
+            model.update_stratification_fractions({"nope": 0.4})
+
+        assert "group1" in str(excinfo.value)
+
+    @pytest.mark.parametrize("value", [-0.1, 1.1])
+    def test_out_of_range_fraction_is_rejected(self, value: float) -> None:
+        model = _stratified_model()
+
+        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+            model.update_stratification_fractions({"group1": value})
+
+    def test_boundary_values_are_allowed(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"group1": 0.0})
+
+        assert _fractions_of(model, "group") == {"group1": 0.0, "group2": 1.0}
+
+    def test_untouched_stratifications_keep_their_fractions(self) -> None:
+        model = _stratified_model()
+
+        model.update_stratification_fractions({"group1": 0.25})
+
+        assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
+
+
+def _round_trip_model(k1: float | None = 0.1, fraction: float | None = 1.0) -> Model:
+    """Two-bin model whose parameter and bin fraction may be uncalibrated."""
+    return (
+        ModelBuilder(name="RoundTrip", version="1.0", description="d")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="k1", value=k1)
+        .add_transition(id="flow", source=["A"], target=["B"], rate="k1")
+        .set_initial_conditions(
+            population_size=100,
+            bin_fractions=[
+                {"bin": "A", "fraction": fraction},
+                {"bin": "B", "fraction": 0.0},
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+class TestToJson:
+    def test_round_trips_to_an_equal_model(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+
+        assert Model.from_json(path) == model
+
+    def test_an_uncalibrated_parameter_round_trips(self, tmp_path: Path) -> None:
+        model = _round_trip_model(k1=None)
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        restored = Model.from_json(path)
+
+        assert restored == model
+        assert restored.get_uncalibrated_parameters() == ["k1"]
+
+    def test_an_uncalibrated_bin_fraction_round_trips(self, tmp_path: Path) -> None:
+        model = _round_trip_model(fraction=None)
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        restored = Model.from_json(path)
+
+        assert restored == model
+        assert restored.get_uncalibrated_initial_conditions() == ["A"]
+
+    def test_accepts_a_string_path(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        path = tmp_path / "model.json"
+
+        model.to_json(str(path))
+
+        assert Model.from_json(path) == model
+
+    def test_long_numeric_arrays_are_written_on_one_line(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        model.parameters[0].value = TimeSeriesValue(
+            data=[(step, float(step)) for step in range(20)]
+        )
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+        text = path.read_text()
+
+        assert Model.from_json(path) == model
+        assert max(len(line) for line in text.splitlines()) > 100
+
+    def test_indent_is_configurable(self, tmp_path: Path) -> None:
+        model = _round_trip_model()
+        wide = tmp_path / "wide.json"
+        narrow = tmp_path / "narrow.json"
+
+        model.to_json(wide, indent=8)
+        model.to_json(narrow, indent=2)
+
+        assert len(wide.read_text()) > len(narrow.read_text())
+        assert Model.from_json(wide) == Model.from_json(narrow)

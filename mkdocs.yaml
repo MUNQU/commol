@@ -89,6 +89,7 @@ nav:
       - Model Builder: api/model-builder.md
       - Simulation: api/simulation.md
       - Time Patterns: api/time-patterns.md
+      - Time Scale: api/time-scale.md
       - Calibrator: api/calibrator.md
       - Probabilistic Calibrator: api/probabilistic-calibrator.md
   - Advanced:
