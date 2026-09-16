@@ -697,8 +697,13 @@ class SimulationPlotter:
                 )
             else:
                 _, plot_median = windowed_median
-                _, plot_ci_lower = self._apply_windows(ci_lower, observed)  # type: ignore[misc]
-                _, plot_ci_upper = self._apply_windows(ci_upper, observed)  # type: ignore[misc]
+                # `observed` already yielded `windowed_median`, so it carries
+                # window_steps and neither call returns None. The fallbacks keep
+                # the unwindowed series, matching the outer non-windowed branch.
+                windowed_ci_lower = self._apply_windows(ci_lower, observed)
+                windowed_ci_upper = self._apply_windows(ci_upper, observed)
+                plot_ci_lower = windowed_ci_lower[1] if windowed_ci_lower else ci_lower
+                plot_ci_upper = windowed_ci_upper[1] if windowed_ci_upper else ci_upper
         else:
             time_steps = list(range(len(median_values)))
             plot_median = median_values

@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
 
@@ -108,9 +108,9 @@ class ObservedDataPointProtocol(Protocol):
     def scale_id(self) -> str | None: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
-    Parameter: "CalibrationParameterTypeProtocol"
-    InitialCondition: "CalibrationParameterTypeProtocol"
-    Scale: "CalibrationParameterTypeProtocol"
+    Parameter: ClassVar["CalibrationParameterTypeProtocol"]
+    InitialCondition: ClassVar["CalibrationParameterTypeProtocol"]
+    Scale: ClassVar["CalibrationParameterTypeProtocol"]
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
