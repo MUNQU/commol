@@ -82,6 +82,7 @@ TAGS.*
 __pycache__/
 *.py[cod]
 *$py.class
+.venv
 .venv/
 venv/
 .pytest_cache/
@@ -124,3 +125,4 @@ CLAUDE.md
 AGENT.md
 example.py
 flu/
+.atl/
