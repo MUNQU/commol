@@ -15,7 +15,7 @@ repos:
         types: [rust]
       - id: ty-check
         name: ty check
-        entry: bash -c "cd py-commol && ty check commol"
+        entry: bash -c "cd py-commol && uv run ty check commol"
         language: system
         pass_filenames: false
         types: [python]
