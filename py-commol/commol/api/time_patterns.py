@@ -392,9 +392,7 @@ class TimePattern(BaseModel):
             iterable of values with the same length as ``at`` — one per step.
         """
         amount_resolved: float | str | list[float | str] = (
-            list(amount)  # type: ignore[arg-type]
-            if not isinstance(amount, (float, int, str))
-            else amount
+            list(amount) if not isinstance(amount, (float, int, str)) else amount
         )
         if isinstance(amount_resolved, (float, int, str)):
             _validate_amount_string(amount_resolved)
