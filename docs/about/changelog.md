@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Per-compartment initial conditions: `InitialConditions.compartment_fractions`
+  (Python and Rust) accepts overrides keyed by expanded compartment name,
+  expressed as fractions of the total population and applied after the uniform
+  expansion. Includes `ModelBuilder.set_initial_conditions(compartment_fractions=...)`,
+  a Python compartment-name generator with expansion-parity tests, engine-build
+  validation (unknown compartment is an error), and calibration write-back for
+  exact-compartment initial-condition parameters via
+  `Model.update_compartment_fractions`.
 - GitHub Actions CI/CD pipelines for code quality, building, and PyPI releases
 - MkDocs Material documentation site
 - Comprehensive development workflow documentation
