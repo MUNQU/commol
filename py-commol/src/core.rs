@@ -227,6 +227,7 @@ impl PyInitialConditions {
                 population_size,
                 bin_fractions,
                 stratification_fractions,
+                compartment_fractions: Vec::new(),
             },
         }
     }

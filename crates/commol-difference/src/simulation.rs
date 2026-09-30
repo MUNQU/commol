@@ -660,6 +660,7 @@ mod tests {
                         },
                     ],
                     stratification_fractions: vec![],
+                    compartment_fractions: vec![],
                 },
             },
             dynamics: Dynamics {
@@ -713,6 +714,7 @@ mod tests {
                         },
                     ],
                     stratification_fractions: vec![],
+                    compartment_fractions: vec![],
                 },
             },
             dynamics: Dynamics {
@@ -981,6 +983,7 @@ mod tests {
                         },
                     ],
                     stratification_fractions: vec![],
+                    compartment_fractions: vec![],
                 },
             },
             dynamics: Dynamics {
