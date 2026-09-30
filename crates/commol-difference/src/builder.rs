@@ -59,7 +59,8 @@ impl DifferenceEquations {
             .collect();
 
         // Initialize population distribution
-        let population = initialize_population(model, &compartments);
+        let population = initialize_population(model, &compartments)
+            .unwrap_or_else(|error| panic!("Failed to build population: {error}"));
 
         // Store constant parameters for quick lookup
         // Formula parameters will be evaluated on each step
@@ -344,7 +345,11 @@ fn generate_accumulators(model: &Model) -> Vec<GeneratedAccumulatorOutput> {
 /// stratification has conditions that are not satisfied by a compartment's
 /// already-applied categories, that compartment is kept as-is (its population
 /// is not split by that stratification's fractions).
-fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
+///
+/// After the uniform distribution is computed, `compartment_fractions` overrides
+/// replace the value of the named compartments with `population_size * fraction`.
+/// An override naming a compartment that does not exist is a build error.
+fn initialize_population(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
     let total_population = model.population.initial_conditions.population_size as f64;
 
     let bin_fraction_map: HashMap<String, Option<f64>> = model
@@ -410,10 +415,28 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
         .map(|(name, _, pop)| (name, pop))
         .collect();
 
-    compartments
+    let compartment_index: HashMap<&str, usize> = compartments
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (name.as_str(), index))
+        .collect();
+
+    let mut initial_population: Vec<f64> = compartments
         .iter()
         .map(|comp| *distribution.get(comp).unwrap_or(&0.0))
-        .collect()
+        .collect();
+
+    for compartment_fraction in &model.population.initial_conditions.compartment_fractions {
+        let Some(&index) = compartment_index.get(compartment_fraction.compartment.as_str()) else {
+            return Err(format!(
+                "Unknown compartment '{}' in initial conditions. Available compartments: {:?}",
+                compartment_fraction.compartment, compartments
+            ));
+        };
+        initial_population[index] = total_population * compartment_fraction.fraction;
+    }
+
+    Ok(initial_population)
 }
 
 /// Build pre-computed transition flows.
@@ -1208,5 +1231,185 @@ fn resolve_var_slot(
         VarSlot::ParameterIndex(idx)
     } else {
         VarSlot::Parameter(name.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use commol_core::types::population::CompartmentFraction;
+    use commol_core::{
+        Bin, BinFraction, Dynamics, InitialConditions, ModelTypes, Population, Stratification,
+        StratificationCondition, StratificationFraction, StratificationFractions,
+    };
+
+    fn bin_fraction(bin: &str, fraction: f64) -> BinFraction {
+        BinFraction {
+            bin: bin.to_string(),
+            fraction: Some(fraction),
+        }
+    }
+
+    fn group_stratification() -> Stratification {
+        Stratification {
+            id: "group".to_string(),
+            categories: vec!["g1".to_string(), "g2".to_string()],
+            conditions: None,
+        }
+    }
+
+    fn group_fractions(g1: f64, g2: f64) -> StratificationFractions {
+        StratificationFractions {
+            stratification: "group".to_string(),
+            fractions: vec![
+                StratificationFraction {
+                    category: "g1".to_string(),
+                    fraction: g1,
+                },
+                StratificationFraction {
+                    category: "g2".to_string(),
+                    fraction: g2,
+                },
+            ],
+        }
+    }
+
+    fn sub_fractions(s1: f64, s2: f64) -> StratificationFractions {
+        StratificationFractions {
+            stratification: "sub".to_string(),
+            fractions: vec![
+                StratificationFraction {
+                    category: "s1".to_string(),
+                    fraction: s1,
+                },
+                StratificationFraction {
+                    category: "s2".to_string(),
+                    fraction: s2,
+                },
+            ],
+        }
+    }
+
+    fn make_model(
+        stratifications: Vec<Stratification>,
+        stratification_fractions: Vec<StratificationFractions>,
+        compartment_fractions: Vec<CompartmentFraction>,
+    ) -> Model {
+        Model {
+            name: "test".to_string(),
+            description: None,
+            version: None,
+            population: Population {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "A".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "B".to_string(),
+                    },
+                ],
+                accumulators: vec![],
+                stratifications,
+                transitions: vec![],
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![bin_fraction("A", 1.0), bin_fraction("B", 0.0)],
+                    stratification_fractions,
+                    compartment_fractions,
+                },
+            },
+            parameters: vec![],
+            dynamics: Dynamics {
+                typology: ModelTypes::DifferenceEquations,
+                transitions: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn override_is_applied_after_uniform_expansion() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g2".to_string(),
+                fraction: 0.25,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(compartments, vec!["A_g1", "A_g2", "B_g1", "B_g2"]);
+        assert_eq!(population, vec![600.0, 250.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn override_on_truncated_conditional_compartment() {
+        let sub = Stratification {
+            id: "sub".to_string(),
+            categories: vec!["s1".to_string(), "s2".to_string()],
+            conditions: Some(vec![StratificationCondition {
+                stratification: "group".to_string(),
+                category: Some("g1".to_string()),
+                to: None,
+            }]),
+        };
+        let model = make_model(
+            vec![group_stratification(), sub],
+            vec![group_fractions(1.0, 0.0), sub_fractions(0.5, 0.5)],
+            vec![CompartmentFraction {
+                compartment: "A_g2".to_string(),
+                fraction: 0.3,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(
+            compartments,
+            vec!["A_g1_s1", "A_g1_s2", "A_g2", "B_g1_s1", "B_g1_s2", "B_g2"]
+        );
+        assert_eq!(population, vec![500.0, 500.0, 300.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn unknown_compartment_override_is_a_build_error() {
+        let model = make_model(
+            vec![],
+            vec![],
+            vec![CompartmentFraction {
+                compartment: "Missing".to_string(),
+                fraction: 0.1,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("Unknown compartment 'Missing'"));
+    }
+
+    #[test]
+    fn population_is_conserved_with_overrides() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.4,
+                },
+                CompartmentFraction {
+                    compartment: "A_g2".to_string(),
+                    fraction: 0.6,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(population, vec![400.0, 600.0, 0.0, 0.0]);
+        assert!((population.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
     }
 }
