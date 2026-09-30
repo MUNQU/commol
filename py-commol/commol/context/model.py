@@ -12,6 +12,7 @@ from commol.context.calibration import (
     CalibrationResult,
     calibrated_values,
 )
+from commol.context.compartments import generate_compartment_names
 from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
@@ -228,6 +229,26 @@ class Model(BaseModel):
         """
         self.population.initial_conditions.update_stratification_fractions(fractions)
 
+    def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Upsert per-compartment initial condition overrides.
+
+        A compartment already declared in the model definition has its
+        fraction replaced; a new one is appended.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping expanded compartment names to their new fraction
+            of the total population.
+
+        Raises
+        ------
+        ValueError
+            If a value lies outside ``[0.0, 1.0]``.
+        """
+        self.population.initial_conditions.update_compartment_fractions(fractions)
+
     def apply_calibration_parameters(
         self,
         result: CalibrationResult
@@ -240,9 +261,10 @@ class Model(BaseModel):
 
         Each value is routed by the ``parameter_type`` declared for it in
         ``problem``: ``parameter`` values update model parameters,
-        ``initial_condition`` values update bin fractions or stratification
-        category fractions, and ``scale`` values are ignored because they apply
-        to observations rather than to the model.
+        ``initial_condition`` values update bin fractions, stratification
+        category fractions, or expanded-compartment fractions, and ``scale``
+        values are ignored because they apply to observations rather than to
+        the model.
 
         Parameters
         ----------
@@ -257,8 +279,8 @@ class Model(BaseModel):
         ------
         ValueError
             If an id is not declared in ``problem``, or if an initial condition
-            id refers to an expanded compartment, which the model definition
-            cannot represent.
+            id is neither a bin, a stratification category, nor an expanded
+            compartment of the model.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -269,12 +291,66 @@ class Model(BaseModel):
                 f"Declared calibration parameters: {sorted(types)}"
             )
 
+        compartments = set(
+            generate_compartment_names(
+                self.population.bins, self.population.stratifications
+            )
+        )
+        parameters, bin_fractions, stratification_fractions, compartment_fractions = (
+            self._route_calibration_values(values, types, compartments)
+        )
+
+        if parameters:
+            self.update_parameters(parameters)
+        if bin_fractions:
+            self.update_initial_conditions(bin_fractions)
+        if stratification_fractions:
+            self.update_stratification_fractions(stratification_fractions)
+        if compartment_fractions:
+            self.update_compartment_fractions(compartment_fractions)
+
+    def _route_calibration_values(
+        self,
+        values: Mapping[str, float],
+        types: Mapping[str, str],
+        compartments: set[str],
+    ) -> tuple[
+        dict[str, float | None],
+        dict[str, float | None],
+        dict[str, float],
+        dict[str, float],
+    ]:
+        """
+        Route calibrated values to the definition fields they update.
+
+        Parameters
+        ----------
+        values : Mapping[str, float]
+            Calibrated value per parameter id.
+        types : Mapping[str, str]
+            Declared ``parameter_type`` per parameter id.
+        compartments : set[str]
+            Expanded compartment names of the model.
+
+        Returns
+        -------
+        tuple
+            Parameter values, bin fractions, stratification fractions, and
+            compartment fractions, in that order.
+
+        Raises
+        ------
+        ValueError
+            If an initial condition id is neither a bin, a stratification
+            category, nor an expanded compartment of the model.
+        """
         bin_ids = {bin_item.id for bin_item in self.population.bins}
         categories = self.population.initial_conditions.get_categories_with_fractions()
 
         parameters: dict[str, float | None] = {}
         bin_fractions: dict[str, float | None] = {}
         stratification_fractions: dict[str, float] = {}
+        compartment_fractions: dict[str, float] = {}
 
         for param_id, value in values.items():
             parameter_type = types[param_id]
@@ -286,23 +362,23 @@ class Model(BaseModel):
                 bin_fractions[param_id] = value
             elif param_id in categories:
                 stratification_fractions[param_id] = value
+            elif param_id in compartments:
+                compartment_fractions[param_id] = value
             else:
                 raise ValueError(
-                    f"Initial condition '{param_id}' is neither a bin nor a "
-                    f"stratification category. Per-compartment initial "
-                    f"conditions can be calibrated but cannot be written back, "
-                    f"because the model defines initial conditions as bin and "
-                    f"stratification fractions only. Available bins: "
-                    f"{sorted(bin_ids)}. Available categories: "
-                    f"{sorted(categories)}"
+                    f"Initial condition '{param_id}' is neither a bin, a "
+                    f"stratification category, nor an expanded compartment. "
+                    f"Available bins: {sorted(bin_ids)}. Available categories: "
+                    f"{sorted(categories)}. Available compartments: "
+                    f"{sorted(compartments)}"
                 )
 
-        if parameters:
-            self.update_parameters(parameters)
-        if bin_fractions:
-            self.update_initial_conditions(bin_fractions)
-        if stratification_fractions:
-            self.update_stratification_fractions(stratification_fractions)
+        return (
+            parameters,
+            bin_fractions,
+            stratification_fractions,
+            compartment_fractions,
+        )
 
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:

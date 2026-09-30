@@ -1680,7 +1680,7 @@ class TestApplyCalibrationParameters:
         with pytest.raises(ValueError, match="no declared parameter type"):
             model.apply_calibration_parameters({"mystery": 0.15}, problem)
 
-    def test_per_compartment_initial_condition_is_rejected_not_silently_skipped(
+    def test_per_compartment_initial_condition_is_written_back_not_silently_skipped(
         self,
     ) -> None:
         model = _binary_stratified_model()
@@ -1694,5 +1694,31 @@ class TestApplyCalibrationParameters:
             )
         )
 
-        with pytest.raises(ValueError, match="cannot be written back"):
-            model.apply_calibration_parameters({"A_group1": 0.3}, problem)
+        model.apply_calibration_parameters({"A_group1": 0.3}, problem)
+
+        overrides = {
+            fraction.compartment: fraction.fraction
+            for fraction in model.population.initial_conditions.compartment_fractions
+        }
+        assert overrides == {"A_group1": pytest.approx(0.3)}
+
+    def test_per_compartment_initial_condition_is_upserted(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._problem()
+        problem.parameters.append(
+            CalibrationParameter(
+                id="A_group1",
+                parameter_type="initial_condition",
+                min_bound=0.0,
+                max_bound=1.0,
+            )
+        )
+
+        model.apply_calibration_parameters({"A_group1": 0.3}, problem)
+        model.apply_calibration_parameters({"A_group1": 0.4}, problem)
+
+        overrides = [
+            (fraction.compartment, fraction.fraction)
+            for fraction in model.population.initial_conditions.compartment_fractions
+        ]
+        assert overrides == [("A_group1", pytest.approx(0.4))]
