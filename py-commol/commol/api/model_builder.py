@@ -20,8 +20,10 @@ from commol.context.dynamics import (
     StratifiedRate,
     Transition,
 )
+from commol.context.compartments import generate_compartment_names
 from commol.context.initial_conditions import (
     BinFraction,
+    CompartmentFraction,
     InitialConditions,
     StratificationFraction,
     StratificationFractions,
@@ -68,6 +70,13 @@ class StratificationFractionsDict(TypedDict):
 
     stratification: str
     fractions: list[StratificationFractionDict]
+
+
+class CompartmentFractionDict(TypedDict):
+    """Type definition for a single expanded compartment override."""
+
+    compartment: str
+    fraction: float
 
 
 class ModelBuilder:
@@ -775,11 +784,143 @@ class ModelBuilder:
             rules=rule_objects,
         )
 
+    def _build_compartment_fractions(
+        self,
+        bin_fractions: list[BinFractionDict],
+        stratification_fractions: list[StratificationFractionsDict] | None,
+        compartment_fractions: list[CompartmentFractionDict] | None,
+    ) -> list[CompartmentFraction]:
+        """
+        Validate and convert per-compartment overrides.
+
+        Parameters
+        ----------
+        bin_fractions : list[BinFractionDict]
+            Bin fractions declared for the model.
+        stratification_fractions : list[StratificationFractionsDict] | None
+            Stratification fractions declared for the model.
+        compartment_fractions : list[CompartmentFractionDict] | None
+            Overrides, each mapping an expanded compartment name to a fraction
+            of the total population.
+
+        Returns
+        -------
+        list[CompartmentFraction]
+            Validated overrides.
+
+        Raises
+        ------
+        ValueError
+            If a compartment name is unknown or repeated, a fraction lies
+            outside ``[0.0, 1.0]``, or the overridden population exceeds the
+            total population size.
+        """
+        if not compartment_fractions:
+            return []
+
+        available = generate_compartment_names(self._bins, self._stratifications)
+        available_set = set(available)
+        uniform = self._uniform_compartment_fractions(
+            bin_fractions, stratification_fractions
+        )
+
+        seen: set[str] = set()
+        for override in compartment_fractions:
+            name = override["compartment"]
+            value = override["fraction"]
+            if name not in available_set:
+                raise ValueError(
+                    f"Compartment '{name}' is not part of the model expansion. "
+                    f"Available compartments: {available}"
+                )
+            if name in seen:
+                raise ValueError(f"Duplicate compartment fraction for '{name}'.")
+            seen.add(name)
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"Fraction for compartment '{name}' must be between 0.0 and "
+                    f"1.0, got {value}."
+                )
+
+        # Conservation semantics: values are fractions of the total population,
+        # so the check compares normalized fractions against 1.0. Uncalibrated
+        # (``None``) bin fractions are treated as an unknown base of 0.0. This
+        # is sound (never rejects a configuration whose calibrated total stays
+        # within ``population_size``) but not complete: a violation that only
+        # appears once the uncalibrated bins receive their calibrated fractions
+        # cannot be detected here.
+        base_total = sum(uniform.values())
+        overridden_base = sum(uniform[o["compartment"]] for o in compartment_fractions)
+        overridden_value = sum(o["fraction"] for o in compartment_fractions)
+        if base_total - overridden_base + overridden_value > 1.0 + 1e-6:
+            raise ValueError(
+                "Per-compartment overrides would make the initial population "
+                "exceed population_size."
+            )
+
+        return [
+            CompartmentFraction(
+                compartment=override["compartment"], fraction=override["fraction"]
+            )
+            for override in compartment_fractions
+        ]
+
+    def _uniform_compartment_fractions(
+        self,
+        bin_fractions: list[BinFractionDict],
+        stratification_fractions: list[StratificationFractionsDict] | None,
+    ) -> dict[str, float]:
+        """
+        Compute the uniform expansion of bin fractions, before overrides.
+
+        Mirrors ``initialize_population`` in the Rust engine: bins are split by
+        each stratification that applies to them. Values are fractions of the
+        total population.
+        """
+        bin_fraction_map = {bf["bin"]: bf["fraction"] for bf in bin_fractions}
+        stratification_maps = {
+            sf["stratification"]: {
+                fraction["category"]: fraction["fraction"]
+                for fraction in sf["fractions"]
+            }
+            for sf in (stratification_fractions or [])
+        }
+
+        partials: list[tuple[str, dict[str, str], float]] = [
+            (bin_item.id, {}, bin_fraction_map.get(bin_item.id) or 0.0)
+            for bin_item in self._bins
+        ]
+
+        for stratification in self._stratifications:
+            fraction_map = stratification_maps.get(stratification.id, {})
+            new_partials: list[tuple[str, dict[str, str], float]] = []
+            for name, applied, value in partials:
+                conditions_met = stratification.conditions is None or all(
+                    applied.get(condition.stratification) == condition.category
+                    for condition in stratification.conditions
+                )
+                if conditions_met:
+                    for category in stratification.categories:
+                        new_partials.append(
+                            (
+                                f"{name}_{category}",
+                                {**applied, stratification.id: category},
+                                value * fraction_map.get(category, 0.0),
+                            )
+                        )
+                else:
+                    new_partials.append((name, applied, value))
+            partials = new_partials
+
+        return {name: value for name, _, value in partials}
+
     def set_initial_conditions(
         self,
         population_size: int,
         bin_fractions: list[BinFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
+        *,
+        compartment_fractions: list[CompartmentFractionDict] | None = None,
     ) -> Self:
         """
         Set the initial conditions for the model.
@@ -816,6 +957,16 @@ class ModelBuilder:
                     ]
                 }
             ]
+        compartment_fractions : list[CompartmentFractionDict] | None, default=None
+            List of per-compartment overrides applied after the uniform
+            expansion. Each item is a dictionary with:
+            - "compartment": str (expanded compartment name)
+            - "fraction": float (fraction of the total population)
+
+            Example:
+            [
+                {"compartment": "IH_y60", "fraction": 0.0}
+            ]
 
         Returns
         -------
@@ -825,7 +976,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If initial conditions have already been set.
+            If initial conditions have already been set, a compartment name is
+            unknown or repeated, a fraction lies outside ``[0.0, 1.0]``, or the
+            overrides make the initial population exceed ``population_size``.
         """
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
@@ -857,10 +1010,15 @@ class ModelBuilder:
                     )
                 )
 
+        compartment_fraction_list = self._build_compartment_fractions(
+            bin_fractions, stratification_fractions, compartment_fractions
+        )
+
         self._initial_conditions = InitialConditions(
             population_size=population_size,
             bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
+            compartment_fractions=compartment_fraction_list,
         )
         bin_ids = [bf["bin"] for bf in bin_fractions]
         logging.info(

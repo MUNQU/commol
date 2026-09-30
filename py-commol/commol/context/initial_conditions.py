@@ -2,7 +2,7 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class BinFraction(BaseModel):
@@ -68,6 +68,34 @@ class StratificationFractions(BaseModel):
     )
 
 
+class CompartmentFraction(BaseModel):
+    """
+    Fraction for a single expanded compartment.
+
+    Attributes
+    ----------
+    compartment : str
+        The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.
+    fraction : float
+        The fraction of the total population in this compartment,
+        between 0.0 and 1.0.
+    """
+
+    compartment: str = Field(default=..., description="The expanded compartment name.")
+    fraction: float = Field(
+        default=...,
+        description="The fraction of the total population in this compartment.",
+    )
+
+    @field_validator("fraction")
+    @classmethod
+    def validate_fraction_range(cls, value: float) -> float:
+        """Enforce that the fraction lies within ``[0.0, 1.0]``."""
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"Fraction must be between 0.0 and 1.0, got {value}.")
+        return value
+
+
 class InitialConditions(BaseModel):
     """
     Initial conditions for a simulation.
@@ -82,6 +110,10 @@ class InitialConditions(BaseModel):
     stratification_fractions : list[StratificationFractions], optional
         List of stratification fractions. Each item contains a stratification id and
         its category fractions.
+    compartment_fractions : list[CompartmentFraction], optional
+        List of per-compartment overrides applied after the uniform expansion. Each
+        item contains an expanded compartment name and the fraction of the total
+        population it holds.
     """
 
     population_size: int = Field(..., description="Population size.")
@@ -99,6 +131,25 @@ class InitialConditions(BaseModel):
             "and its category fractions."
         ),
     )
+    compartment_fractions: list[CompartmentFraction] = Field(
+        default_factory=list,
+        description=(
+            "List of per-compartment overrides applied after the uniform expansion. "
+            "Each item contains an expanded compartment name and the fraction of the "
+            "total population it holds."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_compartment_fractions_unique(self) -> Self:
+        """Validate that each compartment appears at most once."""
+        compartments = [cf.compartment for cf in self.compartment_fractions]
+        duplicates = sorted(
+            {name for name in compartments if compartments.count(name) > 1}
+        )
+        if duplicates:
+            raise ValueError(f"Duplicate compartment fractions found: {duplicates}.")
+        return self
 
     @model_validator(mode="after")
     def validate_calibrated_fractions_sum_to_one(self) -> Self:
@@ -326,6 +377,40 @@ class InitialConditions(BaseModel):
             named = by_stratification.get(stratification.stratification)
             if named is not None:
                 self._apply_stratification_update(stratification, named)
+
+    def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Upsert per-compartment overrides by expanded compartment name.
+
+        A compartment already present in ``compartment_fractions`` has its
+        fraction replaced; a new one is appended.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping expanded compartment names to their new
+            fraction of the total population. Each value must lie between
+            0.0 and 1.0.
+
+        Raises
+        ------
+        ValueError
+            If a value lies outside ``[0.0, 1.0]``.
+        """
+        for compartment, value in fractions.items():
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"Fraction for compartment '{compartment}' must be between "
+                    f"0.0 and 1.0, got {value}."
+                )
+            for existing in self.compartment_fractions:
+                if existing.compartment == compartment:
+                    existing.fraction = value
+                    break
+            else:
+                self.compartment_fractions.append(
+                    CompartmentFraction(compartment=compartment, fraction=value)
+                )
 
     def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         """
