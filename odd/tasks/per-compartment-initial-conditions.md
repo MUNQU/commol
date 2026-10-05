@@ -108,3 +108,21 @@ Design decisions (recorded in odd/judgment-day/per-compartment-initial-condition
   idempotent (pair totals are invariant under 0.4+0.6=1); a shared-category
   value is intentionally NOT idempotent on re-apply — re-applying re-scores,
   exactly like the engine. The round-2 declared-base branch is withdrawn.
+
+Resolution (commit: 37bb0ab fix: resolve escalated JD residuals with
+engine-parity write-back) — all escalated residuals closed:
+
+- ESC-2/JD-G-1 fixed: declared-base branch withdrawn; live replay per parameter
+  (engine parity incl. pre-existing overrides and mixed multi-parameter dicts);
+  shared-category double-apply test rewritten to re-scoring semantics.
+- ESC-1 fixed: round-2 Pydantic construction total guard withdrawn; reload of
+  non-conserving states is unconditional; ModelBuilder and public update_*
+  keep their guards.
+- JD-G-3 fixed: non-conserving bin values divert to per-compartment overrides;
+  bin conservation guard never bypassed; conserving values still update the
+  fraction.
+- ESC-3 fixed: conditional-category report intervals rescaled to the
+  population unit (bracket the reported fraction).
+- ESC-4 fixed: PyO3 bin_fractions constructor accepts Option<f64>.
+- Verification: pytest 571 passed; cargo 90+25 passed; fmt/clippy/ruff/ty
+  clean; independent verify agent 7/7 PASS before commit.
