@@ -70,19 +70,20 @@ def _group_label(group: tuple[str, ...]) -> str:
 def _interval(
     entry_id: str,
     statistics: Mapping[str, ParameterSetStatistics] | None,
+    scale: float = 1.0,
 ) -> Interval | None:
     """Ensemble spread of one entry, or None when there is no ensemble."""
     stats = (statistics or {}).get(entry_id)
     if stats is None:
         return None
     return {
-        "mean": stats.mean,
-        "median": stats.median,
-        "ci_lower": stats.percentile_lower,
-        "ci_upper": stats.percentile_upper,
-        "min": stats.min,
-        "max": stats.max,
-        "std": stats.std,
+        "mean": stats.mean * scale,
+        "median": stats.median * scale,
+        "ci_lower": stats.percentile_lower * scale,
+        "ci_upper": stats.percentile_upper * scale,
+        "min": stats.min * scale,
+        "max": stats.max * scale,
+        "std": stats.std * scale,
     }
 
 
@@ -107,18 +108,19 @@ def _initial_condition_entry(
     entry_id: str,
     group: str,
     fraction: float | None,
-    group_population: float,
+    value: float | None,
     calibrated_ids: set[str],
     statistics: Mapping[str, ParameterSetStatistics] | None,
+    interval_scale: float = 1.0,
 ) -> InitialConditionEntry:
     """One reported initial condition, with its interval when there is one."""
     entry: InitialConditionEntry = {
         "group": group,
         "fraction": fraction,
-        "value": None if fraction is None else fraction * group_population,
+        "value": value,
         "calibrated": entry_id in calibrated_ids,
     }
-    interval = _interval(entry_id, statistics)
+    interval = _interval(entry_id, statistics, interval_scale)
     if interval is not None:
         entry["interval"] = interval
     return entry
@@ -157,15 +159,21 @@ def applied_parameters_report(
     ``scale`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions carry the ``fraction`` the model was built from, the
-    head ``value`` it works out to, and the ``group`` that fraction is taken
-    of: ``population`` for bins and unconditional stratifications, and the
-    conditioning categories for a conditional one. ``N`` is the population the
-    fractions of the whole-population group apply to.
+    Initial conditions carry the effective head ``value`` the engine builds
+    from the uniform expansion plus the declared compartment overrides, its
+    ``fraction`` as that head count over the declared population size, and the
+    ``group`` it belongs to: ``population`` for bins and unconditional
+    stratifications, and the conditioning categories for a conditional one.
+    ``N`` is the declared population size, with fraction 1.0. A bin left
+    uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
+    calibration" marker even when overrides touch some of its compartments.
 
     For a probabilistic result each entry gains an ``interval`` holding the
-    ensemble spread, expressed in the unit the entry was calibrated in, which
-    for an initial condition is its fraction rather than its head count.
+    ensemble spread. A parameter is in the unit it was calibrated in. An
+    initial-condition entry is in the fraction the row reports: a conditional
+    stratification's category is calibrated as a group fraction but reported
+    over the whole population, so its interval is rescaled by the group's share
+    of the population and brackets the reported fraction.
 
     Parameters
     ----------
@@ -266,13 +274,27 @@ def _initial_conditions_report(
     """
     Every bin fraction, stratification category and compartment override.
 
-    An override row is reported ``calibrated`` when its compartment carries a
-    calibrated parameter id, or when a calibrated bin or category parameter id
-    covers it. A declared override that no calibrated id covers reports
-    ``calibrated`` false.
+    Every row reports its effective head count the engine builds from the
+    uniform expansion plus the declared compartment overrides, and its fraction
+    as that head count over the declared ``population_size``. A single
+    denominator is used for bin, category and override rows, so the fractions
+    line up with one another and with ``N``. An override row is reported
+    ``calibrated`` when its compartment carries a calibrated parameter id, or
+    when a calibrated bin or category parameter id covers it. A declared
+    override that no calibrated id covers reports ``calibrated`` false.
+
+    A bin whose declared fraction is ``None`` keeps the ``None`` fraction and
+    head count that mark it as needing calibration, even when overrides touch
+    some of its compartments; the override rows still carry their own numbers.
     """
     initial_conditions_block = model.population.initial_conditions
     population_size = float(initial_conditions_block.population_size)
+    effective = model._initial_population_fractions()
+    expanded = model._expanded_compartments()
+    override_names = {
+        override.compartment
+        for override in initial_conditions_block.compartment_fractions
+    }
 
     report: dict[str, InitialConditionEntry] = {
         "N": {
@@ -283,25 +305,62 @@ def _initial_conditions_report(
         }
     }
     for bin_fraction in initial_conditions_block.bin_fractions:
+        names = [
+            name
+            for name, _ in expanded
+            if name == bin_fraction.bin or name.startswith(f"{bin_fraction.bin}_")
+        ]
+        fraction: float | None
+        value: float | None
+        if bin_fraction.fraction is None:
+            # A bin needing calibration keeps its marker even when overrides
+            # pin some of its compartments; the override rows carry the numbers.
+            fraction = None
+            value = None
+        elif not (set(names) & override_names):
+            # No override touches this row, so report the declared fraction
+            # verbatim rather than an expansion sum that drifts in the last
+            # float bits.
+            fraction = bin_fraction.fraction
+            value = fraction * population_size
+        else:
+            value = sum(effective.get(name, 0.0) for name in names) * population_size
+            fraction = value / population_size
         report[bin_fraction.bin] = _initial_condition_entry(
             bin_fraction.bin,
             WHOLE_POPULATION_GROUP,
-            bin_fraction.fraction,
-            population_size,
+            fraction,
+            value,
             calibrated_ids,
             parameter_statistics,
         )
     for stratification in initial_conditions_block.stratification_fractions:
         group = model.get_conditioning_categories(stratification.stratification)
-        group_population = model.subgroup_population(group)
-        for fraction in stratification.fractions:
-            report[fraction.category] = _initial_condition_entry(
-                fraction.category,
+        # A conditional stratification's category is calibrated as a fraction
+        # of its conditioning subgroup, but reported as a fraction of the whole
+        # population. The group's share of the population is the same factor
+        # that converts one unit into the other, so it rescales the interval.
+        interval_scale = (
+            model.subgroup_population(group) / population_size if group else 1.0
+        )
+        for category_fraction in stratification.fractions:
+            names = [
+                name
+                for name, applied in expanded
+                if applied.get(stratification.stratification)
+                == category_fraction.category
+            ]
+            row_value = (
+                sum(effective.get(name, 0.0) for name in names) * population_size
+            )
+            report[category_fraction.category] = _initial_condition_entry(
+                category_fraction.category,
                 _group_label(group),
-                fraction.fraction,
-                group_population,
+                row_value / population_size,
+                row_value,
                 calibrated_ids,
                 parameter_statistics,
+                interval_scale,
             )
     for override in initial_conditions_block.compartment_fractions:
         calibrated = _override_is_calibrated(
@@ -311,7 +370,7 @@ def _initial_conditions_report(
             override.compartment,
             WHOLE_POPULATION_GROUP,
             override.fraction,
-            population_size,
+            override.fraction * population_size,
             {override.compartment} if calibrated else set(),
             parameter_statistics,
         )

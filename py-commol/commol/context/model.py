@@ -3,7 +3,7 @@ from itertools import combinations, product
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
@@ -55,6 +55,13 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+
+    # Compartment pairs depend only on the (immutable after construction)
+    # stratifications, so memoizing them per model instance keeps repeated
+    # report lookups linear in the number of categories.
+    _category_pairs_cache: dict[str, list[tuple[str, str]]] = PrivateAttr(
+        default_factory=dict
+    )
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:
@@ -358,14 +365,39 @@ class Model(BaseModel):
             self._route_calibration_values(values, types, compartments)
         )
 
-        if parameters:
-            self.update_parameters(parameters)
-        if bin_fractions:
-            self.update_initial_conditions(bin_fractions)
-        if stratification_fractions:
-            self.update_stratification_fractions(stratification_fractions)
-        if compartment_fractions:
-            self.update_compartment_fractions(compartment_fractions)
+        # Applying the routed values mutates several definition blocks in turn.
+        # Snapshot them so a validation failure late in the sequence (for
+        # example an over-allocating compartment override) rolls the model back
+        # to the state it had before the call rather than leaving a partial
+        # write-back.
+        parameters_snapshot = {param.id: param.value for param in self.parameters}
+        initial_conditions_snapshot = self.population.initial_conditions.model_copy(
+            deep=True
+        )
+        try:
+            if parameters:
+                self.update_parameters(parameters)
+            if bin_fractions:
+                # The routing diverts any bin value whose update would break
+                # the declared mapping, so the public conservation guard is
+                # safe and is re-applied here as the single source of truth.
+                self.update_initial_conditions(bin_fractions)
+            if stratification_fractions:
+                self.update_stratification_fractions(stratification_fractions)
+            if compartment_fractions:
+                # Calibration write-back is as permissive as the engine: the
+                # scored engine state may be non-conserving (the Rust
+                # ``set_initial_condition`` has no total check), so persisting
+                # it must not be rejected by the definition-level total guard.
+                self.population.initial_conditions._upsert_compartment_fractions(
+                    compartment_fractions, validate_total=False
+                )
+        except Exception:
+            for param in self.parameters:
+                if param.id in parameters_snapshot:
+                    param.value = parameters_snapshot[param.id]
+            self.population.initial_conditions = initial_conditions_snapshot
+            raise
 
     def _base_compartment_fractions(self) -> dict[str, float]:
         """Uniform expansion fractions of the declared bin and category values."""
@@ -409,8 +441,22 @@ class Model(BaseModel):
             if name == param_id or name.startswith(prefix)
         ]
 
+    def _declaring_stratifications(self, category: str) -> int:
+        """Number of stratifications that declare a fraction for a category."""
+        declared = self.population.initial_conditions.stratification_fractions
+        return sum(
+            1
+            for stratification in declared
+            if any(
+                fraction.category == category for fraction in stratification.fractions
+            )
+        )
+
     def _category_pairs(self, category: str) -> list[tuple[str, str]]:
         """Pairs of compartments that differ only in one category token."""
+        cached = self._category_pairs_cache.get(category)
+        if cached is not None:
+            return cached
         expanded = self._expanded_compartments()
         tokens_by_name = {name: name.split("_") for name, _ in expanded}
         pairs: list[tuple[str, str]] = []
@@ -435,6 +481,12 @@ class Model(BaseModel):
                 if pair not in seen:
                     seen.add(pair)
                     pairs.append(pair)
+        # Match the engine's replay order: it sorts its complementary pairs by
+        # compartment index (calibration_problem.rs). Order matters when a
+        # category is shared by two stratifications and pairs overlap.
+        position = {name: index for index, (name, _) in enumerate(expanded)}
+        pairs.sort(key=lambda pair: (position[pair[0]], position[pair[1]]))
+        self._category_pairs_cache[category] = pairs
         return pairs
 
     @staticmethod
@@ -462,19 +514,27 @@ class Model(BaseModel):
         """
         Route calibrated values to the definition fields they update.
 
-        Initial-condition values are replayed in parameter order over a working
-        population that starts from the declared expansion plus the current
-        compartment overrides. A bin-level value scales its covered
-        compartments by weights taken from that starting population, and a
-        stratification-category value splits each complementary pair by the
-        live total of the pair.
+        Initial-condition values are replayed in parameter order over a single
+        working population that starts from the declared expansion plus the
+        current compartment overrides, so a bin-level value scales its covered
+        compartments by the weights the engine precomputes from that base and a
+        category value splits each complementary pair by the live pair total.
+        Engine parity is the primary invariant: each parameter reads the
+        working population once and writes its targets, exactly as
+        ``calibration_problem.rs`` snapshots the engine population once per
+        parameter.
 
         A bin or category value whose covered compartments intersect an
         existing override, or a compartment affected by an earlier value in
         this replay, is persisted as per-compartment overrides holding the
-        replayed values. Every other value updates the bin or stratification
-        fraction it declares. An exact compartment value is always persisted as
-        an override.
+        replayed values. A bin value whose update would make the complete
+        declared bin-fraction mapping fail its conservation rule is diverted
+        the same way, so the definition never holds a non-conserving bin
+        fraction. A stratification-category value is also persisted when
+        its name is declared by more than one stratification, because a single
+        stratification fraction cannot express the cross-stratification split.
+        Every other value updates the bin or stratification fraction it
+        declares. An exact compartment value is always persisted as an override.
 
         Parameters
         ----------
@@ -501,6 +561,11 @@ class Model(BaseModel):
         categories = self.population.initial_conditions.get_categories_with_fractions()
         initial_conditions = self.population.initial_conditions
         population_size = float(initial_conditions.population_size)
+        if population_size <= 0.0:
+            raise ValueError(
+                "population_size must be greater than 0 before calibration values "
+                f"can be written back, got {initial_conditions.population_size}."
+            )
         base_fractions = self._initial_population_fractions()
         working = {
             name: base_fractions.get(name, 0.0) * population_size
@@ -535,6 +600,7 @@ class Model(BaseModel):
                     working,
                     affected,
                     diverted,
+                    bin_fractions,
                     population_size,
                 )
                 if route is not None:
@@ -545,7 +611,7 @@ class Model(BaseModel):
                         stratification_fractions[key] = value
 
         compartment_fractions = {
-            name: working[name] / population_size for name in diverted
+            name: working[name] / population_size for name in sorted(diverted)
         }
 
         return (
@@ -554,6 +620,53 @@ class Model(BaseModel):
             stratification_fractions,
             compartment_fractions,
         )
+
+    def _bin_update_keeps_the_mapping_valid(
+        self,
+        bin_id: str,
+        value: float,
+        routed_bins: Mapping[str, float | None],
+    ) -> bool:
+        """
+        Whether setting a bin fraction keeps the declared mapping valid.
+
+        Calibration write-back must not persist a bin fraction the definition
+        cannot hold: a value whose update makes the declared bin-fraction
+        mapping fail :meth:`_validate_bin_fraction_total` is diverted to
+        per-compartment overrides instead. The candidate applies the bin
+        values routed earlier in the same replay, so a combination that is
+        only valid as a whole (every bin named) is not split apart.
+
+        Parameters
+        ----------
+        bin_id : str
+            Id of the bin being updated.
+        value : float
+            Candidate fraction for that bin.
+        routed_bins : Mapping[str, float | None]
+            Bin fractions already routed in this replay.
+
+        Returns
+        -------
+        bool
+            True when the candidate mapping passes the conservation rule.
+        """
+        initial_conditions = self.population.initial_conditions
+        candidate = {
+            fraction.bin: fraction.fraction
+            for fraction in initial_conditions.bin_fractions
+        }
+        candidate.update(routed_bins)
+        candidate[bin_id] = value
+        known = {fraction.bin for fraction in initial_conditions.bin_fractions}
+        complete = set(routed_bins) | {bin_id} >= known
+        try:
+            initial_conditions._validate_bin_fraction_total(
+                candidate, complete=complete
+            )
+        except ValueError:
+            return False
+        return True
 
     def _replay_initial_condition(
         self,
@@ -566,6 +679,7 @@ class Model(BaseModel):
         working: dict[str, float],
         affected: set[str],
         diverted: set[str],
+        routed_bins: Mapping[str, float | None],
         population_size: float,
     ) -> tuple[str, str] | None:
         """
@@ -584,14 +698,18 @@ class Model(BaseModel):
         compartments : set[str]
             Expanded compartment names of the model.
         base_fractions : Mapping[str, float]
-            Starting population fractions, before any value in this replay.
+            Starting population fractions including the current overrides.
         working : dict[str, float]
-            Working head counts, updated in place.
+            Working head counts including the current overrides, updated in
+            place.
         affected : set[str]
             Compartments that carry an existing override or were covered by an
             earlier value in this replay.
         diverted : set[str]
             Compartments persisted as overrides in this replay.
+        routed_bins : Mapping[str, float | None]
+            Bin fractions already routed in this replay, used to test the
+            conservation of a later bin update against the whole mapping.
         population_size : float
             Total population the fractions are taken of.
 
@@ -613,7 +731,14 @@ class Model(BaseModel):
             for name, weight in weights.items():
                 working[name] = value * weight * population_size
             route: tuple[str, str] | None = None
-            if set(covered) & affected:
+            # Divert when the covered compartments intersect an existing
+            # override or an earlier value, and when updating the declared bin
+            # fraction would make the complete mapping fail its conservation
+            # rule. The replayed head counts are pinned as overrides either
+            # way, so the definition stays valid and rebuilds the scored state.
+            if set(covered) & affected or not self._bin_update_keeps_the_mapping_valid(
+                param_id, value, routed_bins
+            ):
                 diverted.update(covered)
             else:
                 route = ("bin", param_id)
@@ -622,12 +747,27 @@ class Model(BaseModel):
         if param_id in categories:
             pairs = self._category_pairs(param_id)
             covered = {name for pair in pairs for name in pair}
-            for category_name, complement_name in pairs:
-                pair_total = working[category_name] + working[complement_name]
+            # The engine takes the population snapshot once per parameter and
+            # then iterates its pairs (calibration_problem.rs). Reading the live
+            # working totals inside the loop made overlapping pairs (a category
+            # shared by two stratifications) compound their edits, diverging
+            # from the engine replay. A shared category is always diverted,
+            # because no single stratification fraction can express the
+            # cross-stratification split, and a repeated apply re-scores from
+            # the reloaded population exactly as a fresh engine problem would.
+            shared = self._declaring_stratifications(param_id) > 1
+            pair_totals = [
+                working[category_name] + working[complement_name]
+                for category_name, complement_name in pairs
+            ]
+            for (category_name, complement_name), pair_total in zip(pairs, pair_totals):
                 working[category_name] = value * pair_total
                 working[complement_name] = (1.0 - value) * pair_total
             route = None
-            if covered & affected:
+            # A category declared by more than one stratification cannot be
+            # represented by a single stratification fraction, so the replayed
+            # head counts are persisted as per-compartment overrides instead.
+            if covered & affected or shared:
                 diverted.update(covered)
             else:
                 route = ("stratification", param_id)
@@ -746,10 +886,10 @@ class Model(BaseModel):
         See
         :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
 
-        A per-compartment override is folded in only when the category chain
-        selects exactly one overridden compartment. When it selects several
-        compartments, the uniform expansion is reported and per-compartment
-        overrides are excluded.
+        Per-compartment overrides are folded into the sum for every compartment
+        the category chain selects, not just when it selects one, so the head
+        count matches the population the engine builds. Without overrides the
+        declared fractions are multiplied exactly as before.
 
         Parameters
         ----------
@@ -768,22 +908,20 @@ class Model(BaseModel):
             If a category is not found.
         """
         selected = tuple(categories)
-        population = self.population.initial_conditions.subgroup_population(selected)
-        overrides = {
-            fraction.compartment: fraction.fraction
-            for fraction in self.population.initial_conditions.compartment_fractions
-        }
-        if not overrides:
-            return population
-        matched = [
-            name
+        initial_conditions = self.population.initial_conditions
+        # Validate the chain first so an unknown category still raises.
+        for category in selected:
+            initial_conditions.get_category_fraction(category)
+        if not initial_conditions.compartment_fractions:
+            return initial_conditions.subgroup_population(selected)
+        population_size = float(initial_conditions.population_size)
+        effective = self._initial_population_fractions()
+        total = sum(
+            effective.get(name, 0.0)
             for name, applied in self._expanded_compartments()
             if all(category in applied.values() for category in selected)
-        ]
-        if len(matched) == 1 and matched[0] in overrides:
-            population_size = float(self.population.initial_conditions.population_size)
-            return overrides[matched[0]] * population_size
-        return population
+        )
+        return total * population_size
 
     def get_outputs_by_source(self) -> dict[str, list[str]]:
         """

@@ -741,10 +741,16 @@ from commol import applied_parameters_report
 report = applied_parameters_report(model, result, problem)
 ```
 
-Initial conditions carry the `fraction` the model was built from, the head
-`value` it works out to, and the `group` that fraction is taken of — which for a
-[conditional stratification](core-concepts.md#subgroup-head-counts) is its
-conditioning categories rather than the whole population.
+Initial conditions carry the effective `value` the engine builds from the
+uniform expansion plus the declared `compartment_fractions` overrides, and its
+`fraction` as that head count over the declared population size. Every row uses
+that one denominator, so the row fractions line up with each other and with `N`
+(the declared `population_size`, fraction `1.0`). The `group` records which
+subgroup the row belongs to — for a
+[conditional stratification](core-concepts.md#subgroup-head-counts) its
+conditioning categories rather than the whole population. A bin left
+uncalibrated keeps a `null` `fraction` and `value` even when overrides touch
+some of its compartments; the override rows still carry their own numbers.
 
 Pass `problem` to include `scale` parameters, which are calibrated but have no
 place in the model. For a `ProbabilisticCalibrationResult` every entry also
@@ -765,8 +771,11 @@ gains an `interval` block, and the report is preceded by `confidence_level`:
 }
 ```
 
-Intervals are in the unit the entry was calibrated in, so for an initial
-condition that is its fraction, not its head count.
+Intervals are in the unit the entry reports. A parameter keeps its calibrated
+unit; an initial condition is a fraction of the whole population, so a
+conditional stratification category — calibrated as a fraction of its
+conditioning subgroup — has its interval rescaled by that subgroup's share of
+the population and therefore brackets the reported fraction.
 
 ### Reporting the run itself
 
@@ -827,16 +836,21 @@ Each value is routed by its declared `parameter_type`:
 | `parameter_type` | Written to |
 |---|---|
 | `parameter` | the model parameter of that id |
-| `initial_condition`, id is a bin | that bin's fraction |
-| `initial_condition`, id is a stratification category | that category's fraction, and the remaining category |
+| `initial_condition`, id is an expanded compartment (`A_group1`) | a per-compartment override of that name |
+| `initial_condition`, id is a bin | that bin's fraction, or per-compartment overrides when the bin intersects an existing override or an earlier value in the same apply |
+| `initial_condition`, id is a stratification category | that category's fraction, and the remaining category, or per-compartment overrides when the category intersects an override or is declared by two stratifications |
 | `scale` | nothing — it scales observations, not the model |
 
-!!! warning "Per-compartment initial conditions cannot be written back"
-
-    A calibration parameter naming an expanded compartment (`A_group1`) is
-    accepted by the calibrator, but the model stores initial conditions only as
-    bin and stratification fractions, so there is nowhere to put it.
-    `apply_calibration_parameters` raises rather than skipping it silently.
+An expanded-compartment id is always stored as a `compartment_fractions`
+override, so the calibrated head count reloads exactly. A bin or category value
+that intersects an existing override (or a compartment already touched earlier
+in the same apply) is diverted to per-compartment overrides too: the replay
+pins the head count each affected compartment scored with, instead of writing a
+single fraction that the override would shadow. Because those overrides cover
+every affected compartment, the definition fraction is left alone. A bin or
+unique-category apply is idempotent; a category declared by two stratifications
+re-scores on re-apply from the reloaded population, exactly like a fresh engine
+problem built on that state.
 
 #### Calibrated stratification splits
 

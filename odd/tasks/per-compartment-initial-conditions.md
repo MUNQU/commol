@@ -90,3 +90,21 @@ Branch: `feature/per-compartment-initial-conditions`
   commol-core` -> 90 + 21 + 1 passed; `cargo fmt --check`, `cargo clippy --all-targets -- -D
   warnings`, `uv run ruff format --check .`, `uv run ruff check .`, `uv run ty check commol` all
   clean; `mkdocs.yaml` parses.
+
+
+## Residual resolution after Judgment Day ESCALATED (user decision: keep delta, resolve now)
+
+Design decisions (recorded in odd/judgment-day/per-compartment-initial-conditions-ledger.md):
+
+- ESC-1 policy: the model definition may represent any state the engine can hold.
+  Total guards live in authoring paths only (ModelBuilder construction, public
+  update_* methods). Deserialization must accept whatever the write-back
+  persisted, so 'a reload reproduces the scored head counts bit-identically'
+  holds unconditionally.
+- ESC-2 policy: engine parity is the primary invariant. The calibration
+  write-back is a pure function of (current definition, problem values) and
+  equals the engine's sequential replay exactly, including pre-existing
+  overrides and multi-parameter orderings. Bin and unique-category replays are
+  idempotent (pair totals are invariant under 0.4+0.6=1); a shared-category
+  value is intentionally NOT idempotent on re-apply — re-applying re-scores,
+  exactly like the engine. The round-2 declared-base branch is withdrawn.

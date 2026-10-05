@@ -212,14 +212,71 @@ class TestInitialConditions:
         assert entry["group"] == "population"
         assert entry["value"] == pytest.approx(600.0)
 
-    def test_conditional_categories_are_taken_of_their_own_group(self) -> None:
+    def test_conditional_category_fractions_use_the_population_denominator(
+        self,
+    ) -> None:
         report = applied_parameters_report(_model(conditional=True), {})
 
         entry = report["initial_conditions"]["s1"]
         assert entry["group"] == "group1"
-        assert entry["fraction"] == 0.25
-        # 0.25 of the group1 subgroup, not of the whole population.
+        # The head count is 0.25 of the group1 subgroup; the reported fraction
+        # is that head count over the declared population size, so every row
+        # shares one denominator.
         assert entry["value"] == pytest.approx(0.25 * 600.0)
+        assert entry["fraction"] == pytest.approx(150.0 / 1000.0)
+
+    def test_population_group_rows_share_the_population_denominator(self) -> None:
+        model = _override_report_model(fraction=0.3)
+        report = applied_parameters_report(model, {})
+        rows = report["initial_conditions"]
+
+        effective = 0.3 + 0.5  # A_g1 override + uniform A_g2
+        bin_total = rows["A"]["fraction"] + rows["B"]["fraction"]
+        category_total = rows["group1"]["fraction"] + rows["group2"]["fraction"]
+
+        assert bin_total == pytest.approx(effective)
+        assert category_total == pytest.approx(effective)
+        assert rows["A"]["fraction"] == pytest.approx(0.8)
+        assert rows["group1"]["fraction"] == pytest.approx(0.3)
+        assert rows["group2"]["fraction"] == pytest.approx(0.5)
+
+    def test_uncalibrated_bin_keeps_its_marker_with_overrides(self) -> None:
+        model = (
+            ModelBuilder(name="UncalibratedOverride", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="flow", source=["A"], target=["B"], rate="k * A")
+            .add_stratification(id="group", categories=["group1", "group2"])
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": None},
+                    {"bin": "B", "fraction": 0.5},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "group",
+                        "fractions": [
+                            {"category": "group1", "fraction": 0.5},
+                            {"category": "group2", "fraction": 0.5},
+                        ],
+                    }
+                ],
+                compartment_fractions=[{"compartment": "A_group1", "fraction": 0.3}],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        report = applied_parameters_report(model, {})
+
+        assert report["initial_conditions"]["A"]["fraction"] is None
+        assert report["initial_conditions"]["A"]["value"] is None
+        # The override row still carries its own number.
+        assert report["initial_conditions"]["A_group1"]["fraction"] == pytest.approx(
+            0.3
+        )
+        assert report["initial_conditions"]["A_group1"]["value"] == pytest.approx(300.0)
 
     def test_an_uncalibrated_fraction_reports_no_head_count(self) -> None:
         report = applied_parameters_report(_model(s_fraction=None), {})
@@ -286,6 +343,62 @@ class TestInitialConditions:
 
         assert model.subgroup_population(("group1",)) == pytest.approx(200.0)
 
+    def test_overrides_are_folded_into_multi_compartment_subgroups(self) -> None:
+        model = _override_report_model(fraction=0.3)
+
+        # group1 selects A_group1 (0.3) and B_group1 (0.0).
+        assert model.subgroup_population(("group1",)) == pytest.approx(300.0)
+        # group2 selects A_group2 (0.5) and B_group2 (0.0).
+        assert model.subgroup_population(("group2",)) == pytest.approx(500.0)
+
+    def test_bin_rows_report_the_effective_head_count_with_overrides(self) -> None:
+        model = _override_report_model(fraction=0.3)
+
+        report = applied_parameters_report(model, {})
+
+        # A_g1 = 0.3 override plus the 0.5 uniform A_g2 gives an effective 0.8.
+        entry = report["initial_conditions"]["A"]
+        assert entry["fraction"] == pytest.approx(0.8)
+        assert entry["value"] == pytest.approx(800.0)
+
+    def test_category_rows_report_the_effective_head_count_with_overrides(
+        self,
+    ) -> None:
+        model = _override_report_model(fraction=0.3)
+
+        report = applied_parameters_report(model, {})
+
+        assert report["initial_conditions"]["group1"]["value"] == pytest.approx(300.0)
+        assert report["initial_conditions"]["group2"]["value"] == pytest.approx(500.0)
+
+    def test_diverted_aggregate_row_does_not_show_the_stale_definition(
+        self,
+    ) -> None:
+        model = _override_report_model(fraction=0.3)
+        problem = _initial_condition_problem("A")
+
+        model.apply_calibration_parameters({"A": 0.6}, problem)
+        report = applied_parameters_report(model, {"A": 0.6}, problem)
+
+        # The diverted write-back pins A_g1 = 0.225 and A_g2 = 0.375, so the
+        # aggregate row must report 0.6 of the population, not the stale 1.0.
+        entry = report["initial_conditions"]["A"]
+        assert entry["calibrated"] is True
+        assert entry["fraction"] == pytest.approx(0.6)
+        assert entry["value"] == pytest.approx(600.0)
+
+    def test_diverted_override_order_is_deterministic(self) -> None:
+        model = _override_report_model(fraction=0.3)
+        problem = _initial_condition_problem("A")
+
+        model.apply_calibration_parameters({"A": 0.6}, problem)
+        names = [
+            override.compartment
+            for override in model.population.initial_conditions.compartment_fractions
+        ]
+
+        assert names == sorted(names)
+
 
 class TestIntervals:
     def test_entries_gain_an_interval_when_statistics_are_given(self) -> None:
@@ -305,6 +418,40 @@ class TestIntervals:
             "max": 1.2,
             "std": 0.1,
         }
+
+    def test_conditional_category_interval_is_rescaled_to_the_population(
+        self,
+    ) -> None:
+        # A conditional category is calibrated as a fraction of its subgroup but
+        # reported as a fraction of the whole population. The interval must be
+        # rescaled by the group share so it brackets the reported fraction.
+        model = _model(conditional=True)
+        statistics = {
+            "s1": ParameterSetStatistics(
+                mean=0.25,
+                median=0.25,
+                std=0.05,
+                percentile_lower=0.2,
+                percentile_upper=0.3,
+                min=0.15,
+                max=0.35,
+            )
+        }
+
+        report = applied_parameters_report(
+            model,
+            {},
+            parameter_statistics=statistics,
+            confidence_level=0.95,
+        )
+
+        entry = report["initial_conditions"]["s1"]
+        interval = entry["interval"]
+        assert entry["fraction"] == pytest.approx(0.25 * 0.6)
+        assert interval["mean"] == pytest.approx(0.25 * 0.6)
+        assert interval["ci_lower"] == pytest.approx(0.2 * 0.6)
+        assert interval["ci_upper"] == pytest.approx(0.3 * 0.6)
+        assert interval["ci_lower"] < entry["fraction"] < interval["ci_upper"]
 
     def test_entries_without_statistics_have_no_interval(self) -> None:
         report = applied_parameters_report(
@@ -518,3 +665,47 @@ class TestRunReport:
         assert list(plain["accumulators"]["events"]) == list(
             ensemble["accumulators"]["events"]
         )
+
+
+class TestReportPerformance:
+    def test_report_with_many_compartments_and_overrides_is_bounded(self) -> None:
+        import time
+
+        builder = (
+            ModelBuilder(name="Large", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(
+                id="flow", source=["A"], target=[], rate="k * A", per_compartment=True
+            )
+        )
+        for index in range(8):
+            builder.add_stratification(
+                id=f"s{index}", categories=[f"g{index}a", f"g{index}b"]
+            )
+        model = builder.set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[{"bin": "A", "fraction": 1.0}],
+            stratification_fractions=[
+                {
+                    "stratification": f"s{index}",
+                    "fractions": [
+                        {"category": f"g{index}a", "fraction": 0.5},
+                        {"category": f"g{index}b", "fraction": 0.5},
+                    ],
+                }
+                for index in range(8)
+            ],
+        ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        names = [name for name, _ in model._expanded_compartments()]
+        assert len(names) == 256
+        base = 1.0 / len(names)
+        model.update_compartment_fractions({name: base for name in names[:128]})
+
+        start = time.perf_counter()
+        report = applied_parameters_report(model, {"g0a": 0.5})
+        elapsed = time.perf_counter() - start
+
+        assert report["initial_conditions"]["g0a"]["calibrated"] is True
+        assert elapsed < 3.0

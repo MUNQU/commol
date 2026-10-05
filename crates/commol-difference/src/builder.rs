@@ -439,13 +439,33 @@ fn initialize_population(model: &Model, compartments: &[String]) -> Result<Vec<f
         .map(|comp| *distribution.get(comp).unwrap_or(&0.0))
         .collect();
 
+    // Validate every override before applying any of them, so a rejected
+    // configuration leaves the engine untouched and the error names the first
+    // offending entry.
+    let mut seen_compartments: HashSet<&str> = HashSet::new();
     for compartment_fraction in &model.population.initial_conditions.compartment_fractions {
-        let Some(&index) = compartment_index.get(compartment_fraction.compartment.as_str()) else {
+        if !compartment_index.contains_key(compartment_fraction.compartment.as_str()) {
             return Err(format!(
                 "Unknown compartment '{}' in initial conditions. Available compartments: {:?}",
                 compartment_fraction.compartment, compartments
             ));
-        };
+        }
+        if !seen_compartments.insert(compartment_fraction.compartment.as_str()) {
+            return Err(format!(
+                "Duplicate compartment '{}' in initial conditions.",
+                compartment_fraction.compartment
+            ));
+        }
+        if !(0.0..=1.0).contains(&compartment_fraction.fraction) {
+            return Err(format!(
+                "Fraction for compartment '{}' must be between 0.0 and 1.0, got {}.",
+                compartment_fraction.compartment, compartment_fraction.fraction
+            ));
+        }
+    }
+
+    for compartment_fraction in &model.population.initial_conditions.compartment_fractions {
+        let index = compartment_index[compartment_fraction.compartment.as_str()];
         initial_population[index] = total_population * compartment_fraction.fraction;
     }
 
@@ -1424,5 +1444,81 @@ mod tests {
 
         assert_eq!(population, vec![400.0, 600.0, 0.0, 0.0]);
         assert!((population.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn negative_compartment_fraction_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g1".to_string(),
+                fraction: -0.5,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("between 0.0 and 1.0"), "{error}");
+    }
+
+    #[test]
+    fn fraction_above_one_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g1".to_string(),
+                fraction: 1.5,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("between 0.0 and 1.0"), "{error}");
+    }
+
+    #[test]
+    fn duplicate_compartment_override_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.1,
+                },
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.2,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("Duplicate compartment 'A_g1'"), "{error}");
+    }
+
+    #[test]
+    fn boundary_compartment_fractions_are_accepted() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.0,
+                },
+                CompartmentFraction {
+                    compartment: "A_g2".to_string(),
+                    fraction: 1.0,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(population, vec![0.0, 1000.0, 0.0, 0.0]);
     }
 }

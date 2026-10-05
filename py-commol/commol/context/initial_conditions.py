@@ -140,16 +140,90 @@ class InitialConditions(BaseModel):
         ),
     )
 
+    @field_validator("population_size")
+    @classmethod
+    def validate_population_size(cls, value: int) -> int:
+        """Enforce a strictly positive population size.
+
+        A zero population size would make every fraction-to-head-count
+        conversion a division by zero, so it is rejected as a domain error
+        rather than surfacing later as ``ZeroDivisionError``.
+        """
+        if value <= 0:
+            raise ValueError(f"population_size must be greater than 0, got {value}.")
+        return value
+
     @model_validator(mode="after")
     def validate_compartment_fractions_unique(self) -> Self:
         """Validate that each compartment appears at most once."""
-        compartments = [cf.compartment for cf in self.compartment_fractions]
-        duplicates = sorted(
-            {name for name in compartments if compartments.count(name) > 1}
-        )
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for compartment_fraction in self.compartment_fractions:
+            name = compartment_fraction.compartment
+            if name in seen:
+                duplicates.add(name)
+            seen.add(name)
         if duplicates:
-            raise ValueError(f"Duplicate compartment fractions found: {duplicates}.")
+            raise ValueError(
+                f"Duplicate compartment fractions found: {sorted(duplicates)}."
+            )
         return self
+
+    def _validate_bin_fraction_total(
+        self,
+        candidate: Mapping[str, float | None],
+        *,
+        complete: bool,
+    ) -> None:
+        """
+        Enforce the bin-fraction conservation rule on a candidate mapping.
+
+        The rule mirrors :meth:`validate_calibrated_fractions_sum_to_one`:
+        uncalibrated (``None``) fractions floor the calibrated total strictly
+        below 1.0 so they can be filled later. When every bin is calibrated,
+        a complete specification must sum to 1.0; a partial update may leave the
+        total below 1.0 but never above it, because bin fractions are shares of
+        a single population.
+
+        Parameters
+        ----------
+        candidate : Mapping[str, float | None]
+            Bin id to fraction after the candidate update.
+        complete : bool
+            Whether the caller specified every bin, so the sum-to-1 rule
+            applies in full.
+
+        Raises
+        ------
+        ValueError
+            If the candidate bins would make the total exceed the population or
+            a complete specification does not sum to 1.0.
+        """
+        calibrated = [value for value in candidate.values() if value is not None]
+        if not calibrated:
+            return
+        total = sum(calibrated)
+        uncalibrated = sum(1 for value in candidate.values() if value is None)
+
+        if uncalibrated > 0:
+            if total >= 1.0:
+                raise ValueError(
+                    f"Calibrated bin fractions sum to {total:.4f}, but must be "
+                    f"LESS than 1.0 to leave room for {uncalibrated} "
+                    f"uncalibrated fraction(s). Calibrated fractions: "
+                    f"{[item for item in candidate.items() if item[1] is not None]}"
+                )
+        elif complete:
+            if not math.isclose(total, 1.0, abs_tol=1e-4):
+                raise ValueError(
+                    f"Bin fractions must sum to 1.0, got {total:.4f}. "
+                    f"Fractions: {list(candidate.values())}"
+                )
+        elif total > 1.0 + 1e-4:
+            raise ValueError(
+                f"Bin fractions must not sum to more than 1.0, got {total:.4f}. "
+                f"Fractions: {list(candidate.values())}"
+            )
 
     @model_validator(mode="after")
     def validate_calibrated_fractions_sum_to_one(self) -> Self:
@@ -157,51 +231,14 @@ class InitialConditions(BaseModel):
         Validate that bin fractions sum appropriately.
 
         Rules:
-        - If all fractions are calibrated (no None): must sum to exactly 1.0
         - If some fractions are None (uncalibrated): calibrated ones must sum to LESS
             than 1.0
+        - If all fractions are calibrated (no None): must sum to exactly 1.0
         - If all fractions are None: skip validation (will be set before simulation)
         """
-        calibrated_fractions = [
-            bf.fraction for bf in self.bin_fractions if bf.fraction is not None
-        ]
-
-        # If all fractions are None (all need calibration), skip validation
-        if not calibrated_fractions:
-            return self
-
-        # If some fractions are calibrated, check if they sum correctly
-        # Note: We can't validate the sum if some are None, so we only warn
-        total = sum(calibrated_fractions)
-        uncalibrated_count = sum(1 for bf in self.bin_fractions if bf.fraction is None)
-
-        if uncalibrated_count > 0:
-            # Some fractions are None: calibrated ones MUST be LESS than 1.0
-            if total >= 1.0:
-                raise ValueError(
-                    (
-                        f"Calibrated bin fractions sum to {total:.4f}, but must be "
-                        f"LESS than 1.0 to leave room for {uncalibrated_count} "
-                        f"uncalibrated fraction(s). Calibrated fractions: "
-                        f"{
-                            [
-                                (bf.bin, bf.fraction)
-                                for bf in self.bin_fractions
-                                if bf.fraction is not None
-                            ]
-                        }"
-                    )
-                )
-        else:
-            # All fractions are calibrated, must sum to 1.0
-            if not math.isclose(total, 1.0, abs_tol=1e-4):
-                raise ValueError(
-                    (
-                        f"Bin fractions must sum to 1.0, got {total:.4f}. "
-                        f"Fractions: {[bf.fraction for bf in self.bin_fractions]}"
-                    )
-                )
-
+        self._validate_bin_fraction_total(
+            {bf.bin: bf.fraction for bf in self.bin_fractions}, complete=True
+        )
         return self
 
     def get_uncalibrated_bins(self) -> list[str]:
@@ -402,6 +439,19 @@ class InitialConditions(BaseModel):
             If a value lies outside ``[0.0, 1.0]``, or the overrides make the
             initial population exceed ``population_size``.
         """
+        self._upsert_compartment_fractions(fractions, validate_total=True)
+
+    def _upsert_compartment_fractions(
+        self, fractions: Mapping[str, float], *, validate_total: bool
+    ) -> None:
+        """
+        Write overrides, optionally skipping the over-allocation guard.
+
+        Calibration write-back persists scored engine states that may be
+        non-conserving (the Rust ``set_initial_condition`` has no total check),
+        so it calls this with ``validate_total=False``. The fraction range is
+        always enforced.
+        """
         for compartment, value in fractions.items():
             if not 0.0 <= value <= 1.0:
                 raise ValueError(
@@ -414,7 +464,8 @@ class InitialConditions(BaseModel):
             for override in self.compartment_fractions
         }
         candidate.update(fractions)
-        self._validate_compartment_fraction_total(candidate)
+        if validate_total:
+            self._validate_compartment_fraction_total(candidate)
 
         for compartment, value in fractions.items():
             for existing in self.compartment_fractions:
@@ -474,6 +525,17 @@ class InitialConditions(BaseModel):
         """
         Update bin fractions by bin ID.
 
+        The candidate fractions are validated before any bin is mutated, so a
+        rejected call leaves the initial conditions unchanged. The conservation
+        rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied:
+        a complete specification must sum to 1.0 and a partial one must not
+        exceed it, while uncalibrated (``None``) bins reserve the remainder.
+
+        Calibration write-back never reaches this method with a non-conserving
+        update: a bin value that would break the declared mapping is diverted
+        to per-compartment overrides by
+        :meth:`~commol.context.model.Model._route_calibration_values`.
+
         Parameters
         ----------
         fractions : Mapping[str, float | None]
@@ -483,17 +545,23 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a bin ID is not found in the initial conditions.
+            If a bin ID is not found in the initial conditions, or the
+            resulting fractions violate the conservation rule.
         """
+        known = {bf.bin for bf in self.bin_fractions}
+        unknown = sorted(set(fractions) - known)
+        if unknown:
+            raise ValueError(
+                f"Bin(s) {unknown} not found in initial conditions. "
+                f"Available bins: {[bf.bin for bf in self.bin_fractions]}"
+            )
+
+        candidate = {bf.bin: bf.fraction for bf in self.bin_fractions}
+        candidate.update(fractions)
+        self._validate_bin_fraction_total(candidate, complete=set(fractions) >= known)
+
         for bin_id, fraction in fractions.items():
-            found = False
             for bf in self.bin_fractions:
                 if bf.bin == bin_id:
                     bf.fraction = fraction
-                    found = True
                     break
-            if not found:
-                raise ValueError(
-                    f"Bin '{bin_id}' not found in initial conditions. "
-                    f"Available bins: {[bf.bin for bf in self.bin_fractions]}"
-                )

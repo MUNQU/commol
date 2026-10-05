@@ -49,9 +49,17 @@ class StratificationFractionsProtocol(Protocol):
     fractions: list[StratificationFractionProtocol]
 
 class InitialConditionsProtocol(Protocol):
+    def __init__(
+        self,
+        population_size: int,
+        bin_fractions: list[tuple[str, float | None]],
+        stratification_fractions: dict[str, dict[str, float]] | None = None,
+        compartment_fractions: list[tuple[str, float]] | None = None,
+    ) -> None: ...
     population_size: int
-    bin_fraction: dict[str, float]
-    stratification_fractions: list[StratificationFractionsProtocol]
+    bin_fractions: list[tuple[str, float | None]]
+    stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
+    compartment_fractions: list[tuple[str, float]]
 
 class PopulationProtocol(Protocol):
     bins: list[BinProtocol]

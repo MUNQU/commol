@@ -140,6 +140,42 @@ builder.set_initial_conditions(
 | `C_g1`      | 10000 × 0.0 × 0.6 | 0             |
 | `C_g2`      | 10000 × 0.0 × 0.4 | 0             |
 
+#### Per-compartment overrides
+
+When the uniform expansion cannot express the starting state — for example a
+pathway that only exists in one stratum — pass `compartment_fractions`. Each
+entry names an expanded compartment and gives its fraction of the **total**
+population, applied after the expansion:
+
+```python
+builder.set_initial_conditions(
+    population_size=10000,
+    bin_fractions=[
+        {"bin": "S", "fraction": 0.9},
+        {"bin": "IH", "fraction": 0.1},
+    ],
+    stratification_fractions=[
+        {
+            "stratification": "age",
+            "fractions": [
+                {"category": "y60", "fraction": 0.5},
+                {"category": "oe60", "fraction": 0.5},
+            ],
+        }
+    ],
+    compartment_fractions=[{"compartment": "IH_y60", "fraction": 0.0}],
+)
+```
+
+An override wins over the uniform expansion for the named compartment; every
+other compartment keeps its expanded fraction. The names are validated against
+the model's expansion, must be unique, must lie in `0.0..=1.0`, and must not
+push the initial population past `population_size`.
+
+On a built model the same overrides can be changed with
+`model.update_compartment_fractions({"IH_y60": 0.05})`, which upserts each
+name.
+
 #### Updating fractions after building
 
 Both kinds of fraction can be changed on a built model:

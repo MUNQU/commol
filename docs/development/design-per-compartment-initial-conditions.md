@@ -118,16 +118,61 @@ state.
 
 ### Interaction rules
 
+Engine parity is the primary invariant (ESC-2):
+
 - Initial-condition calibration values are replayed in problem parameter
-  order over a working population that starts from the declared expansion plus
-  the definition overrides. A bin-level value scales its covered compartments
-  by weights taken from that starting population; a stratification-category
-  value splits each complementary pair by the live total of the pair.
+  order over a single working population that starts from the declared
+  expansion plus the definition overrides. A bin-level value scales its
+  covered compartments by weights taken from that starting population; a
+  stratification-category value snapshots each complementary pair's total once
+  per parameter and then splits it, exactly as `calibration_problem.rs` reads
+  the population once before iterating its pairs. The pairs are applied in the
+  engine's order (sorted by compartment index), so overlapping pairs from a
+  category shared by two stratifications match the engine replay.
+- The write-back is a pure function of the current definition and the problem
+  values, and equals the engine's sequential replay exactly, including
+  pre-existing overrides on covered compartments and multi-parameter
+  orderings. There is no declared-base working population: every parameter
+  replays from the live working population.
 - A bin or category value whose covered compartments intersect a definition
   override, or a compartment affected by an earlier value in the replay, is
-  persisted as per-compartment overrides holding the replayed values. Every
-  other value updates the bin or stratification fraction it declares. An exact
-  compartment value is always persisted as an override.
+  persisted as per-compartment overrides holding the replayed values. A bin
+  value whose update would make the complete declared bin-fraction mapping fail
+  its conservation rule (`_validate_bin_fraction_total`) is diverted the same
+  way, so the definition never stores a non-conserving bin fraction and the
+  replayed head counts are preserved as overrides. A stratification-category
+  value whose name is declared by two stratifications is always diverted,
+  because no single stratification fraction can express the cross-stratification
+  split. Every other value updates the bin or stratification fraction it
+  declares. An exact compartment value is always persisted as an override.
+- Idempotence is conditional. Bin and unique-category replays are idempotent
+  because setting a category value preserves its pair total (`0.4 + 0.6 = 1`).
+  A category declared by more than one stratification is intentionally NOT
+  idempotent on re-apply: the second apply re-scores from the reloaded,
+  already-diverted population, exactly like a fresh engine problem built on
+  that state. Diversion still leaves the aggregate bin or stratification
+  fraction unchanged — the overrides cover every affected compartment — and the
+  report sums the effective override head counts for the aggregate row instead
+  of echoing the stale definition.
+
+Non-conserving states and guard placement (ESC-1):
+
+- The model definition may represent any state the engine can hold. Total
+  guards live only on the authoring paths — `ModelBuilder` construction and the
+  public `update_*` methods, including `update_compartment_fractions` and
+  `update_bin_fractions`. Deserialization (`model_validate_json`,
+  `Model.from_json`) accepts non-conserving per-compartment overrides, so a
+  reload of the scored state reproduces the engine head counts. The declared
+  bin fractions keep their existing sum-to-1 construction rule.
+- Calibration write-back never bypasses the bin-fraction conservation guard:
+  a bin value whose update would break the declared mapping is diverted to
+  per-compartment overrides, so the write-back reaches the public
+  `update_bin_fractions` (through `Model.update_initial_conditions`) with only
+  conserving candidates. Per-compartment overrides still use the internal
+  upsert that skips only the total check
+  (`_upsert_compartment_fractions(validate_total=False)`), because the engine
+  may hold a non-conserving compartment state (`set_initial_condition` has no
+  total check); range, uniqueness, and unknown-name validation still apply.
 
 ## Tests
 
