@@ -13,7 +13,8 @@ Branch: `feature/per-compartment-initial-conditions`
 - [x] T6. Rust engine: apply overrides in `initialize_population` + tests (`crates/commol-difference/src/builder.rs`)
 - [x] T7. Model write-back: `update_compartment_fractions` + routing in `apply_calibration_parameters` (`py-commol/commol/context/model.py`)
 - [x] T8. Integration tests: `IH_y60 = 0` end-to-end + calibration round-trip
-- [ ] T9. Full test suites pass (Python pytest + cargo test); changelog entry
+- [x] T9. Full test suites pass (Python pytest + cargo test); changelog entry
+  (commit: 086e716 fix: harden per-compartment IC validation and replay calibration write-back)
 
 ## Evidence
 
@@ -84,3 +85,8 @@ Branch: `feature/per-compartment-initial-conditions`
 - Engine replay check (throwaway script): for aggregate/category orderings over an overridden and
   a plain model, the reloaded engine population equals the population produced by applying the
   same values through `engine.set_initial_condition` in order (9/9 orderings match).
+- T9 closed: full verification re-run on the uncommitted tree by the verify agent before commit
+  086e716: `uv run pytest tests -x -q` -> 532 passed; `cargo test -p commol-difference -p
+  commol-core` -> 90 + 21 + 1 passed; `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `uv run ruff format --check .`, `uv run ruff check .`, `uv run ty check commol` all
+  clean; `mkdocs.yaml` parses.
