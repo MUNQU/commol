@@ -22,6 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive development workflow documentation
 - Contributing guidelines and release process documentation
 
+### Fixed
+
+- An initial-condition override that names an unknown compartment now raises a
+  `ValueError` from the Python construction and update paths and a
+  `RuntimeError` from the `DifferenceEquations` engine constructor. The
+  `update_compartment_fractions` checks validate the post-upsert compartment
+  total before storing, so a rejected call leaves the model unchanged.
+- Calibration write-back replays aggregate and stratification-category values
+  in problem parameter order over the live population, so a reload reproduces
+  scores that combine bin, category, and per-compartment overrides.
+
 ## [0.0.1] - 2025
 
 ### Added

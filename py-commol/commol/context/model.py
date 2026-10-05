@@ -12,7 +12,11 @@ from commol.context.calibration import (
     CalibrationResult,
     calibrated_values,
 )
-from commol.context.compartments import generate_compartment_names
+from commol.context.compartments import (
+    expand_over_stratifications,
+    generate_compartment_names,
+    uniform_compartment_fractions,
+)
 from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
 from commol.context.parameter import Parameter
@@ -245,9 +249,63 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If a value lies outside ``[0.0, 1.0]``.
+            If a name is not an expanded compartment of the model, a value lies
+            outside ``[0.0, 1.0]``, or the resulting overrides make the initial
+            population exceed ``population_size``.
         """
+        available = set(
+            generate_compartment_names(
+                self.population.bins, self.population.stratifications
+            )
+        )
+        unknown = sorted(set(fractions) - available)
+        if unknown:
+            raise ValueError(
+                f"Unknown compartment(s) in initial conditions: {unknown}. "
+                f"Available compartments: {sorted(available)}"
+            )
+        self._validate_compartment_fraction_total(fractions)
         self.population.initial_conditions.update_compartment_fractions(fractions)
+
+    def _validate_compartment_fraction_total(
+        self, new_fractions: Mapping[str, float]
+    ) -> None:
+        """
+        Reject an upsert whose post-upsert compartment total exceeds the population.
+
+        Every expanded compartment contributes its override fraction, or the
+        expansion fraction it keeps when it carries no override. The check runs
+        on the candidate overrides, so a rejected upsert leaves the model
+        unchanged.
+
+        Parameters
+        ----------
+        new_fractions : Mapping[str, float]
+            Compartment overrides to validate against the current ones.
+
+        Raises
+        ------
+        ValueError
+            If the candidate overrides make the initial population exceed
+            ``population_size``.
+        """
+        expanded = [name for name, _ in self._expanded_compartments()]
+        expanded_set = set(expanded)
+        base = self._base_compartment_fractions()
+        candidate = {
+            override.compartment: override.fraction
+            for override in self.population.initial_conditions.compartment_fractions
+        }
+        candidate.update(new_fractions)
+        total = sum(candidate.get(name, base.get(name, 0.0)) for name in expanded)
+        total += sum(
+            value for name, value in candidate.items() if name not in expanded_set
+        )
+        if total > 1.0 + 1e-6:
+            raise ValueError(
+                "Per-compartment overrides would make the initial population "
+                "exceed population_size."
+            )
 
     def apply_calibration_parameters(
         self,
@@ -309,6 +367,87 @@ class Model(BaseModel):
         if compartment_fractions:
             self.update_compartment_fractions(compartment_fractions)
 
+    def _base_compartment_fractions(self) -> dict[str, float]:
+        """Uniform expansion fractions of the declared bin and category values."""
+        initial = self.population.initial_conditions
+        return uniform_compartment_fractions(
+            self.population.bins,
+            self.population.stratifications,
+            {bf.bin: bf.fraction for bf in initial.bin_fractions},
+            (
+                (
+                    stratification.stratification,
+                    {
+                        fraction.category: fraction.fraction
+                        for fraction in stratification.fractions
+                    },
+                )
+                for stratification in initial.stratification_fractions
+            ),
+        )
+
+    def _initial_population_fractions(self) -> dict[str, float]:
+        """Expansion fractions with the current compartment overrides applied."""
+        fractions = self._base_compartment_fractions()
+        for override in self.population.initial_conditions.compartment_fractions:
+            fractions[override.compartment] = override.fraction
+        return fractions
+
+    def _expanded_compartments(self) -> list[tuple[str, dict[str, str]]]:
+        """Expanded compartment names with the categories applied to each."""
+        return expand_over_stratifications(
+            (bin_item.id for bin_item in self.population.bins),
+            self.population.stratifications,
+        )
+
+    def _covered_compartments(self, param_id: str) -> list[str]:
+        """Compartments whose initial condition the parameter id updates."""
+        prefix = f"{param_id}_"
+        return [
+            name
+            for name, _ in self._expanded_compartments()
+            if name == param_id or name.startswith(prefix)
+        ]
+
+    def _category_pairs(self, category: str) -> list[tuple[str, str]]:
+        """Pairs of compartments that differ only in one category token."""
+        expanded = self._expanded_compartments()
+        tokens_by_name = {name: name.split("_") for name, _ in expanded}
+        pairs: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for name, tokens in tokens_by_name.items():
+            for index, token in enumerate(tokens):
+                if index == 0 or token != category:
+                    continue
+                complements = [
+                    candidate
+                    for candidate, candidate_tokens in tokens_by_name.items()
+                    if len(candidate_tokens) == len(tokens)
+                    and candidate_tokens[index] != category
+                    and all(
+                        position == index or candidate_tokens[position] == other
+                        for position, other in enumerate(tokens)
+                    )
+                ]
+                if len(complements) != 1:
+                    continue
+                pair: tuple[str, str] = (name, complements[0])
+                if pair not in seen:
+                    seen.add(pair)
+                    pairs.append(pair)
+        return pairs
+
+    @staticmethod
+    def _aggregate_weights(
+        covered: list[str],
+        base_fractions: Mapping[str, float],
+    ) -> dict[str, float]:
+        """Share of a bin-level value each covered compartment receives."""
+        total = sum(base_fractions.get(name, 0.0) for name in covered)
+        if total > 0.0:
+            return {name: base_fractions.get(name, 0.0) / total for name in covered}
+        return dict.fromkeys(covered, 1.0 / len(covered))
+
     def _route_calibration_values(
         self,
         values: Mapping[str, float],
@@ -323,12 +462,26 @@ class Model(BaseModel):
         """
         Route calibrated values to the definition fields they update.
 
+        Initial-condition values are replayed in parameter order over a working
+        population that starts from the declared expansion plus the current
+        compartment overrides. A bin-level value scales its covered
+        compartments by weights taken from that starting population, and a
+        stratification-category value splits each complementary pair by the
+        live total of the pair.
+
+        A bin or category value whose covered compartments intersect an
+        existing override, or a compartment affected by an earlier value in
+        this replay, is persisted as per-compartment overrides holding the
+        replayed values. Every other value updates the bin or stratification
+        fraction it declares. An exact compartment value is always persisted as
+        an override.
+
         Parameters
         ----------
         values : Mapping[str, float]
             Calibrated value per parameter id.
         types : Mapping[str, str]
-            Declared ``parameter_type`` per parameter id.
+            Declared ``parameter_type`` per parameter id, in problem order.
         compartments : set[str]
             Expanded compartment names of the model.
 
@@ -346,38 +499,151 @@ class Model(BaseModel):
         """
         bin_ids = {bin_item.id for bin_item in self.population.bins}
         categories = self.population.initial_conditions.get_categories_with_fractions()
+        initial_conditions = self.population.initial_conditions
+        population_size = float(initial_conditions.population_size)
+        base_fractions = self._initial_population_fractions()
+        working = {
+            name: base_fractions.get(name, 0.0) * population_size
+            for name, _ in self._expanded_compartments()
+        }
+        affected: set[str] = {
+            fraction.compartment
+            for fraction in initial_conditions.compartment_fractions
+        }
+        diverted: set[str] = set()
 
         parameters: dict[str, float | None] = {}
         bin_fractions: dict[str, float | None] = {}
         stratification_fractions: dict[str, float] = {}
-        compartment_fractions: dict[str, float] = {}
 
-        for param_id, value in values.items():
-            parameter_type = types[param_id]
+        for param_id, parameter_type in types.items():
+            if param_id not in values:
+                continue
+            value = values[param_id]
             if parameter_type == CalibrationParameterType.PARAMETER:
                 parameters[param_id] = value
             elif parameter_type == CalibrationParameterType.SCALE:
                 continue
-            elif param_id in bin_ids:
-                bin_fractions[param_id] = value
-            elif param_id in categories:
-                stratification_fractions[param_id] = value
-            elif param_id in compartments:
-                compartment_fractions[param_id] = value
             else:
-                raise ValueError(
-                    f"Initial condition '{param_id}' is neither a bin, a "
-                    f"stratification category, nor an expanded compartment. "
-                    f"Available bins: {sorted(bin_ids)}. Available categories: "
-                    f"{sorted(categories)}. Available compartments: "
-                    f"{sorted(compartments)}"
+                route = self._replay_initial_condition(
+                    param_id,
+                    value,
+                    bin_ids,
+                    categories,
+                    compartments,
+                    base_fractions,
+                    working,
+                    affected,
+                    diverted,
+                    population_size,
                 )
+                if route is not None:
+                    field, key = route
+                    if field == "bin":
+                        bin_fractions[key] = value
+                    else:
+                        stratification_fractions[key] = value
+
+        compartment_fractions = {
+            name: working[name] / population_size for name in diverted
+        }
 
         return (
             parameters,
             bin_fractions,
             stratification_fractions,
             compartment_fractions,
+        )
+
+    def _replay_initial_condition(
+        self,
+        param_id: str,
+        value: float,
+        bin_ids: set[str],
+        categories: set[str],
+        compartments: set[str],
+        base_fractions: Mapping[str, float],
+        working: dict[str, float],
+        affected: set[str],
+        diverted: set[str],
+        population_size: float,
+    ) -> tuple[str, str] | None:
+        """
+        Apply one initial-condition value to the working population.
+
+        Parameters
+        ----------
+        param_id : str
+            Id of the calibrated initial condition.
+        value : float
+            Calibrated fraction.
+        bin_ids : set[str]
+            Bin ids of the model.
+        categories : set[str]
+            Category names that declare an initial fraction.
+        compartments : set[str]
+            Expanded compartment names of the model.
+        base_fractions : Mapping[str, float]
+            Starting population fractions, before any value in this replay.
+        working : dict[str, float]
+            Working head counts, updated in place.
+        affected : set[str]
+            Compartments that carry an existing override or were covered by an
+            earlier value in this replay.
+        diverted : set[str]
+            Compartments persisted as overrides in this replay.
+        population_size : float
+            Total population the fractions are taken of.
+
+        Returns
+        -------
+        tuple[str, str] | None
+            Definition field to update and its key, or None when the value is
+            persisted as compartment overrides.
+
+        Raises
+        ------
+        ValueError
+            If the id is neither a bin, a stratification category, nor an
+            expanded compartment of the model.
+        """
+        if param_id in bin_ids:
+            covered = self._covered_compartments(param_id)
+            weights = self._aggregate_weights(covered, base_fractions)
+            for name, weight in weights.items():
+                working[name] = value * weight * population_size
+            route: tuple[str, str] | None = None
+            if set(covered) & affected:
+                diverted.update(covered)
+            else:
+                route = ("bin", param_id)
+            affected.update(covered)
+            return route
+        if param_id in categories:
+            pairs = self._category_pairs(param_id)
+            covered = {name for pair in pairs for name in pair}
+            for category_name, complement_name in pairs:
+                pair_total = working[category_name] + working[complement_name]
+                working[category_name] = value * pair_total
+                working[complement_name] = (1.0 - value) * pair_total
+            route = None
+            if covered & affected:
+                diverted.update(covered)
+            else:
+                route = ("stratification", param_id)
+            affected.update(covered)
+            return route
+        if param_id in compartments:
+            working[param_id] = value * population_size
+            diverted.add(param_id)
+            affected.add(param_id)
+            return None
+        raise ValueError(
+            f"Initial condition '{param_id}' is neither a bin, a "
+            f"stratification category, nor an expanded compartment. "
+            f"Available bins: {sorted(bin_ids)}. Available categories: "
+            f"{sorted(categories)}. Available compartments: "
+            f"{sorted(compartments)}"
         )
 
     @model_validator(mode="after")
@@ -480,6 +746,11 @@ class Model(BaseModel):
         See
         :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
 
+        A per-compartment override is folded in only when the category chain
+        selects exactly one overridden compartment. When it selects several
+        compartments, the uniform expansion is reported and per-compartment
+        overrides are excluded.
+
         Parameters
         ----------
         categories : Iterable[str], optional
@@ -496,7 +767,23 @@ class Model(BaseModel):
         ValueError
             If a category is not found.
         """
-        return self.population.initial_conditions.subgroup_population(categories)
+        selected = tuple(categories)
+        population = self.population.initial_conditions.subgroup_population(selected)
+        overrides = {
+            fraction.compartment: fraction.fraction
+            for fraction in self.population.initial_conditions.compartment_fractions
+        }
+        if not overrides:
+            return population
+        matched = [
+            name
+            for name, applied in self._expanded_compartments()
+            if all(category in applied.values() for category in selected)
+        ]
+        if len(matched) == 1 and matched[0] in overrides:
+            population_size = float(self.population.initial_conditions.population_size)
+            return overrides[matched[0]] * population_size
+        return population
 
     def get_outputs_by_source(self) -> dict[str, list[str]]:
         """

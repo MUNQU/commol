@@ -118,12 +118,16 @@ state.
 
 ### Interaction rules
 
-- Exact-compartment calibrated parameter on the same compartment as a
-  definition override: calibration wins at runtime; write-back upserts the
-  stored value.
-- Aggregate-bin calibrated parameter over a bin containing overridden
-  compartments: coherent by construction, because `aggregate` weights derive
-  from the base engine population, which already includes overrides.
+- Initial-condition calibration values are replayed in problem parameter
+  order over a working population that starts from the declared expansion plus
+  the definition overrides. A bin-level value scales its covered compartments
+  by weights taken from that starting population; a stratification-category
+  value splits each complementary pair by the live total of the pair.
+- A bin or category value whose covered compartments intersect a definition
+  override, or a compartment affected by an earlier value in the replay, is
+  persisted as per-compartment overrides holding the replayed values. Every
+  other value updates the bin or stratification fraction it declares. An exact
+  compartment value is always persisted as an override.
 
 ## Tests
 

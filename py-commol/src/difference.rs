@@ -20,11 +20,16 @@ impl PyDifferenceEquations {
     ///
     /// Returns:
     ///     A new DifferenceEquations instance
+    ///
+    /// Raises:
+    ///     RuntimeError: If an initial-condition override names a compartment
+    ///         that is not part of the model expansion
     #[new]
-    fn new(model: &PyModel) -> Self {
-        Self {
-            inner: commol_difference::DifferenceEquations::from_model(&model.inner),
-        }
+    fn new(model: &PyModel) -> PyResult<Self> {
+        Ok(Self {
+            inner: commol_difference::DifferenceEquations::try_from_model(&model.inner)
+                .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?,
+        })
     }
 
     /// Run the simulation for a given number of steps

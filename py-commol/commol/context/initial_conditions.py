@@ -383,7 +383,11 @@ class InitialConditions(BaseModel):
         Upsert per-compartment overrides by expanded compartment name.
 
         A compartment already present in ``compartment_fractions`` has its
-        fraction replaced; a new one is appended.
+        fraction replaced; a new one is appended. The candidate overrides are
+        validated before they are stored, so a rejected call leaves the
+        initial conditions unchanged. The check compares the overrides plus the
+        bin fractions they do not cover against the total population; it does
+        not expand compartments.
 
         Parameters
         ----------
@@ -395,7 +399,8 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a value lies outside ``[0.0, 1.0]``.
+            If a value lies outside ``[0.0, 1.0]``, or the overrides make the
+            initial population exceed ``population_size``.
         """
         for compartment, value in fractions.items():
             if not 0.0 <= value <= 1.0:
@@ -403,6 +408,15 @@ class InitialConditions(BaseModel):
                     f"Fraction for compartment '{compartment}' must be between "
                     f"0.0 and 1.0, got {value}."
                 )
+
+        candidate = {
+            override.compartment: override.fraction
+            for override in self.compartment_fractions
+        }
+        candidate.update(fractions)
+        self._validate_compartment_fraction_total(candidate)
+
+        for compartment, value in fractions.items():
             for existing in self.compartment_fractions:
                 if existing.compartment == compartment:
                     existing.fraction = value
@@ -411,6 +425,50 @@ class InitialConditions(BaseModel):
                 self.compartment_fractions.append(
                     CompartmentFraction(compartment=compartment, fraction=value)
                 )
+
+    def _validate_compartment_fraction_total(
+        self, overrides: Mapping[str, float]
+    ) -> None:
+        """
+        Enforce that overrides plus uncovered bin fractions stay within 1.0.
+
+        A bin counts as covered when an override names it or one of its
+        expanded compartments. Uncalibrated (``None``) bin fractions are
+        skipped: a violation that only appears once they receive their
+        calibrated fractions is not detected here.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, float]
+            Candidate override fractions keyed by compartment name.
+
+        Raises
+        ------
+        ValueError
+            If the overrides make the initial population exceed
+            ``population_size``.
+        """
+        covered_bins = {
+            bin_fraction.bin
+            for bin_fraction in self.bin_fractions
+            if any(
+                compartment == bin_fraction.bin
+                or compartment.startswith(f"{bin_fraction.bin}_")
+                for compartment in overrides
+            )
+        }
+        uncovered = sum(
+            bin_fraction.fraction
+            for bin_fraction in self.bin_fractions
+            if bin_fraction.fraction is not None
+            and bin_fraction.bin not in covered_bins
+        )
+        total = sum(overrides.values())
+        if total + uncovered > 1.0 + 1e-6:
+            raise ValueError(
+                "Per-compartment overrides would make the initial population "
+                "exceed population_size."
+            )
 
     def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         """

@@ -19,6 +19,51 @@ from commol.api.reporting import observed_report, simulation_report
 from commol.constants import ModelTypes
 
 
+def _override_report_model(fraction: float = 0.2) -> Model:
+    return (
+        ModelBuilder(name="OverrideReport", version="1.0")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="k", value=0.1)
+        .add_transition(id="flow", source=["A"], target=["B"], rate="k * A")
+        .add_stratification(id="group", categories=["group1", "group2"])
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 1.0},
+                {"bin": "B", "fraction": 0.0},
+            ],
+            stratification_fractions=[
+                {
+                    "stratification": "group",
+                    "fractions": [
+                        {"category": "group1", "fraction": 0.5},
+                        {"category": "group2", "fraction": 0.5},
+                    ],
+                }
+            ],
+            compartment_fractions=[{"compartment": "A_group1", "fraction": fraction}],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+def _initial_condition_problem(param_id: str) -> CalibrationProblem:
+    return CalibrationProblem(
+        observed_data=[ObservedDataPoint(step=1, compartment="A_group1", value=1.0)],
+        parameters=[
+            CalibrationParameter(
+                id=param_id,
+                parameter_type="initial_condition",
+                min_bound=0.0,
+                max_bound=1.0,
+            )
+        ],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1),
+    )
+
+
 def _model(*, conditional: bool = False, s_fraction: float | None = 0.9) -> Model:
     builder = (
         ModelBuilder(name="Report", version="1.0")
@@ -181,6 +226,65 @@ class TestInitialConditions:
 
         assert report["initial_conditions"]["A"]["fraction"] is None
         assert report["initial_conditions"]["A"]["value"] is None
+
+    def test_declared_compartment_overrides_are_reported(self) -> None:
+        model = _override_report_model(fraction=0.2)
+
+        report = applied_parameters_report(model, {})
+
+        assert report["initial_conditions"]["A_group1"] == {
+            "group": "population",
+            "fraction": 0.2,
+            "value": pytest.approx(200.0),
+            "calibrated": False,
+        }
+
+    def test_exact_compartment_row_reports_calibrated(self) -> None:
+        model = _override_report_model(fraction=0.2)
+        problem = _initial_condition_problem("A_group1")
+
+        model.apply_calibration_parameters({"A_group1": 0.3}, problem)
+        report = applied_parameters_report(model, {"A_group1": 0.3}, problem)
+
+        entry = report["initial_conditions"]["A_group1"]
+        assert entry["fraction"] == pytest.approx(0.3)
+        assert entry["calibrated"] is True
+
+    def test_aggregate_row_written_to_overrides_reports_calibrated(self) -> None:
+        model = _override_report_model(fraction=0.3)
+        problem = _initial_condition_problem("A")
+
+        model.apply_calibration_parameters({"A": 0.6}, problem)
+        report = applied_parameters_report(model, {"A": 0.6}, problem)
+
+        assert report["initial_conditions"]["A_group1"]["calibrated"] is True
+        assert report["initial_conditions"]["A_group2"]["calibrated"] is True
+
+    def test_single_overridden_compartment_sets_the_subgroup_population(self) -> None:
+        model = (
+            ModelBuilder(name="SingleOverride", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="flow", source=["A"], target=[], rate="k * A")
+            .add_stratification(id="group", categories=["group1", "group2"])
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[{"bin": "A", "fraction": 1.0}],
+                stratification_fractions=[
+                    {
+                        "stratification": "group",
+                        "fractions": [
+                            {"category": "group1", "fraction": 1.0},
+                            {"category": "group2", "fraction": 0.0},
+                        ],
+                    }
+                ],
+                compartment_fractions=[{"compartment": "A_group1", "fraction": 0.2}],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        assert model.subgroup_population(("group1",)) == pytest.approx(200.0)
 
 
 class TestIntervals:

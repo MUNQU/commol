@@ -20,7 +20,10 @@ from commol.context.dynamics import (
     StratifiedRate,
     Transition,
 )
-from commol.context.compartments import generate_compartment_names
+from commol.context.compartments import (
+    generate_compartment_names,
+    uniform_compartment_fractions,
+)
 from commol.context.initial_conditions import (
     BinFraction,
     CompartmentFraction,
@@ -842,13 +845,11 @@ class ModelBuilder:
                     f"1.0, got {value}."
                 )
 
-        # Conservation semantics: values are fractions of the total population,
-        # so the check compares normalized fractions against 1.0. Uncalibrated
-        # (``None``) bin fractions are treated as an unknown base of 0.0. This
-        # is sound (never rejects a configuration whose calibrated total stays
-        # within ``population_size``) but not complete: a violation that only
-        # appears once the uncalibrated bins receive their calibrated fractions
-        # cannot be detected here.
+        # Conservation semantics: overrides and bin fractions are both
+        # fractions of the total population, so the check compares normalized
+        # fractions against 1.0. An uncalibrated (``None``) bin fraction counts
+        # as zero: a violation that only appears after the uncalibrated bins
+        # receive their calibrated fractions is not detected here.
         base_total = sum(uniform.values())
         overridden_base = sum(uniform[o["compartment"]] for o in compartment_fractions)
         overridden_value = sum(o["fraction"] for o in compartment_fractions)
@@ -873,46 +874,24 @@ class ModelBuilder:
         """
         Compute the uniform expansion of bin fractions, before overrides.
 
-        Mirrors ``initialize_population`` in the Rust engine: bins are split by
-        each stratification that applies to them. Values are fractions of the
-        total population.
+        Bins are split by each stratification that applies to them, in
+        declaration order. Values are fractions of the total population.
         """
-        bin_fraction_map = {bf["bin"]: bf["fraction"] for bf in bin_fractions}
-        stratification_maps = {
-            sf["stratification"]: {
-                fraction["category"]: fraction["fraction"]
-                for fraction in sf["fractions"]
-            }
-            for sf in (stratification_fractions or [])
-        }
-
-        partials: list[tuple[str, dict[str, str], float]] = [
-            (bin_item.id, {}, bin_fraction_map.get(bin_item.id) or 0.0)
-            for bin_item in self._bins
-        ]
-
-        for stratification in self._stratifications:
-            fraction_map = stratification_maps.get(stratification.id, {})
-            new_partials: list[tuple[str, dict[str, str], float]] = []
-            for name, applied, value in partials:
-                conditions_met = stratification.conditions is None or all(
-                    applied.get(condition.stratification) == condition.category
-                    for condition in stratification.conditions
+        return uniform_compartment_fractions(
+            self._bins,
+            self._stratifications,
+            {bf["bin"]: bf["fraction"] for bf in bin_fractions},
+            (
+                (
+                    sf["stratification"],
+                    {
+                        fraction["category"]: fraction["fraction"]
+                        for fraction in sf["fractions"]
+                    },
                 )
-                if conditions_met:
-                    for category in stratification.categories:
-                        new_partials.append(
-                            (
-                                f"{name}_{category}",
-                                {**applied, stratification.id: category},
-                                value * fraction_map.get(category, 0.0),
-                            )
-                        )
-                else:
-                    new_partials.append((name, applied, value))
-            partials = new_partials
-
-        return {name: value for name, _, value in partials}
+                for sf in (stratification_fractions or [])
+            ),
+        )
 
     def set_initial_conditions(
         self,

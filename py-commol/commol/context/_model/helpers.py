@@ -3,6 +3,7 @@ import re
 import pint
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context.compartments import stratification_conditions_met
 from commol.context.dynamics import Transition
 from commol.utils.equations import (
     UnitConsistencyError,
@@ -39,11 +40,7 @@ class ModelCompartmentHelper:
         for strat in self._model.population.stratifications:
             new_partials: list[tuple[str, dict[str, str]]] = []
             for name, applied in partials:
-                conditions_met = strat.conditions is None or all(
-                    applied.get(c.stratification) == c.category
-                    for c in strat.conditions
-                )
-                if conditions_met:
+                if stratification_conditions_met(strat, applied):
                     for cat in strat.categories:
                         new_partials.append((name, {**applied, strat.id: cat}))
                 else:

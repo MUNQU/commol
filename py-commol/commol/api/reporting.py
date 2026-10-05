@@ -235,12 +235,42 @@ def _scale_ids(problem: CalibrationProblem | None) -> list[str]:
     ]
 
 
+def _override_is_calibrated(
+    model: Model,
+    compartment: str,
+    calibrated_ids: set[str],
+) -> bool:
+    """Whether a compartment override row was written back from calibration."""
+    if compartment in calibrated_ids:
+        return True
+    for bin_item in model.population.bins:
+        if bin_item.id in calibrated_ids and (
+            compartment == bin_item.id or compartment.startswith(f"{bin_item.id}_")
+        ):
+            return True
+    categories = model.population.initial_conditions.get_categories_with_fractions()
+    for category in categories:
+        if category not in calibrated_ids:
+            continue
+        pairs = model._category_pairs(category)
+        if any(compartment == name for pair in pairs for name in pair):
+            return True
+    return False
+
+
 def _initial_conditions_report(
     model: Model,
     calibrated_ids: set[str],
     parameter_statistics: Mapping[str, ParameterSetStatistics] | None,
 ) -> dict[str, InitialConditionEntry]:
-    """Every bin fraction and stratification category, with its head count."""
+    """
+    Every bin fraction, stratification category and compartment override.
+
+    An override row is reported ``calibrated`` when its compartment carries a
+    calibrated parameter id, or when a calibrated bin or category parameter id
+    covers it. A declared override that no calibrated id covers reports
+    ``calibrated`` false.
+    """
     initial_conditions_block = model.population.initial_conditions
     population_size = float(initial_conditions_block.population_size)
 
@@ -273,6 +303,18 @@ def _initial_conditions_report(
                 calibrated_ids,
                 parameter_statistics,
             )
+    for override in initial_conditions_block.compartment_fractions:
+        calibrated = _override_is_calibrated(
+            model, override.compartment, calibrated_ids
+        )
+        report[override.compartment] = _initial_condition_entry(
+            override.compartment,
+            WHOLE_POPULATION_GROUP,
+            override.fraction,
+            population_size,
+            {override.compartment} if calibrated else set(),
+            parameter_statistics,
+        )
     return report
 
 

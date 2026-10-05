@@ -5,6 +5,7 @@ from commol.context._model.helpers import (
     ModelCompartmentHelper,
     replace_bin_in_rate,
 )
+from commol.context.compartments import stratification_conditions_met
 from commol.context.dynamics import Transition
 from commol.utils.security import get_expression_variables
 
@@ -803,10 +804,7 @@ class EquationPrinter:
             else:
                 effective_cat = None
 
-            applies = strat.conditions is None or all(
-                target_applied.get(c.stratification) == c.category
-                for c in strat.conditions
-            )
+            applies = stratification_conditions_met(strat, target_applied)
 
             if applies and effective_cat is not None:
                 target_applied[strat.id] = effective_cat

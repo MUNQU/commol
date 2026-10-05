@@ -40,6 +40,20 @@ impl DifferenceEquations {
     ///
     /// A new `DifferenceEquations` instance ready for simulation.
     pub fn from_model(model: &Model) -> Self {
+        Self::try_from_model(model)
+            .unwrap_or_else(|error| panic!("Failed to build population: {error}"))
+    }
+
+    /// Fallible counterpart of [`Self::from_model`].
+    ///
+    /// Returns the population initialization error instead of panicking, so a
+    /// caller can surface it as its own error type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when an initial-condition override names a
+    /// compartment that is not part of the model expansion.
+    pub fn try_from_model(model: &Model) -> Result<Self, String> {
         // Generate all compartment and accumulator output combinations
         let (compartments, compartment_map) = generate_compartments(model);
         let accumulator_outputs = generate_accumulators(model);
@@ -59,8 +73,7 @@ impl DifferenceEquations {
             .collect();
 
         // Initialize population distribution
-        let population = initialize_population(model, &compartments)
-            .unwrap_or_else(|error| panic!("Failed to build population: {error}"));
+        let population = initialize_population(model, &compartments)?;
 
         // Store constant parameters for quick lookup
         // Formula parameters will be evaluated on each step
@@ -194,7 +207,7 @@ impl DifferenceEquations {
         let num_compartments = compartments.len();
         let compartment_flows = vec![0.0; num_compartments];
 
-        Self {
+        Ok(Self {
             compartments,
             output_names,
             population,
@@ -211,7 +224,7 @@ impl DifferenceEquations {
             n_parameter_index,
             t_parameter_index,
             requires_compartment_context,
-        }
+        })
     }
 }
 

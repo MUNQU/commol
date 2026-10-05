@@ -43,3 +43,44 @@ Branch: `feature/per-compartment-initial-conditions`
   0.0; the check is sound (never rejects a configuration whose calibrated total stays within
   `population_size`) but not complete for the unknown remainder. Documented in
   `model_builder.py` and covered by two tests.
+
+## Judgment Day round 1 fixes
+
+- `JD-A-001`: quoted the mkdocs nav title containing a colon-space; `yaml.safe_load` parses
+  `mkdocs.yaml`.
+- `JD-B-001`: `apply_calibration_parameters` now writes per-compartment overrides when an
+  aggregate bin or stratification-category value intersects an existing override. The shared
+  `context/compartments.py::uniform_compartment_fractions` computes the base expansion and
+  weights, keeping the first entry per stratification id like the engine.
+- WARNINGs: unknown compartments reach Python as `RuntimeError` from the PyO3 boundary; the
+  Python generator treats a category-less condition as satisfied; `update_compartment_fractions`
+  validates names and post-upsert totals; the initial-conditions report lists declared
+  compartment overrides.
+- Evidence: `uv run pytest tests -x -q` -> 524 passed; `cargo test -p commol-difference -p
+  commol-core` -> 90 + 21 passed; `cargo fmt --check` and `cargo clippy --all-targets -- -D
+  warnings` clean; `uv run ruff format --check . && uv run ruff check .` clean.
+
+## Judgment Day round 2 fixes
+
+- `JD-B-001`: `Model.apply_calibration_parameters` replays initial-condition values in problem
+  parameter order over a working population that starts from the declared expansion plus the
+  existing overrides. Bin values scale their covered compartments by weights taken from that
+  starting population; category values split each complementary pair by the live pair total.
+  A bin or category value whose covered compartments intersect an existing override or a
+  compartment affected by an earlier value is persisted as per-compartment overrides holding the
+  replayed values.
+- W3-residual: `Model.update_compartment_fractions` validates the true post-upsert compartment
+  total before storing, so a rejected call leaves the model unchanged; the coarse check in
+  `InitialConditions.update_compartment_fractions` stays as an atomic fallback.
+- A#5: override rows in `_initial_conditions_report` report `calibrated` when the compartment
+  id is calibrated or a calibrated bin/category id covers the compartment.
+- A#6: the duplicated condition predicates in `context/_model/helpers.py` and
+  `context/_model/equations.py` now use `stratification_conditions_met`.
+- A#7: removed the unreachable category branch in `_covered_compartments`; reworded the
+  `uniform_compartment_fractions` docstring; updated the design doc interaction rules; added the
+  `RuntimeError`/`ValueError` changelog notes.
+- Evidence: `uv run pytest tests -x -q` -> 532 passed; `uv run ruff format --check . && uv run
+  ruff check .` and `uv run ty check commol` clean; `mkdocs.yaml` parses unchanged.
+- Engine replay check (throwaway script): for aggregate/category orderings over an overridden and
+  a plain model, the reloaded engine population equals the population produced by applying the
+  same values through `engine.set_initial_condition` in order (9/9 orderings match).
