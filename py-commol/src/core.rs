@@ -82,7 +82,7 @@ impl PyModel {
 }
 
 /// Wrapper for commol_core::Population
-#[pyclass(name = "Population")]
+#[pyclass(name = "Population", from_py_object)]
 #[derive(Clone)]
 pub struct PyPopulation {
     pub inner: commol_core::Population,
@@ -120,7 +120,7 @@ impl PyPopulation {
 }
 
 /// Wrapper for commol_core::Accumulator
-#[pyclass(name = "Accumulator")]
+#[pyclass(name = "Accumulator", from_py_object)]
 #[derive(Clone)]
 pub struct PyAccumulator {
     pub inner: commol_core::types::Accumulator,
@@ -141,7 +141,7 @@ impl PyAccumulator {
 }
 
 /// Wrapper for commol_core::Bin
-#[pyclass(name = "Bin")]
+#[pyclass(name = "Bin", from_py_object)]
 #[derive(Clone)]
 pub struct PyBin {
     pub inner: commol_core::Bin,
@@ -162,7 +162,7 @@ impl PyBin {
 }
 
 /// Wrapper for commol_core::Stratification
-#[pyclass(name = "Stratification")]
+#[pyclass(name = "Stratification", from_py_object)]
 #[derive(Clone)]
 pub struct PyStratification {
     pub inner: commol_core::Stratification,
@@ -183,7 +183,7 @@ impl PyStratification {
 }
 
 /// Wrapper for commol_core::InitialConditions
-#[pyclass(name = "InitialConditions")]
+#[pyclass(name = "InitialConditions", from_py_object)]
 #[derive(Clone)]
 pub struct PyInitialConditions {
     pub inner: commol_core::InitialConditions,
@@ -292,7 +292,7 @@ impl PyInitialConditions {
 }
 
 /// Wrapper for commol_core::Dynamics
-#[pyclass(name = "Dynamics")]
+#[pyclass(name = "Dynamics", from_py_object)]
 #[derive(Clone)]
 pub struct PyDynamics {
     pub inner: commol_core::Dynamics,
@@ -328,7 +328,7 @@ impl PyDynamics {
 }
 
 /// Wrapper for commol_core::Transition
-#[pyclass(name = "Transition")]
+#[pyclass(name = "Transition", from_py_object)]
 #[derive(Clone)]
 pub struct PyTransition {
     pub inner: commol_core::Transition,
@@ -385,7 +385,7 @@ impl PyTransition {
 }
 
 /// Wrapper for commol_core::Parameter
-#[pyclass(name = "Parameter")]
+#[pyclass(name = "Parameter", from_py_object)]
 #[derive(Clone)]
 pub struct PyParameter {
     pub inner: commol_core::Parameter,
@@ -431,7 +431,7 @@ pub enum PyParameterValue {
 }
 
 /// Wrapper for commol_core::MathExpression
-#[pyclass(name = "MathExpression")]
+#[pyclass(name = "MathExpression", from_py_object)]
 #[derive(Clone)]
 pub struct PyMathExpression {
     expression: String,
