@@ -1,347 +1,275 @@
 # Running Simulations
 
-Once you've built a model, use the `Simulation` class to run it and analyze results.
+[Back to Home](../index.md)
 
-## Basic Simulation
+`Simulation` runs a built `Model` in the Rust engine and returns its outputs:
+one series per compartment and per accumulator. This page covers running a
+model, reading and aggregating its outputs, and plotting them.
 
-```python
-from commol import Simulation
-
-# Create simulation from model
-simulation = Simulation(model)
-
-# Run for 100 time steps
-results = simulation.run(num_steps=100)
-```
-
-## Output Formats
-
-Commol supports two output formats for simulation results.
-
-### Dictionary of Lists (Default)
-
-Each compartment maps to a list of values over time:
+## Quick path
 
 ```python
-results = simulation.run(num_steps=100, output_format="dict_of_lists")
+from commol import ModelBuilder, Simulation
 
-# Access results
-state_a = results["A"]  # [900, 880, 855, ...]
-state_b = results["B"]  # [100, 120, 145, ...]
-state_c = results["C"]  # [0, 0, 0, ...]
-
-# Get final values
-final_A = results["A"][-1]
-final_B = results["B"][-1]
-final_C = results["C"][-1]
-
-print(f"Final state: A={final_A:.0f}, B={final_B:.0f}, C={final_C:.0f}")
-```
-
-**Best for**: Plotting, time series analysis, accessing specific compartments
-
-### List of Lists
-
-Each time step is a list of all compartment values:
-
-```python
-results = simulation.run(num_steps=100, output_format="list_of_lists")
-
-# results[time][compartment_index]
-initial_state = results[0]     # [900, 100, 0]
-midpoint_state = results[50]   # [450, 300, 250]
-final_state = results[-1]      # [200, 100, 700]
-
-# Iterate over time steps
-for t, state in enumerate(results):
-    total = sum(state)
-    print(f"Step {t}: Total population = {total}")
-```
-
-**Best for**: Matrix operations, comparing states, exporting to CSV
-
-## Accumulator Outputs
-
-If the model defines [accumulators](core-concepts.md#accumulators), they appear as extra columns in the simulation output alongside compartments. Accumulator columns start at 0 and grow monotonically; they are never subtracted from.
-
-```python
 model = (
-    ModelBuilder("Model with accumulator")
-    .add_bin("A", "State A")
-    .add_bin("B", "State B")
-    .add_accumulator("cum_ab", "Cumulative A→B")
-    .add_parameter("k1", 0.1)
-    .add_transition("flow", ["A"], ["B"], rate="k1", accumulators=["cum_ab"])
-    .set_initial_conditions(1000, [{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}])
-    .build("DifferenceEquations")
-)
-
-sim = Simulation(model)
-results = sim.run(100)
-
-# Population outputs
-a_values = results["A"]     # decreasing
-b_values = results["B"]     # increasing
-
-# Accumulator — equals total flow into B since t=0
-cum = results["cum_ab"]
-```
-
-To enumerate all output names (compartments + accumulators), use `simulation.simulation_outputs`:
-
-```python
-print(simulation.simulation_outputs)
-# ['A', 'B', 'cum_ab']
-```
-
-## Working with Stratified Results
-
-When you use stratifications, your simulation results contain separate time series for each stratified compartment. Understanding how to navigate, access, and aggregate these results is essential for analysis.
-
-### Understanding the Naming Convention
-
-Commol creates stratified compartment names by joining the base compartment ID with category names using underscores. The categories appear in the **order stratifications were added** to the model.
-
-**Pattern**: `{base_compartment}_{category1}_{category2}_...`
-
-```python
-# Model definition
-.add_bin(id="A", name="State A")
-.add_bin(id="B", name="State B")
-.add_stratification(id="group", categories=["g1", "g2"])   # Added first
-.add_stratification(id="type", categories=["t1", "t2"])    # Added second
-
-# Resulting compartment names (8 total):
-# A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2
-# B_g1_t1, B_g1_t2, B_g2_t1, B_g2_t2
-```
-
-**Important**: The order is `{bin}_{group}_{type}` because group was added before type. If you reverse the order of `add_stratification` calls, names would be `{bin}_{type}_{group}`.
-
-### Accessing Stratified Results
-
-#### 1. List All Compartments
-
-```python
-results = simulation.run(num_steps=100)
-
-# See all compartment names
-print("All compartments:", list(results.keys()))
-# Output: ['A_g1', 'A_g2', 'B_g1', 'B_g2', 'C_g1', 'C_g2']
-
-# Count compartments
-print(f"Total compartments: {len(results)}")
-```
-
-#### 2. Access Specific Strata
-
-```python
-# Access specific categories
-g1_b = results["B_g1"]
-g2_b = results["B_g2"]
-
-# Access specific combinations (multiple stratifications)
-g1_t1_b = results["B_g1_t1"]
-g2_t2_b = results["B_g2_t2"]
-```
-
-#### 3. List the Outputs of a Bin or Accumulator
-
-`outputs_for` returns the outputs a bin or accumulator expands into:
-
-```python
-# Every output of bin B
-print(simulation.outputs_for("B"))
-# Output: ['B_g1', 'B_g2']
-
-# Several at once, keyed by the id they belong to
-grouped = simulation.group_outputs(["A", "B"])
-```
-
-!!! warning "Do not match output names by prefix"
-
-    `[k for k in results if k.startswith("B_")]` also matches any other output
-    whose name begins with `B_`, such as an accumulator declared as `B_events`.
-    It also breaks under conditional stratifications, where an output may carry
-    fewer category suffixes than its siblings. `outputs_for` resolves names from
-    the model structure, so neither case can go wrong.
-
-Filtering by *category* still requires matching names, since a category is not a
-declared output on its own:
-
-```python
-# Get all g1 outputs
-g1_keys = [key for key in results.keys() if "_g1" in key]
-```
-
-### Aggregating Stratified Results
-
-A common task is computing totals across one or more stratification dimensions.
-
-#### Sum Across One Stratification
-
-```python
-import numpy as np
-
-# Total B across all groups
-total_b = np.array(results["B_g1"]) + np.array(results["B_g2"])
-
-# Or using list comprehension (no NumPy required)
-total_b = [a + b for a, b in zip(results["B_g1"], results["B_g2"])]
-```
-
-#### Sum Across Multiple Stratifications
-
-```python
-# Model has group=[g1, g2] and type=[t1, t2]
-# Get total B (sum across all strata)
-total_B = (
-    np.array(results["B_g1_t1"]) +
-    np.array(results["B_g1_t2"]) +
-    np.array(results["B_g2_t1"]) +
-    np.array(results["B_g2_t2"])
-)
-
-# Or let the simulation resolve the outputs of B
-total_B = simulation.total_series(results, ["B"])
-```
-
-`total_series` accepts several ids and sums all of their outputs together, which
-is how you total a set of bins:
-
-```python
-# Combined population of A and B at each step
-total_ab = simulation.total_series(results, ["A", "B"])
-```
-
-#### Sum by Stratification Category
-
-```python
-# Total g1 population (across all states)
-g1_keys = [k for k in results.keys() if "_g1" in k]
-total_g1 = sum(np.array(results[k]) for k in g1_keys)
-
-# Total t2 population
-t2_keys = [k for k in results.keys() if "_t2" in k]
-total_t2 = sum(np.array(results[k]) for k in t2_keys)
-```
-
-#### Create Aggregated DataFrame
-
-```python
-import pandas as pd
-import numpy as np
-
-# Convert results to DataFrame
-df = pd.DataFrame(results)
-
-# Add aggregated columns
-df["B_total"] = df[[c for c in df.columns if c.startswith("B_")]].sum(axis=1)
-df["g1_total"] = df[[c for c in df.columns if "_g1" in c]].sum(axis=1)
-
-# Compute proportions
-df["B_proportion"] = df["B_total"] / df[[c for c in df.columns if not c.endswith("_total")]].sum(axis=1)
-```
-
-### Common Pitfalls
-
-#### 1. Case Sensitivity
-
-```python
-# Compartment names use exact category names as declared
-.add_stratification(id="group", categories=["G1", "G2"])  # Capital G
-# Access with: results["B_G1"], results["B_G2"]
-```
-
-#### 2. Order of Stratifications
-
-```python
-# Categories combine in the order stratifications are added
-.add_stratification(id="group", categories=["g1", "g2"])
-.add_stratification(id="type", categories=["t1", "t2"])
-
-# Creates: B_g1_t1, B_g1_t2, B_g2_t1, B_g2_t2
-# NOT: B_t1_g1, B_t2_g1, etc.
-```
-
-#### 3. Missing Compartments
-
-```python
-# Always check compartments exist before accessing
-key = "B_g1"
-if key in results:
-    data = results[key]
-else:
-    print(f"Compartment {key} not found. Available: {list(results.keys())}")
-```
-
-## Visualizing Results
-
-Commol provides the `SimulationPlotter` class for visualizing simulation results with automatic subplot organization and Seaborn styling.
-
-### Basic Plotting
-
-```python
-from commol import SimulationPlotter
-
-# After running simulation
-results = simulation.run(num_steps=100)
-
-# Create plotter
-plotter = SimulationPlotter(simulation, results)
-
-# Plot time series (one subplot per compartment)
-plotter.plot_series(output_file="results.png")
-
-# Plot cumulative results
-plotter.plot_cumulative(output_file="cumulative.png")
-```
-
-### Customizing Plots
-
-```python
-from commol import PlotConfig, SeabornStyleConfig
-
-# Custom configuration
-config = PlotConfig(
-    figsize=(16, 10),
-    dpi=150,
-    layout=(2, 2),  # 2x2 subplot grid
-    seaborn=SeabornStyleConfig(
-        style="darkgrid",      # darkgrid, whitegrid, dark, white, ticks
-        palette="Set2",        # Color palette
-        context="talk"         # paper, notebook, talk, poster
+    ModelBuilder(name="Basic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_bin(id="C", name="State C")
+    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k2", value=0.1)
+    .add_accumulator(id="cum_ab", name="Total moved from A to B")
+    .add_transition(
+        id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N", accumulators=["cum_ab"]
     )
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[
+            {"bin": "A", "fraction": 0.9},
+            {"bin": "B", "fraction": 0.1},
+            {"bin": "C", "fraction": 0.0},
+        ],
+    )
+    .build(typology="DifferenceEquations")
 )
+
+simulation = Simulation(model)
+results = simulation.run(num_steps=100)
+
+print(simulation.simulation_outputs)  # ['A', 'B', 'C', 'cum_ab']
+print(f"C at step 100: {results['C'][-1]:.0f}")
+```
+
+## `Simulation`
+
+| Member | Returns | What it does |
+|---|---|---|
+| `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
+| `run(num_steps, output_format="dict_of_lists")` | results | Runs `num_steps` steps from the engine's current state; see below. Raises `ValueError` if a parameter is still `None`. |
+| `simulation_outputs` | `list[str]` | The output names, in engine order: compartments first, then accumulators. |
+| `outputs_for(id)` | `list[str]` | The outputs of one bin or accumulator. |
+| `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
+| `total_series(results, ids)` | `list[float]` | The sum of all outputs of the given ids, at each step. |
+| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]` | What the given accumulators gained in each window. |
+| `engine` | engine | The underlying Rust engine. `engine.reset()` returns it to the initial state. |
+
+!!! warning "A second `run` continues the first one"
+    The engine keeps its state between calls: a second `run` starts where the
+    first one stopped, and its step 0 is the previous last step. To start
+    again from the initial state, call `simulation.engine.reset()` or create a
+    new `Simulation`.
+
+```python
+simulation.engine.reset()
+first = simulation.run(num_steps=10)
+continued = simulation.run(num_steps=10)
+print(continued["A"][0] == first["A"][-1])  # True: it continued
+
+simulation.engine.reset()
+again = simulation.run(num_steps=10)
+print(again["A"] == first["A"])  # True: it started again
+```
+
+## Output formats
+
+| `output_format` | Shape | Use for |
+|---|---|---|
+| `"dict_of_lists"` (default) | `{output name: [value at step 0, …, value at step n]}` | Reading one output, plotting |
+| `"list_of_lists"` | `[[every output at step 0], …, [every output at step n]]`, in `simulation_outputs` order | Matrix operations, export |
+
+Both contain `num_steps + 1` values per output: step 0 is the initial state.
+
+```python
+simulation.engine.reset()
+rows = simulation.run(num_steps=100, output_format="list_of_lists")
+
+print(len(rows))         # 101
+print(len(rows[0]))      # 4: A, B, C and cum_ab
+print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
+```
+
+## Accumulators
+
+An accumulator output starts at 0 and only grows: it is the total that its
+transitions have moved since step 0. Here `cum_ab` is everything that has moved
+from `A` to `B`, so `A` plus `cum_ab` stays at the initial `A`:
+
+```python
+print(round(results["A"][-1] + results["cum_ab"][-1]))  # 900
+```
+
+## Stratified outputs
+
+With stratifications, every bin and accumulator has one output per
+combination of categories, named `{id}_{category}_{category}…` in the order the
+stratifications were declared.
+
+```python
+stratified = (
+    ModelBuilder(name="Stratified")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_stratification(id="type", categories=["t1", "t2"])
+    .add_accumulator(id="cum_ab", name="Total moved from A to B")
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        stratification_fractions=[
+            {
+                "stratification": "group",
+                "fractions": [
+                    {"category": "g1", "fraction": 0.5},
+                    {"category": "g2", "fraction": 0.5},
+                ],
+            },
+            {
+                "stratification": "type",
+                "fractions": [
+                    {"category": "t1", "fraction": 0.5},
+                    {"category": "t2", "fraction": 0.5},
+                ],
+            },
+        ],
+    )
+    .build(typology="DifferenceEquations")
+)
+
+stratified_simulation = Simulation(stratified)
+stratified_results = stratified_simulation.run(num_steps=50)
+
+print(stratified_simulation.outputs_for("B"))
+# ['B_g1_t1', 'B_g1_t2', 'B_g2_t1', 'B_g2_t2']
+print(stratified_simulation.group_outputs(["A", "cum_ab"])["cum_ab"])
+# ['cum_ab_g1_t1', 'cum_ab_g1_t2', 'cum_ab_g2_t1', 'cum_ab_g2_t2']
+```
+
+### Totals by bin
+
+`total_series` sums every output of the ids you give, at each step:
+
+```python
+total_b = stratified_simulation.total_series(stratified_results, ["B"])
+total_ab = stratified_simulation.total_series(stratified_results, ["A", "B"])
+print(round(total_ab[-1]))  # 1000: A and B hold the whole population
+```
+
+!!! warning "Do not select outputs by name prefix"
+    `[k for k in results if k.startswith("B_")]` also matches an accumulator
+    named `B_events`, and, with conditional stratifications, outputs may have
+    fewer suffixes than their siblings. `outputs_for`, `group_outputs` and
+    `total_series` use the model structure, so neither case can go wrong.
+
+### Totals by category
+
+To select compartments by category, use their labels from
+`Model.initial_state()`: each entry has `name`, `bin` and `categories`.
+
+```python
+in_g1 = [
+    compartment.name
+    for compartment in stratified.initial_state()
+    if compartment.categories.get("group") == "g1"
+]
+print(in_g1)  # ['A_g1_t1', 'A_g1_t2', 'B_g1_t1', 'B_g1_t2']
+
+total_g1 = [
+    sum(stratified_results[name][step] for name in in_g1)
+    for step in range(len(stratified_results[in_g1[0]]))
+]
+print(round(total_g1[-1]))  # 500: g1 started with half of the population
+```
+
+## Windowed totals
+
+`windowed_totals` turns a cumulative output into the amount it gained in each
+window of `window_steps` steps. A window covers the steps `(end − window, end]`.
+
+```python
+per_week = stratified_simulation.windowed_totals(
+    stratified_results, ["cum_ab"], window_steps=7
+)
+print(len(per_week))  # 7: the complete windows of a 50-step run
+```
+
+| Argument | Meaning |
+|---|---|
+| `ids` | Accumulator ids; their outputs are summed first. |
+| `window_steps` | The window length, in steps. Must be positive. |
+| `at_steps` | The steps where windows close. By default, every complete window of the run. Pass observation steps to get the values a calibration compares against. |
+
+The same reduction works on any series with the module-level functions:
+
+```python
+from commol import window_end_steps, windowed_totals
+
+print(window_end_steps(window_steps=7, num_steps=30))        # [7, 14, 21, 28]
+print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], 3))       # [6, 15]
+```
+
+## Plotting
+
+`SimulationPlotter(simulation, results)` draws one subplot per output with
+seaborn, and returns the matplotlib `Figure`:
+
+```python
+from commol import PlotConfig, SimulationPlotter
+
+plotter = SimulationPlotter(simulation, results)  # the results of the first run
+plotter.plot_series(output_file="series.png")
+plotter.plot_cumulative(output_file="cumulative.png")
 
 plotter.plot_series(
     output_file="custom.png",
-    config=config,
-    bins=["B", "C"],  # Only plot specific compartments
+    config=PlotConfig(figsize=(16, 10), dpi=150, style="whitegrid", palette="Set2", context="talk"),
+    bins=["B", "C"],
+    x_label="Week",
+    tick_every=10,
+    step_to_label=lambda step: f"w{step // 7}",
     linewidth=2.5,
-    alpha=0.8
+    alpha=0.8,
 )
 ```
 
-### Overlaying Observed Data
+| Argument | Default | Meaning |
+|---|---|---|
+| `output_file` | `None` | Where to save the figure. `None` only returns it. |
+| `bins` | `None` (all) | The **output names** to plot. With stratifications, name the expanded outputs (`B_g1`), not the bin (`B`). |
+| `observed_data` | `None` | `ObservedDataPoint`s to draw on the matching subplots. |
+| `calibration_result` | `None` | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations. |
+| `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |
+| `show_legend` | `True` | `plot_series` only. |
+| `x_label`, `tick_every`, `step_to_label` | `"Step"`, every step, the step | `plot_series` only. Label the x axis, for example in weeks. |
+| other keyword arguments | — | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`. |
+
+| `PlotConfig` field | Default | Values |
+|---|---|---|
+| `figsize` | `(12, 8)` | Inches (width, height) |
+| `dpi` | `100` | Resolution |
+| `layout` | `None` (automatic) | `(rows, columns)` |
+| `style` | `None` | `"darkgrid"`, `"whitegrid"`, `"dark"`, `"white"`, `"ticks"` |
+| `palette` | `None` | A seaborn palette or matplotlib colormap, such as `"Set2"` |
+| `context` | `None` | `"paper"`, `"notebook"`, `"talk"`, `"poster"` |
+
+To compare with observations:
 
 ```python
 from commol import ObservedDataPoint
 
-observed_data = [
+observed = [
     ObservedDataPoint(step=10, compartment="B", value=45.2),
     ObservedDataPoint(step=20, compartment="B", value=78.5),
-    ObservedDataPoint(step=30, compartment="B", value=62.3),
 ]
-
-plotter.plot_series(
-    output_file="with_data.png",
-    observed_data=observed_data
-)
+plotter.plot_series(output_file="with_data.png", observed_data=observed)
 ```
 
-## Next Steps
+## Next steps
 
-- [Examples](examples.md) - Complete model examples with analysis
-- [API Reference](../api/simulation.md) - Detailed Simulation API
-- [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
+| To learn | Read |
+|---|---|
+| Fitting a model to data | [Model Calibration](calibration.md) |
+| Complete models | [Examples](examples.md) |
+| Signatures | [API reference: Simulation](../api/simulation.md) |

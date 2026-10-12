@@ -83,7 +83,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T2 | S3, S4 | Doc-example test harness and CI job; mark non-runnable fragments | direct | this commit (see Evidence) |
 | T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | this commit (see Evidence) |
 | T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | this commit (see Evidence) |
-| T5 | S3 | Fix examples: `simulations.md` | direct | pending |
+| T5 | S3 | Fix examples: `simulations.md` | direct | this commit (see Evidence) |
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | pending |
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
 | T8 | S2 | API reference pages for the 12 missing public names | direct | pending |
@@ -177,6 +177,24 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   (`N_t1_g1`) evaluates to 0 instead of failing; `<bin>_…` fails correctly.
   `%` passes the security check but makes the whole rate a parameter name
   (`MathExpression::from_string` does not list it as an operator).
+
+- T5: `simulations.md` rewritten: `Simulation` member table from
+  `inspect`, output formats, accumulators, stratified outputs through
+  `outputs_for` / `group_outputs` / `total_series`, category totals through
+  `Model.initial_state()` labels (no name matching), windowed totals, plotting
+  with the real `PlotConfig` fields. Every printed value checked by a run.
+  Wrong claims removed: `SeabornStyleConfig` (does not exist), a run that
+  restarts from the initial state, name-prefix filtering by category.
+- Finding F7 (code): `SimulationPlotter.plot_series(bins=...)` takes output
+  names; a bin id of a stratified model raises a confusing `KeyError` ("Missing
+  result series for aggregate components"). The `plot_series` docstring also
+  omits `step_to_label`, `tick_every` and `x_label` (fixed in T9).
+- Finding F8 (code, user-visible): `Simulation.run` continues from the engine's
+  current state; a second call does not start from the initial state
+  (`DifferenceEquations::run` never resets and `Simulation._run_raw` does not
+  call `reset`). Calibration is not affected: it resets before every
+  evaluation. Documented with `simulation.engine.reset()`; whether `run` should
+  reset is the user's call.
 
 ## Log
 
