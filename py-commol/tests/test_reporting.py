@@ -48,7 +48,7 @@ def _override_report_model(fraction: float = 0.2) -> Model:
     )
 
 
-def _initial_condition_problem(param_id: str) -> CalibrationProblem:
+def _initial_condition_problem(*param_ids: str) -> CalibrationProblem:
     return CalibrationProblem(
         observed_data=[ObservedDataPoint(step=1, compartment="A_group1", value=1.0)],
         parameters=[
@@ -58,6 +58,7 @@ def _initial_condition_problem(param_id: str) -> CalibrationProblem:
                 min_bound=0.0,
                 max_bound=1.0,
             )
+            for param_id in param_ids
         ],
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1),
@@ -298,10 +299,11 @@ class TestInitialConditions:
 
     def test_exact_compartment_row_reports_calibrated(self) -> None:
         model = _override_report_model(fraction=0.2)
-        problem = _initial_condition_problem("A_group1")
+        problem = _initial_condition_problem("A_group1", "A_group2")
+        values = {"A_group1": 0.3, "A_group2": 0.7}
 
-        model.apply_calibration_parameters({"A_group1": 0.3}, problem)
-        report = applied_parameters_report(model, {"A_group1": 0.3}, problem)
+        model.apply_calibration_parameters(values, problem)
+        report = applied_parameters_report(model, values, problem)
 
         entry = report["initial_conditions"]["A_group1"]
         assert entry["fraction"] == pytest.approx(0.3)
@@ -371,21 +373,62 @@ class TestInitialConditions:
         assert report["initial_conditions"]["group1"]["value"] == pytest.approx(300.0)
         assert report["initial_conditions"]["group2"]["value"] == pytest.approx(500.0)
 
-    def test_diverted_aggregate_row_does_not_show_the_stale_definition(
+    def test_aggregate_row_written_to_overrides_reports_the_engine_state(
         self,
     ) -> None:
         model = _override_report_model(fraction=0.3)
         problem = _initial_condition_problem("A")
 
+        # A = 0.6 over the override A_group1 = 0.3 and A_group2 = 0.5 is shared
+        # 0.375 / 0.625, so the engine scores 225 and 375.
         model.apply_calibration_parameters({"A": 0.6}, problem)
         report = applied_parameters_report(model, {"A": 0.6}, problem)
 
-        # The diverted write-back pins A_g1 = 0.225 and A_g2 = 0.375, so the
-        # aggregate row must report 0.6 of the population, not the stale 1.0.
         entry = report["initial_conditions"]["A"]
         assert entry["calibrated"] is True
         assert entry["fraction"] == pytest.approx(0.6)
         assert entry["value"] == pytest.approx(600.0)
+        assert report["initial_conditions"]["A_group1"]["value"] == pytest.approx(225.0)
+
+    def test_shared_category_rows_are_qualified(self) -> None:
+        model = (
+            ModelBuilder(name="SharedReport", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="flow", source=["A"], target=[], rate="k * A")
+            .add_stratification(id="age", categories=["y", "o"])
+            .add_stratification(id="sex", categories=["y", "o"])
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[{"bin": "A", "fraction": 1.0}],
+                stratification_fractions=[
+                    {
+                        "stratification": "age",
+                        "fractions": [
+                            {"category": "y", "fraction": 0.3},
+                            {"category": "o", "fraction": 0.7},
+                        ],
+                    },
+                    {
+                        "stratification": "sex",
+                        "fractions": [
+                            {"category": "y", "fraction": 0.6},
+                            {"category": "o", "fraction": 0.4},
+                        ],
+                    },
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        report = applied_parameters_report(model, {"sex:y": 0.6})
+        rows = report["initial_conditions"]
+
+        assert rows["age:y"]["fraction"] == pytest.approx(0.3)
+        assert rows["sex:y"]["fraction"] == pytest.approx(0.6)
+        assert rows["sex:y"]["calibrated"] is True
+        assert rows["age:y"]["calibrated"] is False
+        assert "y" not in rows
 
     def test_diverted_override_order_is_deterministic(self) -> None:
         model = _override_report_model(fraction=0.3)
@@ -698,7 +741,7 @@ class TestReportPerformance:
             ],
         ).build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
-        names = [name for name, _ in model._expanded_compartments()]
+        names = [compartment.name for compartment in model.initial_state()]
         assert len(names) == 256
         base = 1.0 / len(names)
         model.update_compartment_fractions({name: base for name in names[:128]})

@@ -1,4 +1,4 @@
-"""Per-compartment initial conditions: types, builder validation, integration."""
+"""Per-compartment initial conditions: types, validation, write-back."""
 
 import pytest
 from pydantic import ValidationError
@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
+    Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
@@ -13,6 +14,7 @@ from commol import (
 from commol.api.model_builder import ModelBuilder
 from commol.constants import ModelTypes
 from commol.context import CompartmentFraction
+from commol.context._model.engine_state import calibrated_initial_population
 from commol.context.initial_conditions import BinFraction, InitialConditions
 from commol.context.model import Model
 
@@ -95,11 +97,13 @@ class TestBuilderCompartmentFractions:
         overrides = model.population.initial_conditions.compartment_fractions
         assert [(cf.compartment, cf.fraction) for cf in overrides] == [("A_g2", 0.0)]
 
-    def test_unknown_compartment_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="not part of the model expansion"):
-            _set_initial_conditions(
-                _stratified_builder(), [{"compartment": "A_missing", "fraction": 0.0}]
-            )
+    def test_unknown_compartment_is_rejected_by_the_engine_at_build(self) -> None:
+        builder = _set_initial_conditions(
+            _stratified_builder(), [{"compartment": "A_missing", "fraction": 0.0}]
+        )
+
+        with pytest.raises(ValueError, match="Unknown compartment 'A_missing'"):
+            builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
     def test_duplicate_compartment_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="Duplicate compartment fraction"):
@@ -117,11 +121,13 @@ class TestBuilderCompartmentFractions:
                 _stratified_builder(), [{"compartment": "A_g2", "fraction": 1.5}]
             )
 
-    def test_conservation_is_enforced(self) -> None:
+    def test_over_allocation_is_rejected_by_the_engine_at_build(self) -> None:
+        builder = _set_initial_conditions(
+            _stratified_builder(), [{"compartment": "A_g2", "fraction": 0.5}]
+        )
+
         with pytest.raises(ValueError, match="exceed population_size"):
-            _set_initial_conditions(
-                _stratified_builder(), [{"compartment": "A_g2", "fraction": 0.5}]
-            )
+            builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
     def test_empty_compartment_fractions_use_uniform_expansion(self) -> None:
         model = _set_initial_conditions(_stratified_builder(), []).build(
@@ -139,11 +145,7 @@ class TestBuilderCompartmentFractions:
             .add_transition(id="flow", source=["A"], target=["B"], rate="k * A")
         )
 
-    def test_uncalibrated_bin_fractions_are_treated_as_unknown_base(self) -> None:
-        # A is uncalibrated (None) and B carries 0.5. The override on A keeps
-        # the known total at 0.9, within population_size. Treating the unknown
-        # base as 0.0 is sound: it never rejects a configuration whose
-        # calibrated total stays within population_size.
+    def test_uncalibrated_bin_fractions_count_as_zero(self) -> None:
         builder = self._uncalibrated_builder()
         builder.set_initial_conditions(
             population_size=1000,
@@ -159,16 +161,17 @@ class TestBuilderCompartmentFractions:
         assert [(cf.compartment, cf.fraction) for cf in overrides] == [("A", 0.4)]
 
     def test_uncalibrated_override_exceeding_population_is_rejected(self) -> None:
-        builder = self._uncalibrated_builder()
+        builder = self._uncalibrated_builder().set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": None},
+                {"bin": "B", "fraction": 0.5},
+            ],
+            compartment_fractions=[{"compartment": "A", "fraction": 1.0}],
+        )
+
         with pytest.raises(ValueError, match="exceed population_size"):
-            builder.set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": None},
-                    {"bin": "B", "fraction": 0.5},
-                ],
-                compartment_fractions=[{"compartment": "A", "fraction": 1.0}],
-            )
+            builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
 
 
 def _conditional_pathway_model() -> Model:
@@ -233,6 +236,19 @@ class TestEndToEndOverride:
         assert results["IH_oe60_hosp"][-1] > results["IH_oe60_hosp"][0]
         assert results["S_oe60_hosp"][-1] < results["S_oe60_hosp"][0]
 
+    def test_initial_state_matches_the_engine(self) -> None:
+        model = _conditional_pathway_model()
+        engine = Simulation(model).engine
+
+        state = model.initial_state()
+
+        assert [c.name for c in state] == engine.compartments
+        assert [c.population for c in state] == pytest.approx(engine.population)
+        ih_y60 = next(c for c in state if c.name == "IH_y60")
+        assert ih_y60.bin == "IH"
+        assert ih_y60.categories == {"age": "y60"}
+        assert ih_y60.population == 0.0
+
     def test_uniform_expansion_is_preserved_without_overrides(self) -> None:
         builder = (
             ModelBuilder(name="NoOverride", version="1.0")
@@ -263,71 +279,6 @@ class TestEndToEndOverride:
         initial = dict(zip(engine.compartments, engine.population))
 
         assert initial == {"A_g1": 250.0, "A_g2": 250.0, "B_g1": 250.0, "B_g2": 250.0}
-
-
-class TestCalibrationRoundTrip:
-    def _problem(self) -> CalibrationProblem:
-        return CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=1, compartment="A_g1", value=1.0)],
-            parameters=[
-                CalibrationParameter(
-                    id="A_g1",
-                    parameter_type="initial_condition",
-                    min_bound=0.0,
-                    max_bound=1.0,
-                )
-            ],
-            loss_function="sse",
-            optimization_config=NelderMeadConfig(max_iterations=1),
-        )
-
-    def test_exact_compartment_is_written_back_and_rebuilds_identically(self) -> None:
-        builder = (
-            ModelBuilder(name="CalibrationRoundTrip", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=["B"],
-                rate="k * A",
-                per_compartment=True,
-            )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
-            )
-        )
-        model = builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        problem = self._problem()
-
-        model.apply_calibration_parameters({"A_g1": 0.2}, problem)
-
-        overrides = {
-            fraction.compartment: fraction.fraction
-            for fraction in model.population.initial_conditions.compartment_fractions
-        }
-        assert overrides == {"A_g1": pytest.approx(0.2)}
-
-        simulation = Simulation(model)
-        initial = dict(
-            zip(simulation.engine.compartments, simulation.engine.population)
-        )
-        assert initial["A_g1"] == pytest.approx(200.0)
 
 
 def _aggregate_override_model() -> Model:
@@ -366,8 +317,11 @@ def _aggregate_override_model() -> Model:
     )
 
 
-def _initial_condition_problem(*ids: str) -> CalibrationProblem:
+def _initial_condition_problem(
+    *ids: str, remainder: str | None = None
+) -> CalibrationProblem:
     return CalibrationProblem(
+        initial_condition_remainder=remainder,
         observed_data=[ObservedDataPoint(step=1, compartment="A_g1", value=1.0)],
         parameters=[
             CalibrationParameter(
@@ -381,531 +335,6 @@ def _initial_condition_problem(*ids: str) -> CalibrationProblem:
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1),
     )
-
-
-class TestAggregateOverrideWriteBack:
-    def test_bin_parameter_with_override_reproduces_the_scored_state(self) -> None:
-        # Aggregate A = 0.6 over the base A_g1 = 0.3 and A_g2 = 0.5:
-        # weights 0.375 / 0.625 give 0.225 / 0.375 of the population.
-        model = _aggregate_override_model()
-
-        model.apply_calibration_parameters({"A": 0.6}, _initial_condition_problem("A"))
-
-        simulation = Simulation(model)
-        initial = dict(
-            zip(simulation.engine.compartments, simulation.engine.population)
-        )
-        assert initial["A_g1"] == pytest.approx(225.0)
-        assert initial["A_g2"] == pytest.approx(375.0)
-
-    def test_bin_parameter_without_override_still_updates_the_bin_fraction(
-        self,
-    ) -> None:
-        model = (
-            ModelBuilder(name="AggregatePlain", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=["B"],
-                rate="k * A",
-                per_compartment=True,
-            )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
-            )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        )
-
-        model.apply_calibration_parameters({"A": 0.6}, _initial_condition_problem("A"))
-
-        bin_fractions = {
-            fraction.bin: fraction.fraction
-            for fraction in model.population.initial_conditions.bin_fractions
-        }
-        assert bin_fractions["A"] == pytest.approx(0.6)
-        assert model.population.initial_conditions.compartment_fractions == []
-
-    def test_category_parameter_without_override_still_updates_the_category(
-        self,
-    ) -> None:
-        model = (
-            ModelBuilder(name="CategoryPlain", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=["B"],
-                rate="k * A",
-                per_compartment=True,
-            )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
-            )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        )
-
-        model.apply_calibration_parameters(
-            {"g1": 0.6}, _initial_condition_problem("g1")
-        )
-
-        initial_conditions = model.population.initial_conditions
-        categories = {
-            fraction.category: fraction.fraction
-            for stratification in initial_conditions.stratification_fractions
-            for fraction in stratification.fractions
-        }
-        assert categories["g1"] == pytest.approx(0.6)
-        assert model.population.initial_conditions.compartment_fractions == []
-
-    def test_category_parameter_with_override_reproduces_the_pair_split(self) -> None:
-        model = _aggregate_override_model()
-
-        model.apply_calibration_parameters(
-            {"g1": 0.6}, _initial_condition_problem("g1")
-        )
-
-        simulation = Simulation(model)
-        initial = dict(
-            zip(simulation.engine.compartments, simulation.engine.population)
-        )
-        # Pair total is the overridden A_g1 = 0.3 plus A_g2 = 0.5.
-        assert initial["A_g1"] == pytest.approx(0.6 * 0.8 * 1000)
-        assert initial["A_g2"] == pytest.approx(0.4 * 0.8 * 1000)
-
-    def test_aggregate_then_category_replays_the_engine_sequence(self) -> None:
-        # Base A_g1 = 0.3 and A_g2 = 0.5. Aggregate A = 0.9 splits them by
-        # 0.375 / 0.625, then category g1 = 0.4 splits the live pair
-        # A_g1 + A_g2, which holds 0.9 of the population.
-        model = _aggregate_override_model()
-
-        model.apply_calibration_parameters(
-            {"A": 0.9, "g1": 0.4}, _initial_condition_problem("A", "g1")
-        )
-
-        simulation = Simulation(model)
-        initial = dict(
-            zip(simulation.engine.compartments, simulation.engine.population)
-        )
-        assert initial["A_g1"] == pytest.approx(0.4 * 0.9 * 1000)
-        assert initial["A_g2"] == pytest.approx(0.6 * 0.9 * 1000)
-        assert initial["B_g1"] == pytest.approx(0.0)
-        assert initial["B_g2"] == pytest.approx(0.0)
-
-    def test_category_then_aggregate_without_override_replays_the_engine(
-        self,
-    ) -> None:
-        # With no override, category g1 = 0.4 splits the base pairs first, then
-        # aggregate A = 0.9 overwrites both A compartments.
-        model = (
-            ModelBuilder(name="CategoryThenAggregate", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=["B"],
-                rate="k * A",
-                per_compartment=True,
-            )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
-            )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        )
-
-        model.apply_calibration_parameters(
-            {"g1": 0.4, "A": 0.9}, _initial_condition_problem("g1", "A")
-        )
-
-        simulation = Simulation(model)
-        initial = dict(
-            zip(simulation.engine.compartments, simulation.engine.population)
-        )
-        assert initial["A_g1"] == pytest.approx(0.9 * 0.5 * 1000)
-        assert initial["A_g2"] == pytest.approx(0.9 * 0.5 * 1000)
-        assert initial["B_g1"] == pytest.approx(0.0)
-        assert initial["B_g2"] == pytest.approx(0.0)
-
-    def test_diverted_write_back_pins_the_scored_absolute_values(self) -> None:
-        model = _aggregate_override_model()
-
-        model.apply_calibration_parameters({"A": 0.6}, _initial_condition_problem("A"))
-
-        initial_conditions = model.population.initial_conditions
-        overrides = {
-            fraction.compartment: fraction.fraction
-            for fraction in initial_conditions.compartment_fractions
-        }
-        # The scored values are pinned as overrides; the bin fraction the
-        # aggregate did not update stays at 1.0.
-        assert overrides["A_g1"] == pytest.approx(0.225)
-        assert overrides["A_g2"] == pytest.approx(0.375)
-        bin_a = next(
-            fraction
-            for fraction in initial_conditions.bin_fractions
-            if fraction.bin == "A"
-        )
-        assert bin_a.fraction == pytest.approx(1.0)
-
-
-class TestUnknownCompartmentOverride:
-    def test_building_a_simulation_raises_a_catchable_error(self) -> None:
-        model = _aggregate_override_model()
-        model.population.initial_conditions.compartment_fractions.append(
-            CompartmentFraction(compartment="A_missing", fraction=0.0)
-        )
-
-        with pytest.raises(RuntimeError, match="A_missing") as excinfo:
-            Simulation(model)
-
-        assert isinstance(excinfo.value, Exception)
-
-
-class TestCompartmentFractionValidation:
-    def test_model_rejects_an_unknown_compartment_name(self) -> None:
-        model = _aggregate_override_model()
-
-        with pytest.raises(ValueError, match="Unknown compartment"):
-            model.update_compartment_fractions({"A_missing": 0.1})
-
-    def test_initial_conditions_reject_over_allocation(self) -> None:
-        conditions = InitialConditions(
-            population_size=1000,
-            bin_fractions=[
-                BinFraction(bin="A", fraction=1.0),
-                BinFraction(bin="B", fraction=0.0),
-            ],
-        )
-
-        with pytest.raises(ValueError, match="exceed population_size"):
-            conditions.update_compartment_fractions({"A": 0.7, "B": 0.7})
-
-    def test_initial_conditions_allow_overrides_within_the_population(self) -> None:
-        conditions = InitialConditions(
-            population_size=1000,
-            bin_fractions=[
-                BinFraction(bin="A", fraction=0.6),
-                BinFraction(bin="B", fraction=0.4),
-            ],
-        )
-
-        conditions.update_compartment_fractions({"A": 0.5})
-
-        assert [
-            (fraction.compartment, fraction.fraction)
-            for fraction in conditions.compartment_fractions
-        ] == [("A", 0.5)]
-
-    def test_construction_accepts_overrides_exceeding_the_population(self) -> None:
-        # ESC-1: the definition may represent any state the engine can hold.
-        # Total guards live in authoring paths (ModelBuilder, public
-        # update_* methods), not in construction/deserialization.
-        conditions = InitialConditions(
-            population_size=1000,
-            bin_fractions=[BinFraction(bin="A", fraction=1.0)],
-            compartment_fractions=[
-                CompartmentFraction(compartment="A_g1", fraction=0.6),
-                CompartmentFraction(compartment="A_g2", fraction=0.6),
-            ],
-        )
-
-        assert [
-            (fraction.compartment, fraction.fraction)
-            for fraction in conditions.compartment_fractions
-        ] == [("A_g1", 0.6), ("A_g2", 0.6)]
-
-    def test_model_rejects_over_allocation_at_compartment_granularity(self) -> None:
-        model = _aggregate_override_model()
-
-        # Uniform A_g1 = A_g2 = 0.5, so an override of 0.9 on A_g1 plus the
-        # untouched A_g2 totals 1.4 of the population.
-        with pytest.raises(ValueError, match="exceed population_size"):
-            model.update_compartment_fractions({"A_g1": 0.9})
-
-        assert [
-            (fraction.compartment, fraction.fraction)
-            for fraction in model.population.initial_conditions.compartment_fractions
-        ] == [("A_g1", 0.3)]
-
-    def test_model_allows_over_allocation_within_the_population(self) -> None:
-        model = _aggregate_override_model()
-
-        model.update_compartment_fractions({"A_g1": 0.4})
-
-        overrides = {
-            fraction.compartment: fraction.fraction
-            for fraction in model.population.initial_conditions.compartment_fractions
-        }
-        assert overrides == {"A_g1": pytest.approx(0.4)}
-
-
-class TestNonConservingReload:
-    """ESC-1: deserialization accepts whatever the write-back persisted."""
-
-    @staticmethod
-    def _non_conserving_model() -> tuple[Model, list[float]]:
-        model = _shared_category_model()
-        model.apply_calibration_parameters({"y": 0.6}, _initial_condition_problem("y"))
-        expected = list(Simulation(model).engine.population)
-        return model, expected
-
-    def test_overrides_may_exceed_the_population(self) -> None:
-        model, _ = self._non_conserving_model()
-
-        total = sum(
-            fraction.fraction
-            for fraction in model.population.initial_conditions.compartment_fractions
-        )
-        assert total == pytest.approx(1.1)
-
-    def test_model_validate_json_round_trips(self) -> None:
-        model, expected = self._non_conserving_model()
-
-        reloaded = Model.model_validate_json(model.model_dump_json())
-
-        assert list(Simulation(reloaded).engine.population) == pytest.approx(expected)
-
-    def test_from_json_round_trips(self, tmp_path) -> None:
-        model, expected = self._non_conserving_model()
-        path = tmp_path / "model.json"
-        model.to_json(path)
-
-        reloaded = Model.from_json(path)
-
-        assert list(Simulation(reloaded).engine.population) == pytest.approx(expected)
-
-
-class TestBinFractionValidation:
-    def _conditions(self) -> InitialConditions:
-        return InitialConditions(
-            population_size=1000,
-            bin_fractions=[
-                BinFraction(bin="A", fraction=0.5),
-                BinFraction(bin="B", fraction=0.5),
-            ],
-        )
-
-    def test_complete_update_must_sum_to_one(self) -> None:
-        conditions = self._conditions()
-
-        with pytest.raises(ValueError, match="must sum to 1.0"):
-            conditions.update_bin_fractions({"A": 0.9, "B": 0.9})
-
-    def test_partial_update_must_not_exceed_one(self) -> None:
-        conditions = self._conditions()
-
-        with pytest.raises(ValueError, match="more than 1.0"):
-            conditions.update_bin_fractions({"A": 0.9})
-
-    def test_rejected_update_leaves_the_bins_unchanged(self) -> None:
-        conditions = self._conditions()
-
-        with pytest.raises(ValueError, match="more than 1.0"):
-            conditions.update_bin_fractions({"A": 0.9})
-
-        assert [(bf.bin, bf.fraction) for bf in conditions.bin_fractions] == [
-            ("A", 0.5),
-            ("B", 0.5),
-        ]
-
-    def test_partial_update_within_the_population_is_allowed(self) -> None:
-        conditions = self._conditions()
-
-        conditions.update_bin_fractions({"A": 0.4})
-
-        assert [(bf.bin, bf.fraction) for bf in conditions.bin_fractions] == [
-            ("A", 0.4),
-            ("B", 0.5),
-        ]
-
-
-class TestBinWriteBackParity:
-    """JD-G-3: a non-conserving bin value is diverted, not persisted."""
-
-    @staticmethod
-    def _two_bin_model() -> Model:
-        return (
-            ModelBuilder(name="TwoBin", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(id="flow", source=["A"], target=["B"], rate="k * A")
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 0.5},
-                    {"bin": "B", "fraction": 0.5},
-                ],
-            )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        )
-
-    def test_non_conserving_bin_value_is_diverted_to_overrides(self) -> None:
-        model = self._two_bin_model()
-        problem = _initial_condition_problem("A")
-
-        model.apply_calibration_parameters({"A": 0.6}, problem)
-
-        initial_conditions = model.population.initial_conditions
-        # The declared mapping stays valid: the bin fractions are untouched
-        # and the replayed head counts are pinned as per-compartment overrides.
-        assert {
-            fraction.bin: fraction.fraction
-            for fraction in initial_conditions.bin_fractions
-        } == {"A": 0.5, "B": 0.5}
-        overrides = {
-            fraction.compartment: fraction.fraction
-            for fraction in initial_conditions.compartment_fractions
-        }
-        assert overrides == {"A": pytest.approx(0.6)}
-
-        # The diverted definition round-trips and rebuilds the scored state.
-        reloaded = Model.model_validate_json(model.model_dump_json())
-        assert reloaded.model_dump_json() == model.model_dump_json()
-        rebuilt = Simulation(reloaded).engine
-        assert dict(zip(rebuilt.compartments, rebuilt.population)) == pytest.approx(
-            {"A": 600.0, "B": 500.0}
-        )
-        assert sum(rebuilt.population) == pytest.approx(1100.0)
-
-    def test_non_conserving_bin_apply_is_idempotent(self) -> None:
-        model = self._two_bin_model()
-        problem = _initial_condition_problem("A")
-
-        model.apply_calibration_parameters({"A": 0.6}, problem)
-        first_json = model.model_dump_json()
-        first_population = list(Simulation(model).engine.population)
-
-        model.apply_calibration_parameters({"A": 0.6}, problem)
-
-        assert model.model_dump_json() == first_json
-        assert list(Simulation(model).engine.population) == first_population
-
-    def test_conserving_bin_value_still_updates_the_bin_fraction(self) -> None:
-        model = self._two_bin_model()
-        problem = _initial_condition_problem("A")
-
-        model.apply_calibration_parameters({"A": 0.4}, problem)
-
-        initial_conditions = model.population.initial_conditions
-        assert {
-            fraction.bin: fraction.fraction
-            for fraction in initial_conditions.bin_fractions
-        } == {"A": 0.4, "B": 0.5}
-        assert initial_conditions.compartment_fractions == []
-
-        first_json = model.model_dump_json()
-        model.apply_calibration_parameters({"A": 0.4}, problem)
-        assert model.model_dump_json() == first_json
-
-    def test_public_update_bin_fractions_still_rejects_non_conserving(self) -> None:
-        conditions = InitialConditions(
-            population_size=1000,
-            bin_fractions=[
-                BinFraction(bin="A", fraction=0.5),
-                BinFraction(bin="B", fraction=0.5),
-            ],
-        )
-
-        with pytest.raises(ValueError, match="must sum to 1.0"):
-            conditions.update_bin_fractions({"A": 0.6, "B": 0.5})
-
-
-class TestPopulationSizeValidation:
-    def test_zero_population_size_is_a_domain_error(self) -> None:
-        with pytest.raises(
-            ValidationError, match="population_size must be greater than 0"
-        ):
-            InitialConditions(
-                population_size=0,
-                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
-            )
-
-    def test_negative_population_size_is_a_domain_error(self) -> None:
-        with pytest.raises(
-            ValidationError, match="population_size must be greater than 0"
-        ):
-            InitialConditions(
-                population_size=-10,
-                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
-            )
-
-
-class TestManyCompartmentFractions:
-    def test_thousands_of_unique_names_still_validate(self) -> None:
-        conditions = InitialConditions(
-            population_size=1_000_000,
-            bin_fractions=[BinFraction(bin="A", fraction=1.0)],
-            compartment_fractions=[
-                CompartmentFraction(compartment=f"A_c{index}", fraction=1e-6)
-                for index in range(4000)
-            ],
-        )
-
-        assert len(conditions.compartment_fractions) == 4000
-
-    def test_duplicates_are_still_detected_in_large_inputs(self) -> None:
-        with pytest.raises(ValidationError, match="Duplicate compartment fractions"):
-            InitialConditions(
-                population_size=1_000_000,
-                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
-                compartment_fractions=[
-                    CompartmentFraction(compartment="A_c0", fraction=1e-6),
-                    *(
-                        CompartmentFraction(compartment=f"A_c{index}", fraction=1e-6)
-                        for index in range(1, 2000)
-                    ),
-                    CompartmentFraction(compartment="A_c0", fraction=1e-6),
-                ],
-            )
 
 
 def _shared_category_model() -> Model:
@@ -979,42 +408,6 @@ def _shared_category_override_model() -> Model:
     )
 
 
-def _engine_category_replay(
-    compartments: list[str],
-    population: list[float],
-    category: str,
-    value: float,
-) -> list[float]:
-    """Mirror the engine's paired-category replay (snapshot + sorted pairs)."""
-    pairs: list[tuple[int, int]] = []
-    for index, name in enumerate(compartments):
-        tokens = name.split("_")
-        for token_index, token in enumerate(tokens):
-            if token_index == 0 or token != category:
-                continue
-            complements = [
-                candidate_index
-                for candidate_index, candidate in enumerate(compartments)
-                if len(candidate.split("_")) == len(tokens)
-                and candidate.split("_")[token_index] != category
-                and all(
-                    position == token_index or candidate.split("_")[position] == other
-                    for position, other in enumerate(tokens)
-                )
-            ]
-            assert len(complements) == 1
-            pairs.append((index, complements[0]))
-    pairs.sort()
-
-    result = list(population)
-    snapshot = list(population)
-    for category_index, complement_index in pairs:
-        pair_total = snapshot[category_index] + snapshot[complement_index]
-        result[category_index] = value * pair_total
-        result[complement_index] = (1.0 - value) * pair_total
-    return result
-
-
 def _mixed_replay_model() -> Model:
     """Shared category, a unique category, and two bins for a mixed replay."""
     return (
@@ -1062,343 +455,504 @@ def _mixed_replay_model() -> Model:
     )
 
 
-def _engine_aggregate_weights(
-    compartments: list[str], base: list[float], bin_id: str
-) -> list[tuple[int, float]]:
-    """Engine aggregate weights for a bin, taken from the base population."""
-    covered = [
-        index
-        for index, name in enumerate(compartments)
-        if name == bin_id or name.startswith(f"{bin_id}_")
-    ]
-    total = sum(base[index] for index in covered)
-    if total > 0.0:
-        return [(index, base[index] / total) for index in covered]
-    return [(index, 1.0 / len(covered)) for index in covered]
-
-
-def _engine_category_pairs(
-    compartments: list[str], category: str
-) -> list[tuple[int, int]]:
-    """Engine complementary pairs for a category, sorted by compartment index."""
-    pairs: list[tuple[int, int]] = []
-    seen: set[tuple[int, int]] = set()
-    for index, name in enumerate(compartments):
-        tokens = name.split("_")
-        for token_index, token in enumerate(tokens):
-            if token_index == 0 or token != category:
-                continue
-            complements = [
-                candidate_index
-                for candidate_index, candidate in enumerate(compartments)
-                if len(candidate.split("_")) == len(tokens)
-                and candidate.split("_")[token_index] != category
-                and all(
-                    position == token_index or candidate.split("_")[position] == other
-                    for position, other in enumerate(tokens)
-                )
-            ]
-            assert len(complements) == 1
-            pair = (index, complements[0])
-            if pair not in seen:
-                seen.add(pair)
-                pairs.append(pair)
-    pairs.sort()
-    return pairs
-
-
-def _engine_replay(
-    model: Model,
-    ordered_values: list[tuple[str, float]],
-) -> list[float]:
-    """Mirror the engine's initial-condition replay (calibration_problem.rs).
-
-    A fresh problem rebuilt from ``model`` precomputes aggregate weights and
-    category pairs from the current base engine; each parameter then reads the
-    population once before writing its targets. Category pairs are sorted by
-    compartment index, matching the Rust replay.
-    """
+def _rebuilt(model: Model) -> dict[str, float]:
     engine = Simulation(model).engine
-    compartments = list(engine.compartments)
-    base = list(engine.population)
-    initial_conditions = model.population.initial_conditions
-    population_size = float(initial_conditions.population_size)
-    bin_ids = {bin_item.id for bin_item in model.population.bins}
-    categories = initial_conditions.get_categories_with_fractions()
-
-    result = list(base)
-    for param_id, value in ordered_values:
-        if param_id in bin_ids:
-            for index, weight in _engine_aggregate_weights(
-                compartments, base, param_id
-            ):
-                result[index] = value * weight * population_size
-        elif param_id in categories:
-            snapshot = list(result)
-            for category_index, complement_index in _engine_category_pairs(
-                compartments, param_id
-            ):
-                pair_total = snapshot[category_index] + snapshot[complement_index]
-                result[category_index] = value * pair_total
-                result[complement_index] = (1.0 - value) * pair_total
-        elif param_id in compartments:
-            result[compartments.index(param_id)] = value * population_size
-        else:
-            raise AssertionError(f"Unknown initial-condition id: {param_id}")
-    return result
+    return dict(zip(engine.compartments, engine.population, strict=True))
 
 
-class TestSharedCategoryReplay:
-    def test_write_back_matches_the_engine_snapshot_replay(self) -> None:
+def _scored(
+    model: Model, problem: CalibrationProblem, values: dict[str, float]
+) -> dict[str, float]:
+    """Population the engine scores for the values, before any write-back."""
+    parameters = [
+        param
+        for param in problem.parameters
+        if param.parameter_type == "initial_condition" and param.id in values
+    ]
+    return calibrated_initial_population(
+        model,
+        parameters,
+        [values[param.id] for param in parameters],
+        problem.initial_condition_remainder,
+    ).population
+
+
+def _overrides(model: Model) -> dict[str, float]:
+    return {
+        fraction.compartment: fraction.fraction
+        for fraction in model.population.initial_conditions.compartment_fractions
+    }
+
+
+def _two_bin_model() -> Model:
+    return (
+        ModelBuilder(name="TwoBin", version="1.0")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="k", value=0.1)
+        .add_transition(id="flow", source=["A"], target=["B"], rate="k * A")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 0.5},
+                {"bin": "B", "fraction": 0.5},
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+def _flat_category_model() -> Model:
+    return _set_initial_conditions(_stratified_builder(), []).build(
+        typology=ModelTypes.DIFFERENCE_EQUATIONS.value
+    )
+
+
+WRITE_BACK_CASES = [
+    pytest.param(_aggregate_override_model, {"A_g1": 0.2}, None, id="single-exact"),
+    pytest.param(
+        _aggregate_override_model, {"A_g1": 0.2}, "B", id="single-exact-remainder"
+    ),
+    pytest.param(
+        _aggregate_override_model, {"A_g1": 0.2, "A_g2": 0.6}, None, id="two-exact"
+    ),
+    pytest.param(_aggregate_override_model, {"A": 0.6}, None, id="bin-over-override"),
+    pytest.param(
+        _aggregate_override_model, {"g1": 0.3}, None, id="category-over-override"
+    ),
+    pytest.param(
+        _aggregate_override_model, {"A": 0.6, "g1": 0.3}, "B", id="bin-and-category"
+    ),
+    pytest.param(
+        _aggregate_override_model, {"g1": 0.3, "A": 0.6}, "B", id="category-and-bin"
+    ),
+    pytest.param(_two_bin_model, {"A": 0.6}, "B", id="bin-with-remainder"),
+    pytest.param(_two_bin_model, {"A": 0.4, "B": 0.6}, None, id="complete-bins"),
+    pytest.param(_flat_category_model, {"g1": 0.3}, None, id="flat-category"),
+    pytest.param(_shared_category_model, {"sex:y": 0.6}, None, id="qualified"),
+    pytest.param(
+        _shared_category_override_model,
+        {"age:y": 0.6, "sex:o": 0.3},
+        None,
+        id="qualified-over-override",
+    ),
+    pytest.param(_mixed_replay_model, {"A": 0.5, "g1": 0.4}, "B", id="mixed"),
+    pytest.param(
+        _conditional_pathway_model,
+        {"IH_oe60_hosp": 0.07},
+        "S",
+        id="composite-state",
+    ),
+    pytest.param(
+        _conditional_pathway_model, {"home": 0.2}, None, id="conditional-category"
+    ),
+]
+
+
+class TestWriteBackRebuildsTheScoredState:
+    """The definition written back rebuilds the population the engine scored."""
+
+    @pytest.mark.parametrize(("factory", "values", "remainder"), WRITE_BACK_CASES)
+    def test_rebuild_matches_the_engine(self, factory, values, remainder) -> None:
+        model = factory()
+        problem = _initial_condition_problem(*values, remainder=remainder)
+        expected = _scored(model, problem, values)
+
+        model.apply_calibration_parameters(values, problem)
+
+        assert _rebuilt(model) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(("factory", "values", "remainder"), WRITE_BACK_CASES)
+    def test_definition_round_trips_through_json(
+        self, factory, values, remainder
+    ) -> None:
+        model = factory()
+        problem = _initial_condition_problem(*values, remainder=remainder)
+        model.apply_calibration_parameters(values, problem)
+
+        reloaded = Model.model_validate_json(model.model_dump_json())
+
+        assert _rebuilt(reloaded) == pytest.approx(_rebuilt(model))
+
+
+class TestWriteBackReadability:
+    """Values the declared fractions express are written to those fractions."""
+
+    def test_complete_bin_values_update_the_bin_fractions(self) -> None:
+        model = _two_bin_model()
+
+        model.apply_calibration_parameters(
+            {"A": 0.4, "B": 0.6}, _initial_condition_problem("A", "B")
+        )
+
+        bins = model.population.initial_conditions.bin_fractions
+        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
+            {"A": 0.4, "B": 0.6}
+        )
+        assert _overrides(model) == {}
+
+    def test_remainder_bin_takes_the_rest_of_the_population(self) -> None:
+        model = _two_bin_model()
+
+        model.apply_calibration_parameters(
+            {"A": 0.7}, _initial_condition_problem("A", remainder="B")
+        )
+
+        bins = model.population.initial_conditions.bin_fractions
+        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
+            {"A": 0.7, "B": 0.3}
+        )
+        assert _overrides(model) == {}
+
+    def test_category_value_updates_the_category_fraction(self) -> None:
+        model = _flat_category_model()
+
+        model.apply_calibration_parameters(
+            {"g1": 0.3}, _initial_condition_problem("g1")
+        )
+
+        fractions = {
+            f.category: f.fraction
+            for s in model.population.initial_conditions.stratification_fractions
+            for f in s.fractions
+        }
+        assert fractions == pytest.approx({"g1": 0.3, "g2": 0.7})
+        assert _overrides(model) == {}
+
+    def test_qualified_category_updates_its_own_stratification(self) -> None:
         model = _shared_category_model()
-        base_simulation = Simulation(model)
-        compartments = list(base_simulation.engine.compartments)
-        base_population = list(base_simulation.engine.population)
-        expected = _engine_category_replay(compartments, base_population, "y", 0.4)
 
+        model.apply_calibration_parameters(
+            {"sex:y": 0.6}, _initial_condition_problem("sex:y")
+        )
+
+        fractions = {
+            (s.stratification, f.category): f.fraction
+            for s in model.population.initial_conditions.stratification_fractions
+            for f in s.fractions
+        }
+        assert fractions == pytest.approx(
+            {
+                ("age", "y"): 0.5,
+                ("age", "o"): 0.5,
+                ("sex", "y"): 0.6,
+                ("sex", "o"): 0.4,
+            }
+        )
+        assert _overrides(model) == {}
+
+    def test_single_composite_state_is_free_with_a_remainder(self) -> None:
+        model = _conditional_pathway_model()
+
+        model.apply_calibration_parameters(
+            {"IH_oe60_hosp": 0.07},
+            _initial_condition_problem("IH_oe60_hosp", remainder="S"),
+        )
+
+        # IH totals 0 + 25 + 70 = 95, so S takes the remaining 905 and keeps
+        # its split; only the IH compartments need overrides.
+        bins = model.population.initial_conditions.bin_fractions
+        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
+            {"S": 0.905, "IH": 0.095}
+        )
+        assert set(_overrides(model)) == {"IH_y60", "IH_oe60_home", "IH_oe60_hosp"}
+        rebuilt = _rebuilt(model)
+        assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0)
+        assert rebuilt["IH_y60"] == 0.0
+        assert sum(rebuilt.values()) == pytest.approx(1000.0)
+
+    def test_without_remainder_values_are_applied_as_given(self) -> None:
+        model = _flat_category_model()
+
+        model.apply_calibration_parameters(
+            {"A_g1": 0.2}, _initial_condition_problem("A_g1")
+        )
+
+        assert _rebuilt(model)["A_g1"] == pytest.approx(200.0)
+        assert sum(_rebuilt(model).values()) == pytest.approx(200.0)
+
+    def test_without_remainder_an_excess_is_rejected(self) -> None:
+        model = _two_bin_model()
+        before = model.model_dump_json()
+
+        with pytest.raises(ValueError, match="exceed the population size"):
+            model.apply_calibration_parameters(
+                {"A": 0.6}, _initial_condition_problem("A")
+            )
+
+        assert model.model_dump_json() == before
+
+    def test_applying_the_written_back_values_again_is_a_no_op(self) -> None:
+        model = _two_bin_model()
+        problem = _initial_condition_problem("A", remainder="B")
+        model.apply_calibration_parameters({"A": 0.7}, problem)
+        first = model.model_dump_json()
+
+        model.apply_calibration_parameters({"A": 0.7}, problem)
+
+        assert model.model_dump_json() == first
+
+
+class TestSharedCategory:
+    """A category name declared by two stratifications must be qualified."""
+
+    @pytest.mark.parametrize(
+        "factory", [_shared_category_model, _shared_category_override_model]
+    )
+    def test_bare_name_is_rejected_as_ambiguous(self, factory) -> None:
+        model = factory()
+        before = model.model_dump_json()
+
+        with pytest.raises(ValueError, match="'age:y' or 'sex:y'"):
+            model.apply_calibration_parameters(
+                {"y": 0.6}, _initial_condition_problem("y")
+            )
+
+        assert model.model_dump_json() == before
+
+    def test_qualified_id_conserves_the_population(self) -> None:
+        model = _shared_category_model()
+
+        model.apply_calibration_parameters(
+            {"age:y": 0.6}, _initial_condition_problem("age:y")
+        )
+
+        assert sum(_rebuilt(model).values()) == pytest.approx(1000.0)
+
+    def test_update_rejects_a_bare_ambiguous_category(self) -> None:
+        model = _shared_category_model()
+
+        with pytest.raises(ValueError, match="ambiguous"):
+            model.update_stratification_fractions({"y": 0.6})
+
+
+class TestCompositeStateCalibration:
+    """End to end: calibrate the initial value of a composite state."""
+
+    @staticmethod
+    def _truth() -> Model:
+        model = _conditional_pathway_model()
+        model.update_compartment_fractions({"IH_oe60_hosp": 0.07})
+        return model
+
+    def test_calibrated_composite_state_is_written_back(self) -> None:
+        observed = Simulation(self._truth()).run(10)
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=1, compartment="A_y_y", value=1.0)],
+            observed_data=[
+                ObservedDataPoint(
+                    step=step,
+                    compartment="IH_oe60_hosp",
+                    value=observed["IH_oe60_hosp"][step],
+                )
+                for step in range(1, 10)
+            ],
             parameters=[
                 CalibrationParameter(
-                    id="y",
+                    id="IH_oe60_hosp",
                     parameter_type="initial_condition",
                     min_bound=0.0,
-                    max_bound=1.0,
-                )
+                    max_bound=0.1,
+                ),
             ],
+            initial_condition_remainder="S",
             loss_function="sse",
-            optimization_config=NelderMeadConfig(max_iterations=1),
+            optimization_config=NelderMeadConfig(max_iterations=500),
         )
-
-        model.apply_calibration_parameters({"y": 0.4}, problem)
-
-        # The shared category cannot be expressed by one stratification
-        # fraction, so it is persisted as per-compartment overrides that rebuild
-        # the engine replay exactly.
-        rebuilt = Simulation(model)
-        assert list(rebuilt.engine.population) == pytest.approx(expected)
-        assert model.population.initial_conditions.stratification_fractions[
-            0
-        ].fractions[0].fraction == pytest.approx(0.5)
-
-
-class TestCalibrationIdempotence:
-    """Applying the same calibration result twice must not move the model."""
-
-    @staticmethod
-    def _flat_category_model() -> Model:
-        return (
-            ModelBuilder(name="FlatCategory", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=[],
-                rate="k * A",
-                per_compartment=True,
-            )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[{"bin": "A", "fraction": 1.0}],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
-            )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
-        )
-
-    @staticmethod
-    def _apply_twice(
-        model: Model, values: dict[str, float], problem: CalibrationProblem
-    ) -> tuple[str, list[float]]:
-        model.apply_calibration_parameters(values, problem)
-        first_json = model.model_dump_json()
-        first_population = list(Simulation(model).engine.population)
-        model.apply_calibration_parameters(values, problem)
-        return first_json, first_population
-
-    def test_flat_category_double_apply_is_idempotent(self) -> None:
-        model = self._flat_category_model()
-        problem = _initial_condition_problem("g1")
-
-        first_json, first_population = self._apply_twice(model, {"g1": 0.4}, problem)
-
-        assert model.model_dump_json() == first_json
-        assert list(Simulation(model).engine.population) == first_population
-
-    def test_conditional_category_double_apply_is_idempotent(self) -> None:
         model = _conditional_pathway_model()
-        problem = _initial_condition_problem("y60")
+        result = Calibrator(Simulation(model), problem).run()
+        expected = _scored(model, problem, result.best_parameters)
 
-        first_json, first_population = self._apply_twice(model, {"y60": 0.4}, problem)
+        model.apply_calibration_parameters(result, problem)
 
-        assert model.model_dump_json() == first_json
-        assert list(Simulation(model).engine.population) == first_population
+        rebuilt = _rebuilt(model)
+        assert rebuilt == pytest.approx(expected)
+        assert rebuilt["IH_y60"] == 0.0
+        assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0, abs=0.5)
+        assert sum(rebuilt.values()) == pytest.approx(1000.0)
+        assert result.best_parameters["IH_oe60_hosp"] == pytest.approx(0.07, abs=5e-4)
 
-    def test_shared_category_double_apply_rescores_like_the_engine(self) -> None:
-        # ESC-2: a category declared by more than one stratification is
-        # intentionally NOT idempotent on re-apply. The second apply replays
-        # from the reloaded (already diverted) population, exactly like a fresh
-        # engine problem built on that state, so the shared split is re-scored.
-        model = _shared_category_model()
-        problem = _initial_condition_problem("y")
 
-        first = _engine_replay(model, [("y", 0.4)])
-        model.apply_calibration_parameters({"y": 0.4}, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(first)
+class TestCompartmentFractionValidation:
+    def test_model_rejects_an_unknown_compartment_name(self) -> None:
+        model = _aggregate_override_model()
 
-        second = _engine_replay(model, [("y", 0.4)])
-        model.apply_calibration_parameters({"y": 0.4}, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(second)
-        assert second != pytest.approx(first)
+        with pytest.raises(ValueError, match="Unknown compartment 'A_missing'"):
+            model.update_compartment_fractions({"A_missing": 0.1})
 
-    def test_shared_category_non_conserving_apply_is_accepted(self) -> None:
-        model = _shared_category_model()
-        problem = _initial_condition_problem("y")
-        base = Simulation(model)
-        expected = _engine_category_replay(
-            list(base.engine.compartments), list(base.engine.population), "y", 0.6
+    def test_initial_conditions_upsert_without_the_expansion(self) -> None:
+        conditions = InitialConditions(
+            population_size=1000,
+            bin_fractions=[
+                BinFraction(bin="A", fraction=0.6),
+                BinFraction(bin="B", fraction=0.4),
+            ],
+            compartment_fractions=[CompartmentFraction(compartment="A", fraction=0.1)],
         )
 
-        model.apply_calibration_parameters({"y": 0.6}, problem)
+        conditions.update_compartment_fractions({"A": 0.5, "B": 0.2})
 
-        assert list(Simulation(model).engine.population) == pytest.approx(expected)
-        assert sum(expected) == pytest.approx(1100.0)
+        assert [
+            (fraction.compartment, fraction.fraction)
+            for fraction in conditions.compartment_fractions
+        ] == [("A", 0.5), ("B", 0.2)]
 
-    def test_multi_parameter_shared_category_replay_matches_the_engine(self) -> None:
-        model = _shared_category_model()
-        problem = _initial_condition_problem("y", "A_y_y")
-        base = Simulation(model)
-        compartments = list(base.engine.compartments)
-        # The engine applies the shared category first and then pins one exact
-        # compartment, so the shared diversion must compose in parameter order.
-        after_category = _engine_category_replay(
-            compartments, list(base.engine.population), "y", 0.4
-        )
-        expected = list(after_category)
-        expected[compartments.index("A_y_y")] = 0.5 * 1000
-
-        model.apply_calibration_parameters({"y": 0.4, "A_y_y": 0.5}, problem)
-
-        assert list(Simulation(model).engine.population) == pytest.approx(expected)
-
-
-class TestEngineParityProbes:
-    def test_pre_existing_override_participates_in_the_live_replay(self) -> None:
-        # ESC-2 probe: the declared override A_y_y = 0.0 is part of the live
-        # working population the replay starts from, so the shared-category
-        # replay reproduces the engine's [100, 200, 200, 300] rather than the
-        # declared-base [200, 200, 200, 300].
-        model = _shared_category_override_model()
-        problem = _initial_condition_problem("y")
-        expected = _engine_replay(model, [("y", 0.4)])
-        assert list(expected) == pytest.approx([100.0, 200.0, 200.0, 300.0])
-
-        model.apply_calibration_parameters({"y": 0.4}, problem)
-
-        assert list(Simulation(model).engine.population) == pytest.approx(expected)
-        assert list(Simulation(model).engine.population) != pytest.approx(
-            [200.0, 200.0, 200.0, 300.0]
+    def test_initial_conditions_reject_an_out_of_range_upsert(self) -> None:
+        conditions = InitialConditions(
+            population_size=1000,
+            bin_fractions=[BinFraction(bin="A", fraction=1.0)],
         )
 
-    def test_sequential_shared_category_applies_match_the_engine_replay(self) -> None:
-        # ESC-2 probe: applying y = 0.4 then y = 0.6 re-scores from the reloaded
-        # population, matching the engine's [240, 300, 300, 200].
-        model = _shared_category_model()
-        problem = _initial_condition_problem("y")
+        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+            conditions.update_compartment_fractions({"A": 1.5})
 
-        first = _engine_replay(model, [("y", 0.4)])
-        model.apply_calibration_parameters({"y": 0.4}, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(first)
-        assert list(first) == pytest.approx([200.0, 200.0, 200.0, 300.0])
+    def test_model_rejects_over_allocation(self) -> None:
+        model = _aggregate_override_model()
 
-        second = _engine_replay(model, [("y", 0.6)])
-        model.apply_calibration_parameters({"y": 0.6}, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(second)
-        assert list(second) == pytest.approx([240.0, 300.0, 300.0, 200.0])
+        # Uniform A_g2 = 0.5, so an override of 0.9 on A_g1 totals 1.4.
+        with pytest.raises(ValueError, match="exceed population_size"):
+            model.update_compartment_fractions({"A_g1": 0.9})
 
+        assert _overrides(model) == {"A_g1": 0.3}
 
-class TestMixedReplay:
-    def test_mixed_dict_applied_twice_matches_the_engine_mirror(self) -> None:
-        # ESC-2: a mixed dict of shared category, unique category, and bin
-        # values replays in parameter order from the live population. Each
-        # apply is checked against an independent engine mirror.
-        model = _mixed_replay_model()
-        problem = _initial_condition_problem("y", "g1", "A")
-        ordered = [("y", 0.4), ("g1", 0.6), ("A", 0.5)]
-        values = {"y": 0.4, "g1": 0.6, "A": 0.5}
+    def test_model_allows_overrides_within_the_population(self) -> None:
+        model = _aggregate_override_model()
 
-        first = _engine_replay(model, ordered)
-        model.apply_calibration_parameters(values, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(first)
+        model.update_compartment_fractions({"A_g1": 0.4})
 
-        second = _engine_replay(model, ordered)
-        model.apply_calibration_parameters(values, problem)
-        assert list(Simulation(model).engine.population) == pytest.approx(second)
+        assert _overrides(model) == pytest.approx({"A_g1": 0.4})
+
+    def test_json_with_over_allocation_is_rejected(self) -> None:
+        model = _aggregate_override_model()
+        payload = model.model_dump_json().replace('"fraction":0.3}', '"fraction":0.9}')
+
+        with pytest.raises(ValidationError, match="exceed population_size"):
+            Model.model_validate_json(payload)
 
 
 class TestApplyCalibrationAtomicity:
-    def _model(self) -> Model:
-        return (
-            ModelBuilder(name="Atomic", version="1.0")
-            .add_bin(id="A", name="A")
-            .add_bin(id="B", name="B")
-            .add_parameter(id="k", value=0.1)
-            .add_transition(
-                id="flow",
-                source=["A"],
-                target=["B"],
-                rate="k * A",
-                per_compartment=True,
+    def test_unresolvable_initial_condition_leaves_the_model_unchanged(self) -> None:
+        model = _aggregate_override_model()
+        problem = _initial_condition_problem("A", "missing")
+        problem.parameters.append(
+            CalibrationParameter(
+                id="k", parameter_type="parameter", min_bound=0.0, max_bound=1.0
             )
-            .add_stratification(id="group", categories=["g1", "g2"])
-            .set_initial_conditions(
-                population_size=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 0.5},
-                    {"bin": "B", "fraction": 0.5},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
+        )
+        before = model.model_dump_json()
+
+        with pytest.raises(ValueError, match="missing"):
+            model.apply_calibration_parameters(
+                {"k": 0.5, "A": 0.4, "missing": 0.1}, problem
             )
-            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+        assert model.model_dump_json() == before
+
+
+class TestUnknownCompartmentOverride:
+    def test_building_a_simulation_raises_a_catchable_error(self) -> None:
+        model = _aggregate_override_model()
+        model.population.initial_conditions.compartment_fractions.append(
+            CompartmentFraction(compartment="A_missing", fraction=0.0)
         )
 
-    def test_failing_write_back_restores_the_definition(self) -> None:
-        model = self._model()
-        problem = _initial_condition_problem("A", "A_g1")
+        with pytest.raises(RuntimeError, match="A_missing") as excinfo:
+            Simulation(model)
 
-        before = {
-            fraction.bin: fraction.fraction
-            for fraction in model.population.initial_conditions.bin_fractions
-        }
+        assert isinstance(excinfo.value, Exception)
 
-        # The bin write-back lands first, then the out-of-range exact
-        # compartment fraction fails, so the whole call must roll back.
-        with pytest.raises(ValueError, match="must be between 0.0 and 1.0"):
-            model.apply_calibration_parameters({"A": 0.4, "A_g1": 1.5}, problem)
 
-        after = {
-            fraction.bin: fraction.fraction
-            for fraction in model.population.initial_conditions.bin_fractions
-        }
-        assert after == before
-        assert model.population.initial_conditions.compartment_fractions == []
+class TestBinFractionValidation:
+    def _conditions(self) -> InitialConditions:
+        return InitialConditions(
+            population_size=1000,
+            bin_fractions=[
+                BinFraction(bin="A", fraction=0.5),
+                BinFraction(bin="B", fraction=0.5),
+            ],
+        )
+
+    def test_complete_update_must_sum_to_one(self) -> None:
+        conditions = self._conditions()
+
+        with pytest.raises(ValueError, match="must sum to 1.0"):
+            conditions.update_bin_fractions({"A": 0.9, "B": 0.9})
+
+    def test_partial_update_must_keep_the_sum(self) -> None:
+        conditions = self._conditions()
+
+        with pytest.raises(ValueError, match="must sum to 1.0"):
+            conditions.update_bin_fractions({"A": 0.4})
+
+    def test_rejected_update_leaves_the_bins_unchanged(self) -> None:
+        conditions = self._conditions()
+
+        with pytest.raises(ValueError, match="must sum to 1.0"):
+            conditions.update_bin_fractions({"A": 0.9})
+
+        assert [(bf.bin, bf.fraction) for bf in conditions.bin_fractions] == [
+            ("A", 0.5),
+            ("B", 0.5),
+        ]
+
+    def test_updated_bins_always_reload(self) -> None:
+        conditions = self._conditions()
+
+        conditions.update_bin_fractions({"A": 0.4, "B": 0.6})
+
+        reloaded = InitialConditions.model_validate_json(conditions.model_dump_json())
+        assert [(bf.bin, bf.fraction) for bf in reloaded.bin_fractions] == [
+            ("A", 0.4),
+            ("B", 0.6),
+        ]
+
+
+class TestPopulationSizeValidation:
+    def test_zero_population_size_is_a_domain_error(self) -> None:
+        with pytest.raises(
+            ValidationError, match="population_size must be greater than 0"
+        ):
+            InitialConditions(
+                population_size=0,
+                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
+            )
+
+    def test_negative_population_size_is_a_domain_error(self) -> None:
+        with pytest.raises(
+            ValidationError, match="population_size must be greater than 0"
+        ):
+            InitialConditions(
+                population_size=-10,
+                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
+            )
+
+
+class TestManyCompartmentFractions:
+    def test_thousands_of_unique_names_still_validate(self) -> None:
+        conditions = InitialConditions(
+            population_size=1_000_000,
+            bin_fractions=[BinFraction(bin="A", fraction=1.0)],
+            compartment_fractions=[
+                CompartmentFraction(compartment=f"A_c{index}", fraction=1e-6)
+                for index in range(4000)
+            ],
+        )
+
+        assert len(conditions.compartment_fractions) == 4000
+
+    def test_duplicates_are_still_detected_in_large_inputs(self) -> None:
+        with pytest.raises(ValidationError, match="Duplicate compartment fractions"):
+            InitialConditions(
+                population_size=1_000_000,
+                bin_fractions=[BinFraction(bin="A", fraction=1.0)],
+                compartment_fractions=[
+                    CompartmentFraction(compartment="A_c0", fraction=1e-6),
+                    *(
+                        CompartmentFraction(compartment=f"A_c{index}", fraction=1e-6)
+                        for index in range(1, 2000)
+                    ),
+                    CompartmentFraction(compartment="A_c0", fraction=1e-6),
+                ],
+            )
 
 
 class TestPyO3CompartmentFractions:
@@ -1471,3 +1025,189 @@ class TestPyO3CompartmentFractions:
             for name, categories in initial_conditions.stratification_fractions
         } == {"group": {"g1": 0.5, "g2": 0.5}}
         assert initial_conditions.compartment_fractions == [("A_g1", 0.2)]
+
+    def test_initial_state_binding_reports_bins_and_categories(self) -> None:
+        from commol.commol_rs import _commol_rs as commol_rs
+
+        model = _conditional_pathway_model()
+        rust_model = commol_rs.core.Model.from_json(model.model_dump_json())
+
+        state = commol_rs.difference.initial_state(rust_model)
+
+        assert state[0] == ("S_y60", "S", [("age", "y60")], 450.0)
+        assert [name for name, _, _, _ in state] == Simulation(
+            model
+        ).engine.compartments
+
+
+class TestEquationHelperParity:
+    def test_category_less_condition_expands_like_the_engine(self) -> None:
+        from commol.constants import PrintEquationsOutputFormat
+        from commol.context._model.helpers import ModelCompartmentHelper
+        from commol.context.stratification import Stratification
+        from commol.context.stratification_condition import StratificationCondition
+
+        model = _flat_category_model()
+        # A category-less condition is permitted by the engine but rejected by
+        # the Pydantic validator, so the stratification is built without it.
+        model.population.stratifications.append(
+            Stratification.model_construct(
+                id="care",
+                categories=["home", "hosp"],
+                description=None,
+                conditions=[
+                    StratificationCondition.model_construct(
+                        stratification="group", category=None, to=None
+                    )
+                ],
+            )
+        )
+        helper = ModelCompartmentHelper(model)
+
+        helper_names = [
+            helper.compartment_to_string(compartment, PrintEquationsOutputFormat.TEXT)
+            for compartment in helper.generate_compartments()
+        ]
+
+        assert helper_names == [c.name for c in model.initial_state()]
+        assert "A_g2_hosp" in helper_names
+
+
+class TestQualifiedCategoryReads:
+    """Read methods resolve category ids like calibration does."""
+
+    def test_bare_shared_name_is_ambiguous(self) -> None:
+        model = _shared_category_model()
+
+        with pytest.raises(ValueError, match="ambiguous"):
+            model.subgroup_population(["y"])
+        with pytest.raises(ValueError, match="ambiguous"):
+            model.population.initial_conditions.get_category_fraction("y")
+
+    def test_qualified_name_selects_its_stratification(self) -> None:
+        model = _shared_category_model()
+        model.update_stratification_fractions({"sex:y": 0.8})
+
+        assert model.subgroup_population(["sex:y"]) == pytest.approx(800.0)
+        assert model.subgroup_population(["age:y"]) == pytest.approx(500.0)
+
+    def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
+        model = _shared_category_override_model()
+
+        # A_y_y is pinned to 0, so only A_o_y holds sex:y.
+        assert model.subgroup_population(["sex:y"]) == pytest.approx(250.0)
+        assert model.subgroup_population(["age:o", "sex:y"]) == pytest.approx(250.0)
+
+    def test_conditioning_categories_are_qualified_when_shared(self) -> None:
+        model = (
+            ModelBuilder(name="Conditioned", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="flow", source=["A"], target=[], rate="k * A")
+            .add_stratification(id="age", categories=["y", "o"])
+            .add_stratification(id="sex", categories=["y", "o"])
+            .add_stratification(
+                id="care",
+                categories=["home", "hosp"],
+                conditions=[{"stratification": "sex", "category": "y"}],
+            )
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[{"bin": "A", "fraction": 1.0}],
+                stratification_fractions=[
+                    {
+                        "stratification": strat,
+                        "fractions": [
+                            {"category": first, "fraction": 0.5},
+                            {"category": second, "fraction": 0.5},
+                        ],
+                    }
+                    for strat, first, second in (
+                        ("age", "y", "o"),
+                        ("sex", "y", "o"),
+                        ("care", "home", "hosp"),
+                    )
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        assert model.get_conditioning_categories("care") == ("sex:y",)
+        assert model.subgroup_population(("sex:y",)) == pytest.approx(500.0)
+
+
+class TestBinPrefixes:
+    """A bin id covers its own compartments, not those of a longer bin id."""
+
+    @staticmethod
+    def _model() -> Model:
+        return (
+            ModelBuilder(name="Prefixes", version="1.0")
+            .add_bin(id="A", name="A")
+            .add_bin(id="A_x", name="A x")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="flow", source=["A"], target=["A_x"], rate="k * A")
+            .add_stratification(id="group", categories=["g1", "g2"])
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 0.5},
+                    {"bin": "A_x", "fraction": 0.5},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "group",
+                        "fractions": [
+                            {"category": "g1", "fraction": 0.5},
+                            {"category": "g2", "fraction": 0.5},
+                        ],
+                    }
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+    def test_remainder_bin_with_a_longer_id_is_not_an_overlap(self) -> None:
+        model = self._model()
+
+        model.apply_calibration_parameters(
+            {"A": 0.3}, _initial_condition_problem("A", remainder="A_x")
+        )
+
+        bins = model.population.initial_conditions.bin_fractions
+        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
+            {"A": 0.3, "A_x": 0.7}
+        )
+        assert _overrides(model) == {}
+        assert _rebuilt(model) == pytest.approx(
+            {"A_g1": 150.0, "A_g2": 150.0, "A_x_g1": 350.0, "A_x_g2": 350.0}
+        )
+
+
+class TestEngineExpansion:
+    def test_equation_helper_uses_the_engine_expansion(self) -> None:
+        from commol.context._model.engine_state import expanded_outputs
+        from commol.context._model.helpers import ModelCompartmentHelper
+
+        model = _conditional_pathway_model()
+        compartments, accumulators = expanded_outputs(model)
+        helper = ModelCompartmentHelper(model)
+
+        assert helper.generate_compartments() == [
+            (output.source, output.categories) for output in compartments
+        ]
+        assert helper.generate_accumulator_outputs() == [
+            (output.source, output.categories) for output in accumulators
+        ]
+
+    def test_difference_engine_rejects_a_differential_model(self) -> None:
+        from commol.commol_rs import _commol_rs as commol_rs
+
+        model = _conditional_pathway_model()
+        payload = model.model_dump_json().replace(
+            '"DifferenceEquations"', '"DifferentialEquations"'
+        )
+        rust_model = commol_rs.core.Model.from_json(payload)
+
+        with pytest.raises(RuntimeError, match="cannot solve"):
+            commol_rs.difference.DifferenceEquations(rust_model)
