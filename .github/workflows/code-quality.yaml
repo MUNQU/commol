@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main, develop]
 
+# A new commit on a pull request cancels the runs of its earlier commits. Push
+# runs are never cancelled while running; a newer push only replaces a run that
+# is still waiting.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
