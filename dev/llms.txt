@@ -1,0 +1,49 @@
+# Commol Documentation
+
+> A high-performance compartment modelling library for mathematical modeling
+
+Commol is a Python library, with a Rust engine, to build, simulate and calibrate compartment models. Models are built with ModelBuilder, simulated with Simulation and fitted with Calibrator. Examples use abstract names (bins A, B, C; parameters k1, k2).
+
+
+## Getting started
+
+- [Home](https://munqu.github.io/commol/latest/index.md): Overview and where to go
+- [Installation](https://munqu.github.io/commol/latest/getting-started/installation/index.md)
+- [Quick Start](https://munqu.github.io/commol/latest/getting-started/quickstart/index.md)
+
+## User guide
+
+- [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
+- [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, time-series parameters, validation rules, save and load
+- [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md): Absolute and per-capita rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
+- [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md): Operators, variables, subpopulation sums, functions and security limits of rate formulas
+- [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md): TimePattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
+- [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking and print_equations (text and LaTeX)
+- [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run, output formats, totals by bin and category, windowed totals, plotting
+- [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, results and writing results back
+- [Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md): Calibrating bins, categories and compartments, the remainder and the order of application
+- [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md): Several outputs, sums of outputs, weights, scale factors and windowed observations
+- [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md): Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
+- [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md): Constraints on unknowns and outputs, and how violations count
+- [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md): Ensembles, every configuration field, reading results, member statistics
+- [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
+- [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
+
+## API reference
+
+- [API Overview](https://munqu.github.io/commol/latest/api/index.md)
+- [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)
+- [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)
+- [Model](https://munqu.github.io/commol/latest/api/model/index.md)
+- [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)
+- [Probabilistic Calibration](https://munqu.github.io/commol/latest/api/probabilistic-calibrator/index.md)
+- [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)
+- [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)
+- [TimePattern](https://munqu.github.io/commol/latest/api/time-patterns/index.md)
+- [TimeScale](https://munqu.github.io/commol/latest/api/time-scale/index.md)
+- [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md): The data model of a Model
+
+## Changelog
+
+- [Changelog](https://munqu.github.io/commol/latest/about/changelog/index.md): Every change, breaking ones marked
+

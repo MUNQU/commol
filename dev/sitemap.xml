@@ -17,6 +17,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/calibrator/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -25,7 +29,19 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/model/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/plotting/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/probabilistic-calibrator/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/reports/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -93,6 +109,22 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/guide/calibration-constraints/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/calibration-initial-conditions/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/calibration-observations/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/calibration-optimizers/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/guide/calibration/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -113,11 +145,23 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/guide/reports/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/guide/simulations/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/guide/time-patterns/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/transitions/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/units-and-equations/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
 </urlset>
