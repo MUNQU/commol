@@ -4,10 +4,13 @@ use super::conditions::Condition;
 use crate::math_expression::RateMathExpression;
 
 /// Supported model types for disease dynamics
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelTypes {
     #[serde(rename = "DifferenceEquations")]
     DifferenceEquations,
+    /// Defined for model definitions; no engine solves it yet.
+    #[serde(rename = "DifferentialEquations")]
+    DifferentialEquations,
 }
 
 /// Condition that specifies a stratification category for rate matching.

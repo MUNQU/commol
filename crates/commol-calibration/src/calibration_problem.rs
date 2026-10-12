@@ -5,109 +5,13 @@ use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
+use crate::initial_conditions::{
+    clamp_to_bounds, configure_engine, is_infeasible, InitialConditionPlan,
+};
 use crate::types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
     LossConfig, ObservedDataPoint,
 };
-
-#[derive(Clone)]
-enum InitialConditionTarget {
-    PopulationFraction { entries: Vec<(usize, f64)> },
-    PairedCategoryFraction { pairs: Vec<(usize, usize)> },
-}
-
-impl InitialConditionTarget {
-    fn exact(index: usize) -> Self {
-        Self::PopulationFraction {
-            entries: vec![(index, 1.0)],
-        }
-    }
-
-    fn aggregate(indices: Vec<usize>, population: &[f64]) -> Self {
-        let total: f64 = indices.iter().map(|&idx| population[idx]).sum();
-        let weight = if total > 0.0 {
-            None
-        } else {
-            Some(1.0 / indices.len() as f64)
-        };
-
-        Self::PopulationFraction {
-            entries: indices
-                .into_iter()
-                .map(|idx| {
-                    let entry_weight = weight.unwrap_or(population[idx] / total);
-                    (idx, entry_weight)
-                })
-                .collect(),
-        }
-    }
-
-    fn paired_category(
-        category: &str,
-        compartment_map: &std::collections::HashMap<&str, usize>,
-    ) -> Result<Option<Self>, String> {
-        let mut pairs = Vec::new();
-        for (&name, &category_idx) in compartment_map {
-            let tokens: Vec<&str> = name.split('_').collect();
-            for (token_idx, token) in tokens.iter().enumerate() {
-                // Token 0 is the bin id. Category calibration targets only
-                // stratification suffix tokens.
-                if token_idx == 0 {
-                    continue;
-                }
-                if *token != category {
-                    continue;
-                }
-
-                let mut complement_indices = Vec::new();
-                for (&candidate_name, &candidate_idx) in compartment_map {
-                    let candidate_tokens: Vec<&str> = candidate_name.split('_').collect();
-                    if candidate_tokens.len() != tokens.len()
-                        || candidate_tokens[token_idx] == category
-                    {
-                        continue;
-                    }
-
-                    let same_except_category = tokens
-                        .iter()
-                        .enumerate()
-                        .all(|(idx, token)| idx == token_idx || candidate_tokens[idx] == *token);
-                    if same_except_category {
-                        complement_indices.push(candidate_idx);
-                    }
-                }
-
-                match complement_indices.as_slice() {
-                    [complement_idx] => pairs.push((category_idx, *complement_idx)),
-                    [] => return Ok(None),
-                    _ => {
-                        return Err(format!(
-                            "Initial condition category '{}' is ambiguous for compartment '{}': \
-                             expected exactly one complementary category, found {}",
-                            category,
-                            name,
-                            complement_indices.len()
-                        ));
-                    }
-                }
-            }
-        }
-
-        pairs.sort_unstable();
-        Ok((!pairs.is_empty()).then_some(Self::PairedCategoryFraction { pairs }))
-    }
-
-    fn covered_population_compartments(&self) -> Vec<usize> {
-        match self {
-            Self::PopulationFraction { entries } => entries.iter().map(|(idx, _)| *idx).collect(),
-            Self::PairedCategoryFraction { .. } => Vec::new(),
-        }
-    }
-
-    fn is_population_fraction(&self) -> bool {
-        matches!(self, Self::PopulationFraction { .. })
-    }
-}
 
 /// Generic calibration problem that works with any SimulationEngine implementation.
 ///
@@ -167,9 +71,8 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
 
-    /// Initial-condition targets for calibration parameters (parallel to parameters vec).
-    /// None for non-initial-condition parameters.
-    parameter_initial_condition_targets: Vec<Option<InitialConditionTarget>>,
+    /// Resolved initial-condition targets and remainder of the parameters.
+    initial_conditions: InitialConditionPlan,
 
     /// Scale parameter indices for observed data points (parallel to observed_data vec)
     /// None if no scale is applied, Some(param_idx) if a scale parameter should be applied
@@ -243,7 +146,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             observed_previous_time_indices: self.observed_previous_time_indices.clone(),
             constraint_time_indices: self.constraint_time_indices.clone(),
             parameters: self.parameters.clone(),
-            parameter_initial_condition_targets: self.parameter_initial_condition_targets.clone(),
+            initial_conditions: self.initial_conditions.clone(),
             observed_scale_indices: self.observed_scale_indices.clone(),
             observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
@@ -261,22 +164,23 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
     }
 }
 
-/// Build a mapping from partial compartment name prefixes to the indices of all
-/// compartments that share that prefix.
+/// Build a mapping from output name prefixes to the indices of every output
+/// that shares that prefix.
 ///
-/// Every prefix formed by taking a compartment name up to any of its underscore
-/// separators is a candidate key. A key is retained only when two or more
-/// compartments share it, making it useful for aggregation. This covers both
-/// full bin names (aggregating over all strata) and partial stratification
-/// specifications (aggregating over the remaining unspecified strata).
-fn compute_bin_aggregates(compartment_names: &[String]) -> Vec<(String, Vec<usize>)> {
+/// A prefix is an output's source followed by any number of its leading
+/// categories (`A`, `A_g1`), short of its full name, and is built from the
+/// labels rather than by splitting names, so a bin `A` never covers the
+/// outputs of a bin `A_x`. A key is retained only when two or more outputs
+/// share it, making it useful for aggregation. This covers both full bin names
+/// (aggregating over all strata) and partial stratification specifications
+/// (aggregating over the remaining unspecified strata).
+fn compute_bin_aggregates(labels: &[commol_core::OutputLabels]) -> Vec<(String, Vec<usize>)> {
     let mut map: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
-    for (idx, name) in compartment_names.iter().enumerate() {
-        let mut pos = 0;
-        while let Some(rel) = name[pos..].find('_') {
-            let prefix = name[..pos + rel].to_string();
+    for (idx, label) in labels.iter().enumerate() {
+        let mut prefixes = label.prefixes();
+        prefixes.pop();
+        for prefix in prefixes {
             map.entry(prefix).or_default().push(idx);
-            pos += rel + 1;
         }
     }
     let mut result: Vec<(String, Vec<usize>)> =
@@ -380,7 +284,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // or a bare accumulator and get the total across strata. Indices address
         // full output rows, matching the rows that time-dependent constraints are
         // evaluated against.
-        let output_aggregates = compute_bin_aggregates(&output_names);
+        let output_aggregates = compute_bin_aggregates(&base_engine.output_labels());
         let output_aggregate_names: std::collections::HashSet<&str> = output_aggregates
             .iter()
             .map(|(name, _)| name.as_str())
@@ -427,68 +331,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_output_indices.push(indices);
         }
 
-        // Build compartment indices for calibration parameters
+        // Resolve the initial-condition target of every calibration parameter
         let compartments = base_engine.compartments();
-        let compartment_map: std::collections::HashMap<&str, usize> = compartments
-            .iter()
-            .enumerate()
-            .map(|(idx, name)| (name.as_str(), idx))
-            .collect();
-        let initial_population = base_engine.population();
-        let mut parameter_initial_condition_targets = Vec::with_capacity(parameters.len());
-        for param in &parameters {
-            match param.parameter_type {
-                CalibrationParameterType::Parameter => {
-                    // No initial-condition target needed for regular parameters
-                    parameter_initial_condition_targets.push(None);
-                }
-                CalibrationParameterType::InitialCondition => {
-                    // Initial conditions may target an exact expanded compartment
-                    // (for example A_cat0) or an aggregate bin (for example A).
-                    if let Some(&idx) = compartment_map.get(param.id.as_str()) {
-                        parameter_initial_condition_targets
-                            .push(Some(InitialConditionTarget::exact(idx)));
-                    } else {
-                        let prefix = format!("{}_", param.id);
-                        let aggregate_indices: Vec<usize> = compartments
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(idx, name)| {
-                                (name == &param.id || name.starts_with(&prefix)).then_some(idx)
-                            })
-                            .collect();
-
-                        if aggregate_indices.is_empty() {
-                            if let Some(target) = InitialConditionTarget::paired_category(
-                                &param.id,
-                                &compartment_map,
-                            )? {
-                                parameter_initial_condition_targets.push(Some(target));
-                                continue;
-                            }
-
-                            return Err(format!(
-                                "Invalid bin or compartment ID '{}' for initial condition calibration
-                                (available: {})",
-                                param.id,
-                                compartments.join(", ")
-                            ));
-                        }
-
-                        parameter_initial_condition_targets.push(Some(
-                            InitialConditionTarget::aggregate(
-                                aggregate_indices,
-                                &initial_population,
-                            ),
-                        ));
-                    }
-                }
-                CalibrationParameterType::Scale => {
-                    // No initial-condition target needed for scale parameters
-                    parameter_initial_condition_targets.push(None);
-                }
-            }
-        }
+        let initial_conditions = InitialConditionPlan::new(&base_engine, &parameters)?;
 
         // Build parameter ID to index mapping for scale lookups
         let param_id_map: std::collections::HashMap<&str, usize> = parameters
@@ -668,7 +513,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_previous_time_indices,
             constraint_time_indices,
             parameters,
-            parameter_initial_condition_targets,
+            initial_conditions,
             observed_scale_indices,
             observed_normalization,
             loss_config,
@@ -698,6 +543,27 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         self.observed_normalization =
             compute_observation_normalization(&self.observed_data, enabled);
         self
+    }
+
+    /// Name the compartment or bin that absorbs the difference to the
+    /// population size once the calibrated initial conditions are applied.
+    ///
+    /// Without a remainder, calibrated initial conditions are applied as
+    /// given and only a total above the population size is penalized. With
+    /// one, the initial population always equals the population size, and a
+    /// combination that would leave the remainder negative is penalized.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the id is not a compartment, bin or bin prefix,
+    /// or overlaps a calibrated bin or compartment.
+    pub fn with_initial_condition_remainder(mut self, remainder: &str) -> Result<Self, String> {
+        self.initial_conditions = self.initial_conditions.with_remainder(
+            &self.base_engine,
+            &self.parameters,
+            remainder,
+        )?;
+        Ok(self)
     }
 
     /// Get the number of parameters being calibrated
@@ -739,175 +605,18 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .clear();
     }
 
-    /// Calculate auto-corrected parameter values for initial conditions
-    ///
-    /// This is the single source of truth for auto-IC calculation logic.
-    /// When calibrating initial conditions, one IC parameter may be auto-calculated
-    /// to ensure all fractions sum to 1.0.
-    ///
-    /// # Arguments
-    /// * `param_values` - Raw parameter values from the optimizer
-    ///
-    /// # Returns
-    /// Tuple of (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum_excluding_auto)
-    fn calculate_auto_corrected_parameters(&self, param_values: &[f64]) -> (Vec<f64>, f64, f64) {
-        // Identify which compartments are being calibrated
-        let num_compartments = self.base_engine.compartments().len();
-        let mut calibrated_compartments = vec![false; num_compartments];
-
-        for (param, target) in self
-            .parameters
-            .iter()
-            .zip(&self.parameter_initial_condition_targets)
-        {
-            if param.parameter_type == CalibrationParameterType::InitialCondition {
-                if let Some(target) = target {
-                    for idx in target.covered_population_compartments() {
-                        calibrated_compartments[idx] = true;
-                    }
-                }
-            }
-        }
-
-        // Calculate sum of fixed (non-calibrated) initial condition fractions
-        let current_population = self.base_engine.population();
-        let fixed_initial_conditions_sum: f64 = current_population
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| !calibrated_compartments[*idx])
-            .map(|(_, &val)| val / self.initial_population_size)
-            .sum();
-
-        // Determine which initial condition parameter should be auto-calculated
-        let initial_conditions_params_indices: Vec<usize> = self
-            .parameters
-            .iter()
-            .enumerate()
-            .filter(|(idx, param)| {
-                param.parameter_type == CalibrationParameterType::InitialCondition
-                    && self.parameter_initial_condition_targets[*idx]
-                        .as_ref()
-                        .is_some_and(InitialConditionTarget::is_population_fraction)
-            })
-            .map(|(idx, _)| idx)
-            .collect();
-
-        let num_initial_conditions_params = initial_conditions_params_indices.len();
-        let all_compartments_are_initial_conditions = calibrated_compartments
-            .iter()
-            .all(|is_calibrated| *is_calibrated);
-
-        // Auto-calculate the last population-fraction initial condition when
-        // there is enough information for a remainder. Fixed compartments stay
-        // out of the optimizer and contribute through fixed_initial_conditions_sum.
-        let auto_calc_initial_conditions_idx = if num_initial_conditions_params >= 2
-            || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
-        {
-            initial_conditions_params_indices.last().copied()
-        } else {
-            None
-        };
-
-        // Calculate sum of calibrated initial conditions (excluding auto-calculated one)
-        let calibrated_initial_conditions_sum: f64 = param_values
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| {
-                self.parameters[*idx].parameter_type == CalibrationParameterType::InitialCondition
-                    && self.parameter_initial_condition_targets[*idx]
-                        .as_ref()
-                        .is_some_and(InitialConditionTarget::is_population_fraction)
-                    && Some(*idx) != auto_calc_initial_conditions_idx
-            })
-            .map(|(_, value)| value)
-            .sum();
-
-        // Apply auto-calculation if needed
-        let mut corrected_params = param_values.to_vec();
-        if let Some(idx) = auto_calc_initial_conditions_idx {
-            let auto_calculated_value =
-                (1.0 - fixed_initial_conditions_sum - calibrated_initial_conditions_sum).max(0.0);
-            corrected_params[idx] = auto_calculated_value;
-        }
-
-        (
-            corrected_params,
-            fixed_initial_conditions_sum,
-            calibrated_initial_conditions_sum,
-        )
-    }
-
     /// Get parameter types for external use
     pub fn get_parameter_types(&self) -> Vec<CalibrationParameterType> {
         self.parameters.iter().map(|p| p.parameter_type).collect()
     }
 
-    /// Get information needed for parameter correction (used by python_observer)
+    /// Values the objective applies for a parameter vector: each value
+    /// clamped to its bounds.
     ///
-    /// Returns (fixed_initial_conditions_sum, auto_calc_initial_conditions_idx, param_types)
-    /// This is a convenience method that extracts metadata without requiring parameter values.
-    pub fn get_parameter_fix_info(&self) -> (f64, Option<usize>, Vec<CalibrationParameterType>) {
-        // Calculate fixed initial conditions sum using empty params (we only need the structure)
-        let dummy_params = vec![0.0; self.parameters.len()];
-        let (_, fixed_initial_conditions_sum, _) =
-            self.calculate_auto_corrected_parameters(&dummy_params);
-
-        // Determine auto-calc index
-        let num_compartments = self.base_engine.compartments().len();
-        let initial_conditions_params_indices: Vec<usize> = self
-            .parameters
-            .iter()
-            .enumerate()
-            .filter(|(idx, param)| {
-                param.parameter_type == CalibrationParameterType::InitialCondition
-                    && self.parameter_initial_condition_targets[*idx]
-                        .as_ref()
-                        .is_some_and(InitialConditionTarget::is_population_fraction)
-            })
-            .map(|(idx, _)| idx)
-            .collect();
-
-        let num_initial_conditions_params = initial_conditions_params_indices.len();
-        let mut calibrated_compartments = vec![false; num_compartments];
-        for target in self.parameter_initial_condition_targets.iter().flatten() {
-            for idx in target.covered_population_compartments() {
-                calibrated_compartments[idx] = true;
-            }
-        }
-        let all_compartments_are_initial_conditions = calibrated_compartments
-            .iter()
-            .all(|is_calibrated| *is_calibrated);
-
-        let auto_calc_initial_conditions_idx = if num_initial_conditions_params >= 2
-            || (num_initial_conditions_params == 1 && !all_compartments_are_initial_conditions)
-        {
-            initial_conditions_params_indices.last().copied()
-        } else {
-            None
-        };
-
-        let param_types = self.get_parameter_types();
-
-        (
-            fixed_initial_conditions_sum,
-            auto_calc_initial_conditions_idx,
-            param_types,
-        )
-    }
-
-    /// Fix auto-calculated initial condition parameters in the result
-    ///
-    /// This is a public wrapper around calculate_auto_corrected_parameters
-    /// for use by optimizers that need to correct final results.
-    ///
-    /// # Arguments
-    /// * `param_values` - Parameter values from the optimizer
-    ///
-    /// # Returns
-    /// Corrected parameter values with auto-calculated ICs fixed
-    pub fn fix_auto_calculated_parameters(&self, param_values: Vec<f64>) -> Vec<f64> {
-        let (corrected, _, _) = self.calculate_auto_corrected_parameters(&param_values);
-        corrected
+    /// Optimizers may explore outside the bounds; this is the vector that was
+    /// actually scored, so it is the one to report.
+    pub fn applied_parameter_values(&self, param_values: &[f64]) -> Vec<f64> {
+        clamp_to_bounds(&self.parameters, param_values)
     }
 
     /// Calculate loss from a sparse result matrix whose rows are aligned with
@@ -1005,11 +714,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// we ensure the simulation always receives valid parameter values while
     /// still allowing the optimizer to explore the parameter space freely.
     fn clamp_to_bounds(&self, param_values: &[f64]) -> Vec<f64> {
-        param_values
-            .iter()
-            .zip(&self.parameters)
-            .map(|(value, param)| value.clamp(param.min_bound, param.max_bound))
-            .collect()
+        clamp_to_bounds(&self.parameters, param_values)
     }
 
     /// Validate parameter vector length
@@ -1027,86 +732,14 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// Build an engine clone with calibration parameters applied exactly as in
     /// objective evaluation, including calibrated initial conditions.
     pub fn configured_engine(&self, param_values: &[f64]) -> Result<E, String> {
-        self.validate_parameter_count(param_values)?;
-        let clamped_params = self.clamp_to_bounds(param_values);
-        let (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum) =
-            self.calculate_auto_corrected_parameters(&clamped_params);
-
-        if fixed_initial_conditions_sum + calibrated_initial_conditions_sum > 1.0 {
-            return Err(
-                "Invalid initial-condition fractions: fixed + calibrated values exceed 1.0"
-                    .to_string(),
-            );
-        }
-
-        let mut engine = self.base_engine.clone();
-        engine.reset();
-
-        for ((value, param), target) in corrected_params
-            .iter()
-            .zip(&self.parameters)
-            .zip(&self.parameter_initial_condition_targets)
-        {
-            match param.parameter_type {
-                CalibrationParameterType::Parameter => {
-                    engine
-                        .set_parameter(&param.id, *value)
-                        .map_err(|e| format!("Failed to set parameter '{}': {}", param.id, e))?;
-                }
-                CalibrationParameterType::InitialCondition => {
-                    let target = target
-                        .as_ref()
-                        .expect("InitialCondition must have a target");
-
-                    match target {
-                        InitialConditionTarget::PopulationFraction { entries } => {
-                            for &(idx, weight) in entries {
-                                engine
-                                    .set_initial_condition(
-                                        idx,
-                                        *value * weight * self.initial_population_size,
-                                    )
-                                    .map_err(|e| {
-                                        format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        )
-                                    })?;
-                            }
-                        }
-                        InitialConditionTarget::PairedCategoryFraction { pairs } => {
-                            let current_population = engine.population();
-                            for &(category_idx, complement_idx) in pairs {
-                                let pair_total = current_population[category_idx]
-                                    + current_population[complement_idx];
-                                engine
-                                    .set_initial_condition(category_idx, *value * pair_total)
-                                    .map_err(|e| {
-                                        format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        )
-                                    })?;
-                                engine
-                                    .set_initial_condition(
-                                        complement_idx,
-                                        (1.0 - *value) * pair_total,
-                                    )
-                                    .map_err(|e| {
-                                        format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        )
-                                    })?;
-                            }
-                        }
-                    }
-                }
-                CalibrationParameterType::Scale => {}
-            }
-        }
-
-        Ok(engine)
+        configure_engine(
+            &self.base_engine,
+            &self.parameters,
+            &self.initial_conditions,
+            self.initial_population_size,
+            param_values,
+        )
+        .map(|(engine, _)| engine)
     }
 
     /// Calculate base penalty value for constraint violations
@@ -1295,87 +928,21 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Apply auto-correction for initial condition parameters
-        let (corrected_params, fixed_initial_conditions_sum, calibrated_initial_conditions_sum) =
-            self.calculate_auto_corrected_parameters(&clamped_params);
+        // Update parameters and initial conditions
+        let excess = self
+            .initial_conditions
+            .apply(
+                &mut engine,
+                &self.parameters,
+                self.initial_population_size,
+                &clamped_params,
+            )
+            .map_err(Error::msg)?;
 
-        // Validate that fixed + calibrated fractions don't exceed 1.0
-        if fixed_initial_conditions_sum + calibrated_initial_conditions_sum > 1.0 {
-            // Invalid parameter combination: would result in negative last initial condition
+        if is_infeasible(excess) {
+            // The initial population exceeds the population size
             let base_penalty = self.calculate_base_penalty();
-            let excess = fixed_initial_conditions_sum + calibrated_initial_conditions_sum - 1.0;
-            let penalty = base_penalty * (1.0 + excess * 100.0);
-            return Ok(penalty);
-        }
-
-        // Update parameters and initial conditions using corrected values
-        for ((value, param), target) in corrected_params
-            .iter()
-            .zip(&self.parameters)
-            .zip(&self.parameter_initial_condition_targets)
-        {
-            match param.parameter_type {
-                CalibrationParameterType::Parameter => {
-                    // Set model parameter
-                    engine.set_parameter(&param.id, *value).map_err(|e| {
-                        Error::msg(format!("Failed to set parameter '{}': {}", param.id, e))
-                    })?;
-                }
-                CalibrationParameterType::InitialCondition => {
-                    let target = target
-                        .as_ref()
-                        .expect("InitialCondition must have a target");
-
-                    let fraction = *value;
-                    match target {
-                        InitialConditionTarget::PopulationFraction { entries } => {
-                            // Use corrected value (auto-calculation already applied).
-                            for &(idx, weight) in entries {
-                                let absolute_population =
-                                    fraction * weight * self.initial_population_size;
-                                engine
-                                    .set_initial_condition(idx, absolute_population)
-                                    .map_err(|e| {
-                                        Error::msg(format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        ))
-                                    })?;
-                            }
-                        }
-                        InitialConditionTarget::PairedCategoryFraction { pairs } => {
-                            let current_population = engine.population();
-                            for &(category_idx, complement_idx) in pairs {
-                                let pair_total = current_population[category_idx]
-                                    + current_population[complement_idx];
-                                engine
-                                    .set_initial_condition(category_idx, fraction * pair_total)
-                                    .map_err(|e| {
-                                        Error::msg(format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        ))
-                                    })?;
-                                engine
-                                    .set_initial_condition(
-                                        complement_idx,
-                                        (1.0 - fraction) * pair_total,
-                                    )
-                                    .map_err(|e| {
-                                        Error::msg(format!(
-                                            "Failed to set initial condition for '{}': {}",
-                                            param.id, e
-                                        ))
-                                    })?;
-                            }
-                        }
-                    }
-                }
-                CalibrationParameterType::Scale => {
-                    // Scale parameters are not applied to the engine
-                    // They are used in loss calculation
-                }
-            }
+            return Ok(base_penalty * (1.0 + excess * 100.0));
         }
 
         // Run simulation using pre-allocated buffer to avoid allocations
@@ -1399,7 +966,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         }
 
         let loss = if self.time_dependent_constraint_indices.is_empty() {
-            self.calculate_sparse_loss(&buffer, &corrected_params)
+            self.calculate_sparse_loss(&buffer, &clamped_params)
         } else {
             // Evaluate time-dependent constraints using simulation results
             let time_constraint_penalty = self
@@ -1413,7 +980,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             }
 
             // Calculate and return loss (use corrected params for scale parameters)
-            self.calculate_sparse_loss(&buffer, &corrected_params)
+            self.calculate_sparse_loss(&buffer, &clamped_params)
         };
 
         // Check if loss itself is invalid (defensive programming)
@@ -1424,7 +991,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
 
         // Record this evaluation in the history (use corrected params)
         let evaluation = CalibrationEvaluation {
-            parameters: corrected_params.clone(),
+            parameters: clamped_params.clone(),
             loss,
             predictions: vec![], // Predictions are generated later in Python
         };
@@ -1434,5 +1001,41 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .push(evaluation);
 
         Ok(loss)
+    }
+}
+
+#[cfg(test)]
+mod aggregate_tests {
+    use super::*;
+    use commol_core::OutputLabels;
+
+    fn label(source: &str, categories: &[(&str, &str)]) -> OutputLabels {
+        OutputLabels {
+            source: source.to_string(),
+            categories: categories
+                .iter()
+                .map(|(id, category)| (id.to_string(), category.to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn aggregates_follow_labels_not_name_prefixes() {
+        let labels = vec![
+            label("A", &[("group", "g1"), ("sub", "s1")]),
+            label("A", &[("group", "g1"), ("sub", "s2")]),
+            label("A", &[("group", "g2"), ("sub", "s1")]),
+            label("A_x", &[("group", "g1"), ("sub", "s1")]),
+            label("A_x", &[("group", "g1"), ("sub", "s2")]),
+        ];
+
+        let aggregates: std::collections::HashMap<String, Vec<usize>> =
+            compute_bin_aggregates(&labels).into_iter().collect();
+
+        assert_eq!(aggregates["A"], vec![0, 1, 2]);
+        assert_eq!(aggregates["A_g1"], vec![0, 1]);
+        assert_eq!(aggregates["A_x"], vec![3, 4]);
+        assert_eq!(aggregates["A_x_g1"], vec![3, 4]);
+        assert!(!aggregates.contains_key("A_g2"));
     }
 }

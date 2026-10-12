@@ -24,7 +24,7 @@ pub use math_expression::{
 };
 
 // Re-export simulation engine trait
-pub use simulation_engine::SimulationEngine;
+pub use simulation_engine::{OutputLabels, SimulationEngine};
 
 // Re-export all public types from the types module for convenient access
 pub use types::{

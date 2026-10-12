@@ -307,9 +307,12 @@ impl PyDynamics {
             "differenceequations" | "difference_equations" | "difference" => {
                 commol_core::ModelTypes::DifferenceEquations
             }
+            "differentialequations" | "differential_equations" | "differential" => {
+                commol_core::ModelTypes::DifferentialEquations
+            }
             _ => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid typology '{}'. Must be 'DifferenceEquations', 'difference_equations', or 'difference'",
+                    "Invalid typology '{}'. Must be 'DifferenceEquations' or 'DifferentialEquations'",
                     typology
                 )));
             }

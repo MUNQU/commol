@@ -94,6 +94,18 @@ class DifferenceEquationsProtocol(Protocol):
 
 class DifferenceModule(Protocol):
     DifferenceEquations: type[DifferenceEquationsProtocol]
+    def initial_state(
+        self, model: RustModelProtocol
+    ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
+    def transition_flows(
+        self, model: RustModelProtocol
+    ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
+    def expanded_outputs(
+        self, model: RustModelProtocol
+    ) -> tuple[
+        list[tuple[str, str, list[tuple[str, str]]]],
+        list[tuple[str, str, list[tuple[str, str]]]],
+    ]: ...
 
 class ObservedDataPointProtocol(Protocol):
     def __init__(
@@ -369,7 +381,16 @@ class CalibrationModule(Protocol):
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
         initial_population_size: int,
+        initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
+    def calibrated_initial_population(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        values: list[float],
+        initial_population_size: int,
+        initial_condition_remainder: str | None = None,
+    ) -> tuple[list[float], list[float], list[int]]: ...
     def calibrate_with_history(
         self,
         engine: DifferenceEquationsProtocol,
@@ -379,6 +400,7 @@ class CalibrationModule(Protocol):
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
         initial_population_size: int,
+        initial_condition_remainder: str | None = None,
     ) -> CalibrationResultWithHistoryProtocol: ...
     def run_multiple_calibrations(
         self,
@@ -393,6 +415,7 @@ class CalibrationModule(Protocol):
         seed: int,
         evaluation_retention: str = "all",
         top_k_per_run: int | None = None,
+        initial_condition_remainder: str | None = None,
     ) -> list[CalibrationResultWithHistoryProtocol]: ...
     def deduplicate_evaluations(
         self,
@@ -416,6 +439,7 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         parameter_sets: list[list[float]],
         time_steps: int,
+        initial_condition_remainder: str | None = None,
     ) -> list[list[list[float]]]: ...
     def generate_predictions_at_points_parallel(
         self,
@@ -434,6 +458,7 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         parameter_sets: list[list[float]],
         metric_points: list[tuple[int, int]],
+        initial_condition_remainder: str | None = None,
     ) -> list[list[float]]: ...
     def select_compact_ensemble(
         self,

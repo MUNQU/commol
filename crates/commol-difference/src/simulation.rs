@@ -189,6 +189,14 @@ impl DifferenceEquations {
             if let Some(tgt) = flow_info.target_index {
                 self.compartment_flows[tgt] += flow;
             }
+            for &(src, tgt) in &flow_info.extra_pieces {
+                if let Some(src) = src {
+                    self.compartment_flows[src] -= flow;
+                }
+                if let Some(tgt) = tgt {
+                    self.compartment_flows[tgt] += flow;
+                }
+            }
             for &accumulator_idx in &flow_info.accumulator_indices {
                 self.accumulators[accumulator_idx] += flow;
             }
@@ -537,6 +545,10 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 
     fn compartments(&self) -> Vec<String> {
         self.compartments.clone()
+    }
+
+    fn output_labels(&self) -> Vec<commol_core::OutputLabels> {
+        self.output_labels.clone()
     }
 
     fn output_names(&self) -> Vec<String> {

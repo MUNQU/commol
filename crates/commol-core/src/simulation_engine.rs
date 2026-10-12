@@ -26,6 +26,40 @@ use std::collections::HashMap;
 ///     // ... implement other required methods
 /// }
 /// ```
+/// Source and applied stratification categories of one simulation output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputLabels {
+    /// Bin or accumulator the output expands from.
+    pub source: String,
+    /// `(stratification id, category)` pairs applied to the output, in
+    /// stratification declaration order.
+    pub categories: Vec<(String, String)>,
+}
+
+impl OutputLabels {
+    /// Names the output answers to as a prefix: its source, then its source
+    /// followed by each leading category (`A`, `A_g1`, `A_g1_s2`). The last
+    /// one is the output's own name.
+    pub fn prefixes(&self) -> Vec<String> {
+        let mut prefix = self.source.clone();
+        let mut prefixes = vec![prefix.clone()];
+        for (_, category) in &self.categories {
+            prefix.push('_');
+            prefix.push_str(category);
+            prefixes.push(prefix.clone());
+        }
+        prefixes
+    }
+
+    /// Category applied to the output for a stratification, if any.
+    pub fn category(&self, stratification: &str) -> Option<&str> {
+        self.categories
+            .iter()
+            .find(|(id, _)| id == stratification)
+            .map(|(_, category)| category.as_str())
+    }
+}
+
 pub trait SimulationEngine: Clone {
     /// Run the simulation for a given number of steps.
     ///
@@ -66,6 +100,13 @@ pub trait SimulationEngine: Clone {
     /// For an SIR model: `vec!["S", "I", "R"]`
     /// For a stratified model: `vec!["S_child", "S_adult", "I_child", "I_adult", ...]`
     fn compartments(&self) -> Vec<String>;
+
+    /// Get the source and applied stratification categories of each output.
+    ///
+    /// The order must match `output_names()`, so the compartments come first.
+    /// Calibration uses these labels to resolve initial conditions and
+    /// aggregate names without parsing output names.
+    fn output_labels(&self) -> Vec<OutputLabels>;
 
     /// Get the names of all simulation output columns.
     ///
