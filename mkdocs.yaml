@@ -95,6 +95,13 @@ nav:
   - Advanced:
       - Model Structure: advanced/model-structure.md
   - Development:
+      - Codebase Guide:
+          - Overview: codebase/index.md
+          - Mental Model: codebase/mental-model.md
+          - Repository Map: codebase/repository-map.md
+          - Design Decisions: codebase/design-decisions.md
+          - Conventions: codebase/conventions.md
+          - Maintainer Playbook: codebase/maintainer-playbook.md
       - Development Workflow: development/workflow.md
       - Contributing: development/contributing.md
       - Release Process: development/release.md
