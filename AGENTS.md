@@ -36,6 +36,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-difference -p commol-calibration` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
+| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-difference -p commol-calibration` |
 
 Rebuild the extension after every Rust change, before you run `pytest`.
 `cargo build --workspace` does not link the PyO3 crate outside `maturin`; use

@@ -13,6 +13,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
 | Python dead code | No unused code | `vulture` (CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
+| Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
 | Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
@@ -129,7 +130,7 @@ every match.
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
-| Public Rust items have docs | `missing_docs` | CI (being added) |
+| Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |
 | The format in step 2 is followed | — | Review |
 

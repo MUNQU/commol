@@ -1,31 +1,7 @@
+//! The interface every simulation engine implements, and the labels of its outputs.
+
 use std::collections::HashMap;
 
-/// Common interface that all model engines must implement
-/// to be compatible with calibration and other analysis tools.
-///
-/// This trait provides a model-agnostic abstraction layer that allows
-/// different model types (DifferenceEquations, NetworkModel, StochasticModel, etc.)
-/// to work seamlessly with the same calibration and optimization code.
-///
-/// # Example Implementation
-///
-/// ```rust,ignore
-/// use commol_core::{SimulationEngine};
-/// use std::collections::HashMap;
-///
-/// #[derive(Clone)]
-/// struct MyModel {
-///     // ... model fields
-/// }
-///
-/// impl SimulationEngine for MyModel {
-///     fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-///         // Implementation
-///     }
-///
-///     // ... implement other required methods
-/// }
-/// ```
 /// Source and applied stratification categories of one simulation output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputLabels {
@@ -60,6 +36,31 @@ impl OutputLabels {
     }
 }
 
+/// Common interface that all model engines must implement
+/// to be compatible with calibration and other analysis tools.
+///
+/// Calibration and optimization only use this trait, so they work with any
+/// engine that implements it.
+///
+/// # Example Implementation
+///
+/// ```rust,ignore
+/// use commol_core::{SimulationEngine};
+/// use std::collections::HashMap;
+///
+/// #[derive(Clone)]
+/// struct MyModel {
+///     // ... model fields
+/// }
+///
+/// impl SimulationEngine for MyModel {
+///     fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
+///         // Implementation
+///     }
+///
+///     // ... implement other required methods
+/// }
+/// ```
 pub trait SimulationEngine: Clone {
     /// Run the simulation for a given number of steps.
     ///

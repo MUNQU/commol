@@ -172,7 +172,7 @@ enum PredictionError {
 /// * `time_steps` - Number of time steps to simulate
 ///
 /// # Returns
-/// Vector of predictions, where each prediction is a 2D array [time_step][compartment_idx]
+/// Vector of predictions, where each prediction is a 2D array `[time_step][compartment_idx]`
 ///
 /// # Errors
 /// - `CalibrationError::ParameterSetFailed` if setting a parameter fails

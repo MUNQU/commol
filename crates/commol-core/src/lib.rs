@@ -14,8 +14,11 @@
 //! - [`Model`]: Complete model specification including population and dynamics
 //! - [`types`]: All data structures for defining compartment models
 
+#![warn(missing_docs)]
+
 pub mod math_expression;
 pub mod simulation_engine;
+/// Data types of a model definition.
 pub mod types;
 
 // Re-export commonly used types from math_expression

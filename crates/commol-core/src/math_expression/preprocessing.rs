@@ -5,11 +5,15 @@
 use evalexpr::{Node, build_operator_tree};
 use std::collections::HashSet;
 
-// Special variable names that are automatically available in all expressions
+/// Total population.
 pub const SPECIAL_VAR_N: &str = "N";
+/// Current step.
 pub const SPECIAL_VAR_STEP: &str = "step";
+/// Alias of `step`.
 pub const SPECIAL_VAR_T: &str = "t";
+/// The constant π.
 pub const SPECIAL_VAR_PI: &str = "pi";
+/// The constant e.
 pub const SPECIAL_VAR_E: &str = "e";
 
 /// Preprocesses a formula by adding `math::` prefix to mathematical functions that require it

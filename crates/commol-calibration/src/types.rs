@@ -420,7 +420,7 @@ pub struct CalibrationEvaluation {
     pub loss: f64,
 
     /// Model predictions at each time step for all compartments
-    /// predictions[time_step][compartment_idx]
+    /// `predictions[time_step][compartment_idx]`
     pub predictions: Vec<Vec<f64>>,
 }
 

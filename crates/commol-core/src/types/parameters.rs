@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-/// Prefixes used to identify variable types in expressions
+/// Prefixes of a `Rule` variable.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum VariablePrefixes {
+    /// `state:<bin>`.
     #[serde(rename = "state")]
     State,
+    /// `strat:<stratification>`.
     #[serde(rename = "strat")]
     Strat,
 }
@@ -13,17 +15,17 @@ pub enum VariablePrefixes {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SeriesMode {
     /// Non-zero only at the listed steps; returns 0.0 at all other steps.
-    /// Use for discrete events such as vaccination campaigns or intervention pulses.
+    /// Use for discrete events.
     #[serde(rename = "pulse")]
     Pulse,
     /// Returns the value of the most recent listed step at or before the current
     /// step (zero-order hold); returns 0.0 before the first listed step.
-    /// Use for step-changes such as time-varying transmission rates or policy shifts.
+    /// Use for values that change in steps.
     #[serde(rename = "step_function")]
     StepFunction,
     /// Linearly interpolates between adjacent listed steps; returns 0.0 outside
     /// the listed range.
-    /// Use for smooth empirical schedules such as seasonally adjusted parameters.
+    /// Use for smooth empirical schedules.
     #[serde(rename = "linear")]
     Linear,
 }
@@ -43,6 +45,7 @@ pub enum ParameterValue {
         /// (step, value) pairs.  Need not be pre-sorted; the engine sorts them
         /// at build time.
         data: Vec<(u64, f64)>,
+        /// How the steps between the pairs are read.
         mode: SeriesMode,
     },
 }
@@ -101,9 +104,11 @@ impl From<&str> for ParameterValue {
 /// A parameter definition with its value and optional description
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Parameter {
+    /// Identifier used in expressions.
     pub id: String,
     /// Parameter value - None indicates the parameter needs calibration
     pub value: Option<ParameterValue>,
+    /// Free-text description.
     pub description: Option<String>,
 }
 

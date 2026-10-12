@@ -5,14 +5,19 @@
 //!
 //! - `conditions`: Logic operators, rules, and conditional expressions
 //! - `parameters`: Model parameters and variable prefixes
-//! - `population`: Disease states, stratifications, and population structure
+//! - `population`: Bins, accumulators, stratifications and initial conditions
 //! - `dynamics`: Model dynamics, transitions, and rates
 //! - `model`: Top-level model structure
 
+/// Transition conditions: operators, rules and conditions.
 pub mod conditions;
+/// Dynamics: typologies, transitions and stratified rates.
 pub mod dynamics;
+/// The top-level model definition.
 pub mod model;
+/// Parameters and their values.
 pub mod parameters;
+/// Bins, accumulators, stratifications and initial conditions.
 pub mod population;
 
 // Re-export all public types for convenient access

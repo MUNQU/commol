@@ -27,6 +27,8 @@
 //! results = solver.run(100)
 //! ```
 
+#![warn(missing_docs)]
+
 use pyo3::prelude::*;
 
 // Module declarations

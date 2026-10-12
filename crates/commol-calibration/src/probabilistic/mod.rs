@@ -3,9 +3,9 @@
 //! This module provides Rust implementations of the performance-critical parts
 //! of probabilistic calibration:
 //!
-//! 1. **Parallel execution** of multiple calibration runs ([`calibration`])
-//! 2. **Cluster-based representative selection** ([`clustering`])
-//! 3. **Evaluation deduplication** ([`deduplication`])
+//! 1. **Parallel execution** of multiple calibration runs (`calibration`)
+//! 2. **Cluster-based representative selection** (`clustering`)
+//! 3. **Evaluation deduplication** (`deduplication`)
 //!
 //! Python orchestrates the overall workflow using sklearn for K-means clustering,
 //! while Rust handles the computationally intensive operations.
@@ -13,11 +13,11 @@
 //! # Module Structure
 //!
 //! - [`error`] - Error types for probabilistic calibration
-//! - [`config`] - Configuration for representative selection algorithms
-//! - [`calibration`] - Parallel calibration and prediction generation
-//! - [`deduplication`] - Grid-based spatial deduplication
-//! - [`clustering`] - Cluster representative selection with various methods
-//! - [`utils`] - Shared utility functions
+//! - `config` - Configuration for representative selection algorithms
+//! - `calibration` - Parallel calibration and prediction generation
+//! - `deduplication` - Grid-based spatial deduplication
+//! - `clustering` - Cluster representative selection with various methods
+//! - `utils` - Shared utility functions
 
 mod calibration;
 mod clustering;

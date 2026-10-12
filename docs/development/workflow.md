@@ -218,7 +218,7 @@ The project uses three main CI/CD pipelines:
 
 - Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing,
   including the documentation examples: `pytest -m docs`)
-- Rust: rustfmt (formatting), Clippy (linting), cargo test
+- Rust: rustfmt (formatting), Clippy (linting, including `missing_docs`), rustdoc (no broken doc links), cargo test
 - Runs on: Ubuntu
 - Purpose: Ensure code quality standards
 

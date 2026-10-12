@@ -28,9 +28,17 @@ pub enum EnsembleAlgorithm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EnsembleSizeMode {
     /// Select exactly `size` candidates.
-    Fixed { size: usize },
+    Fixed {
+        /// The ensemble size.
+        size: usize,
+    },
     /// Select between `min` and `max` candidates.
-    Bounded { min: usize, max: usize },
+    Bounded {
+        /// Smallest ensemble size.
+        min: usize,
+        /// Largest ensemble size.
+        max: usize,
+    },
     /// Let the selected algorithm choose a size between two and all candidates.
     Automatic,
 }
@@ -55,37 +63,59 @@ pub enum CentralLossMetric {
 /// Configuration shared by the Rust selection backends.
 #[derive(Debug, Clone)]
 pub struct EnsembleSelectionConfig {
+    /// The selection backend.
     pub algorithm: EnsembleAlgorithm,
+    /// Level of the prediction intervals, such as 0.95.
     pub confidence_level: f64,
+    /// Random seed.
     pub seed: u64,
+    /// Allowed ensemble sizes.
     pub size_mode: EnsembleSizeMode,
+    /// Loss used to score the ensemble median prediction.
     pub central_loss_metric: CentralLossMetric,
+    /// Greedy search: maximum central loss relative to the best member.
     pub central_fit_max_loss_ratio: f64,
+    /// Greedy search: partial ensembles kept per size.
     pub search_beam_width: usize,
+    /// NSGA-II population size.
     pub population_size: usize,
+    /// NSGA-II generations.
     pub generations: usize,
+    /// NSGA-II crossover probability.
     pub crossover_probability: f64,
+    /// NSGA-II preference between narrow intervals and coverage.
     pub pareto_preference: f64,
 }
 
 /// A compact Pareto-front solution.
 #[derive(Debug, Clone)]
 pub struct ParetoSolution {
+    /// Number of members.
     pub ensemble_size: usize,
+    /// Mean interval width at the observations, relative to their magnitude.
     pub ci_width: f64,
+    /// Coverage objective, in `[0, 1]`.
     pub coverage: f64,
+    /// Loss of the member-wise median prediction.
     pub central_loss: f64,
+    /// Indices of the members among the candidates.
     pub selected_indices: Vec<usize>,
 }
 
 /// Result returned by either selection backend.
 #[derive(Debug, Clone)]
 pub struct EnsembleSelectionResult {
+    /// Indices of the selected members among the candidates.
     pub selected_ensemble: Vec<usize>,
+    /// NSGA-II Pareto front; empty for the greedy search.
     pub pareto_front: Vec<ParetoSolution>,
+    /// Index of the reported solution in `pareto_front`, for NSGA-II.
     pub selected_pareto_index: Option<usize>,
+    /// Interval width of the selected ensemble.
     pub ci_width: f64,
+    /// Coverage objective of the selected ensemble.
     pub coverage: f64,
+    /// Named diagnostics of the selection.
     pub diagnostics: Vec<(String, f64)>,
 }
 

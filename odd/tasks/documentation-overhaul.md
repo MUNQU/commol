@@ -88,7 +88,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
 | T8 | S2 | API reference pages for the 12 missing public names | direct | this commit (see Evidence) |
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | this commit (see Evidence) |
-| T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | pending |
+| T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | this commit (see Evidence) |
 | T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
 | T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | pending |
 | T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | pending |
@@ -250,6 +250,18 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   `**kwargs`. The `add_transition(condition)` docstring no longer claims the
   condition gates the transition (F2). `ruff check .`, `ruff format --check`
   and `ty check commol` pass.
+
+- T10: 147 public Rust items documented (103 in `commol-core`, 44 in
+  `commol-calibration`; `commol-difference` and the bindings had none
+  missing). Every crate (`commol-core`, `commol-difference`,
+  `commol-calibration`, `py-commol`) has `#![warn(missing_docs)]`, which
+  `clippy -D warnings` turns into an error in pre-commit and CI. A new Code
+  Quality step runs `RUSTDOCFLAGS="-D warnings" cargo doc`; it caught and fixed
+  10 broken links (private modules, a bracketed index). The `SimulationEngine`
+  trait documentation was attached to `OutputLabels` by mistake and is moved
+  back to the trait; domain words in doc comments (disease, vaccination,
+  transmission, `y60`) are replaced. `cargo clippy --workspace --all-targets
+  -D warnings`, `cargo doc` (0 warnings) and the Rust tests pass.
 
 ## Log
 
