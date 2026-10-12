@@ -126,7 +126,8 @@ every match.
 
 | Check | Command | Enforced by |
 |---|---|---|
-| The site builds with no broken link or anchor | `mkdocs build --strict` | CI |
+| The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
+| External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |

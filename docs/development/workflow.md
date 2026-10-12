@@ -212,31 +212,13 @@ already tests the result of merging it into `main`.
 
 ## Continuous Integration Pipelines
 
-The project uses three main CI/CD pipelines:
-
-### 1. Code Quality (on every push/PR)
-
-- Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing,
-  including the documentation examples: `pytest -m docs`)
-- Rust: rustfmt (formatting), Clippy (linting, including `missing_docs`), rustdoc (no broken doc links), cargo test
-- Runs on: Ubuntu
-- Purpose: Ensure code quality standards
-
-### 2. Build (on every push/PR)
-
-- Tests on: Ubuntu, Windows, macOS
-- Python versions: 3.12, 3.13, 3.14
-- Tests: Full test suite on all platforms, except the documentation examples
-- Wheels: built for every target architecture only on pushes to `main`
-- Required check: `Build Passed`, which sums up the whole workflow
-- Purpose: Ensure cross-platform compatibility
-
-### 3. Release (on GitHub release)
-
-- Builds wheels for all platforms
-- Creates source distribution
-- Publishes to PyPI using trusted publishing
-- Purpose: Automated deployment (see [Release Process](release.md))
+| Workflow | Runs on | Checks | Required check |
+|---|---|---|---|
+| Code Quality (`code-quality.yaml`) | Every push and pull request | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`). Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test. | `Python Code Quality`, `Rust Code Quality` |
+| Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
+| Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike on pushes to `main` (`latest`) and `develop` (`dev`). | `Build Documentation` |
+| Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
+| Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 
 ## Local Development Tips
 

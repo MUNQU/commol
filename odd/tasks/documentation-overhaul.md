@@ -85,7 +85,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | this commit (see Evidence) |
 | T5 | S3 | Fix examples: `simulations.md` | direct | this commit (see Evidence) |
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | this commit (see Evidence) |
-| T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
+| T7 | S3 | Fix the broken anchor; add an external link check | direct | this commit (see Evidence) |
 | T8 | S2 | API reference pages for the 12 missing public names | direct | this commit (see Evidence) |
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | this commit (see Evidence) |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | this commit (see Evidence) |
@@ -262,6 +262,18 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   back to the trait; domain words in doc comments (disease, vaccination,
   transmission, `y60`) are replaced. `cargo clippy --workspace --all-targets
   -D warnings`, `cargo doc` (0 warnings) and the Rust tests pass.
+
+- T7: the broken anchor `#time-series-parameters` now resolves (T4 added the
+  section), and `mkdocs.yaml` validates anchors since T4, so `mkdocs build
+  --strict` fails on any broken internal link or anchor. New workflow
+  `links.yaml` checks external links with lychee v2.9.0 on documentation
+  pull requests, weekly and on demand; it is not a required check. A manual
+  pass over the 29 external URLs found: GitHub Discussions is not enabled (the
+  link in `contributing.md` now points to issues); the release template's
+  compare URL is a placeholder (excluded); and README links without
+  `/latest/` reach a stale unversioned copy of the site at the root of
+  `gh-pages`, so new pages give 404 there (fixed in T12). `workflow.md` now
+  lists all five workflows with their checks and required check names.
 
 ## Log
 

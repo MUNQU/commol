@@ -244,9 +244,8 @@ See [Release Process](release.md) for details on versioning and releases.
 
 ## Getting Help
 
-- **Documentation**: Check the [docs](https://munqu.github.io/commol)
-- **Discussions**: Use [GitHub Discussions](https://github.com/MUNQU/commol/discussions)
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/MUNQU/commol/issues)
+- **Documentation**: Check the [docs](https://munqu.github.io/commol/latest/)
+- **Questions, bugs and ideas**: Open a [GitHub issue](https://github.com/MUNQU/commol/issues)
 
 ## Recognition
 
