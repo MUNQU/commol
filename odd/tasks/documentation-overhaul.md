@@ -84,12 +84,12 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | this commit (see Evidence) |
 | T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | this commit (see Evidence) |
 | T5 | S3 | Fix examples: `simulations.md` | direct | this commit (see Evidence) |
-| T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | pending |
+| T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | this commit (see Evidence) |
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
 | T8 | S2 | API reference pages for the 12 missing public names | direct | pending |
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | pending |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | pending |
-| T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | pending |
+| T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
 | T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | pending |
 | T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | pending |
 | T14 | S1–S6 | Final audit: re-run every baseline measurement and record zero gaps | direct | pending |
@@ -195,6 +195,35 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   call `reset`). Calibration is not affected: it resets before every
   evaluation. Documented with `simulation.engine.reset()`; whether `run` should
   reset is the user's call.
+
+- T6 (also the `calibration.md` part of T11): `calibration.md` split into
+  `calibration.md` (workflow, problem, observations and unknowns tables,
+  losses, results, write-back), `calibration-initial-conditions.md`,
+  `calibration-observations.md`, `calibration-optimizers.md`,
+  `calibration-constraints.md` and `reports.md`; `probabilistic-calibration.md`
+  rewritten with complete configuration tables from `model_fields` and a fast
+  runnable ensemble (about 5 s). Every calibration example generates its data
+  from a known model and prints the recovered values (checked: 0.4 / 0.1, 0.02,
+  0.01, 0.3). The navigation groups the guide into Building Models and
+  Calibration. Mermaid diagrams enabled in `mkdocs.yaml`. The design document's
+  type sketch is marked as a fragment. All docs examples run in 6.6 s.
+  Wrong claims removed: constraint penalty `Σ w max(0, -c)²` (it replaces the
+  loss), `plot_series(scale_values=)`, `SeabornStyleConfig`, `sse` ignoring
+  weights, the plain-weighted formula.
+- The engine error `Parameter index '2' not found` (old calibration.md L934) is
+  Finding F9 (code, user-visible): `Simulation` snapshots the model when it is
+  created. Built while a parameter is `None`, it fails after
+  `update_parameters` with that obscure `RuntimeError`; built before a value
+  changes, it silently keeps the old value. Documented as a warning with the
+  rule "create a new Simulation after changing the model".
+- Finding F10 (code): an `initial_condition` id naming a category of a
+  non-binary stratification fails with "not found" instead of saying that only
+  binary stratifications can be calibrated as a split.
+- Finding F11 (code): `LossConfig::SumSquaredError` and `WeightedSSE` compute
+  the same `Σ (weight × r)²`; the weight is squared. Documented as is.
+- Note: Nelder-Mead from the midpoint can stop at a bound and still report
+  `converged=True` (seen on a one-unknown problem); documented with the advice
+  to check bounds and give `initial_guess`.
 
 ## Log
 

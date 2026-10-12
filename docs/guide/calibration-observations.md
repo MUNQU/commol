@@ -1,0 +1,194 @@
+# Observations
+
+[Back to Model Calibration](calibration.md)
+
+An `ObservedDataPoint` says what the model must reproduce: an output at a step.
+This page shows how to observe several outputs, sums of outputs, partial
+observations (scale factors) and counts per period (windows), and how to weigh
+them.
+
+## Quick path
+
+```python
+from commol import (
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Simulation,
+)
+
+def model(k1: float | None):
+    return (
+        ModelBuilder(name="Observed")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="k2", value=0.1)
+        .add_accumulator(id="cum_ab", name="Total moved from A to B")
+        .add_transition(
+            id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N", accumulators=["cum_ab"]
+        )
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0},
+            ],
+        )
+        .build(typology="DifferenceEquations")
+    )
+
+truth = Simulation(model(0.4)).run(num_steps=70)
+
+def calibrate_k1(observed_data, **problem_options) -> float:
+    problem = CalibrationProblem(
+        observed_data=observed_data,
+        parameters=[
+            CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)
+        ],
+        optimization_config=NelderMeadConfig(max_iterations=2000),
+        **problem_options,
+    )
+    result = Calibrator(Simulation(model(None)), problem).run()
+    return round(result.best_parameters["k1"], 3)
+
+# Observe B and C at the same steps
+observed = [
+    ObservedDataPoint(step=step, compartment=output, value=truth[output][step])
+    for step in range(10, 51, 10)
+    for output in ("B", "C")
+]
+print(calibrate_k1(observed))  # 0.4
+```
+
+Each observation compares the model output named in `compartment` with
+`value`. Any output works: a compartment (`B`, `B_g1`) or an accumulator
+(`cum_ab`).
+
+## Sums of outputs
+
+When one measurement covers several outputs, list them in `compartments`. They
+are summed before the comparison; `compartment` becomes a label for plots and
+reports:
+
+```python
+b_and_c = [
+    ObservedDataPoint(
+        step=step,
+        compartment="B_plus_C",
+        compartments=["B", "C"],
+        value=truth["B"][step] + truth["C"][step],
+    )
+    for step in range(10, 51, 10)
+]
+print(calibrate_k1(b_and_c))  # 0.4
+```
+
+`compartments` may name compartments and accumulators, and works with
+`scale_id` and `window_steps`. It must not be empty.
+
+## Weights and normalization
+
+| Option | Where | Effect |
+|---|---|---|
+| `weight=2.0` | `ObservedDataPoint` | Multiplies the residual by 2 before squaring, so the observation counts 4 times, with `"sse"` or `"weighted_sse"`. Ignored by `"rmse"` and `"mae"`. |
+| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens. |
+
+```python
+weighted = [
+    ObservedDataPoint(step=10, compartment="B", value=truth["B"][10], weight=2.0),
+    ObservedDataPoint(step=30, compartment="B", value=truth["B"][30], weight=1.0),
+    ObservedDataPoint(step=30, compartment="cum_ab", value=truth["cum_ab"][30], weight=1.0),
+]
+print(calibrate_k1(weighted, loss_function="weighted_sse", normalize_observations=True))  # 0.4
+```
+
+## Partial observations: scale factors
+
+When the data sees only part of an output, for example a fixed share of it, a
+`scale` unknown multiplies the prediction before the comparison. Link
+observations to it with `scale_id`:
+
+```python
+seen = 0.3
+partial = [
+    ObservedDataPoint(step=step, compartment="B", value=seen * truth["B"][step], scale_id="share_seen")
+    for step in range(5, 51, 5)
+]
+
+problem = CalibrationProblem(
+    observed_data=partial,
+    parameters=[
+        CalibrationParameter(id="share_seen", parameter_type="scale", min_bound=0.01, max_bound=1.0),
+    ],
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+)
+scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
+print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
+```
+
+| Fact | Detail |
+|---|---|
+| Several scale factors | Each observation names its own `scale_id`, so outputs can have different shares. |
+| Not part of the model | `apply_calibration_parameters` skips `scale` values. |
+| Plots | Pass `calibration_result=` to `SimulationPlotter.plot_series`; it applies the calibrated factors to the comparison. |
+| Identifiability | A rate and a share can explain the same data. Fit them together only when the data can tell them apart. |
+
+## Counts per period: windows
+
+Data often counts what happened **in** each period, such as new arrivals per
+week. Observe a cumulative output (an accumulator) with `window_steps`, and the
+model's prediction becomes the gain over the window:
+
+```text
+predicted(step) = output(step) - output(step - window_steps)
+```
+
+```python
+from commol import windowed_totals
+
+weekly_steps = list(range(7, 71, 7))
+weekly_counts = windowed_totals(truth["cum_ab"], 7, weekly_steps)
+
+weekly = [
+    ObservedDataPoint(step=step, compartment="cum_ab", value=count, window_steps=7)
+    for step, count in zip(weekly_steps, weekly_counts)
+]
+print(calibrate_k1(weekly))  # 0.4
+```
+
+| Rule | Detail |
+|---|---|
+| `window_steps <= step` | Otherwise the observation is rejected when it is created. |
+| Any output | Usually an accumulator, but any compartment works. |
+| Mixed windows | Observations may use different `window_steps`, and steps need not be multiples of the window. |
+| Combinations | Works with `scale_id` and `compartments`. |
+
+`windowed_totals` (module function) and `Simulation.windowed_totals` apply the
+same reduction outside calibration, so a report shows exactly what the loss
+compared. See [Windowed totals](simulations.md#windowed-totals).
+
+## Stratified models
+
+Observe expanded outputs by name, such as `B_g1`, or sum them with
+`compartments`. `Simulation.outputs_for("B")` lists the names.
+
+## Checklist
+
+- [ ] Every `compartment` (and every entry of `compartments`) is an output name.
+- [ ] Weights are used with `"sse"` or `"weighted_sse"`, and you know they count squared.
+- [ ] Every `scale_id` has a `CalibrationParameter` with `parameter_type="scale"`.
+- [ ] Windowed observations use a cumulative output and `window_steps <= step`.
+
+## Next steps
+
+| To learn | Read |
+|---|---|
+| Tuning the optimizer | [Optimizers](calibration-optimizers.md) |
+| Reports of what was compared | [Reports](reports.md) |

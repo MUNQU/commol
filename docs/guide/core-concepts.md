@@ -432,7 +432,7 @@ print(scale.window_index(168, week))                             # 0
 ```
 
 A window covers the steps `(start, end]`, the same interval that
-[windowed observations](calibration.md#calibrating-against-cumulative-outputs)
+[windowed observations](calibration-observations.md#counts-per-period-windows)
 use.
 
 ## Next steps

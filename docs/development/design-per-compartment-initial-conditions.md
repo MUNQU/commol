@@ -47,6 +47,7 @@ initial conditions.
 
 ### Data model
 
+<!-- doc-test: skip: shows the shape of the types, not a runnable example -->
 ```python
 class CompartmentFraction(BaseModel):
     compartment: str   # expanded compartment name: "IH_y60", "S_oe60_v_c", ...

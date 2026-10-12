@@ -64,7 +64,11 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.superfences # Fenced code blocks
+  - pymdownx.superfences: # Fenced code blocks, and mermaid diagrams
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   # Admonitions (note/warning/tip boxes)
   - admonition # Basic admonitions
   - pymdownx.details # Collapsible admonitions
@@ -85,14 +89,21 @@ nav:
       - Quick Start: getting-started/quickstart.md
   - User Guide:
       - Core Concepts: guide/core-concepts.md
-      - Building Models: guide/building-models.md
-      - Transitions: guide/transitions.md
-      - Units and Equations: guide/units-and-equations.md
-      - Mathematical Expressions: guide/mathematical-expressions.md
-      - Time Patterns: guide/time-patterns.md
+      - Building Models:
+          - Overview: guide/building-models.md
+          - Transitions: guide/transitions.md
+          - Mathematical Expressions: guide/mathematical-expressions.md
+          - Time Patterns: guide/time-patterns.md
+          - Units and Equations: guide/units-and-equations.md
       - Running Simulations: guide/simulations.md
-      - Model Calibration: guide/calibration.md
-      - Probabilistic Calibration: guide/probabilistic-calibration.md
+      - Calibration:
+          - Overview: guide/calibration.md
+          - Initial Conditions: guide/calibration-initial-conditions.md
+          - Observations: guide/calibration-observations.md
+          - Optimizers: guide/calibration-optimizers.md
+          - Constraints: guide/calibration-constraints.md
+          - Probabilistic Calibration: guide/probabilistic-calibration.md
+          - Reports: guide/reports.md
       - Examples: guide/examples.md
   - API Reference:
       - Model Builder: api/model-builder.md
