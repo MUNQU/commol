@@ -1,5 +1,7 @@
 # Codebase Guide
 
+[Back to Home](../index.md)
+
 This guide helps you find the right code before you change Commol. It is an
 index for maintainers and AI agents, not an API reference: for the public API,
 see the [User Guide](../guide/core-concepts.md) and the

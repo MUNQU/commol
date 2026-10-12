@@ -1,5 +1,7 @@
 # License
 
+[Back to Home](../index.md)
+
 Commol is licensed under the MIT License.
 
 ## MIT License

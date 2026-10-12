@@ -1,92 +1,66 @@
 # Installation
 
-## Requirements
+[Back to Home](../index.md)
 
-- Python 3.12 or higher
-- Rust toolchain (for building from source)
+Install Commol from PyPI, or build it from source to work on it.
 
-!!! warning "Path Requirements"
-The project directory path **must not contain tildes (`´`, `~`) or spaces**. Maturin (the Rust-Python build tool) may fail with these characters in the path.
-
-    **Good paths:**
-
-    - `/home/username/projects/commol`
-    - `/Users/username/Documents/commol`
-    - `/opt/projects/commol`
-
-    **Bad paths:**
-
-    - `~/projects/commol` (contains tilde)
-    - `/home/my projects/commol` (contains space)
-    - `/Users/User Name/commol` (contains space)
-
-## Install from PyPI
-
-Once published, you can install Commol directly from PyPI:
+## Quick path
 
 ```bash
 pip install commol
 ```
 
-## Install from Source
+| Requirement | Version |
+|---|---|
+| Python | 3.12 or later |
+| Platforms with ready-made wheels | Linux and macOS (x86_64 and arm64), Windows (x86_64) |
 
-To install the latest development version:
+On other platforms, `pip` builds Commol from the source distribution, which
+needs a Rust toolchain.
 
-### 1. Install Prerequisites
+## Check the installation
 
-#### Install Rust
+```python
+import importlib.metadata
 
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+from commol import ModelBuilder, Simulation
+
+print(importlib.metadata.version("commol"))
 ```
 
-### 2. Clone the Repository
+## Build from source
+
+To work on Commol, or to use unreleased code from `develop`:
+
+1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
+2. Install [uv](https://docs.astral.sh/uv/).
+3. Clone, install the dependencies, and build the extension:
 
 ```bash
 git clone https://github.com/MUNQU/commol.git
-cd commol
-```
-
-### 3. Create and Activate Virtual Environment
-
-It's recommended to use a virtual environment:
-
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate  # On Linux/macOS
-venv\Scripts\activate   # On Windows
-```
-
-### 4. Install Dependencies and Build
-
-```bash
-cd py-commol
-
-# Install maturin (build tool)
-pip install maturin
-
-# Build and install the package
+cd commol/py-commol
+uv sync --extra dev --extra docs
+source .venv/bin/activate    # On Windows: .venv\Scripts\activate
 maturin develop --release
+pytest
 ```
 
-!!! important "Virtual Environment"
-Make sure your virtual environment is **activated before running `maturin develop`**. This ensures the extension is built into the correct Python environment.
+| Step | Why |
+|---|---|
+| `uv sync --extra dev --extra docs` | Creates `.venv` with the test, lint and documentation tools. |
+| `source .venv/bin/activate` | `maturin develop` installs into the active environment. |
+| `maturin develop --release` | Compiles the Rust extension and installs Commol in editable mode. Run it again after every Rust change. |
 
-## Verify Installation
+!!! warning "Paths with spaces"
+    Maturin may fail when the project path contains spaces. Clone into a
+    path without them.
 
-Test that Commol is correctly installed:
+See [Development Workflow](../development/workflow.md) for branches, checks and
+pull requests.
 
-```python
-from commol import ModelBuilder
+## Next steps
 
-
-print("Commol installed successfully!")
-```
-
-## Next Steps
-
-- [Quick Start Guide](quickstart.md) - Build your first model
-- [Core Concepts](../guide/core-concepts.md) - Understand Commol fundamentals
+| To learn | Read |
+|---|---|
+| Your first model | [Quick Start](quickstart.md) |
+| The concepts | [Core Concepts](../guide/core-concepts.md) |

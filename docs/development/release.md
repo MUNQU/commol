@@ -1,5 +1,7 @@
 # Release Process
 
+[Back to Codebase Guide](../codebase/index.md)
+
 Commol follows [Semantic Versioning](https://semver.org/) (SemVer) for version numbering: `MAJOR.MINOR.PATCH`
 
 ## Version Guidelines

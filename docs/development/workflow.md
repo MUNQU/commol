@@ -1,67 +1,25 @@
 # Development Workflow
 
+[Back to Codebase Guide](../codebase/index.md)
+
 ## Development Setup
 
-Commol is built with Rust and Python. To set up your development environment:
-
-!!! warning "Path Requirements"
-The project directory path **must not contain tildes (`~`) or spaces**. Maturin (the Rust-Python build tool) may fail with these characters in the path.
-
-    **Good paths:**
-
-    - `/home/username/projects/commol`
-    - `/Users/username/Documents/commol`
-    - `/opt/projects/commol`
-
-    **Bad paths:**
-
-    - `~/projects/commol` (contains tilde)
-    - `/home/my projects/commol` (contains space)
-    - `/Users/User Name/commol` (contains space)
-
-### 1. Install Prerequisites
-
-```bash
-# Install Rust toolchain
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Install Python 3.12 or higher
-# (use your system's package manager)
-```
-
-### 2. Clone and Setup
+Follow [Build from source](../getting-started/installation.md#build-from-source),
+then install the pre-commit hooks:
 
 ```bash
 git clone https://github.com/MUNQU/commol.git
-cd commol
-
-# Create and activate virtual environment
-python -m venv venv
-
-source venv/bin/activate  # On Linux/macOS
-venv\Scripts\activate   # On Windows
-
-# Install Python dependencies
-cd py-commol
-pip install -e ".[dev,docs]"
-
-# Install pre-commit hooks (optional but recommended)
+cd commol/py-commol
+uv sync --extra dev --extra docs
+source .venv/bin/activate
+maturin develop --release
 pre-commit install
 ```
 
-### 3. Build the Project
-
-```bash
-# Build Rust workspace
-cargo build --workspace
-
-# Build Python extension (with virtual environment activated)
-cd py-commol
-maturin develop --release
-```
-
-!!! important "Virtual Environment and Maturin"
-Make sure your virtual environment is **activated before running `maturin develop`**. This ensures the Rust extension is built into the correct Python environment.
+Run `maturin develop --release` again after every Rust change, before you run
+`pytest`. `cargo build --workspace` does not link the PyO3 crate outside
+maturin; use `cargo clippy` and the per-crate tests instead (see
+[Quick commands](#quick-commands)).
 
 ## Branching Strategy
 
@@ -118,7 +76,7 @@ cargo test --workspace
 
 ### 4. Committing Changes
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
+We follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages. The scope is required, and a message is one short phrase with no body; see [Commits](../codebase/conventions.md#commits):
 
 ```bash
 # Commit format: <type>(<scope>): <description>
@@ -225,16 +183,16 @@ already tests the result of merging it into `main`.
 ### Quick Commands
 
 ```bash
-# Run all quality checks (Python) - make sure venv is activated
-cd py-commol && ruff check . && ruff format . && ty check commol && pytest
+# Python, from py-commol/ with the virtual environment active
+ruff check . && ruff format --check . && ty check commol && pytest
 
-# Run all quality checks (Rust)
-cargo fmt --all && cargo clippy --all-targets && cargo test --workspace
+# Rust, from the repository root
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p commol-core -p commol-difference -p commol-calibration
 
-# Build and test the Python package locally - make sure venv is activated
-cd py-commol
-maturin develop --release
-pytest
+# Documentation, from the repository root
+mkdocs build --strict
 ```
 
 ### Pre-commit Hooks
@@ -246,12 +204,16 @@ cd py-commol
 pre-commit install
 ```
 
-This runs:
+On every commit, the hooks in `.pre-commit-config.yaml` run:
 
-- Ruff linting and formatting
-- Ty type checking
-- Trailing whitespace removal
-- End-of-file fixing
+| Hook | Checks |
+|---|---|
+| `cargo-fmt` | Rust formatting |
+| `cargo-clippy` | Rust lints with `-D warnings`, including `missing_docs` |
+| `ty-check` | Python types of `commol` |
+| `ruff-check` | Python lints, including docstrings (`D1`, `D417`) |
+| `ruff-format` | Python formatting |
+| `uv-lock` | `uv.lock` matches `pyproject.toml` |
 
 ### Debugging Rust from Python
 

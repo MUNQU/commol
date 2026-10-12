@@ -89,7 +89,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T8 | S2 | API reference pages for the 12 missing public names | direct | this commit (see Evidence) |
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | this commit (see Evidence) |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | this commit (see Evidence) |
-| T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
+| T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split in T4 and T6, banner in T12, rest in this commit |
 | T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | this commit (see Evidence) |
 | T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | this commit (see Evidence) |
 | T14 | S1–S6 | Final audit: re-run every baseline measurement and record zero gaps | direct | pending |
@@ -294,6 +294,17 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   793 KB), linked from `index.md`. New transitive dependencies were pinned to
   releases at least two weeks old: soupsieve 2.10 and wcwidth 0.9.1 instead
   of 3.0.2 (released today) and 0.9.2.
+
+- T11 (rest): every page except the home page now starts with a back link
+  (the development and about pages had none). `installation.md` rewritten
+  (PyPI first, wheels table, build from source with uv; it still said "once
+  published"). `workflow.md`: setup with uv, quick commands that work locally,
+  the real pre-commit hooks (it listed trailing-whitespace and end-of-file
+  hooks that do not exist), commit rule link. `contributing.md` no longer
+  duplicates the conventions with invented examples, and no longer shows commit
+  bodies, which contradicted the commit rule. Three malformed admonitions
+  (body not indented) fixed. Changelog `[Unreleased]` gained a Documentation
+  section.
 
 ## Log
 
