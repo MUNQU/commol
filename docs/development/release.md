@@ -33,235 +33,183 @@ Incremented for backwards-compatible bug fixes:
 - Security patches
 - Example: Fixing calculation errors, typos in error messages
 
+!!! note "Versions before 1.0.0"
+    While Commol is at `0.x`, a breaking change increments the MINOR version
+    (`0.1.3` → `0.2.0`) and everything else increments the PATCH version.
+
+## Where the Version Comes From
+
+The version is not stored in the repository. `Cargo.toml` keeps a placeholder
+(`0.1.0`), and `pyproject.toml` declares the version as dynamic. When a release
+is built, the `set-version` action (`.github/actions/set-version`) reads the
+git tag, writes it into `py-commol/Cargo.toml`, and maturin turns it into the
+Python package version.
+
+Do not commit version bumps. The tag is the version.
+
 ## Release Workflow
 
-### Step 1: Prepare the Release
+A release is always made from `main`. Publishing a GitHub release starts the
+**Release to PyPI** workflow (`.github/workflows/release.yaml`), which
+publishes to PyPI immediately: the `pypi` environment has no approval step.
 
-#### 1.1 Update Version Numbers
+!!! warning "A published version is final"
+    PyPI never accepts the same version number twice, even after you delete
+    it. Check the tag and the commit before you publish.
 
-Edit the following files:
+### Step 1: Promote `develop` to `main`
 
-- `py-commol/pyproject.toml` - Update `version` field
-- `Cargo.toml` - Update `[workspace.package]` version
+Open a pull request from `develop` to `main` and merge it with **"Create a
+merge commit"**, the only method the `main` ruleset allows (see
+[Development Workflow](workflow.md#8-promoting-develop-to-main)). Wait until the
+**Build** run of the push to `main` passes: it is the only run that builds the
+wheels for every target architecture.
 
-```toml
-# py-commol/pyproject.toml
-[tool.poetry]
-version = "1.2.3"
+### Step 2: Choose the Version
 
-# Cargo.toml
-[workspace.package]
-version = "1.2.3"
-```
-
-#### 1.2 Update CHANGELOG (if maintained)
-
-Document all changes under the new version:
-
-```markdown
-## [1.2.3] - 2024-12-15
-
-### Added
-
-- New mathematical functions for transition rates
-- Support for multi-compartment transitions
-
-### Changed
-
-- Improved simulation performance by 20%
-
-### Fixed
-
-- Fixed population conservation bug in stratified models
-- Corrected type hints in Simulation class
-
-### Security
-
-- Updated dependencies to patch vulnerabilities
-```
-
-#### 1.3 Run Quality Checks
+List the changes since the last release:
 
 ```bash
-# Python checks
-cd py-commol
-poetry run ruff check .
-poetry run ruff format .
-poetry run ty check commol
-poetry run pytest
-
-# Rust checks
-cd ..
-cargo fmt --all
-cargo clippy --all-targets --all-features
-cargo test --workspace
+git fetch --tags origin
+git log --oneline --first-parent "$(git describe --tags --abbrev=0 origin/main)"..origin/main
 ```
 
-#### 1.4 Commit Version Changes
+Use the Version Guidelines above. The `[Unreleased]` section of
+`docs/about/changelog.md` lists the changes, and the breaking ones are marked
+**Breaking**.
+
+### Step 3: Create the Tag
+
+Tag the commit at the top of `main` with an annotated tag:
 
 ```bash
-git add py-commol/pyproject.toml Cargo.toml CHANGELOG.md
-git commit -m "chore: bump version to X.Y.Z"
-git push origin main
-```
-
-### Step 2: Create GitHub Release
-
-#### 2.1 Create Tag
-
-```bash
+git checkout main
+git pull --ff-only origin main
 git tag -a vX.Y.Z -m "Release version X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-#### 2.2 Create GitHub Release
+The tag must start with `v`. Pushing a tag does not publish anything.
 
-1. Go to [Releases page](https://github.com/MUNQU/commol/releases)
-2. Click "Draft a new release"
-3. Select tag: `vX.Y.Z`
-4. Set release title: `Version X.Y.Z`
-5. Add release notes:
+### Step 4: Publish the GitHub Release
+
+Write the release notes from the changelog. Include only the changes since the
+previous release:
 
 ```markdown
 ## What's New in X.Y.Z
 
 ### New Features
 
-- Feature 1 description
-- Feature 2 description
+- Feature description
 
-### Bug Fixes
+## Breaking Changes
 
-- Fix 1 description
-- Fix 2 description
+- What changed and what users must do
 
-### Documentation
+## Bug Fixes
 
-- Documentation improvements
+- Fix description
 
-### Performance
+## Dependencies
 
-- Performance improvements
-
-## Breaking Changes (for major versions)
-
-- List breaking changes
-- Migration guide
+- Updated dependencies
 
 ## Installation
 
-pip install commol==X.Y.Z
+pip install --upgrade commol==X.Y.Z
 
 ## Full Changelog
 
-See [CHANGELOG.md](https://github.com/MUNQU/commol/blob/main/CHANGELOG.md)
+https://github.com/MUNQU/commol/compare/vPREVIOUS...vX.Y.Z
 ```
 
-6. Click "Publish release"
-
-### Step 3: Automated PyPI Publication
-
-Once the release is published, the GitHub Actions workflow automatically:
-
-1. **Builds wheels** for Linux, Windows, and macOS
-2. **Creates source distribution** (sdist)
-3. **Publishes to PyPI** using trusted publishing
-
-Monitor progress:
-
-- Go to [Actions tab](https://github.com/MUNQU/commol/actions)
-- Watch the "Release to PyPI" workflow
-
-### Step 4: Verify the Release
-
-#### 4.1 Check PyPI
-
-Verify the package appears at: https://pypi.org/project/commol/
-
-#### 4.2 Test Installation
+Then publish the release, from the GitHub [Releases page](https://github.com/MUNQU/commol/releases)
+("Draft a new release", tag `vX.Y.Z`, title `Version X.Y.Z`) or with the
+GitHub CLI:
 
 ```bash
-# Create fresh virtual environment
-python -m venv test_env
-source test_env/bin/activate  # or test_env\Scripts\activate on Windows
-
-# Install the new version
-pip install commol==X.Y.Z
-
-# Verify it works
-python -c "from commol import ModelBuilder; print('Success!')"
+gh release create vX.Y.Z --verify-tag --title "Version X.Y.Z" --notes-file notes.md --latest
 ```
 
-#### 4.3 Test Functionality
+### Step 5: Watch the PyPI Publication
+
+The **Release to PyPI** workflow:
+
+1. Builds the wheels for Linux and macOS (x86_64 and aarch64) and Windows
+   (x86_64), for Python 3.12, 3.13 and 3.14
+2. Builds the source distribution (sdist)
+3. Publishes all of them to PyPI with trusted publishing
+
+Watch it in the [Actions tab](https://github.com/MUNQU/commol/actions) or with:
+
+```bash
+gh run watch "$(gh run list --workflow release.yaml --limit 1 --json databaseId --jq '.[0].databaseId')"
+```
+
+### Step 6: Verify the Release
+
+Check that the version appears at <https://pypi.org/project/commol/>. Then
+install it in a clean environment and run a model:
+
+```bash
+uv venv /tmp/commol-check
+uv pip install --python /tmp/commol-check/bin/python --refresh commol==X.Y.Z
+/tmp/commol-check/bin/python -I check.py
+```
 
 ```python
+# check.py
 from commol import ModelBuilder, Simulation
 
-
-# Run a quick test
 model = (
-    ModelBuilder(name="Test")
-    .add_bin(id="A", name="State A")
-    .add_bin(id="B", name="State B")
-    .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=0.3)
-    .add_parameter(id="k2", value=0.1)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
-    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
+    ModelBuilder(name="Release check")
+    .add_bin(id="S", name="Susceptible")
+    .add_bin(id="I", name="Infected")
+    .add_bin(id="R", name="Recovered")
+    .add_parameter(id="beta", value=0.3)
+    .add_parameter(id="gamma", value=0.1)
+    .add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+    .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0}
-        ]
+            {"bin": "S", "fraction": 0.99},
+            {"bin": "I", "fraction": 0.01},
+            {"bin": "R", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
 
-sim = Simulation(model)
-results = sim.run(num_steps=100)
-print(f"Final B: {results['B'][-1]:.0f}")
+results = Simulation(model).run(num_steps=100)
+print(f"Final R: {results['R'][-1]:.0f}")
 ```
 
-### Step 5: Sync Branches
+### Step 7: Update the Changelog
 
-```bash
-# Merge main back to develop
-git checkout develop
-git merge main
-git push origin develop
-```
+On a branch from `develop`, rename `## [Unreleased]` in
+`docs/about/changelog.md` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty
+`## [Unreleased]` above it, and update the Version History list. Open a pull
+request to `develop`.
+
+You do not need to merge `main` back into `develop`: the merge commit of
+Step 1 already keeps the two histories together.
 
 ## Pre-release Versions
 
-For testing before official release:
-
-### Alpha Releases
+Use a beta tag in the PEP 440 form, as for `v0.1.0b3`:
 
 ```bash
-# Version: X.Y.Z-alpha.N
-git tag -a v1.3.0-alpha.1 -m "Alpha release for testing"
-git push origin v1.3.0-alpha.1
+git tag -a vX.Y.ZbN -m "Beta release X.Y.ZbN"
+git push origin vX.Y.ZbN
 ```
 
-### Beta Releases
+The `set-version` action turns `X.Y.ZbN` into the Cargo version `X.Y.Z-beta.N`.
 
-```bash
-# Version: X.Y.Z-beta.N
-git tag -a v1.3.0-beta.1 -m "Beta release for testing"
-git push origin v1.3.0-beta.1
-```
-
-### Release Candidates
-
-```bash
-# Version: X.Y.Z-rc.N
-git tag -a v1.3.0-rc.1 -m "Release candidate"
-git push origin v1.3.0-rc.1
-```
-
-**Important**: Mark GitHub releases as "pre-release" to prevent automatic PyPI publication.
+Mark the GitHub release as a **pre-release**. The workflow still publishes it
+to PyPI, but `pip` installs a pre-release only when it is asked for by version
+or with `--pre`.
 
 ## Version Support Policy
 
@@ -270,51 +218,50 @@ git push origin v1.3.0-rc.1
 
 ## PyPI Trusted Publishing Setup
 
-To enable automated PyPI publishing, configure trusted publishing:
+PyPI accepts the uploads of the release workflow without an API token. The
+trusted publisher of the `commol` project on PyPI is:
 
-1. Go to [PyPI](https://pypi.org) and log in
-2. Go to your project settings
-3. Navigate to "Publishing" section
-4. Add GitHub as a trusted publisher:
-   - **Owner**: MUNQU
-   - **Repository**: commol
-   - **Workflow**: release.yml
-   - **Environment**: pypi
+- **Owner**: MUNQU
+- **Repository**: commol
+- **Workflow**: `release.yaml`
+- **Environment**: `pypi`
 
-This allows GitHub Actions to publish without API tokens.
+If you rename the workflow file or the environment, update the trusted
+publisher on PyPI first, or the upload fails.
 
 ## Release Checklist
 
-- [ ] Version updated in `pyproject.toml`
-- [ ] Version updated in `Cargo.toml`
-- [ ] CHANGELOG updated with all changes
-- [ ] All tests passing locally
-- [ ] Version committed and pushed to main
-- [ ] Git tag created and pushed
-- [ ] GitHub release created with notes
-- [ ] CI/CD pipeline completed successfully
-- [ ] Package verified on PyPI
-- [ ] Installation tested in clean environment
-- [ ] Main merged back to develop
-- [ ] Release announced (if applicable)
+- [ ] `develop` merged into `main` with a merge commit
+- [ ] **Build** run on `main` passed
+- [ ] Version chosen
+- [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
+- [ ] GitHub release published with notes
+- [ ] **Release to PyPI** workflow passed
+- [ ] Version visible on PyPI and tested in a clean environment
+- [ ] Changelog updated in `develop`
 
 ## Troubleshooting
 
 ### PyPI Upload Fails
 
-1. Check GitHub Actions logs
-2. Verify trusted publishing is configured
-3. Ensure version number is unique (not already on PyPI)
-4. Check for artifact build errors
+1. Check the logs of the **Release to PyPI** workflow
+2. Check that the trusted publisher on PyPI matches the workflow file and
+   environment names
+3. Check that the version is not already on PyPI. If it is, publish a new
+   version; you cannot upload the same version again
 
 ### Wheel Build Fails
 
-1. Check that Rust code compiles on all platforms
-2. Verify maturin configuration is correct
-3. Check for platform-specific dependencies
+Nothing reaches PyPI when a build job fails, because the upload job needs all
+of them.
 
-### Version Conflicts
+1. Fix the problem on `develop` and promote it to `main`
+2. Delete the GitHub release and the tag:
 
-1. Ensure version is updated in all required files
-2. Use `git tag -d vX.Y.Z` to delete incorrect tags locally
-3. Use `git push origin :refs/tags/vX.Y.Z` to delete remote tags
+    ```bash
+    gh release delete vX.Y.Z --yes
+    git push origin :refs/tags/vX.Y.Z
+    git tag -d vX.Y.Z
+    ```
+
+3. Tag the new `main` commit and publish the release again

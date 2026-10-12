@@ -223,10 +223,11 @@ The project uses three main CI/CD pipelines:
 
 ### 2. Build (on every push/PR)
 
-- Builds on: Ubuntu, Windows, macOS
-- Python versions: 3.11, 3.12
+- Tests on: Ubuntu, Windows, macOS
+- Python versions: 3.12, 3.13, 3.14
 - Tests: Full test suite on all platforms
-- Artifacts: Wheel files for each platform
+- Wheels: built for every target architecture only on pushes to `main`
+- Required check: `Build Passed`, which sums up the whole workflow
 - Purpose: Ensure cross-platform compatibility
 
 ### 3. Release (on GitHub release)
@@ -234,7 +235,7 @@ The project uses three main CI/CD pipelines:
 - Builds wheels for all platforms
 - Creates source distribution
 - Publishes to PyPI using trusted publishing
-- Purpose: Automated deployment
+- Purpose: Automated deployment (see [Release Process](release.md))
 
 ## Local Development Tips
 
