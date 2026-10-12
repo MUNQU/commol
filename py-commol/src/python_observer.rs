@@ -129,32 +129,18 @@ where
     }
 }
 
-/// Helper struct to hold correction parameters extracted before moving problem
-struct CorrectionParams {
-    fixed_ic_sum: f64,
-    auto_calc_ic_idx: Option<usize>,
-    param_types: Vec<commol_calibration::CalibrationParameterType>,
-}
+/// Parameter bounds extracted before the problem moves into the executor, so
+/// the reported values are the ones the objective scored.
+struct ParameterBounds(Vec<(f64, f64)>);
 
-impl CorrectionParams {
-    /// Apply corrections to parameter values
-    fn apply(&self, mut param_values: Vec<f64>) -> Vec<f64> {
-        if let Some(idx) = self.auto_calc_ic_idx {
-            let calibrated_ic_sum: f64 = param_values
-                .iter()
-                .enumerate()
-                .filter(|(param_idx, _)| {
-                    self.param_types[*param_idx]
-                        == commol_calibration::CalibrationParameterType::InitialCondition
-                        && *param_idx != idx
-                })
-                .map(|(_, value)| value)
-                .sum();
-
-            let auto_calculated_value = (1.0 - self.fixed_ic_sum - calibrated_ic_sum).max(0.0);
-            param_values[idx] = auto_calculated_value;
-        }
+impl ParameterBounds {
+    /// Clamp parameter values to their bounds
+    fn apply(&self, param_values: Vec<f64>) -> Vec<f64> {
         param_values
+            .into_iter()
+            .zip(&self.0)
+            .map(|(value, (min, max))| value.clamp(*min, *max))
+            .collect()
     }
 }
 
@@ -174,13 +160,8 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
 
-    // Extract correction info BEFORE moving problem into executor
-    let (fixed_ic_sum, auto_calc_ic_idx, param_types) = problem.get_parameter_fix_info();
-    let correction_params = CorrectionParams {
-        fixed_ic_sum,
-        auto_calc_ic_idx,
-        param_types,
-    };
+    // Extract the bounds BEFORE moving problem into executor
+    let correction_params = ParameterBounds(problem.parameter_bounds());
 
     match config {
         OptimizationConfig::NelderMead(nm_config) => {

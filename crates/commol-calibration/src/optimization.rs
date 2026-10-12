@@ -620,12 +620,12 @@ fn optimize_nelder_mead_internal<E: SimulationEngine>(
     let state = result.state();
     let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
 
-    // Use CalibrationProblem's method to fix auto-calculated parameters
+    // Report the values the objective scored (clamped to their bounds)
     let corrected_params = result
         .problem()
         .problem
         .as_ref()
-        .map(|p| p.fix_auto_calculated_parameters(best_params.clone()))
+        .map(|p| p.applied_parameter_values(&best_params))
         .unwrap_or(best_params);
 
     Ok((
@@ -833,12 +833,12 @@ fn optimize_particle_swarm_internal<E: SimulationEngine>(
         None => (initial_params.clone(), f64::INFINITY),
     };
 
-    // Use CalibrationProblem's method to fix auto-calculated parameters
+    // Report the values the objective scored (clamped to their bounds)
     let corrected_params = result
         .problem()
         .problem
         .as_ref()
-        .map(|p| p.fix_auto_calculated_parameters(best_params.clone()))
+        .map(|p| p.applied_parameter_values(&best_params))
         .unwrap_or(best_params);
 
     Ok((

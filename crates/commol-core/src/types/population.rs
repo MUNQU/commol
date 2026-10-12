@@ -54,12 +54,22 @@ pub struct StratificationFractions {
     pub fractions: Vec<StratificationFraction>,
 }
 
+/// Specifies an override fraction for a single expanded compartment
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompartmentFraction {
+    pub compartment: String,
+    /// Fraction of the total population, applied after the uniform expansion
+    pub fraction: f64,
+}
+
 /// Initial conditions for the population model
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     pub population_size: u64,
     pub bin_fractions: Vec<BinFraction>,
     pub stratification_fractions: Vec<StratificationFractions>,
+    #[serde(default)]
+    pub compartment_fractions: Vec<CompartmentFraction>,
 }
 
 /// Complete population structure including disease states, stratifications, and initial conditions
@@ -71,4 +81,36 @@ pub struct Population {
     pub stratifications: Vec<Stratification>,
     pub transitions: Vec<Transition>,
     pub initial_conditions: InitialConditions,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initial_conditions_without_compartment_fractions_deserialize() {
+        let json = r#"{
+            "population_size": 1000,
+            "bin_fractions": [{"bin": "A", "fraction": 1.0}],
+            "stratification_fractions": []
+        }"#;
+        let conditions: InitialConditions = serde_json::from_str(json).unwrap();
+
+        assert!(conditions.compartment_fractions.is_empty());
+    }
+
+    #[test]
+    fn compartment_fractions_round_trip() {
+        let json = r#"{
+            "population_size": 1000,
+            "bin_fractions": [{"bin": "A", "fraction": 1.0}],
+            "stratification_fractions": [],
+            "compartment_fractions": [{"compartment": "A_g1", "fraction": 0.25}]
+        }"#;
+        let conditions: InitialConditions = serde_json::from_str(json).unwrap();
+
+        assert_eq!(conditions.compartment_fractions.len(), 1);
+        assert_eq!(conditions.compartment_fractions[0].compartment, "A_g1");
+        assert_eq!(conditions.compartment_fractions[0].fraction, 0.25);
+    }
 }

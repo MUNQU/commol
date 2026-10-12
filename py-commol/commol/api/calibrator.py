@@ -170,6 +170,7 @@ class Calibrator:
             rust_loss_config,
             rust_optimization_config,
             initial_population_size,
+            initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
         # Convert result back to Python CalibrationResult
@@ -270,6 +271,7 @@ class Calibrator:
             rust_loss_config,
             rust_optimization_config,
             initial_population_size,
+            initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
         logger.info(

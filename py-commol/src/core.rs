@@ -192,17 +192,16 @@ pub struct PyInitialConditions {
 #[pymethods]
 impl PyInitialConditions {
     #[new]
+    #[pyo3(signature = (population_size, bin_fractions, stratification_fractions=None, compartment_fractions=None))]
     fn new(
         population_size: u64,
-        bin_fractions: Vec<(String, f64)>,
+        bin_fractions: Vec<(String, Option<f64>)>,
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
+        compartment_fractions: Option<Vec<(String, f64)>>,
     ) -> Self {
         let bin_fractions: Vec<commol_core::BinFraction> = bin_fractions
             .into_iter()
-            .map(|(bin, fraction)| commol_core::BinFraction {
-                bin,
-                fraction: Some(fraction),
-            })
+            .map(|(bin, fraction)| commol_core::BinFraction { bin, fraction })
             .collect();
 
         let stratification_fractions = stratification_fractions
@@ -222,13 +221,73 @@ impl PyInitialConditions {
             )
             .collect();
 
+        let compartment_fractions = compartment_fractions
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(compartment, fraction)| commol_core::CompartmentFraction {
+                compartment,
+                fraction,
+            })
+            .collect();
+
         Self {
             inner: commol_core::InitialConditions {
                 population_size,
                 bin_fractions,
                 stratification_fractions,
+                compartment_fractions,
             },
         }
+    }
+
+    /// Declared population size.
+    #[getter]
+    fn population_size(&self) -> u64 {
+        self.inner.population_size
+    }
+
+    /// Declared bin fractions as ``(bin, fraction)`` pairs.
+    #[getter]
+    fn bin_fractions(&self) -> Vec<(String, Option<f64>)> {
+        self.inner
+            .bin_fractions
+            .iter()
+            .map(|bin_fraction| (bin_fraction.bin.clone(), bin_fraction.fraction))
+            .collect()
+    }
+
+    /// Declared stratification fractions as ``(stratification, categories)`` pairs.
+    #[getter]
+    fn stratification_fractions(&self) -> Vec<(String, Vec<(String, f64)>)> {
+        self.inner
+            .stratification_fractions
+            .iter()
+            .map(|stratification| {
+                (
+                    stratification.stratification.clone(),
+                    stratification
+                        .fractions
+                        .iter()
+                        .map(|fraction| (fraction.category.clone(), fraction.fraction))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// Per-compartment initial-condition overrides as ``(name, fraction)`` pairs.
+    #[getter]
+    fn compartment_fractions(&self) -> Vec<(String, f64)> {
+        self.inner
+            .compartment_fractions
+            .iter()
+            .map(|override_fraction| {
+                (
+                    override_fraction.compartment.clone(),
+                    override_fraction.fraction,
+                )
+            })
+            .collect()
     }
 }
 
@@ -248,9 +307,12 @@ impl PyDynamics {
             "differenceequations" | "difference_equations" | "difference" => {
                 commol_core::ModelTypes::DifferenceEquations
             }
+            "differentialequations" | "differential_equations" | "differential" => {
+                commol_core::ModelTypes::DifferentialEquations
+            }
             _ => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid typology '{}'. Must be 'DifferenceEquations', 'difference_equations', or 'difference'",
+                    "Invalid typology '{}'. Must be 'DifferenceEquations' or 'DifferentialEquations'",
                     typology
                 )));
             }

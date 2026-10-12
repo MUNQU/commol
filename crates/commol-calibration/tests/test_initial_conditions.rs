@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
-    ObservedDataPoint,
+    calibrated_initial_population, CalibrationParameter, CalibrationParameterType,
+    CalibrationProblem, LossConfig, ObservedDataPoint,
 };
-use commol_core::SimulationEngine;
+use commol_core::{OutputLabels, SimulationEngine};
 
 #[derive(Clone)]
 struct TestEngine {
@@ -76,6 +76,23 @@ impl SimulationEngine for TestEngine {
         self.compartments.clone()
     }
 
+    fn output_labels(&self) -> Vec<OutputLabels> {
+        // Names are `<bin>` or `<bin>_<category>` of a single stratification.
+        self.compartments
+            .iter()
+            .map(|name| match name.split_once('_') {
+                Some((bin, category)) => OutputLabels {
+                    source: bin.to_string(),
+                    categories: vec![("group".to_string(), category.to_string())],
+                },
+                None => OutputLabels {
+                    source: name.clone(),
+                    categories: vec![],
+                },
+            })
+            .collect()
+    }
+
     fn population(&self) -> Vec<f64> {
         self.population.clone()
     }
@@ -108,69 +125,116 @@ impl SimulationEngine for TestEngine {
     }
 }
 
-#[test]
-fn aggregate_initial_conditions_are_accepted_and_auto_corrected() {
-    let problem = CalibrationProblem::new(
-        TestEngine::new(),
-        vec![ObservedDataPoint::new(0, "A_cat0".to_string(), 300.0)],
-        vec![
-            CalibrationParameter::with_type_and_guess(
-                "A".to_string(),
-                CalibrationParameterType::InitialCondition,
-                0.1,
-                0.9,
-                0.6,
-            ),
-            CalibrationParameter::with_type_and_guess(
-                "B".to_string(),
-                CalibrationParameterType::InitialCondition,
-                0.1,
-                0.9,
-                0.4,
-            ),
-        ],
-        vec![],
-        LossConfig::SumSquaredError,
-        1000,
+fn initial_condition(id: &str) -> CalibrationParameter {
+    CalibrationParameter::with_type_and_guess(
+        id.to_string(),
+        CalibrationParameterType::InitialCondition,
+        0.0,
+        1.0,
+        0.5,
     )
-    .expect("aggregate bin IDs should be valid initial-condition targets");
+}
 
-    let corrected = problem.fix_auto_calculated_parameters(vec![0.65, 0.2]);
+fn initial_population(
+    engine: &TestEngine,
+    ids: &[&str],
+    remainder: Option<&str>,
+    values: &[f64],
+) -> Result<Vec<f64>, String> {
+    let parameters: Vec<_> = ids.iter().map(|id| initial_condition(id)).collect();
+    calibrated_initial_population(engine, &parameters, remainder, values, 1000)
+        .map(|state| state.population)
+}
 
-    assert_eq!(corrected, vec![0.65, 0.35]);
+fn assert_close(actual: &[f64], expected: &[f64]) {
+    assert_eq!(actual.len(), expected.len());
+    for (a, e) in actual.iter().zip(expected) {
+        assert!((a - e).abs() < 1e-9, "{actual:?} != {expected:?}");
+    }
 }
 
 #[test]
-fn auto_remainder_allows_fixed_initial_compartments_outside_optimizer() {
+fn remainder_absorbs_the_difference_and_keeps_its_split() {
+    // A = 0.65 keeps its 300:200 split; B takes the remaining 350 at 400:100.
+    let population = initial_population(&TestEngine::new(), &["A"], Some("B"), &[0.65]).unwrap();
+
+    assert_close(&population, &[390.0, 260.0, 280.0, 70.0]);
+}
+
+#[test]
+fn remainder_leaves_fixed_compartments_alone() {
+    // C stays at 100, so B takes 1000 - 300 - 100 = 600 at 300:100.
+    let population =
+        initial_population(&TestEngine::with_fixed_h(), &["A"], Some("B"), &[0.3]).unwrap();
+
+    assert_close(&population, &[180.0, 120.0, 100.0, 450.0, 150.0]);
+}
+
+#[test]
+fn single_exact_value_is_free_with_a_remainder() {
+    let population =
+        initial_population(&TestEngine::new(), &["A_cat1"], Some("B"), &[0.1]).unwrap();
+
+    assert_close(&population, &[300.0, 100.0, 480.0, 120.0]);
+}
+
+#[test]
+fn without_remainder_values_are_applied_as_given() {
+    let population = initial_population(&TestEngine::new(), &["A_cat0"], None, &[0.1]).unwrap();
+
+    assert_close(&population, &[100.0, 200.0, 400.0, 100.0]);
+}
+
+#[test]
+fn without_remainder_an_excess_over_the_population_is_rejected() {
+    let error = initial_population(&TestEngine::new(), &["A_cat0"], None, &[0.5]).unwrap_err();
+
+    assert!(error.contains("exceed the population size"), "{error}");
+}
+
+#[test]
+fn negative_remainder_is_rejected() {
+    let error =
+        initial_population(&TestEngine::with_fixed_h(), &["A"], Some("B"), &[0.95]).unwrap_err();
+
+    assert!(error.contains("remainder 'B'"), "{error}");
+}
+
+#[test]
+fn remainder_overlapping_a_calibrated_value_is_rejected() {
+    let error = initial_population(&TestEngine::new(), &["A"], Some("A_cat0"), &[0.5]).unwrap_err();
+
+    assert!(error.contains("overlaps"), "{error}");
+}
+
+#[test]
+fn category_splits_apply_after_bin_values_whatever_the_parameter_order() {
+    // A = 0.6 first (360 / 240), then cat1 = 0.1 splits every pair, and the
+    // remainder B takes 400 at the new 450:50 split.
+    let population =
+        initial_population(&TestEngine::new(), &["cat1", "A"], Some("B"), &[0.1, 0.6]).unwrap();
+
+    assert_close(&population, &[540.0, 60.0, 360.0, 40.0]);
+}
+
+#[test]
+fn infeasible_initial_conditions_are_penalized() {
     let problem = CalibrationProblem::new(
         TestEngine::with_fixed_h(),
         vec![ObservedDataPoint::new(0, "A_cat0".to_string(), 300.0)],
-        vec![
-            CalibrationParameter::with_type_and_guess(
-                "A".to_string(),
-                CalibrationParameterType::InitialCondition,
-                0.1,
-                0.9,
-                0.6,
-            ),
-            CalibrationParameter::with_type_and_guess(
-                "B".to_string(),
-                CalibrationParameterType::InitialCondition,
-                0.1,
-                0.9,
-                0.4,
-            ),
-        ],
+        vec![initial_condition("A")],
         vec![],
         LossConfig::SumSquaredError,
         1000,
     )
-    .expect("fixed initial compartments should not block auto remainder");
+    .unwrap()
+    .with_initial_condition_remainder("B")
+    .unwrap();
 
-    let corrected = problem.fix_auto_calculated_parameters(vec![0.3, 0.2]);
+    let feasible = problem.cost(&vec![0.6]).expect("cost should run");
+    let infeasible = problem.cost(&vec![0.95]).expect("cost should run");
 
-    assert_eq!(corrected[0], 0.3);
-    assert!((corrected[1] - 0.6).abs() < 1e-12);
+    assert!(infeasible > feasible);
 }
 
 #[test]

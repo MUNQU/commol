@@ -169,7 +169,7 @@ model = (
     .build(typology="DifferenceEquations")
 )
 
-# Calibrate initial fraction for B
+# Calibrate the initial fraction of B; A absorbs the difference
 parameters = [
     CalibrationParameter(
         id="B",
@@ -183,6 +183,7 @@ parameters = [
 problem = CalibrationProblem(
     observed_data=observed_data,
     parameters=parameters,
+    initial_condition_remainder="A",
     loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=1000),
 )
@@ -192,13 +193,60 @@ simulation = Simulation(model)
 calibrator = Calibrator(simulation, problem)
 result = calibrator.run()
 
-# Update initial conditions with calibrated values
-model.update_initial_conditions(result.best_parameters)
+# Write the calibrated initial conditions back (B and the remainder A)
+model.apply_calibration_parameters(result, problem)
 
 # Now create final simulation
 final_simulation = Simulation(model)
 results = final_simulation.run(num_steps=100)
 ```
+
+#### The initial-condition remainder
+
+Calibrated initial conditions are applied as given. When they change the
+population of some compartments, `initial_condition_remainder` names the
+compartment or bin that absorbs the difference, so the initial population
+stays `population_size`:
+
+- The remainder is not calibrated; it takes `population_size` minus every
+  other compartment, and keeps its own split across strata.
+- It must not overlap a calibrated bin or compartment.
+- A combination that would leave it negative is penalized during the
+  optimization.
+
+Without a remainder, the values are applied as given and only an initial
+population above `population_size` is penalized.
+
+This is what makes a single composite state calibratable:
+
+```python
+parameters = [
+    CalibrationParameter(
+        id="IH_oe60_hosp",  # one expanded compartment
+        parameter_type="initial_condition",
+        min_bound=0.0,
+        max_bound=0.1,
+    )
+]
+problem = CalibrationProblem(
+    ...,
+    parameters=parameters,
+    initial_condition_remainder="S",
+)
+```
+
+#### Order of application
+
+Calibrated initial conditions are written in the same layers as a model
+definition, whatever their order in `parameters`:
+
+1. bin values (`A`, or a bin prefix such as `A_g1`);
+2. stratification-category splits (`g1`, or `group:g1`);
+3. exact compartments (`A_g1_s2`);
+4. the remainder.
+
+A category name that more than one stratification declares must be qualified
+with its stratification, as in `sex:female`.
 
 ## Loss Functions
 
@@ -741,10 +789,16 @@ from commol import applied_parameters_report
 report = applied_parameters_report(model, result, problem)
 ```
 
-Initial conditions carry the `fraction` the model was built from, the head
-`value` it works out to, and the `group` that fraction is taken of — which for a
-[conditional stratification](core-concepts.md#subgroup-head-counts) is its
-conditioning categories rather than the whole population.
+Initial conditions carry the effective `value` the engine builds from the
+uniform expansion plus the declared `compartment_fractions` overrides, and its
+`fraction` as that head count over the declared population size. Every row uses
+that one denominator, so the row fractions line up with each other and with `N`
+(the declared `population_size`, fraction `1.0`). The `group` records which
+subgroup the row belongs to — for a
+[conditional stratification](core-concepts.md#subgroup-head-counts) its
+conditioning categories rather than the whole population. A bin left
+uncalibrated keeps a `null` `fraction` and `value` even when overrides touch
+some of its compartments; the override rows still carry their own numbers.
 
 Pass `problem` to include `scale` parameters, which are calibrated but have no
 place in the model. For a `ProbabilisticCalibrationResult` every entry also
@@ -765,8 +819,11 @@ gains an `interval` block, and the report is preceded by `confidence_level`:
 }
 ```
 
-Intervals are in the unit the entry was calibrated in, so for an initial
-condition that is its fraction, not its head count.
+Intervals are in the unit the entry reports. A parameter keeps its calibrated
+unit; an initial condition is a fraction of the whole population, so a
+conditional stratification category — calibrated as a fraction of its
+conditioning subgroup — has its interval rescaled by that subgroup's share of
+the population and therefore brackets the reported fraction.
 
 ### Reporting the run itself
 
@@ -827,16 +884,24 @@ Each value is routed by its declared `parameter_type`:
 | `parameter_type` | Written to |
 |---|---|
 | `parameter` | the model parameter of that id |
-| `initial_condition`, id is a bin | that bin's fraction |
-| `initial_condition`, id is a stratification category | that category's fraction, and the remaining category |
+| `initial_condition` | the initial population the engine scored (see below) |
 | `scale` | nothing — it scales observations, not the model |
 
-!!! warning "Per-compartment initial conditions cannot be written back"
+Initial-condition values are written back so that the model rebuilds the
+initial population the engine scored for them. The Rust engine is the single
+authority for that population: it applies the values exactly as the calibration
+objective does (see [the remainder](#the-initial-condition-remainder) and
+[the order of application](#order-of-application)). The write-back then:
 
-    A calibration parameter naming an expanded compartment (`A_group1`) is
-    accepted by the calibrator, but the model stores initial conditions only as
-    bin and stratification fractions, so there is nowhere to put it.
-    `apply_calibration_parameters` raises rather than skipping it silently.
+1. gives every bin a calibrated value or the remainder covers the share of the
+   population the engine gave it, and every calibrated category the split the
+   engine applied, so the definition stays readable;
+2. rebuilds the model and pins every compartment whose head count still
+   differs from the scored one as a `compartment_fractions` override.
+
+An expanded-compartment id (`A_group1`) therefore always ends up as an
+override, and so does any bin or category value that overlaps an existing
+override. Reloading the model reproduces the scored state exactly.
 
 #### Calibrated stratification splits
 

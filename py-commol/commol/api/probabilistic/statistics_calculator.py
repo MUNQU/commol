@@ -161,6 +161,9 @@ class StatisticsCalculator:
                     self._calibration_runner.initial_population_size(),
                     parameter_sets,
                     time_steps,
+                    initial_condition_remainder=(
+                        self._calibration_runner.problem.initial_condition_remainder
+                    ),
                 )
             )
 
