@@ -14,10 +14,15 @@ updates:
       interval: "monthly"
     target-branch: "develop"
     groups:
+      # The cranelift crates must share one version, and each 0.x release is a
+      # major update; the whole family moves together. Listed first, because a
+      # dependency joins the first group it matches.
+      cranelift:
+        patterns: ["cranelift*"]
       rust-minor-patch:
         patterns: ["*"]
         # A 0.x minor release of pyo3 changes its API; keep it separate.
-        exclude-patterns: ["pyo3*"]
+        exclude-patterns: ["pyo3*", "cranelift*"]
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "uv" # Python dependencies
