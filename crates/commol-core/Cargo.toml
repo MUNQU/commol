@@ -20,6 +20,6 @@ evalexpr = "12.0"
 
 # Cranelift JIT compiler
 cranelift = "0.125"
-cranelift-jit = "0.125"
+cranelift-jit = "0.126"
 cranelift-module = "0.125"
 cranelift-codegen = "0.125"
