@@ -21,7 +21,7 @@ owns every rule about how a model becomes numbers.
 | It is not | Boundary |
 |---|---|
 | A domain library | It knows bins, categories and rates, not diseases or drugs. Domain vocabulary belongs in user scripts. |
-| An ODE solver | `ModelTypes::DifferentialEquations` exists so any model can be expanded, but `crates/commol-differential/` is empty and the difference engine rejects that typology. |
+| An ODE solver | `ModelTypes::DifferentialEquations` exists so any model can be expanded, but no engine runs it: the difference engine rejects that typology. |
 | A clock | A model has no physical time: rates are per step and periods are step counts. `TimeScale` converts at the edges (see [Design decisions](design-decisions.md#physical-time-is-not-in-the-model)). |
 | A rule engine for transitions | `Transition.condition` is stored and serialized, but the engine does not evaluate it. |
 

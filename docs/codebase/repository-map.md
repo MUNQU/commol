@@ -20,7 +20,6 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-calibration/src/initial_conditions.rs` | How calibrated initial-condition values reach the engine (`InitialConditionPlan`, `calibrated_initial_population`). | Parameter values. |
 | `crates/commol-calibration/src/optimization.rs` | Nelder-Mead and particle swarm setup on the argmin fork. | Loss definitions. |
 | `crates/commol-calibration/src/probabilistic/` | Parallel calibration runs, deduplication, clustering and ensemble selection (NSGA-II). | Statistics for reports. |
-| `crates/commol-differential/` | Placeholder for an ODE engine; empty. | Anything, until that engine is designed. |
 
 ## PyO3 bindings
 
