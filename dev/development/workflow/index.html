@@ -2410,10 +2410,11 @@ Updating the file there also triggers a version-update check right away.</p>
 </ul>
 <h3 id="2-build-on-every-pushpr">2. Build (on every push/PR)<a class="headerlink" href="#2-build-on-every-pushpr" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Builds on: Ubuntu, Windows, macOS</li>
-<li>Python versions: 3.11, 3.12</li>
+<li>Tests on: Ubuntu, Windows, macOS</li>
+<li>Python versions: 3.12, 3.13, 3.14</li>
 <li>Tests: Full test suite on all platforms</li>
-<li>Artifacts: Wheel files for each platform</li>
+<li>Wheels: built for every target architecture only on pushes to <code>main</code></li>
+<li>Required check: <code>Build Passed</code>, which sums up the whole workflow</li>
 <li>Purpose: Ensure cross-platform compatibility</li>
 </ul>
 <h3 id="3-release-on-github-release">3. Release (on GitHub release)<a class="headerlink" href="#3-release-on-github-release" title="Permanent link">&para;</a></h3>
@@ -2421,7 +2422,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <li>Builds wheels for all platforms</li>
 <li>Creates source distribution</li>
 <li>Publishes to PyPI using trusted publishing</li>
-<li>Purpose: Automated deployment</li>
+<li>Purpose: Automated deployment (see <a href="../release/">Release Process</a>)</li>
 </ul>
 <h2 id="local-development-tips">Local Development Tips<a class="headerlink" href="#local-development-tips" title="Permanent link">&para;</a></h2>
 <h3 id="quick-commands">Quick Commands<a class="headerlink" href="#quick-commands" title="Permanent link">&para;</a></h3>
