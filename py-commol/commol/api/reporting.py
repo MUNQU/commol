@@ -14,7 +14,9 @@ from commol.context.calibration import (
     ObservedDataPoint,
     calibrated_values,
 )
+from commol.context._model.engine_state import InitialCompartment
 from commol.context.constants import CalibrationParameterType
+from commol.context.initial_conditions import CATEGORY_SEPARATOR
 from commol.context.model import Model
 from commol.context.probabilistic_calibration import (
     ParameterSetStatistics,
@@ -243,27 +245,43 @@ def _scale_ids(problem: CalibrationProblem | None) -> list[str]:
     ]
 
 
+def _category_ids(model: Model, stratification: str, category: str) -> list[str]:
+    """
+    Ids that name a stratification category, preferred first.
+
+    The qualified id (``sex:female``) always names it. The bare name does too
+    when no other stratification declares a category of that name.
+    """
+    qualified = f"{stratification}{CATEGORY_SEPARATOR}{category}"
+    preferred = model.population.initial_conditions.category_id(
+        stratification, category
+    )
+    return [qualified] if preferred == qualified else [preferred, qualified]
+
+
 def _override_is_calibrated(
     model: Model,
-    compartment: str,
+    compartment: InitialCompartment,
     calibrated_ids: set[str],
 ) -> bool:
-    """Whether a compartment override row was written back from calibration."""
-    if compartment in calibrated_ids:
+    """
+    Whether a compartment override row was written back from calibration.
+
+    It was when a calibrated id names the compartment, its bin, or a category
+    of a stratification applied to it: a category value splits the category
+    and its complement, so both sides are written back.
+    """
+    if compartment.name in calibrated_ids or compartment.bin in calibrated_ids:
         return True
-    for bin_item in model.population.bins:
-        if bin_item.id in calibrated_ids and (
-            compartment == bin_item.id or compartment.startswith(f"{bin_item.id}_")
-        ):
-            return True
-    categories = model.population.initial_conditions.get_categories_with_fractions()
-    for category in categories:
-        if category not in calibrated_ids:
-            continue
-        pairs = model._category_pairs(category)
-        if any(compartment == name for pair in pairs for name in pair):
-            return True
-    return False
+    categories_by_stratification = {
+        stratification.id: stratification.categories
+        for stratification in model.population.stratifications
+    }
+    return any(
+        not calibrated_ids.isdisjoint(_category_ids(model, stratification, category))
+        for stratification in compartment.categories
+        for category in categories_by_stratification[stratification]
+    )
 
 
 def _initial_conditions_report(
@@ -289,8 +307,8 @@ def _initial_conditions_report(
     """
     initial_conditions_block = model.population.initial_conditions
     population_size = float(initial_conditions_block.population_size)
-    effective = model._initial_population_fractions()
-    expanded = model._expanded_compartments()
+    state = model.initial_state()
+    by_name = {compartment.name: compartment for compartment in state}
     override_names = {
         override.compartment
         for override in initial_conditions_block.compartment_fractions
@@ -305,11 +323,7 @@ def _initial_conditions_report(
         }
     }
     for bin_fraction in initial_conditions_block.bin_fractions:
-        names = [
-            name
-            for name, _ in expanded
-            if name == bin_fraction.bin or name.startswith(f"{bin_fraction.bin}_")
-        ]
+        compartments = [c for c in state if c.bin == bin_fraction.bin]
         fraction: float | None
         value: float | None
         if bin_fraction.fraction is None:
@@ -317,14 +331,14 @@ def _initial_conditions_report(
             # pin some of its compartments; the override rows carry the numbers.
             fraction = None
             value = None
-        elif not (set(names) & override_names):
+        elif override_names.isdisjoint(c.name for c in compartments):
             # No override touches this row, so report the declared fraction
             # verbatim rather than an expansion sum that drifts in the last
             # float bits.
             fraction = bin_fraction.fraction
             value = fraction * population_size
         else:
-            value = sum(effective.get(name, 0.0) for name in names) * population_size
+            value = sum(c.population for c in compartments)
             fraction = value / population_size
         report[bin_fraction.bin] = _initial_condition_entry(
             bin_fraction.bin,
@@ -344,17 +358,20 @@ def _initial_conditions_report(
             model.subgroup_population(group) / population_size if group else 1.0
         )
         for category_fraction in stratification.fractions:
-            names = [
-                name
-                for name, applied in expanded
-                if applied.get(stratification.stratification)
+            row_value = sum(
+                c.population
+                for c in state
+                if c.categories.get(stratification.stratification)
                 == category_fraction.category
-            ]
-            row_value = (
-                sum(effective.get(name, 0.0) for name in names) * population_size
             )
-            report[category_fraction.category] = _initial_condition_entry(
-                category_fraction.category,
+            # A category name two stratifications declare is reported under
+            # its qualified id, so the rows do not overwrite each other.
+            ids = _category_ids(
+                model, stratification.stratification, category_fraction.category
+            )
+            entry_id = next((i for i in ids if i in calibrated_ids), ids[0])
+            report[ids[0]] = _initial_condition_entry(
+                entry_id,
                 _group_label(group),
                 row_value / population_size,
                 row_value,
@@ -364,7 +381,7 @@ def _initial_conditions_report(
             )
     for override in initial_conditions_block.compartment_fractions:
         calibrated = _override_is_calibrated(
-            model, override.compartment, calibrated_ids
+            model, by_name[override.compartment], calibrated_ids
         )
         report[override.compartment] = _initial_condition_entry(
             override.compartment,

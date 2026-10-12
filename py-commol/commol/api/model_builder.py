@@ -20,10 +20,6 @@ from commol.context.dynamics import (
     StratifiedRate,
     Transition,
 )
-from commol.context.compartments import (
-    generate_compartment_names,
-    uniform_compartment_fractions,
-)
 from commol.context.initial_conditions import (
     BinFraction,
     CompartmentFraction,
@@ -787,112 +783,6 @@ class ModelBuilder:
             rules=rule_objects,
         )
 
-    def _build_compartment_fractions(
-        self,
-        bin_fractions: list[BinFractionDict],
-        stratification_fractions: list[StratificationFractionsDict] | None,
-        compartment_fractions: list[CompartmentFractionDict] | None,
-    ) -> list[CompartmentFraction]:
-        """
-        Validate and convert per-compartment overrides.
-
-        Parameters
-        ----------
-        bin_fractions : list[BinFractionDict]
-            Bin fractions declared for the model.
-        stratification_fractions : list[StratificationFractionsDict] | None
-            Stratification fractions declared for the model.
-        compartment_fractions : list[CompartmentFractionDict] | None
-            Overrides, each mapping an expanded compartment name to a fraction
-            of the total population.
-
-        Returns
-        -------
-        list[CompartmentFraction]
-            Validated overrides.
-
-        Raises
-        ------
-        ValueError
-            If a compartment name is unknown or repeated, a fraction lies
-            outside ``[0.0, 1.0]``, or the overridden population exceeds the
-            total population size.
-        """
-        if not compartment_fractions:
-            return []
-
-        available = generate_compartment_names(self._bins, self._stratifications)
-        available_set = set(available)
-        uniform = self._uniform_compartment_fractions(
-            bin_fractions, stratification_fractions
-        )
-
-        seen: set[str] = set()
-        for override in compartment_fractions:
-            name = override["compartment"]
-            value = override["fraction"]
-            if name not in available_set:
-                raise ValueError(
-                    f"Compartment '{name}' is not part of the model expansion. "
-                    f"Available compartments: {available}"
-                )
-            if name in seen:
-                raise ValueError(f"Duplicate compartment fraction for '{name}'.")
-            seen.add(name)
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(
-                    f"Fraction for compartment '{name}' must be between 0.0 and "
-                    f"1.0, got {value}."
-                )
-
-        # Conservation semantics: overrides and bin fractions are both
-        # fractions of the total population, so the check compares normalized
-        # fractions against 1.0. An uncalibrated (``None``) bin fraction counts
-        # as zero: a violation that only appears after the uncalibrated bins
-        # receive their calibrated fractions is not detected here.
-        base_total = sum(uniform.values())
-        overridden_base = sum(uniform[o["compartment"]] for o in compartment_fractions)
-        overridden_value = sum(o["fraction"] for o in compartment_fractions)
-        if base_total - overridden_base + overridden_value > 1.0 + 1e-6:
-            raise ValueError(
-                "Per-compartment overrides would make the initial population "
-                "exceed population_size."
-            )
-
-        return [
-            CompartmentFraction(
-                compartment=override["compartment"], fraction=override["fraction"]
-            )
-            for override in compartment_fractions
-        ]
-
-    def _uniform_compartment_fractions(
-        self,
-        bin_fractions: list[BinFractionDict],
-        stratification_fractions: list[StratificationFractionsDict] | None,
-    ) -> dict[str, float]:
-        """
-        Compute the uniform expansion of bin fractions, before overrides.
-
-        Bins are split by each stratification that applies to them, in
-        declaration order. Values are fractions of the total population.
-        """
-        return uniform_compartment_fractions(
-            self._bins,
-            self._stratifications,
-            {bf["bin"]: bf["fraction"] for bf in bin_fractions},
-            (
-                (
-                    sf["stratification"],
-                    {
-                        fraction["category"]: fraction["fraction"]
-                        for fraction in sf["fractions"]
-                    },
-                )
-                for sf in (stratification_fractions or [])
-            ),
-        )
-
     def set_initial_conditions(
         self,
         population_size: int,
@@ -947,6 +837,9 @@ class ModelBuilder:
                 {"compartment": "IH_y60", "fraction": 0.0}
             ]
 
+            Compartment names and the resulting total population are checked
+            against the engine expansion when the model is built.
+
         Returns
         -------
         ModelBuilder
@@ -956,8 +849,7 @@ class ModelBuilder:
         ------
         ValueError
             If initial conditions have already been set, a compartment name is
-            unknown or repeated, a fraction lies outside ``[0.0, 1.0]``, or the
-            overrides make the initial population exceed ``population_size``.
+            repeated, or a fraction lies outside ``[0.0, 1.0]``.
         """
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
@@ -989,9 +881,12 @@ class ModelBuilder:
                     )
                 )
 
-        compartment_fraction_list = self._build_compartment_fractions(
-            bin_fractions, stratification_fractions, compartment_fractions
-        )
+        compartment_fraction_list = [
+            CompartmentFraction(
+                compartment=override["compartment"], fraction=override["fraction"]
+            )
+            for override in compartment_fractions or []
+        ]
 
         self._initial_conditions = InitialConditions(
             population_size=population_size,
@@ -1114,7 +1009,9 @@ class ModelBuilder:
         ------
         ValueError
             If validation fails, required components are missing,
-            or typology is invalid.
+            typology is invalid, or a per-compartment override names an unknown
+            compartment or makes the initial population exceed
+            ``population_size``.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")

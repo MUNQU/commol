@@ -4,6 +4,9 @@ from typing import Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+# Separator of a qualified category id, as in ``sex:female``.
+CATEGORY_SEPARATOR = ":"
+
 
 class BinFraction(BaseModel):
     """
@@ -169,35 +172,26 @@ class InitialConditions(BaseModel):
             )
         return self
 
-    def _validate_bin_fraction_total(
-        self,
-        candidate: Mapping[str, float | None],
-        *,
-        complete: bool,
-    ) -> None:
+    @staticmethod
+    def _validate_bin_fraction_total(candidate: Mapping[str, float | None]) -> None:
         """
-        Enforce the bin-fraction conservation rule on a candidate mapping.
+        Enforce the bin-fraction conservation rule on a complete mapping.
 
-        The rule mirrors :meth:`validate_calibrated_fractions_sum_to_one`:
-        uncalibrated (``None``) fractions floor the calibrated total strictly
+        Uncalibrated (``None``) fractions floor the calibrated total strictly
         below 1.0 so they can be filled later. When every bin is calibrated,
-        a complete specification must sum to 1.0; a partial update may leave the
-        total below 1.0 but never above it, because bin fractions are shares of
-        a single population.
+        the fractions must sum to 1.0, because they are shares of a single
+        population. Construction and updates apply the same rule, so an update
+        never produces a definition that cannot be loaded again.
 
         Parameters
         ----------
         candidate : Mapping[str, float | None]
-            Bin id to fraction after the candidate update.
-        complete : bool
-            Whether the caller specified every bin, so the sum-to-1 rule
-            applies in full.
+            Fraction of every bin.
 
         Raises
         ------
         ValueError
-            If the candidate bins would make the total exceed the population or
-            a complete specification does not sum to 1.0.
+            If the fractions break the rule.
         """
         calibrated = [value for value in candidate.values() if value is not None]
         if not calibrated:
@@ -213,15 +207,9 @@ class InitialConditions(BaseModel):
                     f"uncalibrated fraction(s). Calibrated fractions: "
                     f"{[item for item in candidate.items() if item[1] is not None]}"
                 )
-        elif complete:
-            if not math.isclose(total, 1.0, abs_tol=1e-4):
-                raise ValueError(
-                    f"Bin fractions must sum to 1.0, got {total:.4f}. "
-                    f"Fractions: {list(candidate.values())}"
-                )
-        elif total > 1.0 + 1e-4:
+        elif not math.isclose(total, 1.0, abs_tol=1e-4):
             raise ValueError(
-                f"Bin fractions must not sum to more than 1.0, got {total:.4f}. "
+                f"Bin fractions must sum to 1.0, got {total:.4f}. "
                 f"Fractions: {list(candidate.values())}"
             )
 
@@ -237,7 +225,7 @@ class InitialConditions(BaseModel):
         - If all fractions are None: skip validation (will be set before simulation)
         """
         self._validate_bin_fraction_total(
-            {bf.bin: bf.fraction for bf in self.bin_fractions}, complete=True
+            {bf.bin: bf.fraction for bf in self.bin_fractions}
         )
         return self
 
@@ -269,6 +257,56 @@ class InitialConditions(BaseModel):
             for fraction in stratification.fractions
         }
 
+    def resolve_category(self, category: str) -> tuple[str, str]:
+        """
+        Resolve a category id to its stratification and its bare name.
+
+        A qualified id (``sex:female``) names the stratification. A bare name
+        must be declared by exactly one stratification.
+
+        Parameters
+        ----------
+        category : str
+            A bare or qualified category id.
+
+        Returns
+        -------
+        tuple[str, str]
+            The stratification id and the bare category name.
+
+        Raises
+        ------
+        ValueError
+            If the category is not found or a bare name is ambiguous.
+        """
+        owner, name = self._owning_stratification(category)
+        return owner.stratification, name
+
+    def category_id(self, stratification: str, category: str) -> str:
+        """
+        Shortest id that names a category without ambiguity.
+
+        Parameters
+        ----------
+        stratification : str
+            Id of the stratification that declares the category.
+        category : str
+            Bare category name.
+
+        Returns
+        -------
+        str
+            The bare name, or ``stratification:category`` when another
+            stratification declares a category of the same name.
+        """
+        declaring = sum(
+            any(fraction.category == category for fraction in item.fractions)
+            for item in self.stratification_fractions
+        )
+        if declaring > 1:
+            return f"{stratification}{CATEGORY_SEPARATOR}{category}"
+        return category
+
     def get_category_fraction(self, category: str) -> float:
         """
         Get the fraction of a category within the group it subdivides.
@@ -276,7 +314,7 @@ class InitialConditions(BaseModel):
         Parameters
         ----------
         category : str
-            A stratification category name.
+            A category id, bare or qualified (``sex:female``).
 
         Returns
         -------
@@ -287,15 +325,13 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If the category is not found.
+            If the category is not found or a bare name is ambiguous.
         """
-        for stratification in self.stratification_fractions:
-            for fraction in stratification.fractions:
-                if fraction.category == category:
-                    return fraction.fraction
-        raise ValueError(
-            f"Category '{category}' not found in initial conditions. "
-            f"Available categories: {sorted(self.get_categories_with_fractions())}"
+        owner, name = self._owning_stratification(category)
+        return next(
+            fraction.fraction
+            for fraction in owner.fractions
+            if fraction.category == name
         )
 
     def subgroup_population(self, categories: Iterable[str] = ()) -> float:
@@ -309,8 +345,8 @@ class InitialConditions(BaseModel):
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category names forming a chain from the whole population down to
-            the subgroup, outermost first.
+            Category ids, bare or qualified, forming a chain from the whole
+            population down to the subgroup, outermost first.
 
         Returns
         -------
@@ -320,24 +356,45 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a category is not found.
+            If a category is not found or a bare name is ambiguous.
         """
         population = float(self.population_size)
         for category in categories:
             population *= self.get_category_fraction(category)
         return population
 
-    def _owning_stratification(self, category: str) -> StratificationFractions:
-        """Return the stratification that declares a category."""
-        for stratification in self.stratification_fractions:
-            if any(
-                fraction.category == category for fraction in stratification.fractions
-            ):
-                return stratification
-        raise ValueError(
-            f"Category '{category}' not found in initial conditions. "
-            f"Available categories: {sorted(self.get_categories_with_fractions())}"
-        )
+    def _owning_stratification(
+        self, category: str
+    ) -> tuple[StratificationFractions, str]:
+        """
+        Return the stratification that declares a category, and its bare name.
+
+        A qualified id (``sex:female``) names the stratification. A bare name
+        must be declared by exactly one stratification.
+        """
+        stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
+        owners = [
+            stratification
+            for stratification in self.stratification_fractions
+            if (not separator or stratification.stratification == stratification_id)
+            and any(fraction.category == name for fraction in stratification.fractions)
+        ]
+        if len(owners) > 1:
+            qualified = " or ".join(
+                f"'{owner.stratification}{CATEGORY_SEPARATOR}{name}'"
+                for owner in owners
+            )
+            raise ValueError(
+                f"Category '{category}' is ambiguous: it is declared by "
+                f"stratifications {[owner.stratification for owner in owners]}. "
+                f"Qualify it as {qualified}."
+            )
+        if not owners:
+            raise ValueError(
+                f"Category '{category}' not found in initial conditions. "
+                f"Available categories: {sorted(self.get_categories_with_fractions())}"
+            )
+        return owners[0], name
 
     def _apply_stratification_update(
         self,
@@ -380,22 +437,25 @@ class InitialConditions(BaseModel):
         Update stratification category fractions by category name.
 
         Categories belonging to several stratifications may be given in one
-        call. Within each stratification, at most one category may be omitted;
-        the omitted category receives the remaining fraction so that the
-        stratification sums to 1.0. When every category is given, the values
+        call. A category name declared by more than one stratification must be
+        qualified with its stratification, as in ``sex:female``. Within each
+        stratification, at most one category may be omitted; the omitted
+        category receives the remaining fraction so that the stratification
+        sums to 1.0. When every category is given, the values
         must already sum to 1.0.
 
         Parameters
         ----------
         fractions : Mapping[str, float]
-            Dictionary mapping category names to their new fraction values.
-            Each value must lie between 0.0 and 1.0.
+            Dictionary mapping category names, bare or qualified, to their new
+            fraction values. Each value must lie between 0.0 and 1.0.
 
         Raises
         ------
         ValueError
-            If a category is not found, a value lies outside [0.0, 1.0], a
-            stratification has more than one category omitted, fully specified
+            If a category is not found or is ambiguous, a value lies outside
+            [0.0, 1.0], a stratification has more than one category omitted, fully
+            specified
             values do not sum to 1.0, or the given values exceed 1.0.
         """
         for category, value in fractions.items():
@@ -407,8 +467,8 @@ class InitialConditions(BaseModel):
 
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
-            owner = self._owning_stratification(category).stratification
-            by_stratification.setdefault(owner, {})[category] = value
+            owner, name = self._owning_stratification(category)
+            by_stratification.setdefault(owner.stratification, {})[name] = value
 
         for stratification in self.stratification_fractions:
             named = by_stratification.get(stratification.stratification)
@@ -420,11 +480,10 @@ class InitialConditions(BaseModel):
         Upsert per-compartment overrides by expanded compartment name.
 
         A compartment already present in ``compartment_fractions`` has its
-        fraction replaced; a new one is appended. The candidate overrides are
-        validated before they are stored, so a rejected call leaves the
-        initial conditions unchanged. The check compares the overrides plus the
-        bin fractions they do not cover against the total population; it does
-        not expand compartments.
+        fraction replaced; a new one is appended. Compartment names and the
+        total population depend on the model expansion, so they are validated
+        by :meth:`~commol.context.model.Model.update_compartment_fractions`
+        against the engine, not here.
 
         Parameters
         ----------
@@ -436,90 +495,21 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a value lies outside ``[0.0, 1.0]``, or the overrides make the
-            initial population exceed ``population_size``.
+            If a value lies outside ``[0.0, 1.0]``.
         """
-        self._upsert_compartment_fractions(fractions, validate_total=True)
-
-    def _upsert_compartment_fractions(
-        self, fractions: Mapping[str, float], *, validate_total: bool
-    ) -> None:
-        """
-        Write overrides, optionally skipping the over-allocation guard.
-
-        Calibration write-back persists scored engine states that may be
-        non-conserving (the Rust ``set_initial_condition`` has no total check),
-        so it calls this with ``validate_total=False``. The fraction range is
-        always enforced.
-        """
-        for compartment, value in fractions.items():
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(
-                    f"Fraction for compartment '{compartment}' must be between "
-                    f"0.0 and 1.0, got {value}."
-                )
-
-        candidate = {
-            override.compartment: override.fraction
+        updated = {
+            compartment: CompartmentFraction(compartment=compartment, fraction=value)
+            for compartment, value in fractions.items()
+        }
+        existing = {override.compartment for override in self.compartment_fractions}
+        self.compartment_fractions = [
+            updated.get(override.compartment, override)
             for override in self.compartment_fractions
-        }
-        candidate.update(fractions)
-        if validate_total:
-            self._validate_compartment_fraction_total(candidate)
-
-        for compartment, value in fractions.items():
-            for existing in self.compartment_fractions:
-                if existing.compartment == compartment:
-                    existing.fraction = value
-                    break
-            else:
-                self.compartment_fractions.append(
-                    CompartmentFraction(compartment=compartment, fraction=value)
-                )
-
-    def _validate_compartment_fraction_total(
-        self, overrides: Mapping[str, float]
-    ) -> None:
-        """
-        Enforce that overrides plus uncovered bin fractions stay within 1.0.
-
-        A bin counts as covered when an override names it or one of its
-        expanded compartments. Uncalibrated (``None``) bin fractions are
-        skipped: a violation that only appears once they receive their
-        calibrated fractions is not detected here.
-
-        Parameters
-        ----------
-        overrides : Mapping[str, float]
-            Candidate override fractions keyed by compartment name.
-
-        Raises
-        ------
-        ValueError
-            If the overrides make the initial population exceed
-            ``population_size``.
-        """
-        covered_bins = {
-            bin_fraction.bin
-            for bin_fraction in self.bin_fractions
-            if any(
-                compartment == bin_fraction.bin
-                or compartment.startswith(f"{bin_fraction.bin}_")
-                for compartment in overrides
-            )
-        }
-        uncovered = sum(
-            bin_fraction.fraction
-            for bin_fraction in self.bin_fractions
-            if bin_fraction.fraction is not None
-            and bin_fraction.bin not in covered_bins
-        )
-        total = sum(overrides.values())
-        if total + uncovered > 1.0 + 1e-6:
-            raise ValueError(
-                "Per-compartment overrides would make the initial population "
-                "exceed population_size."
-            )
+        ] + [
+            override
+            for compartment, override in updated.items()
+            if compartment not in existing
+        ]
 
     def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         """
@@ -527,14 +517,10 @@ class InitialConditions(BaseModel):
 
         The candidate fractions are validated before any bin is mutated, so a
         rejected call leaves the initial conditions unchanged. The conservation
-        rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied:
-        a complete specification must sum to 1.0 and a partial one must not
-        exceed it, while uncalibrated (``None``) bins reserve the remainder.
-
-        Calibration write-back never reaches this method with a non-conserving
-        update: a bin value that would break the declared mapping is diverted
-        to per-compartment overrides by
-        :meth:`~commol.context.model.Model._route_calibration_values`.
+        rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
+        to the resulting mapping: the bin fractions must sum to 1.0, while
+        uncalibrated (``None``) bins reserve the remainder. To move population
+        between bins, update every bin involved in one call.
 
         Parameters
         ----------
@@ -558,7 +544,7 @@ class InitialConditions(BaseModel):
 
         candidate = {bf.bin: bf.fraction for bf in self.bin_fractions}
         candidate.update(fractions)
-        self._validate_bin_fraction_total(candidate, complete=set(fractions) >= known)
+        self._validate_bin_fraction_total(candidate)
 
         for bin_id, fraction in fractions.items():
             for bf in self.bin_fractions:

@@ -3,19 +3,20 @@ from itertools import combinations, product
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context._model import engine_state
+from commol.context._model.calibration_write_back import (
+    calibrated_initial_conditions,
+    with_initial_conditions,
+)
+from commol.context._model.engine_state import InitialCompartment
 from commol.context._model.serialization import render_json
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
     calibrated_values,
-)
-from commol.context.compartments import (
-    expand_over_stratifications,
-    generate_compartment_names,
-    uniform_compartment_fractions,
 )
 from commol.context.constants import CalibrationParameterType
 from commol.context.dynamics import Dynamics, Transition
@@ -55,13 +56,6 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
-
-    # Compartment pairs depend only on the (immutable after construction)
-    # stratifications, so memoizing them per model instance keeps repeated
-    # report lookups linear in the number of categories.
-    _category_pairs_cache: dict[str, list[tuple[str, str]]] = PrivateAttr(
-        default_factory=dict
-    )
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:
@@ -245,7 +239,9 @@ class Model(BaseModel):
         Upsert per-compartment initial condition overrides.
 
         A compartment already declared in the model definition has its
-        fraction replaced; a new one is appended.
+        fraction replaced; a new one is appended. The engine validates the
+        result before it is stored, so a rejected call leaves the model
+        unchanged.
 
         Parameters
         ----------
@@ -260,59 +256,30 @@ class Model(BaseModel):
             outside ``[0.0, 1.0]``, or the resulting overrides make the initial
             population exceed ``population_size``.
         """
-        available = set(
-            generate_compartment_names(
-                self.population.bins, self.population.stratifications
-            )
-        )
-        unknown = sorted(set(fractions) - available)
-        if unknown:
-            raise ValueError(
-                f"Unknown compartment(s) in initial conditions: {unknown}. "
-                f"Available compartments: {sorted(available)}"
-            )
-        self._validate_compartment_fraction_total(fractions)
-        self.population.initial_conditions.update_compartment_fractions(fractions)
+        candidate = self.population.initial_conditions.model_copy(deep=True)
+        candidate.update_compartment_fractions(fractions)
+        engine_state.initial_state(with_initial_conditions(self, candidate))
+        self.population.initial_conditions = candidate
 
-    def _validate_compartment_fraction_total(
-        self, new_fractions: Mapping[str, float]
-    ) -> None:
+    def initial_state(self) -> list[InitialCompartment]:
         """
-        Reject an upsert whose post-upsert compartment total exceeds the population.
+        Expanded compartments and the population each one starts with.
 
-        Every expanded compartment contributes its override fraction, or the
-        expansion fraction it keeps when it carries no override. The check runs
-        on the candidate overrides, so a rejected upsert leaves the model
-        unchanged.
+        The engine builds this state from the bin fractions, the stratification
+        fractions and the per-compartment overrides; it is the population a
+        simulation of this model starts from.
 
-        Parameters
-        ----------
-        new_fractions : Mapping[str, float]
-            Compartment overrides to validate against the current ones.
+        Returns
+        -------
+        list[InitialCompartment]
+            One entry per expanded compartment, in engine order.
 
         Raises
         ------
         ValueError
-            If the candidate overrides make the initial population exceed
-            ``population_size``.
+            If the per-compartment overrides are not valid for the model.
         """
-        expanded = [name for name, _ in self._expanded_compartments()]
-        expanded_set = set(expanded)
-        base = self._base_compartment_fractions()
-        candidate = {
-            override.compartment: override.fraction
-            for override in self.population.initial_conditions.compartment_fractions
-        }
-        candidate.update(new_fractions)
-        total = sum(candidate.get(name, base.get(name, 0.0)) for name in expanded)
-        total += sum(
-            value for name, value in candidate.items() if name not in expanded_set
-        )
-        if total > 1.0 + 1e-6:
-            raise ValueError(
-                "Per-compartment overrides would make the initial population "
-                "exceed population_size."
-            )
+        return engine_state.initial_state(self)
 
     def apply_calibration_parameters(
         self,
@@ -325,11 +292,16 @@ class Model(BaseModel):
         Write calibrated values back onto the model.
 
         Each value is routed by the ``parameter_type`` declared for it in
-        ``problem``: ``parameter`` values update model parameters,
-        ``initial_condition`` values update bin fractions, stratification
-        category fractions, or expanded-compartment fractions, and ``scale``
-        values are ignored because they apply to observations rather than to
-        the model.
+        ``problem``: ``parameter`` values update model parameters, and
+        ``scale`` values are ignored because they apply to observations rather
+        than to the model.
+
+        ``initial_condition`` values are persisted so that the model rebuilds
+        the initial population the engine scored for them. Bin and category
+        values update the fractions they declare. Every compartment that those
+        fractions do not reproduce, such as an exact compartment value or a
+        value that overlaps a per-compartment override, is persisted as a
+        per-compartment override.
 
         Parameters
         ----------
@@ -343,9 +315,8 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If an id is not declared in ``problem``, or if an initial condition
-            id is neither a bin, a stratification category, nor an expanded
-            compartment of the model.
+            If an id is not declared in ``problem``, or the engine cannot
+            resolve an initial condition id.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -356,435 +327,37 @@ class Model(BaseModel):
                 f"Declared calibration parameters: {sorted(types)}"
             )
 
-        compartments = set(
-            generate_compartment_names(
-                self.population.bins, self.population.stratifications
-            )
-        )
-        parameters, bin_fractions, stratification_fractions, compartment_fractions = (
-            self._route_calibration_values(values, types, compartments)
-        )
-
-        # Applying the routed values mutates several definition blocks in turn.
-        # Snapshot them so a validation failure late in the sequence (for
-        # example an over-allocating compartment override) rolls the model back
-        # to the state it had before the call rather than leaving a partial
-        # write-back.
-        parameters_snapshot = {param.id: param.value for param in self.parameters}
-        initial_conditions_snapshot = self.population.initial_conditions.model_copy(
-            deep=True
-        )
-        try:
-            if parameters:
-                self.update_parameters(parameters)
-            if bin_fractions:
-                # The routing diverts any bin value whose update would break
-                # the declared mapping, so the public conservation guard is
-                # safe and is re-applied here as the single source of truth.
-                self.update_initial_conditions(bin_fractions)
-            if stratification_fractions:
-                self.update_stratification_fractions(stratification_fractions)
-            if compartment_fractions:
-                # Calibration write-back is as permissive as the engine: the
-                # scored engine state may be non-conserving (the Rust
-                # ``set_initial_condition`` has no total check), so persisting
-                # it must not be rejected by the definition-level total guard.
-                self.population.initial_conditions._upsert_compartment_fractions(
-                    compartment_fractions, validate_total=False
-                )
-        except Exception:
-            for param in self.parameters:
-                if param.id in parameters_snapshot:
-                    param.value = parameters_snapshot[param.id]
-            self.population.initial_conditions = initial_conditions_snapshot
-            raise
-
-    def _base_compartment_fractions(self) -> dict[str, float]:
-        """Uniform expansion fractions of the declared bin and category values."""
-        initial = self.population.initial_conditions
-        return uniform_compartment_fractions(
-            self.population.bins,
-            self.population.stratifications,
-            {bf.bin: bf.fraction for bf in initial.bin_fractions},
-            (
-                (
-                    stratification.stratification,
-                    {
-                        fraction.category: fraction.fraction
-                        for fraction in stratification.fractions
-                    },
-                )
-                for stratification in initial.stratification_fractions
-            ),
-        )
-
-    def _initial_population_fractions(self) -> dict[str, float]:
-        """Expansion fractions with the current compartment overrides applied."""
-        fractions = self._base_compartment_fractions()
-        for override in self.population.initial_conditions.compartment_fractions:
-            fractions[override.compartment] = override.fraction
-        return fractions
-
-    def _expanded_compartments(self) -> list[tuple[str, dict[str, str]]]:
-        """Expanded compartment names with the categories applied to each."""
-        return expand_over_stratifications(
-            (bin_item.id for bin_item in self.population.bins),
-            self.population.stratifications,
-        )
-
-    def _covered_compartments(self, param_id: str) -> list[str]:
-        """Compartments whose initial condition the parameter id updates."""
-        prefix = f"{param_id}_"
-        return [
-            name
-            for name, _ in self._expanded_compartments()
-            if name == param_id or name.startswith(prefix)
-        ]
-
-    def _declaring_stratifications(self, category: str) -> int:
-        """Number of stratifications that declare a fraction for a category."""
-        declared = self.population.initial_conditions.stratification_fractions
-        return sum(
-            1
-            for stratification in declared
-            if any(
-                fraction.category == category for fraction in stratification.fractions
-            )
-        )
-
-    def _category_pairs(self, category: str) -> list[tuple[str, str]]:
-        """Pairs of compartments that differ only in one category token."""
-        cached = self._category_pairs_cache.get(category)
-        if cached is not None:
-            return cached
-        expanded = self._expanded_compartments()
-        tokens_by_name = {name: name.split("_") for name, _ in expanded}
-        pairs: list[tuple[str, str]] = []
-        seen: set[tuple[str, str]] = set()
-        for name, tokens in tokens_by_name.items():
-            for index, token in enumerate(tokens):
-                if index == 0 or token != category:
-                    continue
-                complements = [
-                    candidate
-                    for candidate, candidate_tokens in tokens_by_name.items()
-                    if len(candidate_tokens) == len(tokens)
-                    and candidate_tokens[index] != category
-                    and all(
-                        position == index or candidate_tokens[position] == other
-                        for position, other in enumerate(tokens)
-                    )
-                ]
-                if len(complements) != 1:
-                    continue
-                pair: tuple[str, str] = (name, complements[0])
-                if pair not in seen:
-                    seen.add(pair)
-                    pairs.append(pair)
-        # Match the engine's replay order: it sorts its complementary pairs by
-        # compartment index (calibration_problem.rs). Order matters when a
-        # category is shared by two stratifications and pairs overlap.
-        position = {name: index for index, (name, _) in enumerate(expanded)}
-        pairs.sort(key=lambda pair: (position[pair[0]], position[pair[1]]))
-        self._category_pairs_cache[category] = pairs
-        return pairs
-
-    @staticmethod
-    def _aggregate_weights(
-        covered: list[str],
-        base_fractions: Mapping[str, float],
-    ) -> dict[str, float]:
-        """Share of a bin-level value each covered compartment receives."""
-        total = sum(base_fractions.get(name, 0.0) for name in covered)
-        if total > 0.0:
-            return {name: base_fractions.get(name, 0.0) / total for name in covered}
-        return dict.fromkeys(covered, 1.0 / len(covered))
-
-    def _route_calibration_values(
-        self,
-        values: Mapping[str, float],
-        types: Mapping[str, str],
-        compartments: set[str],
-    ) -> tuple[
-        dict[str, float | None],
-        dict[str, float | None],
-        dict[str, float],
-        dict[str, float],
-    ]:
-        """
-        Route calibrated values to the definition fields they update.
-
-        Initial-condition values are replayed in parameter order over a single
-        working population that starts from the declared expansion plus the
-        current compartment overrides, so a bin-level value scales its covered
-        compartments by the weights the engine precomputes from that base and a
-        category value splits each complementary pair by the live pair total.
-        Engine parity is the primary invariant: each parameter reads the
-        working population once and writes its targets, exactly as
-        ``calibration_problem.rs`` snapshots the engine population once per
-        parameter.
-
-        A bin or category value whose covered compartments intersect an
-        existing override, or a compartment affected by an earlier value in
-        this replay, is persisted as per-compartment overrides holding the
-        replayed values. A bin value whose update would make the complete
-        declared bin-fraction mapping fail its conservation rule is diverted
-        the same way, so the definition never holds a non-conserving bin
-        fraction. A stratification-category value is also persisted when
-        its name is declared by more than one stratification, because a single
-        stratification fraction cannot express the cross-stratification split.
-        Every other value updates the bin or stratification fraction it
-        declares. An exact compartment value is always persisted as an override.
-
-        Parameters
-        ----------
-        values : Mapping[str, float]
-            Calibrated value per parameter id.
-        types : Mapping[str, str]
-            Declared ``parameter_type`` per parameter id, in problem order.
-        compartments : set[str]
-            Expanded compartment names of the model.
-
-        Returns
-        -------
-        tuple
-            Parameter values, bin fractions, stratification fractions, and
-            compartment fractions, in that order.
-
-        Raises
-        ------
-        ValueError
-            If an initial condition id is neither a bin, a stratification
-            category, nor an expanded compartment of the model.
-        """
-        bin_ids = {bin_item.id for bin_item in self.population.bins}
-        categories = self.population.initial_conditions.get_categories_with_fractions()
-        initial_conditions = self.population.initial_conditions
-        population_size = float(initial_conditions.population_size)
-        if population_size <= 0.0:
-            raise ValueError(
-                "population_size must be greater than 0 before calibration values "
-                f"can be written back, got {initial_conditions.population_size}."
-            )
-        base_fractions = self._initial_population_fractions()
-        working = {
-            name: base_fractions.get(name, 0.0) * population_size
-            for name, _ in self._expanded_compartments()
+        parameters: dict[str, float | None] = {
+            param_id: value
+            for param_id, value in values.items()
+            if types[param_id] == CalibrationParameterType.PARAMETER
         }
-        affected: set[str] = {
-            fraction.compartment
-            for fraction in initial_conditions.compartment_fractions
-        }
-        diverted: set[str] = set()
+        # Computed before any mutation, so a rejected value leaves the model
+        # unchanged.
+        initial_conditions = calibrated_initial_conditions(self, problem, values)
 
-        parameters: dict[str, float | None] = {}
-        bin_fractions: dict[str, float | None] = {}
-        stratification_fractions: dict[str, float] = {}
+        if parameters:
+            self.update_parameters(parameters)
+        self.population.initial_conditions = initial_conditions
 
-        for param_id, parameter_type in types.items():
-            if param_id not in values:
-                continue
-            value = values[param_id]
-            if parameter_type == CalibrationParameterType.PARAMETER:
-                parameters[param_id] = value
-            elif parameter_type == CalibrationParameterType.SCALE:
-                continue
-            else:
-                route = self._replay_initial_condition(
-                    param_id,
-                    value,
-                    bin_ids,
-                    categories,
-                    compartments,
-                    base_fractions,
-                    working,
-                    affected,
-                    diverted,
-                    bin_fractions,
-                    population_size,
-                )
-                if route is not None:
-                    field, key = route
-                    if field == "bin":
-                        bin_fractions[key] = value
-                    else:
-                        stratification_fractions[key] = value
-
-        compartment_fractions = {
-            name: working[name] / population_size for name in sorted(diverted)
-        }
-
-        return (
-            parameters,
-            bin_fractions,
-            stratification_fractions,
-            compartment_fractions,
-        )
-
-    def _bin_update_keeps_the_mapping_valid(
-        self,
-        bin_id: str,
-        value: float,
-        routed_bins: Mapping[str, float | None],
-    ) -> bool:
+    @model_validator(mode="after")
+    def validate_transitions_with_engine(self) -> Self:
         """
-        Whether setting a bin fraction keeps the declared mapping valid.
+        Validate the transitions against the flows the engine plans for them.
 
-        Calibration write-back must not persist a bin fraction the definition
-        cannot hold: a value whose update makes the declared bin-fraction
-        mapping fail :meth:`_validate_bin_fraction_total` is diverted to
-        per-compartment overrides instead. The candidate applies the bin
-        values routed earlier in the same replay, so a combination that is
-        only valid as a whole (every bin named) is not split apart.
-
-        Parameters
-        ----------
-        bin_id : str
-            Id of the bin being updated.
-        value : float
-            Candidate fraction for that bin.
-        routed_bins : Mapping[str, float | None]
-            Bin fractions already routed in this replay.
-
-        Returns
-        -------
-        bool
-            True when the candidate mapping passes the conservation rule.
+        The engine rejects a category transition without exactly one source and
+        one target category, and a stratified rate whose conditions match none
+        of the compartments the transition starts from.
         """
-        initial_conditions = self.population.initial_conditions
-        candidate = {
-            fraction.bin: fraction.fraction
-            for fraction in initial_conditions.bin_fractions
-        }
-        candidate.update(routed_bins)
-        candidate[bin_id] = value
-        known = {fraction.bin for fraction in initial_conditions.bin_fractions}
-        complete = set(routed_bins) | {bin_id} >= known
-        try:
-            initial_conditions._validate_bin_fraction_total(
-                candidate, complete=complete
-            )
-        except ValueError:
-            return False
-        return True
+        engine_state.transition_flows(self)
+        return self
 
-    def _replay_initial_condition(
-        self,
-        param_id: str,
-        value: float,
-        bin_ids: set[str],
-        categories: set[str],
-        compartments: set[str],
-        base_fractions: Mapping[str, float],
-        working: dict[str, float],
-        affected: set[str],
-        diverted: set[str],
-        routed_bins: Mapping[str, float | None],
-        population_size: float,
-    ) -> tuple[str, str] | None:
-        """
-        Apply one initial-condition value to the working population.
-
-        Parameters
-        ----------
-        param_id : str
-            Id of the calibrated initial condition.
-        value : float
-            Calibrated fraction.
-        bin_ids : set[str]
-            Bin ids of the model.
-        categories : set[str]
-            Category names that declare an initial fraction.
-        compartments : set[str]
-            Expanded compartment names of the model.
-        base_fractions : Mapping[str, float]
-            Starting population fractions including the current overrides.
-        working : dict[str, float]
-            Working head counts including the current overrides, updated in
-            place.
-        affected : set[str]
-            Compartments that carry an existing override or were covered by an
-            earlier value in this replay.
-        diverted : set[str]
-            Compartments persisted as overrides in this replay.
-        routed_bins : Mapping[str, float | None]
-            Bin fractions already routed in this replay, used to test the
-            conservation of a later bin update against the whole mapping.
-        population_size : float
-            Total population the fractions are taken of.
-
-        Returns
-        -------
-        tuple[str, str] | None
-            Definition field to update and its key, or None when the value is
-            persisted as compartment overrides.
-
-        Raises
-        ------
-        ValueError
-            If the id is neither a bin, a stratification category, nor an
-            expanded compartment of the model.
-        """
-        if param_id in bin_ids:
-            covered = self._covered_compartments(param_id)
-            weights = self._aggregate_weights(covered, base_fractions)
-            for name, weight in weights.items():
-                working[name] = value * weight * population_size
-            route: tuple[str, str] | None = None
-            # Divert when the covered compartments intersect an existing
-            # override or an earlier value, and when updating the declared bin
-            # fraction would make the complete mapping fail its conservation
-            # rule. The replayed head counts are pinned as overrides either
-            # way, so the definition stays valid and rebuilds the scored state.
-            if set(covered) & affected or not self._bin_update_keeps_the_mapping_valid(
-                param_id, value, routed_bins
-            ):
-                diverted.update(covered)
-            else:
-                route = ("bin", param_id)
-            affected.update(covered)
-            return route
-        if param_id in categories:
-            pairs = self._category_pairs(param_id)
-            covered = {name for pair in pairs for name in pair}
-            # The engine takes the population snapshot once per parameter and
-            # then iterates its pairs (calibration_problem.rs). Reading the live
-            # working totals inside the loop made overlapping pairs (a category
-            # shared by two stratifications) compound their edits, diverging
-            # from the engine replay. A shared category is always diverted,
-            # because no single stratification fraction can express the
-            # cross-stratification split, and a repeated apply re-scores from
-            # the reloaded population exactly as a fresh engine problem would.
-            shared = self._declaring_stratifications(param_id) > 1
-            pair_totals = [
-                working[category_name] + working[complement_name]
-                for category_name, complement_name in pairs
-            ]
-            for (category_name, complement_name), pair_total in zip(pairs, pair_totals):
-                working[category_name] = value * pair_total
-                working[complement_name] = (1.0 - value) * pair_total
-            route = None
-            # A category declared by more than one stratification cannot be
-            # represented by a single stratification fraction, so the replayed
-            # head counts are persisted as per-compartment overrides instead.
-            if covered & affected or shared:
-                diverted.update(covered)
-            else:
-                route = ("stratification", param_id)
-            affected.update(covered)
-            return route
-        if param_id in compartments:
-            working[param_id] = value * population_size
-            diverted.add(param_id)
-            affected.add(param_id)
-            return None
-        raise ValueError(
-            f"Initial condition '{param_id}' is neither a bin, a "
-            f"stratification category, nor an expanded compartment. "
-            f"Available bins: {sorted(bin_ids)}. Available categories: "
-            f"{sorted(categories)}. Available compartments: "
-            f"{sorted(compartments)}"
-        )
+    @model_validator(mode="after")
+    def validate_compartment_fractions(self) -> Self:
+        """Validate per-compartment overrides against the engine expansion."""
+        if self.population.initial_conditions.compartment_fractions:
+            engine_state.initial_state(self)
+        return self
 
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:
@@ -858,18 +431,23 @@ class Model(BaseModel):
         Returns
         -------
         tuple[str, ...]
-            Categories selecting the subgroup this stratification subdivides,
-            empty for an unconditional stratification.
+            Ids of the categories selecting the subgroup this stratification
+            subdivides, empty for an unconditional stratification. A category
+            name another stratification also declares is qualified, as in
+            ``sex:female``.
 
         Raises
         ------
         ValueError
             If the stratification is not found.
         """
+        initial_conditions = self.population.initial_conditions
         for stratification in self.population.stratifications:
             if stratification.id == stratification_id:
                 return tuple(
-                    condition.category
+                    initial_conditions.category_id(
+                        condition.stratification, condition.category
+                    )
                     for condition in (stratification.conditions or [])
                     if condition.category is not None
                 )
@@ -894,8 +472,8 @@ class Model(BaseModel):
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category names forming a chain from the whole population down to
-            the subgroup, outermost first.
+            Category ids, bare or qualified (``sex:female``), forming a chain
+            from the whole population down to the subgroup, outermost first.
 
         Returns
         -------
@@ -905,23 +483,21 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If a category is not found.
+            If a category is not found or a bare name is ambiguous.
         """
         selected = tuple(categories)
         initial_conditions = self.population.initial_conditions
-        # Validate the chain first so an unknown category still raises.
-        for category in selected:
-            initial_conditions.get_category_fraction(category)
         if not initial_conditions.compartment_fractions:
             return initial_conditions.subgroup_population(selected)
-        population_size = float(initial_conditions.population_size)
-        effective = self._initial_population_fractions()
-        total = sum(
-            effective.get(name, 0.0)
-            for name, applied in self._expanded_compartments()
-            if all(category in applied.values() for category in selected)
+        resolved = [initial_conditions.resolve_category(c) for c in selected]
+        return sum(
+            compartment.population
+            for compartment in self.initial_state()
+            if all(
+                compartment.categories.get(stratification) == name
+                for stratification, name in resolved
+            )
         )
-        return total * population_size
 
     def get_outputs_by_source(self) -> dict[str, list[str]]:
         """

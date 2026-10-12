@@ -287,6 +287,9 @@ class EnsembleSelector:
                 self._calibration_runner.initial_population_size(),
                 parameter_sets,
                 metric_points,
+                initial_condition_remainder=(
+                    self._calibration_runner.problem.initial_condition_remainder
+                ),
             )
         )
 
