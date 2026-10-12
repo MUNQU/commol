@@ -28,7 +28,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 
 | Task | Command |
 |---|---|
-| Install dependencies | `uv sync --extra dev` |
+| Install dependencies | `uv sync --extra dev --extra docs` |
 | Build the extension | `source .venv/bin/activate && maturin develop --release` |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |

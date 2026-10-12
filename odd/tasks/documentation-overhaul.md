@@ -90,8 +90,8 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | this commit (see Evidence) |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | this commit (see Evidence) |
 | T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
-| T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | pending |
-| T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | pending |
+| T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | this commit (see Evidence) |
+| T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | this commit (see Evidence) |
 | T14 | S1–S6 | Final audit: re-run every baseline measurement and record zero gaps | direct | pending |
 
 ## Delivery
@@ -274,6 +274,26 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   `/latest/` reach a stale unversioned copy of the site at the root of
   `gh-pages`, so new pages give 404 there (fixed in T12). `workflow.md` now
   lists all five workflows with their checks and required check names.
+
+- T12: `README.md` is now a landing page (features table, install, a runnable
+  quick start with abstract names, a "Where to go / What you will find" table,
+  development, license, authors, citation); its long epidemiology tutorial is
+  gone (the guide covers it), every site link uses `/latest/`, and the
+  repository links are absolute so they work on PyPI. `pytest -m docs` now
+  runs the README example, and `test_docs_reference.py` checks that every
+  site link in `README.md` and `AGENTS.md` names an existing docs page (lychee
+  skips the site, whose new pages appear only after a release). `index.md`
+  has a "You are… / Start with / Then" table for every reader, a mermaid
+  diagram of the model lifecycle and a features table; its malformed warning
+  block is fixed. `examples.md` gained a back link and an index. A banner
+  marks every page of a non-default version (`overrides/main.html`,
+  `extra.version.default: latest`). Navigation titles are unique.
+- T13: `mkdocs-llmstxt` (0.5.0; `>=0.5,<0.6` in the `docs` extra) generates
+  `llms.txt` (an ordered, described index of the guide, the API reference and
+  the changelog) and `llms-full.txt` (every page, API reference included;
+  793 KB), linked from `index.md`. New transitive dependencies were pinned to
+  releases at least two weeks old: soupsieve 2.10 and wcwidth 0.9.1 instead
+  of 3.0.2 (released today) and 0.9.2.
 
 ## Log
 

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{# Shown on every page of a version other than the default one (`latest`). #}
+{% block outdated %}
+  You are reading the <strong>dev</strong> documentation, which describes code
+  that is not released yet.
+  <a href="{{ '../' ~ base_url }}"><strong>Read the latest release instead.</strong></a>
+{% endblock %}

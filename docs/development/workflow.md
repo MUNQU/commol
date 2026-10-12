@@ -72,7 +72,7 @@ We use a simplified Git Flow approach:
 - **`feature/*`**: New features, refactoring, or significant changes (e.g., `feature/add-stochastic-model`)
 - **`fix/*`**: Bug fixes (e.g., `fix/calculation-error`)
 - **`docs/*`**: Documentation-only changes (e.g., `docs/update-api-reference`)
-- **`test/*`**: Test additions or improvements (e.g., `test/add-sir-model-tests`)
+- **`test/*`**: Test additions or improvements (e.g., `test/add-conditional-stratification-tests`)
 - **`chore/*`**: Maintenance tasks, dependencies (e.g., `chore/update-dependencies`)
 
 ## Development Process

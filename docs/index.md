@@ -1,109 +1,90 @@
 # Commol
 
-A high-performance compartmental modelling library for mathematical modeling using difference equations. Commol provides a clean Python API backed by a fast Rust engine for numerical computations.
+Commol builds, simulates and calibrates compartment models: a population moves
+between states (compartments) at rates you write as formulas. You describe the
+model in Python; a Rust engine expands it over your stratifications, compiles
+every rate to machine code, and runs it or fits it to your data.
 
-!!! warning "Alpha Stage - API Unstable"
-**Commol is currently in alpha development.** The API is not yet stable and may change between versions without backward compatibility guarantees.
+!!! warning "Before version 1.0"
+    The API can change between minor versions (`0.2` → `0.3`). The
+    [changelog](about/changelog.md) marks every change that breaks code as
+    **Breaking**.
 
-    - Breaking changes may occur in any release
-    - Not recommended for production use yet
-    - API will stabilize in version 1.0.0
+## Where to go
 
-    We welcome feedback and contributions as we work toward a stable release!
+| You are… | Start with | Then |
+|---|---|---|
+| New to Commol | [Quick Start](getting-started/quickstart.md) | [Core Concepts](guide/core-concepts.md) |
+| Building a model | [Building Models](guide/building-models.md) | [Transitions](guide/transitions.md), [Mathematical Expressions](guide/mathematical-expressions.md) |
+| Fitting a model to data | [Model Calibration](guide/calibration.md) | [Probabilistic Calibration](guide/probabilistic-calibration.md) |
+| Looking up a class or argument | [API Reference](api/index.md) | [Model Structure](advanced/model-structure.md) |
+| Contributing to Commol | [Codebase Guide](codebase/index.md) | [Development Workflow](development/workflow.md) |
+| An AI agent using Commol | <a href="llms.txt"><code>llms.txt</code></a>: an index of the site | <a href="llms-full.txt"><code>llms-full.txt</code></a>: the whole site in one file |
+| An AI agent changing Commol | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md) | [Codebase Guide](codebase/index.md) |
 
-## Features
+## How Commol works
 
-- **Intuitive Model Building**: Fluent API for constructing compartment models
-- **Mathematical Expressions**: Support for complex mathematical formulas in transition rates
-- **High Performance**: Rust-powered simulation engine for fast computations
-- **Flexible Architecture**: Support for stratified populations and conditional transitions
-- **Type Safety**: Comprehensive validation using Pydantic models
-- **Multiple Output Formats**: Get results as dictionaries or lists for easy analysis
+```mermaid
+flowchart LR
+    A[ModelBuilder] -->|build| B[Model]
+    B --> C[Simulation]
+    C -->|run| D[Results]
+    B --> E[CalibrationProblem]
+    E --> F[Calibrator]
+    F -->|run| G[CalibrationResult]
+    G -->|apply_calibration_parameters| B
+```
 
-## Quick Example
+1. **Build** a `Model` with `ModelBuilder`: bins, parameters, transitions,
+   stratifications and initial conditions. Commol validates it as you go.
+2. **Simulate** it with `Simulation`: one series per compartment and
+   accumulator.
+3. **Calibrate** unknown values against observations with `Calibrator`, and
+   write the result back into the model.
+
+## Quick example
 
 ```python
 from commol import ModelBuilder, Simulation
 
-# Build a simple 3-compartment model
 model = (
-    ModelBuilder(name="Basic Model", version="1.0")
+    ModelBuilder(name="Basic Model")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(
-        id="t_ab",
-        source=["A"],
-        target=["B"],
-        rate="k1 * A * B / N"
-    )
-    .add_transition(
-        id="t_bc",
-        source=["B"],
-        target=["C"],
-        rate="k2"
-    )
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0}
-        ]
+            {"bin": "C", "fraction": 0.0},
+        ],
     )
     .build(typology="DifferenceEquations")
 )
 
-# Run simulation
-simulation = Simulation(model)
-results = simulation.run(num_steps=100)
+results = Simulation(model).run(num_steps=100)
 ```
 
-## Getting Started
+## Features
 
-- [Installation Guide](getting-started/installation.md) - Install Commol
-- [Quick Start](getting-started/quickstart.md) - Build your first model
-- [Core Concepts](guide/core-concepts.md) - Understand the fundamentals
+| Feature | Guide |
+|---|---|
+| Fluent, validated model building | [Building Models](guide/building-models.md) |
+| Stratifications, conditional stratifications, per-compartment initial conditions | [Core Concepts](guide/core-concepts.md#stratifications) |
+| Rate formulas compiled with Cranelift | [Mathematical Expressions](guide/mathematical-expressions.md) |
+| Pulses, windows, ramps, seasons and schedules per subgroup | [Time Patterns](guide/time-patterns.md) |
+| Unit checking and equation output (text, LaTeX) | [Units and Equations](guide/units-and-equations.md) |
+| Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
+| Ensembles and prediction intervals | [Probabilistic Calibration](guide/probabilistic-calibration.md) |
+| JSON-ready reports and seaborn plots | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |
 
-## Documentation Sections
+## License and authors
 
-### User Guide
-
-Learn how to build and run compartment models:
-
-- [Core Concepts](guide/core-concepts.md) - Compartments, stratifications, parameters
-- [Building Models](guide/building-models.md) - Using the ModelBuilder API
-- [Mathematical Expressions](guide/mathematical-expressions.md) - Advanced rate formulas
-- [Running Simulations](guide/simulations.md) - Execute models and analyze results
-- [Model Calibration](guide/calibration.md) - Fit models to observed data
-- [Examples](guide/examples.md) - Complete examples (basic, stratified, conditional models)
-
-### API Reference
-
-Complete API documentation for all public interfaces:
-
-- [Model Builder](api/model-builder.md) - ModelBuilder class documentation
-- [Simulation](api/simulation.md) - Simulation runner
-- [Calibrator](api/calibrator.md) - Parameter calibration and optimization
-
-### Development
-
-Contributing to Commol:
-
-- [Development Workflow](development/workflow.md) - Setup, branching, CI/CD
-- [Contributing Guidelines](development/contributing.md) - How to contribute
-- [Release Process](development/release.md) - Version management and releases
-
-## License
-
-Commol is licensed under the MIT License. See [License](about/license.md) for details.
-
-## Authors
-
-MUNQU Team
-
-- Rafael J. Villanueva Micó
-- Carlos Andreu Vilarroig
-- David Martínez Rodríguez
+Commol is licensed under the MIT License; see [License](about/license.md). It
+is developed by the MUNQU team: Rafael J. Villanueva Micó, Carlos Andreu
+Vilarroig and David Martínez Rodríguez.

@@ -35,10 +35,14 @@ jobs:
         uses: lycheeverse/lychee-action@v2.9.0
         with:
           # The release template's compare link is a placeholder, not a link.
+          # Links to this site are checked against docs/ by
+          # py-commol/tests/test_docs_reference.py, because new pages reach
+          # the published site only after a release.
           args: >-
             --no-progress
             --scheme https
             --scheme http
             --exclude "/compare/vPREVIOUS"
+            --exclude "^https://munqu\.github\.io/commol/"
             "docs/**/*.md" README.md AGENTS.md
           fail: true
