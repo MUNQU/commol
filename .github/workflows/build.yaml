@@ -6,22 +6,27 @@ on:
     pull_request:
         branches: [main, develop]
 
+# A new commit on a pull request cancels the runs of its earlier commits. Push
+# runs are never cancelled while running; a newer push only replaces a run that
+# is still waiting.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
     FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-    test-and-build:
-        name: Test and Build on ${{ matrix.os }} ${{ matrix.target }} (Python ${{ matrix.python-version }})
+    # Tests run on the runner's own architecture, so the target architecture
+    # does not change them: one job per operating system and Python version.
+    test:
+        name: Test on ${{ matrix.os }} (Python ${{ matrix.python-version }})
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
                 os: [ubuntu-latest, windows-latest, macos-latest]
-                target: [x86_64, aarch64]
                 python-version: ["3.12", "3.13", "3.14"]
-                exclude:
-                    - os: windows-latest
-                      target: aarch64
 
         steps:
             - uses: actions/checkout@v7
@@ -49,11 +54,30 @@ jobs:
               working-directory: ./py-commol
               run: uv run pytest
 
-            - name: Clean Rust extension before wheel build
-              working-directory: ./py-commol
-              shell: bash
-              run: |
-                  rm -f commol/commol_rs/*.so commol/commol_rs/*.pyd commol/commol_rs/*.dll
+    # Wheels are validated for every target architecture on pushes to main.
+    # Releases build their own wheels (release.yaml); pull requests rely on the
+    # test jobs, which already compile the extension on every operating system.
+    build-wheels:
+        name: Build wheel on ${{ matrix.os }} ${{ matrix.target }} (Python ${{ matrix.python-version }})
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+                target: [x86_64, aarch64]
+                python-version: ["3.12", "3.13", "3.14"]
+                exclude:
+                    - os: windows-latest
+                      target: aarch64
+
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v7
+              with:
+                  python-version: ${{ matrix.python-version }}
 
             - name: Build distribution wheel (validates wheel builds correctly)
               uses: PyO3/maturin-action@v1
@@ -69,16 +93,19 @@ jobs:
                   name: wheels-${{ matrix.os }}-${{ matrix.target }}-py${{ matrix.python-version }}
                   path: dist/*.whl
 
-    # Single required status check for the whole matrix, so the branch rulesets
-    # do not have to list every os/target/Python combination.
+    # Single required status check for the whole workflow, so the branch
+    # rulesets do not have to list every job. The wheel jobs only run on pushes
+    # to main, so they count as passed when skipped.
     build-passed:
         name: Build Passed
         if: always()
-        needs: test-and-build
+        needs: [test, build-wheels]
         runs-on: ubuntu-latest
         steps:
-            - name: Fail unless every matrix job succeeded
+            - name: Fail unless the tests passed and the wheels did not fail
               run: |
-                  result="${{ needs.test-and-build.result }}"
-                  echo "test-and-build result: $result"
-                  test "$result" = "success"
+                  tests="${{ needs.test.result }}"
+                  wheels="${{ needs.build-wheels.result }}"
+                  echo "test: $tests, build-wheels: $wheels"
+                  test "$tests" = "success"
+                  test "$wheels" = "success" -o "$wheels" = "skipped"
