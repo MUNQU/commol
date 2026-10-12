@@ -3,8 +3,8 @@
 #
 # Updates run once a month. Minor and patch updates of each ecosystem arrive
 # grouped in a single pull request, so the shared lockfile is rebased once
-# instead of once per package. Major updates, which may break the API, keep a
-# pull request of their own.
+# instead of once per package. Major updates of Python keep a pull request of
+# their own; major updates of Rust arrive grouped too, and pyo3 alone.
 
 version: 2
 updates:
@@ -14,11 +14,22 @@ updates:
       interval: "monthly"
     target-branch: "develop"
     groups:
+      # The cranelift crates must share one version, and each 0.x release is a
+      # major update; the whole family moves together. Listed first, because a
+      # dependency joins the first group it matches.
+      cranelift:
+        patterns: ["cranelift*"]
       rust-minor-patch:
         patterns: ["*"]
         # A 0.x minor release of pyo3 changes its API; keep it separate.
-        exclude-patterns: ["pyo3*"]
+        exclude-patterns: ["pyo3*", "cranelift*"]
         update-types: ["minor", "patch"]
+      # Major updates also arrive in one pull request, so the Rust updates of a
+      # month touch Cargo.lock once.
+      rust-major:
+        patterns: ["*"]
+        exclude-patterns: ["pyo3*", "cranelift*"]
+        update-types: ["major"]
 
   - package-ecosystem: "uv" # Python dependencies
     directory: "/py-commol"
