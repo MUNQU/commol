@@ -32,7 +32,7 @@ Feature suggestions are welcome! Please:
 
 1. **Keep PRs focused**: One feature/fix per PR
 2. **Write tests**: All new code should have tests
-3. **Update docs**: Update README or documentation as needed
+3. **Update docs (mandatory)**: Every change ships with its documentation. Follow the [documentation definition of done](../codebase/conventions.md#documentation-definition-of-done)
 4. **Follow conventions**: Use the project's code style
 5. **Be descriptive**: Write clear commit messages and PR descriptions
 

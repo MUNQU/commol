@@ -9,12 +9,18 @@ the code is the final authority.
 validates input and presents results. It never re-implements how the engine
 expands, initializes, plans or simulates a model. It asks the engine.
 
+**Documentation is mandatory.** Every change to this repository, including
+yours, ships with the documentation it needs, in the agreed format and at the
+agreed quality. Before you call a change done, follow the
+[documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done).
+
 ## Before you change code
 
 1. Read [Mental model](docs/codebase/mental-model.md) (5 minutes).
 2. Find the owner of the behavior in [Repository map](docs/codebase/repository-map.md).
 3. Read the [Design decisions](docs/codebase/design-decisions.md) that touch it.
 4. Follow the checklist for your change in the [Maintainer playbook](docs/codebase/maintainer-playbook.md).
+5. Update the documentation as the [definition of done](docs/codebase/conventions.md#documentation-definition-of-done) requires.
 
 ## Commands
 
@@ -43,7 +49,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Branches | Work on a branch from `develop`. PRs to `develop` are squash-merged; `develop` → `main` uses a merge commit. See [Development workflow](docs/development/workflow.md). |
 | Tests | Run the Rust and the Python suites before you call a change done. |
 | Comments | Describe the code as it is, never how it came to be. See [Conventions](docs/codebase/conventions.md). |
-| Docs | A change is not done until the docs that describe it are updated. Doc examples use abstract names (`A`, `B`, `k1`, `group1`). |
+| Docs | **Mandatory.** Every change ships with its documentation, in the agreed format and quality: the [documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done). |
 | Releases | Follow [Release process](docs/development/release.md). A published PyPI version is final. |
 
 ## If you need to…
