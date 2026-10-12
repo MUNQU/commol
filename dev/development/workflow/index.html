@@ -1425,6 +1425,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#8-promoting-develop-to-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Promoting Develop to Main
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1999,6 +2010,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#8-promoting-develop-to-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Promoting Develop to Main
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2350,16 +2372,33 @@
 </ul>
 <p><strong>PR Requirements</strong>:</p>
 <ul>
-<li>All CI checks must pass</li>
-<li>At least one approving review</li>
+<li>The required checks must pass: <code>Python Code Quality</code>, <code>Rust Code Quality</code>,
+  <code>Build Documentation</code> and <code>Build Passed</code> (the whole test matrix)</li>
+<li>An approving review from a code owner</li>
 <li>No merge conflicts with target branch</li>
+<li>For PRs into <code>develop</code>, the branch must be up to date with <code>develop</code></li>
 <li>Code coverage should be &gt;95%</li>
 </ul>
 <h3 id="7-merging-to-develop">7. Merging to Develop<a class="headerlink" href="#7-merging-to-develop" title="Permanent link">&para;</a></h3>
 <p>Once approved:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Merge using &quot;Squash and merge&quot; or &quot;Rebase and merge&quot; on GitHub</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Merge using &quot;Squash and merge&quot; on GitHub (the only method develop allows)</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># Delete the feature branch after merging</span>
 </span></code></pre></div>
+<h3 id="8-promoting-develop-to-main">8. Promoting Develop to Main<a class="headerlink" href="#8-promoting-develop-to-main" title="Permanent link">&para;</a></h3>
+<p>To release, open a pull request from <code>develop</code> to <code>main</code> and merge it with
+<strong>"Create a merge commit"</strong>, never "Squash and merge".</p>
+<p>A merge commit keeps the history of <code>develop</code> inside <code>main</code>, so the next
+promotion only carries the new commits. A squash adds to <code>main</code> a commit that
+<code>develop</code> does not have, so the two histories drift apart. The next promotion
+then conflicts on any file that changed again in <code>develop</code>, and fixing it needs
+a merge pushed to <code>develop</code> with an admin bypass.</p>
+<p><code>main</code> does not require the branch to be up to date: the CI of the pull request
+already tests the result of merging it into <code>main</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Dependabot reads its configuration from <code>main</code></p>
+<p>Changes to <code>.github/dependabot.yaml</code> take effect only once they reach <code>main</code>.
+Updating the file there also triggers a version-update check right away.</p>
+</div>
 <h2 id="continuous-integration-pipelines">Continuous Integration Pipelines<a class="headerlink" href="#continuous-integration-pipelines" title="Permanent link">&para;</a></h2>
 <p>The project uses three main CI/CD pipelines:</p>
 <h3 id="1-code-quality-on-every-pushpr">1. Code Quality (on every push/PR)<a class="headerlink" href="#1-code-quality-on-every-pushpr" title="Permanent link">&para;</a></h3>
