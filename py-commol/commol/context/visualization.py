@@ -1,3 +1,5 @@
+"""Plot configuration."""
+
 from typing import Self
 
 from pydantic import BaseModel, Field

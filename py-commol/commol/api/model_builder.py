@@ -1,3 +1,5 @@
+"""Fluent builder that assembles and validates a `Model`."""
+
 import copy
 import logging
 from typing import Literal, Self, TypedDict, cast
@@ -447,8 +449,9 @@ class ModelBuilder:
             - "conditions": List of dicts with "stratification" and "category" keys
             - "rate": Rate expression string
 
-        condition : Condition| None, default=None
-            Logical conditions that must be met for the transition.
+        condition : Condition | None, default=None
+            A condition stored with the transition. The engine does not evaluate
+            it: the transition runs at every step.
 
         per_compartment : bool | None, default=None
             When True, base compartment names in the rate
@@ -456,6 +459,9 @@ class ModelBuilder:
             compartment name for each expanded transition flow. This ensures
             each subpopulation transitions based on its own compartment value
             rather than the total across all subpopulations.
+
+        accumulators : list[str] | None, default=None
+            Ids of accumulators that add up the flow of this transition.
 
         Returns
         -------

@@ -1,3 +1,5 @@
+"""Dimensional analysis of model equations with pint."""
+
 import math
 from collections.abc import Callable
 from typing import cast

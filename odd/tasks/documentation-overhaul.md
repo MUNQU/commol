@@ -87,7 +87,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | this commit (see Evidence) |
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
 | T8 | S2 | API reference pages for the 12 missing public names | direct | this commit (see Evidence) |
-| T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | pending |
+| T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | this commit (see Evidence) |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | pending |
 | T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
 | T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | pending |
@@ -238,6 +238,18 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   New gate `tests/test_docs_reference.py`: every name in `commol.__all__` must
   have a `::: path` entry. `pytest -m docs`: 53 passed in 8 s; `mkdocs build
   --strict` clean.
+
+- T9: ruff now selects `D1` and `D417` with the NumPy convention (tests
+  excluded), so pre-commit and CI reject an undocumented public module, class,
+  function or argument. Fixed 39 gaps: 24 module and package docstrings, the
+  four enums of `constants.py`, two validators, `TimePattern.__str__`,
+  `AddGroupFn.__call__`, and the arguments `add_transition(accumulators)`,
+  `plot_series(step_to_label, tick_every, x_label)`,
+  `run_multiple(evaluation_retention, top_k_per_run)`,
+  `find_optimal_k` / `cluster_evaluations(feature_vectors)` and the PSO
+  `**kwargs`. The `add_transition(condition)` docstring no longer claims the
+  condition gates the transition (F2). `ruff check .`, `ruff format --check`
+  and `ty check commol` pass.
 
 ## Log
 

@@ -101,12 +101,19 @@ line-length = 88
 indent-width = 4
 
 [tool.ruff.lint]
-select = ["E", "F", "C90", "ARG", "ERA", "B007"]
+# D1 and D417: every public module, class, function and argument is documented.
+select = ["E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417"]
 fixable = ["ALL"]
 unfixable = []
 ignore = [
     "ERA001",  # Allow explanatory comments that look like commented code
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D1"]
 
 [tool.ruff.format]
 indent-style = "space"

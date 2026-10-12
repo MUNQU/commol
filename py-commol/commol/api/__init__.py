@@ -1,3 +1,5 @@
+"""User-facing workflows: building, simulating, calibrating, plotting and reporting."""
+
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
 from .plotter import SimulationPlotter

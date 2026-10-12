@@ -1,3 +1,5 @@
+"""Conditions on stratification categories."""
+
 from pydantic import BaseModel, Field
 
 

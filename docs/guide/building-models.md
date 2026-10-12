@@ -322,6 +322,7 @@ the definition is not valid:
 | Check | Example of a rejected definition |
 |---|---|
 | Initial conditions are set | `build` called before `set_initial_conditions` |
+| At least one bin and one transition | A model with no transition |
 | Initial conditions follow the rules above | Bin fractions that sum to 0.9 |
 | Parameter ids are unique and are not bin ids | A parameter named `A` |
 | Every rate expression passes the security check | A formula with `__import__` |

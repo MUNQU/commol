@@ -1,3 +1,5 @@
+"""A model population: bins, accumulators, stratifications and initial conditions."""
+
 import math
 from typing import Self
 
@@ -32,6 +34,7 @@ class Population(BaseModel):
     @field_validator("bins")
     @classmethod
     def validate_bins_not_empty(cls, v: list[Bin]) -> list[Bin]:
+        """Require at least one bin."""
         if not v:
             raise ValueError("At least one bin must be defined.")
         return v

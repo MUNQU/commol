@@ -13,7 +13,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
 | Python dead code | No unused code | `vulture` (CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
-| Docstrings | NumPy style on public functions | Review |
+| Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
@@ -128,7 +128,7 @@ every match.
 | The site builds with no broken link or anchor | `mkdocs build --strict` | CI |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
-| Public Python names have docstrings | The docstring coverage check | CI (being added) |
+| Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
 | Public Rust items have docs | `missing_docs` | CI (being added) |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |
 | The format in step 2 is followed | — | Review |

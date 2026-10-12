@@ -1,3 +1,5 @@
+"""Compartment models with a Rust engine: build, simulate and calibrate them."""
+
 import logging
 from typing import TextIO
 
