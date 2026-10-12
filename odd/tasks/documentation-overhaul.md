@@ -81,7 +81,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 |---|---|---|---|---|
 | T1 | S4 | Documentation definition of done: `conventions.md`, `AGENTS.md`, `contributing.md`, maintainer playbook, PR template | direct | b2db454 |
 | T2 | S3, S4 | Doc-example test harness and CI job; mark non-runnable fragments | direct | this commit (see Evidence) |
-| T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | pending |
+| T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | this commit (see Evidence) |
 | T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | pending |
 | T5 | S3 | Fix examples: `simulations.md` | direct | pending |
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | pending |
@@ -132,6 +132,19 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   Build matrix runs `pytest -m "not docs"`. First run: 5 pages pass, 10 fail
   (fixed by T3–T6). The rule, `AGENTS.md` and `workflow.md` document the
   harness and the marker.
+
+- T3: `quickstart.md` and `core-concepts.md` rewritten in the agreed shape (back
+  link, quick path or concept table, runnable examples, tables, next steps) with
+  abstract names only; `index.md` already passed. `pytest -m docs` passes for
+  the three pages; every printed value claimed in a comment was checked against
+  a run (expansion names, head counts, `subgroup_population`,
+  `get_conditioning_categories`, `$compartment` ids, `print_equations` showing
+  `k2 * B`, `TimeScale` values).
+- Finding F1 (code, not fixed here): `check_unit_consistency` infers the time
+  unit only from known time units (`UnitChecker._infer_time_unit`) and defaults
+  to `day`; a parameter in `1/step` therefore always fails with "expected
+  `<bin_unit>/day`". Per-step units are natural in Commol (a model has no
+  physical time). The docs use `1/day`; the user decides on a code fix.
 
 ## Log
 
