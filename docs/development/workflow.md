@@ -216,7 +216,8 @@ The project uses three main CI/CD pipelines:
 
 ### 1. Code Quality (on every push/PR)
 
-- Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing)
+- Python: Ruff (linting/formatting), Ty (type checking), Pytest (testing,
+  including the documentation examples: `pytest -m docs`)
 - Rust: rustfmt (formatting), Clippy (linting), cargo test
 - Runs on: Ubuntu
 - Purpose: Ensure code quality standards
@@ -225,7 +226,7 @@ The project uses three main CI/CD pipelines:
 
 - Tests on: Ubuntu, Windows, macOS
 - Python versions: 3.12, 3.13, 3.14
-- Tests: Full test suite on all platforms
+- Tests: Full test suite on all platforms, except the documentation examples
 - Wheels: built for every target architecture only on pushes to `main`
 - Required check: `Build Passed`, which sums up the whole workflow
 - Purpose: Ensure cross-platform compatibility

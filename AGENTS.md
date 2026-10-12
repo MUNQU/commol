@@ -31,6 +31,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Install dependencies | `uv sync --extra dev` |
 | Build the extension | `source .venv/bin/activate && maturin develop --release` |
 | Python tests | `pytest` |
+| Documentation examples | `pytest -m docs` |
 | Python lint and types | `ruff check . && ruff format --check . && ty check commol` |
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-difference -p commol-calibration` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |

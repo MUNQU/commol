@@ -16,7 +16,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Docstrings | NumPy style on public functions | Review |
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
-| Doc examples | Abstract names; every block runs | CI (being added) and review |
+| Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -100,9 +100,18 @@ every match.
 - Use abstract names only: bins `A`, `B`, `C`; categories `group1`, `cat1`;
   parameters `k1`, `alpha`. No names from epidemiology, chemistry or any other
   field.
-- Every Python block runs, top to bottom within its page. A block that cannot
-  run alone (a signature, a fragment) is marked as a non-runnable fragment and
-  says why.
+- Every Python block runs, top to bottom within its page, in one namespace and
+  from a temporary directory (`py-commol/tests/test_docs_examples.py`). Define
+  what a block needs in an earlier block of the same page.
+- A block that cannot run alone (a signature, a fragment) is marked on the line
+  just before its fence, with a reason:
+
+    ```markdown
+    <!-- doc-test: skip: shows only the signature -->
+    ```
+
+  Use the marker only when the block cannot run; never to hide a failing
+  example.
 
 **Code documentation**
 
@@ -117,7 +126,7 @@ every match.
 | Check | Command | Enforced by |
 |---|---|---|
 | The site builds with no broken link or anchor | `mkdocs build --strict` | CI |
-| The documentation examples run | The doc-example test job | CI (being added) |
+| The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Public Python names have docstrings | The docstring coverage check | CI (being added) |
 | Public Rust items have docs | `missing_docs` | CI (being added) |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |

@@ -2,7 +2,7 @@
 
 Goal: documentation as complete, correct and well referenced as gentle-ai's,
 useful to people and to agents, and a mandatory rule that keeps it that way.
-Branch: one branch per task group from `develop`, squash-merged (see Delivery).
+Branch: `docs/documentation-overhaul`, one PR (#98) merged at the end (see Delivery).
 Engram mirror: topic `odd/documentation-overhaul/tasks` (project `commol`).
 Runners: `pytest` (from `py-commol/`), `cargo test -p commol-core -p commol-difference -p commol-calibration`, `mkdocs build --strict` (from the root).
 
@@ -80,7 +80,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
 | T1 | S4 | Documentation definition of done: `conventions.md`, `AGENTS.md`, `contributing.md`, maintainer playbook, PR template | direct | b2db454 |
-| T2 | S3, S4 | Doc-example test harness and CI job; mark non-runnable fragments | direct | pending |
+| T2 | S3, S4 | Doc-example test harness and CI job; mark non-runnable fragments | direct | this commit (see Evidence) |
 | T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | pending |
 | T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | pending |
 | T5 | S3 | Fix examples: `simulations.md` | direct | pending |
@@ -96,9 +96,9 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 
 ## Delivery
 
-- Forecast: several thousand authored changed lines, so the work is delivered as
-  a chain of pull requests to `develop`, one per task or task group, each
-  squash-merged before the next starts.
+- Strategy: `single-pr`, at the user's request (L6). Every task is one or more
+  work-unit commits on `docs/documentation-overhaul`; PR #98 carries all of them
+  and is merged into `develop` once T14 passes.
 - Order: T1 first (the rule applies to the rest of this work), then T2 (no
   example fix can be verified before the harness exists), then T3–T14.
 - Every task closes with a work-unit commit and its evidence below.
@@ -124,6 +124,15 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   resolves. The CI gates are added by T2, T9 and T10, and the table in
   `conventions.md` marks them as "being added" until then.
 
+- T2: `py-commol/tests/test_docs_examples.py` runs every page with `python`
+  blocks as one script (one namespace, temporary working directory, Agg
+  backend, `plt.show` disabled), including indented fences; `<!-- doc-test:
+  skip: <reason> -->` skips a fragment and requires a reason. Marker `docs`
+  registered in `pyproject.toml`. Code Quality runs it with the full suite; the
+  Build matrix runs `pytest -m "not docs"`. First run: 5 pages pass, 10 fail
+  (fixed by T3–T6). The rule, `AGENTS.md` and `workflow.md` document the
+  harness and the marker.
+
 ## Log
 
 - L1 (user, 2026-10-12): "¿Qué habría que hacer para mejorar la documentación del proyecto? Quiero una documentación que sea como la de gentle-ai, es decir, que pueda ser útil tanto a humanos como a agentes. Antes de implementar nada, dime qué harías."
@@ -131,3 +140,4 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 - L3 (user): "Quiero que la documentación sea lo más completa posible. Básate en la documentación de gentle-ai para evaluar cuál es la calidad que busco"
 - L4 (user): "Genera un documento odd para realizar la tarea. Añade también una obligatoriedad de que cualquier nueva modificación del repositorio debe de complimentar la documentación necesaria, con el formato acordado y la calidad adecuada."
 - L5: phases 1–2 of the earlier plan are done: `AGENTS.md` and `docs/codebase/` (#96), repository cleanup (#97).
+- L6 (user): "¿puedes realizar todo el ODD e integrar al final?"

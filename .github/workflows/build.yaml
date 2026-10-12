@@ -50,9 +50,10 @@ jobs:
               working-directory: ./py-commol
               run: uv run maturin develop --release
 
+            # The documentation examples run once, in the Code Quality workflow.
             - name: Run tests
               working-directory: ./py-commol
-              run: uv run pytest
+              run: uv run pytest -m "not docs"
 
     # Wheels are validated for every target architecture on pushes to main.
     # Releases build their own wheels (release.yaml); pull requests rely on the
