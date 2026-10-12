@@ -1,7 +1,8 @@
 //! NSGA-II ensemble selection.
 
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::RngExt;
+use rand::SeedableRng;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 

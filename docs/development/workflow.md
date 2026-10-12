@@ -176,9 +176,11 @@ When you create a PR, automated checks run:
 
 **PR Requirements**:
 
-- All CI checks must pass
-- At least one approving review
+- The required checks must pass: `Python Code Quality`, `Rust Code Quality`,
+  `Build Documentation` and `Build Passed` (the whole test matrix)
+- An approving review from a code owner
 - No merge conflicts with target branch
+- For PRs into `develop`, the branch must be up to date with `develop`
 - Code coverage should be >95%
 
 ### 7. Merging to Develop
@@ -186,9 +188,27 @@ When you create a PR, automated checks run:
 Once approved:
 
 ```bash
-# Merge using "Squash and merge" or "Rebase and merge" on GitHub
+# Merge using "Squash and merge" on GitHub (the only method develop allows)
 # Delete the feature branch after merging
 ```
+
+### 8. Promoting Develop to Main
+
+To release, open a pull request from `develop` to `main` and merge it with
+**"Create a merge commit"**, never "Squash and merge".
+
+A merge commit keeps the history of `develop` inside `main`, so the next
+promotion only carries the new commits. A squash adds to `main` a commit that
+`develop` does not have, so the two histories drift apart. The next promotion
+then conflicts on any file that changed again in `develop`, and fixing it needs
+a merge pushed to `develop` with an admin bypass.
+
+`main` does not require the branch to be up to date: the CI of the pull request
+already tests the result of merging it into `main`.
+
+!!! note "Dependabot reads its configuration from `main`"
+    Changes to `.github/dependabot.yaml` take effect only once they reach `main`.
+    Updating the file there also triggers a version-update check right away.
 
 ## Continuous Integration Pipelines
 
