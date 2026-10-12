@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::difference::PyDifferenceEquations;
 
 /// Type of value being calibrated
-#[pyclass(name = "CalibrationParameterType")]
+#[pyclass(name = "CalibrationParameterType", from_py_object)]
 #[derive(Clone, Copy)]
 pub enum PyCalibrationParameterType {
     Parameter,
@@ -32,7 +32,7 @@ impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParamet
 }
 
 /// Observed data point for calibration
-#[pyclass(name = "ObservedDataPoint")]
+#[pyclass(name = "ObservedDataPoint", from_py_object)]
 #[derive(Clone)]
 pub struct PyObservedDataPoint {
     pub inner: commol_calibration::ObservedDataPoint,
@@ -89,7 +89,7 @@ impl PyObservedDataPoint {
 }
 
 /// Parameter to calibrate with bounds
-#[pyclass(name = "CalibrationParameter")]
+#[pyclass(name = "CalibrationParameter", from_py_object)]
 #[derive(Clone)]
 pub struct PyCalibrationParameter {
     pub inner: commol_calibration::CalibrationParameter,
@@ -143,7 +143,7 @@ impl PyCalibrationParameter {
 }
 
 /// Calibration constraint defined as a mathematical expression
-#[pyclass(name = "CalibrationConstraint")]
+#[pyclass(name = "CalibrationConstraint", from_py_object)]
 #[derive(Clone)]
 pub struct PyCalibrationConstraint {
     pub inner: commol_calibration::CalibrationConstraint,
@@ -199,7 +199,7 @@ impl PyCalibrationConstraint {
 }
 
 /// Loss function configuration
-#[pyclass(name = "LossConfig")]
+#[pyclass(name = "LossConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyLossConfig {
     pub inner: commol_calibration::LossConfig,
@@ -266,7 +266,7 @@ impl PyLossConfig {
 }
 
 /// Nelder-Mead optimization configuration
-#[pyclass(name = "NelderMeadConfig")]
+#[pyclass(name = "NelderMeadConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyNelderMeadConfig {
     pub inner: commol_calibration::NelderMeadConfig,
@@ -324,7 +324,7 @@ impl PyNelderMeadConfig {
 }
 
 /// PSO Inertia Weight Strategy - Constant
-#[pyclass(name = "PSOInertiaConstant")]
+#[pyclass(name = "PSOInertiaConstant", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOInertiaConstant {
     #[pyo3(get)]
@@ -340,7 +340,7 @@ impl PyPSOInertiaConstant {
 }
 
 /// PSO Inertia Weight Strategy - Chaotic
-#[pyclass(name = "PSOInertiaChaotic")]
+#[pyclass(name = "PSOInertiaChaotic", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOInertiaChaotic {
     #[pyo3(get)]
@@ -358,7 +358,7 @@ impl PyPSOInertiaChaotic {
 }
 
 /// PSO Acceleration Strategy - Constant
-#[pyclass(name = "PSOAccelerationConstant")]
+#[pyclass(name = "PSOAccelerationConstant", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOAccelerationConstant {
     #[pyo3(get)]
@@ -376,7 +376,7 @@ impl PyPSOAccelerationConstant {
 }
 
 /// PSO Acceleration Strategy - Time Varying (TVAC)
-#[pyclass(name = "PSOAccelerationTimeVarying")]
+#[pyclass(name = "PSOAccelerationTimeVarying", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOAccelerationTimeVarying {
     #[pyo3(get)]
@@ -403,7 +403,7 @@ impl PyPSOAccelerationTimeVarying {
 }
 
 /// PSO Mutation Configuration
-#[pyclass(name = "PSOMutation")]
+#[pyclass(name = "PSOMutation", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOMutation {
     #[pyo3(get)]
@@ -430,7 +430,7 @@ impl PyPSOMutation {
 }
 
 /// PSO Velocity Configuration
-#[pyclass(name = "PSOVelocity")]
+#[pyclass(name = "PSOVelocity", from_py_object)]
 #[derive(Clone)]
 pub struct PyPSOVelocity {
     #[pyo3(get)]
@@ -452,7 +452,7 @@ impl PyPSOVelocity {
 }
 
 /// Particle Swarm Optimization configuration
-#[pyclass(name = "ParticleSwarmConfig")]
+#[pyclass(name = "ParticleSwarmConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyParticleSwarmConfig {
     pub inner: commol_calibration::ParticleSwarmConfig,
@@ -480,14 +480,14 @@ impl PyParticleSwarmConfig {
         num_particles: usize,
         max_iterations: u64,
         verbose: bool,
-        inertia: Option<PyObject>,
-        acceleration: Option<PyObject>,
+        inertia: Option<Py<PyAny>>,
+        acceleration: Option<Py<PyAny>>,
         mutation: Option<Py<PyPSOMutation>>,
         velocity: Option<Py<PyPSOVelocity>>,
         initialization: &str,
         seed: Option<u64>,
     ) -> PyResult<Self> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             // Parse initialization strategy
             let init_strategy = match initialization {
                 "uniform" | "uniform_random" => {
@@ -727,7 +727,7 @@ impl PyParticleSwarmConfig {
 }
 
 /// Optimization algorithm configuration
-#[pyclass(name = "OptimizationConfig")]
+#[pyclass(name = "OptimizationConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyOptimizationConfig {
     pub inner: commol_calibration::OptimizationConfig,
@@ -762,7 +762,7 @@ impl PyOptimizationConfig {
 }
 
 /// Calibration evaluation (single optimization run)
-#[pyclass(name = "CalibrationEvaluation")]
+#[pyclass(name = "CalibrationEvaluation", from_py_object)]
 #[derive(Clone)]
 pub struct PyCalibrationEvaluation {
     pub inner: commol_calibration::CalibrationEvaluation,
@@ -806,7 +806,7 @@ impl PyCalibrationEvaluation {
 }
 
 /// Compact Pareto-front solution returned by ensemble selection.
-#[pyclass(name = "ParetoSolution")]
+#[pyclass(name = "ParetoSolution", from_py_object)]
 #[derive(Clone)]
 pub struct PyParetoSolution {
     pub inner: commol_calibration::ParetoSolution,
@@ -848,7 +848,7 @@ impl PyParetoSolution {
 }
 
 /// Result returned by compact ensemble selection.
-#[pyclass(name = "EnsembleSelectionResult")]
+#[pyclass(name = "EnsembleSelectionResult", from_py_object)]
 #[derive(Clone)]
 pub struct PyEnsembleSelectionResult {
     pub inner: commol_calibration::EnsembleSelectionResult,

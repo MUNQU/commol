@@ -20,7 +20,7 @@ const DEFAULT_HEADER_INTERVAL: u64 = 100;
 /// This function writes to Python's sys.stdout instead of Rust's stdout,
 /// which is necessary for proper display in Python environments.
 fn write_to_python_stdout(message: &str) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         if let Err(e) = py
             .import("sys")
             .and_then(|sys| sys.getattr("stdout"))
@@ -38,7 +38,7 @@ fn write_to_python_stdout(message: &str) {
 
 /// Write an optimization header to Python's stdout
 fn write_optimization_header(header: &str) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let _ = py
             .import("sys")
             .and_then(|sys| sys.getattr("stdout"))
