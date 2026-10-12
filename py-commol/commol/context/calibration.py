@@ -918,6 +918,13 @@ class CalibrationProblem(BaseModel):
         before applying the loss metric (default: False).
     optimization_config : OptimizationConfig
         Configuration for the optimization algorithm
+    initial_condition_remainder : str | None
+        Expanded compartment or bin that absorbs the difference to the
+        population size once the calibrated initial conditions are applied
+        (default: None). It is not calibrated itself. With a remainder, the
+        initial population always equals ``population_size``; without one,
+        calibrated initial conditions are applied as given and only a total
+        above ``population_size`` is penalized.
     probabilistic_config : ProbabilisticCalibrationConfig | None
         Optional configuration for probabilistic calibration (default: None).
         When provided, enables ensemble-based parameter estimation with
@@ -958,6 +965,13 @@ class CalibrationProblem(BaseModel):
     )
     optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
         default=..., description="Optimization algorithm configuration"
+    )
+    initial_condition_remainder: str | None = Field(
+        default=None,
+        description=(
+            "Expanded compartment or bin that absorbs the difference to the "
+            "population size once the calibrated initial conditions are applied."
+        ),
     )
     probabilistic_config: ProbabilisticCalibrationConfig | None = Field(
         default=None,

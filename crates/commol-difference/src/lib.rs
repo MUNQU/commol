@@ -32,8 +32,14 @@
 //! ```
 
 mod builder;
+mod flows;
 mod helpers;
+mod layout;
 mod simulation;
 mod types;
 
+pub use builder::{
+    ExpandedOutput, InitialCompartment, expand_accumulators, expand_compartments, initial_state,
+};
+pub use flows::{FlowDescription, describe_flows};
 pub use types::DifferenceEquations;

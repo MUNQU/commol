@@ -22,6 +22,7 @@ from commol.context.dynamics import (
 )
 from commol.context.initial_conditions import (
     BinFraction,
+    CompartmentFraction,
     InitialConditions,
     StratificationFraction,
     StratificationFractions,
@@ -68,6 +69,13 @@ class StratificationFractionsDict(TypedDict):
 
     stratification: str
     fractions: list[StratificationFractionDict]
+
+
+class CompartmentFractionDict(TypedDict):
+    """Type definition for a single expanded compartment override."""
+
+    compartment: str
+    fraction: float
 
 
 class ModelBuilder:
@@ -780,6 +788,8 @@ class ModelBuilder:
         population_size: int,
         bin_fractions: list[BinFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
+        *,
+        compartment_fractions: list[CompartmentFractionDict] | None = None,
     ) -> Self:
         """
         Set the initial conditions for the model.
@@ -816,6 +826,19 @@ class ModelBuilder:
                     ]
                 }
             ]
+        compartment_fractions : list[CompartmentFractionDict] | None, default=None
+            List of per-compartment overrides applied after the uniform
+            expansion. Each item is a dictionary with:
+            - "compartment": str (expanded compartment name)
+            - "fraction": float (fraction of the total population)
+
+            Example:
+            [
+                {"compartment": "IH_y60", "fraction": 0.0}
+            ]
+
+            Compartment names and the resulting total population are checked
+            against the engine expansion when the model is built.
 
         Returns
         -------
@@ -825,7 +848,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If initial conditions have already been set.
+            If initial conditions have already been set, a compartment name is
+            repeated, or a fraction lies outside ``[0.0, 1.0]``.
         """
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
@@ -857,10 +881,18 @@ class ModelBuilder:
                     )
                 )
 
+        compartment_fraction_list = [
+            CompartmentFraction(
+                compartment=override["compartment"], fraction=override["fraction"]
+            )
+            for override in compartment_fractions or []
+        ]
+
         self._initial_conditions = InitialConditions(
             population_size=population_size,
             bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
+            compartment_fractions=compartment_fraction_list,
         )
         bin_ids = [bf["bin"] for bf in bin_fractions]
         logging.info(
@@ -977,7 +1009,9 @@ class ModelBuilder:
         ------
         ValueError
             If validation fails, required components are missing,
-            or typology is invalid.
+            typology is invalid, or a per-compartment override names an unknown
+            compartment or makes the initial population exceed
+            ``population_size``.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")

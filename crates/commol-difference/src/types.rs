@@ -62,6 +62,9 @@ pub(crate) struct TransitionFlow {
     pub(crate) source_index: Option<usize>,
     /// `None` for target-less transitions.
     pub(crate) target_index: Option<usize>,
+    /// Further `(source, target)` pieces of a transition with several sources
+    /// or targets. Each moves the same flow as the first piece.
+    pub(crate) extra_pieces: Vec<(Option<usize>, Option<usize>)>,
     /// Accumulator output indices incremented by this transition flow.
     pub(crate) accumulator_indices: Vec<usize>,
     pub(crate) rate_expression: RateMathExpression,
@@ -181,6 +184,8 @@ pub(crate) struct GeneratedAccumulatorOutput {
 #[derive(Clone)]
 pub struct DifferenceEquations {
     pub(crate) compartments: Vec<String>,
+    /// Source and applied categories of each output, parallel to `output_names`
+    pub(crate) output_labels: Vec<commol_core::OutputLabels>,
     pub(crate) output_names: Vec<String>,
     pub(crate) population: Vec<f64>,
     pub(crate) accumulators: Vec<f64>,

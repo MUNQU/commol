@@ -1680,19 +1680,49 @@ class TestApplyCalibrationParameters:
         with pytest.raises(ValueError, match="no declared parameter type"):
             model.apply_calibration_parameters({"mystery": 0.15}, problem)
 
-    def test_per_compartment_initial_condition_is_rejected_not_silently_skipped(
+    @staticmethod
+    def _with_exact_compartments(problem: CalibrationProblem) -> CalibrationProblem:
+        # Two exact compartments, applied as given.
+        for compartment in ("A_group1", "A_group2"):
+            problem.parameters.append(
+                CalibrationParameter(
+                    id=compartment,
+                    parameter_type="initial_condition",
+                    min_bound=0.0,
+                    max_bound=1.0,
+                )
+            )
+        return problem
+
+    def test_per_compartment_initial_condition_is_written_back_not_silently_skipped(
         self,
     ) -> None:
         model = _binary_stratified_model()
-        problem = self._problem()
-        problem.parameters.append(
-            CalibrationParameter(
-                id="A_group1",
-                parameter_type="initial_condition",
-                min_bound=0.0,
-                max_bound=1.0,
-            )
-        )
+        problem = self._with_exact_compartments(self._problem())
 
-        with pytest.raises(ValueError, match="cannot be written back"):
-            model.apply_calibration_parameters({"A_group1": 0.3}, problem)
+        model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
+
+        overrides = {
+            fraction.compartment: fraction.fraction
+            for fraction in model.population.initial_conditions.compartment_fractions
+        }
+        assert overrides == {
+            "A_group1": pytest.approx(0.3),
+            "A_group2": pytest.approx(0.7),
+        }
+
+    def test_per_compartment_initial_condition_is_upserted(self) -> None:
+        model = _binary_stratified_model()
+        problem = self._with_exact_compartments(self._problem())
+
+        model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
+        model.apply_calibration_parameters({"A_group1": 0.4, "A_group2": 0.6}, problem)
+
+        overrides = [
+            (fraction.compartment, fraction.fraction)
+            for fraction in model.population.initial_conditions.compartment_fractions
+        ]
+        assert overrides == [
+            ("A_group1", pytest.approx(0.4)),
+            ("A_group2", pytest.approx(0.6)),
+        ]

@@ -3,7 +3,7 @@ import re
 import pint
 
 from commol.constants import PrintEquationsOutputFormat
-from commol.context.dynamics import Transition
+from commol.context._model import engine_state
 from commol.utils.equations import (
     UnitConsistencyError,
     get_predefined_variable_units,
@@ -17,51 +17,36 @@ class ModelCompartmentHelper:
 
     def __init__(self, model) -> None:
         self._model = model
+        self._expanded: (
+            tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]
+            | None
+        ) = None
 
     # ------------------------------------------------------------------
     # Compartment generation
     # ------------------------------------------------------------------
 
-    def expand_over_stratifications(
-        self, source_ids: list[str]
-    ) -> list[tuple[str, dict[str, str]]]:
-        """Expand ids across the stratifications that apply to each of them.
-
-        Each element is a 2-tuple ``(source_id, applied_categories)`` where
-        ``applied_categories`` maps each stratification ID that was actually
-        applied to its chosen category. A conditional stratification is applied
-        only to ids whose already-applied categories satisfy its conditions.
-        """
-        partials: list[tuple[str, dict[str, str]]] = [
-            (source_id, {}) for source_id in source_ids
-        ]
-
-        for strat in self._model.population.stratifications:
-            new_partials: list[tuple[str, dict[str, str]]] = []
-            for name, applied in partials:
-                conditions_met = strat.conditions is None or all(
-                    applied.get(c.stratification) == c.category
-                    for c in strat.conditions
-                )
-                if conditions_met:
-                    for cat in strat.categories:
-                        new_partials.append((name, {**applied, strat.id: cat}))
-                else:
-                    new_partials.append((name, applied))
-            partials = new_partials
-
-        return partials
+    def _expanded_outputs(
+        self,
+    ) -> tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]:
+        """Compartments and accumulator outputs, as the engine expands them."""
+        if self._expanded is None:
+            compartments, accumulators = engine_state.expanded_outputs(self._model)
+            self._expanded = (
+                [(output.source, output.categories) for output in compartments],
+                [(output.source, output.categories) for output in accumulators],
+            )
+        return self._expanded
 
     def generate_compartments(self) -> list[tuple[str, dict[str, str]]]:
         """Generate all compartment combinations from bins and stratifications.
 
         Each element is a 2-tuple ``(bin_id, applied_categories)`` where
         ``applied_categories`` maps each stratification ID that was actually
-        applied to this compartment to its chosen category.
+        applied to this compartment to its chosen category. The engine expands
+        them.
         """
-        return self.expand_over_stratifications(
-            [state.id for state in self._model.population.bins]
-        )
+        return self._expanded_outputs()[0]
 
     def generate_accumulator_outputs(self) -> list[tuple[str, dict[str, str]]]:
         """Generate all accumulator output combinations.
@@ -69,9 +54,7 @@ class ModelCompartmentHelper:
         Each element is a 2-tuple ``(accumulator_id, applied_categories)``,
         following the same expansion as compartments.
         """
-        return self.expand_over_stratifications(
-            [accumulator.id for accumulator in self._model.population.accumulators]
-        )
+        return self._expanded_outputs()[1]
 
     def compartment_to_string(
         self, compartment: tuple[str, dict[str, str]], format: str
@@ -90,45 +73,6 @@ class ModelCompartmentHelper:
 
             return latex_variable(name)
         return name
-
-    # ------------------------------------------------------------------
-    # Transition classification
-    # ------------------------------------------------------------------
-
-    def separate_transitions_by_type(
-        self,
-    ) -> tuple[list[Transition], list[Transition], list[Transition]]:
-        """Separate transitions into bin, stratification, and cross-category."""
-        bin_id_set = {bin_item.id for bin_item in self._model.population.bins}
-
-        bin_transitions: list[Transition] = []
-        stratification_transitions: list[Transition] = []
-        cross_category_transitions: list[Transition] = []
-
-        for transition in self._model.dynamics.transitions:
-            if transition_has_category_overrides(transition):
-                cross_category_transitions.append(transition)
-            else:
-                transition_ids = set(transition.source) | set(transition.target)
-                if transition_ids.issubset(bin_id_set):
-                    bin_transitions.append(transition)
-                else:
-                    stratification_transitions.append(transition)
-
-        return bin_transitions, stratification_transitions, cross_category_transitions
-
-    def group_transitions_by_stratification(
-        self, transitions: list[Transition]
-    ) -> dict[str, list[Transition]]:
-        """Group stratification transitions by their stratification ID."""
-        strat_by_id: dict[str, list[Transition]] = {}
-        for strat in self._model.population.stratifications:
-            strat_by_id[strat.id] = []
-            for transition in transitions:
-                transition_states = set(transition.source) | set(transition.target)
-                if transition_states.issubset(set(strat.categories)):
-                    strat_by_id[strat.id].append(transition)
-        return strat_by_id
 
     # ------------------------------------------------------------------
     # Unit helpers
@@ -381,20 +325,6 @@ class ModelCompartmentHelper:
 # ------------------------------------------------------------------
 # Module-level helpers (no model dependency)
 # ------------------------------------------------------------------
-
-
-def replace_bin_in_rate(rate: str, bin_name: str, replacement: str) -> str:
-    """Replace a base bin name in a rate expression with word-boundary matching."""
-    return re.sub(rf"\b{re.escape(bin_name)}\b", replacement, rate)
-
-
-def transition_has_category_overrides(transition: Transition) -> bool:
-    """Check if any stratified rate has ``to`` overrides."""
-    if not transition.stratified_rates:
-        return False
-    return any(
-        c.to is not None for sr in transition.stratified_rates for c in sr.conditions
-    )
 
 
 def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:

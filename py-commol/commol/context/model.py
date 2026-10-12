@@ -6,6 +6,12 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from commol.constants import PrintEquationsOutputFormat
+from commol.context._model import engine_state
+from commol.context._model.calibration_write_back import (
+    calibrated_initial_conditions,
+    with_initial_conditions,
+)
+from commol.context._model.engine_state import InitialCompartment
 from commol.context._model.serialization import render_json
 from commol.context.calibration import (
     CalibrationProblem,
@@ -228,6 +234,53 @@ class Model(BaseModel):
         """
         self.population.initial_conditions.update_stratification_fractions(fractions)
 
+    def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+        """
+        Upsert per-compartment initial condition overrides.
+
+        A compartment already declared in the model definition has its
+        fraction replaced; a new one is appended. The engine validates the
+        result before it is stored, so a rejected call leaves the model
+        unchanged.
+
+        Parameters
+        ----------
+        fractions : Mapping[str, float]
+            Dictionary mapping expanded compartment names to their new fraction
+            of the total population.
+
+        Raises
+        ------
+        ValueError
+            If a name is not an expanded compartment of the model, a value lies
+            outside ``[0.0, 1.0]``, or the resulting overrides make the initial
+            population exceed ``population_size``.
+        """
+        candidate = self.population.initial_conditions.model_copy(deep=True)
+        candidate.update_compartment_fractions(fractions)
+        engine_state.initial_state(with_initial_conditions(self, candidate))
+        self.population.initial_conditions = candidate
+
+    def initial_state(self) -> list[InitialCompartment]:
+        """
+        Expanded compartments and the population each one starts with.
+
+        The engine builds this state from the bin fractions, the stratification
+        fractions and the per-compartment overrides; it is the population a
+        simulation of this model starts from.
+
+        Returns
+        -------
+        list[InitialCompartment]
+            One entry per expanded compartment, in engine order.
+
+        Raises
+        ------
+        ValueError
+            If the per-compartment overrides are not valid for the model.
+        """
+        return engine_state.initial_state(self)
+
     def apply_calibration_parameters(
         self,
         result: CalibrationResult
@@ -239,10 +292,16 @@ class Model(BaseModel):
         Write calibrated values back onto the model.
 
         Each value is routed by the ``parameter_type`` declared for it in
-        ``problem``: ``parameter`` values update model parameters,
-        ``initial_condition`` values update bin fractions or stratification
-        category fractions, and ``scale`` values are ignored because they apply
-        to observations rather than to the model.
+        ``problem``: ``parameter`` values update model parameters, and
+        ``scale`` values are ignored because they apply to observations rather
+        than to the model.
+
+        ``initial_condition`` values are persisted so that the model rebuilds
+        the initial population the engine scored for them. Bin and category
+        values update the fractions they declare. Every compartment that those
+        fractions do not reproduce, such as an exact compartment value or a
+        value that overlaps a per-compartment override, is persisted as a
+        per-compartment override.
 
         Parameters
         ----------
@@ -256,9 +315,8 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If an id is not declared in ``problem``, or if an initial condition
-            id refers to an expanded compartment, which the model definition
-            cannot represent.
+            If an id is not declared in ``problem``, or the engine cannot
+            resolve an initial condition id.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -269,40 +327,37 @@ class Model(BaseModel):
                 f"Declared calibration parameters: {sorted(types)}"
             )
 
-        bin_ids = {bin_item.id for bin_item in self.population.bins}
-        categories = self.population.initial_conditions.get_categories_with_fractions()
-
-        parameters: dict[str, float | None] = {}
-        bin_fractions: dict[str, float | None] = {}
-        stratification_fractions: dict[str, float] = {}
-
-        for param_id, value in values.items():
-            parameter_type = types[param_id]
-            if parameter_type == CalibrationParameterType.PARAMETER:
-                parameters[param_id] = value
-            elif parameter_type == CalibrationParameterType.SCALE:
-                continue
-            elif param_id in bin_ids:
-                bin_fractions[param_id] = value
-            elif param_id in categories:
-                stratification_fractions[param_id] = value
-            else:
-                raise ValueError(
-                    f"Initial condition '{param_id}' is neither a bin nor a "
-                    f"stratification category. Per-compartment initial "
-                    f"conditions can be calibrated but cannot be written back, "
-                    f"because the model defines initial conditions as bin and "
-                    f"stratification fractions only. Available bins: "
-                    f"{sorted(bin_ids)}. Available categories: "
-                    f"{sorted(categories)}"
-                )
+        parameters: dict[str, float | None] = {
+            param_id: value
+            for param_id, value in values.items()
+            if types[param_id] == CalibrationParameterType.PARAMETER
+        }
+        # Computed before any mutation, so a rejected value leaves the model
+        # unchanged.
+        initial_conditions = calibrated_initial_conditions(self, problem, values)
 
         if parameters:
             self.update_parameters(parameters)
-        if bin_fractions:
-            self.update_initial_conditions(bin_fractions)
-        if stratification_fractions:
-            self.update_stratification_fractions(stratification_fractions)
+        self.population.initial_conditions = initial_conditions
+
+    @model_validator(mode="after")
+    def validate_transitions_with_engine(self) -> Self:
+        """
+        Validate the transitions against the flows the engine plans for them.
+
+        The engine rejects a category transition without exactly one source and
+        one target category, and a stratified rate whose conditions match none
+        of the compartments the transition starts from.
+        """
+        engine_state.transition_flows(self)
+        return self
+
+    @model_validator(mode="after")
+    def validate_compartment_fractions(self) -> Self:
+        """Validate per-compartment overrides against the engine expansion."""
+        if self.population.initial_conditions.compartment_fractions:
+            engine_state.initial_state(self)
+        return self
 
     @model_validator(mode="after")
     def validate_formula_variables(self) -> Self:
@@ -376,18 +431,23 @@ class Model(BaseModel):
         Returns
         -------
         tuple[str, ...]
-            Categories selecting the subgroup this stratification subdivides,
-            empty for an unconditional stratification.
+            Ids of the categories selecting the subgroup this stratification
+            subdivides, empty for an unconditional stratification. A category
+            name another stratification also declares is qualified, as in
+            ``sex:female``.
 
         Raises
         ------
         ValueError
             If the stratification is not found.
         """
+        initial_conditions = self.population.initial_conditions
         for stratification in self.population.stratifications:
             if stratification.id == stratification_id:
                 return tuple(
-                    condition.category
+                    initial_conditions.category_id(
+                        condition.stratification, condition.category
+                    )
                     for condition in (stratification.conditions or [])
                     if condition.category is not None
                 )
@@ -404,11 +464,16 @@ class Model(BaseModel):
         See
         :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
 
+        Per-compartment overrides are folded into the sum for every compartment
+        the category chain selects, not just when it selects one, so the head
+        count matches the population the engine builds. Without overrides the
+        declared fractions are multiplied exactly as before.
+
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category names forming a chain from the whole population down to
-            the subgroup, outermost first.
+            Category ids, bare or qualified (``sex:female``), forming a chain
+            from the whole population down to the subgroup, outermost first.
 
         Returns
         -------
@@ -418,9 +483,21 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If a category is not found.
+            If a category is not found or a bare name is ambiguous.
         """
-        return self.population.initial_conditions.subgroup_population(categories)
+        selected = tuple(categories)
+        initial_conditions = self.population.initial_conditions
+        if not initial_conditions.compartment_fractions:
+            return initial_conditions.subgroup_population(selected)
+        resolved = [initial_conditions.resolve_category(c) for c in selected]
+        return sum(
+            compartment.population
+            for compartment in self.initial_state()
+            if all(
+                compartment.categories.get(stratification) == name
+                for stratification, name in resolved
+            )
+        )
 
     def get_outputs_by_source(self) -> dict[str, list[str]]:
         """

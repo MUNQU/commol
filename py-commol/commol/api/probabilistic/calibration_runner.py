@@ -102,6 +102,7 @@ class CalibrationRunner:
                 self.seed,
                 evaluation_retention,
                 top_k_per_run,
+                initial_condition_remainder=self.problem.initial_condition_remainder,
             )
             logger.info(f"Completed {len(results)}/{n_runs} calibrations successfully")
             return results

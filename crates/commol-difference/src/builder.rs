@@ -1,9 +1,7 @@
 //! Model builder for constructing DifferenceEquations from a compartment model.
 
-use crate::helpers::{
-    compute_target_with_category_overrides, extract_stratifications,
-    get_rate_string_for_compartment, has_category_overrides, replace_bin_in_rate,
-};
+use crate::flows::{PlannedFlow, plan_transition_flows};
+use crate::layout::CompartmentLayout;
 use crate::types::{
     AccumulatorOutputRef, DifferenceEquations, FastRateExpression, FastRateOp,
     GeneratedAccumulatorOutput, SubpopulationLayout, SubpopulationMapping, TimeSeriesParameter,
@@ -11,7 +9,7 @@ use crate::types::{
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
-use commol_core::{MathExpressionContext, Model, RateMathExpression};
+use commol_core::{MathExpressionContext, Model, OutputLabels, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
 /// Time-series parameter payload collected before parameter slots are
@@ -40,8 +38,35 @@ impl DifferenceEquations {
     ///
     /// A new `DifferenceEquations` instance ready for simulation.
     pub fn from_model(model: &Model) -> Self {
+        Self::try_from_model(model)
+            .unwrap_or_else(|error| panic!("Failed to build population: {error}"))
+    }
+
+    /// Fallible counterpart of [`Self::from_model`].
+    ///
+    /// Returns the population initialization error instead of panicking, so a
+    /// caller can surface it as its own error type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the model is not a difference-equations model,
+    /// or when an initial-condition override is not valid for the expansion.
+    pub fn try_from_model(model: &Model) -> Result<Self, String> {
+        if model.dynamics.typology != commol_core::ModelTypes::DifferenceEquations {
+            return Err(format!(
+                "The DifferenceEquations engine cannot solve a {:?} model",
+                model.dynamics.typology
+            ));
+        }
+
         // Generate all compartment and accumulator output combinations
-        let (compartments, compartment_map) = generate_compartments(model);
+        let layout = CompartmentLayout::new(model);
+        let compartments: Vec<String> = layout.names().to_vec();
+        let compartment_map: HashMap<String, usize> = compartments
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.clone(), index))
+            .collect();
         let accumulator_outputs = generate_accumulators(model);
         let accumulator_names: Vec<String> = accumulator_outputs
             .iter()
@@ -58,8 +83,31 @@ impl DifferenceEquations {
             .cloned()
             .collect();
 
-        // Initialize population distribution
-        let population = initialize_population(model, &compartments);
+        // Initial population of each compartment, in the same order as
+        // `compartments`
+        let state = initial_state(model)?;
+        debug_assert!(
+            state
+                .iter()
+                .map(|compartment| &compartment.name)
+                .eq(compartments.iter())
+        );
+        let population: Vec<f64> = state.iter().map(|c| c.population).collect();
+
+        // Labels of every output: compartments first, then accumulators
+        let output_labels: Vec<OutputLabels> = layout
+            .labels()
+            .iter()
+            .cloned()
+            .chain(
+                expand_accumulators(model)
+                    .into_iter()
+                    .map(|output| OutputLabels {
+                        source: output.source,
+                        categories: output.categories,
+                    }),
+            )
+            .collect();
 
         // Store constant parameters for quick lookup
         // Formula parameters will be evaluated on each step
@@ -104,11 +152,7 @@ impl DifferenceEquations {
         // Pre-compute subpopulation mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subpopulation variable names)
-        let subpopulation_layout = build_subpopulation_mappings(
-            &compartments,
-            &model.population.stratifications,
-            &model.population.bins,
-        );
+        let subpopulation_layout = build_subpopulation_mappings(&layout, model);
 
         let subpopulation_param_names: HashSet<String> = subpopulation_layout
             .iter()
@@ -161,16 +205,11 @@ impl DifferenceEquations {
             })
             .collect();
 
-        // Pre-compute all transition flows
-        let transition_flows = build_transition_flows(
-            model,
-            &compartments,
-            &compartment_map,
-            &accumulator_map,
-            &model.population.stratifications,
-            &subpopulation_param_names,
-            &expression_context,
-        );
+        // Plan the transition flows and compile them
+        let planned_flows =
+            plan_transition_flows(model, &layout, &accumulator_map, &subpopulation_param_names)?;
+        let transition_flows =
+            compile_transition_flows(planned_flows, &compartment_map, &expression_context);
 
         let used_context_variables =
             collect_used_context_variables(&transition_flows, &formula_parameters);
@@ -193,8 +232,9 @@ impl DifferenceEquations {
         let num_compartments = compartments.len();
         let compartment_flows = vec![0.0; num_compartments];
 
-        Self {
+        Ok(Self {
             compartments,
+            output_labels,
             output_names,
             population,
             accumulators: vec![0.0; accumulator_map.len()],
@@ -210,7 +250,7 @@ impl DifferenceEquations {
             n_parameter_index,
             t_parameter_index,
             requires_compartment_context,
-        }
+        })
     }
 }
 
@@ -229,57 +269,92 @@ fn stratification_conditions_met(
     }
 }
 
-/// Generate all stratified compartment combinations.
+/// A bin or accumulator expanded over the stratifications.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExpandedOutput {
+    /// Expanded name, for example `IH_y60` or `S_oe60_home`.
+    pub name: String,
+    /// Bin or accumulator the output expands from.
+    pub source: String,
+    /// `(stratification id, category)` pairs applied to the output, in
+    /// stratification declaration order. A conditional stratification whose
+    /// conditions the output does not meet is absent.
+    pub categories: Vec<(String, String)>,
+}
+
+/// Expand source ids over the stratifications, in declaration order.
 ///
-/// When a stratification has `conditions`, it only expands compartments whose
-/// already-applied categories satisfy all of those conditions. Compartments
-/// that do not satisfy the conditions are kept as-is (without appending this
-/// stratification's categories), so the result is a non-uniform Cartesian
-/// product.
-///
-/// Returns a tuple of (compartments vector, compartment_map for lookups).
-fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>) {
-    // Each element: (compartment_name, applied_categories)
-    // applied_categories maps stratification_id → chosen_category for that compartment
-    let mut partials: Vec<(String, HashMap<String, String>)> = model
-        .population
-        .bins
-        .iter()
-        .map(|b| (b.id.clone(), HashMap::new()))
+/// This is the single source of truth for the expansion of bins and
+/// accumulators. When a stratification has `conditions`, it only expands the
+/// outputs whose already-applied categories satisfy all of them; the others are
+/// kept as-is, so the result is a non-uniform Cartesian product.
+fn expand<'a>(
+    model: &Model,
+    source_ids: impl IntoIterator<Item = &'a str>,
+) -> Vec<(ExpandedOutput, HashMap<String, String>)> {
+    // Each element: (source, name, applied categories by stratification id)
+    let mut partials: Vec<(String, String, HashMap<String, String>)> = source_ids
+        .into_iter()
+        .map(|id| (id.to_string(), id.to_string(), HashMap::new()))
         .collect();
 
     for stratification in &model.population.stratifications {
-        let mut new_partials: Vec<(String, HashMap<String, String>)> = Vec::new();
-
-        for (name, applied) in partials {
+        let mut new_partials = Vec::with_capacity(partials.len());
+        for (source, name, applied) in partials {
             if stratification_conditions_met(&stratification.conditions, &applied) {
-                // Conditions met: expand into one entry per category
                 for cat in &stratification.categories {
                     let mut new_applied = applied.clone();
                     new_applied.insert(stratification.id.clone(), cat.clone());
-                    new_partials.push((format!("{}_{}", name, cat), new_applied));
+                    new_partials.push((source.clone(), format!("{}_{}", name, cat), new_applied));
                 }
             } else {
-                // Conditions not met: keep compartment unchanged
-                new_partials.push((name, applied));
+                new_partials.push((source, name, applied));
             }
         }
-
         partials = new_partials;
     }
 
-    let compartments: Vec<String> = partials.into_iter().map(|(name, _)| name).collect();
-
-    let compartment_map: HashMap<String, usize> = compartments
-        .iter()
-        .enumerate()
-        .map(|(index, name)| (name.clone(), index))
-        .collect();
-
-    (compartments, compartment_map)
+    partials
+        .into_iter()
+        .map(|(source, name, applied)| {
+            let categories = model
+                .population
+                .stratifications
+                .iter()
+                .filter_map(|s| applied.get(&s.id).map(|c| (s.id.clone(), c.clone())))
+                .collect();
+            (
+                ExpandedOutput {
+                    name,
+                    source,
+                    categories,
+                },
+                applied,
+            )
+        })
+        .collect()
 }
 
-fn accumulator_output_ref(
+/// Expanded compartments of a model, in engine order.
+pub fn expand_compartments(model: &Model) -> Vec<ExpandedOutput> {
+    expand(model, model.population.bins.iter().map(|b| b.id.as_str()))
+        .into_iter()
+        .map(|(output, _)| output)
+        .collect()
+}
+
+/// Expanded accumulator outputs of a model, in engine order.
+pub fn expand_accumulators(model: &Model) -> Vec<ExpandedOutput> {
+    expand(
+        model,
+        model.population.accumulators.iter().map(|a| a.id.as_str()),
+    )
+    .into_iter()
+    .map(|(output, _)| output)
+    .collect()
+}
+
+pub(crate) fn accumulator_output_ref(
     accumulator_id: String,
     applied: &HashMap<String, String>,
     stratifications: &[commol_core::Stratification],
@@ -293,574 +368,278 @@ fn accumulator_output_ref(
     }
 }
 
-fn generate_accumulators(model: &Model) -> Vec<GeneratedAccumulatorOutput> {
-    let mut partials: Vec<(String, String, HashMap<String, String>)> = model
-        .population
-        .accumulators
-        .iter()
-        .map(|a| (a.id.clone(), a.id.clone(), HashMap::new()))
-        .collect();
-
-    for stratification in &model.population.stratifications {
-        let mut new_partials: Vec<(String, String, HashMap<String, String>)> = Vec::new();
-
-        for (accumulator_id, name, applied) in partials {
-            if stratification_conditions_met(&stratification.conditions, &applied) {
-                for cat in &stratification.categories {
-                    let mut new_applied = applied.clone();
-                    new_applied.insert(stratification.id.clone(), cat.clone());
-                    new_partials.push((
-                        accumulator_id.clone(),
-                        format!("{}_{}", name, cat),
-                        new_applied,
-                    ));
-                }
-            } else {
-                new_partials.push((accumulator_id, name, applied));
-            }
-        }
-
-        partials = new_partials;
-    }
-
-    partials
-        .into_iter()
-        .map(
-            |(accumulator_id, name, applied)| GeneratedAccumulatorOutput {
-                name,
-                output_ref: accumulator_output_ref(
-                    accumulator_id,
-                    &applied,
-                    &model.population.stratifications,
-                ),
-            },
-        )
-        .collect()
+pub(crate) fn generate_accumulators(model: &Model) -> Vec<GeneratedAccumulatorOutput> {
+    expand(
+        model,
+        model.population.accumulators.iter().map(|a| a.id.as_str()),
+    )
+    .into_iter()
+    .map(|(output, applied)| GeneratedAccumulatorOutput {
+        name: output.name,
+        output_ref: accumulator_output_ref(
+            output.source,
+            &applied,
+            &model.population.stratifications,
+        ),
+    })
+    .collect()
 }
 
-/// Initialize population distribution across compartments.
-///
-/// Mirrors the conditional expansion logic of `generate_compartments`: when a
-/// stratification has conditions that are not satisfied by a compartment's
-/// already-applied categories, that compartment is kept as-is (its population
-/// is not split by that stratification's fractions).
-fn initialize_population(model: &Model, compartments: &[String]) -> Vec<f64> {
-    let total_population = model.population.initial_conditions.population_size as f64;
+/// One expanded compartment of a model and the population it starts with.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialCompartment {
+    /// Expanded compartment name, for example `IH_y60` or `S_oe60_home`.
+    pub name: String,
+    /// Bin the compartment expands from.
+    pub bin: String,
+    /// `(stratification id, category)` pairs applied to the compartment, in
+    /// stratification declaration order. A conditional stratification whose
+    /// conditions the compartment does not meet is absent.
+    pub categories: Vec<(String, String)>,
+    /// Initial population, including `compartment_fractions` overrides.
+    pub population: f64,
+}
 
-    let bin_fraction_map: HashMap<String, Option<f64>> = model
-        .population
-        .initial_conditions
+/// Relative tolerance of the check that overrides keep the initial population
+/// within `population_size`.
+const POPULATION_TOLERANCE: f64 = 1e-9;
+
+/// Expand a model into its compartments and their initial populations.
+///
+/// This is the single source of truth for the initial state of a model. Bins
+/// are expanded over the stratifications in declaration order; when a
+/// stratification has conditions that a compartment's already-applied
+/// categories do not meet, that compartment is kept as-is and its population
+/// is not split by that stratification's fractions. An uncalibrated bin
+/// fraction counts as zero.
+///
+/// After the uniform distribution is computed, `compartment_fractions` overrides
+/// replace the value of the named compartments with `population_size * fraction`.
+///
+/// # Errors
+///
+/// Returns a message when an override names a compartment that is not part of
+/// the expansion, names a compartment twice, holds a fraction outside
+/// `[0.0, 1.0]`, or makes the initial population exceed `population_size`.
+pub fn initial_state(model: &Model) -> Result<Vec<InitialCompartment>, String> {
+    let initial_conditions = &model.population.initial_conditions;
+    let total_population = initial_conditions.population_size as f64;
+
+    let bin_fraction_map: HashMap<&str, Option<f64>> = initial_conditions
         .bin_fractions
         .iter()
-        .map(|bf| (bf.bin.clone(), bf.fraction))
+        .map(|bf| (bf.bin.as_str(), bf.fraction))
+        .collect();
+    let category_fraction_map: HashMap<(&str, &str), f64> = model
+        .population
+        .stratifications
+        .iter()
+        .filter_map(|stratification| {
+            initial_conditions
+                .stratification_fractions
+                .iter()
+                .find(|sf| sf.stratification == stratification.id)
+        })
+        .flat_map(|item| {
+            item.fractions.iter().map(|fraction| {
+                (
+                    (item.stratification.as_str(), fraction.category.as_str()),
+                    fraction.fraction,
+                )
+            })
+        })
         .collect();
 
-    // Each element: (compartment_name, applied_categories, population_value)
-    let mut partials: Vec<(String, HashMap<String, String>, f64)> = model
-        .population
-        .bins
-        .iter()
-        .map(|bin| {
-            let fraction = bin_fraction_map
-                .get(&bin.id)
+    // Each compartment holds its bin's share of the population, split by the
+    // fraction of every category applied to it. An uncalibrated bin or an
+    // undeclared category counts as zero.
+    let mut state: Vec<InitialCompartment> = expand_compartments(model)
+        .into_iter()
+        .map(|output| {
+            let bin_fraction = bin_fraction_map
+                .get(output.source.as_str())
                 .and_then(|f| *f)
                 .unwrap_or(0.0);
-            (bin.id.clone(), HashMap::new(), total_population * fraction)
+            let population =
+                output
+                    .categories
+                    .iter()
+                    .fold(total_population * bin_fraction, |pop, (id, cat)| {
+                        pop * category_fraction_map
+                            .get(&(id.as_str(), cat.as_str()))
+                            .copied()
+                            .unwrap_or(0.0)
+                    });
+            InitialCompartment {
+                name: output.name,
+                bin: output.source,
+                categories: output.categories,
+                population,
+            }
         })
         .collect();
 
-    for stratification in &model.population.stratifications {
-        let fraction_map: HashMap<String, f64> = model
-            .population
-            .initial_conditions
-            .stratification_fractions
-            .iter()
-            .find(|sf| sf.stratification == stratification.id)
-            .map(|item| {
-                item.fractions
-                    .iter()
-                    .map(|frac| (frac.category.clone(), frac.fraction))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let mut new_partials: Vec<(String, HashMap<String, String>, f64)> = Vec::new();
-
-        for (name, applied, pop) in partials {
-            if stratification_conditions_met(&stratification.conditions, &applied) {
-                // Conditions met: split population by stratification fractions
-                for cat in &stratification.categories {
-                    let fraction = fraction_map.get(cat).unwrap_or(&0.0);
-                    let mut new_applied = applied.clone();
-                    new_applied.insert(stratification.id.clone(), cat.clone());
-                    new_partials.push((format!("{}_{}", name, cat), new_applied, pop * fraction));
-                }
-            } else {
-                // Conditions not met: keep compartment and population unchanged
-                new_partials.push((name, applied, pop));
-            }
-        }
-
-        partials = new_partials;
+    let overrides = &initial_conditions.compartment_fractions;
+    if overrides.is_empty() {
+        return Ok(state);
     }
 
-    // Convert to vector indexed by compartment order
-    let distribution: HashMap<String, f64> = partials
-        .into_iter()
-        .map(|(name, _, pop)| (name, pop))
+    let compartment_index: HashMap<String, usize> = state
+        .iter()
+        .enumerate()
+        .map(|(index, compartment)| (compartment.name.clone(), index))
         .collect();
 
-    compartments
-        .iter()
-        .map(|comp| *distribution.get(comp).unwrap_or(&0.0))
-        .collect()
+    // Validate every override before applying any of them, so a rejected
+    // configuration names the first offending entry.
+    let mut seen_compartments: HashSet<&str> = HashSet::new();
+    for compartment_fraction in overrides {
+        if !compartment_index.contains_key(&compartment_fraction.compartment) {
+            let available: Vec<&str> = state.iter().map(|c| c.name.as_str()).collect();
+            return Err(format!(
+                "Unknown compartment '{}' in initial conditions. Available compartments: {:?}",
+                compartment_fraction.compartment, available
+            ));
+        }
+        if !seen_compartments.insert(compartment_fraction.compartment.as_str()) {
+            return Err(format!(
+                "Duplicate compartment '{}' in initial conditions.",
+                compartment_fraction.compartment
+            ));
+        }
+        if !(0.0..=1.0).contains(&compartment_fraction.fraction) {
+            return Err(format!(
+                "Fraction for compartment '{}' must be between 0.0 and 1.0, got {}.",
+                compartment_fraction.compartment, compartment_fraction.fraction
+            ));
+        }
+    }
+
+    for compartment_fraction in overrides {
+        let index = compartment_index[&compartment_fraction.compartment];
+        state[index].population = total_population * compartment_fraction.fraction;
+    }
+
+    let total: f64 = state.iter().map(|c| c.population).sum();
+    if total > total_population * (1.0 + POPULATION_TOLERANCE) {
+        return Err(format!(
+            "Per-compartment overrides would make the initial population exceed \
+             population_size ({} > {}).",
+            total, total_population
+        ));
+    }
+
+    Ok(state)
 }
 
-/// Build pre-computed transition flows.
-fn build_transition_flows(
-    model: &Model,
-    compartments: &[String],
+/// Compile planned transition flows into runtime flows.
+fn compile_transition_flows(
+    planned_flows: Vec<PlannedFlow>,
     compartment_map: &HashMap<String, usize>,
-    accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
-    stratifications: &[commol_core::Stratification],
-    subpopulation_names: &HashSet<String>,
     expression_context: &MathExpressionContext,
 ) -> Vec<TransitionFlow> {
-    let mut transition_flows = Vec::new();
-
-    for transition in &model.dynamics.transitions {
-        let source_empty = transition.source.is_empty();
-        let target_empty = transition.target.is_empty();
-
-        if source_empty && target_empty {
-            continue;
-        }
-
-        if source_empty {
-            // Source-less transition: add to target compartments from outside the system.
-            // Rate is always treated as absolute (no source population to multiply by).
-            let target_bin = &transition.target[0];
-            for (i, compartment_name) in compartments.iter().enumerate() {
-                if compartment_name.starts_with(target_bin) {
-                    let stratification_values =
-                        extract_stratifications(compartment_name, target_bin, stratifications);
-                    if let Some(matched) =
-                        get_rate_string_for_compartment(transition, &stratification_values)
-                    {
-                        let rate_expression =
-                            RateMathExpression::from_string(matched.rate_string.clone());
-                        let resolved_slots = resolve_jit_slots(
-                            &rate_expression,
-                            compartment_map,
-                            expression_context,
-                        );
-                        let fast_rate_expression = build_fast_rate_expression(
-                            &rate_expression,
-                            compartment_map,
-                            expression_context,
-                        );
-                        transition_flows.push(TransitionFlow {
-                            source_index: None,
-                            target_index: Some(i),
-                            accumulator_indices: accumulator_indices_for_transition(
-                                transition,
-                                target_bin,
-                                compartment_name,
-                                &stratification_values,
-                                stratifications,
-                                accumulator_map,
-                                matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
-                            ),
-                            rate_expression,
-                            fast_rate_expression,
-                            is_absolute_flow: true,
-                            resolved_slots,
-                        });
-                    }
-                }
+    planned_flows
+        .into_iter()
+        .map(|flow| {
+            let rate_expression = RateMathExpression::from_string(flow.rate);
+            let resolved_slots =
+                resolve_jit_slots(&rate_expression, compartment_map, expression_context);
+            let fast_rate_expression =
+                build_fast_rate_expression(&rate_expression, compartment_map, expression_context);
+            let (source_index, target_index) = flow.pieces[0];
+            TransitionFlow {
+                source_index,
+                target_index,
+                extra_pieces: flow.pieces[1..].to_vec(),
+                accumulator_indices: flow.accumulator_indices,
+                rate_expression,
+                fast_rate_expression,
+                is_absolute_flow: flow.absolute,
+                resolved_slots,
             }
-        } else if target_empty {
-            // Target-less transition: remove from source compartments out of the system.
-            let source_bin = &transition.source[0];
-            for (i, compartment_name) in compartments.iter().enumerate() {
-                if compartment_name.starts_with(source_bin) {
-                    let stratification_values =
-                        extract_stratifications(compartment_name, source_bin, stratifications);
-                    if let Some(matched) =
-                        get_rate_string_for_compartment(transition, &stratification_values)
-                    {
-                        let rate_expression =
-                            RateMathExpression::from_string(matched.rate_string.clone());
-                        let is_absolute_flow =
-                            match matched.stratified_rate.and_then(|sr| sr.absolute) {
-                                Some(abs) => abs,
-                                None => {
-                                    let rate_variables = rate_expression.get_variables();
-                                    rate_variables.iter().any(|v| {
-                                        compartment_map.contains_key(v)
-                                            || subpopulation_names.contains(v)
-                                    })
-                                }
-                            };
-                        let resolved_slots = resolve_jit_slots(
-                            &rate_expression,
-                            compartment_map,
-                            expression_context,
-                        );
-                        let fast_rate_expression = build_fast_rate_expression(
-                            &rate_expression,
-                            compartment_map,
-                            expression_context,
-                        );
-                        transition_flows.push(TransitionFlow {
-                            source_index: Some(i),
-                            target_index: None,
-                            accumulator_indices: accumulator_indices_for_transition(
-                                transition,
-                                source_bin,
-                                compartment_name,
-                                &stratification_values,
-                                stratifications,
-                                accumulator_map,
-                                matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
-                            ),
-                            rate_expression,
-                            fast_rate_expression,
-                            is_absolute_flow,
-                            resolved_slots,
-                        });
-                    }
-                }
-            }
-        } else {
-            // Normal transition: move from source to target compartments.
-            let source_bin = &transition.source[0];
-            let target_bin = &transition.target[0];
-
-            for (i, compartment_name) in compartments.iter().enumerate() {
-                if compartment_name.starts_with(source_bin) {
-                    let source_index = i;
-
-                    // Extract stratifications for this compartment
-                    let stratification_values =
-                        extract_stratifications(compartment_name, source_bin, stratifications);
-
-                    // Get the appropriate rate for this compartment
-                    if let Some(matched) =
-                        get_rate_string_for_compartment(transition, &stratification_values)
-                    {
-                        // Compute target compartment name:
-                        // If matched stratified rate has `to` overrides, use them
-                        // to remap categories. Otherwise, use standard bin replacement.
-                        let target_compartment_name = if let Some(sr) = matched.stratified_rate {
-                            if has_category_overrides(&sr.conditions) {
-                                compute_target_with_category_overrides(
-                                    target_bin,
-                                    &stratification_values,
-                                    stratifications,
-                                    &sr.conditions,
-                                )
-                            } else {
-                                compartment_name.replacen(source_bin, target_bin, 1)
-                            }
-                        } else {
-                            compartment_name.replacen(source_bin, target_bin, 1)
-                        };
-
-                        if let Some(&target_index) = compartment_map.get(&target_compartment_name) {
-                            // If per_compartment is enabled, replace base bin names
-                            // with the specific stratified compartment names
-                            let rate_string = if transition.per_compartment.unwrap_or(false) {
-                                let mut modified = replace_bin_in_rate(
-                                    &matched.rate_string,
-                                    source_bin,
-                                    compartment_name,
-                                );
-                                modified = replace_bin_in_rate(
-                                    &modified,
-                                    target_bin,
-                                    &target_compartment_name,
-                                );
-                                modified
-                            } else {
-                                matched.rate_string.clone()
-                            };
-
-                            // Parse the rate expression once
-                            let rate_expression =
-                                RateMathExpression::from_string(rate_string.clone());
-
-                            // Determine absolute vs per-capita mode: the matched
-                            // stratified rate's explicit flag takes precedence;
-                            // otherwise infer from whether the expression references
-                            // any compartment or subpopulation variable.
-                            let is_absolute_flow =
-                                match matched.stratified_rate.and_then(|sr| sr.absolute) {
-                                    Some(abs) => abs,
-                                    None => {
-                                        let rate_variables = rate_expression.get_variables();
-                                        rate_variables.iter().any(|v| {
-                                            compartment_map.contains_key(v)
-                                                || subpopulation_names.contains(v)
-                                        })
-                                    }
-                                };
-
-                            let resolved_slots = resolve_jit_slots(
-                                &rate_expression,
-                                compartment_map,
-                                expression_context,
-                            );
-                            let fast_rate_expression = build_fast_rate_expression(
-                                &rate_expression,
-                                compartment_map,
-                                expression_context,
-                            );
-
-                            transition_flows.push(TransitionFlow {
-                                source_index: Some(source_index),
-                                target_index: Some(target_index),
-                                accumulator_indices: accumulator_indices_for_transition(
-                                    transition,
-                                    source_bin,
-                                    compartment_name,
-                                    &stratification_values,
-                                    stratifications,
-                                    accumulator_map,
-                                    matched.stratified_rate.map(|sr| sr.conditions.as_slice()),
-                                ),
-                                rate_expression,
-                                fast_rate_expression,
-                                is_absolute_flow,
-                                resolved_slots,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    transition_flows
-}
-
-fn accumulator_indices_for_transition(
-    transition: &commol_core::Transition,
-    _source_bin: &str,
-    _source_compartment_name: &str,
-    stratification_values: &HashMap<String, String>,
-    stratifications: &[commol_core::Stratification],
-    accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
-    matched_conditions: Option<&[commol_core::StratificationCondition]>,
-) -> Vec<usize> {
-    transition
-        .accumulators
-        .iter()
-        .filter_map(|accumulator_id| {
-            let output_ref = if let Some(conditions) = matched_conditions {
-                if has_category_overrides(conditions) {
-                    accumulator_output_ref_with_category_overrides(
-                        accumulator_id.clone(),
-                        stratification_values,
-                        stratifications,
-                        conditions,
-                    )
-                } else {
-                    accumulator_output_ref(
-                        accumulator_id.clone(),
-                        stratification_values,
-                        stratifications,
-                    )
-                }
-            } else {
-                accumulator_output_ref(
-                    accumulator_id.clone(),
-                    stratification_values,
-                    stratifications,
-                )
-            };
-            accumulator_map.get(&output_ref).copied()
         })
         .collect()
-}
-
-fn accumulator_output_ref_with_category_overrides(
-    accumulator_id: String,
-    stratification_values: &HashMap<String, String>,
-    stratifications: &[commol_core::Stratification],
-    conditions: &[commol_core::StratificationCondition],
-) -> AccumulatorOutputRef {
-    let override_map: HashMap<&str, &str> = conditions
-        .iter()
-        .filter_map(|condition| {
-            condition
-                .to
-                .as_ref()
-                .map(|target| (condition.stratification.as_str(), target.as_str()))
-        })
-        .collect();
-    let mut target_applied: HashMap<String, String> = HashMap::new();
-
-    for stratification in stratifications {
-        let effective_category = override_map
-            .get(stratification.id.as_str())
-            .map(|category| (*category).to_string())
-            .or_else(|| stratification_values.get(&stratification.id).cloned());
-
-        let applies = match &stratification.conditions {
-            None => true,
-            Some(conditions) => conditions
-                .iter()
-                .all(|condition| match &condition.category {
-                    Some(category) => {
-                        target_applied.get(&condition.stratification) == Some(category)
-                    }
-                    None => true,
-                }),
-        };
-
-        if applies && let Some(category) = effective_category {
-            target_applied.insert(stratification.id.clone(), category);
-        }
-    }
-
-    accumulator_output_ref(accumulator_id, &target_applied, stratifications)
 }
 
 /// Build pre-computed subpopulation mappings for stratifications.
 ///
 /// This function creates mappings for:
-/// 1. Subpopulation totals (N_young, N_old, N_young_urban, etc.)
-/// 2. Base compartment totals (S, I, R) - sum of all stratified versions
+/// 1. Subpopulation totals over categories (`N_young`, `N_young_urban`, ...)
+/// 2. Bin totals (`S`, `I`, `R`): the sum of all stratified versions
+/// 3. Partial bin totals (`S_young` when a second stratification splits it)
 ///
-/// When stratifications are present, base compartment names (S, I, R) become
-/// available as variables representing the sum of all their stratified versions.
-/// For example, S = S_young + S_old when age stratification is applied.
+/// Every mapping is built from the compartment labels.
 fn build_subpopulation_mappings(
-    compartments: &[String],
-    stratifications: &[commol_core::Stratification],
-    bins: &[commol_core::Bin],
+    layout: &CompartmentLayout,
+    model: &Model,
 ) -> Vec<SubpopulationLayout> {
-    if stratifications.is_empty() {
+    if model.population.stratifications.is_empty() {
         return Vec::new();
     }
 
-    let mut subpopulation_map: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
+    let partial_bin_totals = model.population.stratifications.len() >= 2;
 
-    // Build mappings for subpopulation totals (N_young, N_old, etc.)
-    for (compartment_index, compartment_name) in compartments.iter().enumerate() {
-        let categories: Vec<_> = compartment_name.split('_').skip(1).collect();
+    for (compartment_index, label) in layout.labels().iter().enumerate() {
+        let categories: Vec<&str> = label
+            .categories
+            .iter()
+            .map(|(_, category)| category.as_str())
+            .collect();
+        if categories.is_empty() {
+            continue;
+        }
 
-        if !categories.is_empty() {
-            // Generate all non-empty subsets using bitmask iteration
-            for subset_mask in 1..(1 << categories.len()) {
-                let subset: Vec<&str> = categories
-                    .iter()
-                    .enumerate()
-                    .filter(|(k, _)| (subset_mask >> k) & 1 == 1)
-                    .map(|(_, category)| *category)
-                    .collect();
+        // Bin total
+        totals
+            .entry(label.source.clone())
+            .or_default()
+            .push(compartment_index);
 
-                let combination_name = subset.join("_");
-                subpopulation_map
-                    .entry(combination_name)
+        let full_mask: u32 = (1 << categories.len()) - 1;
+        for subset_mask in 1..=full_mask {
+            let subset: Vec<&str> = categories
+                .iter()
+                .enumerate()
+                .filter(|(k, _)| (subset_mask >> k) & 1 == 1)
+                .map(|(_, category)| *category)
+                .collect();
+            let combination = subset.join("_");
+
+            // Subpopulation total over every bin
+            totals
+                .entry(format!("N_{combination}"))
+                .or_default()
+                .push(compartment_index);
+
+            // Partial bin total. With one stratification a partial sum would
+            // duplicate either the compartment or the bin total.
+            if partial_bin_totals && subset_mask != full_mask {
+                totals
+                    .entry(format!("{}_{}", label.source, combination))
                     .or_default()
                     .push(compartment_index);
             }
         }
     }
 
-    // Build mappings for base compartment totals (S, I, R)
-    // Each base compartment name maps to the sum of all its stratified versions
-    let mut base_compartment_map: HashMap<String, Vec<usize>> = HashMap::new();
-
-    for bin in bins {
-        let bin_id = &bin.id;
-        for (compartment_index, compartment_name) in compartments.iter().enumerate() {
-            // Check if this compartment belongs to this bin
-            // (starts with bin_id followed by underscore)
-            if compartment_name.starts_with(bin_id)
-                && (compartment_name.chars().nth(bin_id.len()) == Some('_'))
-            {
-                base_compartment_map
-                    .entry(bin_id.clone())
-                    .or_default()
-                    .push(compartment_index);
-            }
-        }
-    }
-
-    // Convert subpopulation mappings to vector
-    let mut mappings: Vec<SubpopulationLayout> = subpopulation_map
+    totals
         .into_iter()
-        .map(|(combination_name, indices)| SubpopulationLayout {
-            contributing_compartment_indices: indices,
-            parameter_name: format!("N_{}", combination_name),
-        })
-        .collect();
+        .map(
+            |(parameter_name, contributing_compartment_indices)| SubpopulationLayout {
+                contributing_compartment_indices,
+                parameter_name,
+            },
+        )
+        .collect()
+}
 
-    // Add base compartment mappings
-    // These use the bin name directly (S, I, R) instead of N_ prefix
-    for (bin_name, indices) in base_compartment_map {
-        mappings.push(SubpopulationLayout {
-            contributing_compartment_indices: indices,
-            parameter_name: bin_name,
-        });
-    }
-
-    // Build mappings for partial bin-stratification sums
-    // These represent the sum of all compartments for a given bin that match
-    // a partial subset of stratification categories. Only meaningful with 2+
-    // stratifications (with 1 stratification, partial sums would duplicate
-    // either the full compartment or the base compartment total).
-    if stratifications.len() >= 2 {
-        let mut bin_strat_partial_map: HashMap<String, Vec<usize>> = HashMap::new();
-
-        for bin in bins {
-            let bin_id = &bin.id;
-            let bin_prefix_len = bin_id.len();
-
-            for (compartment_index, compartment_name) in compartments.iter().enumerate() {
-                // Only process compartments belonging to this bin
-                if !compartment_name.starts_with(bin_id.as_str())
-                    || (compartment_name.chars().nth(bin_prefix_len) != Some('_'))
-                {
-                    continue;
-                }
-
-                // Extract categories from the stratification suffix
-                let strat_suffix = &compartment_name[bin_prefix_len + 1..];
-                let categories: Vec<&str> = strat_suffix.split('_').collect();
-                let num_cats = categories.len();
-
-                // Iterate over all proper non-empty subsets (exclude full mask)
-                let full_mask: u32 = (1 << num_cats) - 1;
-                for subset_mask in 1..full_mask {
-                    let subset: Vec<&str> = categories
-                        .iter()
-                        .enumerate()
-                        .filter(|(k, _)| (subset_mask >> *k) & 1 == 1)
-                        .map(|(_, cat)| *cat)
-                        .collect();
-
-                    let var_name = format!("{}_{}", bin_id, subset.join("_"));
-                    bin_strat_partial_map
-                        .entry(var_name)
-                        .or_default()
-                        .push(compartment_index);
-                }
-            }
-        }
-
-        for (var_name, indices) in bin_strat_partial_map {
-            mappings.push(SubpopulationLayout {
-                contributing_compartment_indices: indices,
-                parameter_name: var_name,
-            });
-        }
-    }
-
-    mappings
+/// Names of the subpopulation totals a rate expression may reference.
+pub(crate) fn subpopulation_names(layout: &CompartmentLayout, model: &Model) -> HashSet<String> {
+    build_subpopulation_mappings(layout, model)
+        .into_iter()
+        .map(|mapping| mapping.parameter_name)
+        .collect()
 }
 
 fn collect_used_context_variables(
@@ -1208,5 +987,345 @@ fn resolve_var_slot(
         VarSlot::ParameterIndex(idx)
     } else {
         VarSlot::Parameter(name.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Generate all stratified compartment combinations.
+    ///
+    /// Returns a tuple of (compartments vector, compartment_map for lookups).
+    fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>) {
+        let compartments: Vec<String> = expand_compartments(model)
+            .into_iter()
+            .map(|output| output.name)
+            .collect();
+
+        let compartment_map: HashMap<String, usize> = compartments
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.clone(), index))
+            .collect();
+
+        (compartments, compartment_map)
+    }
+    use commol_core::types::population::CompartmentFraction;
+    use commol_core::{
+        Bin, BinFraction, Dynamics, InitialConditions, ModelTypes, Population, Stratification,
+        StratificationCondition, StratificationFraction, StratificationFractions,
+    };
+
+    /// Initial population of each compartment, in the order of `compartments`.
+    fn initialize_population(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
+        let state = initial_state(model)?;
+        let population: HashMap<&str, f64> = state
+            .iter()
+            .map(|compartment| (compartment.name.as_str(), compartment.population))
+            .collect();
+        Ok(compartments
+            .iter()
+            .map(|name| *population.get(name.as_str()).unwrap_or(&0.0))
+            .collect())
+    }
+
+    fn bin_fraction(bin: &str, fraction: f64) -> BinFraction {
+        BinFraction {
+            bin: bin.to_string(),
+            fraction: Some(fraction),
+        }
+    }
+
+    fn group_stratification() -> Stratification {
+        Stratification {
+            id: "group".to_string(),
+            categories: vec!["g1".to_string(), "g2".to_string()],
+            conditions: None,
+        }
+    }
+
+    fn group_fractions(g1: f64, g2: f64) -> StratificationFractions {
+        StratificationFractions {
+            stratification: "group".to_string(),
+            fractions: vec![
+                StratificationFraction {
+                    category: "g1".to_string(),
+                    fraction: g1,
+                },
+                StratificationFraction {
+                    category: "g2".to_string(),
+                    fraction: g2,
+                },
+            ],
+        }
+    }
+
+    fn sub_fractions(s1: f64, s2: f64) -> StratificationFractions {
+        StratificationFractions {
+            stratification: "sub".to_string(),
+            fractions: vec![
+                StratificationFraction {
+                    category: "s1".to_string(),
+                    fraction: s1,
+                },
+                StratificationFraction {
+                    category: "s2".to_string(),
+                    fraction: s2,
+                },
+            ],
+        }
+    }
+
+    fn make_model(
+        stratifications: Vec<Stratification>,
+        stratification_fractions: Vec<StratificationFractions>,
+        compartment_fractions: Vec<CompartmentFraction>,
+    ) -> Model {
+        Model {
+            name: "test".to_string(),
+            description: None,
+            version: None,
+            population: Population {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "A".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "B".to_string(),
+                    },
+                ],
+                accumulators: vec![],
+                stratifications,
+                transitions: vec![],
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![bin_fraction("A", 1.0), bin_fraction("B", 0.0)],
+                    stratification_fractions,
+                    compartment_fractions,
+                },
+            },
+            parameters: vec![],
+            dynamics: Dynamics {
+                typology: ModelTypes::DifferenceEquations,
+                transitions: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn override_is_applied_after_uniform_expansion() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g2".to_string(),
+                fraction: 0.25,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(compartments, vec!["A_g1", "A_g2", "B_g1", "B_g2"]);
+        assert_eq!(population, vec![600.0, 250.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn override_on_truncated_conditional_compartment() {
+        let sub = Stratification {
+            id: "sub".to_string(),
+            categories: vec!["s1".to_string(), "s2".to_string()],
+            conditions: Some(vec![StratificationCondition {
+                stratification: "group".to_string(),
+                category: Some("g1".to_string()),
+                to: None,
+            }]),
+        };
+        let model = make_model(
+            vec![group_stratification(), sub],
+            vec![group_fractions(0.7, 0.3), sub_fractions(0.5, 0.5)],
+            vec![CompartmentFraction {
+                compartment: "A_g2".to_string(),
+                fraction: 0.1,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(
+            compartments,
+            vec!["A_g1_s1", "A_g1_s2", "A_g2", "B_g1_s1", "B_g1_s2", "B_g2"]
+        );
+        assert_eq!(population, vec![350.0, 350.0, 100.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn unknown_compartment_override_is_a_build_error() {
+        let model = make_model(
+            vec![],
+            vec![],
+            vec![CompartmentFraction {
+                compartment: "Missing".to_string(),
+                fraction: 0.1,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("Unknown compartment 'Missing'"));
+    }
+
+    #[test]
+    fn population_is_conserved_with_overrides() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.4,
+                },
+                CompartmentFraction {
+                    compartment: "A_g2".to_string(),
+                    fraction: 0.6,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(population, vec![400.0, 600.0, 0.0, 0.0]);
+        assert!((population.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn negative_compartment_fraction_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g1".to_string(),
+                fraction: -0.5,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("between 0.0 and 1.0"), "{error}");
+    }
+
+    #[test]
+    fn fraction_above_one_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "A_g1".to_string(),
+                fraction: 1.5,
+            }],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("between 0.0 and 1.0"), "{error}");
+    }
+
+    #[test]
+    fn duplicate_compartment_override_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.1,
+                },
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.2,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let error = initialize_population(&model, &compartments).unwrap_err();
+
+        assert!(error.contains("Duplicate compartment 'A_g1'"), "{error}");
+    }
+
+    #[test]
+    fn boundary_compartment_fractions_are_accepted() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![
+                CompartmentFraction {
+                    compartment: "A_g1".to_string(),
+                    fraction: 0.0,
+                },
+                CompartmentFraction {
+                    compartment: "A_g2".to_string(),
+                    fraction: 1.0,
+                },
+            ],
+        );
+        let (compartments, _) = generate_compartments(&model);
+        let population = initialize_population(&model, &compartments).unwrap();
+
+        assert_eq!(population, vec![0.0, 1000.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn override_exceeding_population_is_a_build_error() {
+        let model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![CompartmentFraction {
+                compartment: "B_g1".to_string(),
+                fraction: 0.5,
+            }],
+        );
+        let error = initial_state(&model).unwrap_err();
+
+        assert!(error.contains("exceed population_size"), "{error}");
+    }
+
+    #[test]
+    fn initial_state_reports_bin_and_applied_categories() {
+        let sub = Stratification {
+            id: "sub".to_string(),
+            categories: vec!["s1".to_string(), "s2".to_string()],
+            conditions: Some(vec![StratificationCondition {
+                stratification: "group".to_string(),
+                category: Some("g1".to_string()),
+                to: None,
+            }]),
+        };
+        let model = make_model(
+            vec![group_stratification(), sub],
+            vec![group_fractions(0.6, 0.4), sub_fractions(0.5, 0.5)],
+            vec![],
+        );
+        let state = initial_state(&model).unwrap();
+        let a_g1_s2 = &state[1];
+        let a_g2 = &state[2];
+
+        assert_eq!(a_g1_s2.name, "A_g1_s2");
+        assert_eq!(a_g1_s2.bin, "A");
+        assert_eq!(
+            a_g1_s2.categories,
+            vec![
+                ("group".to_string(), "g1".to_string()),
+                ("sub".to_string(), "s2".to_string())
+            ]
+        );
+        assert_eq!(a_g1_s2.population, 300.0);
+        assert_eq!(a_g2.name, "A_g2");
+        assert_eq!(
+            a_g2.categories,
+            vec![("group".to_string(), "g2".to_string())]
+        );
+        assert_eq!(a_g2.population, 400.0);
     }
 }
