@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
 ### Added
 
 - Per-compartment initial conditions: `InitialConditions.compartment_fractions`
@@ -22,10 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `commol_calibration::calibrated_initial_population`, exposed to Python. The
   calibration objective, the calibrated predictions and the model write-back
   share one implementation of how calibration values reach the engine.
-- GitHub Actions CI/CD pipelines for code quality, building, and PyPI releases
-- MkDocs Material documentation site
-- Comprehensive development workflow documentation
-- Contributing guidelines and release process documentation
 
 ### Changed
 
@@ -123,6 +121,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An initial-condition override that names an unknown compartment raises a
   `ValueError` when the model is built or updated, and a `RuntimeError` from the
   `DifferenceEquations` engine constructor.
+- The greedy ensemble search of probabilistic calibration takes its random
+  starts from the shuffled part of the sample (argmin fork). The starts were
+  biased towards low indices, so the same seed can now select a different
+  ensemble.
+
+### Dependencies
+
+- cranelift 0.126, rand 0.10 (with the argmin fork migrated to it),
+  thiserror 2, evalexpr 13 and pyo3 0.29.
+
+## [0.1.0] to [0.1.3] - 2026
+
+See the [GitHub Releases](https://github.com/MUNQU/commol/releases) page for
+the details of these versions.
+
+### Added
+
+- GitHub Actions CI/CD pipelines for code quality, building, and PyPI releases
+- MkDocs Material documentation site
+- Comprehensive development workflow documentation
+- Contributing guidelines and release process documentation
 
 ## [0.0.1] - 2025
 
@@ -148,7 +167,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-- **0.0.1** - Initial release with core functionality
 - **Unreleased** - Current development version
+- **0.2.0** - Per-compartment initial conditions and engine-planned transitions
+- **0.1.0 to 0.1.3** - First 0.1 versions
+- **0.0.1** - Initial release with core functionality
 
 For detailed information about each release, see the [GitHub Releases](https://github.com/MUNQU/commol/releases) page.
