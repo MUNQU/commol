@@ -92,7 +92,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split in T4 and T6, banner in T12, rest in this commit |
 | T12 | S1, S5 | README documentation table; home page entry points; mermaid diagrams | direct | this commit (see Evidence) |
 | T13 | S6 | `llms.txt` and `llms-full.txt` in the site build | direct | this commit (see Evidence) |
-| T14 | S1–S6 | Final audit: re-run every baseline measurement and record zero gaps | direct | pending |
+| T14 | S1–S6 | Final audit: re-run every baseline measurement and record zero gaps | direct | this commit (see Evidence) |
 
 ## Delivery
 
@@ -305,6 +305,35 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   bodies, which contradicted the commit rule. Three malformed admonitions
   (body not indented) fixed. Changelog `[Unreleased]` gained a Documentation
   section.
+
+- T14 final audit (every baseline re-run):
+
+  | Measure | Baseline | Final |
+  |---|---|---|
+  | Doc example pages failing (`pytest -m docs`) | 10 of 15 pages (82 of 190 blocks) | 0: 23 pages including `README.md`, plus 31 API-coverage and 2 site-link checks (55 docs tests) |
+  | Names of `commol.__all__` without an API entry | 12 of 32 | 0 (checked in CI) |
+  | Public Python items without docstrings (ruff `D1`, `D417`) | 39 | 0 (enforced by ruff) |
+  | Public Rust items without docs (`missing_docs`) | 147 | 0 (denied by clippy) |
+  | rustdoc warnings | 10 | 0 (denied in CI) |
+  | `mkdocs build --strict` warnings, anchors validated | 1 broken anchor (not even reported) | 0 |
+  | Broken external links | 3 | 0 (`links.yaml` weekly and on doc PRs) |
+  | Pages without a back link | 8 | 0 (home excepted) |
+  | Paths, tests and identifiers named in `AGENTS.md` and `docs/codebase/` that do not exist | not measured | 0 |
+
+  Also green: `cargo fmt --check`, `cargo clippy --workspace --all-targets -D
+  warnings`, Rust tests (166), `ruff check`, `ruff format --check`, `ty check
+  commol`, `pytest` (656). The README links `AGENTS.md` on `develop` (it
+  reaches `main` with the next release). GitHub answers 503 to scripted
+  requests for `github.com/.../blob/...` pages; `LICENSE` exists on `main`
+  (checked through the API).
+- Findings for the user (code, not changed by this documentation work):
+  F1 per-step units fail the unit check; F2 transition conditions are not
+  evaluated; F3 `ModelBuilder.reset` keeps accumulators; F4 reserved names
+  are not rejected as parameter ids; F5 `pi`/`e` outside a function argument
+  fail in rates; F6 out-of-order `N_…` names evaluate to 0; F7 `plot_series`
+  `bins` takes output names; F8 `Simulation.run` continues the previous run;
+  F9 `Simulation` snapshots the model; F10 misleading error for a non-binary
+  category; F11 `sse` equals `weighted_sse` and squares the weight.
 
 ## Log
 

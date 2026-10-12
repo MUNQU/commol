@@ -72,7 +72,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/) | Fitting parameters and initial conditions, and probabilistic calibration |
 | [API Reference](https://munqu.github.io/commol/latest/api/) | Every public class and function |
 | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/) | How Commol is built, for contributors |
-| [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md) | The entry point for AI agents working on this repository |
+| [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md) | The entry point for AI agents working on this repository |
 
 The site has two versions: `latest` (the released code) and `dev` (the
 `develop` branch).
