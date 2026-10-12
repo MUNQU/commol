@@ -1,17 +1,40 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
+# Dependabot version updates.
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Updates run once a month. Minor and patch updates of each ecosystem arrive
+# grouped in a single pull request, so the shared lockfile is rebased once
+# instead of once per package. Major updates, which may break the API, keep a
+# pull request of their own.
 
 version: 2
 updates:
-  - package-ecosystem: "cargo" # Rust dependencies
-    directory: "/crates" # Location of Rust package manifests
+  - package-ecosystem: "cargo" # Rust workspace (Cargo.toml and Cargo.lock at the root)
+    directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     target-branch: "develop"
+    groups:
+      rust-minor-patch:
+        patterns: ["*"]
+        # A 0.x minor release of pyo3 changes its API; keep it separate.
+        exclude-patterns: ["pyo3*"]
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: "uv" # Python dependencies
-    directory: "/py-commol" # Location of Python package manifests
+    directory: "/py-commol"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     target-branch: "develop"
+    groups:
+      python-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions" # Actions used by the workflows
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "develop"
+    groups:
+      github-actions:
+        patterns: ["*"]
