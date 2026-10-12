@@ -1286,6 +1286,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design: Per-compartment initial conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1467,6 +1495,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1587,6 +1637,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1669,10 +1741,126 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Per-compartment initial conditions: <code>InitialConditions.compartment_fractions</code>
+  (Python and Rust) accepts overrides keyed by expanded compartment name,
+  expressed as fractions of the total population and applied after the uniform
+  expansion. Includes <code>ModelBuilder.set_initial_conditions(compartment_fractions=...)</code>,
+  <code>Model.update_compartment_fractions</code>, and <code>Model.initial_state()</code>, which
+  returns each expanded compartment with its bin, categories and initial
+  population as the engine builds it. The Rust engine is the single source of
+  truth for the expansion and validates the overrides (unknown or repeated
+  name, fraction outside <code>0.0..=1.0</code>, total above <code>population_size</code>).</li>
+<li>Rust <code>commol_difference::initial_state</code> and
+  <code>commol_calibration::calibrated_initial_population</code>, exposed to Python. The
+  calibration objective, the calibrated predictions and the model write-back
+  share one implementation of how calibration values reach the engine.</li>
 <li>GitHub Actions CI/CD pipelines for code quality, building, and PyPI releases</li>
 <li>MkDocs Material documentation site</li>
 <li>Comprehensive development workflow documentation</li>
 <li>Contributing guidelines and release process documentation</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Breaking:</strong> calibrated initial conditions no longer auto-calculate the
+  last population-fraction value as the remainder of the population. The new
+  <code>CalibrationProblem.initial_condition_remainder</code> names the compartment or bin
+  that absorbs the difference; it is not calibrated and keeps its own split.
+  Without it, values are applied as given and only an initial population above
+  <code>population_size</code> is penalized. A single exact compartment, such as a
+  composite state, can now be calibrated on its own.</li>
+<li><strong>Breaking:</strong> calibrated initial conditions are applied in fixed layers —
+  bins, category splits, exact compartments, remainder — instead of in
+  parameter order.</li>
+<li><strong>Breaking:</strong> a stratification category may be named with a qualified id
+  (<code>sex:female</code>). A bare name that more than one stratification declares is
+  rejected as ambiguous, in calibration and in
+  <code>update_stratification_fractions</code>, and the report qualifies its rows.
+  Category pairs come from the engine's compartment labels instead of parsing
+  compartment names.</li>
+<li><strong>Breaking:</strong> <code>get_category_fraction</code>, <code>subgroup_population</code> and
+  <code>get_conditioning_categories</code> resolve category ids like calibration: a
+  qualified id (<code>sex:female</code>) selects its stratification and a bare name that
+  more than one stratification declares raises instead of silently using the
+  first one. <code>get_conditioning_categories</code> returns qualified ids for shared
+  names.</li>
+<li>Bin and bin-prefix initial-condition ids, and the remainder, resolve from the
+  engine's compartment labels instead of name prefixes, so a bin <code>A</code> no longer
+  covers the compartments of a bin <code>A_x</code>.</li>
+<li>The Rust engine expands bins and accumulators in one function; the equation
+  printer and unit checker use it (<code>expanded_outputs</code>) instead of their own
+  Python expansion. The Rust <code>ModelTypes</code> gains <code>DifferentialEquations</code>, so any
+  model definition can be expanded; the difference engine rejects it.</li>
+<li><strong>Breaking:</strong> <code>update_bin_fractions</code> / <code>update_initial_conditions</code> apply the
+  same rule as construction: the bin fractions must sum to 1.0 after the
+  update.</li>
+<li>
+<p><strong>Breaking (Rust):</strong> <code>SimulationEngine</code> requires <code>compartment_labels()</code>.
+  <code>CalibrationProblem::fix_auto_calculated_parameters</code> and
+  <code>get_parameter_fix_info</code> are removed; <code>applied_parameter_values</code> returns the
+  clamped values the objective scored, which is what results now report.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> transitions are planned by the Rust engine from compartment
+  labels (bin and categories) instead of compartment names, in one planner
+  shared by the simulation and <code>print_equations</code>. The printed equations are
+  therefore the simulated ones: a per-capita rate is shown multiplied by its
+  source (<code>gamma * I</code>), a transition without flows shows <code>(no flows)</code>, and the
+  compact form lists the flows of each transition.</p>
+</li>
+<li><strong>Breaking:</strong> building a model rejects a stratified rate whose <code>category</code>
+  conditions match no source compartment (use <code>to</code> to route into a
+  stratification the source does not carry), a transition with several
+  sources and a per-capita rate, a category transition without exactly one
+  source and one target, and a flow that ends in categories no compartment has.
+  These used to be skipped without notice.</li>
+<li>Constraint aggregates (a bin or bin prefix in a constraint expression) are
+  built from output labels, so a bin <code>A</code> no longer sums the outputs of a bin
+  <code>A_x</code>.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A transition between bins no longer moves bins whose id starts with the
+  source bin id: <code>A -&gt; B</code> moved <code>AB -&gt; BB</code> as well.</li>
+<li>Transitions between the categories of a stratification (<code>young -&gt; old</code>) are
+  now simulated; the engine used to ignore them while <code>print_equations</code> showed
+  them.</li>
+<li>
+<p>A transition with several sources or targets (<code>A + B -&gt; 2 C</code>) now applies its
+  flow to every source and target, as documented; the engine used to move only
+  the first source to the first target.</p>
+</li>
+<li>
+<p>The applied-parameters report now shows the effective head count for bin,
+  stratification-category, and subgroup rows — the uniform expansion plus the
+  declared <code>compartment_fractions</code> overrides — and reports each <code>fraction</code> as
+  that head count over the declared <code>population_size</code>, so every row shares one
+  denominator with <code>N</code>. An aggregate row written back as overrides no longer reports the stale
+  pre-calibration value as <code>calibrated</code>, and a bin left uncalibrated keeps its
+  <code>null</code> marker even when overrides touch some of its compartments.</p>
+</li>
+<li>A conditional-stratification category is calibrated as a fraction of its
+  conditioning subgroup but reported as a fraction of the whole population, so
+  the report rescales its <code>interval</code> by the subgroup's share of the population;
+  the interval now brackets the reported <code>fraction</code>.</li>
+<li><code>apply_calibration_parameters</code> writes initial-condition values back so the
+  model rebuilds the initial population the engine scored for them. Bin and
+  category values update the fractions they declare, as the engine applied them;
+  every compartment those fractions do not reproduce is pinned as a
+  per-compartment override. The call computes the result before it changes the
+  model, so a rejected value leaves the model unchanged.</li>
+<li><code>population_size</code> must be greater than zero, reported as a domain <code>ValueError</code>
+  rather than a later <code>ZeroDivisionError</code>. <code>update_bin_fractions</code> re-applies the
+  sum-to-1/conservation rule.</li>
+<li>Calibrating a bare category name that two stratifications declare no longer
+  builds an initial population larger than <code>population_size</code>: the engine used
+  to split the overlapping pairs of both stratifications from one snapshot.</li>
+<li>The PyO3 <code>InitialConditions</code> binding exposes <code>population_size</code>, <code>bin_fractions</code>,
+  <code>stratification_fractions</code> and <code>compartment_fractions</code> with getters, and the
+  <code>_commol_rs</code> stub declares only those real attributes (correcting the
+  <code>bin_fractions</code> field name).</li>
+<li>An initial-condition override that names an unknown compartment raises a
+  <code>ValueError</code> when the model is built or updated, and a <code>RuntimeError</code> from the
+  <code>DifferenceEquations</code> engine constructor.</li>
 </ul>
 <h2 id="001-2025">[0.0.1] - 2025<a class="headerlink" href="#001-2025" title="Permanent link">&para;</a></h2>
 <h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
