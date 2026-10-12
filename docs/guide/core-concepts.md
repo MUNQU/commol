@@ -112,9 +112,10 @@ builder = builder.set_initial_conditions(
 | Rule | Checked when |
 |---|---|
 | `population_size` is greater than 0 | The conditions are set |
-| Every bin has a fraction, and the fractions sum to 1.0 | The model is built |
-| Every stratification has fractions, and they sum to 1.0 | The model is built |
 | Each fraction is between 0.0 and 1.0 | The conditions are set |
+| The bin fractions sum to 1.0 | The conditions are set |
+| Every bin has a fraction | The model is built |
+| Every stratification has fractions, and they sum to 1.0 | The model is built |
 
 A fraction may be `None` when calibration will find it; see
 [Model Calibration](calibration.md).
@@ -270,7 +271,7 @@ print(conditional.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
 print(conditional.get_conditioning_categories("subtype"))  # ('g2',)
 ```
 
-See [Conditional Stratifications](building-models.md#conditional-stratifications)
+See [Conditional Stratifications](building-models.md#stratifications)
 for the full API.
 
 ### Per-compartment overrides

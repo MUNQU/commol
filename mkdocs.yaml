@@ -52,6 +52,13 @@ plugins:
             filters:
               - "!^_[^_]"
 
+# Broken links and anchors fail `mkdocs build --strict`.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 markdown_extensions:
   - pymdownx.highlight: # Code highlighting
       anchor_linenums: true
@@ -79,6 +86,8 @@ nav:
   - User Guide:
       - Core Concepts: guide/core-concepts.md
       - Building Models: guide/building-models.md
+      - Transitions: guide/transitions.md
+      - Units and Equations: guide/units-and-equations.md
       - Mathematical Expressions: guide/mathematical-expressions.md
       - Time Patterns: guide/time-patterns.md
       - Running Simulations: guide/simulations.md

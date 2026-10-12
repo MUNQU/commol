@@ -82,7 +82,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T1 | S4 | Documentation definition of done: `conventions.md`, `AGENTS.md`, `contributing.md`, maintainer playbook, PR template | direct | b2db454 |
 | T2 | S3, S4 | Doc-example test harness and CI job; mark non-runnable fragments | direct | this commit (see Evidence) |
 | T3 | S3 | Fix examples: `quickstart.md`, `core-concepts.md`, `index.md` | direct | this commit (see Evidence) |
-| T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | pending |
+| T4 | S3 | Fix examples: `building-models.md`, `mathematical-expressions.md`, `time-patterns.md` | direct | this commit (see Evidence) |
 | T5 | S3 | Fix examples: `simulations.md` | direct | pending |
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | pending |
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
@@ -145,6 +145,38 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
   to `day`; a parameter in `1/step` therefore always fails with "expected
   `<bin_unit>/day`". Per-step units are natural in Commol (a model has no
   physical time). The docs use `1/day`; the user decides on a code fix.
+
+- T4 (also the `building-models.md` part of T11): `building-models.md` split
+  into `building-models.md` (builder, bins, parameters including time series,
+  stratifications, accumulators, initial conditions, build, save/load),
+  `transitions.md` and `units-and-equations.md`; `mathematical-expressions.md`
+  and `time-patterns.md` rewritten. Every argument table comes from
+  `inspect.signature`; every printed value and every rule was checked by running
+  it (time-series modes, validation timing, `$compartment` ids, category
+  transitions, `to`, `per_compartment`, stratified-rate selection, build errors,
+  unit errors, `print_equations` text and LaTeX output, every function and
+  operator, subpopulation variables, every `TimePattern` and schedule).
+  `mkdocs.yaml` now validates anchors (`validation:` block), and the moved
+  anchors were fixed. Wrong claims removed: a working `condition` on
+  transitions, `add_bin(description=)`, `add_transition(description=)`,
+  `(B > 100)` as a factor, the LaTeX output format, a 500-character limit,
+  performance claims.
+- Finding F2 (code): `Transition.condition` / `create_condition` are stored but
+  never evaluated by the engine (a condition that is never true still moves
+  population). The docs now say so; implement or remove is the user's call.
+- Finding F3 (code): `ModelBuilder.reset()` does not clear accumulators.
+- Finding F4 (code): only bin ids are rejected as parameter ids; `N`, `N_*`,
+  `step`, `t`, `pi`, `e` and compartment names such as `A_g1` are accepted
+  silently.
+- Finding F5 (code, user-visible): in transition rates, `pi` and `e` outside a
+  function argument fail at run time ("Variable 'pi' not found"):
+  `crates/commol-difference/src/simulation.rs::resolve_slot` looks them up in
+  the context, but they are JIT constants (`jit/codegen.rs::load_variable`).
+  Documented as a known issue in `mathematical-expressions.md`.
+- Finding F6 (code): an `N_…` variable with suffixes out of declaration order
+  (`N_t1_g1`) evaluates to 0 instead of failing; `<bin>_…` fails correctly.
+  `%` passes the security check but makes the whole rate a parameter name
+  (`MathExpression::from_string` does not list it as an operator).
 
 ## Log
 

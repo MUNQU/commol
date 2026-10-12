@@ -795,7 +795,7 @@ uniform expansion plus the declared `compartment_fractions` overrides, and its
 that one denominator, so the row fractions line up with each other and with `N`
 (the declared `population_size`, fraction `1.0`). The `group` records which
 subgroup the row belongs to — for a
-[conditional stratification](core-concepts.md#subgroup-head-counts) its
+[conditional stratification](core-concepts.md#conditional-stratifications) its
 conditioning categories rather than the whole population. A bin left
 uncalibrated keeps a `null` `fraction` and `value` even when overrides touch
 some of its compartments; the override rows still carry their own numbers.

@@ -92,7 +92,7 @@ model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mi
 
 The check catches rates that mix time scales or pass a quantity with units to
 a function that needs a plain number. See
-[Unit Checking](../guide/building-models.md#unit-checking).
+[Unit checking](../guide/units-and-equations.md#unit-checking).
 
 ## Calibrate unknown parameters
 

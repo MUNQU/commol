@@ -1,367 +1,274 @@
-# Time-Varying Rate Patterns
+# Time Patterns
 
-Commol provides the `TimePattern` class to express time-dependent transition
-rates — discrete pulses, periodic events, sliding windows, seasonal curves,
-linear ramps, Gaussian bell pulses, and arbitrary user formulas. Every pattern
-is parenthesised so it composes safely; security validation runs at
-construction time.
+[Back to Transitions](transitions.md)
 
-`TimePattern` is the **only** user-facing class for this feature. Multi-group
-schedules are built by calling `TimePattern.add_group(...)` directly on the
-class and chaining further calls on the returned instance — there is no
-separate schedule type to import or instantiate.
+`TimePattern` builds rates that change with the step: pulses, periodic events,
+windows, seasons, ramps and bell curves, and schedules that give each subgroup
+its own pattern. Pass a pattern as `rate=` to `add_transition`. Every pattern is
+a tested, parenthesised expression, so patterns combine safely.
 
-A `TimePattern` is consumed directly by `ModelBuilder.add_transition` via
-the `rate=` argument:
+## Quick path
 
 ```python
-builder.add_transition("flow", ["A"], ["B"], rate=TimePattern.pulse(at=5, amount=0.1))
+from commol import ModelBuilder, Simulation, TimePattern
+
+def flow_per_step(rate: TimePattern, num_steps: int = 10) -> list[float]:
+    """The flow into B at each step, for a transition with no source."""
+    model = (
+        ModelBuilder(name="Pattern")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_transition(id="inflow", source=[], target=["B"], rate=rate)
+        .set_initial_conditions(
+            population_size=100,
+            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        )
+        .build(typology="DifferenceEquations")
+    )
+    series = Simulation(model).run(num_steps=num_steps)["B"]
+    return [round(series[i + 1] - series[i], 4) for i in range(num_steps)]
+
+print(flow_per_step(TimePattern.window(start=3, end=6, amount=1.0)))
+# [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-The same call works whether `rate=` is a single pattern, a single grouped
-pattern, or a multi-group schedule.
-
----
+A transition with no source uses the pattern as the flow. With a source, a
+pattern that names no compartment is per-capita: `amount=0.1` moves 10% of the
+source. See [Absolute and per-capita rates](transitions.md#absolute-and-per-capita-rates).
 
 ## Single patterns
 
-### Pulse
+| Pattern | Value at step `s` | Arguments |
+|---|---|---|
+| `pulse(at, amount)` | `amount` when `s == at`, else 0 | `at >= 0` |
+| `pulses(at, amount)` | `amount` at each step in `at`, else 0 | unique steps, not empty; `amount` may be one value per step |
+| `periodic(period, amount, offset=0)` | `amount` when `s = offset, offset + period, …`, else 0 | `period > 0`, `0 <= offset < period` |
+| `window(start, end, amount)` | `amount` for `start <= s < end`, else 0 | `start < end` |
+| `linear_ramp(start, end, start_value, end_value)` | From `start_value` at `start` towards `end_value`, for `start <= s < end`; else 0 | `start < end` |
+| `seasonal(amplitude, period, phase=0, baseline=0)` | `baseline + amplitude × sin(2π (s − phase) / period)` | numeric `period != 0` |
+| `gaussian_pulse(center, width, peak)` | `peak × exp(−(s − center)² / (2 width²))` | `width > 0` |
+| `from_formula(expr)` | Any expression, wrapped in parentheses | not empty; passes the security check |
 
-`TimePattern.pulse(at, amount)` fires exactly once at step `at`.
+An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These
+arguments also accept a parameter name, so calibration can fit them: `amount`
+of `pulse`, `pulses`, `periodic` and `window`; every argument of `seasonal`; and
+`peak` of `gaussian_pulse`.
 
 ```python
-from commol import TimePattern
-
-rate = TimePattern.pulse(at=10, amount=0.05)
-# Formula: (if(step == 10, 0.05, 0))
+print(flow_per_step(TimePattern.pulse(at=3, amount=1.0)))
+# [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+print(flow_per_step(TimePattern.pulses(at=[2, 5], amount=1.0)))
+# [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+print(flow_per_step(TimePattern.periodic(period=4, amount=1.0, offset=1)))
+# [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+print(flow_per_step(TimePattern.linear_ramp(start=2, end=6, start_value=0.0, end_value=1.0)))
+# [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]
+print(flow_per_step(TimePattern.seasonal(amplitude=1.0, period=8, baseline=1.0)))
+# [1.0, 1.7071, 2.0, 1.7071, 1.0, 0.2929, 0.0, 0.2929, 1.0, 1.7071]
+print(flow_per_step(TimePattern.gaussian_pulse(center=5.0, width=1.0, peak=1.0)))
+# [0.0, 0.0003, 0.0111, 0.1353, 0.6065, 1.0, 0.6065, 0.1353, 0.0111, 0.0003]
 ```
 
-### Multi-step pulses
-
-`TimePattern.pulses(at=[steps], amount)` fires at each step in `at`. Steps
-must be unique and non-negative.
+`str(pattern)` and `pattern.formula` give the expression:
 
 ```python
-rate = TimePattern.pulses(at=[3, 7, 14], amount=0.1)
+print(TimePattern.pulse(at=10, amount=0.05).formula)  # (if(step == 10, 0.05, 0))
+print(f"2 * {TimePattern.from_formula('k1 + k2')}")    # 2 * (k1 + k2)
 ```
 
-### Periodic
+The parentheses make composition safe: the `2 *` applies to the whole
+expression.
 
-`TimePattern.periodic(period, amount, offset=0)` fires every `period` steps,
-first at step `offset`. Floor-based modulo is used so the formula compiles on
-both the evalexpr fallback and the Cranelift JIT path.
+## Combining patterns
 
-```python
-weekly = TimePattern.periodic(period=7, amount=0.05)
-monthly_from_step_3 = TimePattern.periodic(period=30, amount=0.05, offset=3)
-```
+`TimePattern.combine(*patterns, mode=TimePattern.SUM)` merges patterns:
 
-### Window
-
-`TimePattern.window(start, end, amount)` is constant at `amount` for
-`step in [start, end)` and 0 elsewhere.
+| `mode` | Value |
+|---|---|
+| `TimePattern.SUM` (default) | The sum of the patterns |
+| `TimePattern.MAX` | The largest value at each step |
+| `TimePattern.MIN` | The smallest value at each step |
 
 ```python
-rate = TimePattern.window(start=5, end=12, amount=0.2)
-```
-
-### Seasonal (sinusoidal)
-
-`TimePattern.seasonal(amplitude, period, phase=0, baseline=0)` is the
-continuous formula `baseline + amplitude * sin(2*pi*(t - phase) / period)`.
-
-```python
-rate = TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01)
-```
-
-All four arguments may be parameter names (strings) — useful when the values
-are calibrated.
-
-### Gaussian pulse
-
-`TimePattern.gaussian_pulse(center, width, peak)` is a smooth bell-shaped
-pulse centred at step `center` with standard deviation `width`.
-
-```python
-rate = TimePattern.gaussian_pulse(center=20.0, width=3.0, peak=0.1)
-```
-
-### Linear ramp
-
-`TimePattern.linear_ramp(start, end, start_value, end_value)` linearly
-interpolates between `start_value` at `start` and `end_value` at `end`
-(exclusive). Outside `[start, end)` the rate is 0.
-
-```python
-rate = TimePattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.5)
-```
-
-### Arbitrary formula
-
-`TimePattern.from_formula(expr)` wraps any rate formula string in parens and
-runs the full security validator at construction time.
-
-```python
-rate = TimePattern.from_formula("beta * t / 100")
-```
-
-The wrapping makes composition safe:
-
-```python
-composed = f"2 * {TimePattern.from_formula('a + b')}"
-# Composed: "2 * (a + b)" — multiplication binds to the whole expression.
-```
-
----
-
-## Composing patterns: `combine`
-
-`TimePattern.combine(*patterns, mode=TimePattern.SUM)` merges multiple
-patterns. Modes:
-
-- `TimePattern.SUM` (default) — add the sub-formulas.
-- `TimePattern.MAX` — pointwise maximum.
-- `TimePattern.MIN` — pointwise minimum.
-
-```python
-rate = TimePattern.combine(
-    TimePattern.pulse(at=0, amount=0.3),
-    TimePattern.periodic(period=30, amount=0.05),
-    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.0),
-    mode=TimePattern.SUM,
+peak_or_window = TimePattern.combine(
+    TimePattern.pulse(at=3, amount=2.0),
+    TimePattern.window(start=2, end=5, amount=1.0),
+    mode=TimePattern.MAX,
 )
+print(flow_per_step(peak_or_window))
+# [0.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-Rules:
+| Rule | Otherwise |
+|---|---|
+| At least one pattern | `ValueError` |
+| All patterns have the same group binding (or none); the result keeps it | `ValueError` |
+| The result is not longer than `SecurityConfig.max_expression_length` (10000 characters by default) | `ValueError` |
 
-- `combine(p)` (single input) is the identity — returns `p` unchanged.
-- All inputs must share the same `conditions` and `source_compartment`
-  (or have none). The result preserves them.
-- The composed formula must not exceed the security length cap
-  (`SecurityConfig.max_expression_length`, default 500 chars). When it
-  would, `combine` raises a clear `ValueError`.
+`combine(p)` with one pattern returns `p`.
 
----
+## Patterns per subgroup
 
-## Sub-group binding: `for_group`
-
-`pattern.for_group(conditions, source_compartment=None)` returns a copy of
-the pattern restricted to compartments matching `conditions`. Use this for a
-**single** sub-group:
+With stratifications, a schedule gives each subgroup its own pattern. Start
+with the class method `TimePattern.add_group(...)` and chain more groups on the
+result:
 
 ```python
-rate = TimePattern.pulse(at=5, amount=0.1).for_group(
+def stratified_flows(rate: TimePattern, num_steps: int = 7) -> dict[str, list[float]]:
+    """The change of each compartment at each step, for a transition A -> B."""
+    model = (
+        ModelBuilder(name="Groups")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_stratification(id="group", categories=["cat1", "cat2"])
+        .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+            stratification_fractions=[
+                {
+                    "stratification": "group",
+                    "fractions": [
+                        {"category": "cat1", "fraction": 0.5},
+                        {"category": "cat2", "fraction": 0.5},
+                    ],
+                }
+            ],
+        )
+        .build(typology="DifferenceEquations")
+    )
+    results = Simulation(model).run(num_steps=num_steps)
+    return {
+        name: [round(series[i + 1] - series[i], 2) for i in range(num_steps)]
+        for name, series in results.items()
+        if name.startswith("B")
+    }
+
+schedule = (
+    TimePattern.add_group(
+        conditions=[{"stratification": "group", "category": "cat1"}],
+        schedule=TimePattern.periodic(period=3, amount=0.1),
+    )
+    .add_group(
+        conditions=[{"stratification": "group", "category": "cat2"}],
+        schedule=TimePattern.window(start=2, end=4, amount=0.2),
+    )
+)
+print(stratified_flows(schedule))
+# {'B_cat1': [50.0, 0.0, 0.0, 45.0, 0.0, 0.0, 40.5],
+#  'B_cat2': [0.0, 0.0, 100.0, 80.0, 0.0, 0.0, 0.0]}
+```
+
+| Method | What it does |
+|---|---|
+| `TimePattern.add_group(conditions, schedule, *, source_compartment=None, absolute=None)` | Class method: starts a schedule with its first group. On a schedule: adds a group. On a single pattern: `TypeError`. |
+| `schedule.set_default(pattern)` | The pattern for compartments that match no group. At most once; the pattern may not have conditions or a `source_compartment`. |
+| `pattern.for_group(conditions, *, source_compartment=None)` | A single pattern for one subgroup only. |
+
+| Rule | Behavior |
+|---|---|
+| A compartment that matches no group, with no default | No flow |
+| A compartment that matches several groups | The group with the most conditions wins |
+| `conditions` | Not empty; each entry has `stratification` and `category`, and may have `to` |
+
+```python
+only_cat1 = TimePattern.add_group(
+    conditions=[{"stratification": "group", "category": "cat1"}],
+    schedule=TimePattern.pulse(at=1, amount=0.1),
+)
+with_default = only_cat1.set_default(TimePattern.from_formula("0.01"))
+print(stratified_flows(with_default, num_steps=3))
+# {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [5.0, 4.95, 4.9]}
+
+print(stratified_flows(TimePattern.pulse(at=1, amount=0.1).for_group(
     [{"stratification": "group", "category": "cat1"}]
-)
-builder.add_transition("flow", ["A"], ["B"], rate=rate)
+), num_steps=3))
+# {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [0.0, 0.0, 0.0]}
 ```
 
-For multiple sub-groups, use `TimePattern.add_group(...)` (next section).
+### Absolute flows and `source_compartment`
 
----
-
-## Sub-group schedules
-
-When different stratification sub-groups should receive different patterns,
-chain `add_group(...)` calls starting from the class itself:
+| Argument of `add_group` | Effect |
+|---|---|
+| `absolute=None` (default) | Inferred: a pattern that names a compartment is absolute, otherwise per-capita |
+| `absolute=False` | Per-capita: `amount=0.1` moves 10% of each matching source compartment |
+| `absolute=True` | Absolute: `amount=100.0` moves exactly 100 |
+| `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute |
 
 ```python
-rate = (
+mixed = (
     TimePattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=TimePattern.periodic(period=7, amount=0.05),
+        schedule=TimePattern.pulse(at=1, amount=0.1),
+        absolute=False,
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=TimePattern.periodic(period=30, amount=0.05),
+        schedule=TimePattern.pulse(at=1, amount=100.0),
+        absolute=True,
     )
 )
-
-builder.add_transition("flow", ["A"], ["B"], rate=rate)
+print(stratified_flows(mixed, num_steps=3))
+# {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [0.0, 100.0, 0.0]}
 ```
 
-- The **first** `add_group` is a class-level call that creates a fresh
-  schedule and registers the first group.
-- Subsequent `add_group` calls are instance methods that append additional
-  groups to the same schedule.
-- Calling `add_group` on a non-schedule pattern (a single `pulse`, `periodic`,
-  etc.) raises `TypeError`. Use the class-level call instead.
+### Moving between categories with `to`
 
-### Conditional exclusion by default
-
-If you do not register a fallback, compartments not matched by any
-`add_group` receive **zero flow**:
+A condition with `to` sends the flow to another category of the same
+stratification. With the same bin as source and target, the bin's total stays
+the same:
 
 ```python
-# Only cat1 receives the schedule; cat2 compartments do not transition.
-rate = TimePattern.add_group(
-    conditions=[{"stratification": "group", "category": "cat1"}],
-    schedule=TimePattern.periodic(period=7, amount=0.05),
-)
-```
-
-This makes schedules opt-in by group, exactly what is needed for targeted
-interventions.
-
-### Fallback via `set_default`
-
-Use `set_default` to register a pattern that applies to every unmatched
-sub-group:
-
-```python
-rate = (
-    TimePattern.add_group(
-        conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=TimePattern.periodic(period=7, amount=0.05),
+routing = (
+    ModelBuilder(name="Routing")
+    .add_bin(id="A", name="State A")
+    .add_stratification(id="status", categories=["s0", "s1"])
+    .add_transition(
+        id="flow",
+        source=["A"],
+        target=["A"],
+        rate=TimePattern.add_group(
+            conditions=[{"stratification": "status", "category": "s0", "to": "s1"}],
+            schedule=TimePattern.pulse(at=1, amount=0.5),
+        ),
     )
-    .set_default(TimePattern.from_formula("0.01"))
-)
-```
-
-The default pattern must not carry `conditions` or a `source_compartment`.
-`set_default` can be called at most once per schedule.
-
-### Per-capita vs absolute flows
-
-For schedule groups, `absolute` controls whether the group formula is
-interpreted as a per-capita rate or as an absolute count per step:
-
-- `absolute=None` (default): infer from the formula. Expressions that
-  reference compartment or sub-population variables are treated as absolute;
-  other expressions are treated as per-capita.
-- `absolute=False`: force per-capita behavior.
-- `absolute=True`: force absolute-flow behavior.
-
-```python
-rate = (
-    TimePattern.add_group(
-        conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=TimePattern.pulse(at=5, amount=0.1),
-        absolute=False,  # 10% of the matching source compartment
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}],
+        stratification_fractions=[
+            {
+                "stratification": "status",
+                "fractions": [
+                    {"category": "s0", "fraction": 0.5},
+                    {"category": "s1", "fraction": 0.5},
+                ],
+            }
+        ],
     )
-    .add_group(
-        conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=TimePattern.pulse(at=5, amount=100.0),
-        absolute=True,  # exactly 100 units at step 5
-    )
+    .build(typology="DifferenceEquations")
 )
+routed = Simulation(routing).run(num_steps=2)
+print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
 ```
 
-For advanced cases, `source_compartment` multiplies the group formula by a
-specific compartment variable:
+## How patterns are stored
 
-```python
-rate = TimePattern.add_group(
-    conditions=[{"stratification": "group", "category": "cat1"}],
-    schedule=TimePattern.pulse(at=5, amount=0.25),
-    source_compartment="A_cat1",
-)
-```
+Numeric `pulse` and `pulses` patterns become
+[time-series parameters](building-models.md#time-series-parameters) instead of
+long formulas, so equations stay readable and many pulses stay fast:
 
-With the default `absolute=None`, that compartment reference is inferred as
-an absolute flow. If you need a per-capita expression that references
-population variables, pass `absolute=False` explicitly.
+| Pattern | Generated parameter id |
+|---|---|
+| Not in a group | `_ts_<n>` |
+| In a group | `{transition}_{source bin}_{source categories}_to_{target bin}_{target categories}`, such as `flow_A_cat1_to_B_cat1` |
 
-`set_default` rejects `source_compartment` (the default applies to every
-unmatched compartment, so binding it to one name is almost always a bug).
+A generated id must not clash with a parameter of yours; building the model
+raises if it does.
 
-### Numeric pulse schedules as parameters
+## Next steps
 
-Numeric `TimePattern.pulse(...)` and `TimePattern.pulses(...)` schedules are
-stored internally as `TimeSeries` parameters instead of long generated
-formula strings. This keeps extended equations readable and makes large
-pulse schedules efficient to evaluate.
-
-For grouped schedules, generated parameter names use the transition name and
-the source/target group labels:
-
-```text
-{transition_id}_{source_bin}_{source_categories}_to_{target_bin}_{target_categories}
-```
-
-Generated parameter names must be unique. If a user-defined parameter already
-uses the same name, model construction raises an error instead of silently
-renaming it.
-
-### Cross-category routing (`to:`)
-
-A condition entry may include a `to` key to move population **between
-categories** of the same stratification:
-
-```python
-rate = TimePattern.add_group(
-    conditions=[{"stratification": "status", "category": "s0", "to": "s1"}],
-    schedule=TimePattern.pulse(at=5, amount=0.5),
-)
-
-builder.add_transition("flow", ["A"], ["A"], rate=rate)
-```
-
-This creates a transition `A_s0 → A_s1` (the bin is the same, only the
-category changes). Total population in bin `A` is conserved.
-
-### Multi-stratification conditions
-
-A group can pin multiple stratifications simultaneously:
-
-```python
-rate = TimePattern.add_group(
-    conditions=[
-        {"stratification": "group", "category": "cat1"},
-        {"stratification": "status", "category": "s0"},
-    ],
-    schedule=TimePattern.pulse(at=5, amount=0.5),
-)
-```
-
-The schedule only applies to compartments matching **all** listed
-conditions. Most-specific match wins, so a single-condition group is
-overridden by a multi-condition group whenever both apply.
-
----
-
-## Special variables
-
-All formulas have access to the standard engine variables:
-
-- `step` — current simulation step (integer-valued, starts at 0).
-- `t` — alias for `step`.
-- `pi`, `e` — mathematical constants.
-- `N`, `N_{combo}` — total / sub-population totals.
-- Compartment and bin names (when stratifications are present).
-
-See [mathematical-expressions.md](mathematical-expressions.md) for the full
-list of available variables and operators.
-
----
-
-## Validation rules
-
-| Pattern          | Constraints                                                  |
-|------------------|--------------------------------------------------------------|
-| `pulse`          | `at >= 0`. `amount` strings must not contain `,`.            |
-| `pulses`         | Non-empty unique step list.                                  |
-| `periodic`       | `period > 0`; `0 <= offset < period`.                        |
-| `window`         | `start < end`.                                               |
-| `seasonal`       | Numeric `period != 0` (strings accepted as parameter names). |
-| `gaussian_pulse` | `width > 0`.                                                 |
-| `linear_ramp`    | `start < end`.                                               |
-| `combine`        | At least one input; consistent group bindings; under length cap. |
-| `from_formula`   | Non-empty expression that survives the full security validator. |
-| `add_group`      | Non-empty conditions; condition dicts must have `stratification` and `category`. |
-| `set_default`    | Pattern with no conditions and no `source_compartment`. At most one default per schedule. |
-
-Bad inputs raise `pydantic.ValidationError` (or plain `ValueError` for
-explicit pre-validation paths). See `tests/test_time_patterns.py` for the
-canonical set of accepted and rejected cases.
-
----
-
-## Where to next
-
-- [Examples](examples.md) — fully worked patterns and schedules in abstract
-  models.
-- [Mathematical Expressions](mathematical-expressions.md) — full list of
-  available variables, operators, and functions.
-- [API reference: TimePattern](../api/time-patterns.md) — auto-generated
-  signature reference.
+| To learn | Read |
+|---|---|
+| Everything a formula can contain | [Mathematical Expressions](mathematical-expressions.md) |
+| How rates become flows | [Transitions](transitions.md) |
+| Signatures | [API reference: TimePattern](../api/time-patterns.md) |
