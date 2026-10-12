@@ -291,17 +291,70 @@ builder.add_transition(
 
 See [Mathematical Expressions](mathematical-expressions.md) for more complex rate formulas.
 
-### Multi-State Transitions
+### Per-Capita and Absolute Rates
+
+A rate is **per capita** unless it references a compartment or a subpopulation
+total: the engine then multiplies it by the source compartment. A rate that
+references compartments (`"beta * S * I / N"`) is an **absolute** flow and is
+used as is. A source-less transition is always absolute. A stratified rate can
+set `absolute` explicitly.
 
 ```python
-# Outflow from multiple compartments
+builder.add_transition(id="recovery", source=["I"], target=["R"], rate="gamma")
+# flow = gamma * I
+builder.add_transition(id="infection", source=["S"], target=["I"], rate="beta * S * I / N")
+# flow = beta * S * I / N
+```
+
+`model.print_equations()` shows every flow as the engine computes it, so a
+per-capita rate appears multiplied by its source (`gamma * I`).
+
+### Multi-State Transitions
+
+A transition with several sources or targets moves **one** flow: every
+occurrence in `source` loses it and every occurrence in `target` gains it, like
+a reaction. Its rate must be absolute (it references the compartments), because
+a per-capita rate has no single source to multiply:
+
+```python
+# A + B -> 2 C
+builder.add_transition(
+    id="reaction",
+    source=["A", "B"],
+    target=["C", "C"],
+    rate="k * A * B",
+)
+# dA/dt = - (k*A*B), dB/dt = - (k*A*B), dC/dt = + 2*(k*A*B)
+```
+
+For independent flows from several compartments, use the `$compartment`
+placeholder, which creates one transition per source:
+
+```python
 builder.add_transition(
     id="outflow",
     source=["A", "B", "C"],
-    target=[],  # Empty = leaves system
-    rate="mu"
+    target=[],  # Empty = removal from system
+    rate="mu * $compartment",
 )
 ```
+
+### Transitions Between Categories
+
+A transition whose source and target are categories of one stratification moves
+population between those categories in **every bin**:
+
+```python
+builder.add_stratification(id="age", categories=["young", "old"])
+builder.add_transition(id="aging", source=["young"], target=["old"], rate="a")
+# S_young -> S_old, I_young -> I_old, ... each with flow a * X_young
+```
+
+It needs exactly one source and one target category. If moving into the target
+category makes a conditional stratification apply (for example `care`, which
+only splits `old`), the flow needs a `to` condition that names its category
+(see [Redirecting the Target with `to`](#redirecting-the-target-with-to));
+otherwise building the model raises an error.
 
 ### Using `$compartment` Placeholder for Per-Compartment Rates
 
@@ -572,6 +625,36 @@ builder.add_transition(
 | `A_g1_t1_v1`        | 0                   | `k_default * A * B / N`       |
 
 Only `A_g2_t1_v2` matches all three conditions, so it gets the special rate. All others use the fallback.
+
+#### Redirecting the Target with `to`
+
+A condition with a `category` **filters the source** compartments. A condition
+with `to` **redirects the target**: the flow ends in that category instead.
+Without a `category`, a `to` condition does not filter the source, so it can
+send the flow into a stratification the source does not carry:
+
+```python
+# age: [y, o]; comorbidity: [nc, c] only applies to age "o"
+builder.add_transition(
+    id="aging_c",
+    source=["S"],
+    target=["S"],
+    stratified_rates=[
+        {
+            "conditions": [
+                {"stratification": "age", "category": "y", "to": "o"},
+                {"stratification": "comorbidity", "to": "c"},
+            ],
+            "rate": "aging * p_c",
+        }
+    ],
+)
+# S_y -> S_o_c
+```
+
+A stratified rate whose `category` conditions match none of the source
+compartments could never apply, so building the model raises an error that
+points to `to`.
 
 #### Fallback Rate Behavior
 

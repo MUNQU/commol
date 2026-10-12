@@ -1,6 +1,6 @@
 # Design: Per-compartment initial conditions
 
-- **Status:** Proposed
+- **Status:** Implemented (revised 2026-10-12: Rust is the single source of truth)
 - **Date:** 2026-09-30
 - **Scope:** `commol-core` (types), `commol-difference` (engine build), `py-commol` (context, builder, model write-back)
 
@@ -92,87 +92,67 @@ and the calibration auto-correction inherit overrides for free; neither
 
 ### Validation
 
-Two layers, one source of truth for compartment names:
+The Rust engine is the only place that knows the expansion, so it is the only
+place that validates names and totals:
 
-- **Python (builder, early feedback):** `ModelBuilder.set_initial_conditions(...,
-  compartment_fractions=None)` validates: (a) every compartment name exists
-  in the expansion; (b) no duplicates; (c) `0.0 <= fraction <= 1.0`;
-  (d) total population after overrides does not exceed `population_size`.
-  For (a) a pure-Python compartment-name generator mirrors the Rust
-  `generate_compartments` (including conditional-stratification behaviour).
-  It becomes the shared helper for builder-side validation, with a parity
-  test against `engine.compartments` guarding divergence.
-- **Rust (engine, final authority):** unknown compartment names are a build
-  error.
+- **Rust (`commol_difference::initial_state`):** expands the model and applies
+  the overrides. It rejects an unknown or repeated compartment, a fraction
+  outside `[0.0, 1.0]`, and overrides that make the initial population exceed
+  `population_size` (relative tolerance `1e-9`). The engine constructor uses the
+  same function.
+- **Python:** keeps only the schema checks that need no expansion (fraction
+  range, duplicate names). `Model` has a validator that asks the engine for the
+  initial state when overrides exist, so `ModelBuilder.build`,
+  `Model.model_validate_json` and `Model.from_json` all get the engine's
+  verdict. `Model.update_compartment_fractions` validates a candidate copy the
+  same way before it stores it.
+
+The expansion itself is one Rust function (`expand`) shared by the engine
+build, `initial_state` and the accumulator outputs. Python reads it through
+`expanded_outputs` for printing equations and checking units.
+
+`Model.initial_state()` returns each expanded compartment with its bin, its
+applied categories and its initial population, as the engine builds it. The
+report and `Model.subgroup_population` use it instead of a Python expansion.
+
+### Applying calibrated initial conditions (engine)
+
+`commol-calibration/src/initial_conditions.rs` owns how calibration values
+reach the engine. `cost()`, `configured_engine()` and the public
+`calibrated_initial_population` share it.
+
+- **Targets.** An id resolves, in order, to an exact compartment, a qualified
+  category (`sex:female`), a bin or bin prefix (its bin followed by its leading
+  categories, matched on the labels), or the category of exactly one binary
+  stratification. Category pairs come from the engine's
+  `compartment_labels()` (bin and applied categories), not from compartment
+  names. A bare name that two stratifications declare is an error that names
+  the qualified alternatives.
+- **Layers.** Values are written as bins, then category splits, then exact
+  compartments, as the definition layers bin fractions, stratification
+  fractions and overrides. Within a layer, parameter order applies.
+- **Remainder.** `initial_condition_remainder` (a compartment, bin or bin
+  prefix) is outside the optimizer. After the layers, it takes
+  `population_size` minus every other compartment and keeps its own split. It
+  must not overlap a calibrated bin or compartment. A negative remainder, or,
+  without a remainder, a total above `population_size`, is infeasible: the
+  objective returns a penalty and `configured_engine` an error.
+- Results report the clamped values the objective scored.
 
 ### Calibration write-back
 
-`py-commol/commol/context/model.py::apply_calibration_parameters` replaces
-its current rejection branch ("Per-compartment initial conditions ... cannot
-be written back") with: an `InitialCondition` parameter whose id matches an
-expanded compartment name is persisted as an upsert into
-`compartment_fractions` (new `Model.update_compartment_fractions`, following
-the existing `update_bin_fractions` / `update_stratification_fractions`
-pattern). Reloading a calibrated run therefore rebuilds the exact initial
-state.
+`Model.apply_calibration_parameters`:
 
-### Interaction rules
+1. asks the engine for the scored initial population;
+2. gives every bin a calibrated value or the remainder covers its scored share,
+   and every calibrated category the split the engine applied (an update the
+   definition rejects is skipped);
+3. asks the engine for the initial state of that candidate definition;
+4. pins every compartment whose head count differs from the scored one as a
+   `compartment_fractions` override.
 
-Engine parity is the primary invariant (ESC-2):
-
-- Initial-condition calibration values are replayed in problem parameter
-  order over a single working population that starts from the declared
-  expansion plus the definition overrides. A bin-level value scales its
-  covered compartments by weights taken from that starting population; a
-  stratification-category value snapshots each complementary pair's total once
-  per parameter and then splits it, exactly as `calibration_problem.rs` reads
-  the population once before iterating its pairs. The pairs are applied in the
-  engine's order (sorted by compartment index), so overlapping pairs from a
-  category shared by two stratifications match the engine replay.
-- The write-back is a pure function of the current definition and the problem
-  values, and equals the engine's sequential replay exactly, including
-  pre-existing overrides on covered compartments and multi-parameter
-  orderings. There is no declared-base working population: every parameter
-  replays from the live working population.
-- A bin or category value whose covered compartments intersect a definition
-  override, or a compartment affected by an earlier value in the replay, is
-  persisted as per-compartment overrides holding the replayed values. A bin
-  value whose update would make the complete declared bin-fraction mapping fail
-  its conservation rule (`_validate_bin_fraction_total`) is diverted the same
-  way, so the definition never stores a non-conserving bin fraction and the
-  replayed head counts are preserved as overrides. A stratification-category
-  value whose name is declared by two stratifications is always diverted,
-  because no single stratification fraction can express the cross-stratification
-  split. Every other value updates the bin or stratification fraction it
-  declares. An exact compartment value is always persisted as an override.
-- Idempotence is conditional. Bin and unique-category replays are idempotent
-  because setting a category value preserves its pair total (`0.4 + 0.6 = 1`).
-  A category declared by more than one stratification is intentionally NOT
-  idempotent on re-apply: the second apply re-scores from the reloaded,
-  already-diverted population, exactly like a fresh engine problem built on
-  that state. Diversion still leaves the aggregate bin or stratification
-  fraction unchanged — the overrides cover every affected compartment — and the
-  report sums the effective override head counts for the aggregate row instead
-  of echoing the stale definition.
-
-Non-conserving states and guard placement (ESC-1):
-
-- The model definition may represent any state the engine can hold. Total
-  guards live only on the authoring paths — `ModelBuilder` construction and the
-  public `update_*` methods, including `update_compartment_fractions` and
-  `update_bin_fractions`. Deserialization (`model_validate_json`,
-  `Model.from_json`) accepts non-conserving per-compartment overrides, so a
-  reload of the scored state reproduces the engine head counts. The declared
-  bin fractions keep their existing sum-to-1 construction rule.
-- Calibration write-back never bypasses the bin-fraction conservation guard:
-  a bin value whose update would break the declared mapping is diverted to
-  per-compartment overrides, so the write-back reaches the public
-  `update_bin_fractions` (through `Model.update_initial_conditions`) with only
-  conserving candidates. Per-compartment overrides still use the internal
-  upsert that skips only the total check
-  (`_upsert_compartment_fractions(validate_total=False)`), because the engine
-  may hold a non-conserving compartment state (`set_initial_condition` has no
-  total check); range, uniqueness, and unknown-name validation still apply.
+The result rebuilds the scored population exactly. Python does not replay the
+engine.
 
 ## Tests
 
@@ -182,8 +162,8 @@ Non-conserving states and guard placement (ESC-1):
 3. **Integration:** end-to-end `IH_y60 = 0` scenario (build → simulate →
    series stay zero); calibration round-trip (exact-compartment IC parameter
    → calibrate → apply parameters → rebuild engine → identical initial state).
-4. **Expansion parity:** Python generator output equals `engine.compartments`
-   for models with and without conditional stratifications.
+4. **Write-back parity:** for each mix of bin, category and exact-compartment
+   values, the rebuilt population equals `calibrated_initial_population`.
 
 ## Non-goals
 

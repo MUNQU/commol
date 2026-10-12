@@ -168,13 +168,15 @@ builder.set_initial_conditions(
 ```
 
 An override wins over the uniform expansion for the named compartment; every
-other compartment keeps its expanded fraction. The names are validated against
-the model's expansion, must be unique, must lie in `0.0..=1.0`, and must not
+other compartment keeps its expanded fraction. The names must be unique and
+the fractions must lie in `0.0..=1.0`. When the model is built, the engine
+checks that every name is part of the expansion and that the overrides do not
 push the initial population past `population_size`.
 
 On a built model the same overrides can be changed with
 `model.update_compartment_fractions({"IH_y60": 0.05})`, which upserts each
-name.
+name. To see the population each compartment starts with, as the engine
+builds it, call `model.initial_state()`.
 
 #### Updating fractions after building
 
@@ -195,7 +197,13 @@ model.update_stratification_fractions({"low": 0.2, "mid": 0.3})
 
 Naming every category is also allowed, in which case the given values must
 already sum to 1.0. Omitting two or more categories raises, because the split
-between them would be undetermined.
+between them would be undetermined. A category name that more than one
+stratification declares must be qualified with its stratification, as in
+`model.update_stratification_fractions({"sex:female": 0.5})`.
+
+Bin fractions follow the same rule as when the model is built: after the
+update they must sum to 1.0, so move population between bins in one call
+(`{"A": 0.85, "B": 0.15}`).
 
 Both methods are also what [calibration](calibration.md) writes back when a bin
 fraction or a stratification split is fitted.
@@ -283,13 +291,31 @@ builder.add_transition(
 
 ### Multi-Source Transitions
 
+A transition with several sources or targets moves **one** flow: every
+occurrence in `source` loses it and every occurrence in `target` gains it, like
+a reaction. Its rate must be absolute (it references the compartments), because
+a per-capita rate has no single source to multiply:
+
 ```python
-# Outflow from multiple states
+# A + B -> 2 C
+builder.add_transition(
+    id="reaction",
+    source=["A", "B"],
+    target=["C", "C"],
+    rate="k * A * B",
+)
+# dA/dt = - (k*A*B), dB/dt = - (k*A*B), dC/dt = + 2*(k*A*B)
+```
+
+For independent flows from several compartments, use the `$compartment`
+placeholder, which creates one transition per source:
+
+```python
 builder.add_transition(
     id="outflow",
     source=["A", "B", "C"],
     target=[],  # Empty = removal from system
-    rate="mu"
+    rate="mu * $compartment",
 )
 ```
 
