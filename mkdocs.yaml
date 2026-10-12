@@ -106,13 +106,16 @@ nav:
           - Reports: guide/reports.md
       - Examples: guide/examples.md
   - API Reference:
-      - Model Builder: api/model-builder.md
+      - Overview: api/index.md
+      - ModelBuilder: api/model-builder.md
+      - Model: api/model.md
       - Simulation: api/simulation.md
-      - Time Patterns: api/time-patterns.md
-      - Time Scale: api/time-scale.md
-      - Calibrator: api/calibrator.md
-      - Probabilistic Calibrator: api/probabilistic-calibrator.md
-  - Advanced:
+      - Plotting: api/plotting.md
+      - TimePattern: api/time-patterns.md
+      - TimeScale: api/time-scale.md
+      - Calibration: api/calibrator.md
+      - Probabilistic Calibration: api/probabilistic-calibrator.md
+      - Reports: api/reports.md
       - Model Structure: advanced/model-structure.md
   - Development:
       - Codebase Guide:

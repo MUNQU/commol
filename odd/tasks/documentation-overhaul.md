@@ -86,7 +86,7 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 | T5 | S3 | Fix examples: `simulations.md` | direct | this commit (see Evidence) |
 | T6 | S3 | Fix examples: `calibration.md`, `probabilistic-calibration.md`; investigate the engine error `Parameter index '2' not found` (calibration.md L934) | direct | this commit (see Evidence) |
 | T7 | S3 | Fix the broken anchor; add an external link check | direct | pending |
-| T8 | S2 | API reference pages for the 12 missing public names | direct | pending |
+| T8 | S2 | API reference pages for the 12 missing public names | direct | this commit (see Evidence) |
 | T9 | S2, S4 | Python docstrings for the 23 missing definitions; docstring coverage gate in CI | direct | pending |
 | T10 | S2, S4 | Rust docs for the public items; deny `missing_docs` in CI | direct | pending |
 | T11 | S5 | Split and restructure `calibration.md` and `building-models.md`; quick paths, version notes, back links | direct | split done in T4 and T6; version notes in T12 |
@@ -224,6 +224,20 @@ User: "Añade también una obligatoriedad de que cualquier nueva modificación d
 - Note: Nelder-Mead from the midpoint can stop at a bound and still report
   `converged=True` (seen on a one-unknown problem); documented with the advice
   to check bounds and give `initial_guess`.
+
+- T8: API reference rebuilt: an overview table (`api/index.md`) and one page
+  per area; new pages for `Model` (with `InitialCompartment` and
+  `UnitConsistencyError`), plotting and reports; `CalibrationConstraint`,
+  `EnsembleSelectionSummary`, the probabilistic configs, `ci_percentiles`,
+  `member_statistics` and the window functions added. The per-page
+  `options:` blocks were not indented, so mkdocstrings printed them as text
+  ("show_root_heading: true" appeared on the site); they are removed in favour
+  of the global options. `advanced/model-structure.md` now has a tree of the
+  data model and one entry per type, and moves under API Reference (`Model`
+  lives only in `api/model.md`, which removes a duplicate autorefs target).
+  New gate `tests/test_docs_reference.py`: every name in `commol.__all__` must
+  have a `::: path` entry. `pytest -m docs`: 53 passed in 8 s; `mkdocs build
+  --strict` clean.
 
 ## Log
 

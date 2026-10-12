@@ -64,7 +64,7 @@ Design reasons and invariants that cross components go to
 
 | If the change… | Update |
 |---|---|
-| Adds or changes a public Python name, argument, default or error | Its docstring; its page in `docs/api/`; the guide page that uses it |
+| Adds or changes a public Python name, argument, default or error | Its docstring; a `::: path` entry in `docs/api/` for a new name in `commol.__all__`; the guide page that uses it |
 | Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
 | Changes calibration or ensembles | `guide/calibration.md` or `guide/probabilistic-calibration.md` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
@@ -127,6 +127,7 @@ every match.
 |---|---|---|
 | The site builds with no broken link or anchor | `mkdocs build --strict` | CI |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
 | Public Python names have docstrings | The docstring coverage check | CI (being added) |
 | Public Rust items have docs | `missing_docs` | CI (being added) |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |
