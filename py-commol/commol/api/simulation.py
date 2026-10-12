@@ -1,3 +1,5 @@
+"""Simulation of a model with the Rust engine, and access to its outputs."""
+
 import logging
 import time
 from collections.abc import Iterable, Mapping, Sequence

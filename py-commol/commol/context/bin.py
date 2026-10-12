@@ -1,3 +1,5 @@
+"""Bins and accumulators of a model population."""
+
 from typing import override
 
 from pydantic import BaseModel, Field

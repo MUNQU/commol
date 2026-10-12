@@ -1,3 +1,5 @@
+"""Transitions, stratified rates and the dynamics of a model."""
+
 from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -273,6 +275,7 @@ class Dynamics(BaseModel):
     @field_validator("transitions")
     @classmethod
     def validate_transitions_not_empty(cls, v: list[Transition]) -> list[Transition]:
+        """Require at least one transition."""
         if not v:
             raise ValueError("At least one transition must be defined.")
         return v

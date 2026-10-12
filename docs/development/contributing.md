@@ -1,5 +1,7 @@
 # Contributing Guidelines
 
+[Back to Codebase Guide](../codebase/index.md)
+
 Thank you for considering contributing to Commol! This document provides guidelines for contributing to the project.
 
 ## How to Contribute
@@ -32,195 +34,37 @@ Feature suggestions are welcome! Please:
 
 1. **Keep PRs focused**: One feature/fix per PR
 2. **Write tests**: All new code should have tests
-3. **Update docs**: Update README or documentation as needed
+3. **Update docs (mandatory)**: Every change ships with its documentation. Follow the [documentation definition of done](../codebase/conventions.md#documentation-definition-of-done)
 4. **Follow conventions**: Use the project's code style
 5. **Be descriptive**: Write clear commit messages and PR descriptions
 
 ## Development Guidelines
 
-### Code Style
+The rules for code, comments, documentation and commits are in one place:
+[Conventions](../codebase/conventions.md). In short:
 
-#### Python
+| Area | Rule |
+|---|---|
+| Python | Ruff (line length 88), type hints on every signature and never `Any`, NumPy docstrings on every public item |
+| Rust | `cargo fmt`, no Clippy warnings, rustdoc on every public item |
+| Tests | pytest for Python, `#[cfg(test)]` modules and `tests/` for Rust; test both success and error cases |
+| Documentation | Mandatory with every change: the [definition of done](../codebase/conventions.md#documentation-definition-of-done) |
+| Commits | `type(scope): description`, one short phrase, no body; see [Commits](../codebase/conventions.md#commits) |
 
-- Follow [PEP 8](https://pep8.org/)
-- Use type hints for all functions
-- Maximum line length: 88 characters
-- Use Ruff for linting and formatting
-
-```bash
-cd py-commol
-uv run ruff check .
-uv run ruff format .
-uv run ty check commol
-```
-
-#### Rust
-
-- Follow [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
-- Use `cargo fmt` for formatting
-- Use `cargo clippy` for linting
-- Document public APIs with rustdoc
+Run the checks before you open a pull request:
 
 ```bash
-cargo fmt --all
-cargo clippy --all-targets --all-features
+# Python, from py-commol/ with the virtual environment active
+ruff check . && ruff format --check . && ty check commol && pytest
+
+# Rust, from the repository root
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p commol-core -p commol-difference -p commol-calibration
 ```
 
-### Testing
-
-#### Python Tests
-
-- Write tests using pytest
-- Aim for >95% code coverage
-- Test both success and error cases
-- Use descriptive test names
-
-```python
-def test_model_builder_creates_valid_model():
-    """Test that ModelBuilder creates a valid model."""
-    model = (
-        ModelBuilder(name="Test Model")
-        .add_bin(id="A", name="State A")
-        # ... rest of model
-        .build("DifferenceEquations")
-    )
-    assert model.name == "Test Model"
-```
-
-Run tests:
-
-```bash
-cd py-commol
-uv run pytest -v --cov=commol
-```
-
-#### Rust Tests
-
-- Write unit tests in the same file
-- Write integration tests in `tests/` directory
-- Use `#[should_panic]` for error cases
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_model_creation() {
-        // Test implementation
-    }
-}
-```
-
-Run tests:
-
-```bash
-cargo test --workspace
-```
-
-### Documentation
-
-#### Python Docstrings
-
-Use NumPy-style docstrings:
-
-```python
-def run(self, num_steps: int, output_format: str = "dict_of_lists") -> dict:
-    """
-    Runs the simulation and returns results.
-
-    Parameters
-    ----------
-    num_steps : int
-        Number of simulation steps to run.
-    output_format : str, default 'dict_of_lists'
-        Format for results ('dict_of_lists' or 'list_of_lists').
-
-    Returns
-    -------
-    dict
-        Simulation results in the specified format.
-
-    Raises
-    ------
-    ValueError
-        If num_steps is negative.
-
-    Examples
-    --------
-    >>> sim = Simulation(model)
-    >>> results = sim.run(num_steps=100)
-    """
-```
-
-#### Rust Documentation
-
-Use rustdoc:
-
-````rust
-/// Runs the simulation for a given number of steps.
-///
-/// # Arguments
-///
-/// * `num_steps` - The number of time steps to simulate
-///
-/// # Returns
-///
-/// A vector of state vectors, one per time step
-///
-/// # Examples
-///
-/// ```
-/// let results = engine.run(100);
-/// assert_eq!(results.len(), 100);
-/// ```
-pub fn run(&self, num_steps: usize) -> Vec<Vec<f64>> {
-    // Implementation
-}
-````
-
-### Commit Messages
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Types**:
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style (formatting, missing semicolons, etc.)
-- `refactor`: Code refactoring
-- `perf`: Performance improvements
-- `test`: Adding or updating tests
-- `build`: Build system or dependencies
-- `ci`: CI/CD changes
-- `chore`: Other changes (releasing, etc.)
-
-**Examples**:
-
-```
-feat(transitions): add support for time-dependent rates
-
-Implemented mathematical expression parsing for dynamic
-transition rates that change over time.
-
-Closes #123
-```
-
-```
-fix(simulation): prevent negative population values
-
-Added validation to ensure compartment populations
-remain non-negative during simulation.
-```
+The pre-commit hooks run most of them on every commit; see
+[Pre-commit Hooks](workflow.md#pre-commit-hooks).
 
 ## Code Review Process
 
@@ -244,9 +88,8 @@ See [Release Process](release.md) for details on versioning and releases.
 
 ## Getting Help
 
-- **Documentation**: Check the [docs](https://munqu.github.io/commol)
-- **Discussions**: Use [GitHub Discussions](https://github.com/MUNQU/commol/discussions)
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/MUNQU/commol/issues)
+- **Documentation**: Check the [docs](https://munqu.github.io/commol/latest/)
+- **Questions, bugs and ideas**: Open a [GitHub issue](https://github.com/MUNQU/commol/issues)
 
 ## Recognition
 

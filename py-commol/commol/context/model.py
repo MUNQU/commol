@@ -1,3 +1,5 @@
+"""The `Model` definition and its update, inspection and serialization methods."""
+
 from collections.abc import Iterable, Mapping
 from itertools import combinations, product
 from pathlib import Path

@@ -62,6 +62,8 @@
 //! println!("Converged: {}", result.converged);
 //! ```
 
+#![warn(missing_docs)]
+
 pub mod calibration_problem;
 pub mod initial_conditions;
 pub mod optimization;

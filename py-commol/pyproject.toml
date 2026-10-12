@@ -37,6 +37,7 @@ docs = [
     "mkdocstrings[python]>=0.26,<2.0",
     "mkdocs-autorefs>=1.4.4,<2.0",
     "mkdocs-material>=9.7.6,<10.0",
+    "mkdocs-llmstxt>=0.5,<0.6",
 ]
 
 [project.urls]
@@ -58,6 +59,9 @@ module-name = "commol.commol_rs._commol_rs"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 addopts = "--log-cli-level=WARN"
+markers = [
+    "docs: runs the Python examples of the documentation (tests/test_docs_examples.py)",
+]
 log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
@@ -98,12 +102,19 @@ line-length = 88
 indent-width = 4
 
 [tool.ruff.lint]
-select = ["E", "F", "C90", "ARG", "ERA", "B007"]
+# D1 and D417: every public module, class, function and argument is documented.
+select = ["E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417"]
 fixable = ["ALL"]
 unfixable = []
 ignore = [
     "ERA001",  # Allow explanatory comments that look like commented code
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D1"]
 
 [tool.ruff.format]
 indent-style = "space"

@@ -1,3 +1,5 @@
+"""Calibration problems, observations, unknowns, constraints, optimizers and results."""
+
 from collections.abc import Mapping
 from typing import Self, overload, override
 
@@ -638,6 +640,8 @@ class ParticleSwarmConfig(BaseModel):
         ----------
         type : str
             Inertia strategy type: "constant" or "chaotic"
+        **kwargs : float
+            The settings of the strategy, listed under Other Parameters.
 
         Other Parameters
         ----------------
@@ -698,6 +702,8 @@ class ParticleSwarmConfig(BaseModel):
         ----------
         type : str
             Acceleration strategy type: "constant" or "time_varying"
+        **kwargs : float
+            The settings of the strategy, listed under Other Parameters.
 
         Other Parameters
         ----------------

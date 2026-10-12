@@ -63,7 +63,9 @@ class AddGroupFn(Protocol):
         *,
         source_compartment: str | None = None,
         absolute: bool | None = None,
-    ) -> "TimePattern": ...
+    ) -> "TimePattern":
+        """Add a group to a schedule; see `TimePattern.add_group`."""
+        ...
 
 
 class CombineMode(StrEnum):
@@ -301,6 +303,7 @@ class TimePattern(BaseModel):
         return None
 
     def __str__(self) -> str:
+        """Return the pattern's formula."""
         return self.formula
 
     def for_group(

@@ -1,3 +1,5 @@
+"""Enumerations of calibration settings."""
+
 from enum import StrEnum, unique
 
 

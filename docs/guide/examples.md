@@ -1,6 +1,24 @@
 # Examples
 
-Complete examples demonstrating different modeling scenarios using abstract, domain-agnostic compartment models.
+[Back to Home](../index.md)
+
+Complete models, each runnable on its own, with abstract names. Each example
+shows one technique:
+
+| Example | Technique |
+|---|---|
+| 1. Basic three-state model | Absolute and per-capita rates |
+| 2. Four-state model | A chain of states |
+| 3. Periodic rates | `sin` of `step` in a rate |
+| 4. Group-specific rates | Stratified rates |
+| 5. Waning effect | A cyclic transition back to the first state |
+| 6. Capacity-constrained rate | `max` in a rate |
+| 7. Intersection rates | Stratified rates with several conditions |
+| 8. Subpopulation-normalized rate | `N_<category>` variables |
+| 9. Conditional stratification | A stratification that splits one group only |
+| 10. Parameter calibration | `Calibrator` |
+| Time-pattern transition | `TimePattern` as a rate |
+| Schedules per subgroup | `TimePattern.add_group` |
 
 ## Example 1: Basic Three-State Model
 

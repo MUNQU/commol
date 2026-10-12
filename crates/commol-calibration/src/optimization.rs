@@ -162,20 +162,33 @@ pub enum InertiaWeightStrategy {
     /// Constant inertia weight (default: 1/(2*ln(2)) ≈ 0.721)
     Constant(f64),
     /// Chaotic inertia weight using logistic map
-    /// Parameters: (w_min, w_max)
-    Chaotic { w_min: f64, w_max: f64 },
+    Chaotic {
+        /// Lowest inertia weight.
+        w_min: f64,
+        /// Highest inertia weight; greater than `w_min`.
+        w_max: f64,
+    },
 }
 
 /// Acceleration coefficient strategy for PSO
 #[derive(Debug, Clone)]
 pub enum AccelerationStrategy {
     /// Constant coefficients (default: cognitive=0.5+ln(2), social=0.5+ln(2))
-    Constant { cognitive: f64, social: f64 },
+    Constant {
+        /// Pull towards each particle's best position (c1).
+        cognitive: f64,
+        /// Pull towards the swarm's best position (c2).
+        social: f64,
+    },
     /// Time-Varying Acceleration Coefficients (TVAC)
     TimeVarying {
+        /// Cognitive coefficient at the first iteration.
         c1_initial: f64,
+        /// Cognitive coefficient at the last iteration.
         c1_final: f64,
+        /// Social coefficient at the first iteration.
         c2_initial: f64,
+        /// Social coefficient at the last iteration.
         c2_final: f64,
     },
 }

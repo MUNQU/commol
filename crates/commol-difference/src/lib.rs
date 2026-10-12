@@ -31,6 +31,8 @@
 //! let final_state = engine.population();
 //! ```
 
+#![warn(missing_docs)]
+
 mod builder;
 mod flows;
 mod helpers;

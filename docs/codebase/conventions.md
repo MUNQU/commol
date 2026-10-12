@@ -13,9 +13,11 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
 | Python dead code | No unused code | `vulture` (CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
-| Docstrings | NumPy style on public functions | Review |
+| Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
+| Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |
 | Comments | Describe the code as it is | Review |
-| Doc examples | Abstract names only | Review |
+| Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
+| Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -51,20 +53,98 @@ Describe the code as it is now. Never describe how it came to be.
 Design reasons and invariants that cross components go to
 [Design decisions](design-decisions.md), not to the source.
 
-## Documentation
+## Documentation definition of done
 
-- **A change is not done until its documentation is updated.** Check every page
-  that mentions the changed concept: the guide page of the feature, the API
-  page, [Model structure](../advanced/model-structure.md), and, for maintainers,
-  the pages of this guide.
-- **Examples are domain-agnostic.** Use abstract names: bins `A`, `B`, `C`;
-  categories `group1`, `cat1`; parameters `k1`, `alpha`. Do not use names from
-  epidemiology, chemistry or any other field.
-- **Write for people and agents.** Put the answer first. Prefer tables,
-  checklists and short sections to long prose. Name the file or function behind
-  each claim, so a reader can check it.
-- **Write in simple technical English**: short sentences, one idea per
-  sentence, active voice.
+!!! warning "Mandatory"
+    **Every change to this repository ships with the documentation it needs, in
+    the agreed format and at the agreed quality.** A change without it is not
+    done, and its pull request is not merged. This applies to people and to
+    agents, to features, fixes, refactors, dependency updates and CI changes.
+
+### 1. Update the docs the change affects
+
+| If the change… | Update |
+|---|---|
+| Adds or changes a public Python name, argument, default or error | Its docstring; a `::: path` entry in `docs/api/` for a new name in `commol.__all__`; the guide page that uses it |
+| Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
+| Changes calibration or ensembles | `guide/calibration.md` or `guide/probabilistic-calibration.md` |
+| Changes an expression function or variable | `guide/mathematical-expressions.md` |
+| Moves code, adds a module, or changes who owns what | [Repository map](repository-map.md); `AGENTS.md` if a "If you need to…" row changes |
+| Adds or changes a rule that is not obvious from the code | [Design decisions](design-decisions.md), with the test that guards it |
+| Changes a workflow, a command, CI or the release | `AGENTS.md`; `docs/development/` |
+| Is visible to users | `docs/about/changelog.md`, under `[Unreleased]` |
+| Adds or changes a public Rust item | Its rustdoc comment |
+
+When in doubt, search `docs/` and `AGENTS.md` for the changed name and update
+every match.
+
+### 2. Use the agreed format
+
+**Pages**
+
+- One page, one job. The title says the outcome.
+- Start with one paragraph (what it is, who it is for), then a quick path, then
+  details, then a checklist or the next step.
+- Prefer tables, checklists and short sections to long prose.
+- Start every page with a link back to its index, and end it with
+  previous/next links when it belongs to a sequence.
+
+**Text**
+
+- Simple technical English: short sentences, one idea per sentence, active
+  voice, the answer first.
+- Every claim about the code names the file, function or test behind it.
+- Describe the present. History belongs in git and in the changelog.
+
+**Examples**
+
+- Use abstract names only: bins `A`, `B`, `C`; categories `group1`, `cat1`;
+  parameters `k1`, `alpha`. No names from epidemiology, chemistry or any other
+  field.
+- Every Python block runs, top to bottom within its page, in one namespace and
+  from a temporary directory (`py-commol/tests/test_docs_examples.py`). Define
+  what a block needs in an earlier block of the same page.
+- A block that cannot run alone (a signature, a fragment) is marked on the line
+  just before its fence, with a reason:
+
+    ```markdown
+    <!-- doc-test: skip: shows only the signature -->
+    ```
+
+  Use the marker only when the block cannot run; never to hide a failing
+  example.
+
+**Code documentation**
+
+- Python: a NumPy-style docstring on every public function, method and class
+  (`Parameters`, `Returns`, `Raises`).
+- Rust: a rustdoc comment on every public item; a `//!` summary at the top of
+  every new module.
+- Comments follow [Comments and docstrings](#comments-and-docstrings).
+
+### 3. Pass the quality checks
+
+| Check | Command | Enforced by |
+|---|---|---|
+| The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
+| External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
+| The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
+| Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
+| Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
+| The table in step 1 is complete for this change | — | Pull request checklist and review |
+| The format in step 2 is followed | — | Review |
+
+The pull request template repeats this checklist. A reviewer who finds a gap
+asks for it before approving.
+
+### Writing for people and agents
+
+The same pages serve both. An agent reads the Markdown source by path, so:
+
+- keep each page self-contained, with its links;
+- name files and functions exactly, in code format;
+- put the rule before the explanation.
 
 ## Commits
 

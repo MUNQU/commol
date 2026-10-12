@@ -13,7 +13,8 @@ Use this page before you make or review a change. It turns the
 3. Read the tests next to that code before you change it.
 4. Make the change in the narrowest owner.
 5. Run both test suites (see [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md#commands)).
-6. Update the documentation that describes the change.
+6. Update the documentation as the mandatory
+   [definition of done](conventions.md#documentation-definition-of-done) requires.
 
 ## Guardrails
 
@@ -103,6 +104,8 @@ Use this page before you make or review a change. It turns the
 
 - [ ] The change lives in the owner that the [Repository map](repository-map.md) names.
 - [ ] No engine rule is re-implemented in Python.
+- [ ] The change meets the [documentation definition of done](conventions.md#documentation-definition-of-done):
+      the affected docs are updated, in the agreed format, and the doc checks pass.
 - [ ] Every new claim in the docs names a file, function or test.
 - [ ] The tests that guard the touched [design decisions](design-decisions.md) still pass.
 

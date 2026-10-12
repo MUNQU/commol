@@ -1,3 +1,5 @@
+"""Security validation of user-supplied mathematical expressions."""
+
 from dataclasses import dataclass
 import math
 import re

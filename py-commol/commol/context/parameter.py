@@ -1,3 +1,5 @@
+"""Model parameters: constants, formulas, time series and uncalibrated values."""
+
 import math
 
 from pydantic import BaseModel, Field, field_validator

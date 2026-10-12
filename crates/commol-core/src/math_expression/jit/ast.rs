@@ -15,24 +15,37 @@ pub enum Expr {
 
     /// Binary operation (e.g., a + b, x * y)
     BinaryOp {
+        /// The operator.
         op: BinaryOperator,
+        /// The left operand.
         left: Box<Expr>,
+        /// The right operand.
         right: Box<Expr>,
     },
 
     /// Unary operation (e.g., -x, !condition)
     UnaryOp {
+        /// The operator.
         op: UnaryOperator,
+        /// The operand.
         operand: Box<Expr>,
     },
 
     /// Function call (e.g., sin(x), pow(x, 2))
-    FunctionCall { name: String, args: Vec<Expr> },
+    FunctionCall {
+        /// The function name, without the `math::` prefix.
+        name: String,
+        /// The arguments.
+        args: Vec<Expr>,
+    },
 
     /// Conditional expression: if(condition, true_expr, false_expr)
     Conditional {
+        /// The condition.
         condition: Box<Expr>,
+        /// The value when the condition is true.
         true_expr: Box<Expr>,
+        /// The value when the condition is false.
         false_expr: Box<Expr>,
     },
 }
@@ -40,25 +53,34 @@ pub enum Expr {
 /// Binary operators
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
-    // Arithmetic
+    /// `+`
     Add,
+    /// `-`
     Sub,
+    /// `*`
     Mul,
+    /// `/`
     Div,
+    /// `%`
     Mod,
+    /// `^` (and `**` after preprocessing)
     Pow,
-
-    // Comparison
-    Lt, // <
-    Gt, // >
-    Le, // <=
-    Ge, // >=
-    Eq, // ==
-    Ne, // !=
-
-    // Logical
-    And, // &&
-    Or,  // ||
+    /// `<`
+    Lt,
+    /// `>`
+    Gt,
+    /// `<=`
+    Le,
+    /// `>=`
+    Ge,
+    /// `==`
+    Eq,
+    /// `!=`
+    Ne,
+    /// `&&`
+    And,
+    /// `||`
+    Or,
 }
 
 /// Unary operators

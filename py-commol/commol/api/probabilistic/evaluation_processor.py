@@ -349,6 +349,9 @@ class EvaluationProcessor:
         ----------
         evaluations : list[CalibrationEvaluation]
             List of evaluations to analyze
+        feature_vectors : np.ndarray | None, default=None
+            One feature row per evaluation to cluster on. If None, the
+            evaluations' parameter values are used.
 
         Returns
         -------
@@ -462,6 +465,9 @@ class EvaluationProcessor:
             List of evaluations to cluster
         k : int
             Number of clusters
+        feature_vectors : np.ndarray | None, default=None
+            One feature row per evaluation to cluster on. If None, the
+            evaluations' parameter values are used.
 
         Returns
         -------

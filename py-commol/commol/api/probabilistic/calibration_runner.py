@@ -1,3 +1,5 @@
+"""Repeated calibration runs that feed probabilistic calibration."""
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -68,6 +70,11 @@ class CalibrationRunner:
         ----------
         n_runs : int
             Number of calibration runs to perform.
+        evaluation_retention : str, default="all"
+            Which evaluations of each run to keep: "all", "best_per_run" or
+            "top_k_per_run".
+        top_k_per_run : int | None, default=None
+            Number of evaluations kept per run with "top_k_per_run".
 
         Returns
         -------

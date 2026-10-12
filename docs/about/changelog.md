@@ -1,11 +1,29 @@
 # Changelog
 
+[Back to Home](../index.md)
+
 All notable changes to Commol will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Documentation
+
+- The guide is rewritten and split into pages with one job each (building
+  models, transitions, expressions, time patterns, units, simulations, and six
+  calibration pages). Every example runs in CI, and every claim was checked
+  against the engine. Behaviors that were described wrongly are now documented
+  as they are, among them: transition `condition`s are not evaluated, a second
+  `Simulation.run` continues the first one, a `Simulation` keeps the model it
+  was created with, `"sse"` uses observation weights (squared), and a violated
+  constraint replaces the loss with a penalty.
+- The API reference documents every public name, and `Model`, plotting and
+  reports have their own pages.
+- The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks
+  the pages of the `dev` version.
+- `README.md` is a short landing page with links to the documentation.
 
 ## [0.2.0] - 2026-10-12
 

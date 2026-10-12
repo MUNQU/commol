@@ -1,8 +1,11 @@
 # Simulation API
 
+[Back to API Reference](index.md)
+
+Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simulations.md).
+
 ::: commol.api.simulation.Simulation
-options:
-show_root_heading: true
-show_source: true
-heading_level: 2
-show_docstring_attributes: false
+
+::: commol.api.windows.window_end_steps
+
+::: commol.api.windows.windowed_totals

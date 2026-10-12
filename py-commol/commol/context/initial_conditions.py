@@ -1,3 +1,5 @@
+"""Initial conditions: population size, bin, category and compartment fractions."""
+
 import math
 from collections.abc import Iterable, Mapping
 from typing import Self

@@ -1,3 +1,5 @@
+"""Plots of simulation results, observations and ensemble bands."""
+
 import logging
 import math
 from collections import defaultdict
@@ -105,6 +107,14 @@ class SimulationPlotter:
             List of bin IDs to plot. If None, plots all bins.
         show_legend : bool
             Whether to show the legend on each subplot. Default True.
+        step_to_label : Callable[[int], str] | None
+            Turns a step into an x-axis tick label, such as a date. If None,
+            the ticks show the step.
+        tick_every : int | None
+            Labels every `tick_every` plotted steps, counted from the first
+            plotted step. If None, labels every plotted step.
+        x_label : str
+            The x-axis label. Default "Step".
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.

@@ -1,5 +1,7 @@
 # Design: Per-compartment initial conditions
 
+[Back to Design decisions](../codebase/design-decisions.md)
+
 - **Status:** Implemented (revised 2026-10-12: Rust is the single source of truth)
 - **Date:** 2026-09-30
 - **Scope:** `commol-core` (types), `commol-difference` (engine build), `py-commol` (context, builder, model write-back)
@@ -47,6 +49,7 @@ initial conditions.
 
 ### Data model
 
+<!-- doc-test: skip: shows the shape of the types, not a runnable example -->
 ```python
 class CompartmentFraction(BaseModel):
     compartment: str   # expanded compartment name: "IH_y60", "S_oe60_v_c", ...
