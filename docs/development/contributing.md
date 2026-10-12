@@ -49,9 +49,9 @@ Feature suggestions are welcome! Please:
 
 ```bash
 cd py-commol
-poetry run ruff check .
-poetry run ruff format .
-poetry run ty check commol
+uv run ruff check .
+uv run ruff format .
+uv run ty check commol
 ```
 
 #### Rust
@@ -91,7 +91,7 @@ Run tests:
 
 ```bash
 cd py-commol
-poetry run pytest -v --cov=commol
+uv run pytest -v --cov=commol
 ```
 
 #### Rust Tests
