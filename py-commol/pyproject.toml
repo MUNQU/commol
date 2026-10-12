@@ -14,7 +14,7 @@ requires-python = ">=3.12.0"
 dependencies = [
     "cffi (>=2.1.0,<3.0)",
     "numpy (>=2.5.1,<3.0)",
-    "pint (>=0.25.3,<0.26.0)",
+    "pint>=0.25.3,<0.27.0",
     "pydantic (>=2.13.4,<3.0)",
     "scikit-learn (>=1.9.0,<2.0)",
     "seaborn (>=0.13.2,<0.14.0)",
@@ -22,13 +22,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "maturin>=1.9.1,<1.15.0",
+    "maturin>=1.9.1,<1.16.0",
     "pre-commit>=3.8,<5.0",
     "pytest>=8.4,<10.0",
     "pytest-cov>=6.2,<8.0",
     "ruff>=0.12,<0.17",
     "twine>=6.2.0,<8.0.0",
-    "ty>=0.0.9,<0.0.70",
+    "ty>=0.0.9,<0.0.86",
     "vulture (>=2.16,<3.0)",
 ]
 docs = [
@@ -47,7 +47,7 @@ Repository = "https://github.com/MUNQU/commol"
 
 # Build system
 [build-system]
-requires = ["maturin>=1.9.1,<1.15.0"]
+requires = ["maturin>=1.9.1,<1.16.0"]
 build-backend = "maturin"
 
 [tool.maturin]
