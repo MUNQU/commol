@@ -183,7 +183,57 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Measured 2026-10-13 on `test/reference-models`.
+
+### Triage (T1)
+
+Every entry has a row in the local `test-map.md`, with its class, its test and
+its primary sources.
+
+| Class | Entries | With a test in the repository |
+|---|---:|---:|
+| E | 13 | 13 |
+| C | 58 | 53; 5 not added (no primary source: pure linear systems and an oscillator with no model behind them) |
+| N | 9 | 0 (8 pure linear algebra, 1 interpolation formula for census data) |
+| G | 9 | 2 (F1, `xfail`); 7 (F3) without a test |
+| Total | 89 | 68 |
+
+Policy applied in the triage:
+
+- A result stated for an arbitrary stage distribution is tested on an instance
+  that commol states exactly when the source itself gives a staged or gamma
+  version: a bounded discrete distribution as a chain of one-step stages, a
+  gamma distribution of integer shape as a chain of exponential stages. With
+  no staged version in the source, the entry is G (F3), as S2 says for
+  continuous age.
+- 16 entries have a slip in the stated result or in the printed equations (a
+  dropped factor, a swapped index, a missing coefficient). The test checks the
+  result that follows from the model and its primary source; `test-map.md`
+  records each slip.
+
+### Tests (T2–T4)
+
+- 23 modules in `py-commol/tests/reference_models/`, 63 test functions: 88 runs
+  pass and 4 are `xfail` (2 for F1, 2 for F2). The whole suite: 895 passed,
+  4 xfailed.
+- Helpers in `tests/support/`: `flows.py` (`Flow`, `flow_model` from absolute
+  initial values, `increments` for the right-hand side at one state, the
+  `FINE` solver settings) and `oracles.py` (`bisect`, `final_size`,
+  `growth_ratio`, `assert_threshold`, `settled`); `assertions.py` gains
+  `ODE_REL` and compares mappings of single values.
+- Every module has a `References` section with at least one full citation; the
+  37 distinct DOIs cited were checked against Crossref.
+
+### Findings
+
+| ID | Smallest model | Observed | Expected | Suspected code | Test |
+|---|---|---|---|---|---|
+| F1 | One bin `Y` with `y0 = 0.5` (or `0`) and the flow `Y * Y` out of the model | `ValidationError`: `population_size` must be an integer (and positive) | The model runs; an initial state is a list of values, not shares of an integer count | `InitialConditions.population_size` (`py-commol/commol/context/initial_conditions.py`), `u64` in Rust (`commol-model` `initial_state`) | `test_quadratic_decay.py` (2 `xfail`) |
+| F2 | A rate that names a parameter or bin `e1`, `E2` or `c1star` | `ValidationError`: "scientific notation without base" or "digits followed by letters" | An identifier is accepted wherever it is valid; only a malformed number is rejected | The numeric-format patterns of `utils/security.py` (`(?<!\w)e\d+` with `IGNORECASE`, `\d+[a-df-zA-DF-Z]+`) scan identifiers too | `test_discrete_epidemic.py::test_staged_treatment_with_ids_that_hold_digits` (2 `xfail`) |
+| F3 | SIS with a fixed infectious period, or any model with a density in infection age | Cannot be stated: no delays, integral or partial differential equations | A way to state an arbitrary stage duration or an age density | Model kind, not a code defect | None: a strict `xfail` needs a call that a fix makes pass, and no API states such a model yet |
+
+F2 does not come from a catalogue entry: it appeared when the chains of stages
+were named `E1`, `E2`, … The tests name those stages `L1`, `L2`, … meanwhile.
 
 ## Log
 
@@ -216,3 +266,10 @@ Each row says why the recommendation beats each alternative.
   self-contained tests; T2 reuses `build_ode` and `TIGHT`; the integer
   `population_size` and continuous age of infection are named as candidate
   gaps; Delivery no longer waits.
+- L11 (agent, 2026-10-13): implemented T1–T5. Decisions taken during the
+  work, for review in the PR: the arbitrary-distribution policy of Evidence;
+  F3 without a test (S4 asks for an `xfail`, but no API exists to call);
+  textbook examples with no model and no primary source not added (L8);
+  `flow_model` solves with `FINE` because `TIGHT` (`atol = 1e-8`) misses
+  `1e-6` on values below one; no `scipy` oracle (`increments` reads the
+  right-hand side through a difference step, roots use `bisect`).
