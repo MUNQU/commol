@@ -6,7 +6,7 @@ after this ODD is chosen by evidence. The result also serves as material for a
 software paper.
 Branch: `chore/library-benchmark` from `develop`, after the PRs of
 `odd/archive/tasks/test-suite-refactor.md`, `odd/archive/tasks/ode-engine.md` and
-`odd/tasks/reference-model-tests.md` merge.
+`odd/archive/tasks/reference-model-tests.md` merge.
 Engram mirror: topic `odd/library-benchmark/tasks` (project `commol`).
 Runners: `pytest` (from `py-commol/`), the benchmark command of S5,
 `mkdocs build --strict` (from the root).
@@ -116,7 +116,7 @@ Each row says why the recommendation beats each alternative.
 - Order: after the three planned PRs (test refactor, ODE engine, reference
   tests). T1 → T2 → T3 → T3b → T4 → T5.
 - Version impact: none (nothing in the package changes).
-- The leak check of `reference-model-tests.md` (Confidentiality) also runs
+- The leak check of `odd/archive/tasks/reference-model-tests.md` (Confidentiality) also runs
   here.
 
 ## Evidence

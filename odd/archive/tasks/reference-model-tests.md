@@ -167,16 +167,17 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Triage of the 89 entries into E/C/N/G in the local `test-map.md`, with the primary sources of each model (Attribution); counts in Evidence | direct | |
-| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/` (which already has `build_ode` and `TIGHT`): final-size root finder, a builder from absolute initial values, a threshold check (S3) | direct | |
-| T3 | S2, S3, S4 | Class E tests | direct | |
-| T4 | S2, S3, S4 | Class C tests, one module per model family | direct | |
-| T5 | S4, S5 | Findings in Evidence; docs; leak check; PR | direct | |
+| T1 | S1 | Triage of the 89 entries into E/C/N/G in the local `test-map.md`, with the primary sources of each model (Attribution); counts in Evidence | direct | `f2c4e24` |
+| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/` (which already has `build_ode` and `TIGHT`): final-size root finder, a builder from absolute initial values, a threshold check (S3) | direct | `f2c4e24` |
+| T3 | S2, S3, S4 | Class E tests | direct | `f2c4e24` |
+| T4 | S2, S3, S4 | Class C tests, one module per model family | direct | `f2c4e24` |
+| T5 | S4, S5 | Findings in Evidence; docs; leak check; merge | direct | `f2c4e24` |
 
 ## Delivery
 
-- Strategy: one PR to `develop` from `test/reference-models`, squash-merged
-  (`test(reference): …` commits).
+- Strategy: one squash commit on `develop` from `test/reference-models`
+  (`test(reference): …`). Delivered as `f2c4e24`, squash-merged locally
+  without a PR at the user's request (L12).
 - Order: T1 → T5. Both prerequisites are merged (PR #100, PR #101).
 - Version impact: none (tests and contributor docs only).
 - Leak check (Confidentiality) before every commit and before the PR.
@@ -273,3 +274,6 @@ were named `E1`, `E2`, … The tests name those stages `L1`, `L2`, … meanwhile
   `flow_model` solves with `FINE` because `TIGHT` (`atol = 1e-8`) misses
   `1e-6` on values below one; no `scipy` oracle (`increments` reads the
   right-hand side through a difference step, roots use `bisect`).
+- L12 (user, 2026-10-13): "archiva, haz merge, push y borra la rama".
+  Squash-merged locally into `develop` as `f2c4e24` (no PR), pushed, branch
+  deleted, ODD archived.
