@@ -1977,6 +1977,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reference-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference models
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2470,6 +2481,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reference-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference models
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2804,7 +2826,9 @@ The tests live in <code>py-commol/tests/</code>.</p>
 <p>A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scale.py</code>,
-<code>api/probabilistic/</code>) goes in the package of its feature.</p>
+<code>api/probabilistic/</code>) goes in the package of its feature. The one exception is
+<code>reference_models/</code>: it checks published models across features (see
+<a href="#reference-models">Reference models</a>).</p>
 <table>
 <thead>
 <tr>
@@ -2875,6 +2899,11 @@ of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scal
 <td>—</td>
 </tr>
 <tr>
+<td><code>reference_models/</code></td>
+<td>Published models against their stated results, one module per model family</td>
+<td>— (across features)</td>
+</tr>
+<tr>
 <td><code>support/</code></td>
 <td>No tests: the code the tests share</td>
 <td>—</td>
@@ -2922,6 +2951,10 @@ topic inside its package.</p>
 <td>An invariant</td>
 <td>Conservation of the population (<code>assert_population_conserved</code>); two paths that must agree, such as a bin id and the explicit sum of its compartments.</td>
 </tr>
+<tr>
+<td>What a stated result predicts about a run</td>
+<td><code>tests/support/oracles.py</code>: <code>final_size</code> solves the final size relation, <code>assert_threshold</code> checks that an infection grows at a reproduction number of <code>1.05</code> and dies out at <code>0.95</code>, <code>settled</code> reads a limit once doubling the horizon no longer moves it.</td>
+</tr>
 </tbody>
 </table>
 <p>"It runs" is not a result. A test whose only check is that no exception
@@ -2934,11 +2967,43 @@ that accepts a valid input.</p>
   difference.</li>
 <li><code>ENGINE_REL = 1e-9</code> compares the engine with a hand computation of the same
   arithmetic: only the order of the floating-point operations differs.</li>
+<li><code>ODE_REL = 1e-6</code> compares a differential model with a closed form, a final
+  size or an equilibrium. <code>flow_model</code> solves with <code>FINE</code> (<code>TIGHT</code> with
+  <code>atol = 1e-12</code>), so the error of a value near zero stays below its own size.</li>
 <li><code>pytest.approx</code> with its default (relative <code>1e-6</code>) suits a single value
   computed by hand.</li>
 <li>An optimizer result states the tolerance its convergence allows, for example
   <code>abs=1e-5</code> for Nelder-Mead on noise-free data.</li>
 </ul>
+<h3 id="reference-models">Reference models<a class="headerlink" href="#reference-models" title="Permanent link">&para;</a></h3>
+<p><code>tests/reference_models/</code> shows that commol can state published models and
+computes their stated results. A module holds one model family and is named
+after its epidemiology (<code>test_pulse_vaccination.py</code>); a test checks one stated
+result (<code>test_the_fixed_point_starts_the_periodic_orbit</code>).</p>
+<ul>
+<li><strong>Attribution.</strong> The module docstring has a <code>References</code> section in the NumPy
+  format with the original papers of the model and of its parameter values
+  (authors, year, title, journal, DOI). A value or a result taken from a paper
+  cites it in a comment next to the value. A model with no primary source is
+  not added.</li>
+<li><strong>Independent oracle.</strong> The expected value comes from the stated result,
+  computed with <code>math</code> or <code>numpy</code>: a closed form, a root of the final size
+  relation, a spectral radius. A test never compares commol with commol. A
+  quantity that commol does not output, such as a reproduction number, is
+  checked through what it predicts about a run (<code>tests/support/oracles.py</code>).</li>
+<li><strong>Equations.</strong> To check that a model has the stated equations, <code>increments</code>
+  reads its right-hand side at one state: a difference-equation step adds the
+  flows of the state it starts from, and both engines compile the same flows.</li>
+<li><strong>Tolerances.</strong> <code>ENGINE_REL</code> for a discrete model, <code>ODE_REL</code> for a
+  differential one; an asymptotic result is read with <code>settled</code>, and the test
+  states its horizon.</li>
+<li><strong>Gaps.</strong> A model that commol cannot state, or computes wrong, gets a test
+  marked <code>xfail(strict=True, reason="F&lt;n&gt;: …")</code> that names a finding of the
+  task that added it, so a fix makes the test pass and forces the marker out.</li>
+</ul>
+<p>To add a test, write the model with <code>Flow</code> and <code>flow_model</code> (<code>tests/support/flows.py</code>)
+from the initial value of each bin, compute the stated result in the test,
+and cite the papers.</p>
 <h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
 <p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a>:
 <code>&lt;type&gt;(&lt;scope&gt;): &lt;description&gt;</code>.</p>
