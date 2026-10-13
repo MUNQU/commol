@@ -282,3 +282,22 @@ def calibrated_initial_population(
         population=dict(zip(engine.compartments, population, strict=True)),
         covered=[engine.compartments[index] for index in covered],
     )
+
+
+def check_names(model: "Model") -> None:
+    """
+    Check the names a model uses against the names the engine provides.
+
+    Parameters
+    ----------
+    model : Model
+        The model definition.
+
+    Raises
+    ------
+    ValueError
+        If a parameter id is an expanded compartment or a subpopulation total,
+        or a rate or formula parameter uses an ``N_…`` name that is not a
+        subpopulation of the model.
+    """
+    commol_rs.difference.check_names(_rust_model(model))

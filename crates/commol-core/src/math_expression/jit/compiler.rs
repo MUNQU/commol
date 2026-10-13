@@ -101,6 +101,9 @@ impl JITFunction {
                     .filter(|(comp_name, _)| comp_name.ends_with(suffix))
                     .map(|(_, val)| *val)
                     .collect();
+                if filtered_values.is_empty() {
+                    return Err(MathExpressionError::VariableNotFound(name.clone()));
+                }
                 filtered_values.sort_by(|a, b| a.total_cmp(b));
                 filtered_values.iter().sum()
             } else {

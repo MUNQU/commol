@@ -146,12 +146,12 @@ class TestCompartmentPlaceholder:
             .add_bin(id="S", name="Susceptible")
             .add_bin(id="I", name="Infected")
             .add_parameter(id="d", value=0.01, unit="1/day")
-            .add_parameter(id="N", value=1000, unit="person")
+            .add_parameter(id="K", value=1000, unit="person")
             .add_transition(
                 id="complex_death",
                 source=["S", "I"],
                 target=[],
-                rate="d * $compartment * (1 + 0.1 * $compartment / N)",
+                rate="d * $compartment * (1 + 0.1 * $compartment / K)",
             )
             .set_initial_conditions(
                 population_size=1000,
@@ -170,7 +170,7 @@ class TestCompartmentPlaceholder:
             assert "$compartment" not in transition.rate
             source_compartment = transition.source[0]
             expected_rate = (
-                f"d * {source_compartment} * (1 + 0.1 * {source_compartment} / N)"
+                f"d * {source_compartment} * (1 + 0.1 * {source_compartment} / K)"
             )
             assert transition.rate == expected_rate
 

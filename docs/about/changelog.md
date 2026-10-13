@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before,
   outside a function argument, the simulation failed with "Variable 'pi' not
   found".
+- `%` (remainder) works as the only operator of a rate, as in `"step % 7"`.
+  Before, the rate was read as a parameter name.
+- An `N_…` variable that names no subpopulation, such as `N_t1_g1` when
+  `group` is declared before `type`, is a build error that lists the valid
+  names. Before, a formula parameter or the engine gave it the value 0.
+- A parameter id cannot be `N`, `step`, `t`, `pi`, `e`, an expanded
+  compartment or a subpopulation total. Before, only bin ids were rejected, and
+  the parameter and the engine variable shared one value.
 
 ### Documentation
 

@@ -1,6 +1,7 @@
 //! Model builder for constructing DifferenceEquations from a compartment model.
 
 use crate::flows::{PlannedFlow, plan_transition_flows};
+use crate::helpers::rate_to_string;
 use crate::layout::CompartmentLayout;
 use crate::types::{
     AccumulatorOutputRef, DifferenceEquations, FastRateExpression, FastRateOp,
@@ -59,6 +60,7 @@ impl DifferenceEquations {
                 model.dynamics.typology
             ));
         }
+        check_names(model)?;
 
         // Generate all compartment and accumulator output combinations
         let layout = CompartmentLayout::new(model);
@@ -641,6 +643,102 @@ pub(crate) fn subpopulation_names(layout: &CompartmentLayout, model: &Model) -> 
         .into_iter()
         .map(|mapping| mapping.parameter_name)
         .collect()
+}
+
+/// Check the names a model uses against the names the engine provides.
+///
+/// The engine provides one variable per expanded compartment and one per
+/// subpopulation total: `N_<categories>`, bin totals and partial bin totals.
+/// This function returns an error when:
+///
+/// - a parameter id is one of those names, because the parameter and the
+///   engine variable would share one slot;
+/// - a transition rate or a formula parameter uses an `N_…` name that is not
+///   a subpopulation of the model. Category suffixes follow the declaration
+///   order of the stratifications, so `N_t1_g1` is not a name when `group` is
+///   declared before `type`. A parameter or compartment whose id starts with
+///   `N_` is not such a name.
+///
+/// # Errors
+///
+/// Returns a message that names each conflict and lists the valid
+/// subpopulation names.
+pub fn check_names(model: &Model) -> Result<(), String> {
+    let layout = CompartmentLayout::new(model);
+    let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
+    let subpopulations = subpopulation_names(&layout, model);
+    let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
+
+    let mut reserved: Vec<String> = model
+        .parameters
+        .iter()
+        .filter_map(|parameter| {
+            let id = parameter.id.as_str();
+            if compartments.contains(id) {
+                Some(format!("'{id}' (a compartment)"))
+            } else if subpopulations.contains(id) {
+                Some(format!("'{id}' (a subpopulation total)"))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if !reserved.is_empty() {
+        reserved.sort();
+        return Err(format!(
+            "Parameter ids cannot be names the engine provides: {}. Rename the \
+             parameter(s).",
+            reserved.join(", ")
+        ));
+    }
+
+    let mut used: HashSet<String> = HashSet::new();
+    for transition in &model.dynamics.transitions {
+        if let Some(rate) = &transition.rate {
+            // A deserialized rate is a `Parameter` until it is parsed again.
+            used.extend(RateMathExpression::from_string(rate_to_string(rate)).get_variables());
+        }
+        for stratified in transition.stratified_rates.iter().flatten() {
+            used.extend(RateMathExpression::from_string(stratified.rate.clone()).get_variables());
+        }
+    }
+    for parameter in &model.parameters {
+        if let Some(commol_core::ParameterValue::Formula(formula)) = &parameter.value {
+            used.extend(RateMathExpression::from_string(formula.clone()).get_variables());
+        }
+    }
+
+    let mut unknown: Vec<&String> = used
+        .iter()
+        .filter(|name| name.starts_with("N_"))
+        .filter(|name| !subpopulations.contains(*name))
+        .filter(|name| !compartments.contains(name.as_str()))
+        .filter(|name| !parameter_ids.contains(name.as_str()))
+        .collect();
+    if unknown.is_empty() {
+        return Ok(());
+    }
+    unknown.sort();
+    let mut valid: Vec<&str> = subpopulations
+        .iter()
+        .map(String::as_str)
+        .filter(|name| name.starts_with("N_"))
+        .collect();
+    valid.sort_unstable();
+    let valid = if valid.is_empty() {
+        "none (the model has no stratifications)".to_string()
+    } else {
+        valid.join(", ")
+    };
+    Err(format!(
+        "Unknown subpopulation variable(s) {}. Category suffixes follow the \
+         declaration order of the stratifications. Valid names: {valid}",
+        unknown
+            .iter()
+            .map(|name| format!("'{name}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
 }
 
 fn collect_used_context_variables(
@@ -1332,5 +1430,93 @@ mod tests {
             vec![("group".to_string(), "g2".to_string())]
         );
         assert_eq!(a_g2.population, 400.0);
+    }
+
+    fn model_with_rate(rate: &str) -> Model {
+        use commol_core::{Parameter, ParameterValue, Transition};
+        let sub = Stratification {
+            id: "sub".to_string(),
+            categories: vec!["s1".to_string(), "s2".to_string()],
+            conditions: None,
+        };
+        let mut model = make_model(
+            vec![group_stratification(), sub],
+            vec![group_fractions(0.5, 0.5), sub_fractions(0.5, 0.5)],
+            vec![],
+        );
+        model.parameters = vec![Parameter {
+            id: "k".to_string(),
+            value: Some(ParameterValue::Constant(0.1)),
+            description: None,
+        }];
+        model.dynamics.transitions = vec![Transition {
+            id: "ab".to_string(),
+            source: vec!["A".to_string()],
+            target: vec!["B".to_string()],
+            accumulators: vec![],
+            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            stratified_rates: None,
+            condition: None,
+            per_compartment: None,
+        }];
+        model
+    }
+
+    #[test]
+    fn subpopulation_variable_out_of_declaration_order_is_a_build_error() {
+        let error = DifferenceEquations::try_from_model(&model_with_rate("k * N_s1_g1 / N"))
+            .err()
+            .expect("N_s1_g1 names no subpopulation");
+        assert!(error.contains("'N_s1_g1'"), "{error}");
+        assert!(error.contains("N_g1_s1"), "{error}");
+    }
+
+    #[test]
+    fn unknown_subpopulation_variable_is_a_build_error() {
+        let error = DifferenceEquations::try_from_model(&model_with_rate("k * N_x"))
+            .err()
+            .expect("N_x names no subpopulation");
+        assert!(error.contains("'N_x'"), "{error}");
+    }
+
+    #[test]
+    fn subpopulation_variable_in_declaration_order_builds() {
+        assert!(DifferenceEquations::try_from_model(&model_with_rate("k * N_g1_s1 / N")).is_ok());
+    }
+
+    #[test]
+    fn modulo_is_an_operator_in_a_rate() {
+        // `step % 2` is 0 at even steps and 1 at odd steps (per-capita rate).
+        let mut engine = DifferenceEquations::try_from_model(&model_with_rate("step % 2")).unwrap();
+        let results = engine.run(2).unwrap();
+        // Compartment 0 is A_g1_s1 with 250 people.
+        assert_eq!(results[1][0], 250.0);
+        assert_eq!(results[2][0], 0.0);
+    }
+
+    fn model_with_parameter(id: &str) -> Model {
+        use commol_core::{Parameter, ParameterValue};
+        let mut model = model_with_rate("k");
+        model.parameters.push(Parameter {
+            id: id.to_string(),
+            value: Some(ParameterValue::Constant(1.0)),
+            description: None,
+        });
+        model
+    }
+
+    #[test]
+    fn parameter_id_cannot_be_a_compartment_or_a_subpopulation() {
+        for (id, kind) in [
+            ("A_g1_s1", "a compartment"),
+            ("N_g1", "a subpopulation total"),
+            ("A_g1", "a subpopulation total"),
+            ("A", "a subpopulation total"),
+        ] {
+            let error =
+                check_names(&model_with_parameter(id)).expect_err("a reserved id must be rejected");
+            assert!(error.contains(&format!("'{id}' ({kind})")), "{error}");
+        }
+        assert!(check_names(&model_with_parameter("N_max")).is_ok());
     }
 }

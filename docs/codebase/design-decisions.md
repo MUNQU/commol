@@ -8,7 +8,7 @@ test that guards it. Read the ones of your area before you change it.
 
 | Area | Decisions |
 |---|---|
-| Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label) |
+| Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Dynamics | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup head counts](#subgroup-head-counts-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical time](#physical-time-is-not-in-the-model), [windowed observations](#windowed-observations) |
@@ -53,6 +53,22 @@ label, not by name.
 **Guards:** `test_simulation_outputs.py::test_expansion_matches_the_engine_output_names`
 (order) and `TestSourceIdSharingAPrefix` (a bin and an accumulator that share
 a prefix).
+
+### The engine owns the variable names
+
+The engine sets one variable per expanded compartment and per subpopulation
+total (`N_<categories>`, bin totals and partial bin totals).
+`check_names` in `crates/commol-difference/src/builder.rs` rejects a parameter
+id that is one of those names, and an `N_…` variable in a rate or a formula
+parameter that names no subpopulation. `Model.validate_names_with_engine`
+calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
+
+**Rule:** never list these names in Python. Ask the engine.
+
+**Guards:** `builder.rs` tests
+`parameter_id_cannot_be_a_compartment_or_a_subpopulation` and
+`subpopulation_variable_out_of_declaration_order_is_a_build_error`;
+`test_reserved_names.py`.
 
 ## Dynamics
 

@@ -118,7 +118,7 @@ builder = (
 
 | Argument | Type | Default | Meaning |
 |---|---|---|---|
-| `id` | `str` | required | The identifier. It must be unique and must not be a bin id. |
+| `id` | `str` | required | The identifier. It must be unique and must not be a [name the engine sets](#names-the-engine-sets). |
 | `value` | `float`, `str`, `list[tuple[int, float]]` or `None` | required | See the table below. |
 | `description` | `str \| None` | `None` | A free-text description. |
 | `unit` | `str \| None` | `None` | The unit, for [unit checking](units-and-equations.md#unit-checking). |
@@ -131,10 +131,21 @@ builder = (
 | `[(step, value), …]` | Time series | A value per step, read with `mode` (below). |
 | `None` | Uncalibrated | Calibration must set it before a simulation runs. |
 
-!!! warning "Names the engine sets"
-    `N`, `N_<category>…`, `step`, `t`, `pi`, `e` and expanded compartment names
-    such as `A_g1` are variables that the engine sets. Commol only rejects bin
-    ids, so do not give a parameter any of these names.
+### Names the engine sets
+
+The engine sets these variables, so `build` rejects a parameter with one of
+these ids (`Model.validate_parameter_names_not_reserved` and
+`check_names` in `crates/commol-difference/src/builder.rs`):
+
+| Name | Example |
+|---|---|
+| `N`, `step`, `t`, `pi`, `e` | `N` |
+| A bin id | `A` |
+| An expanded compartment | `A_g1` |
+| A subpopulation total | `N_g1`, `A_t1` (with two stratifications) |
+
+An id that starts with `N_` but names no subpopulation, such as `N_max`, is
+accepted.
 
 ### Time-series parameters
 
@@ -324,7 +335,8 @@ the definition is not valid:
 | Initial conditions are set | `build` called before `set_initial_conditions` |
 | At least one bin and one transition | A model with no transition |
 | Initial conditions follow the rules above | Bin fractions that sum to 0.9 |
-| Parameter ids are unique and are not bin ids | A parameter named `A` |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `N` or `A_g1` |
+| Every `N_…` variable names a subpopulation | `N_t1_g1` when `group` is declared before `type` |
 | Every rate expression passes the security check | A formula with `__import__` |
 | Every transition can be planned by the engine | See [Transitions](transitions.md#what-building-checks) |
 

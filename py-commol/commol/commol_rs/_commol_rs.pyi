@@ -100,6 +100,7 @@ class DifferenceModule(Protocol):
     def transition_flows(
         self, model: RustModelProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
+    def check_names(self, model: RustModelProtocol) -> None: ...
     def expanded_outputs(
         self, model: RustModelProtocol
     ) -> tuple[
