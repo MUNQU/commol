@@ -115,6 +115,18 @@ class TestTimeInsideAStep:
         assert_close(continuous["A"][0], 1000 * math.exp(-(1.5**2) / 2), rel=1e-8)
         assert_close(stepwise["A"][0], 1000 * math.exp(-2.0), rel=1e-8)
 
+    @pytest.mark.parametrize(
+        ("start", "end"), [("12.5", "14"), ("4 * pi", "4 * pi + 1.5")]
+    )
+    def test_a_window_on_t_is_not_stepped_over(self, start: str, end: str) -> None:
+        # The rate is 0 before the window, so only a restart at its start keeps
+        # the solver from stepping over it. A keeps exp(-0.5 * 1.5).
+        rate = f"if(t >= {start}, if(t < {end}, 0.5, 0), 0)"
+        model = build_ode(a_to_b_builder(rate=rate, parameters={}))
+        results = Simulation(model).run(40)
+
+        assert_close(results["A"][40], 1000 * math.exp(-0.75), rel=1e-7)
+
 
 class TestSolverSettings:
     def test_settings_are_saved_and_loaded_back(self, tmp_path) -> None:

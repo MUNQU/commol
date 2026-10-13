@@ -176,6 +176,34 @@ impl CompiledModel {
         positions
     }
 
+    /// Positions in `(from, to)` where `t` reaches a value that a rate compares
+    /// it with, ascending and without duplicates, for the current parameter
+    /// values.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when such a value cannot be evaluated, for example
+    /// because a parameter has no value yet.
+    pub fn time_thresholds(&mut self, from: f64, to: f64) -> Result<Vec<f64>, String> {
+        let mut positions = Vec::with_capacity(self.time_thresholds.len());
+        for threshold in &self.time_thresholds {
+            let position = threshold
+                .evaluate(&mut self.expression_context)
+                .map_err(|error| {
+                    format!(
+                        "Failed to evaluate the time threshold '{}': {error}",
+                        threshold.preprocessed()
+                    )
+                })?;
+            if position > from && position < to {
+                positions.push(position);
+            }
+        }
+        positions.sort_by(f64::total_cmp);
+        positions.dedup();
+        Ok(positions)
+    }
+
     /// The first impulse position that is not an integer, with its
     /// transition id, if any. A difference engine only steps at integers.
     pub fn first_non_integer_impulse(&self) -> Option<(String, f64)> {

@@ -339,6 +339,43 @@ fn a_formula_parameter_that_reads_the_step_restarts_the_integration() {
     assert_close(rows[3][0], 1000.0 * (-0.6_f64).exp(), 1e-7, "A(3)");
 }
 
+#[test]
+fn a_rate_that_switches_on_t_acts_only_on_its_window() {
+    // The rate is 0.5 on [12.5, 14) only: A keeps exp(−0.75) of its start.
+    // Before the window the rate is 0, so without a restart at 12.5 the
+    // solver grows its step and can step over the window.
+    let rows = engine(&rate_model("if(t >= 12.5, if(t < 14, 0.5, 0), 0)"))
+        .run(40)
+        .unwrap();
+    assert_close(rows[12][0], 1000.0, 1e-12, "A before the window");
+    let after = 1000.0 * (-0.75_f64).exp();
+    assert_close(rows[14][0], after, 1e-7, "A at the end of the window");
+    assert_close(rows[40][0], after, 1e-7, "A after the window");
+}
+
+#[test]
+fn a_time_threshold_reads_the_current_parameter_values() {
+    let model = model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.1"), ("t_on", "10.0")],
+        &[],
+        &[transition(
+            "move",
+            &["A"],
+            &["B"],
+            "if(t >= t_on, if(t < t_on + 1.5, k, 0), 0)",
+            "",
+        )],
+        TIGHT,
+    );
+    let mut engine = engine(&model);
+    engine.set_parameter("t_on", 15.5).unwrap();
+    let rows = engine.run(40).unwrap();
+    assert_close(rows[15][0], 1000.0, 1e-12, "A before t_on");
+    assert_close(rows[40][0], 1000.0 * (-0.15_f64).exp(), 1e-7, "A(40)");
+}
+
 fn impulse_model(typology: &str, extra: &str) -> Model {
     model(
         typology,

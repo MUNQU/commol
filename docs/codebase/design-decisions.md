@@ -189,6 +189,15 @@ interval. When the right-hand side reads one of them
 every integer, so each jump of the rate is the start of a piece
 (`breakpoints` in `crates/commol-differential/src/solve.rs`).
 
+A rate can also jump where `t` reaches a value it compares `t` with
+(`t >= t_on`). The compiler collects those values when they read only numbers,
+`pi`, `e` and parameters that do not change during a run
+(`time_thresholds` in `crates/commol-model/src/builder.rs`), and the engine
+evaluates them with the current parameters and ends a piece there. Without
+that, an adaptive solver whose rate is 0 before a short window grows its step
+and steps over the window. A comparison with the state is a state event, which
+the engine does not detect.
+
 Whether an expression reads `step` comes from `reads_variable`, not from
 `get_variables`: `get_variables` leaves out the special variables, because it
 lists the variables a model must define.
@@ -200,7 +209,9 @@ length, so it would never act.
 
 **Guards:** `tests/simulation/test_differential.py::TestTimeInsideAStep`,
 `crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`,
-`a_rate_reads_the_step_of_its_unit_interval`.
+`a_rate_reads_the_step_of_its_unit_interval`,
+`a_rate_that_switches_on_t_acts_only_on_its_window`,
+`crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold`.
 
 ### Impulses come before the flows of their step
 

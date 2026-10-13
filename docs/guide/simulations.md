@@ -281,6 +281,13 @@ rate can jump. A per-capita pulse `p` on step `n` acts as the constant rate
 difference model. To move a fraction at once, use an
 [impulse](transitions.md#impulses).
 
+A rate can also jump where `t` reaches a value that it compares `t` with, such
+as `if(t >= t_on, beta, 0)`. The engine restarts the integration there too, so
+the solver cannot step over a short window. This works when the value reads
+only numbers, `pi`, `e` and parameters with a constant or calibrated value, and
+`t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump
+that depends on the state, such as `if(t >= A, ...)`, is not found.
+
 `TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step
 probabilities for difference models. A differential model needs the
 continuous rate; see [Steps and physical time](core-concepts.md#steps-and-physical-time).
