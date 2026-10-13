@@ -89,11 +89,11 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S5 | Baseline: test count, `pytest --cov=commol` report, warnings; record in Evidence | direct | |
-| T2 | S2 | `tests/support/` factories and assertions, `conftest.py` | direct | |
-| T3 | S1, S2 | Move and split files into the D2 packages; replace hand-built models with factories | direct | |
-| T4 | S3, S4 | Oracles for smoke tests; merge duplicates; fix deprecated fixtures | direct | |
-| T5 | S5, S6 | Coverage and count check against T1; `repository-map.md`, "Tests" section in `conventions.md`; PR | direct | |
+| T1 | S5 | Baseline: test count, `pytest --cov=commol` report, warnings; record in Evidence | direct | b9e1f9d |
+| T2 | S2 | `tests/support/` factories and assertions, `conftest.py` | direct | b9e1f9d |
+| T3 | S1, S2 | Move and split files into the D2 packages; replace hand-built models with factories | direct | b9e1f9d |
+| T4 | S3, S4 | Oracles for smoke tests; merge duplicates; fix deprecated fixtures | direct | b9e1f9d |
+| T5 | S5, S6 | Coverage and count check against T1; `repository-map.md`, "Tests" section in `conventions.md`; PR | direct | b9e1f9d |
 
 ## Delivery
 
