@@ -759,13 +759,11 @@ class Model(BaseModel):
         """
         Check unit consistency of all equations in the model.
 
-        This method validates that all transition rates have consistent units.
-        It only performs the check if ALL parameters have units specified.
-        If any parameter lacks a unit, the check is skipped.
-
-        For difference equation models, all rates should have units that result in
-        population change rates (e.g., "person/day" or "1/day" when multiplied by
-        population).
+        The engine applies every flow once per step and converts no value
+        between units. So the check infers one step unit from the parameter
+        units: the one unit of time (``day``, ``week``, ``step``, …) that they
+        use, or ``step`` when they use none. Every flow must then be exactly
+        ``<bin unit>/<step unit>``, such as ``person/day``.
 
         Parameters
         ----------
@@ -775,14 +773,15 @@ class Model(BaseModel):
         Raises
         ------
         UnitConsistencyError
-            If unit inconsistencies are found in any equation.
+            If a constant parameter or a bin has no unit, if the parameters use
+            more than one unit of time (``1/day`` and ``1/week``), or if a flow
+            does not have the unit ``<bin unit>/<step unit>``.
         ValueError
             If the model type doesn't support unit checking.
 
         Notes
         -----
-        - Bin variables are assumed to have units of "person"
-        - Predefined variables (N, N_young, etc.) have units of "person"
+        - Predefined variables (N, N_young, etc.) have the bin unit
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """

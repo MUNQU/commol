@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Simulation.run` starts from the initial state at every call, so two calls
   give the same result. Before, a second `run` continued the first one. To
   continue a run, call `simulation.engine.step()`.
+- `Model.check_unit_consistency` infers one step unit from the parameter
+  units (`day`, `week`, `step`, …; `step` when there is none) and requires
+  every flow to be exactly `<bin unit>/<step unit>`. A model in `"1/step"` now
+  passes. Rates in two units of time, such as `"1/day"` and `"1/week"`, are an
+  error that names each parameter, because the engine converts nothing. Before,
+  the check accepted any convertible unit and defaulted to `day`.
 
 ### Removed
 
@@ -39,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Model.check_unit_consistency` names every bin without a unit. Before, it
+  failed with "'None' is not defined in the unit registry".
 - A `Simulation` follows its model: `run` and `engine` rebuild the engine when
   the model changed after the `Simulation` was created, for example with
   `update_parameters` or `apply_calibration_parameters`. Before, it used the

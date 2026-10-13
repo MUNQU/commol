@@ -2,6 +2,7 @@ import pytest
 
 from commol.api.model_builder import ModelBuilder
 from commol.constants import ModelTypes
+from commol.context.model import Model
 from commol.utils.equations import (
     UnitConsistencyError,
     check_all_parameters_have_units,
@@ -180,7 +181,7 @@ class TestModelUnitConsistency:
     def test_sir_model_without_units_raises_error(self):
         """Test that unit check raises error when parameters lack units."""
         builder = (
-            ModelBuilder(name="SIR", version="1.0")
+            ModelBuilder(name="SIR", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -210,7 +211,7 @@ class TestModelUnitConsistency:
     def test_sir_model_with_inconsistent_units(self):
         """Test SIR model with inconsistent units raises error."""
         builder = (
-            ModelBuilder(name="SIR", version="1.0")
+            ModelBuilder(name="SIR", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -295,7 +296,7 @@ class TestModelUnitConsistency:
     def test_mixed_units_some_parameters_without_units(self):
         """Test that check raises error when some parameters lack units."""
         builder = (
-            ModelBuilder(name="SIR", version="1.0")
+            ModelBuilder(name="SIR", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -475,14 +476,15 @@ class TestMathFunctionsInUnitChecking:
             )
             assert is_consistent, f"Error for unit '{time_unit}': {error}"
 
-    def test_time_unit_conversions(self):
-        """Test that different time units are compatible."""
+    def test_convertible_time_units_are_not_equal(self):
+        """The engine converts nothing, so a rate in 1/week is not person/day."""
         variable_units = {"rate": "1/week", "I": "person"}
-        # Week and day are compatible time units
         is_consistent, error = check_equation_units(
             "rate * I", variable_units, "person/day"
         )
-        assert is_consistent, f"Error: {error}"
+        assert not is_consistent
+        assert error is not None
+        assert "Unit mismatch" in error
 
 
 class TestFullModelUnitFailures:
@@ -496,7 +498,7 @@ class TestFullModelUnitFailures:
     def test_simple_sir_wrong_beta_units(self):
         """Test SIR model fails with wrong beta units."""
         builder = (
-            ModelBuilder(name="SIR Wrong Beta", version="1.0")
+            ModelBuilder(name="SIR Wrong Beta", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -526,7 +528,7 @@ class TestFullModelUnitFailures:
     def test_sir_with_log_of_population_fails(self):
         """Test SIR model fails when log receives population (dimensional)."""
         builder = (
-            ModelBuilder(name="SIR Bad Log", version="1.0")
+            ModelBuilder(name="SIR Bad Log", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -560,7 +562,7 @@ class TestFullModelUnitFailures:
     def test_seir_with_exponential_wrong_units(self):
         """Test SEIR model fails when exp receives dimensional parameter."""
         builder = (
-            ModelBuilder(name="SEIR Bad Exp", version="1.0")
+            ModelBuilder(name="SEIR Bad Exp", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("E", "Exposed")
             .add_bin("I", "Infected")
@@ -599,7 +601,7 @@ class TestFullModelUnitFailures:
     def test_stratified_model_with_sqrt_wrong_units(self):
         """Test stratified model fails when sqrt receives dimensional quantity."""
         builder = (
-            ModelBuilder(name="Stratified Bad Sqrt", version="1.0")
+            ModelBuilder(name="Stratified Bad Sqrt", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -652,7 +654,7 @@ class TestFullModelUnitFailures:
     def test_vaccination_model_with_pow_wrong_exponent(self):
         """Test vaccination model fails when pow has dimensional exponent."""
         builder = (
-            ModelBuilder(name="Vaccination Bad Pow", version="1.0")
+            ModelBuilder(name="Vaccination Bad Pow", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("V", "Vaccinated")
             .add_bin("I", "Infected")
@@ -692,7 +694,7 @@ class TestFullModelUnitFailures:
     def test_complex_model_seasonal_wrong_sin_argument(self):
         """Test complex seasonal model fails with dimensional sin argument."""
         builder = (
-            ModelBuilder(name="Complex Seasonal Bad", version="1.0")
+            ModelBuilder(name="Complex Seasonal Bad", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("E", "Exposed")
             .add_bin("I", "Infected")
@@ -738,7 +740,9 @@ class TestFullModelUnitFailures:
     def test_multi_stratified_model_with_nested_math_errors(self):
         """Test multi-stratified model fails with nested math function errors."""
         builder = (
-            ModelBuilder(name="Multi-Strat Bad Nested", version="1.0")
+            ModelBuilder(
+                name="Multi-Strat Bad Nested", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -824,7 +828,7 @@ class TestFullModelUnitFailures:
     def test_sirs_model_with_atan2_wrong_units(self):
         """Test SIRS model fails when atan2 receives incompatible units."""
         builder = (
-            ModelBuilder(name="SIRS Bad Atan2", version="1.0")
+            ModelBuilder(name="SIRS Bad Atan2", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -864,7 +868,9 @@ class TestFullModelUnitFailures:
     def test_complex_intervention_model_with_min_max_errors(self):
         """Test complex intervention model fails with min/max unit errors."""
         builder = (
-            ModelBuilder(name="Intervention Bad Min Max", version="1.0")
+            ModelBuilder(
+                name="Intervention Bad Min Max", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("H", "Hospitalized")
@@ -908,7 +914,9 @@ class TestFullModelUnitFailures:
     def test_age_structured_with_floor_dimensional_error(self):
         """Test age-structured model fails when floor receives dimensional quantity."""
         builder = (
-            ModelBuilder(name="Age Structured Bad Floor", version="1.0")
+            ModelBuilder(
+                name="Age Structured Bad Floor", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1089,7 +1097,7 @@ class TestFullModelUnitFailures:
     def test_sir_model_with_dimensional_sin_argument_fails(self):
         """Test SIR model fails when sin receives dimensional argument."""
         builder = (
-            ModelBuilder(name="SIR Bad Seasonality", version="1.0")
+            ModelBuilder(name="SIR Bad Seasonality", version="1.0", bin_unit="person")
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1493,7 +1501,9 @@ class TestFullModelUnitFailures:
         units.
         """
         builder = (
-            ModelBuilder(name="Model with Invalid Formula", version="1.0")
+            ModelBuilder(
+                name="Model with Invalid Formula", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1564,7 +1574,9 @@ class TestFullModelUnitFailures:
         Test that constant parameters without units raise an error during unit checking.
         """
         builder = (
-            ModelBuilder(name="Model with Missing Unit", version="1.0")
+            ModelBuilder(
+                name="Model with Missing Unit", version="1.0", bin_unit="person"
+            )
             .add_bin("S", "Susceptible")
             .add_bin("I", "Infected")
             .add_bin("R", "Recovered")
@@ -1591,3 +1603,73 @@ class TestFullModelUnitFailures:
 
         assert "beta" in str(exc_info.value)
         assert "missing units" in str(exc_info.value)
+
+
+def _two_rate_model(
+    k1_unit: str, k2_unit: str, bin_unit: str | None = "person"
+) -> Model:
+    return (
+        ModelBuilder(name="Step unit", bin_unit=bin_unit)
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_bin(id="C", name="C")
+        .add_parameter(id="k1", value=0.1, unit=k1_unit)
+        .add_parameter(id="k2", value=0.1, unit=k2_unit)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 1.0},
+                {"bin": "B", "fraction": 0.0},
+                {"bin": "C", "fraction": 0.0},
+            ],
+        )
+        .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+    )
+
+
+class TestStepUnit:
+    """One step unit, inferred from the parameters, for every rate."""
+
+    @pytest.mark.parametrize("unit", ["1/step", "1/day", "1/week", "1/d"])
+    def test_a_model_in_one_unit_of_time_passes(self, unit: str) -> None:
+        _two_rate_model(unit, unit).check_unit_consistency()
+
+    def test_aliases_of_one_unit_are_one_unit(self) -> None:
+        _two_rate_model("1/day", "1/d").check_unit_consistency()
+
+    @pytest.mark.parametrize(
+        ("k1_unit", "k2_unit"), [("1/day", "1/week"), ("1/day", "1/step")]
+    )
+    def test_two_units_of_time_are_an_error(self, k1_unit: str, k2_unit: str) -> None:
+        with pytest.raises(UnitConsistencyError) as error:
+            _two_rate_model(k1_unit, k2_unit).check_unit_consistency()
+
+        message = str(error.value)
+        assert f"'k1' in '{k1_unit}'" in message
+        assert f"'k2' in '{k2_unit}'" in message
+
+    def test_a_model_without_units_of_time_uses_step(self) -> None:
+        model = (
+            ModelBuilder(name="Absolute", bin_unit="person")
+            .add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_parameter(id="share", value=0.1, unit="dimensionless")
+            .add_transition(id="t_ab", source=["A"], target=["B"], rate="share")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 1.0},
+                    {"bin": "B", "fraction": 0.0},
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        with pytest.raises(UnitConsistencyError, match="person/step"):
+            model.check_unit_consistency()
+
+    def test_a_bin_without_a_unit_is_named(self) -> None:
+        with pytest.raises(UnitConsistencyError, match="no unit: A, B, C"):
+            _two_rate_model("1/day", "1/day", bin_unit=None).check_unit_consistency()
