@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A parameter id cannot be `N`, `step`, `t`, `pi`, `e`, an expanded
   compartment or a subpopulation total. Before, only bin ids were rejected, and
   the parameter and the engine variable shared one value.
+- `ModelBuilder.reset` removes the accumulators, and `ModelBuilder.clone`
+  copies them and the `bin_unit`. Before, `reset` kept the accumulators and a
+  clone lost them.
 
 ### Documentation
 

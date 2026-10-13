@@ -480,3 +480,63 @@ class TestCompartmentPlaceholder:
                     f"{results_auto[compartment][i]} vs "
                     f"{results_manual[compartment][i]}"
                 )
+
+
+def _builder_with_accumulator() -> ModelBuilder:
+    return (
+        ModelBuilder(name="Copy", bin_unit="person")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_accumulator(id="moved", name="Moved")
+        .add_parameter(id="k", value=0.1)
+        .add_transition(
+            id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["moved"]
+        )
+        .set_initial_conditions(
+            population_size=100,
+            bin_fractions=[
+                {"bin": "A", "fraction": 1.0},
+                {"bin": "B", "fraction": 0.0},
+            ],
+        )
+    )
+
+
+class TestCloneAndReset:
+    def test_a_clone_builds_the_same_model(self) -> None:
+        original = _builder_with_accumulator()
+
+        clone = original.clone()
+
+        typology = ModelTypes.DIFFERENCE_EQUATIONS.value
+        assert clone.build(typology=typology) == original.build(typology=typology)
+
+    def test_a_clone_is_independent(self) -> None:
+        original = _builder_with_accumulator()
+        clone = original.clone()
+
+        clone.add_accumulator(id="other", name="Other")
+
+        typology = ModelTypes.DIFFERENCE_EQUATIONS.value
+        accumulators = original.build(typology=typology).population.accumulators
+        assert [accumulator.id for accumulator in accumulators] == ["moved"]
+
+    def test_reset_removes_every_accumulator(self) -> None:
+        builder = _builder_with_accumulator().reset()
+
+        model = (
+            builder.add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_parameter(id="k", value=0.1)
+            .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+            .set_initial_conditions(
+                population_size=100,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 1.0},
+                    {"bin": "B", "fraction": 0.0},
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+
+        assert model.population.accumulators == []

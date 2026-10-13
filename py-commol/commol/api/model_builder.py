@@ -940,22 +940,19 @@ class ModelBuilder:
         Returns
         -------
         ModelBuilder
-            A new ModelBuilder instance with the same configuration.
+            A new ModelBuilder instance with the same configuration: every
+            bin, accumulator, stratification, transition, parameter and the
+            initial conditions. Changes to one builder do not affect the other.
         """
-
-        new_builder = type(self)(self._name, self._description, self._version)
-
-        new_builder._bins = copy.deepcopy(self._bins)
-        new_builder._stratifications = copy.deepcopy(self._stratifications)
-        new_builder._transitions = copy.deepcopy(self._transitions)
-        new_builder._parameters = copy.deepcopy(self._parameters)
-        new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-        return new_builder
+        return copy.deepcopy(self)
 
     def reset(self) -> Self:
         """
-        Reset the builder to empty state while keeping name, description, and version.
+        Reset the builder to empty state.
+
+        The name, description, version and ``bin_unit`` are kept. Every bin,
+        accumulator, stratification, transition, parameter and the initial
+        conditions are removed.
 
         Returns
         -------
@@ -963,10 +960,12 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._bins.clear()
+        self._accumulators.clear()
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._initial_conditions = None
+        self._ts_counter = 0
         return self
 
     def _validate_typology(self, typology: str) -> ModelTypes:
