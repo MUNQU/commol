@@ -89,54 +89,24 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def _run_raw(self, num_steps: int) -> list[list[float]]:
+    def run(self, num_steps: int) -> SimulationResults:
         """
-        Runs the simulation and returns the raw, high-performance output.
-        This is the fastest method, returning a list of lists of floats.
-        """
-        logging.info(f"Running raw simulation for {num_steps} steps.")
-        start = time.time()
-        results = self._engine.run(num_steps)
-        end = time.time()
-        logging.info(f"Raw simulation complete. It tool {end - start} seconds.")
-        return results
+        Runs the simulation from the initial state on its default grid.
 
-    @overload
-    def run(
-        self, num_steps: int, output_format: Literal["list_of_lists"]
-    ) -> list[list[float]]: ...
-    @overload
-    def run(
-        self, num_steps: int, output_format: Literal["dict_of_lists"]
-    ) -> dict[str, list[float]]: ...
-    @overload
-    def run(self, num_steps: int) -> dict[str, list[float]]: ...
-    def run(
-        self,
-        num_steps: int,
-        output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
-    ) -> dict[str, list[float]] | list[list[float]]:
-        """
-        Runs the simulation from the initial state.
-
-        Every call starts at step 0 with the current ``model_definition``, so
-        two calls with the same model give the same result. To continue a run
-        step by step, call ``simulation.engine.step()``.
+        Every call starts at position 0 with the current ``model_definition``,
+        so two calls with the same model give the same result. To continue a
+        run, call ``simulation.engine.step()``.
 
         Parameters
         ----------
         num_steps : int
-            The number of steps for the simulation.
-        output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
-            - 'dict_of_lists': Returns a dictionary of lists, with compartment names
-                as keys.
-            - 'list_of_lists': Returns a list of lists of floats, where the first level
-                is the step and the second level the comptarment.
+            The number of steps: the results hold the positions
+            ``0, 1, ..., num_steps``.
 
         Returns
         -------
-        dict[str, list[float]] | list[list[float]]
-            The simulation results in the specified format.
+        SimulationResults
+            One value per position for each output, and the positions.
 
         Raises
         ------
@@ -146,80 +116,45 @@ class Simulation:
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         self._engine.reset()
-        raw_results = self._run_raw(num_steps)
-        if output_format == "list_of_lists":
-            logging.info("Returning results in 'list_of_lists' format.")
-            return raw_results
+        logging.info(f"Running simulation for {num_steps} steps.")
+        start = time.time()
+        positions, rows = self._engine.run(num_steps)
+        logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 
-        elif output_format == "dict_of_lists":
-            logging.info("Transposing raw results to 'dict_of_lists' format.")
-            if not raw_results:
-                return {c: [] for c in self._simulation_outputs}
-            transposed_results = zip(*raw_results)
-            return {
-                column: list(values)
-                for column, values in zip(self._simulation_outputs, transposed_results)
-            }
-
-        else:
-            assert_never(output_format)
-
-    def run_at(
-        self,
-        steps: Sequence[float],
-        output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
-    ) -> dict[str, list[float]] | list[list[float]]:
+    def run_at(self, at: Sequence[float]) -> SimulationResults:
         """
-        Runs the simulation from the initial state and reports at given steps.
+        Runs the simulation from the initial state and reports at given positions.
 
-        The steps are positions on the axis, the independent variable of the
-        model (time or any other quantity). A
-        DifferentialEquations model reports at any position, from the dense
-        output of its solver; a DifferenceEquations model only at integer
-        steps.
+        The positions are on the axis, the independent variable of the model.
+        The engine decides which positions its model type reports at: a
+        DifferentialEquations model at any finite, non-negative position, from
+        the dense output of its solver; a DifferenceEquations model only at
+        integer steps.
 
         Parameters
         ----------
-        steps : Sequence[float]
-            Sorted, unique, non-negative positions to report at.
-        output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
-            As in `run`: one value per position for each output, or one row
-            per position.
+        at : Sequence[float]
+            Sorted, unique positions to report at.
 
         Returns
         -------
-        dict[str, list[float]] | list[list[float]]
-            The outputs at each position, in the specified format.
+        SimulationResults
+            One value per position for each output, and the positions.
 
         Raises
         ------
         ValueError
-            If a parameter or initial condition has no value, the steps are not
-            sorted and unique, or a step is not an integer in a
-            DifferenceEquations model.
+            If a parameter or initial condition has no value, the positions are
+            not sorted and unique, or the engine does not report at one of them;
+            the message is the engine's.
         """
-        positions = [float(step) for step in steps]
-        if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
-            raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
-        if any(position < 0 for position in positions):
-            raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+        positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         self._engine.reset()
-        try:
-            rows = self._engine.run_at(positions)
-        except RuntimeError as error:
-            raise ValueError(str(error)) from error
-        if output_format == "list_of_lists":
-            return rows
-        if output_format == "dict_of_lists":
-            if not rows:
-                return {c: [] for c in self._simulation_outputs}
-            return {
-                column: list(values)
-                for column, values in zip(self._simulation_outputs, zip(*rows))
-            }
-        assert_never(output_format)
+        rows = self._engine.run_at(positions)
+        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -239,13 +174,13 @@ class Simulation:
         self._sync_engine()
         return self._simulation_outputs
 
-    def outputs_for(self, source_id: str) -> list[str]:
+    def outputs_for(self, id: str) -> list[str]:
         """
         Names of the outputs a bin or accumulator expands into.
 
         Parameters
         ----------
-        source_id : str
+        id : str
             A bin id or an accumulator id.
 
         Returns
@@ -256,23 +191,23 @@ class Simulation:
         Raises
         ------
         KeyError
-            If `source_id` is not a bin or accumulator of the model.
+            If `id` is not a bin or accumulator of the model.
         """
         outputs = self.model_definition.get_outputs_by_source()
-        if source_id not in outputs:
+        if id not in outputs:
             raise KeyError(
-                f"'{source_id}' is not a bin or accumulator of model "
+                f"'{id}' is not a bin or accumulator of model "
                 f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
             )
-        return outputs[source_id]
+        return outputs[id]
 
-    def group_outputs(self, source_ids: Iterable[str]) -> dict[str, list[str]]:
+    def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
         """
         Group output names by the bin or accumulator they belong to.
 
         Parameters
         ----------
-        source_ids : Iterable[str]
+        ids : Iterable[str]
             Bin and accumulator ids.
 
         Returns
@@ -285,27 +220,27 @@ class Simulation:
         KeyError
             If an id is not a bin or accumulator of the model.
         """
-        return {source_id: self.outputs_for(source_id) for source_id in source_ids}
+        return {id: self.outputs_for(id) for id in ids}
 
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
-        source_ids: Iterable[str],
+        ids: Iterable[str],
     ) -> list[float]:
         """
-        Sum the outputs of the given bins or accumulators at each step.
+        Sum the outputs of the given bins or accumulators at each position.
 
         Parameters
         ----------
         results : Mapping[str, Sequence[float]]
-            Simulation results in `dict_of_lists` form.
-        source_ids : Iterable[str]
+            Simulation results, such as those of `run` or `run_at`.
+        ids : Iterable[str]
             Bin and accumulator ids whose outputs are summed together.
 
         Returns
         -------
         list[float]
-            One value per step.
+            One value per position of `results`.
 
         Raises
         ------
@@ -313,9 +248,7 @@ class Simulation:
             If an id is not a bin or accumulator of the model, or an expected
             output is missing from `results`.
         """
-        names = [
-            name for source_id in source_ids for name in self.outputs_for(source_id)
-        ]
+        names = [name for id in ids for name in self.outputs_for(id)]
         missing = [name for name in names if name not in results]
         if missing:
             raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -328,26 +261,27 @@ class Simulation:
 
     def windowed_totals(
         self,
-        results: Mapping[str, Sequence[float]],
-        source_ids: Iterable[str],
-        window_steps: int,
-        at_steps: Iterable[int] | None = None,
+        results: SimulationResults,
+        ids: Iterable[str],
+        window: float,
+        at: Iterable[float] | None = None,
     ) -> list[float]:
         """
         Amount the given accumulators gained over each window.
 
         Parameters
         ----------
-        results : Mapping[str, Sequence[float]]
-            Simulation results in `dict_of_lists` form.
-        source_ids : Iterable[str]
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
             Accumulator ids whose outputs are summed before windowing.
-        window_steps : int
-            Length of one window, in simulation steps.
-        at_steps : Iterable[int] | None, optional
-            Steps at which windows close. Defaults to every complete window of
-            the run. Pass the observation steps to reproduce exactly the values
-            a calibration used.
+        window : float
+            Length of one window on the axis.
+        at : Iterable[float] | None, optional
+            Positions at which windows close. Defaults to every complete
+            window of the results (:func:`commol.window_ends`). Pass the
+            observation positions to reproduce exactly the values a
+            calibration used.
 
         Returns
         -------
@@ -360,13 +294,11 @@ class Simulation:
             If an id is not a bin or accumulator of the model, or an expected
             output is missing from `results`.
         ValueError
-            If `window_steps` is not positive, or a requested step has no
-            complete window inside the run.
+            If `window` is not positive, or the results have no value at the
+            end or the start of a requested window.
         """
         return windowed_totals(
-            self.total_series(results, source_ids),
-            window_steps,
-            at_steps,
+            self.total_series(results, ids), results.positions, window, at
         )
 ```
 
@@ -428,37 +360,24 @@ def __init__(self, model: Model):
 #### run
 
 ```python
-run(num_steps: int, output_format: Literal['list_of_lists']) -> list[list[float]]
+run(num_steps: int) -> SimulationResults
 ```
 
-```python
-run(num_steps: int, output_format: Literal['dict_of_lists']) -> dict[str, list[float]]
-```
+Runs the simulation from the initial state on its default grid.
 
-```python
-run(num_steps: int) -> dict[str, list[float]]
-```
-
-```python
-run(num_steps: int, output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
-```
-
-Runs the simulation from the initial state.
-
-Every call starts at step 0 with the current `model_definition`, so two calls with the same model give the same result. To continue a run step by step, call `simulation.engine.step()`.
+Every call starts at position 0 with the current `model_definition`, so two calls with the same model give the same result. To continue a run, call `simulation.engine.step()`.
 
 Parameters:
 
-| Name            | Type                             | Description                                                                                                                                                                                                 | Default           |
-| --------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| `num_steps`     | `int`                            | The number of steps for the simulation.                                                                                                                                                                     | *required*        |
-| `output_format` | `(dict_of_lists, list_of_lists)` | 'dict_of_lists': Returns a dictionary of lists, with compartment names as keys. 'list_of_lists': Returns a list of lists of floats, where the first level is the step and the second level the comptarment. | `'dict_of_lists'` |
+| Name        | Type  | Description                                                               | Default    |
+| ----------- | ----- | ------------------------------------------------------------------------- | ---------- |
+| `num_steps` | `int` | The number of steps: the results hold the positions 0, 1, ..., num_steps. | *required* |
 
 Returns:
 
-| Type                       | Description           |
-| -------------------------- | --------------------- |
-| \`dict\[str, list[float]\] | list\[list[float]\]\` |
+| Type                | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, and the positions. |
 
 Raises:
 
@@ -469,32 +388,24 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def run(
-    self,
-    num_steps: int,
-    output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
-) -> dict[str, list[float]] | list[list[float]]:
+def run(self, num_steps: int) -> SimulationResults:
     """
-    Runs the simulation from the initial state.
+    Runs the simulation from the initial state on its default grid.
 
-    Every call starts at step 0 with the current ``model_definition``, so
-    two calls with the same model give the same result. To continue a run
-    step by step, call ``simulation.engine.step()``.
+    Every call starts at position 0 with the current ``model_definition``,
+    so two calls with the same model give the same result. To continue a
+    run, call ``simulation.engine.step()``.
 
     Parameters
     ----------
     num_steps : int
-        The number of steps for the simulation.
-    output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
-        - 'dict_of_lists': Returns a dictionary of lists, with compartment names
-            as keys.
-        - 'list_of_lists': Returns a list of lists of floats, where the first level
-            is the step and the second level the comptarment.
+        The number of steps: the results hold the positions
+        ``0, 1, ..., num_steps``.
 
     Returns
     -------
-    dict[str, list[float]] | list[list[float]]
-        The simulation results in the specified format.
+    SimulationResults
+        One value per position for each output, and the positions.
 
     Raises
     ------
@@ -504,128 +415,92 @@ def run(
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
     self._engine.reset()
-    raw_results = self._run_raw(num_steps)
-    if output_format == "list_of_lists":
-        logging.info("Returning results in 'list_of_lists' format.")
-        return raw_results
-
-    elif output_format == "dict_of_lists":
-        logging.info("Transposing raw results to 'dict_of_lists' format.")
-        if not raw_results:
-            return {c: [] for c in self._simulation_outputs}
-        transposed_results = zip(*raw_results)
-        return {
-            column: list(values)
-            for column, values in zip(self._simulation_outputs, transposed_results)
-        }
-
-    else:
-        assert_never(output_format)
+    logging.info(f"Running simulation for {num_steps} steps.")
+    start = time.time()
+    positions, rows = self._engine.run(num_steps)
+    logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+    return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 ```
 
 #### run_at
 
 ```python
-run_at(steps: Sequence[float], output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
+run_at(at: Sequence[float]) -> SimulationResults
 ```
 
-Runs the simulation from the initial state and reports at given steps.
+Runs the simulation from the initial state and reports at given positions.
 
-The steps are positions on the axis, the independent variable of the model (time or any other quantity). A DifferentialEquations model reports at any position, from the dense output of its solver; a DifferenceEquations model only at integer steps.
+The positions are on the axis, the independent variable of the model. The engine decides which positions its model type reports at: a DifferentialEquations model at any finite, non-negative position, from the dense output of its solver; a DifferenceEquations model only at integer steps.
 
 Parameters:
 
-| Name            | Type                             | Description                                                                 | Default           |
-| --------------- | -------------------------------- | --------------------------------------------------------------------------- | ----------------- |
-| `steps`         | `Sequence[float]`                | Sorted, unique, non-negative positions to report at.                        | *required*        |
-| `output_format` | `(dict_of_lists, list_of_lists)` | As in run: one value per position for each output, or one row per position. | `'dict_of_lists'` |
+| Name | Type              | Description                            | Default    |
+| ---- | ----------------- | -------------------------------------- | ---------- |
+| `at` | `Sequence[float]` | Sorted, unique positions to report at. | *required* |
 
 Returns:
 
-| Type                       | Description           |
-| -------------------------- | --------------------- |
-| \`dict\[str, list[float]\] | list\[list[float]\]\` |
+| Type                | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, and the positions. |
 
 Raises:
 
-| Type         | Description                                                                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a parameter or initial condition has no value, the steps are not sorted and unique, or a step is not an integer in a DifferenceEquations model. |
+| Type         | Description                                                                                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def run_at(
-    self,
-    steps: Sequence[float],
-    output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
-) -> dict[str, list[float]] | list[list[float]]:
+def run_at(self, at: Sequence[float]) -> SimulationResults:
     """
-    Runs the simulation from the initial state and reports at given steps.
+    Runs the simulation from the initial state and reports at given positions.
 
-    The steps are positions on the axis, the independent variable of the
-    model (time or any other quantity). A
-    DifferentialEquations model reports at any position, from the dense
-    output of its solver; a DifferenceEquations model only at integer
-    steps.
+    The positions are on the axis, the independent variable of the model.
+    The engine decides which positions its model type reports at: a
+    DifferentialEquations model at any finite, non-negative position, from
+    the dense output of its solver; a DifferenceEquations model only at
+    integer steps.
 
     Parameters
     ----------
-    steps : Sequence[float]
-        Sorted, unique, non-negative positions to report at.
-    output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
-        As in `run`: one value per position for each output, or one row
-        per position.
+    at : Sequence[float]
+        Sorted, unique positions to report at.
 
     Returns
     -------
-    dict[str, list[float]] | list[list[float]]
-        The outputs at each position, in the specified format.
+    SimulationResults
+        One value per position for each output, and the positions.
 
     Raises
     ------
     ValueError
-        If a parameter or initial condition has no value, the steps are not
-        sorted and unique, or a step is not an integer in a
-        DifferenceEquations model.
+        If a parameter or initial condition has no value, the positions are
+        not sorted and unique, or the engine does not report at one of them;
+        the message is the engine's.
     """
-    positions = [float(step) for step in steps]
-    if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
-        raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
-    if any(position < 0 for position in positions):
-        raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+    positions = [float(position) for position in at]
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
     self._engine.reset()
-    try:
-        rows = self._engine.run_at(positions)
-    except RuntimeError as error:
-        raise ValueError(str(error)) from error
-    if output_format == "list_of_lists":
-        return rows
-    if output_format == "dict_of_lists":
-        if not rows:
-            return {c: [] for c in self._simulation_outputs}
-        return {
-            column: list(values)
-            for column, values in zip(self._simulation_outputs, zip(*rows))
-        }
-    assert_never(output_format)
+    rows = self._engine.run_at(positions)
+    return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 ```
 
 #### outputs_for
 
 ```python
-outputs_for(source_id: str) -> list[str]
+outputs_for(id: str) -> list[str]
 ```
 
 Names of the outputs a bin or accumulator expands into.
 
 Parameters:
 
-| Name        | Type  | Description                    | Default    |
-| ----------- | ----- | ------------------------------ | ---------- |
-| `source_id` | `str` | A bin id or an accumulator id. | *required* |
+| Name | Type  | Description                    | Default    |
+| ---- | ----- | ------------------------------ | ---------- |
+| `id` | `str` | A bin id or an accumulator id. | *required* |
 
 Returns:
 
@@ -635,20 +510,20 @@ Returns:
 
 Raises:
 
-| Type       | Description                                            |
-| ---------- | ------------------------------------------------------ |
-| `KeyError` | If source_id is not a bin or accumulator of the model. |
+| Type       | Description                                     |
+| ---------- | ----------------------------------------------- |
+| `KeyError` | If id is not a bin or accumulator of the model. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def outputs_for(self, source_id: str) -> list[str]:
+def outputs_for(self, id: str) -> list[str]:
     """
     Names of the outputs a bin or accumulator expands into.
 
     Parameters
     ----------
-    source_id : str
+    id : str
         A bin id or an accumulator id.
 
     Returns
@@ -659,30 +534,30 @@ def outputs_for(self, source_id: str) -> list[str]:
     Raises
     ------
     KeyError
-        If `source_id` is not a bin or accumulator of the model.
+        If `id` is not a bin or accumulator of the model.
     """
     outputs = self.model_definition.get_outputs_by_source()
-    if source_id not in outputs:
+    if id not in outputs:
         raise KeyError(
-            f"'{source_id}' is not a bin or accumulator of model "
+            f"'{id}' is not a bin or accumulator of model "
             f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
         )
-    return outputs[source_id]
+    return outputs[id]
 ```
 
 #### group_outputs
 
 ```python
-group_outputs(source_ids: Iterable[str]) -> dict[str, list[str]]
+group_outputs(ids: Iterable[str]) -> dict[str, list[str]]
 ```
 
 Group output names by the bin or accumulator they belong to.
 
 Parameters:
 
-| Name         | Type            | Description              | Default    |
-| ------------ | --------------- | ------------------------ | ---------- |
-| `source_ids` | `Iterable[str]` | Bin and accumulator ids. | *required* |
+| Name  | Type            | Description              | Default    |
+| ----- | --------------- | ------------------------ | ---------- |
+| `ids` | `Iterable[str]` | Bin and accumulator ids. | *required* |
 
 Returns:
 
@@ -699,13 +574,13 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def group_outputs(self, source_ids: Iterable[str]) -> dict[str, list[str]]:
+def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
     """
     Group output names by the bin or accumulator they belong to.
 
     Parameters
     ----------
-    source_ids : Iterable[str]
+    ids : Iterable[str]
         Bin and accumulator ids.
 
     Returns
@@ -718,29 +593,29 @@ def group_outputs(self, source_ids: Iterable[str]) -> dict[str, list[str]]:
     KeyError
         If an id is not a bin or accumulator of the model.
     """
-    return {source_id: self.outputs_for(source_id) for source_id in source_ids}
+    return {id: self.outputs_for(id) for id in ids}
 ```
 
 #### total_series
 
 ```python
-total_series(results: Mapping[str, Sequence[float]], source_ids: Iterable[str]) -> list[float]
+total_series(results: Mapping[str, Sequence[float]], ids: Iterable[str]) -> list[float]
 ```
 
-Sum the outputs of the given bins or accumulators at each step.
+Sum the outputs of the given bins or accumulators at each position.
 
 Parameters:
 
-| Name         | Type                            | Description                                                | Default    |
-| ------------ | ------------------------------- | ---------------------------------------------------------- | ---------- |
-| `results`    | `Mapping[str, Sequence[float]]` | Simulation results in dict_of_lists form.                  | *required* |
-| `source_ids` | `Iterable[str]`                 | Bin and accumulator ids whose outputs are summed together. | *required* |
+| Name      | Type                            | Description                                                | Default    |
+| --------- | ------------------------------- | ---------------------------------------------------------- | ---------- |
+| `results` | `Mapping[str, Sequence[float]]` | Simulation results, such as those of run or run_at.        | *required* |
+| `ids`     | `Iterable[str]`                 | Bin and accumulator ids whose outputs are summed together. | *required* |
 
 Returns:
 
-| Type          | Description         |
-| ------------- | ------------------- |
-| `list[float]` | One value per step. |
+| Type          | Description                        |
+| ------------- | ---------------------------------- |
+| `list[float]` | One value per position of results. |
 
 Raises:
 
@@ -754,22 +629,22 @@ Source code in `commol/api/simulation.py`
 def total_series(
     self,
     results: Mapping[str, Sequence[float]],
-    source_ids: Iterable[str],
+    ids: Iterable[str],
 ) -> list[float]:
     """
-    Sum the outputs of the given bins or accumulators at each step.
+    Sum the outputs of the given bins or accumulators at each position.
 
     Parameters
     ----------
     results : Mapping[str, Sequence[float]]
-        Simulation results in `dict_of_lists` form.
-    source_ids : Iterable[str]
+        Simulation results, such as those of `run` or `run_at`.
+    ids : Iterable[str]
         Bin and accumulator ids whose outputs are summed together.
 
     Returns
     -------
     list[float]
-        One value per step.
+        One value per position of `results`.
 
     Raises
     ------
@@ -777,9 +652,7 @@ def total_series(
         If an id is not a bin or accumulator of the model, or an expected
         output is missing from `results`.
     """
-    names = [
-        name for source_id in source_ids for name in self.outputs_for(source_id)
-    ]
+    names = [name for id in ids for name in self.outputs_for(id)]
     missing = [name for name in names if name not in results]
     if missing:
         raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -794,19 +667,19 @@ def total_series(
 #### windowed_totals
 
 ```python
-windowed_totals(results: Mapping[str, Sequence[float]], source_ids: Iterable[str], window_steps: int, at_steps: Iterable[int] | None = None) -> list[float]
+windowed_totals(results: SimulationResults, ids: Iterable[str], window: float, at: Iterable[float] | None = None) -> list[float]
 ```
 
 Amount the given accumulators gained over each window.
 
 Parameters:
 
-| Name           | Type                            | Description                                                | Default                                                                                                                                                    |
-| -------------- | ------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results`      | `Mapping[str, Sequence[float]]` | Simulation results in dict_of_lists form.                  | *required*                                                                                                                                                 |
-| `source_ids`   | `Iterable[str]`                 | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                 |
-| `window_steps` | `int`                           | Length of one window, in simulation steps.                 | *required*                                                                                                                                                 |
-| `at_steps`     | \`Iterable[int]                 | None\`                                                     | Steps at which windows close. Defaults to every complete window of the run. Pass the observation steps to reproduce exactly the values a calibration used. |
+| Name      | Type                | Description                                                | Default                                                                                                                                                                                           |
+| --------- | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` | `SimulationResults` | Simulation results, with their positions.                  | *required*                                                                                                                                                                                        |
+| `ids`     | `Iterable[str]`     | Accumulator ids whose outputs are summed before windowing. | *required*                                                                                                                                                                                        |
+| `window`  | `float`             | Length of one window on the axis.                          | *required*                                                                                                                                                                                        |
+| `at`      | \`Iterable[float]   | None\`                                                     | Positions at which windows close. Defaults to every complete window of the results (:func:commol.window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -816,36 +689,37 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `KeyError`   | If an id is not a bin or accumulator of the model, or an expected output is missing from results. |
-| `ValueError` | If window_steps is not positive, or a requested step has no complete window inside the run.       |
+| Type         | Description                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| `KeyError`   | If an id is not a bin or accumulator of the model, or an expected output is missing from results.      |
+| `ValueError` | If window is not positive, or the results have no value at the end or the start of a requested window. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
 def windowed_totals(
     self,
-    results: Mapping[str, Sequence[float]],
-    source_ids: Iterable[str],
-    window_steps: int,
-    at_steps: Iterable[int] | None = None,
+    results: SimulationResults,
+    ids: Iterable[str],
+    window: float,
+    at: Iterable[float] | None = None,
 ) -> list[float]:
     """
     Amount the given accumulators gained over each window.
 
     Parameters
     ----------
-    results : Mapping[str, Sequence[float]]
-        Simulation results in `dict_of_lists` form.
-    source_ids : Iterable[str]
+    results : SimulationResults
+        Simulation results, with their positions.
+    ids : Iterable[str]
         Accumulator ids whose outputs are summed before windowing.
-    window_steps : int
-        Length of one window, in simulation steps.
-    at_steps : Iterable[int] | None, optional
-        Steps at which windows close. Defaults to every complete window of
-        the run. Pass the observation steps to reproduce exactly the values
-        a calibration used.
+    window : float
+        Length of one window on the axis.
+    at : Iterable[float] | None, optional
+        Positions at which windows close. Defaults to every complete
+        window of the results (:func:`commol.window_ends`). Pass the
+        observation positions to reproduce exactly the values a
+        calibration used.
 
     Returns
     -------
@@ -858,14 +732,281 @@ def windowed_totals(
         If an id is not a bin or accumulator of the model, or an expected
         output is missing from `results`.
     ValueError
-        If `window_steps` is not positive, or a requested step has no
-        complete window inside the run.
+        If `window` is not positive, or the results have no value at the
+        end or the start of a requested window.
     """
     return windowed_totals(
-        self.total_series(results, source_ids),
-        window_steps,
-        at_steps,
+        self.total_series(results, ids), results.positions, window, at
     )
+```
+
+## SimulationResults
+
+Bases: `dict[str, list[float]]`
+
+Values of every output at each position on the axis.
+
+A `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in :attr:`positions`.
+
+Attributes:
+
+| Name        | Type          | Description                                                                              |
+| ----------- | ------------- | ---------------------------------------------------------------------------------------- |
+| `positions` | `list[float]` | Positions on the axis, ascending. results[name][i] is the value of name at positions[i]. |
+
+Source code in `commol/api/results.py`
+
+```python
+class SimulationResults(dict[str, list[float]]):
+    """
+    Values of every output at each position on the axis.
+
+    A ``dict`` from output name to one value per position, so
+    ``results["A"]``, ``json.dumps(results)`` and
+    ``pandas.DataFrame(results)`` work as for any mapping. The positions the
+    values were read at are in :attr:`positions`.
+
+    Attributes
+    ----------
+    positions : list[float]
+        Positions on the axis, ascending. ``results[name][i]`` is the value of
+        ``name`` at ``positions[i]``.
+    """
+
+    positions: list[float]
+
+    def __init__(
+        self,
+        positions: Iterable[float],
+        values: Mapping[str, Sequence[float]] | None = None,
+    ):
+        """
+        Results at the given positions.
+
+        Parameters
+        ----------
+        positions : Iterable[float]
+            Positions on the axis, ascending.
+        values : Mapping[str, Sequence[float]] | None, optional
+            One value per position for each output.
+
+        Raises
+        ------
+        ValueError
+            If an output does not have one value per position.
+        """
+        super().__init__(
+            {name: list(series) for name, series in (values or {}).items()}
+        )
+        self.positions = [float(position) for position in positions]
+        for name, series in self.items():
+            if len(series) != len(self.positions):
+                raise ValueError(
+                    f"Output '{name}' has {len(series)} values for "
+                    f"{len(self.positions)} positions."
+                )
+
+    @classmethod
+    def from_rows(
+        cls,
+        positions: Sequence[float],
+        names: Sequence[str],
+        rows: Sequence[Sequence[float]],
+    ) -> "SimulationResults":
+        """
+        Results from one row of output values per position.
+
+        Parameters
+        ----------
+        positions : Sequence[float]
+            Positions on the axis, ascending.
+        names : Sequence[str]
+            Output names, in the order of each row.
+        rows : Sequence[Sequence[float]]
+            One row per position.
+
+        Returns
+        -------
+        SimulationResults
+            One series per output name.
+        """
+        columns = list(zip(*rows)) if rows else [() for _ in names]
+        return cls(positions, dict(zip(names, columns, strict=True)))
+
+    def rows(self) -> list[list[float]]:
+        """
+        Every output at each position, one row per position.
+
+        Returns
+        -------
+        list[list[float]]
+            ``rows()[i][j]`` is the value of the ``j``-th output, in key order
+            (the order of ``Simulation.simulation_outputs``), at
+            ``positions[i]``.
+        """
+        return [list(row) for row in zip(*self.values())] if self else []
+
+    def __repr__(self) -> str:
+        """The positions and the values."""
+        return f"SimulationResults(positions={self.positions!r}, {dict.__repr__(self)})"
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None)
+```
+
+Results at the given positions.
+
+Parameters:
+
+| Name        | Type                              | Description                       | Default                                 |
+| ----------- | --------------------------------- | --------------------------------- | --------------------------------------- |
+| `positions` | `Iterable[float]`                 | Positions on the axis, ascending. | *required*                              |
+| `values`    | \`Mapping\[str, Sequence[float]\] | None\`                            | One value per position for each output. |
+
+Raises:
+
+| Type         | Description                                        |
+| ------------ | -------------------------------------------------- |
+| `ValueError` | If an output does not have one value per position. |
+
+Source code in `commol/api/results.py`
+
+```python
+def __init__(
+    self,
+    positions: Iterable[float],
+    values: Mapping[str, Sequence[float]] | None = None,
+):
+    """
+    Results at the given positions.
+
+    Parameters
+    ----------
+    positions : Iterable[float]
+        Positions on the axis, ascending.
+    values : Mapping[str, Sequence[float]] | None, optional
+        One value per position for each output.
+
+    Raises
+    ------
+    ValueError
+        If an output does not have one value per position.
+    """
+    super().__init__(
+        {name: list(series) for name, series in (values or {}).items()}
+    )
+    self.positions = [float(position) for position in positions]
+    for name, series in self.items():
+        if len(series) != len(self.positions):
+            raise ValueError(
+                f"Output '{name}' has {len(series)} values for "
+                f"{len(self.positions)} positions."
+            )
+```
+
+#### from_rows
+
+```python
+from_rows(positions: Sequence[float], names: Sequence[str], rows: Sequence[Sequence[float]]) -> SimulationResults
+```
+
+Results from one row of output values per position.
+
+Parameters:
+
+| Name        | Type                        | Description                             | Default    |
+| ----------- | --------------------------- | --------------------------------------- | ---------- |
+| `positions` | `Sequence[float]`           | Positions on the axis, ascending.       | *required* |
+| `names`     | `Sequence[str]`             | Output names, in the order of each row. | *required* |
+| `rows`      | `Sequence[Sequence[float]]` | One row per position.                   | *required* |
+
+Returns:
+
+| Type                | Description                 |
+| ------------------- | --------------------------- |
+| `SimulationResults` | One series per output name. |
+
+Source code in `commol/api/results.py`
+
+```python
+@classmethod
+def from_rows(
+    cls,
+    positions: Sequence[float],
+    names: Sequence[str],
+    rows: Sequence[Sequence[float]],
+) -> "SimulationResults":
+    """
+    Results from one row of output values per position.
+
+    Parameters
+    ----------
+    positions : Sequence[float]
+        Positions on the axis, ascending.
+    names : Sequence[str]
+        Output names, in the order of each row.
+    rows : Sequence[Sequence[float]]
+        One row per position.
+
+    Returns
+    -------
+    SimulationResults
+        One series per output name.
+    """
+    columns = list(zip(*rows)) if rows else [() for _ in names]
+    return cls(positions, dict(zip(names, columns, strict=True)))
+```
+
+#### rows
+
+```python
+rows() -> list[list[float]]
+```
+
+Every output at each position, one row per position.
+
+Returns:
+
+| Type                | Description                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `list[list[float]]` | rows()[i][j] is the value of the j-th output, in key order (the order of Simulation.simulation_outputs), at positions[i]. |
+
+Source code in `commol/api/results.py`
+
+```python
+def rows(self) -> list[list[float]]:
+    """
+    Every output at each position, one row per position.
+
+    Returns
+    -------
+    list[list[float]]
+        ``rows()[i][j]`` is the value of the ``j``-th output, in key order
+        (the order of ``Simulation.simulation_outputs``), at
+        ``positions[i]``.
+    """
+    return [list(row) for row in zip(*self.values())] if self else []
+```
+
+#### __repr__
+
+```python
+__repr__() -> str
+```
+
+The positions and the values.
+
+Source code in `commol/api/results.py`
+
+```python
+def __repr__(self) -> str:
+    """The positions and the values."""
+    return f"SimulationResults(positions={self.positions!r}, {dict.__repr__(self)})"
 ```
 
 ## OdeSolver
@@ -900,6 +1041,8 @@ class OdeSolver(BaseModel):
         Absolute tolerance of each state component, in the unit of the bins.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
@@ -907,149 +1050,329 @@ class OdeSolver(BaseModel):
     atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
 
-## window_end_steps
+## Windows
+
+## window_start
 
 ```python
-window_end_steps(window_steps: int, num_steps: int) -> list[int]
+window_start(index: int, window: float) -> float
 ```
 
-Steps closing each complete window of a run.
+Position at which a window opens.
 
 Parameters:
 
-| Name           | Type  | Description                                                  | Default    |
-| -------------- | ----- | ------------------------------------------------------------ | ---------- |
-| `window_steps` | `int` | Length of one window, in simulation steps.                   | *required* |
-| `num_steps`    | `int` | Number of steps the run covers, excluding the initial state. | *required* |
+| Name     | Type    | Description                       | Default    |
+| -------- | ------- | --------------------------------- | ---------- |
+| `index`  | `int`   | Zero-based window index.          | *required* |
+| `window` | `float` | Length of one window on the axis. | *required* |
 
 Returns:
 
-| Type        | Description                                                                                           |
-| ----------- | ----------------------------------------------------------------------------------------------------- |
-| `list[int]` | Steps window_steps, 2 * window_steps, ... up to num_steps. A trailing partial window is not included. |
+| Type    | Description     |
+| ------- | --------------- |
+| `float` | index * window. |
 
 Raises:
 
-| Type         | Description                      |
-| ------------ | -------------------------------- |
-| `ValueError` | If window_steps is not positive. |
+| Type         | Description                                     |
+| ------------ | ----------------------------------------------- |
+| `ValueError` | If window is not positive or index is negative. |
 
 Source code in `commol/api/windows.py`
 
 ```python
-def window_end_steps(window_steps: int, num_steps: int) -> list[int]:
+def window_start(index: int, window: float) -> float:
     """
-    Steps closing each complete window of a run.
+    Position at which a window opens.
 
     Parameters
     ----------
-    window_steps : int
-        Length of one window, in simulation steps.
-    num_steps : int
-        Number of steps the run covers, excluding the initial state.
+    index : int
+        Zero-based window index.
+    window : float
+        Length of one window on the axis.
 
     Returns
     -------
-    list[int]
-        Steps ``window_steps``, ``2 * window_steps``, ... up to ``num_steps``.
-        A trailing partial window is not included.
+    float
+        ``index * window``.
 
     Raises
     ------
     ValueError
-        If ``window_steps`` is not positive.
+        If `window` is not positive or `index` is negative.
     """
-    if window_steps <= 0:
-        raise ValueError(f"window_steps must be positive, got {window_steps}.")
-    return list(range(window_steps, num_steps + 1, window_steps))
+    _check_window(window)
+    if index < 0:
+        raise ValueError(f"index must not be negative, got {index}.")
+    return index * window
+```
+
+## window_end
+
+```python
+window_end(index: int, window: float) -> float
+```
+
+Position at which a window closes, equal to the start of the next.
+
+Parameters:
+
+| Name     | Type    | Description                       | Default    |
+| -------- | ------- | --------------------------------- | ---------- |
+| `index`  | `int`   | Zero-based window index.          | *required* |
+| `window` | `float` | Length of one window on the axis. | *required* |
+
+Returns:
+
+| Type    | Description           |
+| ------- | --------------------- |
+| `float` | (index + 1) * window. |
+
+Raises:
+
+| Type         | Description                                     |
+| ------------ | ----------------------------------------------- |
+| `ValueError` | If window is not positive or index is negative. |
+
+Source code in `commol/api/windows.py`
+
+```python
+def window_end(index: int, window: float) -> float:
+    """
+    Position at which a window closes, equal to the start of the next.
+
+    Parameters
+    ----------
+    index : int
+        Zero-based window index.
+    window : float
+        Length of one window on the axis.
+
+    Returns
+    -------
+    float
+        ``(index + 1) * window``.
+
+    Raises
+    ------
+    ValueError
+        If `window` is not positive or `index` is negative.
+    """
+    return window_start(index + 1, window)
+```
+
+## window_index
+
+```python
+window_index(at: float, window: float) -> int
+```
+
+Window a position belongs to.
+
+The exact inverse of :func:`window_end`, and the containing window for any position in between: `max(ceil(at / window) - 1, 0)`. Position 0 belongs to window 0. :func:`commol.api.reporting.observed_report` places each observation with this rule.
+
+Parameters:
+
+| Name     | Type    | Description                       | Default    |
+| -------- | ------- | --------------------------------- | ---------- |
+| `at`     | `float` | A position on the axis.           | *required* |
+| `window` | `float` | Length of one window on the axis. | *required* |
+
+Returns:
+
+| Type  | Description              |
+| ----- | ------------------------ |
+| `int` | Zero-based window index. |
+
+Raises:
+
+| Type         | Description                                  |
+| ------------ | -------------------------------------------- |
+| `ValueError` | If window is not positive or at is negative. |
+
+Source code in `commol/api/windows.py`
+
+```python
+def window_index(at: float, window: float) -> int:
+    """
+    Window a position belongs to.
+
+    The exact inverse of :func:`window_end`, and the containing window for
+    any position in between: ``max(ceil(at / window) - 1, 0)``. Position 0
+    belongs to window 0. :func:`commol.api.reporting.observed_report` places
+    each observation with this rule.
+
+    Parameters
+    ----------
+    at : float
+        A position on the axis.
+    window : float
+        Length of one window on the axis.
+
+    Returns
+    -------
+    int
+        Zero-based window index.
+
+    Raises
+    ------
+    ValueError
+        If `window` is not positive or `at` is negative.
+    """
+    _check_window(window)
+    if not at >= 0:
+        raise ValueError(f"at must not be negative, got {at}.")
+    return max(math.ceil(_windows_in(at, window)) - 1, 0)
+```
+
+## window_ends
+
+```python
+window_ends(window: float, end: float) -> list[float]
+```
+
+Positions closing each complete window up to a position.
+
+Parameters:
+
+| Name     | Type    | Description                                                | Default    |
+| -------- | ------- | ---------------------------------------------------------- | ---------- |
+| `window` | `float` | Length of one window on the axis.                          | *required* |
+| `end`    | `float` | Last position covered, such as the last position of a run. | *required* |
+
+Returns:
+
+| Type          | Description                                                                   |
+| ------------- | ----------------------------------------------------------------------------- |
+| `list[float]` | window, 2 * window, ... up to end. A trailing partial window is not included. |
+
+Raises:
+
+| Type         | Description                |
+| ------------ | -------------------------- |
+| `ValueError` | If window is not positive. |
+
+Source code in `commol/api/windows.py`
+
+```python
+def window_ends(window: float, end: float) -> list[float]:
+    """
+    Positions closing each complete window up to a position.
+
+    Parameters
+    ----------
+    window : float
+        Length of one window on the axis.
+    end : float
+        Last position covered, such as the last position of a run.
+
+    Returns
+    -------
+    list[float]
+        ``window``, ``2 * window``, ... up to `end`. A trailing partial window
+        is not included.
+
+    Raises
+    ------
+    ValueError
+        If `window` is not positive.
+    """
+    _check_window(window)
+    count = math.floor(_windows_in(end, window)) if end > 0 else 0
+    return [window_end(index, window) for index in range(count)]
 ```
 
 ## windowed_totals
 
 ```python
-windowed_totals(series: Sequence[float], window_steps: int, at_steps: Iterable[int] | None = None) -> list[float]
+windowed_totals(series: Sequence[float], positions: Sequence[float], window: float, at: Iterable[float] | None = None) -> list[float]
 ```
 
 Amount a cumulative series gained over each window.
 
-Each value is `series[step] - series[step - window_steps]`, the same quantity a calibration compares an observation against when that observation sets `window_steps`.
+Each value is the series at the end of the window minus the series at its start, `at - window`: the same quantity a calibration compares an observation against when that observation sets `window`.
 
 Parameters:
 
-| Name           | Type              | Description                                      | Default                                                                                                                                                   |
-| -------------- | ----------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `series`       | `Sequence[float]` | A cumulative series, indexed by simulation step. | *required*                                                                                                                                                |
-| `window_steps` | `int`             | Length of one window, in simulation steps.       | *required*                                                                                                                                                |
-| `at_steps`     | \`Iterable[int]   | None\`                                           | Steps at which windows close. Defaults to every complete window of series. Pass the observation steps to reproduce exactly the values a calibration used. |
+| Name        | Type              | Description                                                              | Default                                                                                                                                                                                   |
+| ----------- | ----------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                |
+| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                |
+| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                |
+| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (:func:window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
-| Type          | Description                       |
-| ------------- | --------------------------------- |
-| `list[float]` | One increment per requested step. |
+| Type          | Description                           |
+| ------------- | ------------------------------------- |
+| `list[float]` | One increment per requested position. |
 
 Raises:
 
-| Type         | Description                                                                                |
-| ------------ | ------------------------------------------------------------------------------------------ |
-| `ValueError` | If window_steps is not positive, or a requested step has no complete window inside series. |
+| Type         | Description                                                                                                                             |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If window is not positive, a window starts before position 0, or the series has no value at the end or the start of a requested window. |
 
 Source code in `commol/api/windows.py`
 
 ```python
 def windowed_totals(
     series: Sequence[float],
-    window_steps: int,
-    at_steps: Iterable[int] | None = None,
+    positions: Sequence[float],
+    window: float,
+    at: Iterable[float] | None = None,
 ) -> list[float]:
     """
     Amount a cumulative series gained over each window.
 
-    Each value is ``series[step] - series[step - window_steps]``, the same
-    quantity a calibration compares an observation against when that
-    observation sets ``window_steps``.
+    Each value is the series at the end of the window minus the series at its
+    start, ``at - window``: the same quantity a calibration compares an
+    observation against when that observation sets ``window``.
 
     Parameters
     ----------
     series : Sequence[float]
-        A cumulative series, indexed by simulation step.
-    window_steps : int
-        Length of one window, in simulation steps.
-    at_steps : Iterable[int] | None, optional
-        Steps at which windows close. Defaults to every complete window of
-        `series`. Pass the observation steps to reproduce exactly the values a
-        calibration used.
+        A cumulative series, one value per position.
+    positions : Sequence[float]
+        Positions of the series, ascending, such as
+        ``SimulationResults.positions``.
+    window : float
+        Length of one window on the axis.
+    at : Iterable[float] | None, optional
+        Positions at which windows close. Defaults to every complete window of
+        the series (:func:`window_ends`). Pass the observation positions to
+        reproduce exactly the values a calibration used.
 
     Returns
     -------
     list[float]
-        One increment per requested step.
+        One increment per requested position.
 
     Raises
     ------
     ValueError
-        If ``window_steps`` is not positive, or a requested step has no
-        complete window inside `series`.
+        If `window` is not positive, a window starts before position 0, or the
+        series has no value at the end or the start of a requested window.
     """
-    if window_steps <= 0:
-        raise ValueError(f"window_steps must be positive, got {window_steps}.")
-
-    steps = (
-        window_end_steps(window_steps, len(series) - 1)
-        if at_steps is None
-        else list(at_steps)
+    _check_window(window)
+    ends = (
+        window_ends(window, positions[-1] if positions else 0.0)
+        if at is None
+        else list(at)
     )
 
-    for step in steps:
-        if step - window_steps < 0:
+    totals = []
+    for end in ends:
+        start = end - window
+        if start < -POSITION_TOLERANCE * max(abs(end), 1.0):
             raise ValueError(
-                f"Step {step} has no complete window of {window_steps} steps before it."
+                f"Position {end} has no complete window of {window} before it."
             )
-        if step >= len(series):
-            raise ValueError(
-                f"Step {step} is outside a series of {len(series)} points "
-                f"(steps 0 to {len(series) - 1})."
-            )
-
-    return [series[step] - series[step - window_steps] for step in steps]
+        totals.append(
+            series[index_at(positions, end)]
+            - series[index_at(positions, max(start, 0.0))]
+        )
+    return totals
 ```

@@ -787,14 +787,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1085,10 +1085,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#partial-observations-scale-factors" class="md-nav__link">
+  <a href="#partial-observations-factors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Partial observations: scale factors
+        Partial observations: factors
       
     </span>
   </a>
@@ -1107,10 +1107,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps-between-integers" class="md-nav__link">
+  <a href="#positions-between-integers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps between integers
+        Positions between integers
       
     </span>
   </a>
@@ -1513,14 +1513,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2255,10 +2255,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#partial-observations-scale-factors" class="md-nav__link">
+  <a href="#partial-observations-factors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Partial observations: scale factors
+        Partial observations: factors
       
     </span>
   </a>
@@ -2277,10 +2277,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps-between-integers" class="md-nav__link">
+  <a href="#positions-between-integers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps between integers
+        Positions between integers
       
     </span>
   </a>
@@ -2342,10 +2342,10 @@
 
 <h1 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h1>
 <p><a href="../calibration/">Back to Model Calibration</a></p>
-<p>An <code>ObservedDataPoint</code> says what the model must reproduce: an output at a step.
-This page shows how to observe several outputs, sums of outputs, partial
-observations (scale factors), counts per period (windows) and steps between
-integers, and how to weigh them.</p>
+<p>An <code>ObservedDataPoint</code> says what the model must reproduce: an output at a
+position on the axis. This page shows how to observe several outputs, sums of
+outputs, partial observations (factors), counts per period (windows) and
+positions between integers, and how to weigh them.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">CalibrationParameter</span><span class="p">,</span>
@@ -2397,32 +2397,94 @@ integers, and how to weigh them.</p>
 </span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>
 </span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="c1"># Observe B and C at the same steps</span>
 </span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="n">observed</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="n">output</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="n">output</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="n">output</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
 </span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
 </span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>    <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">)</span>
 </span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="p">]</span>
 </span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">observed</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
-<p>Each observation compares the model output named in <code>compartment</code> with
-<code>value</code>. Any output works: a compartment (<code>B</code>, <code>B_g1</code>) or an accumulator
-(<code>cum_ab</code>).</p>
+<p>Each observation compares the model output named in <code>output</code> with <code>value</code> at
+the position <code>at</code>. Any output works: a compartment (<code>B</code>, <code>B_g1</code>) or an
+accumulator (<code>cum_ab</code>). The observation's <code>label</code> names its series in reports,
+plots and the per-series normalization; it defaults to <code>output</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>at</code></td>
+<td><code>float</code></td>
+<td>required</td>
+<td>The position on the axis. The engine decides which positions its model type accepts.</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>The observed output. Give <code>output</code> or <code>outputs</code>, not both.</td>
+</tr>
+<tr>
+<td><code>outputs</code></td>
+<td><code>list[str] \| None</code></td>
+<td><code>None</code></td>
+<td>Outputs summed before the comparison; needs a <code>label</code>.</td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td><code>str</code></td>
+<td><code>output</code></td>
+<td>The name of the observed series.</td>
+</tr>
+<tr>
+<td><code>value</code></td>
+<td><code>float</code></td>
+<td>required</td>
+<td>The observed value, not negative.</td>
+</tr>
+<tr>
+<td><code>weight</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>How much the observation counts in the loss.</td>
+</tr>
+<tr>
+<td><code>factor_id</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>A <code>factor</code> unknown that multiplies the prediction.</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td><code>float \| None</code></td>
+<td><code>None</code></td>
+<td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
+</tr>
+</tbody>
+</table>
+<p>An unknown field, such as a misspelt name, raises <code>ValidationError</code> and names
+it.</p>
 <h2 id="sums-of-outputs">Sums of outputs<a class="headerlink" href="#sums-of-outputs" title="Permanent link">&para;</a></h2>
-<p>When one measurement covers several outputs, list them in <code>compartments</code>. They
-are summed before the comparison; <code>compartment</code> becomes a label for plots and
-reports:</p>
+<p>When one measurement covers several outputs, list them in <code>outputs</code>. They are
+summed before the comparison; <code>label</code> names the sum for plots and reports:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">b_and_c</span> <span class="o">=</span> <span class="p">[</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B_plus_C&quot;</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">compartments</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;B_plus_C&quot;</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">]</span> <span class="o">+</span> <span class="n">truth</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">],</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">)</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">]</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">b_and_c</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
-<p><code>compartments</code> may name compartments and accumulators, and works with
-<code>scale_id</code> and <code>window_steps</code>. It must not be empty.</p>
+<p><code>outputs</code> may name compartments and accumulators, and works with <code>factor_id</code>
+and <code>window</code>. It must not be empty.</p>
 <h2 id="weights-and-normalization">Weights and normalization<a class="headerlink" href="#weights-and-normalization" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2446,26 +2508,26 @@ reports:</p>
 </tbody>
 </table>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">weighted</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="mi">10</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="mi">10</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">]</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">weighted</span><span class="p">,</span> <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span> <span class="n">normalize_observations</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
-<h2 id="partial-observations-scale-factors">Partial observations: scale factors<a class="headerlink" href="#partial-observations-scale-factors" title="Permanent link">&para;</a></h2>
+<h2 id="partial-observations-factors">Partial observations: factors<a class="headerlink" href="#partial-observations-factors" title="Permanent link">&para;</a></h2>
 <p>When the data sees only part of an output, for example a fixed share of it, a
-<code>scale</code> unknown multiplies the prediction before the comparison. Link
-observations to it with <code>scale_id</code>:</p>
+<code>factor</code> unknown multiplies the prediction before the comparison. Link
+observations to it with <code>factor_id</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">seen</span> <span class="o">=</span> <span class="mf">0.3</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">partial</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">seen</span> <span class="o">*</span> <span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">],</span> <span class="n">scale_id</span><span class="o">=</span><span class="s2">&quot;share_seen&quot;</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">seen</span> <span class="o">*</span> <span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">],</span> <span class="n">factor_id</span><span class="o">=</span><span class="s2">&quot;share_seen&quot;</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">]</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">partial</span><span class="p">,</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;share_seen&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;scale&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;share_seen&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;factor&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="p">],</span>
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">)</span>
@@ -2481,12 +2543,12 @@ observations to it with <code>scale_id</code>:</p>
 </thead>
 <tbody>
 <tr>
-<td>Several scale factors</td>
-<td>Each observation names its own <code>scale_id</code>, so outputs can have different shares.</td>
+<td>Several factors</td>
+<td>Each observation names its own <code>factor_id</code>, so outputs can have different shares.</td>
 </tr>
 <tr>
 <td>Not part of the model</td>
-<td><code>apply_calibration_parameters</code> skips <code>scale</code> values.</td>
+<td><code>apply_calibration_parameters</code> skips <code>factor</code> values.</td>
 </tr>
 <tr>
 <td>Plots</td>
@@ -2500,18 +2562,18 @@ observations to it with <code>scale_id</code>:</p>
 </table>
 <h2 id="counts-per-period-windows">Counts per period: windows<a class="headerlink" href="#counts-per-period-windows" title="Permanent link">&para;</a></h2>
 <p>Data often counts what happened <strong>in</strong> each period, such as new arrivals per
-week. Observe a cumulative output (an accumulator) with <code>window_steps</code>, and the
+week. Observe a cumulative output (an accumulator) with <code>window</code>, and the
 model's prediction becomes the gain over the window:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>predicted(step) = output(step) - output(step - window_steps)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>predicted(at) = output(at) - output(at - window)
 </span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">windowed_totals</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_ends</span><span class="p">,</span> <span class="n">windowed_totals</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">weekly_steps</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">71</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">weekly_counts</span> <span class="o">=</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="mi">7</span><span class="p">,</span> <span class="n">weekly_steps</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">weekly_ends</span> <span class="o">=</span> <span class="n">window_ends</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">weekly_counts</span> <span class="o">=</span> <span class="n">windowed_totals</span><span class="p">(</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">],</span> <span class="n">truth</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="n">weekly_ends</span><span class="p">)</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">weekly</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window_steps</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">for</span> <span class="n">step</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">weekly_steps</span><span class="p">,</span> <span class="n">weekly_counts</span><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">weekly_ends</span><span class="p">,</span> <span class="n">weekly_counts</span><span class="p">)</span>
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">]</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">weekly</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
@@ -2524,7 +2586,7 @@ model's prediction becomes the gain over the window:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>window_steps &lt;= step</code></td>
+<td><code>window &lt;= at</code></td>
 <td>Otherwise the observation is rejected when it is created.</td>
 </tr>
 <tr>
@@ -2533,25 +2595,27 @@ model's prediction becomes the gain over the window:</p>
 </tr>
 <tr>
 <td>Mixed windows</td>
-<td>Observations may use different <code>window_steps</code>, and steps need not be multiples of the window.</td>
+<td>Observations may use different windows, and positions need not be multiples of the window.</td>
 </tr>
 <tr>
 <td>Combinations</td>
-<td>Works with <code>scale_id</code> and <code>compartments</code>.</td>
+<td>Works with <code>factor_id</code> and <code>outputs</code>.</td>
 </tr>
 </tbody>
 </table>
 <p><code>windowed_totals</code> (module function) and <code>Simulation.windowed_totals</code> apply the
 same reduction outside calibration, so a report shows exactly what the loss
 compared. See <a href="../simulations/#windowed-totals">Windowed totals</a>.</p>
-<h2 id="steps-between-integers">Steps between integers<a class="headerlink" href="#steps-between-integers" title="Permanent link">&para;</a></h2>
+<h2 id="positions-between-integers">Positions between integers<a class="headerlink" href="#positions-between-integers" title="Permanent link">&para;</a></h2>
 <p>A <code>DifferentialEquations</code> model runs in continuous time, so an observation may
-be at any step, such as <code>2.5</code>, and a window may cover any length. The
+be at any position, such as <code>2.5</code>, and a window may cover any length. The
 calibration reads the engine at those positions
-(<code>SimulationEngine::run_at_positions_into_buffer</code>). A <code>DifferenceEquations</code>
-model reports only at integer steps: <code>Calibrator</code> raises <code>ValueError</code>, naming
-the observation or the constraint, for a step that is not an integer
-(<code>check_steps_for_typology</code> in <code>py-commol/commol/context/calibration.py</code>).</p>
+(<code>SimulationEngine::run_at_positions_into_buffer</code>). The engine decides which
+positions its model type accepts (<code>SimulationEngine::check_position</code>): a
+<code>DifferenceEquations</code> model reports only at integer steps, so <code>Calibrator</code>
+raises <code>ValueError</code> for any other position, and the engine's message names the
+observation, or the constraint, that holds it (<code>check_positions</code> in
+<code>crates/commol-calibration/src/calibration_problem.rs</code>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">ode_model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="p">(</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Observed in continuous time&quot;</span><span class="p">)</span>
@@ -2566,29 +2630,27 @@ the observation or the constraint, for a step that is not an integer
 </span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="p">)</span>
 </span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">steps</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.75</span><span class="p">,</span> <span class="mf">3.25</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">]</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">observed_b</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">ode_model</span><span class="p">(</span><span class="mf">0.2</span><span class="p">))</span><span class="o">.</span><span class="n">run_at</span><span class="p">(</span><span class="n">steps</span><span class="p">)[</span><span class="s2">&quot;B&quot;</span><span class="p">]</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">positions</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.75</span><span class="p">,</span> <span class="mf">3.25</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">]</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">observed_b</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">ode_model</span><span class="p">(</span><span class="mf">0.2</span><span class="p">))</span><span class="o">.</span><span class="n">run_at</span><span class="p">(</span><span class="n">positions</span><span class="p">)[</span><span class="s2">&quot;B&quot;</span><span class="p">]</span>
 </span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
 </span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>        <span class="k">for</span> <span class="n">step</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">steps</span><span class="p">,</span> <span class="n">observed_b</span><span class="p">)</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">at</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>        <span class="k">for</span> <span class="n">at</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">positions</span><span class="p">,</span> <span class="n">observed_b</span><span class="p">)</span>
 </span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="p">],</span>
 </span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span><span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)],</span>
 </span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span>
 </span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="p">)</span>
 </span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">ode_model</span><span class="p">(</span><span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span><span class="o">.</span><span class="n">best_parameters</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">],</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># 0.2</span>
 </span></code></pre></div>
-<p>A step that is a whole number is stored as an <code>int</code>, so <code>step=3.0</code> and
-<code>step=3</code> are the same observation.</p>
 <h2 id="stratified-models">Stratified models<a class="headerlink" href="#stratified-models" title="Permanent link">&para;</a></h2>
 <p>Observe expanded outputs by name, such as <code>B_g1</code>, or sum them with
-<code>compartments</code>. <code>Simulation.outputs_for("B")</code> lists the names.</p>
+<code>outputs</code>. <code>Simulation.outputs_for("B")</code> lists the names.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
-<li>[ ] Every <code>compartment</code> (and every entry of <code>compartments</code>) is an output name.</li>
+<li>[ ] Every <code>output</code> (and every entry of <code>outputs</code>) is an output name; a sum has a <code>label</code>.</li>
 <li>[ ] Weights say how much each observation counts, in every loss.</li>
-<li>[ ] Every <code>scale_id</code> has a <code>CalibrationParameter</code> with <code>parameter_type="scale"</code>.</li>
-<li>[ ] Windowed observations use a cumulative output and <code>window_steps &lt;= step</code>.</li>
+<li>[ ] Every <code>factor_id</code> has a <code>CalibrationParameter</code> with <code>parameter_type="factor"</code>.</li>
+<li>[ ] Windowed observations use a cumulative output and <code>window &lt;= at</code>.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

@@ -821,10 +821,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#time-series-parameters" class="md-nav__link">
+  <a href="#series-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Time-series parameters
+        Series parameters
       
     </span>
   </a>
@@ -974,14 +974,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1552,14 +1552,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2317,10 +2317,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#time-series-parameters" class="md-nav__link">
+  <a href="#series-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Time-series parameters
+        Series parameters
       
     </span>
   </a>
@@ -2630,7 +2630,7 @@ in a rate means the total of all its expanded compartments.</p>
 </tr>
 <tr>
 <td><code>value</code></td>
-<td><code>float</code>, <code>str</code>, <code>list[tuple[int, float]]</code> or <code>None</code></td>
+<td><code>float</code>, <code>str</code>, <code>list[tuple[float, float]]</code> or <code>None</code></td>
 <td>required</td>
 <td>See the table below.</td>
 </tr>
@@ -2650,7 +2650,7 @@ in a rate means the total of all its expanded compartments.</p>
 <td><code>mode</code></td>
 <td><code>str \| None</code></td>
 <td><code>None</code></td>
-<td>How a time series is read; required for a time series and rejected otherwise.</td>
+<td>How a series is read; required for a series and rejected otherwise.</td>
 </tr>
 </tbody>
 </table>
@@ -2674,9 +2674,9 @@ in a rate means the total of all its expanded compartments.</p>
 <td>Evaluated at every step, in declaration order, so it can use earlier formulas, <code>N</code>, <code>step</code> and the other <a href="../mathematical-expressions/">special variables</a>.</td>
 </tr>
 <tr>
-<td><code>[(step, value), …]</code></td>
-<td>Time series</td>
-<td>A value per step, read with <code>mode</code> (below).</td>
+<td><code>[(position, value), …]</code></td>
+<td>Series</td>
+<td>Values at positions on the axis, read with <code>mode</code> (below).</td>
 </tr>
 <tr>
 <td><code>None</code></td>
@@ -2717,40 +2717,66 @@ these ids (<code>Model.validate_parameter_names_not_reserved</code> and
 </table>
 <p>An id that starts with <code>N_</code> but names no subpopulation, such as <code>N_max</code>, is
 accepted.</p>
-<h3 id="time-series-parameters">Time-series parameters<a class="headerlink" href="#time-series-parameters" title="Permanent link">&para;</a></h3>
-<p>A time series gives a parameter its value from <code>(step, value)</code> pairs. <code>mode</code>
-says how the steps between the pairs are read:</p>
+<h3 id="series-parameters">Series parameters<a class="headerlink" href="#series-parameters" title="Permanent link">&para;</a></h3>
+<p>A series gives a parameter its value from <code>(position, value)</code> points on the
+axis. <code>mode</code> says how the positions between the points are read, and whether
+the series reads <code>step</code> or <code>t</code> (<code>SeriesParameter::evaluate</code> in
+<code>crates/commol-model/src/types.rs</code>):</p>
 <table>
 <thead>
 <tr>
 <th><code>mode</code></th>
-<th>Before the first pair</th>
-<th>At a listed step</th>
-<th>Between listed steps</th>
-<th>After the last pair</th>
+<th>Reads</th>
+<th>Before the first point</th>
+<th>At a point</th>
+<th>Between points</th>
+<th>After the last point</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>"pulse"</code></td>
+<td><code>step</code></td>
 <td>0</td>
-<td>the listed value</td>
+<td>the value on the whole step</td>
 <td>0</td>
 <td>0</td>
 </tr>
 <tr>
 <td><code>"step_function"</code></td>
+<td><code>t</code></td>
 <td>0</td>
-<td>the listed value</td>
-<td>the last listed value</td>
-<td>the last listed value</td>
+<td>the value</td>
+<td>the value of the last point</td>
+<td>the value of the last point</td>
 </tr>
 <tr>
 <td><code>"linear"</code></td>
+<td><code>t</code></td>
 <td>0</td>
-<td>the listed value</td>
-<td>linear interpolation</td>
+<td>the value</td>
+<td>linear interpolation in <code>t</code></td>
 <td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The engine decides which positions its model type accepts, and names the
+parameter in its error:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Accepted positions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DifferenceEquations</code></td>
+<td>Integer steps only, for every mode. <code>t</code> equals <code>step</code>, so <code>"linear"</code> is read at each step.</td>
+</tr>
+<tr>
+<td><code>DifferentialEquations</code></td>
+<td>Any non-negative position for <code>"step_function"</code> and <code>"linear"</code>; the engine restarts its integration at each point. A <code>"pulse"</code> keeps integer positions: it is a rate on one unit step (<a href="../simulations/#time-inside-a-step">Time inside a step</a>).</td>
 </tr>
 </tbody>
 </table>
@@ -2758,7 +2784,7 @@ says how the steps between the pairs are read:</p>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">inflow_per_step</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Time series&quot;</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Series&quot;</span><span class="p">)</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k_in&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="p">[(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)],</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;inflow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k_in&quot;</span><span class="p">)</span>

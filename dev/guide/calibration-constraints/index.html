@@ -787,14 +787,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1480,14 +1480,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2316,7 +2316,7 @@ outputs is checked at the steps you list.</p>
 </span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="c1"># The data comes from k1 / k2 = 4</span>
 </span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
 </span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
 </span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 </span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="p">]</span>
 </span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
@@ -2373,10 +2373,10 @@ outputs is checked at the steps you list.</p>
 <td>Scales the penalty of a violation.</td>
 </tr>
 <tr>
-<td><code>time_steps</code></td>
-<td><code>list[int] \| None</code></td>
+<td><code>at</code></td>
+<td><code>list[float] \| None</code></td>
 <td><code>None</code></td>
-<td>The steps at which to evaluate it. Required when the expression names an output.</td>
+<td>The positions on the axis at which to evaluate it. Required when the expression names an output. A difference model accepts integer steps only.</td>
 </tr>
 </tbody>
 </table>
@@ -2412,11 +2412,11 @@ outputs is checked at the steps you list.</p>
 </tr>
 <tr>
 <td><code>B &lt;= 300</code> at steps 0 to 50</td>
-<td><code>"300 - B"</code> with <code>time_steps=list(range(51))</code></td>
+<td><code>"300 - B"</code> with <code>at=list(range(51))</code></td>
 </tr>
 <tr>
-<td><code>A + B &lt;= 100</code> at step 30</td>
-<td><code>"100 - (A + B)"</code> with <code>time_steps=[30]</code></td>
+<td><code>A + B &lt;= 100</code> at position 30</td>
+<td><code>"100 - (A + B)"</code> with <code>at=[30]</code></td>
 </tr>
 </tbody>
 </table>
@@ -2432,22 +2432,22 @@ passes the same security check.</p>
 </thead>
 <tbody>
 <tr>
-<td>Without <code>time_steps</code></td>
+<td>Without <code>at</code></td>
 <td>The calibration unknowns only</td>
 <td>Once per evaluation, before the simulation</td>
 </tr>
 <tr>
-<td>With <code>time_steps</code></td>
+<td>With <code>at</code></td>
 <td>The unknowns and the simulation outputs (compartments and accumulators)</td>
-<td>At each listed step of the simulation</td>
+<td>At each listed position of the simulation</td>
 </tr>
 </tbody>
 </table>
 <p>A constraint cannot name a model parameter that is not calibrated, and an
-expression that names an output without <code>time_steps</code> is rejected when the
+expression that names an output without <code>at</code> is rejected when the
 calibration starts.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">best</span> <span class="o">=</span> <span class="n">calibrate</span><span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="p">[</span><span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;300 - B&quot;</span><span class="p">,</span> <span class="n">time_steps</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">51</span><span class="p">)))]</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="p">[</span><span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;300 - B&quot;</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">51</span><span class="p">)))]</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="p">)</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">peak</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">],</span> <span class="n">best</span><span class="p">[</span><span class="s2">&quot;k2&quot;</span><span class="p">]))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)[</span><span class="s2">&quot;B&quot;</span><span class="p">])</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">peak</span><span class="p">))</span>  <span class="c1"># 300: the best fit whose B never exceeds 300</span>
@@ -2466,7 +2466,7 @@ only ranks violations against each other.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Each expression is <code>&gt;= 0</code> when the condition holds.</li>
-<li>[ ] Expressions that name outputs have <code>time_steps</code>.</li>
+<li>[ ] Expressions that name outputs have <code>at</code>.</li>
 <li>[ ] Expressions name only calibration unknowns (and outputs).</li>
 <li>[ ] The constraints do not contradict each other, such as <code>k1 - 0.5</code> and <code>0.4 - k1</code>.</li>
 <li>[ ] The search box contains points that satisfy every constraint.</li>

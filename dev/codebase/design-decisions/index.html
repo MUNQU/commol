@@ -781,14 +781,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/time-patterns/" class="md-nav__link">
+      <a href="../../guide/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1356,14 +1356,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2016,6 +2016,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-engine-owns-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine owns positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-carry-their-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results carry their positions
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2149,6 +2171,17 @@
     <span class="md-ellipsis">
       
         Model files are written in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public models forbid unknown fields
       
     </span>
   </a>
@@ -2760,6 +2793,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-engine-owns-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine owns positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-carry-their-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results carry their positions
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2893,6 +2948,17 @@
     <span class="md-ellipsis">
       
         Model files are written in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public models forbid unknown fields
       
     </span>
   </a>
@@ -3134,13 +3200,14 @@ See also <a href="../../development/design-per-compartment-initial-conditions/">
 counts. The axis of a model is its independent variable, whatever quantity it
 is (time is one case), so the engines never ask which dimension it has. <code>Model.step_unit</code> is optional and only the unit check
 reads it. <code>TimeScale</code> (<code>api/time_scale.py</code>) holds the length of a step of time
-and converts durations, probabilities and window grids. Conversions <strong>raise</strong>
+and converts durations and probabilities; the window grid is in
+<code>api/windows.py</code>. Conversions <strong>raise</strong>
 when a period is not a whole number of steps, instead of rounding. Months and
 years are absent on purpose, because they have no fixed length in steps.
 <code>TimeScale</code> applies only when that variable is time:
 <code>TimeScale.from_step_unit</code> raises for a step unit that is not time.</p>
-<p><strong>Guards:</strong> <code>tests/simulation/test_time_scale.py::TestWindowGrid</code>,
-<code>tests/simulation/test_time_scale.py::TestFromStepUnit</code>.</p>
+<p><strong>Guards:</strong> <code>tests/simulation/test_time_scale.py::TestFromStepUnit</code>,
+<code>tests/simulation/test_windows.py::TestWindowGrid</code>.</p>
 <h3 id="one-step-unit-in-the-unit-check">One step unit in the unit check<a class="headerlink" href="#one-step-unit-in-the-unit-check" title="Permanent link">&para;</a></h3>
 <p>The engine applies every flow once per step and converts no value between
 units. So <code>UnitChecker._step_unit</code> (<code>context/_model/units.py</code>) uses one step
@@ -3158,19 +3225,29 @@ model would apply a weekly rate every day.</p>
 <h3 id="time-inside-a-step">Time inside a step<a class="headerlink" href="#time-inside-a-step" title="Permanent link">&para;</a></h3>
 <p>A differential model integrates in continuous time, but on <code>[n, n + 1)</code> its
 rates see <code>step = n</code>: <code>t</code> is continuous, <code>step</code> is the floor of <code>t</code>. A rate that
-reads <code>step</code>, a time series or a time pattern is therefore constant on its unit
-interval. When the right-hand side reads one of them
-(<code>CompiledModel::depends_on_step</code>), the engine ends a piece of integration at
-every integer, so each jump of the rate is the start of a piece
-(<code>breakpoints</code> in <code>crates/commol-differential/src/solve.rs</code>).</p>
+reads <code>step</code> or a <code>"pulse"</code> series (and so <code>AxisPattern.pulse</code>, <code>pulses</code>,
+<code>periodic</code>) is therefore constant on its unit interval. When the right-hand
+side reads one of them (<code>CompiledModel::depends_on_step</code>), the engine ends a
+piece of integration at every integer, so each jump of the rate is the start of
+a piece (<code>breakpoints</code> in <code>crates/commol-differential/src/solve.rs</code>).</p>
+<p>A <code>"step_function"</code> or <code>"linear"</code> series reads <code>t</code>
+(<code>SeriesParameter::evaluate</code>), so it holds or interpolates from any position.
+The engine ends a piece at each of its points (<code>CompiledModel::series_points</code>),
+where the series jumps or bends. A difference engine reads <code>t = step</code>, so it
+gives the same values as before, and it rejects a point between integers.</p>
 <p>A rate can also jump where <code>t</code> reaches a value it compares <code>t</code> with
-(<code>t &gt;= t_on</code>). The compiler collects those values when they read only numbers,
-<code>pi</code>, <code>e</code> and parameters that do not change during a run
-(<code>time_thresholds</code> in <code>crates/commol-model/src/builder.rs</code>), and the engine
-evaluates them with the current parameters and ends a piece there. Without
-that, an adaptive solver whose rate is 0 before a short window grows its step
-and steps over the window. A comparison with the state is a state event, which
-the engine does not detect.</p>
+(<code>t &gt;= t_on</code>, and so <code>AxisPattern.interval</code> and <code>linear_ramp</code>). The compiler
+collects those values when they read only numbers, <code>pi</code>, <code>e</code> and parameters
+that do not change during a run (<code>time_thresholds</code> in
+<code>crates/commol-model/src/builder.rs</code>), and the engine evaluates them with the
+current parameters and ends a piece there. Without that, an adaptive solver
+whose rate is 0 before a short window grows its step and steps over the window.
+A comparison with the state is a state event, which the engine does not
+detect.</p>
+<p>On a piece <code>[start, end)</code> the right-hand side sees <code>t</code> no larger than the
+float just below <code>end</code> (<code>RightHandSide::last_t</code>). A Runge–Kutta step evaluates
+the right-hand side at the end of its interval; without the limit, a value that
+jumps at <code>end</code> would already act on the last step of the piece.</p>
 <p>Whether an expression reads <code>step</code> comes from <code>reads_variable</code>, not from
 <code>get_variables</code>: <code>get_variables</code> leaves out the special variables, because it
 lists the variables a model must define.</p>
@@ -3182,7 +3259,10 @@ length, so it would never act.</p>
 <code>crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval</code>,
 <code>a_rate_reads_the_step_of_its_unit_interval</code>,
 <code>a_rate_that_switches_on_t_acts_only_on_its_window</code>,
-<code>crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold</code>.</p>
+<code>a_linear_series_matches_the_integral_of_its_interpolant</code>,
+<code>a_step_function_series_holds_from_a_position_between_steps</code>,
+<code>crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold</code>,
+<code>tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration</code>.</p>
 <h3 id="impulses-come-before-the-flows-of-their-step">Impulses come before the flows of their step<a class="headerlink" href="#impulses-come-before-the-flows-of-their-step" title="Permanent link">&para;</a></h3>
 <p>At step <code>n</code> the state jumps first, then the flows of the step run from the new
 state, in both engines (<code>CompiledModel::apply_impulses</code>). Every jump of one
@@ -3195,16 +3275,50 @@ impulse step and restarts from the new state, so <code>diffsol</code> needs no e
 <p><strong>Guards:</strong> <code>tests/transitions/test_impulses.py::TestJump</code>,
 <code>crates/commol-differential/src/tests.rs::an_impulse_moves_its_fraction_at_once_in_both_engines</code>.</p>
 <h3 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h3>
-<p>An observation with <code>window_steps = W</code> is compared with
-<code>series[step] - series[step - W]</code>, anchored at its own step. The Rust loss and
+<p>An observation at <code>at</code> with <code>window = W</code> is compared with
+<code>output(at) - output(at - W)</code>, anchored at its own position. The Rust loss and
 <code>windowed_totals</code> (<code>api/windows.py</code>) must give the same number, and so must the
-ensemble statistics (<code>StatisticsCalculator._member_window_value</code>). A
-differential model may observe at non-integer steps: the statistics then read
-the engine at those positions (<code>StatisticsCalculator._point_values</code>), never an
-interpolation of the integer trajectory.</p>
+ensemble statistics (<code>StatisticsCalculator._member_window_value</code>). Window <code>w</code>
+covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
+<code>max(ceil(at / W) − 1, 0)</code>, and <code>observed_report</code> calls it.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
-the generating parameters is zero) and
-<code>tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps</code>.</p>
+the generating parameters is zero),
+<code>tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index</code>
+and
+<code>tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_positions</code>.</p>
+<h3 id="the-engine-owns-positions">The engine owns positions<a class="headerlink" href="#the-engine-owns-positions" title="Permanent link">&para;</a></h3>
+<p>A position on the axis is an <code>f64</code> in every engine call and a <code>float</code> in every
+public Python name (<code>at</code>); a length is <code>window</code> or <code>period</code>; a count of steps
+keeps <code>num_steps</code>. The <code>SimulationEngine</code> trait
+(<code>crates/commol-core/src/simulation_engine.rs</code>) runs only at positions
+(<code>run_at_positions_into_buffer</code>); <code>run(n)</code> runs on the grid the engine builds,
+<code>grid(n)</code>, and returns it. Each engine says which positions its model type
+accepts (<code>check_position</code>): a difference engine non-negative integers, a
+differential engine any finite, non-negative position. The engine checks every
+position where it receives it, and its message names the object that holds a
+rejected one: the observation or constraint (<code>check_positions</code> in
+<code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition
+or series parameter (<code>DifferenceEquations::from_compiled</code>).</p>
+<p><strong>Rule:</strong> Python passes positions on and shows the engine's message. It never
+checks whether a model type accepts a position.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_positions.rs</code>,
+<code>crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected</code>,
+<code>crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps</code>,
+<code>tests/calibration/test_observations.py::TestPositionsAndTypology</code>.</p>
+<h3 id="results-carry-their-positions">Results carry their positions<a class="headerlink" href="#results-carry-their-positions" title="Permanent link">&para;</a></h3>
+<p><code>Simulation.run</code> and <code>run_at</code> return <code>SimulationResults</code>
+(<code>api/results.py</code>): a <code>dict</code> from output name to values, with the positions in
+<code>positions</code> and the rows in <code>rows()</code>. A <code>dict</code> keeps <code>results["A"]</code>,
+<code>json.dumps</code> and <code>pandas.DataFrame(results)</code> working; a reserved key could clash
+with an output name. Windows, reports, plots and ensemble statistics read a
+value at a position (<code>index_at</code>, which matches within a relative <code>1e-9</code>), never
+at a list index, so a model type that reports between integers fits them. The
+ensemble trajectories hold <code>StatisticsCalculator.positions</code>: the unit grid and
+every observation position and window start.</p>
+<p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>,
+<code>tests/reporting/test_simulation_report.py::TestNonIntegerPositions</code>,
+<code>tests/plotting/test_plotter.py::TestDifferentialModel</code>,
+<code>tests/probabilistic/test_differential.py</code>.</p>
 <h2 id="engines">Engines<a class="headerlink" href="#engines" title="Permanent link">&para;</a></h2>
 <h3 id="one-right-hand-side-two-engines">One right-hand side, two engines<a class="headerlink" href="#one-right-hand-side-two-engines" title="Permanent link">&para;</a></h3>
 <p><code>CompiledModel::derivatives</code> (<code>crates/commol-model/src/system.rs</code>) computes
@@ -3285,6 +3399,11 @@ would lose a required key and fail to reload. <code>render_json</code>
 (<code>context/_model/serialization.py</code>) keeps files readable by writing long numeric
 arrays on one line. It is internal on purpose: an output format in the public
 API becomes a compatibility promise.</p>
+<h3 id="public-models-forbid-unknown-fields">Public models forbid unknown fields<a class="headerlink" href="#public-models-forbid-unknown-fields" title="Permanent link">&para;</a></h3>
+<p>Every public Pydantic class sets <code>model_config = ConfigDict(extra="forbid")</code>.
+An unknown field, such as a misspelt or an old name (<code>window_steps</code>), raises a
+<code>ValidationError</code> that names it, instead of being dropped with no error.</p>
+<p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
 <h2 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h2>
 <h3 id="every-user-expression-is-validated">Every user expression is validated<a class="headerlink" href="#every-user-expression-is-validated" title="Permanent link">&para;</a></h3>
 <p>Rate expressions (<code>context/dynamics.py</code>) and calibration constraints

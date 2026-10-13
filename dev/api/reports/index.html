@@ -779,14 +779,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/time-patterns/" class="md-nav__link">
+      <a href="../../guide/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1359,14 +1359,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2200,8 +2200,8 @@
 <p>Each entry carries the value the model holds and whether calibration set
 it, so entries the calibration left alone appear alongside the fitted ones.</p>
 <p>Parameters that are not a single number, such as a formula or a
-time-series, are omitted: they are inputs rather than fitted values.
-<code>scale</code> parameters have no place in the model, so they are reported from
+series, are omitted: they are inputs rather than fitted values.
+<code>factor</code> parameters have no place in the model, so they are reported from
 <code>problem</code> when it is given.</p>
 <p>Initial conditions carry the effective head <code>value</code> the engine builds
 from the uniform expansion plus the declared compartment overrides, its
@@ -2272,7 +2272,7 @@ one ensemble member's parameters.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The problem the result came from, used to report scale parameters.</p>
+                <p>The problem the result came from, used to report factor parameters.</p>
               </div>
             </td>
             <td>
@@ -2445,8 +2445,8 @@ a probabilistic result and this is not given.</p>
 </span><span id="__span-0-158"><a id="__codelineno-0-158" name="__codelineno-0-158"></a><span class="sd">    it, so entries the calibration left alone appear alongside the fitted ones.</span>
 </span><span id="__span-0-159"><a id="__codelineno-0-159" name="__codelineno-0-159"></a>
 </span><span id="__span-0-160"><a id="__codelineno-0-160" name="__codelineno-0-160"></a><span class="sd">    Parameters that are not a single number, such as a formula or a</span>
-</span><span id="__span-0-161"><a id="__codelineno-0-161" name="__codelineno-0-161"></a><span class="sd">    time-series, are omitted: they are inputs rather than fitted values.</span>
-</span><span id="__span-0-162"><a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">    ``scale`` parameters have no place in the model, so they are reported from</span>
+</span><span id="__span-0-161"><a id="__codelineno-0-161" name="__codelineno-0-161"></a><span class="sd">    series, are omitted: they are inputs rather than fitted values.</span>
+</span><span id="__span-0-162"><a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">    ``factor`` parameters have no place in the model, so they are reported from</span>
 </span><span id="__span-0-163"><a id="__codelineno-0-163" name="__codelineno-0-163"></a><span class="sd">    `problem` when it is given.</span>
 </span><span id="__span-0-164"><a id="__codelineno-0-164" name="__codelineno-0-164"></a>
 </span><span id="__span-0-165"><a id="__codelineno-0-165" name="__codelineno-0-165"></a><span class="sd">    Initial conditions carry the effective head ``value`` the engine builds</span>
@@ -2473,7 +2473,7 @@ a probabilistic result and this is not given.</p>
 </span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a><span class="sd">        The calibration outcome, or a mapping of parameter id to value such as</span>
 </span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a><span class="sd">        one ensemble member&#39;s parameters.</span>
 </span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a><span class="sd">    problem : CalibrationProblem | None, optional</span>
-</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a><span class="sd">        The problem the result came from, used to report scale parameters.</span>
+</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a><span class="sd">        The problem the result came from, used to report factor parameters.</span>
 </span><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a><span class="sd">    parameter_statistics : Mapping[str, ParameterSetStatistics] | None, optional</span>
 </span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a><span class="sd">        Ensemble spread per entry. Taken from `result` when it is a</span>
 </span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a><span class="sd">        probabilistic result and this is not given.</span>
@@ -2500,10 +2500,10 @@ a probabilistic result and this is not given.</p>
 </span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a>        <span class="k">for</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span>
 </span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parameter</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 </span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a>    <span class="p">}</span>
-</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a>    <span class="k">for</span> <span class="n">scale_id</span> <span class="ow">in</span> <span class="n">_scale_ids</span><span class="p">(</span><span class="n">problem</span><span class="p">):</span>
-</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>        <span class="k">if</span> <span class="n">scale_id</span> <span class="ow">in</span> <span class="n">calibrated</span><span class="p">:</span>
-</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>            <span class="n">parameters</span><span class="p">[</span><span class="n">scale_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">_parameter_entry</span><span class="p">(</span>
-</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>                <span class="n">scale_id</span><span class="p">,</span> <span class="n">calibrated</span><span class="p">[</span><span class="n">scale_id</span><span class="p">],</span> <span class="n">calibrated_ids</span><span class="p">,</span> <span class="n">parameter_statistics</span>
+</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a>    <span class="k">for</span> <span class="n">factor_id</span> <span class="ow">in</span> <span class="n">_factor_ids</span><span class="p">(</span><span class="n">problem</span><span class="p">):</span>
+</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>        <span class="k">if</span> <span class="n">factor_id</span> <span class="ow">in</span> <span class="n">calibrated</span><span class="p">:</span>
+</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>            <span class="n">parameters</span><span class="p">[</span><span class="n">factor_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">_parameter_entry</span><span class="p">(</span>
+</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>                <span class="n">factor_id</span><span class="p">,</span> <span class="n">calibrated</span><span class="p">[</span><span class="n">factor_id</span><span class="p">],</span> <span class="n">calibrated_ids</span><span class="p">,</span> <span class="n">parameter_statistics</span>
 </span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>            <span class="p">)</span>
 </span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a>
 </span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="n">initial_conditions</span> <span class="o">=</span> <span class="n">_initial_conditions_report</span><span class="p">(</span>
@@ -2534,7 +2534,7 @@ a probabilistic result and this is not given.</p>
 
 
 <a href="#commol.api.reporting.simulation_report" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">simulation_report</span><span class="p">(</span><span class="n">simulation</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Simulation (commol.api.simulation.Simulation)" href="../simulation/#commol.api.simulation.Simulation">Simulation</a></span><span class="p">,</span> <span class="n">results</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]],</span> <span class="n">steps</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="int">int</span></span><span class="p">],</span> <span class="n">window_steps</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">num_windows</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">observed_data</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol.context.calibration.ObservedDataPoint)" href="../calibrator/#commol.context.calibration.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span> <span class="n">accumulators</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span> <span class="n">ensemble_runs</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="commol.api.reporting.SimulationReport">SimulationReport</span></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">simulation_report</span><span class="p">(</span><span class="n">simulation</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Simulation (commol.api.simulation.Simulation)" href="../simulation/#commol.api.simulation.Simulation">Simulation</a></span><span class="p">,</span> <span class="n">results</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="SimulationResults (commol.api.results.SimulationResults)" href="../simulation/#commol.api.results.SimulationResults">SimulationResults</a></span><span class="p">,</span> <span class="n">at</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">],</span> <span class="n">window</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">num_windows</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">observed_data</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol.context.calibration.ObservedDataPoint)" href="../calibrator/#commol.context.calibration.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span> <span class="n">accumulators</span><span class="p">:</span> <span class="n"><span title="collections.abc.Iterable">Iterable</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span> <span class="n">ensemble_runs</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="SimulationResults (commol.api.results.SimulationResults)" href="../simulation/#commol.api.results.SimulationResults">SimulationResults</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="commol.api.reporting.SimulationReport">SimulationReport</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2581,11 +2581,11 @@ label, axis labels or domain-specific summary figures.</p>
                 <code>results</code>
             </td>
             <td>
-                  <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="collections.abc.Sequence">Sequence</span>[<span title="float">float</span>]]</code>
+                  <code><a class="autorefs autorefs-internal" title="SimulationResults (commol.api.results.SimulationResults)" href="../simulation/#commol.api.results.SimulationResults">SimulationResults</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Results in <code>dict_of_lists</code> form.</p>
+                <p>Results of a run, with their positions.</p>
               </div>
             </td>
             <td>
@@ -2594,14 +2594,14 @@ label, axis labels or domain-specific summary figures.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>steps</code>
+                <code>at</code>
             </td>
             <td>
-                  <code><span title="collections.abc.Sequence">Sequence</span>[<span title="int">int</span>]</code>
+                  <code><span title="collections.abc.Sequence">Sequence</span>[<span title="float">float</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Steps the series and cumulative accumulators are sampled at.</p>
+                <p>Positions the series and cumulative accumulators are sampled at.</p>
               </div>
             </td>
             <td>
@@ -2610,14 +2610,14 @@ label, axis labels or domain-specific summary figures.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>window_steps</code>
+                <code>window</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Length of one window, in steps.</p>
+                <p>Length of one window on the axis.</p>
               </div>
             </td>
             <td>
@@ -2677,7 +2677,7 @@ label, axis labels or domain-specific summary figures.</p>
                 <code>ensemble_runs</code>
             </td>
             <td>
-                  <code><span title="collections.abc.Sequence">Sequence</span>[<span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="collections.abc.Sequence">Sequence</span>[<span title="float">float</span>]]] | None</code>
+                  <code><span title="collections.abc.Sequence">Sequence</span>[<a class="autorefs autorefs-internal" title="SimulationResults (commol.api.results.SimulationResults)" href="../simulation/#commol.api.results.SimulationResults">SimulationResults</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2731,9 +2731,36 @@ label, axis labels or domain-specific summary figures.</p>
     </table>
 
 
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the results have no value at a position the report reads.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
             <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/api/reporting.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-668">668</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-664">664</a></span>
+<span class="normal"><a href="#__codelineno-0-665">665</a></span>
+<span class="normal"><a href="#__codelineno-0-666">666</a></span>
+<span class="normal"><a href="#__codelineno-0-667">667</a></span>
+<span class="normal"><a href="#__codelineno-0-668">668</a></span>
 <span class="normal"><a href="#__codelineno-0-669">669</a></span>
 <span class="normal"><a href="#__codelineno-0-670">670</a></span>
 <span class="normal"><a href="#__codelineno-0-671">671</a></span>
@@ -2803,77 +2830,83 @@ label, axis labels or domain-specific summary figures.</p>
 <span class="normal"><a href="#__codelineno-0-735">735</a></span>
 <span class="normal"><a href="#__codelineno-0-736">736</a></span>
 <span class="normal"><a href="#__codelineno-0-737">737</a></span>
-<span class="normal"><a href="#__codelineno-0-738">738</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-668"><a id="__codelineno-0-668" name="__codelineno-0-668"></a><span class="k">def</span><span class="w"> </span><span class="nf">simulation_report</span><span class="p">(</span>
-</span><span id="__span-0-669"><a id="__codelineno-0-669" name="__codelineno-0-669"></a>    <span class="n">simulation</span><span class="p">:</span> <span class="n">Simulation</span><span class="p">,</span>
-</span><span id="__span-0-670"><a id="__codelineno-0-670" name="__codelineno-0-670"></a>    <span class="n">results</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span>
-</span><span id="__span-0-671"><a id="__codelineno-0-671" name="__codelineno-0-671"></a>    <span class="n">steps</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span id="__span-0-672"><a id="__codelineno-0-672" name="__codelineno-0-672"></a>    <span class="n">window_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-</span><span id="__span-0-673"><a id="__codelineno-0-673" name="__codelineno-0-673"></a>    <span class="n">num_windows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-</span><span id="__span-0-674"><a id="__codelineno-0-674" name="__codelineno-0-674"></a>    <span class="n">observed_data</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">ObservedDataPoint</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
-</span><span id="__span-0-675"><a id="__codelineno-0-675" name="__codelineno-0-675"></a>    <span class="n">accumulators</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
-</span><span id="__span-0-676"><a id="__codelineno-0-676" name="__codelineno-0-676"></a>    <span class="n">ensemble_runs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-677"><a id="__codelineno-0-677" name="__codelineno-0-677"></a>    <span class="n">confidence_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-678"><a id="__codelineno-0-678" name="__codelineno-0-678"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SimulationReport</span><span class="p">:</span>
-</span><span id="__span-0-679"><a id="__codelineno-0-679" name="__codelineno-0-679"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-680"><a id="__codelineno-0-680" name="__codelineno-0-680"></a><span class="sd">    Report the observed data, compartment series and accumulators of a run.</span>
-</span><span id="__span-0-681"><a id="__codelineno-0-681" name="__codelineno-0-681"></a>
-</span><span id="__span-0-682"><a id="__codelineno-0-682" name="__codelineno-0-682"></a><span class="sd">    The three blocks share one window axis, so the observed values, the</span>
-</span><span id="__span-0-683"><a id="__codelineno-0-683" name="__codelineno-0-683"></a><span class="sd">    windowed accumulator increments and the sampled series can be read against</span>
-</span><span id="__span-0-684"><a id="__codelineno-0-684" name="__codelineno-0-684"></a><span class="sd">    each other. With `ensemble_runs` every leaf becomes a</span>
-</span><span id="__span-0-685"><a id="__codelineno-0-685" name="__codelineno-0-685"></a><span class="sd">    ``{mean, median, ci_lower, ci_upper, min, max}`` block computed across</span>
-</span><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a><span class="sd">    members, and the layout is otherwise unchanged.</span>
-</span><span id="__span-0-687"><a id="__codelineno-0-687" name="__codelineno-0-687"></a>
-</span><span id="__span-0-688"><a id="__codelineno-0-688" name="__codelineno-0-688"></a><span class="sd">    Callers add whatever envelope they need around these blocks, such as a run</span>
-</span><span id="__span-0-689"><a id="__codelineno-0-689" name="__codelineno-0-689"></a><span class="sd">    label, axis labels or domain-specific summary figures.</span>
-</span><span id="__span-0-690"><a id="__codelineno-0-690" name="__codelineno-0-690"></a>
-</span><span id="__span-0-691"><a id="__codelineno-0-691" name="__codelineno-0-691"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-692"><a id="__codelineno-0-692" name="__codelineno-0-692"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-693"><a id="__codelineno-0-693" name="__codelineno-0-693"></a><span class="sd">    simulation : Simulation</span>
-</span><span id="__span-0-694"><a id="__codelineno-0-694" name="__codelineno-0-694"></a><span class="sd">        The simulation the results came from.</span>
-</span><span id="__span-0-695"><a id="__codelineno-0-695" name="__codelineno-0-695"></a><span class="sd">    results : Mapping[str, Sequence[float]]</span>
-</span><span id="__span-0-696"><a id="__codelineno-0-696" name="__codelineno-0-696"></a><span class="sd">        Results in `dict_of_lists` form.</span>
-</span><span id="__span-0-697"><a id="__codelineno-0-697" name="__codelineno-0-697"></a><span class="sd">    steps : Sequence[int]</span>
-</span><span id="__span-0-698"><a id="__codelineno-0-698" name="__codelineno-0-698"></a><span class="sd">        Steps the series and cumulative accumulators are sampled at.</span>
-</span><span id="__span-0-699"><a id="__codelineno-0-699" name="__codelineno-0-699"></a><span class="sd">    window_steps : int</span>
-</span><span id="__span-0-700"><a id="__codelineno-0-700" name="__codelineno-0-700"></a><span class="sd">        Length of one window, in steps.</span>
-</span><span id="__span-0-701"><a id="__codelineno-0-701" name="__codelineno-0-701"></a><span class="sd">    num_windows : int</span>
-</span><span id="__span-0-702"><a id="__codelineno-0-702" name="__codelineno-0-702"></a><span class="sd">        Number of windows on the observed and windowed axes.</span>
-</span><span id="__span-0-703"><a id="__codelineno-0-703" name="__codelineno-0-703"></a><span class="sd">    observed_data : Iterable[ObservedDataPoint], optional</span>
-</span><span id="__span-0-704"><a id="__codelineno-0-704" name="__codelineno-0-704"></a><span class="sd">        The calibration targets to report alongside the run.</span>
-</span><span id="__span-0-705"><a id="__codelineno-0-705" name="__codelineno-0-705"></a><span class="sd">    accumulators : Iterable[str], optional</span>
-</span><span id="__span-0-706"><a id="__codelineno-0-706" name="__codelineno-0-706"></a><span class="sd">        Accumulator ids to report.</span>
-</span><span id="__span-0-707"><a id="__codelineno-0-707" name="__codelineno-0-707"></a><span class="sd">    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional</span>
-</span><span id="__span-0-708"><a id="__codelineno-0-708" name="__codelineno-0-708"></a><span class="sd">        One results mapping per ensemble member.</span>
-</span><span id="__span-0-709"><a id="__codelineno-0-709" name="__codelineno-0-709"></a><span class="sd">    confidence_level : float | None, optional</span>
-</span><span id="__span-0-710"><a id="__codelineno-0-710" name="__codelineno-0-710"></a><span class="sd">        Confidence level of the reported intervals.</span>
-</span><span id="__span-0-711"><a id="__codelineno-0-711" name="__codelineno-0-711"></a>
-</span><span id="__span-0-712"><a id="__codelineno-0-712" name="__codelineno-0-712"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-713"><a id="__codelineno-0-713" name="__codelineno-0-713"></a><span class="sd">    -------</span>
-</span><span id="__span-0-714"><a id="__codelineno-0-714" name="__codelineno-0-714"></a><span class="sd">    SimulationReport</span>
-</span><span id="__span-0-715"><a id="__codelineno-0-715" name="__codelineno-0-715"></a><span class="sd">        Keys ``observed``, ``series`` and ``accumulators``.</span>
-</span><span id="__span-0-716"><a id="__codelineno-0-716" name="__codelineno-0-716"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-717"><a id="__codelineno-0-717" name="__codelineno-0-717"></a>    <span class="n">accumulator_ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">accumulators</span><span class="p">)</span>
-</span><span id="__span-0-718"><a id="__codelineno-0-718" name="__codelineno-0-718"></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="__span-0-719"><a id="__codelineno-0-719" name="__codelineno-0-719"></a>        <span class="s2">&quot;observed&quot;</span><span class="p">:</span> <span class="n">observed_report</span><span class="p">(</span><span class="n">observed_data</span><span class="p">,</span> <span class="n">window_steps</span><span class="p">,</span> <span class="n">num_windows</span><span class="p">),</span>
-</span><span id="__span-0-720"><a id="__codelineno-0-720" name="__codelineno-0-720"></a>        <span class="s2">&quot;series&quot;</span><span class="p">:</span> <span class="n">series_report</span><span class="p">(</span>
-</span><span id="__span-0-721"><a id="__codelineno-0-721" name="__codelineno-0-721"></a>            <span class="n">simulation</span><span class="p">,</span>
-</span><span id="__span-0-722"><a id="__codelineno-0-722" name="__codelineno-0-722"></a>            <span class="n">results</span><span class="p">,</span>
-</span><span id="__span-0-723"><a id="__codelineno-0-723" name="__codelineno-0-723"></a>            <span class="n">steps</span><span class="p">,</span>
-</span><span id="__span-0-724"><a id="__codelineno-0-724" name="__codelineno-0-724"></a>            <span class="n">accumulator_ids</span><span class="p">,</span>
-</span><span id="__span-0-725"><a id="__codelineno-0-725" name="__codelineno-0-725"></a>            <span class="n">ensemble_runs</span><span class="p">,</span>
-</span><span id="__span-0-726"><a id="__codelineno-0-726" name="__codelineno-0-726"></a>            <span class="n">confidence_level</span><span class="p">,</span>
-</span><span id="__span-0-727"><a id="__codelineno-0-727" name="__codelineno-0-727"></a>        <span class="p">),</span>
-</span><span id="__span-0-728"><a id="__codelineno-0-728" name="__codelineno-0-728"></a>        <span class="s2">&quot;accumulators&quot;</span><span class="p">:</span> <span class="n">accumulators_report</span><span class="p">(</span>
-</span><span id="__span-0-729"><a id="__codelineno-0-729" name="__codelineno-0-729"></a>            <span class="n">simulation</span><span class="p">,</span>
-</span><span id="__span-0-730"><a id="__codelineno-0-730" name="__codelineno-0-730"></a>            <span class="n">results</span><span class="p">,</span>
-</span><span id="__span-0-731"><a id="__codelineno-0-731" name="__codelineno-0-731"></a>            <span class="n">accumulator_ids</span><span class="p">,</span>
-</span><span id="__span-0-732"><a id="__codelineno-0-732" name="__codelineno-0-732"></a>            <span class="n">steps</span><span class="p">,</span>
-</span><span id="__span-0-733"><a id="__codelineno-0-733" name="__codelineno-0-733"></a>            <span class="n">window_steps</span><span class="p">,</span>
-</span><span id="__span-0-734"><a id="__codelineno-0-734" name="__codelineno-0-734"></a>            <span class="n">num_windows</span><span class="p">,</span>
-</span><span id="__span-0-735"><a id="__codelineno-0-735" name="__codelineno-0-735"></a>            <span class="n">ensemble_runs</span><span class="p">,</span>
-</span><span id="__span-0-736"><a id="__codelineno-0-736" name="__codelineno-0-736"></a>            <span class="n">confidence_level</span><span class="p">,</span>
-</span><span id="__span-0-737"><a id="__codelineno-0-737" name="__codelineno-0-737"></a>        <span class="p">),</span>
-</span><span id="__span-0-738"><a id="__codelineno-0-738" name="__codelineno-0-738"></a>    <span class="p">}</span>
+<span class="normal"><a href="#__codelineno-0-738">738</a></span>
+<span class="normal"><a href="#__codelineno-0-739">739</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-664"><a id="__codelineno-0-664" name="__codelineno-0-664"></a><span class="k">def</span><span class="w"> </span><span class="nf">simulation_report</span><span class="p">(</span>
+</span><span id="__span-0-665"><a id="__codelineno-0-665" name="__codelineno-0-665"></a>    <span class="n">simulation</span><span class="p">:</span> <span class="n">Simulation</span><span class="p">,</span>
+</span><span id="__span-0-666"><a id="__codelineno-0-666" name="__codelineno-0-666"></a>    <span class="n">results</span><span class="p">:</span> <span class="n">SimulationResults</span><span class="p">,</span>
+</span><span id="__span-0-667"><a id="__codelineno-0-667" name="__codelineno-0-667"></a>    <span class="n">at</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+</span><span id="__span-0-668"><a id="__codelineno-0-668" name="__codelineno-0-668"></a>    <span class="n">window</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-0-669"><a id="__codelineno-0-669" name="__codelineno-0-669"></a>    <span class="n">num_windows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+</span><span id="__span-0-670"><a id="__codelineno-0-670" name="__codelineno-0-670"></a>    <span class="n">observed_data</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">ObservedDataPoint</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+</span><span id="__span-0-671"><a id="__codelineno-0-671" name="__codelineno-0-671"></a>    <span class="n">accumulators</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+</span><span id="__span-0-672"><a id="__codelineno-0-672" name="__codelineno-0-672"></a>    <span class="n">ensemble_runs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">SimulationResults</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-673"><a id="__codelineno-0-673" name="__codelineno-0-673"></a>    <span class="n">confidence_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-674"><a id="__codelineno-0-674" name="__codelineno-0-674"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SimulationReport</span><span class="p">:</span>
+</span><span id="__span-0-675"><a id="__codelineno-0-675" name="__codelineno-0-675"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-676"><a id="__codelineno-0-676" name="__codelineno-0-676"></a><span class="sd">    Report the observed data, compartment series and accumulators of a run.</span>
+</span><span id="__span-0-677"><a id="__codelineno-0-677" name="__codelineno-0-677"></a>
+</span><span id="__span-0-678"><a id="__codelineno-0-678" name="__codelineno-0-678"></a><span class="sd">    The three blocks share one window axis, so the observed values, the</span>
+</span><span id="__span-0-679"><a id="__codelineno-0-679" name="__codelineno-0-679"></a><span class="sd">    windowed accumulator increments and the sampled series can be read against</span>
+</span><span id="__span-0-680"><a id="__codelineno-0-680" name="__codelineno-0-680"></a><span class="sd">    each other. With `ensemble_runs` every leaf becomes a</span>
+</span><span id="__span-0-681"><a id="__codelineno-0-681" name="__codelineno-0-681"></a><span class="sd">    ``{mean, median, ci_lower, ci_upper, min, max}`` block computed across</span>
+</span><span id="__span-0-682"><a id="__codelineno-0-682" name="__codelineno-0-682"></a><span class="sd">    members, and the layout is otherwise unchanged.</span>
+</span><span id="__span-0-683"><a id="__codelineno-0-683" name="__codelineno-0-683"></a>
+</span><span id="__span-0-684"><a id="__codelineno-0-684" name="__codelineno-0-684"></a><span class="sd">    Callers add whatever envelope they need around these blocks, such as a run</span>
+</span><span id="__span-0-685"><a id="__codelineno-0-685" name="__codelineno-0-685"></a><span class="sd">    label, axis labels or domain-specific summary figures.</span>
+</span><span id="__span-0-686"><a id="__codelineno-0-686" name="__codelineno-0-686"></a>
+</span><span id="__span-0-687"><a id="__codelineno-0-687" name="__codelineno-0-687"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-688"><a id="__codelineno-0-688" name="__codelineno-0-688"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-689"><a id="__codelineno-0-689" name="__codelineno-0-689"></a><span class="sd">    simulation : Simulation</span>
+</span><span id="__span-0-690"><a id="__codelineno-0-690" name="__codelineno-0-690"></a><span class="sd">        The simulation the results came from.</span>
+</span><span id="__span-0-691"><a id="__codelineno-0-691" name="__codelineno-0-691"></a><span class="sd">    results : SimulationResults</span>
+</span><span id="__span-0-692"><a id="__codelineno-0-692" name="__codelineno-0-692"></a><span class="sd">        Results of a run, with their positions.</span>
+</span><span id="__span-0-693"><a id="__codelineno-0-693" name="__codelineno-0-693"></a><span class="sd">    at : Sequence[float]</span>
+</span><span id="__span-0-694"><a id="__codelineno-0-694" name="__codelineno-0-694"></a><span class="sd">        Positions the series and cumulative accumulators are sampled at.</span>
+</span><span id="__span-0-695"><a id="__codelineno-0-695" name="__codelineno-0-695"></a><span class="sd">    window : float</span>
+</span><span id="__span-0-696"><a id="__codelineno-0-696" name="__codelineno-0-696"></a><span class="sd">        Length of one window on the axis.</span>
+</span><span id="__span-0-697"><a id="__codelineno-0-697" name="__codelineno-0-697"></a><span class="sd">    num_windows : int</span>
+</span><span id="__span-0-698"><a id="__codelineno-0-698" name="__codelineno-0-698"></a><span class="sd">        Number of windows on the observed and windowed axes.</span>
+</span><span id="__span-0-699"><a id="__codelineno-0-699" name="__codelineno-0-699"></a><span class="sd">    observed_data : Iterable[ObservedDataPoint], optional</span>
+</span><span id="__span-0-700"><a id="__codelineno-0-700" name="__codelineno-0-700"></a><span class="sd">        The calibration targets to report alongside the run.</span>
+</span><span id="__span-0-701"><a id="__codelineno-0-701" name="__codelineno-0-701"></a><span class="sd">    accumulators : Iterable[str], optional</span>
+</span><span id="__span-0-702"><a id="__codelineno-0-702" name="__codelineno-0-702"></a><span class="sd">        Accumulator ids to report.</span>
+</span><span id="__span-0-703"><a id="__codelineno-0-703" name="__codelineno-0-703"></a><span class="sd">    ensemble_runs : Sequence[SimulationResults] | None, optional</span>
+</span><span id="__span-0-704"><a id="__codelineno-0-704" name="__codelineno-0-704"></a><span class="sd">        One results mapping per ensemble member.</span>
+</span><span id="__span-0-705"><a id="__codelineno-0-705" name="__codelineno-0-705"></a><span class="sd">    confidence_level : float | None, optional</span>
+</span><span id="__span-0-706"><a id="__codelineno-0-706" name="__codelineno-0-706"></a><span class="sd">        Confidence level of the reported intervals.</span>
+</span><span id="__span-0-707"><a id="__codelineno-0-707" name="__codelineno-0-707"></a>
+</span><span id="__span-0-708"><a id="__codelineno-0-708" name="__codelineno-0-708"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-709"><a id="__codelineno-0-709" name="__codelineno-0-709"></a><span class="sd">    -------</span>
+</span><span id="__span-0-710"><a id="__codelineno-0-710" name="__codelineno-0-710"></a><span class="sd">    SimulationReport</span>
+</span><span id="__span-0-711"><a id="__codelineno-0-711" name="__codelineno-0-711"></a><span class="sd">        Keys ``observed``, ``series`` and ``accumulators``.</span>
+</span><span id="__span-0-712"><a id="__codelineno-0-712" name="__codelineno-0-712"></a>
+</span><span id="__span-0-713"><a id="__codelineno-0-713" name="__codelineno-0-713"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-714"><a id="__codelineno-0-714" name="__codelineno-0-714"></a><span class="sd">    ------</span>
+</span><span id="__span-0-715"><a id="__codelineno-0-715" name="__codelineno-0-715"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-716"><a id="__codelineno-0-716" name="__codelineno-0-716"></a><span class="sd">        If the results have no value at a position the report reads.</span>
+</span><span id="__span-0-717"><a id="__codelineno-0-717" name="__codelineno-0-717"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-718"><a id="__codelineno-0-718" name="__codelineno-0-718"></a>    <span class="n">accumulator_ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">accumulators</span><span class="p">)</span>
+</span><span id="__span-0-719"><a id="__codelineno-0-719" name="__codelineno-0-719"></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="__span-0-720"><a id="__codelineno-0-720" name="__codelineno-0-720"></a>        <span class="s2">&quot;observed&quot;</span><span class="p">:</span> <span class="n">observed_report</span><span class="p">(</span><span class="n">observed_data</span><span class="p">,</span> <span class="n">window</span><span class="p">,</span> <span class="n">num_windows</span><span class="p">),</span>
+</span><span id="__span-0-721"><a id="__codelineno-0-721" name="__codelineno-0-721"></a>        <span class="s2">&quot;series&quot;</span><span class="p">:</span> <span class="n">series_report</span><span class="p">(</span>
+</span><span id="__span-0-722"><a id="__codelineno-0-722" name="__codelineno-0-722"></a>            <span class="n">simulation</span><span class="p">,</span>
+</span><span id="__span-0-723"><a id="__codelineno-0-723" name="__codelineno-0-723"></a>            <span class="n">results</span><span class="p">,</span>
+</span><span id="__span-0-724"><a id="__codelineno-0-724" name="__codelineno-0-724"></a>            <span class="n">at</span><span class="p">,</span>
+</span><span id="__span-0-725"><a id="__codelineno-0-725" name="__codelineno-0-725"></a>            <span class="n">accumulator_ids</span><span class="p">,</span>
+</span><span id="__span-0-726"><a id="__codelineno-0-726" name="__codelineno-0-726"></a>            <span class="n">ensemble_runs</span><span class="p">,</span>
+</span><span id="__span-0-727"><a id="__codelineno-0-727" name="__codelineno-0-727"></a>            <span class="n">confidence_level</span><span class="p">,</span>
+</span><span id="__span-0-728"><a id="__codelineno-0-728" name="__codelineno-0-728"></a>        <span class="p">),</span>
+</span><span id="__span-0-729"><a id="__codelineno-0-729" name="__codelineno-0-729"></a>        <span class="s2">&quot;accumulators&quot;</span><span class="p">:</span> <span class="n">accumulators_report</span><span class="p">(</span>
+</span><span id="__span-0-730"><a id="__codelineno-0-730" name="__codelineno-0-730"></a>            <span class="n">simulation</span><span class="p">,</span>
+</span><span id="__span-0-731"><a id="__codelineno-0-731" name="__codelineno-0-731"></a>            <span class="n">results</span><span class="p">,</span>
+</span><span id="__span-0-732"><a id="__codelineno-0-732" name="__codelineno-0-732"></a>            <span class="n">accumulator_ids</span><span class="p">,</span>
+</span><span id="__span-0-733"><a id="__codelineno-0-733" name="__codelineno-0-733"></a>            <span class="n">at</span><span class="p">,</span>
+</span><span id="__span-0-734"><a id="__codelineno-0-734" name="__codelineno-0-734"></a>            <span class="n">window</span><span class="p">,</span>
+</span><span id="__span-0-735"><a id="__codelineno-0-735" name="__codelineno-0-735"></a>            <span class="n">num_windows</span><span class="p">,</span>
+</span><span id="__span-0-736"><a id="__codelineno-0-736" name="__codelineno-0-736"></a>            <span class="n">ensemble_runs</span><span class="p">,</span>
+</span><span id="__span-0-737"><a id="__codelineno-0-737" name="__codelineno-0-737"></a>            <span class="n">confidence_level</span><span class="p">,</span>
+</span><span id="__span-0-738"><a id="__codelineno-0-738" name="__codelineno-0-738"></a>        <span class="p">),</span>
+</span><span id="__span-0-739"><a id="__codelineno-0-739" name="__codelineno-0-739"></a>    <span class="p">}</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>

@@ -111,20 +111,20 @@ builder = (
 )
 ```
 
-| Argument      | Type                                                | Default  | Meaning                                                                                                        |
-| ------------- | --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                                               | required | The identifier. It must be unique and must not be a [name the engine sets](#names-the-engine-sets).            |
-| `value`       | `float`, `str`, `list[tuple[int, float]]` or `None` | required | See the table below.                                                                                           |
-| `description` | `str \| None`                                       | `None`   | A free-text description.                                                                                       |
-| `unit`        | `str \| None`                                       | `None`   | The unit, for [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
-| `mode`        | `str \| None`                                       | `None`   | How a time series is read; required for a time series and rejected otherwise.                                  |
+| Argument      | Type                                                  | Default  | Meaning                                                                                                        |
+| ------------- | ----------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                                                 | required | The identifier. It must be unique and must not be a [name the engine sets](#names-the-engine-sets).            |
+| `value`       | `float`, `str`, `list[tuple[float, float]]` or `None` | required | See the table below.                                                                                           |
+| `description` | `str \| None`                                         | `None`   | A free-text description.                                                                                       |
+| `unit`        | `str \| None`                                         | `None`   | The unit, for [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
+| `mode`        | `str \| None`                                         | `None`   | How a series is read; required for a series and rejected otherwise.                                            |
 
-| `value`              | Kind         | Behavior                                                                                                                                                                                                     |
-| -------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0.3`                | Constant     | The same value at every step.                                                                                                                                                                                |
-| `"k1 / 2"`           | Formula      | Evaluated at every step, in declaration order, so it can use earlier formulas, `N`, `step` and the other [special variables](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md). |
-| `[(step, value), …]` | Time series  | A value per step, read with `mode` (below).                                                                                                                                                                  |
-| `None`               | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                            |
+| `value`                  | Kind         | Behavior                                                                                                                                                                                                     |
+| ------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0.3`                    | Constant     | The same value at every step.                                                                                                                                                                                |
+| `"k1 / 2"`               | Formula      | Evaluated at every step, in declaration order, so it can use earlier formulas, `N`, `step` and the other [special variables](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md). |
+| `[(position, value), …]` | Series       | Values at positions on the axis, read with `mode` (below).                                                                                                                                                   |
+| `None`                   | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                            |
 
 ### Names the engine sets
 
@@ -139,22 +139,29 @@ The engine sets these variables, so `build` rejects a parameter with one of thes
 
 An id that starts with `N_` but names no subpopulation, such as `N_max`, is accepted.
 
-### Time-series parameters
+### Series parameters
 
-A time series gives a parameter its value from `(step, value)` pairs. `mode` says how the steps between the pairs are read:
+A series gives a parameter its value from `(position, value)` points on the axis. `mode` says how the positions between the points are read, and whether the series reads `step` or `t` (`SeriesParameter::evaluate` in `crates/commol-model/src/types.rs`):
 
-| `mode`            | Before the first pair | At a listed step | Between listed steps  | After the last pair   |
-| ----------------- | --------------------- | ---------------- | --------------------- | --------------------- |
-| `"pulse"`         | 0                     | the listed value | 0                     | 0                     |
-| `"step_function"` | 0                     | the listed value | the last listed value | the last listed value |
-| `"linear"`        | 0                     | the listed value | linear interpolation  | 0                     |
+| `mode`            | Reads  | Before the first point | At a point                  | Between points              | After the last point        |
+| ----------------- | ------ | ---------------------- | --------------------------- | --------------------------- | --------------------------- |
+| `"pulse"`         | `step` | 0                      | the value on the whole step | 0                           | 0                           |
+| `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
+| `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
+
+The engine decides which positions its model type accepts, and names the parameter in its error:
+
+| Model                   | Accepted positions                                                                                                                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DifferenceEquations`   | Integer steps only, for every mode. `t` equals `step`, so `"linear"` is read at each step.                                                                                                                                                                                                 |
+| `DifferentialEquations` | Any non-negative position for `"step_function"` and `"linear"`; the engine restarts its integration at each point. A `"pulse"` keeps integer positions: it is a rate on one unit step ([Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)). |
 
 ```python
 import numpy as np
 
 def inflow_per_step(mode: str) -> list[float]:
     model = (
-        ModelBuilder(name="Time series")
+        ModelBuilder(name="Series")
         .add_bin(id="A", name="State A")
         .add_parameter(id="k_in", value=[(2, 1.0), (5, 4.0)], mode=mode)
         .add_transition(id="inflow", source=[], target=["A"], rate="k_in")

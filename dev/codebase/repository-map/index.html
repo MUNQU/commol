@@ -781,14 +781,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/time-patterns/" class="md-nav__link">
+      <a href="../../guide/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1356,14 +1356,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2320,7 +2320,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait and <code>OutputLabels</code>: what calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait (runs at positions, <code>check_position</code>), <code>Trajectory</code>, <code>check_positions</code> and <code>OutputLabels</code>: what calibration needs from any engine.</td>
 <td>Code for one engine.</td>
 </tr>
 <tr>
@@ -2355,12 +2355,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/types.rs</code></td>
-<td><code>CompiledModel</code>, compiled flows, impulse schedules, time-series lookup.</td>
+<td><code>CompiledModel</code>, compiled flows, impulse schedules, series lookup (<code>SeriesParameter</code>).</td>
 <td>Python types.</td>
 </tr>
 <tr>
 <td><code>crates/commol-difference/src/simulation.rs</code></td>
-<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, and its <code>SimulationEngine</code> implementation.</td>
+<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, the positions it accepts (integers), and its <code>SimulationEngine</code> implementation.</td>
 <td>Model compilation.</td>
 </tr>
 <tr>
@@ -2375,7 +2375,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td>Loss, constraints and the objective function.</td>
+<td>Loss, constraints, the objective function, and the position check that names an observation or constraint (<code>check_positions</code>).</td>
 <td>Optimizer setup.</td>
 </tr>
 <tr>
@@ -2455,7 +2455,12 @@
 <tr>
 <td><code>api/simulation.py</code></td>
 <td><code>Simulation</code>: runs (<code>run</code>, <code>run_at</code>), output grouping.</td>
-<td>Expansion rules.</td>
+<td>Expansion rules; which positions a model type accepts.</td>
+</tr>
+<tr>
+<td><code>api/results.py</code></td>
+<td><code>SimulationResults</code> (values with their positions), <code>index_at</code>, <code>sample</code>.</td>
+<td>Engine rules.</td>
 </tr>
 <tr>
 <td><code>api/calibrator.py</code>, <code>api/probabilistic_calibrator.py</code></td>
@@ -2473,8 +2478,8 @@
 <td>Domain vocabulary.</td>
 </tr>
 <tr>
-<td><code>api/time_patterns.py</code>, <code>api/time_scale.py</code>, <code>api/windows.py</code></td>
-<td>Time-varying rates, step/physical-time conversion, windowed totals.</td>
+<td><code>api/patterns.py</code>, <code>api/time_scale.py</code>, <code>api/windows.py</code></td>
+<td>Rates that change along the axis (<code>AxisPattern</code>), step/physical-time conversion, the window grid and windowed totals.</td>
 <td>Physical time inside the model.</td>
 </tr>
 <tr>
@@ -2520,7 +2525,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>time_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; and <code>support/</code> with the shared model factories, the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; and <code>support/</code> with the shared model factories, the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>

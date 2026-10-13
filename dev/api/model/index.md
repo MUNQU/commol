@@ -49,6 +49,8 @@ class Model(BaseModel):
         from the parameter units of dimension time (or uses ``step``).
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., description="Name which identifies the model.")
     description: str | None = Field(
         None,
@@ -105,7 +107,7 @@ class Model(BaseModel):
         Every field is written, including those left unset, so the file always
         reloads through :meth:`from_json` to an equal model.
 
-        Long numeric arrays, such as a time-series parameter, are written on a
+        Long numeric arrays, such as a series parameter, are written on a
         single line.
 
         Parameters
@@ -874,7 +876,7 @@ Save the model to a JSON file.
 
 Every field is written, including those left unset, so the file always reloads through :meth:`from_json` to an equal model.
 
-Long numeric arrays, such as a time-series parameter, are written on a single line.
+Long numeric arrays, such as a series parameter, are written on a single line.
 
 Parameters:
 
@@ -893,7 +895,7 @@ def to_json(self, file_path: str | Path, indent: int = 2) -> None:
     Every field is written, including those left unset, so the file always
     reloads through :meth:`from_json` to an equal model.
 
-    Long numeric arrays, such as a time-series parameter, are written on a
+    Long numeric arrays, such as a series parameter, are written on a
     single line.
 
     Parameters

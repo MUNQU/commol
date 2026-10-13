@@ -787,14 +787,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1519,14 +1519,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2431,7 +2431,7 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 </span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="c1"># Observations generated from k1 = 0.4, k2 = 0.1</span>
 </span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">basic_model</span><span class="p">(</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
 </span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="n">observed_data</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
 </span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 </span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="p">]</span>
 </span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>
@@ -2542,16 +2542,28 @@ also when it was created while a parameter was <code>None</code>. See
 </thead>
 <tbody>
 <tr>
-<td><code>step</code></td>
-<td><code>int</code></td>
+<td><code>at</code></td>
+<td><code>float</code></td>
 <td>required</td>
-<td>The step of the observation.</td>
+<td>The position of the observation on the axis. A difference model accepts integer steps only.</td>
 </tr>
 <tr>
-<td><code>compartment</code></td>
+<td><code>output</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>The output it observes: a compartment or accumulator name, such as <code>B</code> or <code>B_g1</code>. Give <code>output</code> or <code>outputs</code>.</td>
+</tr>
+<tr>
+<td><code>outputs</code></td>
+<td><code>list[str] \| None</code></td>
+<td><code>None</code></td>
+<td>Outputs to sum before the comparison; needs a <code>label</code>.</td>
+</tr>
+<tr>
+<td><code>label</code></td>
 <td><code>str</code></td>
-<td>required</td>
-<td>The output it observes: a compartment or accumulator name, such as <code>B</code> or <code>B_g1</code>. With <code>compartments</code>, a label.</td>
+<td><code>output</code></td>
+<td>The name of the observed series in reports, plots and the normalization.</td>
 </tr>
 <tr>
 <td><code>value</code></td>
@@ -2566,22 +2578,16 @@ also when it was created while a parameter was <code>None</code>. See
 <td>How much the observation counts in every loss; see <a href="#losses">Losses</a>.</td>
 </tr>
 <tr>
-<td><code>compartments</code></td>
-<td><code>list[str] \| None</code></td>
-<td><code>None</code></td>
-<td>Outputs to sum before the comparison.</td>
-</tr>
-<tr>
-<td><code>scale_id</code></td>
+<td><code>factor_id</code></td>
 <td><code>str \| None</code></td>
 <td><code>None</code></td>
-<td>A <code>scale</code> parameter that multiplies the prediction.</td>
+<td>A <code>factor</code> parameter that multiplies the prediction.</td>
 </tr>
 <tr>
-<td><code>window_steps</code></td>
-<td><code>int \| None</code></td>
+<td><code>window</code></td>
+<td><code>float \| None</code></td>
 <td><code>None</code></td>
-<td>Compares with the gain over the last <code>window_steps</code> steps instead of the value.</td>
+<td>Compares with the gain over <code>(at − window, at]</code> instead of the value.</td>
 </tr>
 </tbody>
 </table>
@@ -2606,7 +2612,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>parameter_type</code></td>
 <td><code>str</code></td>
 <td>required</td>
-<td><code>"parameter"</code>, <code>"initial_condition"</code> or <code>"scale"</code>.</td>
+<td><code>"parameter"</code>, <code>"initial_condition"</code> or <code>"factor"</code>.</td>
 </tr>
 <tr>
 <td><code>min_bound</code>, <code>max_bound</code></td>
@@ -2642,8 +2648,8 @@ also when it was created while a parameter was <code>None</code>. See
 <td>A fraction of the population; see <a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
 </tr>
 <tr>
-<td><code>"scale"</code></td>
-<td>Any new id, used by observations through <code>scale_id</code></td>
+<td><code>"factor"</code></td>
+<td>Any new id, used by observations through <code>factor_id</code></td>
 <td>A factor on the predictions; not part of the model</td>
 </tr>
 </tbody>
@@ -2685,7 +2691,7 @@ and mean absolute error. <code>LossConfig</code> in
 and for the ensemble central loss.</p>
 </div>
 <p>With <code>normalize_observations=True</code>, each residual is first divided by the RMS
-of the observations of its series (its output, or its aggregate label).</p>
+of the observations of its series (its <code>label</code>).</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator(simulation, problem)</code> checks the problem against the model, and
 <code>run()</code> returns a <code>CalibrationResult</code>:</p>
@@ -2768,7 +2774,7 @@ value into the model, routed by its <code>parameter_type</code>:</p>
 <td>The initial conditions, so the model rebuilds exactly the population the optimizer scored</td>
 </tr>
 <tr>
-<td><code>"scale"</code></td>
+<td><code>"factor"</code></td>
 <td>Nothing: it describes the observations, not the model</td>
 </tr>
 </tbody>

@@ -42,7 +42,7 @@ def model(k1: float | None, k2: float | None):
 # The data comes from k1 / k2 = 4
 truth = Simulation(model(0.4, 0.1)).run(num_steps=50)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="B", value=truth["B"][step])
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 51, 5)
 ]
 
@@ -66,40 +66,40 @@ print(round(best["k1"] / best["k2"], 2))  # 3.0: the best fit that respects k1 /
 
 ## `CalibrationConstraint`
 
-| Field         | Type                | Default  | Meaning                                                                          |
-| ------------- | ------------------- | -------- | -------------------------------------------------------------------------------- |
-| `id`          | `str`               | required | A unique identifier, used in error messages.                                     |
-| `expression`  | `str`               | required | Must evaluate to `>= 0` when the constraint holds.                               |
-| `description` | `str \| None`       | `None`   | A free-text description.                                                         |
-| `weight`      | `float`             | `1.0`    | Scales the penalty of a violation.                                               |
-| `time_steps`  | `list[int] \| None` | `None`   | The steps at which to evaluate it. Required when the expression names an output. |
+| Field         | Type                  | Default  | Meaning                                                                                                                                         |
+| ------------- | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                 | required | A unique identifier, used in error messages.                                                                                                    |
+| `expression`  | `str`                 | required | Must evaluate to `>= 0` when the constraint holds.                                                                                              |
+| `description` | `str \| None`         | `None`   | A free-text description.                                                                                                                        |
+| `weight`      | `float`               | `1.0`    | Scales the penalty of a violation.                                                                                                              |
+| `at`          | `list[float] \| None` | `None`   | The positions on the axis at which to evaluate it. Required when the expression names an output. A difference model accepts integer steps only. |
 
 ## Writing the expression
 
 Move every term to one side, so that the expression is `>= 0` when it holds:
 
-| Condition                   | `expression`                                  |
-| --------------------------- | --------------------------------------------- |
-| `k1 <= 0.5`                 | `"0.5 - k1"`                                  |
-| `k1 >= k2`                  | `"k1 - k2"`                                   |
-| `k1 / k2 <= 5`              | `"5.0 - k1 / k2"`                             |
-| `2 <= k1 / k2`              | `"k1 / k2 - 2.0"`                             |
-| `k1 + k2 + k3 <= 1`         | `"1.0 - (k1 + k2 + k3)"`                      |
-| `B <= 300` at steps 0 to 50 | `"300 - B"` with `time_steps=list(range(51))` |
-| `A + B <= 100` at step 30   | `"100 - (A + B)"` with `time_steps=[30]`      |
+| Condition                     | `expression`                          |
+| ----------------------------- | ------------------------------------- |
+| `k1 <= 0.5`                   | `"0.5 - k1"`                          |
+| `k1 >= k2`                    | `"k1 - k2"`                           |
+| `k1 / k2 <= 5`                | `"5.0 - k1 / k2"`                     |
+| `2 <= k1 / k2`                | `"k1 / k2 - 2.0"`                     |
+| `k1 + k2 + k3 <= 1`           | `"1.0 - (k1 + k2 + k3)"`              |
+| `B <= 300` at steps 0 to 50   | `"300 - B"` with `at=list(range(51))` |
+| `A + B <= 100` at position 30 | `"100 - (A + B)"` with `at=[30]`      |
 
 The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) and passes the same security check.
 
-| Kind                 | Can name                                                                | Checked                                    |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |
-| Without `time_steps` | The calibration unknowns only                                           | Once per evaluation, before the simulation |
-| With `time_steps`    | The unknowns and the simulation outputs (compartments and accumulators) | At each listed step of the simulation      |
+| Kind         | Can name                                                                | Checked                                    |
+| ------------ | ----------------------------------------------------------------------- | ------------------------------------------ |
+| Without `at` | The calibration unknowns only                                           | Once per evaluation, before the simulation |
+| With `at`    | The unknowns and the simulation outputs (compartments and accumulators) | At each listed position of the simulation  |
 
-A constraint cannot name a model parameter that is not calibrated, and an expression that names an output without `time_steps` is rejected when the calibration starts.
+A constraint cannot name a model parameter that is not calibrated, and an expression that names an output without `at` is rejected when the calibration starts.
 
 ```python
 best = calibrate(
-    [CalibrationConstraint(id="peak", expression="300 - B", time_steps=list(range(51)))]
+    [CalibrationConstraint(id="peak", expression="300 - B", at=list(range(51)))]
 )
 peak = max(Simulation(model(best["k1"], best["k2"])).run(num_steps=50)["B"])
 print(round(peak))  # 300: the best fit whose B never exceeds 300
@@ -119,7 +119,7 @@ where the sum runs over the violated constraints and `n` is the number of observ
 ## Checklist
 
 - [ ] Each expression is `>= 0` when the condition holds.
-- [ ] Expressions that name outputs have `time_steps`.
+- [ ] Expressions that name outputs have `at`.
 - [ ] Expressions name only calibration unknowns (and outputs).
 - [ ] The constraints do not contradict each other, such as `k1 - 0.5` and `0.4 - k1`.
 - [ ] The search box contains points that satisfy every constraint.

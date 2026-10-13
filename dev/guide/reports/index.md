@@ -46,11 +46,11 @@ def model(k1: float | None):
         .build(typology="DifferenceEquations")
     )
 
-steps = [7, 14, 21, 28]
+ends = [7, 14, 21, 28]
 truth = Simulation(model(0.4)).run(num_steps=28)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="cum_ab", value=count, window_steps=7)
-    for step, count in zip(steps, windowed_totals(truth["cum_ab"], 7, steps))
+    ObservedDataPoint(at=end, output="cum_ab", value=count, window=7)
+    for end, count in zip(ends, windowed_totals(truth["cum_ab"], truth.positions, 7, ends))
 ]
 problem = CalibrationProblem(
     observed_data=observed_data,
@@ -72,8 +72,8 @@ results = simulation.run(num_steps=28)
 run_report = simulation_report(
     simulation,
     results,
-    steps=steps,
-    window_steps=7,
+    at=ends,
+    window=7,
     num_windows=4,
     observed_data=observed_data,
     accumulators=["cum_ab"],
@@ -104,12 +104,12 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 | ------------------------------------------ | --------------------------------------------------------------------------------------- |
 | `model`                                    | The model **after** `apply_calibration_parameters`.                                     |
 | `result`                                   | A `CalibrationResult`, a `ProbabilisticCalibrationResult`, or an `{id: value}` mapping. |
-| `problem`                                  | Optional. Adds the `scale` parameters, which the model does not hold.                   |
+| `problem`                                  | Optional. Adds the `factor` parameters, which the model does not hold.                  |
 | `parameter_statistics`, `confidence_level` | Optional. Taken from a probabilistic `result` when not given.                           |
 
 | Entry                                 | Rule                                                                                 |
 | ------------------------------------- | ------------------------------------------------------------------------------------ |
-| Parameters                            | Only numeric parameters: formulas and time series are inputs, not fitted values.     |
+| Parameters                            | Only numeric parameters: formulas and series are inputs, not fitted values.          |
 | `N`                                   | The declared `population_size`, with fraction 1.0.                                   |
 | Initial-condition `value`             | The head count the engine builds, overrides included.                                |
 | Initial-condition `fraction`          | That head count over `population_size`, so every row shares one denominator.         |
@@ -121,34 +121,35 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `g
 
 ## `simulation_report`
 
-`simulation_report(simulation, results, steps, window_steps, num_windows, observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)` reports a run on one axis of windows:
+`simulation_report(simulation, results, at, window, num_windows, observed_data=(), accumulators=(), ensemble_runs=None, confidence_level=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
 
-| Block          | Content                                                                                                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed`     | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index                                                                                   |
-| `series`       | Each compartment output sampled at `steps`                                                                                                                                                      |
-| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window, as the loss compares it) and `cumulative` (sampled at `steps`); each reading as a `total` and `by_output` |
+| Block          | Content                                                                                                                                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed`     | For each observation label: `values`, padded to `num_windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (`window_index`). `weights`, `outputs` and `factor_id` appear when a series uses them. |
+| `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                         |
+| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                       |
 
-| Argument                            | Meaning                                                                                                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `steps`                             | The steps where series and cumulative readings are sampled.                                                                                       |
-| `window_steps`, `num_windows`       | The window axis of `observed` and `windowed`.                                                                                                     |
-| `observed_data`                     | The observations to report next to the run.                                                                                                       |
-| `accumulators`                      | The accumulator ids to report.                                                                                                                    |
-| `ensemble_runs`, `confidence_level` | One results mapping per ensemble member. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
+| Argument                            | Meaning                                                                                                                                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                             |
+| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                      |
+| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                         |
+| `observed_data`                     | The observations to report next to the run.                                                                                                           |
+| `accumulators`                      | The accumulator ids to report.                                                                                                                        |
+| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
 
 The report holds only these blocks. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
 ```python
-document = {"kind": "calibration", "steps": steps, **run_report}
+document = {"kind": "calibration", "at": ends, **run_report}
 print(json.dumps(document)[:30])
 ```
 
 ## Checklist
 
 - [ ] The model passed to `applied_parameters_report` already has the calibrated values.
-- [ ] `problem` is passed when there are `scale` parameters.
-- [ ] `steps`, `window_steps` and `num_windows` match the observations.
+- [ ] `problem` is passed when there are `factor` parameters.
+- [ ] `at`, `window` and `num_windows` match the observations, and the results hold every position the report reads.
 
 ## Next steps
 

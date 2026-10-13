@@ -17,7 +17,7 @@ Model                      name, description, version, step_unit
 │       ├── stratification_fractions: [StratificationFractions]
 │       │   └── fractions: [StratificationFraction]
 │       └── compartment_fractions: [CompartmentFraction]
-├── parameters: [Parameter]                (a value may be a TimeSeriesValue)
+├── parameters: [Parameter]                (a value may be a SeriesValue)
 └── dynamics: Dynamics
     ├── typology: "DifferenceEquations" or "DifferentialEquations"
     ├── solver: OdeSolver | None            (differential models only)
@@ -60,6 +60,8 @@ class Population(BaseModel):
     initial_conditions: Initialization
         Initial state of the subpopulations and stratifications.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     bins: list[Bin]
     accumulators: list[Accumulator] = Field(default_factory=list)
@@ -501,6 +503,8 @@ class Bin(BaseModel):
         If None, the bin will use the model-level bin_unit when specified.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(..., description="Identifier of the bin.")
     name: str = Field(..., description="Descriptive, human-readable name for the bin.")
     unit: str | None = Field(
@@ -528,6 +532,8 @@ Source code in `commol/context/bin.py`
 ```python
 class Accumulator(BaseModel):
     """A cumulative event counter tracked as output but not as population state."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Identifier of the accumulator.")
     name: str = Field(..., description="Descriptive, human-readable name.")
@@ -573,6 +579,8 @@ class Stratification(BaseModel):
 
         May only reference stratifications declared before this one.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(default=..., description="Identifier of the stratification.")
     categories: list[str] = Field(
@@ -780,6 +788,8 @@ class StratificationCondition(BaseModel):
         stratification.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     stratification: str = Field(default=..., description="ID of the stratification")
     category: str | None = Field(
         default=None,
@@ -826,13 +836,13 @@ class Parameter(BaseModel):
     ----------
     id : str
         The identifier of the parameter.
-    value : float | str | TimeSeriesValue | None
+    value : float | str | SeriesValue | None
         Value of the parameter. Can be:
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
-               special variables (N, N_category, step/t, pi, e), or contain
+               special variables (N, N_category, step, t, pi, e), or contain
                mathematical expressions
-        - TimeSeriesValue: An empirical time series evaluated via binary search
+        - SeriesValue: An empirical series evaluated via binary search
         - None: Indicates that the parameter needs to be calibrated before use
     description : str | None
         A human-readable description of the parameter.
@@ -841,12 +851,14 @@ class Parameter(BaseModel):
         If None, the parameter has no unit specified.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(default=..., description="Identifier of the parameter.")
-    value: float | str | TimeSeriesValue | None = Field(
+    value: float | str | SeriesValue | None = Field(
         default=...,
         description=(
             "Value of the parameter. Can be a float (constant), "
-            "str (formula), TimeSeriesValue (empirical series), "
+            "str (formula), SeriesValue (empirical series), "
             "or None (requires calibration)."
         ),
     )
@@ -861,10 +873,10 @@ class Parameter(BaseModel):
     @field_validator("value")
     @classmethod
     def validate_value(
-        cls, value: float | str | TimeSeriesValue | None
-    ) -> float | str | TimeSeriesValue | None:
+        cls, value: float | str | SeriesValue | None
+    ) -> float | str | SeriesValue | None:
         """Validate the parameter value."""
-        if value is None or isinstance(value, TimeSeriesValue):
+        if value is None or isinstance(value, SeriesValue):
             return value
         if isinstance(value, (int, float)):
             return float(value)
@@ -889,7 +901,7 @@ class Parameter(BaseModel):
 #### validate_value
 
 ```python
-validate_value(value: float | str | TimeSeriesValue | None) -> float | str | TimeSeriesValue | None
+validate_value(value: float | str | SeriesValue | None) -> float | str | SeriesValue | None
 ```
 
 Validate the parameter value.
@@ -900,10 +912,10 @@ Source code in `commol/context/parameter.py`
 @field_validator("value")
 @classmethod
 def validate_value(
-    cls, value: float | str | TimeSeriesValue | None
-) -> float | str | TimeSeriesValue | None:
+    cls, value: float | str | SeriesValue | None
+) -> float | str | SeriesValue | None:
     """Validate the parameter value."""
-    if value is None or isinstance(value, TimeSeriesValue):
+    if value is None or isinstance(value, SeriesValue):
         return value
     if isinstance(value, (int, float)):
         return float(value)
@@ -941,55 +953,64 @@ def is_calibrated(self) -> bool:
     return self.value is not None
 ```
 
-## TimeSeriesValue
+## SeriesValue
 
 Bases: `BaseModel`
 
-An empirical time series for a parameter value.
+An empirical series for a parameter value.
 
 Attributes:
 
-| Name   | Type                      | Description                                                                                                                  |
-| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `data` | `list[tuple[int, float]]` | (step, value) pairs. Need not be pre-sorted; the engine sorts them.                                                          |
-| `mode` | `str`                     | Interpolation mode: "pulse" (non-zero only at listed steps), "step_function" (zero-order hold), or "linear" (interpolation). |
+| Name   | Type                        | Description                                                                                                                                                                                                                                                                                                                                             |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                    |
+| `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations model only integer steps. |
 
 Source code in `commol/context/parameter.py`
 
 ```python
-class TimeSeriesValue(BaseModel):
+class SeriesValue(BaseModel):
     """
-    An empirical time series for a parameter value.
+    An empirical series for a parameter value.
 
     Attributes
     ----------
-    data : list[tuple[int, float]]
-        (step, value) pairs. Need not be pre-sorted; the engine sorts them.
+    data : list[tuple[float, float]]
+        (position, value) points on the axis. Need not be pre-sorted; the
+        engine sorts them.
     mode : str
-        Interpolation mode: ``"pulse"`` (non-zero only at listed steps),
-        ``"step_function"`` (zero-order hold), or ``"linear"`` (interpolation).
+        How the series is read between its points: ``"pulse"`` (the value on
+        the step of a point, 0 on every other step; integer positions only),
+        ``"step_function"`` (the value of the last point at or before ``t``),
+        or ``"linear"`` (linear interpolation in ``t``). The engine decides
+        which positions its model type accepts: a DifferenceEquations model
+        only integer steps.
     """
 
-    data: list[tuple[int, float]]
+    model_config = ConfigDict(extra="forbid")
+
+    data: list[tuple[float, float]]
     mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
 
     @field_validator("data")
     @classmethod
-    def validate_data(cls, value: list[tuple[int, float]]) -> list[tuple[int, float]]:
-        """Validate time-series points before they reach the Rust engine."""
+    def validate_data(
+        cls, value: list[tuple[float, float]]
+    ) -> list[tuple[float, float]]:
+        """Validate series points before they reach the Rust engine."""
         if not value:
-            raise ValueError("Time-series data must contain at least one point")
+            raise ValueError("Series data must contain at least one point")
 
-        steps: list[int] = []
-        for step, amount in value:
-            if step < 0:
-                raise ValueError("Time-series steps must be non-negative")
+        positions: list[float] = []
+        for position, amount in value:
+            if not (math.isfinite(position) and position >= 0):
+                raise ValueError("Series positions must be finite and non-negative")
             if not math.isfinite(amount):
-                raise ValueError("Time-series values must be finite")
-            steps.append(step)
+                raise ValueError("Series values must be finite")
+            positions.append(position)
 
-        if len(steps) != len(set(steps)):
-            raise ValueError("Time-series steps must be unique")
+        if len(positions) != len(set(positions)):
+            raise ValueError("Series positions must be unique")
 
         return value
 ```
@@ -999,31 +1020,33 @@ class TimeSeriesValue(BaseModel):
 #### validate_data
 
 ```python
-validate_data(value: list[tuple[int, float]]) -> list[tuple[int, float]]
+validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
 ```
 
-Validate time-series points before they reach the Rust engine.
+Validate series points before they reach the Rust engine.
 
 Source code in `commol/context/parameter.py`
 
 ```python
 @field_validator("data")
 @classmethod
-def validate_data(cls, value: list[tuple[int, float]]) -> list[tuple[int, float]]:
-    """Validate time-series points before they reach the Rust engine."""
+def validate_data(
+    cls, value: list[tuple[float, float]]
+) -> list[tuple[float, float]]:
+    """Validate series points before they reach the Rust engine."""
     if not value:
-        raise ValueError("Time-series data must contain at least one point")
+        raise ValueError("Series data must contain at least one point")
 
-    steps: list[int] = []
-    for step, amount in value:
-        if step < 0:
-            raise ValueError("Time-series steps must be non-negative")
+    positions: list[float] = []
+    for position, amount in value:
+        if not (math.isfinite(position) and position >= 0):
+            raise ValueError("Series positions must be finite and non-negative")
         if not math.isfinite(amount):
-            raise ValueError("Time-series values must be finite")
-        steps.append(step)
+            raise ValueError("Series values must be finite")
+        positions.append(position)
 
-    if len(steps) != len(set(steps)):
-        raise ValueError("Time-series steps must be unique")
+    if len(positions) != len(set(positions)):
+        raise ValueError("Series positions must be unique")
 
     return value
 ```
@@ -1062,6 +1085,8 @@ class Dynamics(BaseModel):
         defaults of `OdeSolver`. A difference-equations model has none.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     typology: Literal[
         ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
     ]
@@ -1073,24 +1098,12 @@ class Dynamics(BaseModel):
 
     @model_validator(mode="after")
     def validate_typology_settings(self) -> Self:
-        """
-        A solver needs a differential model; a difference model steps only at
-        integers, so its impulse positions must be integers.
-        """
-        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-            if self.solver is not None:
-                raise ValueError(
-                    "Solver settings apply only to a DifferentialEquations model; "
-                    "a DifferenceEquations model has no solver."
-                )
-            for transition in self.transitions:
-                bad = [p for p in transition.impulse_positions() if p != int(p)]
-                if bad:
-                    raise ValueError(
-                        f"Transition '{transition.id}': impulse position {bad[0]} "
-                        f"is not an integer step; a DifferenceEquations model "
-                        f"steps only at integers."
-                    )
+        """A solver needs a differential model."""
+        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
+            raise ValueError(
+                "Solver settings apply only to a DifferentialEquations model; "
+                "a DifferenceEquations model has no solver."
+            )
         return self
 
     @field_validator("transitions")
@@ -1123,31 +1136,19 @@ class Dynamics(BaseModel):
 validate_typology_settings() -> Self
 ```
 
-A solver needs a differential model; a difference model steps only at integers, so its impulse positions must be integers.
+A solver needs a differential model.
 
 Source code in `commol/context/dynamics.py`
 
 ```python
 @model_validator(mode="after")
 def validate_typology_settings(self) -> Self:
-    """
-    A solver needs a differential model; a difference model steps only at
-    integers, so its impulse positions must be integers.
-    """
-    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-        if self.solver is not None:
-            raise ValueError(
-                "Solver settings apply only to a DifferentialEquations model; "
-                "a DifferenceEquations model has no solver."
-            )
-        for transition in self.transitions:
-            bad = [p for p in transition.impulse_positions() if p != int(p)]
-            if bad:
-                raise ValueError(
-                    f"Transition '{transition.id}': impulse position {bad[0]} "
-                    f"is not an integer step; a DifferenceEquations model "
-                    f"steps only at integers."
-                )
+    """A solver needs a differential model."""
+    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
+        raise ValueError(
+            "Solver settings apply only to a DifferentialEquations model; "
+            "a DifferenceEquations model has no solver."
+        )
     return self
 ```
 
@@ -1249,6 +1250,8 @@ class Transition(BaseModel):
         all specified stratification conditions.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(default=..., description="Id of the transition.")
     source: list[str] = Field(default=..., description="Origin compartments.")
     target: list[str] = Field(default=..., description="Destination compartments.")
@@ -1301,19 +1304,6 @@ class Transition(BaseModel):
     def is_impulse(self) -> bool:
         """Whether the transition is an impulse rather than a continuous flow."""
         return self.impulse_at is not None or self.impulse_every is not None
-
-    def impulse_positions(self) -> list[float]:
-        """
-        The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
-
-        These are the values that must be integers in a difference model.
-        """
-        if self.impulse_at is not None:
-            return list(self.impulse_at)
-        if self.impulse_every is not None:
-            period, offset = self.impulse_every
-            return [offset, period]
-        return []
 
     @model_validator(mode="after")
     def validate_impulse(self) -> Self:
@@ -1374,33 +1364,6 @@ is_impulse: bool
 Whether the transition is an impulse rather than a continuous flow.
 
 ### Methods:
-
-#### impulse_positions
-
-```python
-impulse_positions() -> list[float]
-```
-
-The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
-
-These are the values that must be integers in a difference model.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-def impulse_positions(self) -> list[float]:
-    """
-    The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
-
-    These are the values that must be integers in a difference model.
-    """
-    if self.impulse_at is not None:
-        return list(self.impulse_at)
-    if self.impulse_every is not None:
-        period, offset = self.impulse_every
-        return [offset, period]
-    return []
-```
 
 #### validate_impulse
 
@@ -1502,6 +1465,8 @@ class StratifiedRate(BaseModel):
     rate : str
         Rate expression for compartments matching these conditions
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     conditions: list[StratificationCondition] = Field(
         default=..., description="Stratification conditions that must match"
@@ -1670,6 +1635,8 @@ class InitialConditions(BaseModel):
         item contains an expanded compartment name and the fraction of the total
         population it holds.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     population_size: int = Field(..., description="Population size.")
     bin_fractions: list[BinFraction] = Field(
@@ -2712,6 +2679,8 @@ class BinFraction(BaseModel):
         needs to be calibrated.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     bin: str = Field(default=..., description="The bin id.")
     fraction: float | None = Field(
         default=...,
@@ -2772,6 +2741,8 @@ class StratificationFractions(BaseModel):
         List of category fractions for this stratification.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     stratification: str = Field(..., description="The stratification id.")
     fractions: list[StratificationFraction] = Field(
         default=..., description="List of category fractions for this stratification."
@@ -2805,6 +2776,8 @@ class StratificationFraction(BaseModel):
     fraction : float
         The fractional size of this category.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     category: str = Field(default=..., description="The stratification category name.")
     fraction: float = Field(
@@ -2840,6 +2813,8 @@ class CompartmentFraction(BaseModel):
         The fraction of the total population in this compartment,
         between 0.0 and 1.0.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     compartment: str = Field(default=..., description="The expanded compartment name.")
     fraction: float = Field(

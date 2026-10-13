@@ -103,7 +103,7 @@ class ModelBuilder:
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
-        self._ts_counter: int = 0
+        self._series_counter: int = 0
 
         logging.info(
             (
@@ -215,7 +215,7 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float | str | list[tuple[int, float]] | None,
+        value: float | str | list[tuple[float, float]] | None,
         description: str | None = None,
         unit: str | None = None,
         mode: str | None = None,
@@ -227,14 +227,14 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float | str | list[tuple[int, float]] | None
+        value : float | str | list[tuple[float, float]] | None
             Value of the parameter. Can be:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
-                   special variables (N, N_category, step/t, pi, e), or contain
+                   special variables (N, N_category, step, t, pi, e), or contain
                    mathematical expressions (e.g., "beta * 2", "N_young / N")
-            - list[tuple[int, float]]: Empirical time series as (step, value) pairs;
-                   requires ``mode`` to be set.
+            - list[tuple[float, float]]: Empirical series as (position, value)
+                   points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
 
         description : str | None, default=None
@@ -243,10 +243,11 @@ class ModelBuilder:
             Unit of the parameter (e.g., "1/day", "dimensionless", "person").
             Used for unit consistency checking in equations.
         mode : str | None, default=None
-            Required when ``value`` is a list of (step, value) pairs. Selects the
-            interpolation mode: ``"pulse"`` (non-zero only at listed steps),
-            ``"step_function"`` (zero-order hold from last listed step), or
-            ``"linear"`` (interpolation between adjacent listed steps).
+            Required when ``value`` is a list of (position, value) points.
+            Selects how the series is read: ``"pulse"`` (the value on the step
+            of a point, 0 on every other step; integer positions only),
+            ``"step_function"`` (the value of the last point at or before
+            ``t``), or ``"linear"`` (linear interpolation in ``t``).
 
         Returns
         -------
@@ -263,16 +264,16 @@ class ModelBuilder:
             if mode is None:
                 raise ValueError(
                     f"Parameter '{id}': 'mode' is required when 'value' is a "
-                    "time-series list. Use mode='pulse', 'step_function', or 'linear'."
+                    "series list. Use mode='pulse', 'step_function', or 'linear'."
                 )
-            param_value: float | str | TimeSeriesValue | None = TimeSeriesValue(
+            param_value: float | str | SeriesValue | None = SeriesValue(
                 data=value, mode=mode
             )
         else:
             if mode is not None:
                 raise ValueError(
                     f"Parameter '{id}': 'mode' is only valid when 'value' is a "
-                    "time-series list."
+                    "series list."
                 )
             param_value = value
         self._ensure_parameter_id_available(id)
@@ -286,21 +287,21 @@ class ModelBuilder:
         if any(parameter.id == id for parameter in self._parameters):
             raise ValueError(f"Parameter id '{id}' already exists")
 
-    def _register_ts_pattern(
+    def _register_series_pattern(
         self,
-        pattern: TimePattern,
+        pattern: AxisPattern,
         *,
         transition_id: str = "",
         source_bin: str = "",
         target_bin: str = "",
-    ) -> TimePattern:
-        """Auto-register a TimeSeries parameter for pulse-type patterns.
+    ) -> AxisPattern:
+        """Auto-register a series parameter for pulse-type patterns.
 
-        If ``pattern`` has numeric pulse data, registers a ``TimeSeries``
-        parameter and returns a ``_ComputedTimePattern`` whose formula is the
+        If ``pattern`` has numeric pulse data, registers a ``"pulse"`` series
+        parameter and returns a ``_ComputedAxisPattern`` whose formula is the
         generated parameter name. Otherwise returns ``pattern`` unchanged.
         """
-        data = pattern._as_time_series_data()
+        data = pattern._as_series_data()
         if data is None:
             return pattern
         conditions = pattern.conditions
@@ -315,16 +316,16 @@ class ModelBuilder:
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
             param_name = f"{transition_id}_{src}_to_{tgt}"
         else:
-            param_name = f"_ts_{self._ts_counter}"
-            self._ts_counter += 1
+            param_name = f"_series_{self._series_counter}"
+            self._series_counter += 1
         self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,
-                value=TimeSeriesValue(data=data, mode="pulse"),
+                value=SeriesValue(data=data, mode="pulse"),
             )
         )
-        return _ComputedTimePattern(
+        return _ComputedAxisPattern(
             computed_formula=param_name,
             conditions=conditions,
             source_compartment=pattern.source_compartment,
@@ -335,7 +336,7 @@ class ModelBuilder:
         id: str,
         source: list[str],
         target: list[str],
-        rate: "str | float | TimePattern | None" = None,
+        rate: "str | float | AxisPattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
@@ -399,7 +400,9 @@ class ModelBuilder:
 
             Special variables available in formulas:
             - N: Total population (automatically calculated)
-            - step or t: Current simulation step (both are equivalent)
+            - t: The current position on the axis
+            - step: The step that holds it, ``floor(t)``; in a
+              DifferenceEquations model ``t`` and ``step`` are equal
             - pi, e: Mathematical constants
             - $compartment: Expands to each source compartment name (only with
               multiple sources)
@@ -441,29 +444,29 @@ class ModelBuilder:
             - If $compartment is used with multiple targets
             - If rate is None when using $compartment
         """
-        # If `rate` is a TimePattern, extract its rate string and stratified
-        # rates and route them into the existing pipeline. A TimePattern fully
+        # If `rate` is a AxisPattern, extract its rate string and stratified
+        # rates and route them into the existing pipeline. A AxisPattern fully
         # specifies the time-varying behaviour, so passing `stratified_rates=`
         # alongside it is a conflict.
-        if isinstance(rate, TimePattern):
+        if isinstance(rate, AxisPattern):
             if impulse_at is not None or impulse_every is not None:
                 raise ValueError(
                     f"Transition '{id}': an impulse moves its rate at once; pass "
-                    "a fraction or an amount as `rate=`, not a TimePattern."
+                    "a fraction or an amount as `rate=`, not a AxisPattern."
                 )
             if stratified_rates is not None:
                 raise ValueError(
-                    f"Transition '{id}': pass either a TimePattern as `rate=` "
+                    f"Transition '{id}': pass either a AxisPattern as `rate=` "
                     "or `stratified_rates=`, not both."
                 )
             src_bin = source[0] if source else ""
             tgt_bin = target[0] if target else ""
-            if isinstance(rate, _ScheduleTimePattern):
+            if isinstance(rate, _ScheduleAxisPattern):
                 resolved = rate.model_copy(
                     update={
                         "patterns": [
                             _GroupEntry(
-                                pattern=self._register_ts_pattern(
+                                pattern=self._register_series_pattern(
                                     entry.pattern,
                                     transition_id=id,
                                     source_bin=src_bin,
@@ -477,7 +480,7 @@ class ModelBuilder:
                 )
                 rate = resolved
             else:
-                rate = self._register_ts_pattern(
+                rate = self._register_series_pattern(
                     rate, transition_id=id, source_bin=src_bin, target_bin=tgt_bin
                 )
             stratified_rates = rate._builder_stratified_rates()
@@ -888,7 +891,7 @@ class ModelBuilder:
         self._transitions.clear()
         self._parameters.clear()
         self._initial_conditions = None
-        self._ts_counter = 0
+        self._series_counter = 0
         return self
 
     def _validate_typology(self, typology: str) -> ModelTypes:
@@ -1050,7 +1053,7 @@ def __init__(
     self._transitions: list[Transition] = []
     self._parameters: list[Parameter] = []
     self._initial_conditions: InitialConditions | None = None
-    self._ts_counter: int = 0
+    self._series_counter: int = 0
 
     logging.info(
         (
@@ -1234,20 +1237,20 @@ def add_stratification(
 #### add_parameter
 
 ```python
-add_parameter(id: str, value: float | str | list[tuple[int, float]] | None, description: str | None = None, unit: str | None = None, mode: str | None = None) -> Self
+add_parameter(id: str, value: float | str | list[tuple[float, float]] | None, description: str | None = None, unit: str | None = None, mode: str | None = None) -> Self
 ```
 
 Add a global parameter to the model.
 
 Parameters:
 
-| Name          | Type    | Description                          | Default                                                                                                                                                                                                                                            |
-| ------------- | ------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`   | Unique identifier for the parameter. | *required*                                                                                                                                                                                                                                         |
-| `value`       | \`float | str                                  | list\[tuple[int, float]\]                                                                                                                                                                                                                          |
-| `description` | \`str   | None\`                               | Human-readable description of the parameter.                                                                                                                                                                                                       |
-| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "person"). Used for unit consistency checking in equations.                                                                                                                                 |
-| `mode`        | \`str   | None\`                               | Required when value is a list of (step, value) pairs. Selects the interpolation mode: "pulse" (non-zero only at listed steps), "step_function" (zero-order hold from last listed step), or "linear" (interpolation between adjacent listed steps). |
+| Name          | Type    | Description                          | Default                                                                                                                                                                                                                                                                                      |
+| ------------- | ------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`   | Unique identifier for the parameter. | *required*                                                                                                                                                                                                                                                                                   |
+| `value`       | \`float | str                                  | list\[tuple[float, float]\]                                                                                                                                                                                                                                                                  |
+| `description` | \`str   | None\`                               | Human-readable description of the parameter.                                                                                                                                                                                                                                                 |
+| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "person"). Used for unit consistency checking in equations.                                                                                                                                                                           |
+| `mode`        | \`str   | None\`                               | Required when value is a list of (position, value) points. Selects how the series is read: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). |
 
 Returns:
 
@@ -1267,7 +1270,7 @@ Source code in `commol/api/model_builder.py`
 def add_parameter(
     self,
     id: str,
-    value: float | str | list[tuple[int, float]] | None,
+    value: float | str | list[tuple[float, float]] | None,
     description: str | None = None,
     unit: str | None = None,
     mode: str | None = None,
@@ -1279,14 +1282,14 @@ def add_parameter(
     ----------
     id : str
         Unique identifier for the parameter.
-    value : float | str | list[tuple[int, float]] | None
+    value : float | str | list[tuple[float, float]] | None
         Value of the parameter. Can be:
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
-               special variables (N, N_category, step/t, pi, e), or contain
+               special variables (N, N_category, step, t, pi, e), or contain
                mathematical expressions (e.g., "beta * 2", "N_young / N")
-        - list[tuple[int, float]]: Empirical time series as (step, value) pairs;
-               requires ``mode`` to be set.
+        - list[tuple[float, float]]: Empirical series as (position, value)
+               points; requires ``mode`` to be set.
         - None: Indicates that the parameter needs to be calibrated before use
 
     description : str | None, default=None
@@ -1295,10 +1298,11 @@ def add_parameter(
         Unit of the parameter (e.g., "1/day", "dimensionless", "person").
         Used for unit consistency checking in equations.
     mode : str | None, default=None
-        Required when ``value`` is a list of (step, value) pairs. Selects the
-        interpolation mode: ``"pulse"`` (non-zero only at listed steps),
-        ``"step_function"`` (zero-order hold from last listed step), or
-        ``"linear"`` (interpolation between adjacent listed steps).
+        Required when ``value`` is a list of (position, value) points.
+        Selects how the series is read: ``"pulse"`` (the value on the step
+        of a point, 0 on every other step; integer positions only),
+        ``"step_function"`` (the value of the last point at or before
+        ``t``), or ``"linear"`` (linear interpolation in ``t``).
 
     Returns
     -------
@@ -1315,16 +1319,16 @@ def add_parameter(
         if mode is None:
             raise ValueError(
                 f"Parameter '{id}': 'mode' is required when 'value' is a "
-                "time-series list. Use mode='pulse', 'step_function', or 'linear'."
+                "series list. Use mode='pulse', 'step_function', or 'linear'."
             )
-        param_value: float | str | TimeSeriesValue | None = TimeSeriesValue(
+        param_value: float | str | SeriesValue | None = SeriesValue(
             data=value, mode=mode
         )
     else:
         if mode is not None:
             raise ValueError(
                 f"Parameter '{id}': 'mode' is only valid when 'value' is a "
-                "time-series list."
+                "series list."
             )
         param_value = value
     self._ensure_parameter_id_available(id)
@@ -1338,7 +1342,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | AxisPattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -1397,7 +1401,7 @@ def add_transition(
     id: str,
     source: list[str],
     target: list[str],
-    rate: "str | float | TimePattern | None" = None,
+    rate: "str | float | AxisPattern | None" = None,
     stratified_rates: list[StratifiedRateDict] | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
@@ -1461,7 +1465,9 @@ def add_transition(
 
         Special variables available in formulas:
         - N: Total population (automatically calculated)
-        - step or t: Current simulation step (both are equivalent)
+        - t: The current position on the axis
+        - step: The step that holds it, ``floor(t)``; in a
+          DifferenceEquations model ``t`` and ``step`` are equal
         - pi, e: Mathematical constants
         - $compartment: Expands to each source compartment name (only with
           multiple sources)
@@ -1503,29 +1509,29 @@ def add_transition(
         - If $compartment is used with multiple targets
         - If rate is None when using $compartment
     """
-    # If `rate` is a TimePattern, extract its rate string and stratified
-    # rates and route them into the existing pipeline. A TimePattern fully
+    # If `rate` is a AxisPattern, extract its rate string and stratified
+    # rates and route them into the existing pipeline. A AxisPattern fully
     # specifies the time-varying behaviour, so passing `stratified_rates=`
     # alongside it is a conflict.
-    if isinstance(rate, TimePattern):
+    if isinstance(rate, AxisPattern):
         if impulse_at is not None or impulse_every is not None:
             raise ValueError(
                 f"Transition '{id}': an impulse moves its rate at once; pass "
-                "a fraction or an amount as `rate=`, not a TimePattern."
+                "a fraction or an amount as `rate=`, not a AxisPattern."
             )
         if stratified_rates is not None:
             raise ValueError(
-                f"Transition '{id}': pass either a TimePattern as `rate=` "
+                f"Transition '{id}': pass either a AxisPattern as `rate=` "
                 "or `stratified_rates=`, not both."
             )
         src_bin = source[0] if source else ""
         tgt_bin = target[0] if target else ""
-        if isinstance(rate, _ScheduleTimePattern):
+        if isinstance(rate, _ScheduleAxisPattern):
             resolved = rate.model_copy(
                 update={
                     "patterns": [
                         _GroupEntry(
-                            pattern=self._register_ts_pattern(
+                            pattern=self._register_series_pattern(
                                 entry.pattern,
                                 transition_id=id,
                                 source_bin=src_bin,
@@ -1539,7 +1545,7 @@ def add_transition(
             )
             rate = resolved
         else:
-            rate = self._register_ts_pattern(
+            rate = self._register_series_pattern(
                 rate, transition_id=id, source_bin=src_bin, target_bin=tgt_bin
             )
         stratified_rates = rate._builder_stratified_rates()
@@ -1861,7 +1867,7 @@ def reset(self) -> Self:
     self._transitions.clear()
     self._parameters.clear()
     self._initial_conditions = None
-    self._ts_counter = 0
+    self._series_counter = 0
     return self
 ```
 

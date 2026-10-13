@@ -14,10 +14,10 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 ## User guide
 
 - [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
-- [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, time-series parameters, validation rules, save and load
+- [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, series parameters, validation rules, save and load
 - [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md): Absolute and per-capita rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
 - [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md): Operators, variables, subpopulation sums, functions and security limits of rate formulas
-- [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md): TimePattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
+- [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md): AxisPattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
 - [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking and print_equations (text and LaTeX)
 - [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run, output formats, totals by bin and category, windowed totals, plotting
 - [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, results and writing results back
@@ -32,6 +32,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 ## API reference
 
 - [API Overview](https://munqu.github.io/commol/latest/api/index.md)
+- [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)
 - [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)
 - [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)
 - [Model](https://munqu.github.io/commol/latest/api/model/index.md)
@@ -39,7 +40,6 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Probabilistic Calibration](https://munqu.github.io/commol/latest/api/probabilistic-calibrator/index.md)
 - [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)
 - [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)
-- [TimePattern](https://munqu.github.io/commol/latest/api/time-patterns/index.md)
 - [TimeScale](https://munqu.github.io/commol/latest/api/time-scale/index.md)
 - [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md): The data model of a Model
 

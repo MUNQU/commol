@@ -12,7 +12,7 @@
         <meta name="author" content="MUNQU Team">
       
       
-        <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/time-patterns/">
+        <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/axis-patterns/">
       
       
         <link rel="prev" href="../mathematical-expressions/">
@@ -29,7 +29,7 @@
     
     
       
-        <title>Time Patterns - Commol Documentation</title>
+        <title>Axis Patterns - Commol Documentation</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#time-patterns" class="md-skip">
+        <a href="#axis-patterns" class="md-skip">
           Skip to content
         </a>
       
@@ -131,7 +131,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Time Patterns
+              Axis Patterns
             
           </span>
         </div>
@@ -805,7 +805,7 @@
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -823,7 +823,7 @@
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1519,14 +1519,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2352,16 +2352,16 @@
   
 
 
-<h1 id="time-patterns">Time Patterns<a class="headerlink" href="#time-patterns" title="Permanent link">&para;</a></h1>
+<h1 id="axis-patterns">Axis Patterns<a class="headerlink" href="#axis-patterns" title="Permanent link">&para;</a></h1>
 <p><a href="../transitions/">Back to Transitions</a></p>
-<p><code>TimePattern</code> builds rates that change with the step: pulses, periodic events,
-windows, seasons, ramps and bell curves, and schedules that give each subgroup
-its own pattern. Pass a pattern as <code>rate=</code> to <code>add_transition</code>. Every pattern is
+<p><code>AxisPattern</code> builds rates that change along the axis: pulses, periodic
+events, intervals, seasons, ramps and bell curves, and schedules that give each
+subgroup its own pattern. Pass a pattern as <code>rate=</code> to <code>add_transition</code>. Every pattern is
 a tested, parenthesised expression, so patterns combine safely.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">TimePattern</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">AxisPattern</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">flow_per_step</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">TimePattern</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">flow_per_step</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">AxisPattern</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;The flow into B at each step, for a transition with no source.&quot;&quot;&quot;</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pattern&quot;</span><span class="p">)</span>
@@ -2377,89 +2377,101 @@ a tested, parenthesised expression, so patterns combine safely.</p>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">series</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="n">num_steps</span><span class="p">)[</span><span class="s2">&quot;B&quot;</span><span class="p">]</span>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="k">return</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">series</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">series</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="mi">4</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_steps</span><span class="p">)]</span>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">window</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]</span>
 </span></code></pre></div>
 <p>A transition with no source uses the pattern as the flow. With a source, a
 pattern that names no compartment is per-capita: <code>amount=0.1</code> moves 10% of the
 source. See <a href="../transitions/#absolute-and-per-capita-rates">Absolute and per-capita rates</a>.</p>
 <h2 id="single-patterns">Single patterns<a class="headerlink" href="#single-patterns" title="Permanent link">&para;</a></h2>
+<p>Each pattern reads <code>step</code> or <code>t</code> (see
+<a href="#patterns-in-a-differential-model">Patterns in a differential model</a>). In a
+difference model both are the step <code>s</code>.</p>
 <table>
 <thead>
 <tr>
 <th>Pattern</th>
-<th>Value at step <code>s</code></th>
+<th>Reads</th>
+<th>Value</th>
 <th>Arguments</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>pulse(at, amount)</code></td>
-<td><code>amount</code> when <code>s == at</code>, else 0</td>
-<td><code>at &gt;= 0</code></td>
+<td><code>step</code></td>
+<td><code>amount</code> when <code>step == at</code>, else 0</td>
+<td>integer <code>at &gt;= 0</code></td>
 </tr>
 <tr>
 <td><code>pulses(at, amount)</code></td>
+<td><code>step</code></td>
 <td><code>amount</code> at each step in <code>at</code>, else 0</td>
-<td>unique steps, not empty; <code>amount</code> may be one value per step</td>
+<td>unique integer steps, not empty; <code>amount</code> may be one value per step</td>
 </tr>
 <tr>
 <td><code>periodic(period, amount, offset=0)</code></td>
-<td><code>amount</code> when <code>s = offset, offset + period, …</code>, else 0</td>
-<td><code>period &gt; 0</code>, <code>0 &lt;= offset &lt; period</code></td>
+<td><code>step</code></td>
+<td><code>amount</code> when <code>step = offset, offset + period, …</code>, else 0</td>
+<td>integer <code>period &gt; 0</code>, <code>0 &lt;= offset &lt; period</code></td>
 </tr>
 <tr>
-<td><code>window(start, end, amount)</code></td>
-<td><code>amount</code> for <code>start &lt;= s &lt; end</code>, else 0</td>
-<td><code>start &lt; end</code></td>
+<td><code>interval(start, end, amount)</code></td>
+<td><code>t</code></td>
+<td><code>amount</code> for <code>start &lt;= t &lt; end</code>, else 0</td>
+<td><code>start &lt; end</code>, any finite positions</td>
 </tr>
 <tr>
 <td><code>linear_ramp(start, end, start_value, end_value)</code></td>
-<td>From <code>start_value</code> at <code>start</code> towards <code>end_value</code>, for <code>start &lt;= s &lt; end</code>; else 0</td>
-<td><code>start &lt; end</code></td>
+<td><code>t</code></td>
+<td>From <code>start_value</code> at <code>start</code> towards <code>end_value</code>, for <code>start &lt;= t &lt; end</code>; else 0</td>
+<td><code>start &lt; end</code>, any finite positions</td>
 </tr>
 <tr>
 <td><code>seasonal(amplitude, period, phase=0, baseline=0)</code></td>
-<td><code>baseline + amplitude × sin(2π (s − phase) / period)</code></td>
+<td><code>t</code></td>
+<td><code>baseline + amplitude × sin(2π (t − phase) / period)</code></td>
 <td>numeric <code>period != 0</code></td>
 </tr>
 <tr>
 <td><code>gaussian_pulse(center, width, peak)</code></td>
-<td><code>peak × exp(−(s − center)² / (2 width²))</code></td>
+<td><code>t</code></td>
+<td><code>peak × exp(−(t − center)² / (2 width²))</code></td>
 <td><code>width &gt; 0</code></td>
 </tr>
 <tr>
 <td><code>from_formula(expr)</code></td>
 <td>Any expression, wrapped in parentheses</td>
 <td>not empty; passes the security check</td>
+<td></td>
 </tr>
 </tbody>
 </table>
 <p>An invalid argument raises <code>pydantic.ValidationError</code> (a <code>ValueError</code>). These
 arguments also accept a parameter name, so calibration can fit them: <code>amount</code>
-of <code>pulse</code>, <code>pulses</code>, <code>periodic</code> and <code>window</code>; every argument of <code>seasonal</code>; and
+of <code>pulse</code>, <code>pulses</code>, <code>periodic</code> and <code>interval</code>; every argument of <code>seasonal</code>; and
 <code>peak</code> of <code>gaussian_pulse</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulses</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulses</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">linear_ramp</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">start_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">end_value</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">linear_ramp</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">start_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">end_value</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">seasonal</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">seasonal</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># [1.0, 1.7071, 2.0, 1.7071, 1.0, 0.2929, 0.0, 0.2929, 1.0, 1.7071]</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">gaussian_pulse</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">peak</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">gaussian_pulse</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">peak</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># [0.0, 0.0003, 0.0111, 0.1353, 0.6065, 1.0, 0.6065, 0.1353, 0.0111, 0.0003]</span>
 </span></code></pre></div>
 <p><code>str(pattern)</code> and <code>pattern.formula</code> give the expression:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span><span class="o">.</span><span class="n">formula</span><span class="p">)</span>  <span class="c1"># (if(step == 10, 0.05, 0))</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;2 * </span><span class="si">{</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">from_formula</span><span class="p">(</span><span class="s1">&#39;k1 + k2&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>    <span class="c1"># 2 * (k1 + k2)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span><span class="o">.</span><span class="n">formula</span><span class="p">)</span>  <span class="c1"># (if(step == 10, 0.05, 0))</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;2 * </span><span class="si">{</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">from_formula</span><span class="p">(</span><span class="s1">&#39;k1 + k2&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>    <span class="c1"># 2 * (k1 + k2)</span>
 </span></code></pre></div>
 <p>The parentheses make composition safe: the <code>2 *</code> applies to the whole
 expression.</p>
 <h2 id="combining-patterns">Combining patterns<a class="headerlink" href="#combining-patterns" title="Permanent link">&para;</a></h2>
-<p><code>TimePattern.combine(*patterns, mode=TimePattern.SUM)</code> merges patterns:</p>
+<p><code>AxisPattern.combine(*patterns, mode=AxisPattern.SUM)</code> merges patterns:</p>
 <table>
 <thead>
 <tr>
@@ -2469,25 +2481,25 @@ expression.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>TimePattern.SUM</code> (default)</td>
+<td><code>AxisPattern.SUM</code> (default)</td>
 <td>The sum of the patterns</td>
 </tr>
 <tr>
-<td><code>TimePattern.MAX</code></td>
-<td>The largest value at each step</td>
+<td><code>AxisPattern.MAX</code></td>
+<td>The largest value at each position</td>
 </tr>
 <tr>
-<td><code>TimePattern.MIN</code></td>
-<td>The smallest value at each step</td>
+<td><code>AxisPattern.MIN</code></td>
+<td>The smallest value at each position</td>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">peak_or_window</span> <span class="o">=</span> <span class="n">TimePattern</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">window</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">mode</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">MAX</span><span class="p">,</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">peak_or_interval</span> <span class="o">=</span> <span class="n">AxisPattern</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">mode</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">MAX</span><span class="p">,</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">peak_or_window</span><span class="p">))</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">peak_or_interval</span><span class="p">))</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># [0.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]</span>
 </span></code></pre></div>
 <table>
@@ -2515,9 +2527,9 @@ expression.</p>
 <p><code>combine(p)</code> with one pattern returns <code>p</code>.</p>
 <h2 id="patterns-per-subgroup">Patterns per subgroup<a class="headerlink" href="#patterns-per-subgroup" title="Permanent link">&para;</a></h2>
 <p>With stratifications, a schedule gives each subgroup its own pattern. Start
-with the class method <code>TimePattern.add_group(...)</code> and chain more groups on the
+with the class method <code>AxisPattern.add_group(...)</code> and chain more groups on the
 result:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">stratified_flows</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">TimePattern</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">stratified_flows</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">AxisPattern</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;The change of each compartment at each step, for a transition A -&gt; B.&quot;&quot;&quot;</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Groups&quot;</span><span class="p">)</span>
@@ -2548,13 +2560,13 @@ result:</p>
 </span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>    <span class="p">}</span>
 </span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>
 </span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="n">schedule</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
+</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-4-33"><a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>        <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat1&quot;</span><span class="p">}],</span>
-</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
 </span><span id="__span-4-35"><a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>    <span class="p">)</span>
 </span><span id="__span-4-36"><a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>    <span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-4-37"><a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a>        <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat2&quot;</span><span class="p">}],</span>
-</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">window</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.2</span><span class="p">),</span>
+</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.2</span><span class="p">),</span>
 </span><span id="__span-4-39"><a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a>    <span class="p">)</span>
 </span><span id="__span-4-40"><a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a><span class="p">)</span>
 </span><span id="__span-4-41"><a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="nb">print</span><span class="p">(</span><span class="n">stratified_flows</span><span class="p">(</span><span class="n">schedule</span><span class="p">))</span>
@@ -2570,7 +2582,7 @@ result:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>TimePattern.add_group(conditions, schedule, *, source_compartment=None, absolute=None)</code></td>
+<td><code>AxisPattern.add_group(conditions, schedule, *, source_compartment=None, absolute=None)</code></td>
 <td>Class method: starts a schedule with its first group. On a schedule: adds a group. On a single pattern: <code>TypeError</code>.</td>
 </tr>
 <tr>
@@ -2605,15 +2617,15 @@ result:</p>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">only_cat1</span> <span class="o">=</span> <span class="n">TimePattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">only_cat1</span> <span class="o">=</span> <span class="n">AxisPattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat1&quot;</span><span class="p">}],</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">)</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">with_default</span> <span class="o">=</span> <span class="n">only_cat1</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">from_formula</span><span class="p">(</span><span class="s2">&quot;0.01&quot;</span><span class="p">))</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">with_default</span> <span class="o">=</span> <span class="n">only_cat1</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">from_formula</span><span class="p">(</span><span class="s2">&quot;0.01&quot;</span><span class="p">))</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">stratified_flows</span><span class="p">(</span><span class="n">with_default</span><span class="p">,</span> <span class="n">num_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># {&#39;B_cat1&#39;: [0.0, 50.0, 0.0], &#39;B_cat2&#39;: [5.0, 4.95, 4.9]}</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">stratified_flows</span><span class="p">(</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span><span class="o">.</span><span class="n">for_group</span><span class="p">(</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">stratified_flows</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span><span class="o">.</span><span class="n">for_group</span><span class="p">(</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat1&quot;</span><span class="p">}]</span>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">),</span> <span class="n">num_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># {&#39;B_cat1&#39;: [0.0, 50.0, 0.0], &#39;B_cat2&#39;: [0.0, 0.0, 0.0]}</span>
@@ -2646,14 +2658,14 @@ result:</p>
 </tbody>
 </table>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mixed</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">TimePattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat1&quot;</span><span class="p">}],</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="n">absolute</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="p">)</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;cat2&quot;</span><span class="p">}],</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">100.0</span><span class="p">),</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">100.0</span><span class="p">),</span>
 </span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="n">absolute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 </span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="p">)</span>
 </span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">)</span>
@@ -2672,9 +2684,9 @@ the same:</p>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
 </span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="n">rate</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="n">rate</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">add_group</span><span class="p">(</span>
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>            <span class="n">conditions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;s0&quot;</span><span class="p">,</span> <span class="s2">&quot;to&quot;</span><span class="p">:</span> <span class="s2">&quot;s1&quot;</span><span class="p">}],</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="n">schedule</span><span class="o">=</span><span class="n">TimePattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="n">schedule</span><span class="o">=</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span>
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        <span class="p">),</span>
 </span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="p">)</span>
 </span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
@@ -2696,15 +2708,53 @@ the same:</p>
 </span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="nb">print</span><span class="p">(</span><span class="n">routed</span><span class="p">[</span><span class="s2">&quot;A_s0&quot;</span><span class="p">],</span> <span class="n">routed</span><span class="p">[</span><span class="s2">&quot;A_s1&quot;</span><span class="p">])</span>  <span class="c1"># [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]</span>
 </span></code></pre></div>
 <h2 id="patterns-in-a-differential-model">Patterns in a differential model<a class="headerlink" href="#patterns-in-a-differential-model" title="Permanent link">&para;</a></h2>
-<p>A pattern reads <code>step</code>. In a <code>DifferentialEquations</code> model, <code>step</code> is constant
-on each unit interval <code>[n, n + 1)</code>, so a pattern is a rate that holds for one
-time unit. A per-capita <code>pulse</code> of <code>amount</code> moves <code>1 − e^(−amount)</code> of its
-source there, and <code>amount</code> in a difference model. To move a fraction at once in
-both engines, use an <a href="../transitions/#impulses">impulse</a>. See
-<a href="../simulations/#time-inside-a-step">Time inside a step</a>.</p>
+<p>In a <code>DifferentialEquations</code> model <code>step</code> is constant on each unit interval
+<code>[n, n + 1)</code> and <code>t</code> moves continuously.</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>In a differential model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pulse</code>, <code>pulses</code>, <code>periodic</code> (read <code>step</code>)</td>
+<td>A rate that holds for one unit: a per-capita <code>pulse</code> of <code>amount</code> moves <code>1 − e^(−amount)</code> of its source, and <code>amount</code> in a difference model. To move a fraction at once in both engines, use an <a href="../transitions/#impulses">impulse</a>.</td>
+</tr>
+<tr>
+<td><code>interval</code>, <code>linear_ramp</code> (read <code>t</code>)</td>
+<td>Open and close at any position, such as <code>interval(start=2.5, end=4, …)</code>; the ramp is continuous. The engine restarts its integration at both bounds.</td>
+</tr>
+<tr>
+<td><code>seasonal</code>, <code>gaussian_pulse</code> (read <code>t</code>)</td>
+<td>Continuous in <code>t</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">remaining_a</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">AxisPattern</span><span class="p">,</span> <span class="n">at</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;A of a per-capita A -&gt; B transition, in a differential model.&quot;&quot;&quot;</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pattern ODE&quot;</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="n">rate</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>            <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}],</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>        <span class="p">)</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="p">)</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="k">return</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run_at</span><span class="p">([</span><span class="n">at</span><span class="p">])[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="c1"># The rate 0.5 acts on [2.5, 4): A keeps exp(-0.75) of its start.</span>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">remaining_a</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span> <span class="mi">6</span><span class="p">),</span> <span class="mi">2</span><span class="p">))</span>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="c1"># 472.37</span>
+</span></code></pre></div>
+<p>See <a href="../simulations/#time-inside-a-step">Time inside a step</a>.</p>
 <h2 id="how-patterns-are-stored">How patterns are stored<a class="headerlink" href="#how-patterns-are-stored" title="Permanent link">&para;</a></h2>
 <p>Numeric <code>pulse</code> and <code>pulses</code> patterns become
-<a href="../building-models/#time-series-parameters">time-series parameters</a> instead of
+<a href="../building-models/#series-parameters">series parameters</a> instead of
 long formulas, so equations stay readable and many pulses stay fast:</p>
 <table>
 <thead>
@@ -2716,7 +2766,7 @@ long formulas, so equations stay readable and many pulses stay fast:</p>
 <tbody>
 <tr>
 <td>Not in a group</td>
-<td><code>_ts_&lt;n&gt;</code></td>
+<td><code>_series_&lt;n&gt;</code></td>
 </tr>
 <tr>
 <td>In a group</td>
@@ -2745,7 +2795,7 @@ raises if it does.</p>
 </tr>
 <tr>
 <td>Signatures</td>
-<td><a href="../../api/time-patterns/">API reference: TimePattern</a></td>
+<td><a href="../../api/axis-patterns/">API reference: AxisPattern</a></td>
 </tr>
 </tbody>
 </table>

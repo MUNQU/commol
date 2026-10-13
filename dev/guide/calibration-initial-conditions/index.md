@@ -41,7 +41,7 @@ def model_with_b(b_fraction: float | None):
 
 truth = Simulation(model_with_b(0.02)).run(num_steps=40)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="B", value=truth["B"][step])
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 41, 5)
 ]
 
@@ -151,7 +151,7 @@ def stratified(b_g1: float | None):
 truth = Simulation(stratified(0.01)).run(num_steps=20)
 problem = CalibrationProblem(
     observed_data=[
-        ObservedDataPoint(step=step, compartment="A_g1", value=truth["A_g1"][step])
+        ObservedDataPoint(at=step, output="A_g1", value=truth["A_g1"][step])
         for step in range(2, 21, 2)
     ],
     parameters=[

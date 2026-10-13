@@ -663,6 +663,8 @@ class ProbabilisticCalibrationResult(BaseModel):
         Counts associated with major stages, useful for performance diagnostics.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     selected_ensemble: EnsembleSolution = Field(
         description="The selected ensemble solution"
     )
@@ -712,25 +714,26 @@ Represents a single ensemble of parameter sets, containing the ensemble composit
 
 Attributes:
 
-| Name                        | Type                                | Description                                                                                                                                   |
-| --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ensemble_size`             | `int`                               | Number of parameter sets in this ensemble                                                                                                     |
-| `selected_indices`          | `list[int]`                         | Indices of parameter sets selected for this ensemble                                                                                          |
-| `ensemble_parameters`       | `list[dict[str, float]]`            | List of parameter dictionaries in this ensemble                                                                                               |
-| `parameter_statistics`      | `dict[str, ParameterSetStatistics]` | Statistics for each parameter across the ensemble                                                                                             |
-| `prediction_median`         | `dict[str, list[float]]`            | Median predictions for each compartment over time                                                                                             |
-| `prediction_ci_lower`       | `dict[str, list[float]]`            | Lower bound of confidence interval for each compartment over time                                                                             |
-| `prediction_ci_upper`       | `dict[str, list[float]]`            | Upper bound of confidence interval for each compartment over time                                                                             |
-| `windowed_prediction_steps` | \`dict\[str, list\[int              | float\]\]\`                                                                                                                                   |
-| `coverage_percentage`       | `float`                             | Percentage of observed data points within the confidence intervals                                                                            |
-| `average_ci_width`          | `float`                             | Average width of confidence intervals across time and compartments                                                                            |
-| `ci_width`                  | `float`                             | Mean observed-data interval width normalized by observation magnitude.                                                                        |
-| `coverage`                  | `float`                             | Normalized coverage objective [0, 1] used in optimization                                                                                     |
-| `point_parameters`          | `dict[str, float]`                  | Parameters of the lowest-loss selected member. This is the only parameter dictionary suitable for constructing a single point model.          |
-| `point_loss`                | `float`                             | Calibration loss of point_parameters.                                                                                                         |
-| `central_loss`              | `float`                             | The memberwise-median prediction scored with the problem's loss function (the same loss the members were fit with), comparable to point_loss. |
-| `observation_diagnostics`   | `dict[str, dict[str, float]]`       | Per-observation-series coverage and interval-width diagnostics.                                                                               |
-| `selection_diagnostics`     | `dict[str, float]`                  | Candidate-search diagnostics produced by the selected backend.                                                                                |
+| Name                            | Type                                | Description                                                                                                                                                   |
+| ------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ensemble_size`                 | `int`                               | Number of parameter sets in this ensemble                                                                                                                     |
+| `selected_indices`              | `list[int]`                         | Indices of parameter sets selected for this ensemble                                                                                                          |
+| `ensemble_parameters`           | `list[dict[str, float]]`            | List of parameter dictionaries in this ensemble                                                                                                               |
+| `parameter_statistics`          | `dict[str, ParameterSetStatistics]` | Statistics for each parameter across the ensemble                                                                                                             |
+| `prediction_positions`          | `list[float]`                       | Positions on the axis of the prediction series, ascending: the unit grid up to one past the last observation, and every observation position and window start |
+| `prediction_median`             | `dict[str, list[float]]`            | Median prediction of each output, one value per position                                                                                                      |
+| `prediction_ci_lower`           | `dict[str, list[float]]`            | Lower bound of the confidence interval of each output, per position                                                                                           |
+| `prediction_ci_upper`           | `dict[str, list[float]]`            | Upper bound of the confidence interval of each output, per position                                                                                           |
+| `windowed_prediction_positions` | `dict[str, list[float]]`            | Positions the windowed values are taken at, one per windowed observation                                                                                      |
+| `coverage_percentage`           | `float`                             | Percentage of observed data points within the confidence intervals                                                                                            |
+| `average_ci_width`              | `float`                             | Average width of confidence intervals across time and compartments                                                                                            |
+| `ci_width`                      | `float`                             | Mean observed-data interval width normalized by observation magnitude.                                                                                        |
+| `coverage`                      | `float`                             | Normalized coverage objective [0, 1] used in optimization                                                                                                     |
+| `point_parameters`              | `dict[str, float]`                  | Parameters of the lowest-loss selected member. This is the only parameter dictionary suitable for constructing a single point model.                          |
+| `point_loss`                    | `float`                             | Calibration loss of point_parameters.                                                                                                                         |
+| `central_loss`                  | `float`                             | The memberwise-median prediction scored with the problem's loss function (the same loss the members were fit with), comparable to point_loss.                 |
+| `observation_diagnostics`       | `dict[str, dict[str, float]]`       | Per-observation-series coverage and interval-width diagnostics.                                                                                               |
+| `selection_diagnostics`         | `dict[str, float]`                  | Candidate-search diagnostics produced by the selected backend.                                                                                                |
 
 Source code in `commol/context/probabilistic_calibration.py`
 
@@ -753,14 +756,18 @@ class EnsembleSolution(BaseModel):
         List of parameter dictionaries in this ensemble
     parameter_statistics : dict[str, ParameterSetStatistics]
         Statistics for each parameter across the ensemble
+    prediction_positions : list[float]
+        Positions on the axis of the prediction series, ascending: the unit
+        grid up to one past the last observation, and every observation
+        position and window start
     prediction_median : dict[str, list[float]]
-        Median predictions for each compartment over time
+        Median prediction of each output, one value per position
     prediction_ci_lower : dict[str, list[float]]
-        Lower bound of confidence interval for each compartment over time
+        Lower bound of the confidence interval of each output, per position
     prediction_ci_upper : dict[str, list[float]]
-        Upper bound of confidence interval for each compartment over time
-    windowed_prediction_steps : dict[str, list[int | float]]
-        Steps the windowed values are taken at, one per windowed observation
+        Upper bound of the confidence interval of each output, per position
+    windowed_prediction_positions : dict[str, list[float]]
+        Positions the windowed values are taken at, one per windowed observation
     coverage_percentage : float
         Percentage of observed data points within the confidence intervals
     average_ci_width : float
@@ -783,6 +790,8 @@ class EnsembleSolution(BaseModel):
         Candidate-search diagnostics produced by the selected backend.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     ensemble_size: int = Field(description="Number of parameter sets in this ensemble")
     selected_indices: list[int] = Field(
         description="Indices of selected parameter sets"
@@ -793,20 +802,23 @@ class EnsembleSolution(BaseModel):
     parameter_statistics: dict[str, ParameterSetStatistics] = Field(
         description="Statistics for each parameter across the ensemble"
     )
+    prediction_positions: list[float] = Field(
+        description="Positions on the axis of the prediction series, ascending"
+    )
     prediction_median: dict[str, list[float]] = Field(
-        description="Median predictions for each compartment over time"
+        description="Median prediction of each output, one value per position"
     )
     prediction_ci_lower: dict[str, list[float]] = Field(
-        description="Lower bound of confidence interval for each compartment over time"
+        description="Lower confidence bound of each output, one value per position"
     )
     prediction_ci_upper: dict[str, list[float]] = Field(
-        description="Upper bound of confidence interval for each compartment over time"
+        description="Upper confidence bound of each output, one value per position"
     )
-    windowed_prediction_steps: dict[str, list[int | float]] = Field(
+    windowed_prediction_positions: dict[str, list[float]] = Field(
         default_factory=dict,
         description=(
-            "Steps the windowed values are taken at, one entry per windowed "
-            "observation of the output, sorted by step"
+            "Positions the windowed values are taken at, one entry per windowed "
+            "observation of the output, sorted by position"
         ),
     )
     windowed_prediction_median: dict[str, list[float]] = Field(
@@ -862,6 +874,8 @@ Source code in `commol/context/probabilistic_calibration.py`
 class EnsembleSelectionSummary(BaseModel):
     """Compact summary of one candidate ensemble from NSGA-II."""
 
+    model_config = ConfigDict(extra="forbid")
+
     ensemble_size: int = Field(description="Number of selected parameter sets")
     selected_indices: list[int] = Field(description="Selected candidate indices")
     ci_width: float = Field(description="Standardized confidence interval width")
@@ -912,6 +926,8 @@ class ParameterSetStatistics(BaseModel):
         Maximum value in ensemble
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     mean: float = Field(description="Mean value across ensemble")
     median: float = Field(description="Median value across ensemble")
     std: float = Field(description="Standard deviation across ensemble")
@@ -959,7 +975,7 @@ class CalibrationEvaluation:
     parameter_names : list[str]
         Names of the parameters (in same order as parameters list)
     predictions : list[list[float]] | None
-        Optional predictions matrix with shape (time_steps, compartments)
+        Optional predictions matrix with one row per position
     """
 
     parameters: list[float]

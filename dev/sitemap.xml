@@ -21,6 +21,10 @@
          <lastmod>2026-10-13</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/axis-patterns/</loc>
+         <lastmod>2026-10-13</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/calibrator/</loc>
          <lastmod>2026-10-13</lastmod>
     </url>
@@ -46,10 +50,6 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/api/simulation/</loc>
-         <lastmod>2026-10-13</lastmod>
-    </url>
-    <url>
-         <loc>https://munqu.github.io/commol/dev/api/time-patterns/</loc>
          <lastmod>2026-10-13</lastmod>
     </url>
     <url>
@@ -105,6 +105,10 @@
          <lastmod>2026-10-13</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/guide/axis-patterns/</loc>
+         <lastmod>2026-10-13</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/guide/building-models/</loc>
          <lastmod>2026-10-13</lastmod>
     </url>
@@ -150,10 +154,6 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/guide/simulations/</loc>
-         <lastmod>2026-10-13</lastmod>
-    </url>
-    <url>
-         <loc>https://munqu.github.io/commol/dev/guide/time-patterns/</loc>
          <lastmod>2026-10-13</lastmod>
     </url>
     <url>

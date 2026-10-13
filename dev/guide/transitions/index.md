@@ -39,7 +39,7 @@ model.print_equations()  # shows every flow as the engine computes it
 | `id`               | `str`                                   | required | The identifier.                                                                                                                                     |
 | `source`           | `list[str]`                             | required | Bins (or one category) that lose the flow. `[]` means the flow enters the system.                                                                   |
 | `target`           | `list[str]`                             | required | Bins (or one category) that gain the flow. `[]` means the flow leaves the system.                                                                   |
-| `rate`             | `str`, `float`, `TimePattern` or `None` | `None`   | The rate formula; see [Rates](#rates). With `stratified_rates`, the fallback rate. `None` with no stratified rate gives a transition with no flows. |
+| `rate`             | `str`, `float`, `AxisPattern` or `None` | `None`   | The rate formula; see [Rates](#rates). With `stratified_rates`, the fallback rate. `None` with no stratified rate gives a transition with no flows. |
 | `stratified_rates` | `list[dict] \| None`                    | `None`   | Rates for some categories; see [Stratified rates](#stratified-rates).                                                                               |
 | `per_compartment`  | `bool \| None`                          | `None`   | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment).                                           |
 | `accumulators`     | `list[str] \| None`                     | `None`   | Accumulators that count the flow; see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#accumulators).                 |
@@ -48,7 +48,7 @@ model.print_equations()  # shows every flow as the engine computes it
 
 ## Rates
 
-A rate is a formula (a string), a number, or a [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md). A formula can use parameters, compartments, bin totals, `N`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
+A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md). A formula can use parameters, compartments, bin totals, `N`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
 
 ### Absolute and per-capita rates
 
@@ -94,7 +94,7 @@ seasonal = (
 )
 ```
 
-For pulses, windows, ramps and schedules per group, use [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md).
+For pulses, windows, ramps and schedules per group, use [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md).
 
 ## Several sources or targets
 
@@ -349,7 +349,7 @@ redirect.print_equations()
 
 ## Limiting when a transition runs
 
-A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md), a [time-series parameter](https://munqu.github.io/commol/latest/guide/building-models/#time-series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
+A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md), a [series parameter](https://munqu.github.io/commol/latest/guide/building-models/#series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
 
 ## Impulses
 
@@ -385,7 +385,7 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                         |
 | `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
 
-An impulse is not a pulse rate. A [`TimePattern.pulse`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one time unit, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one time unit, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
 ## What building checks
 
@@ -406,6 +406,6 @@ An impulse is not a pulse rate. A [`TimePattern.pulse`](https://munqu.github.io/
 
 | To learn                         | Read                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Rates that change over time      | [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md)                       |
+| Rates that change over time      | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
 | Everything a formula can contain | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
 | Units and equation output        | [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)           |

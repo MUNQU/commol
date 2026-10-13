@@ -59,15 +59,16 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 
 ## Variables
 
-| Variable                           | Value                                                                                                                                                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A parameter id                     | The parameter's value at this step                                                                                                                                                                           |
-| A bin id, without stratifications  | The bin's population                                                                                                                                                                                         |
-| A compartment name, such as `A_g1` | That compartment's population                                                                                                                                                                                |
-| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                            |
-| `N`                                | The total population                                                                                                                                                                                         |
-| `step`, `t`                        | The current step: 0, 1, 2, … In a differential model, `t` is the continuous time and `step` its floor; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step) |
-| `pi`, `e`                          | π and e                                                                                                                                                                                                      |
+| Variable                           | Value                                                                                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A parameter id                     | The parameter's value at this step                                                                                                                                                                                                   |
+| A bin id, without stratifications  | The bin's population                                                                                                                                                                                                                 |
+| A compartment name, such as `A_g1` | That compartment's population                                                                                                                                                                                                        |
+| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                    |
+| `N`                                | The total population                                                                                                                                                                                                                 |
+| `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                        |
+| `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step) |
+| `pi`, `e`                          | π and e                                                                                                                                                                                                                              |
 
 ### Subpopulation variables
 
@@ -144,7 +145,7 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Rounding                  | `floor`, `ceil`, `round` (halves round up: `round(2.5)` is 3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                |
 
-For rates that change over time, [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md) builds tested expressions for pulses, windows, ramps and seasons.
+For rates that change over time, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and seasons.
 
 ## Common patterns
 
@@ -191,6 +192,6 @@ except ValueError as error:
 
 | To learn                      | Read                                                                                    |
 | ----------------------------- | --------------------------------------------------------------------------------------- |
-| Ready-made time-varying rates | [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md)     |
+| Ready-made time-varying rates | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)     |
 | How rates become flows        | [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md)         |
 | Running a model               | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md) |

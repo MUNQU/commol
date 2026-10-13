@@ -18,7 +18,7 @@
         <link rel="prev" href="../transitions/">
       
       
-        <link rel="next" href="../time-patterns/">
+        <link rel="next" href="../axis-patterns/">
       
       
         
@@ -930,14 +930,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1508,14 +1508,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2483,8 +2483,12 @@ accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls in
 <td>The total population</td>
 </tr>
 <tr>
-<td><code>step</code>, <code>t</code></td>
-<td>The current step: 0, 1, 2, … In a differential model, <code>t</code> is the continuous time and <code>step</code> its floor; see <a href="../simulations/#time-inside-a-step">Time inside a step</a></td>
+<td><code>t</code></td>
+<td>The current position on the axis. A difference model reads it at each step, so there it equals <code>step</code>; a differential model reads it anywhere</td>
+</tr>
+<tr>
+<td><code>step</code></td>
+<td>The step that holds the current position, <code>floor(t)</code>: 0, 1, 2, … It is constant on each unit interval of a differential model; see <a href="../simulations/#time-inside-a-step">Time inside a step</a></td>
 </tr>
 <tr>
 <td><code>pi</code>, <code>e</code></td>
@@ -2627,7 +2631,7 @@ suffixes must follow the order in which the stratifications were declared.</p>
 </tr>
 </tbody>
 </table>
-<p>For rates that change over time, <a href="../time-patterns/"><code>TimePattern</code></a> builds tested
+<p>For rates that change over time, <a href="../axis-patterns/"><code>AxisPattern</code></a> builds tested
 expressions for pulses, windows, ramps and seasons.</p>
 <h2 id="common-patterns">Common patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">patterns</span> <span class="o">=</span> <span class="p">{</span>
@@ -2702,7 +2706,7 @@ plain mathematics is rejected when the transition is added:</p>
 <tbody>
 <tr>
 <td>Ready-made time-varying rates</td>
-<td><a href="../time-patterns/">Time Patterns</a></td>
+<td><a href="../axis-patterns/">Axis Patterns</a></td>
 </tr>
 <tr>
 <td>How rates become flows</td>

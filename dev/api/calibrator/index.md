@@ -48,7 +48,7 @@ class Calibrator:
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
         self._validate_observed_data()
-        self._warn_constraint_time_steps_beyond_observations()
+        self._warn_constraint_positions_beyond_observations()
 
     def run(self) -> CalibrationResult:
         """
@@ -83,34 +83,12 @@ class Calibrator:
             )
         )
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
         rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
@@ -178,34 +156,12 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
         rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
@@ -244,8 +200,8 @@ class Calibrator:
             return rust_calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
-            return rust_calibration.CalibrationParameterType.Scale
+        elif param_type == CalibrationParameterType.FACTOR:
+            return rust_calibration.CalibrationParameterType.Factor
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -273,7 +229,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                initial_step=opt_config.initial_step,
+                initial_simplex_size=opt_config.initial_simplex_size,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -416,10 +372,10 @@ class Calibrator:
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
                 # The engine resolves initial-condition ids below.
                 pass
-            elif param.parameter_type == CalibrationParameterType.SCALE:
+            elif param.parameter_type == CalibrationParameterType.FACTOR:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
-                        f"Scale parameter '{param.id}' must have positive bounds "
+                        f"Factor parameter '{param.id}' must have positive bounds "
                         f"(got min={param.min_bound}, max={param.max_bound})"
                     )
             else:
@@ -476,7 +432,7 @@ class Calibrator:
         simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            observed_outputs = obs.compartments or [obs.compartment]
+            observed_outputs = obs.observed_outputs
             missing_outputs = [
                 output
                 for output in observed_outputs
@@ -485,36 +441,27 @@ class Calibrator:
             if missing_outputs:
                 raise ValueError(
                     f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"'{obs.label}' not found in model simulation outputs. "
                     f"Available outputs: {sorted(simulation_output_names)}"
                 )
 
-        if self.problem.observed_data:
-            min_step = min(obs.step for obs in self.problem.observed_data)
-            if min_step < 0:
-                raise ValueError(
-                    f"Observed data contains negative time step: {min_step}. "
-                    "Time steps must be non-negative."
-                )
-        check_steps_for_typology(
-            self.simulation.model_definition.dynamics.typology,
-            self.problem.observed_data,
-            self.problem.constraints,
+        engine_state.check_positions(
+            self._engine, self.problem.observed_data, self.problem.constraints
         )
 
-    def _warn_constraint_time_steps_beyond_observations(self) -> None:
+    def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
-        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
-            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+            if constraint.at and max(constraint.at) > max_observed_position:
                 logger.warning(
-                    "Constraint '%s' has time_steps beyond the maximum observed "
-                    "step (%s); simulation will be extended to evaluate them.",
+                    "Constraint '%s' has positions beyond the maximum observed "
+                    "position (%s); simulation will be extended to evaluate them.",
                     constraint.id,
-                    max_observed_step,
+                    max_observed_position,
                 )
 
     def run_probabilistic(self):
@@ -626,7 +573,7 @@ def __init__(
     # Validate calibration parameters against model
     self._validate_calibration_parameters()
     self._validate_observed_data()
-    self._warn_constraint_time_steps_beyond_observations()
+    self._warn_constraint_positions_beyond_observations()
 ```
 
 #### run
@@ -687,34 +634,12 @@ def run(self) -> CalibrationResult:
         )
     )
 
-    # Convert observed data to Rust types
-    rust_observed_data = [
-        rust_calibration.ObservedDataPoint(
-            step=point.step,
-            compartment=point.compartment,
-            value=point.value,
-            weight=point.weight,
-            scale_id=point.scale_id,
-            window_steps=point.window_steps,
-            compartments=point.compartments,
-        )
-        for point in self.problem.observed_data
-    ]
+    rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
     # Convert parameters to Rust types
     rust_parameters = self._rust_parameters()
 
-    # Convert constraints to Rust types
-    rust_constraints = [
-        rust_calibration.CalibrationConstraint(
-            id=constraint.id,
-            expression=constraint.expression,
-            description=constraint.description,
-            weight=constraint.weight,
-            time_steps=constraint.time_steps,
-        )
-        for constraint in self.problem.constraints
-    ]
+    rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
     # Convert loss config to Rust type
     rust_loss_config = self._build_loss_config()
@@ -810,34 +735,12 @@ def run_with_history(self) -> "CalibrationResultWithHistoryProtocol":
     """
     logger.info("Starting calibration with history tracking")
 
-    # Convert observed data to Rust types
-    rust_observed_data = [
-        rust_calibration.ObservedDataPoint(
-            step=point.step,
-            compartment=point.compartment,
-            value=point.value,
-            weight=point.weight,
-            scale_id=point.scale_id,
-            window_steps=point.window_steps,
-            compartments=point.compartments,
-        )
-        for point in self.problem.observed_data
-    ]
+    rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
     # Convert parameters to Rust types
     rust_parameters = self._rust_parameters()
 
-    # Convert constraints to Rust types
-    rust_constraints = [
-        rust_calibration.CalibrationConstraint(
-            id=constraint.id,
-            expression=constraint.expression,
-            description=constraint.description,
-            weight=constraint.weight,
-            time_steps=constraint.time_steps,
-        )
-        for constraint in self.problem.constraints
-    ]
+    rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
     # Convert loss config to Rust type
     rust_loss_config = self._build_loss_config()
@@ -995,6 +898,8 @@ class CalibrationProblem(BaseModel):
         When set, all random operations become deterministic and reproducible.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     observed_data: list[ObservedDataPoint] = Field(
         default=..., min_length=1, description="Observed data points"
     )
@@ -1088,16 +993,20 @@ Bases: `BaseModel`
 
 Represents a single observed data point for calibration.
 
+An observation compares one output, or the sum of several outputs, with an observed value at a position on the axis.
+
 Attributes:
 
-| Name           | Type        | Description                                                                                                                                                                    |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `step`         | \`int       | float\`                                                                                                                                                                        |
-| `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set                                                                  |
-| `compartments` | \`list[str] | None\`                                                                                                                                                                         |
-| `value`        | `float`     | Observed value                                                                                                                                                                 |
-| `weight`       | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w· |
-| `scale_id`     | \`str       | None\`                                                                                                                                                                         |
+| Name        | Type        | Description                                                                                                                                                                                                    |
+| ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step. |
+| `output`    | \`str       | None\`                                                                                                                                                                                                         |
+| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                         |
+| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                      |
+| `value`     | `float`     | Observed value                                                                                                                                                                                                 |
+| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                 |
+| `factor_id` | \`str       | None\`                                                                                                                                                                                                         |
+| `window`    | \`float     | None\`                                                                                                                                                                                                         |
 
 Source code in `commol/context/calibration.py`
 
@@ -1106,17 +1015,24 @@ class ObservedDataPoint(BaseModel):
     """
     Represents a single observed data point for calibration.
 
+    An observation compares one output, or the sum of several outputs, with an
+    observed value at a position on the axis.
+
     Attributes
     ----------
-    step : int | float
-        Position of the observation on the axis. A DifferentialEquations model
-        accepts any non-negative position; a DifferenceEquations model only an
-        integer step. A whole number is stored as an ``int``.
-    compartment : str
-        Name of the compartment being observed, or a display name for aggregate
-        observations when compartments is set
-    compartments : list[str] | None
-        Optional output names to sum before comparing with this observation
+    at : float
+        Position of the observation on the axis. The engine decides which
+        positions its model type accepts: a DifferentialEquations model any
+        non-negative position, a DifferenceEquations model only an integer
+        step.
+    output : str | None
+        The output being observed. Give either `output` or `outputs`.
+    outputs : list[str] | None
+        Outputs summed before comparing with this observation. Needs a
+        `label`.
+    label : str
+        Name of the observed series, used by reports, plots and the
+        per-series normalization. Defaults to `output`.
     value : float
         Observed value
     weight : float
@@ -1124,19 +1040,29 @@ class ObservedDataPoint(BaseModel):
         loss multiplies the squared or absolute residual by it: ``sse`` is
         ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
         ``Σ w·|r| / Σ w``.
-    scale_id : str | None
-        Optional scale parameter ID to apply to model output before comparison
+    factor_id : str | None
+        Optional factor parameter ID that multiplies the model output before
+        comparison
+    window : float | None
+        Optional window length for a cumulative output: the prediction is the
+        output at `at` minus the output at ``at - window``.
     """
 
-    step: int | float = Field(
-        default=..., ge=0, description="Position (step) of the observation"
+    model_config = ConfigDict(extra="forbid")
+
+    at: float = Field(
+        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
     )
-    compartment: str = Field(
-        default=..., min_length=1, description="Name of the compartment being observed"
+    output: str | None = Field(
+        default=None, min_length=1, description="The output being observed"
     )
-    compartments: list[str] | None = Field(
+    outputs: list[str] | None = Field(
         default=None,
-        description="Optional output names to sum before comparison",
+        description="Outputs summed before comparison",
+    )
+    label: str = Field(
+        default="",
+        description="Name of the observed series; defaults to `output`",
     )
     value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
@@ -1144,66 +1070,108 @@ class ObservedDataPoint(BaseModel):
         gt=0.0,
         description="Weight for this observation in the loss function",
     )
-    scale_id: str | None = Field(
+    factor_id: str | None = Field(
         default=None,
-        description="Optional scale parameter ID to apply to model output",
+        description="Optional factor parameter ID that multiplies the model output",
     )
-    window_steps: int | float | None = Field(
+    window: float | None = Field(
         default=None,
         gt=0,
+        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
-            "When set, prediction is value(step) - value(step - window_steps)."
+            "When set, prediction is value(at) - value(at - window)."
         ),
     )
 
-    @field_validator("step", "window_steps")
-    @classmethod
-    def validate_finite_step(cls, value: int | float | None) -> int | float | None:
-        """Reject infinite or NaN steps; store a whole number as an int."""
-        if value is None:
-            return None
-        if not math.isfinite(value):
-            raise ValueError(f"steps must be finite, got {value}")
-        return _whole_as_int(value)
-
     @model_validator(mode="after")
-    def validate_window_steps(self) -> Self:
-        if self.window_steps is not None and self.window_steps > self.step:
-            raise ValueError(
-                f"window_steps ({self.window_steps}) must be <= step ({self.step})"
-            )
+    def validate_observed_outputs(self) -> Self:
+        """Require one of `output` and `outputs`; name the series."""
+        if (self.output is None) == (self.outputs is None):
+            raise ValueError("Give exactly one of 'output' and 'outputs'.")
+        if self.outputs is not None:
+            if not self.outputs:
+                raise ValueError("outputs must be non-empty when provided")
+            if not self.label:
+                raise ValueError(
+                    "An observation of several outputs needs a 'label' that names "
+                    "their sum."
+                )
+        elif not self.label:
+            self.label = self.output or ""
         return self
 
-    @field_validator("compartments")
-    def validate_compartments(cls, v: list[str] | None) -> list[str] | None:
-        if v is not None and not v:
-            raise ValueError("compartments must be non-empty when provided")
-        return v
+    @model_validator(mode="after")
+    def validate_window(self) -> Self:
+        """A window must not start before position 0."""
+        if self.window is not None and self.window > self.at:
+            raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+        return self
+
+    @property
+    def observed_outputs(self) -> list[str]:
+        """The outputs whose sum is compared: `outputs`, or `output` alone."""
+        return list(self.outputs) if self.outputs is not None else [self.output or ""]
 ```
+
+### Attributes
+
+#### observed_outputs
+
+```python
+observed_outputs: list[str]
+```
+
+The outputs whose sum is compared: `outputs`, or `output` alone.
 
 ### Methods:
 
-#### validate_finite_step
+#### validate_observed_outputs
 
 ```python
-validate_finite_step(value: int | float | None) -> int | float | None
+validate_observed_outputs() -> Self
 ```
 
-Reject infinite or NaN steps; store a whole number as an int.
+Require one of `output` and `outputs`; name the series.
 
 Source code in `commol/context/calibration.py`
 
 ```python
-@field_validator("step", "window_steps")
-@classmethod
-def validate_finite_step(cls, value: int | float | None) -> int | float | None:
-    """Reject infinite or NaN steps; store a whole number as an int."""
-    if value is None:
-        return None
-    if not math.isfinite(value):
-        raise ValueError(f"steps must be finite, got {value}")
-    return _whole_as_int(value)
+@model_validator(mode="after")
+def validate_observed_outputs(self) -> Self:
+    """Require one of `output` and `outputs`; name the series."""
+    if (self.output is None) == (self.outputs is None):
+        raise ValueError("Give exactly one of 'output' and 'outputs'.")
+    if self.outputs is not None:
+        if not self.outputs:
+            raise ValueError("outputs must be non-empty when provided")
+        if not self.label:
+            raise ValueError(
+                "An observation of several outputs needs a 'label' that names "
+                "their sum."
+            )
+    elif not self.label:
+        self.label = self.output or ""
+    return self
+```
+
+#### validate_window
+
+```python
+validate_window() -> Self
+```
+
+A window must not start before position 0.
+
+Source code in `commol/context/calibration.py`
+
+```python
+@model_validator(mode="after")
+def validate_window(self) -> Self:
+    """A window must not start before position 0."""
+    if self.window is not None and self.window > self.at:
+        raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+    return self
 ```
 
 ## CalibrationParameter
@@ -1242,6 +1210,8 @@ class CalibrationParameter(BaseModel):
     initial_guess : float | None
         Optional starting value for optimization (if None, midpoint is used)
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(
         default=..., min_length=1, description="Parameter or bin identifier"
@@ -1334,13 +1304,13 @@ Constraints are mathematical expressions that must evaluate to >= 0 for the cons
 
 Attributes:
 
-| Name          | Type        | Description                                                                                                                                                                                                                              |
-| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`       | Unique identifier for this constraint                                                                                                                                                                                                    |
-| `expression`  | `str`       | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When time_steps is specified, can also reference compartment values (S, I, R, etc.) at those time steps. |
-| `description` | \`str       | None\`                                                                                                                                                                                                                                   |
-| `weight`      | `float`     | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                                       |
-| `time_steps`  | \`list\[int | float\]                                                                                                                                                                                                                                  |
+| Name          | Type          | Description                                                                                                                                                                                                                |
+| ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
+| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (S, I, R, etc.) at those positions. |
+| `description` | \`str         | None\`                                                                                                                                                                                                                     |
+| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                         |
+| `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
 
 Examples:
 
@@ -1372,12 +1342,12 @@ Examples:
 ```
 
 ```pycon
->>> # Time-dependent: bin B stays at or below 500 at specific time steps
+>>> # At positions: bin B stays at or below 500 at specific positions
 >>> constraint = CalibrationConstraint(
 ...     id="peak_b",
 ...     expression="500.0 - B",
 ...     description="Peak B never exceeds 500",
-...     time_steps=[10, 20, 30, 40, 50],
+...     at=[10, 20, 30, 40, 50],
 ... )
 ```
 
@@ -1398,19 +1368,20 @@ class CalibrationConstraint(BaseModel):
         Unique identifier for this constraint
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
-        Can reference calibration parameters by their IDs. When time_steps is specified,
-        can also reference compartment values (S, I, R, etc.) at those time steps.
+        Can reference calibration parameters by their IDs. When `at` is specified,
+        can also reference output values (S, I, R, etc.) at those positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
         more important relative to others. The penalty for violating this constraint
         is: weight * violation^2
-    time_steps : list[int | float] | None
-        Optional time steps at which to evaluate this constraint. Non-integer
-        steps need a DifferentialEquations model. If None, constraint
-        is evaluated once before simulation using parameter values only. If specified,
-        constraint is evaluated at each time step and can reference compartment values.
+    at : list[float] | None
+        Optional positions on the axis at which to evaluate this constraint.
+        The engine decides which positions its model type accepts: a
+        DifferenceEquations model only integer steps. If None, the constraint
+        is evaluated once before simulation using parameter values only. If
+        given, it is evaluated at each position and can reference output values.
 
     Examples
     --------
@@ -1435,14 +1406,16 @@ class CalibrationConstraint(BaseModel):
     ...     description="Sum of rates <= 1.0",
     ... )
 
-    >>> # Time-dependent: bin B stays at or below 500 at specific time steps
+    >>> # At positions: bin B stays at or below 500 at specific positions
     >>> constraint = CalibrationConstraint(
     ...     id="peak_b",
     ...     expression="500.0 - B",
     ...     description="Peak B never exceeds 500",
-    ...     time_steps=[10, 20, 30, 40, 50],
+    ...     at=[10, 20, 30, 40, 50],
     ... )
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(
         default=..., min_length=1, description="Unique identifier for this constraint"
@@ -1460,11 +1433,11 @@ class CalibrationConstraint(BaseModel):
         gt=0.0,
         description="Penalty weight multiplier for violations",
     )
-    time_steps: list[int | float] | None = Field(
+    at: list[float] | None = Field(
         default=None,
         description=(
-            "Optional time steps at which to evaluate (for time-dependent "
-            "constraints). Non-integer steps need a DifferentialEquations model."
+            "Optional positions on the axis at which to evaluate the constraint; "
+            "it can then reference output values."
         ),
     )
 
@@ -1481,20 +1454,17 @@ class CalibrationConstraint(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_time_steps(self) -> Self:
-        """Validate that time steps are non-negative and sorted."""
-        if self.time_steps is not None:
-            if len(self.time_steps) == 0:
+    def validate_positions(self) -> Self:
+        """Validate that the positions are finite and non-negative."""
+        if self.at is not None:
+            if len(self.at) == 0:
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must not be empty if "
-                    "specified"
+                    f"at for constraint '{self.id}' must not be empty if specified"
                 )
-            if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
+            if any(position < 0 or not math.isfinite(position) for position in self.at):
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must all be finite "
-                    "and non-negative"
+                    f"at for constraint '{self.id}' must all be finite and non-negative"
                 )
-            self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
         return self
 ```
 
@@ -1524,32 +1494,29 @@ def validate_expression(cls, value: str) -> str:
     return value
 ```
 
-#### validate_time_steps
+#### validate_positions
 
 ```python
-validate_time_steps() -> Self
+validate_positions() -> Self
 ```
 
-Validate that time steps are non-negative and sorted.
+Validate that the positions are finite and non-negative.
 
 Source code in `commol/context/calibration.py`
 
 ```python
 @model_validator(mode="after")
-def validate_time_steps(self) -> Self:
-    """Validate that time steps are non-negative and sorted."""
-    if self.time_steps is not None:
-        if len(self.time_steps) == 0:
+def validate_positions(self) -> Self:
+    """Validate that the positions are finite and non-negative."""
+    if self.at is not None:
+        if len(self.at) == 0:
             raise ValueError(
-                f"time_steps for constraint '{self.id}' must not be empty if "
-                "specified"
+                f"at for constraint '{self.id}' must not be empty if specified"
             )
-        if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
+        if any(position < 0 or not math.isfinite(position) for position in self.at):
             raise ValueError(
-                f"time_steps for constraint '{self.id}' must all be finite "
-                "and non-negative"
+                f"at for constraint '{self.id}' must all be finite and non-negative"
             )
-        self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
     return self
 ```
 
@@ -1563,17 +1530,17 @@ The Nelder-Mead method is a simplex-based derivative-free optimization algorithm
 
 Attributes:
 
-| Name              | Type    | Description                                                                                                                                                                                                                                     |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_iterations`  | `int`   | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
-| `sd_tolerance`    | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
-| `initial_step`    | `float` | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
-| `alpha`           | \`float | None\`                                                                                                                                                                                                                                          |
-| `gamma`           | \`float | None\`                                                                                                                                                                                                                                          |
-| `rho`             | \`float | None\`                                                                                                                                                                                                                                          |
-| `sigma`           | \`float | None\`                                                                                                                                                                                                                                          |
-| `verbose`         | `bool`  | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
-| `header_interval` | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
+| Name                   | Type    | Description                                                                                                                                                                                                                                     |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_iterations`       | `int`   | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
+| `sd_tolerance`         | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
+| `initial_simplex_size` | `float` | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
+| `alpha`                | \`float | None\`                                                                                                                                                                                                                                          |
+| `gamma`                | \`float | None\`                                                                                                                                                                                                                                          |
+| `rho`                  | \`float | None\`                                                                                                                                                                                                                                          |
+| `sigma`                | \`float | None\`                                                                                                                                                                                                                                          |
+| `verbose`              | `bool`  | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
+| `header_interval`      | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
 Source code in `commol/context/calibration.py`
 
@@ -1591,7 +1558,7 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
-    initial_step : float
+    initial_simplex_size : float
         Size of the initial simplex, as a fraction of each parameter's bound
         width, in (0, 1] (default: 0.1). Nelder-Mead searches an unbounded
         coordinate ``u`` and scores ``x = lo + (hi - lo)(sin u + 1)/2``, so
@@ -1611,13 +1578,15 @@ class NelderMeadConfig(BaseModel):
         (default: 100)
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     max_iterations: int = Field(
         default=1000, gt=0, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
     )
-    initial_step: float = Field(
+    initial_simplex_size: float = Field(
         default=0.1,
         gt=0.0,
         le=1.0,
@@ -1712,6 +1681,8 @@ class ParticleSwarmConfig(BaseModel):
     velocity(clamp_factor, mutation_threshold)
         Configure velocity control
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     # Core parameters
     num_particles: int = Field(
@@ -2370,6 +2341,8 @@ class CalibrationResult(BaseModel):
     termination_reason : str
         Explanation of why optimization terminated
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     best_parameters: dict[str, float] = Field(
         default=..., description="Calibrated parameter values"

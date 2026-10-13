@@ -1019,14 +1019,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../time-patterns/" class="md-nav__link">
+      <a href="../axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1597,14 +1597,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2570,7 +2570,7 @@ between categories, stratified rates, impulses, and what <code>build</code> chec
 </tr>
 <tr>
 <td><code>rate</code></td>
-<td><code>str</code>, <code>float</code>, <code>TimePattern</code> or <code>None</code></td>
+<td><code>str</code>, <code>float</code>, <code>AxisPattern</code> or <code>None</code></td>
 <td><code>None</code></td>
 <td>The rate formula; see <a href="#rates">Rates</a>. With <code>stratified_rates</code>, the fallback rate. <code>None</code> with no stratified rate gives a transition with no flows.</td>
 </tr>
@@ -2607,7 +2607,7 @@ between categories, stratified rates, impulses, and what <code>build</code> chec
 </tbody>
 </table>
 <h2 id="rates">Rates<a class="headerlink" href="#rates" title="Permanent link">&para;</a></h2>
-<p>A rate is a formula (a string), a number, or a <a href="../time-patterns/"><code>TimePattern</code></a>.
+<p>A rate is a formula (a string), a number, or a <a href="../axis-patterns/"><code>AxisPattern</code></a>.
 A formula can use parameters, compartments, bin totals, <code>N</code>, <code>step</code>, constants
 and functions; see <a href="../mathematical-expressions/">Mathematical Expressions</a>.</p>
 <h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
@@ -2698,7 +2698,7 @@ appears multiplied by its source.</p>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>For pulses, windows, ramps and schedules per group, use
-<a href="../time-patterns/">Time Patterns</a>.</p>
+<a href="../axis-patterns/">Axis Patterns</a>.</p>
 <h2 id="several-sources-or-targets">Several sources or targets<a class="headerlink" href="#several-sources-or-targets" title="Permanent link">&para;</a></h2>
 <p>A transition with several sources or targets moves <strong>one</strong> flow, like a
 reaction: every entry in <code>source</code> loses it and every entry in <code>target</code> gains it.
@@ -3032,8 +3032,8 @@ it can send the flow into a stratification that the source does not have:</p>
 <h2 id="limiting-when-a-transition-runs">Limiting when a transition runs<a class="headerlink" href="#limiting-when-a-transition-runs" title="Permanent link">&para;</a></h2>
 <p>A transition runs at every step. To limit a flow, write the condition in the
 rate with <code>if</code>, as in <code>"if(step &gt; 30, k, 0)"</code>, or use a
-<a href="../time-patterns/"><code>TimePattern</code></a>, a
-<a href="../building-models/#time-series-parameters">time-series parameter</a> or a
+<a href="../axis-patterns/"><code>AxisPattern</code></a>, a
+<a href="../building-models/#series-parameters">series parameter</a> or a
 <a href="#stratified-rates">stratified rate</a>. A comparison alone is a boolean, so
 <code>"k * (step &gt; 30)"</code> is rejected.</p>
 <h2 id="impulses">Impulses<a class="headerlink" href="#impulses" title="Permanent link">&para;</a></h2>
@@ -3092,7 +3092,7 @@ stratified rates and accumulators as any transition.</p>
 </tr>
 </tbody>
 </table>
-<p>An impulse is not a pulse rate. A <a href="../time-patterns/"><code>TimePattern.pulse</code></a> is a
+<p>An impulse is not a pulse rate. A <a href="../axis-patterns/"><code>AxisPattern.pulse</code></a> is a
 rate: a difference model applies it for one step with the other flows, and a
 differential model applies it as a constant rate for one time unit, so it
 moves <code>1 − e^(−p)</code> of its source. An impulse moves exactly <code>p</code> of its source in
@@ -3153,7 +3153,7 @@ simulate as written:</p>
 <tbody>
 <tr>
 <td>Rates that change over time</td>
-<td><a href="../time-patterns/">Time Patterns</a></td>
+<td><a href="../axis-patterns/">Axis Patterns</a></td>
 </tr>
 <tr>
 <td>Everything a formula can contain</td>

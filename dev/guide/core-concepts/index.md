@@ -382,27 +382,29 @@ except ValueError as error:
     print(error)
 ```
 
-| Method                                             | Returns                                                                         |
-| -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `rate_from_mean_duration(seconds)`                 | `1 - exp(-step / duration)`: the per-step rate for a mean time in a state       |
-| `rate_from_probability(p, period_steps)`           | `1 - (1 - p) ** (1 / period_steps)`: applied over the period, it gives back `p` |
-| `window_start(i, period)`, `window_end(i, period)` | The steps that bound window `i`                                                 |
-| `window_index(step, period)`                       | The window that contains a step; the inverse of `window_end`                    |
+| Method                                   | Returns                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `rate_from_mean_duration(seconds)`       | `1 - exp(-step / duration)`: the per-step rate for a mean time in a state       |
+| `rate_from_probability(p, period_steps)` | `1 - (1 - p) ** (1 / period_steps)`: applied over the period, it gives back `p` |
 
 ```python
+from commol import window_end, window_index, window_start
+
 print(scale.rate_from_mean_duration(4 * 24 * 60 * 60))  # mean of 4 days
 print(scale.rate_from_probability(0.3, scale.steps_per_week))
 
 week = scale.steps_per_week
-print(scale.window_start(0, week), scale.window_end(0, week))  # 0 168
-print(scale.window_index(168, week))                             # 0
+print(window_start(0, week), window_end(0, week))  # 0 168
+print(window_index(168, week))                     # 0
 ```
+
+The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
 
 Rates for difference models only
 
 `rate_from_mean_duration` and `rate_from_probability` return per-step probabilities, which a `DifferenceEquations` model applies once per step. A `DifferentialEquations` model integrates its rates in continuous time, so it needs the continuous rate: `1 / duration` for a mean duration and `-ln(1 - p) / period` for a probability `p` over a period, both in steps. With the per-step value, the model moves too little.
 
-A window covers the steps `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
+A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
 
 ## Next steps
 
@@ -410,5 +412,5 @@ A window covers the steps `(start, end]`, the same interval that [windowed obser
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Every builder option            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
 | What rate formulas can contain  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Rates that change over time     | [Time Patterns](https://munqu.github.io/commol/latest/guide/time-patterns/index.md)                       |
+| Rates that change over time     | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
 | Running and reading simulations | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |

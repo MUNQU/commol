@@ -122,10 +122,10 @@ calibration_model = (
 )
 
 observed_data = [
-    ObservedDataPoint(step=10, compartment="B", value=45.2),
-    ObservedDataPoint(step=20, compartment="B", value=78.5),
-    ObservedDataPoint(step=30, compartment="B", value=62.3),
-    ObservedDataPoint(step=40, compartment="B", value=38.1),
+    ObservedDataPoint(at=10, output="B", value=45.2),
+    ObservedDataPoint(at=20, output="B", value=78.5),
+    ObservedDataPoint(at=30, output="B", value=62.3),
+    ObservedDataPoint(at=40, output="B", value=38.1),
 ]
 
 problem = CalibrationProblem(

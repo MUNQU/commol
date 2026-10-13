@@ -777,14 +777,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/time-patterns/" class="md-nav__link">
+      <a href="../../guide/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1352,14 +1352,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2572,8 +2572,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   (<code>t &gt;= t_on</code>), so the solver cannot step over a jump.</li>
 <li><code>OdeSolver</code> (<code>method</code> <code>"tsit45"</code> or <code>"bdf"</code>, <code>rtol</code>, <code>atol</code>), stored in the
   model as <code>Dynamics.solver</code> and set with <code>ModelBuilder(..., solver=...)</code>.</li>
-<li><code>Simulation.run_at(steps)</code>: the outputs at the given sorted steps. A
-  differential model takes any step, such as <code>0.5</code>.</li>
+<li><code>Simulation.run_at(at)</code>: the outputs at the given sorted positions. A
+  differential model takes any position, such as <code>0.5</code>.</li>
+<li><code>SimulationResults</code>: what <code>Simulation.run</code> and <code>run_at</code> return. A <code>dict</code>
+  from output name to values, as before, with the positions in <code>positions</code>
+  and the rows in <code>rows()</code>.</li>
+<li>The window grid as module functions: <code>window_start</code>, <code>window_end</code>,
+  <code>window_index</code> and <code>window_ends</code>, beside <code>windowed_totals</code>.</li>
+<li>A public Pydantic class rejects an unknown field and names it
+  (<code>extra="forbid"</code> on every class of <code>commol.__all__</code>), so a misspelt or an
+  old name is an error instead of being dropped.</li>
 <li>Impulses: <code>add_transition(..., impulse_at=[...])</code> or
   <code>impulse_every=(period, offset)</code> moves the rate (a fraction or an amount) at
   once at those steps, in both engines, before the flows of the step.
@@ -2585,25 +2593,139 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>ObservedDataPoint.step</code> and <code>window_steps</code>, and
-  <code>CalibrationConstraint.time_steps</code>, accept a float for a differential model.
-  A whole number is stored as an <code>int</code>. A difference model still requires
-  integers, and <code>Calibrator</code> names the observation or constraint that is not.</li>
+<li>A position on the axis is a <code>float</code> everywhere, and the engine alone decides
+  which positions its model type accepts: a difference model integer steps, a
+  differential model any non-negative position. Its error names the
+  observation, constraint, impulse transition or series parameter that holds
+  a rejected position. The engine trait runs only at positions
+  (<code>run_at_positions_into_buffer</code>); <code>run(n)</code> returns the grid it ran on.</li>
+<li>Names of positions, lengths and counts, and names with more than one
+  meaning. No old name is kept; an old keyword raises an error that names it.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ObservedDataPoint(step=…)</code></td>
+<td><code>ObservedDataPoint(at=…)</code></td>
+</tr>
+<tr>
+<td><code>ObservedDataPoint(window_steps=…)</code></td>
+<td><code>ObservedDataPoint(window=…)</code></td>
+</tr>
+<tr>
+<td><code>ObservedDataPoint(compartment="B")</code></td>
+<td><code>ObservedDataPoint(output="B")</code></td>
+</tr>
+<tr>
+<td><code>ObservedDataPoint(compartment="label", compartments=[…])</code></td>
+<td><code>ObservedDataPoint(label="label", outputs=[…])</code></td>
+</tr>
+<tr>
+<td><code>ObservedDataPoint(scale_id=…)</code></td>
+<td><code>ObservedDataPoint(factor_id=…)</code></td>
+</tr>
+<tr>
+<td><code>CalibrationParameter(parameter_type="scale")</code>, <code>CalibrationParameterType.SCALE</code></td>
+<td><code>"factor"</code>, <code>CalibrationParameterType.FACTOR</code></td>
+</tr>
+<tr>
+<td><code>CalibrationConstraint(time_steps=…)</code></td>
+<td><code>CalibrationConstraint(at=…)</code></td>
+</tr>
+<tr>
+<td><code>NelderMeadConfig(initial_step=…)</code></td>
+<td><code>NelderMeadConfig(initial_simplex_size=…)</code></td>
+</tr>
+<tr>
+<td><code>Simulation.run_at(steps)</code></td>
+<td><code>Simulation.run_at(at)</code></td>
+</tr>
+<tr>
+<td><code>Simulation.windowed_totals(results, source_ids, window_steps, at_steps)</code></td>
+<td><code>Simulation.windowed_totals(results, ids, window, at)</code></td>
+</tr>
+<tr>
+<td><code>Simulation.total_series(results, source_ids)</code>, <code>group_outputs(source_ids)</code>, <code>outputs_for(source_id)</code></td>
+<td><code>ids</code>, <code>id</code></td>
+</tr>
+<tr>
+<td><code>windowed_totals(series, window_steps, at_steps)</code></td>
+<td><code>windowed_totals(series, positions, window, at)</code></td>
+</tr>
+<tr>
+<td><code>window_end_steps(window_steps, num_steps)</code></td>
+<td><code>window_ends(window, end)</code></td>
+</tr>
+<tr>
+<td><code>TimeScale.window_start</code>, <code>window_end</code>, <code>window_index</code></td>
+<td><code>commol.window_start</code>, <code>window_end</code>, <code>window_index</code></td>
+</tr>
+<tr>
+<td><code>simulation_report(…, steps, window_steps, …)</code>, <code>series_report</code>, <code>accumulators_report</code>, <code>observed_report</code></td>
+<td><code>at</code>, <code>window</code></td>
+</tr>
+<tr>
+<td><code>SimulationPlotter.plot_series(step_to_label=…)</code></td>
+<td><code>position_label=…</code>, which takes a <code>float</code></td>
+</tr>
+<tr>
+<td><code>TimePattern</code> (<code>commol.api.time_patterns</code>)</td>
+<td><code>AxisPattern</code> (<code>commol.api.patterns</code>)</td>
+</tr>
+<tr>
+<td><code>TimePattern.window(start, end, amount)</code></td>
+<td><code>AxisPattern.interval(start, end, amount)</code></td>
+</tr>
+<tr>
+<td><code>TimeSeriesValue</code>, "time-series parameter"</td>
+<td><code>SeriesValue</code>, "series parameter"</td>
+</tr>
+<tr>
+<td><code>EnsembleSolution.windowed_prediction_steps</code></td>
+<td><code>windowed_prediction_positions</code></td>
+</tr>
+<tr>
+<td><code>engine.current_step()</code></td>
+<td><code>engine.current_position()</code></td>
+</tr>
+<tr>
+<td><code>simulation.run(n, output_format="list_of_lists")</code></td>
+<td><code>simulation.run(n).rows()</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Reports, windows, plots and ensemble statistics read a value at a position
+  of the results, not at a list index, so a differential model windows and
+  reports at non-integer positions once its results hold them. The report key
+  <code>scale_id</code> is <code>factor_id</code>, and <code>compartments</code> is <code>outputs</code>.</li>
+<li><code>EnsembleSolution</code> has <code>prediction_positions</code>; its prediction series hold the
+  unit grid and every observation position and window start.</li>
+<li>Series parameters take <code>(position, value)</code> points with <code>float</code> positions.
+  <code>"linear"</code> interpolates in <code>t</code> and <code>"step_function"</code> holds from any
+  position; a differential engine restarts its integration at their points,
+  so a <code>"linear"</code> series is a ramp, not a staircase. <code>"pulse"</code> keeps integer
+  positions. A difference model gives the same results and rejects a point
+  between integers.</li>
+<li><code>AxisPattern.interval</code> and <code>linear_ramp</code> read <code>t</code> and take <code>float</code> bounds. A
+  difference model gives the same results; in a differential model an
+  interval opens at any position and a ramp is continuous.</li>
+<li>A pattern parameter that the builder generates is named <code>_series_&lt;n&gt;</code>
+  (was <code>_ts_&lt;n&gt;</code>).</li>
 <li>The model compiler moved from <code>commol-difference</code> to the new crate
   <code>commol-model</code>, which both engines use; <code>commol_rs.difference</code> no longer has
   <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code> and <code>check_names</code>,
   which are in <code>commol_rs.model</code>. No public Python name changes.</li>
-<li>
-<p><code>SimulationPlotter</code> raises <code>ValueError</code> for a windowed observation whose
-  <code>window_steps</code> is not a whole number, because the plotted series holds
-  integer steps only.</p>
-</li>
-<li>
-<p><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> take <code>series</code> instead
+<li><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> take <code>series</code> instead
   of <code>bins</code>. An entry is an output name or a bin or accumulator id; an id plots
   the sum of its outputs, so a bin of a stratified model can be plotted. There
-  is no <code>bins</code> alias: rename the argument.</p>
-</li>
+  is no <code>bins</code> alias: rename the argument.</li>
 <li>Every loss uses the observation weights the same way: <code>"sse"</code> is
   <code>Σ w·r²</code>, <code>"rmse"</code> is <code>√(Σ w·r² / Σ w)</code> and <code>"mae"</code> is <code>Σ w·|r| / Σ w</code>.
   Before, <code>"sse"</code> squared the weight and <code>"rmse"</code> and <code>"mae"</code> ignored it. With
@@ -2623,7 +2745,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>
 <p>Nelder-Mead searches inside the bounds: it optimizes an unbounded
   coordinate and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>. Its first simplex
-  is set by <code>NelderMeadConfig.initial_step</code> (a fraction of each bound width,
+  is set by <code>NelderMeadConfig.initial_simplex_size</code> (a fraction of each bound width,
   default 0.1), which replaces <code>simplex_perturbation</code>; there is no alias. Every
   Nelder-Mead result can change.</p>
 </li>
@@ -2635,17 +2757,32 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Condition</code> and <code>Rule</code> types, and the <code>LogicOperators</code> and
   <code>VariablePrefixes</code> enums, in Python and in Rust. The engine never evaluated
   them, so a condition that was never true still moved population. Write the
-  condition in the rate (<code>"if(step &gt; 30, k, 0)"</code>), or use a <code>TimePattern</code> or a
-  stratified rate. A model file with a <code>condition</code> key still loads; the key is
-  ignored.</li>
+  condition in the rate (<code>"if(step &gt; 30, k, 0)"</code>), or use an <code>AxisPattern</code> or
+  a stratified rate. A model file with a <code>condition</code> key raises an error that
+  names it.</li>
+<li><code>Simulation.run(..., output_format=...)</code> and <code>run_at(..., output_format=...)</code>:
+  both return <code>SimulationResults</code>; use <code>rows()</code> for one row per position.</li>
+<li><code>commol_core::integer_steps</code>, <code>SimulationEngine::run_into_buffer</code> and
+  <code>run_at_steps_into_buffer</code>; the Python checks that repeated the engine's
+  rules on positions (<code>check_steps_for_typology</code>, the impulse check of
+  <code>Dynamics</code>, the order check of <code>Simulation.run_at</code>).</li>
 <li>The <code>"weighted_sse"</code> loss and <code>LossConfig.weighted_sse()</code>. Use <code>"sse"</code>,
   which uses the weights.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>CalibrationResult.converged</code> is <code>True</code> only when the optimizer met its
+<li>
+<p>A differential model: on a piece of integration that ends where a rate
+  jumps (a value <code>t</code> is compared with, a series point), the right-hand side
+  sees <code>t</code> below the end. Before, the last solver step of the piece already
+  saw the rate after the jump, so a rate of 0.5 that starts at 2.5 moved
+  <code>3·10⁻⁸</code> of the state before 2.5.</p>
+</li>
+<li>
+<p><code>CalibrationResult.converged</code> is <code>True</code> only when the optimizer met its
   convergence test or <code>target_cost</code>. Before, every finished run reported
-  <code>True</code>, also one that stopped at <code>max_iterations</code>.</li>
+  <code>True</code>, also one that stopped at <code>max_iterations</code>.</p>
+</li>
 <li>Nelder-Mead from a start value of 0 builds a real simplex, and no longer
   stops at a bound where the clamped loss is flat. Before, the simplex was
   degenerate at 0, and could collapse on a bound and report <code>converged=True</code>.</li>

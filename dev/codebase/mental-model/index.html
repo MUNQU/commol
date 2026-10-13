@@ -781,14 +781,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/time-patterns/" class="md-nav__link">
+      <a href="../../guide/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Time Patterns
+    Axis Patterns
   
 
     
@@ -1356,14 +1356,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-patterns/" class="md-nav__link">
+      <a href="../../api/axis-patterns/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimePattern
+    AxisPattern
   
 
     
@@ -2357,7 +2357,7 @@ numbers.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                        build the initial state
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                                        plan the transition flows and compile the rates
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                        derivatives(step, t, X) = Σ flows
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Simulation.run(n) / run_at(steps)  -&gt; difference: X += derivatives, once per step
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Simulation.run(n) / run_at(at)     -&gt; difference: X += derivatives, once per step
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                      differential: diffsol integrates derivatives
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...)
 </span></code></pre></div>
