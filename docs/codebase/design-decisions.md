@@ -11,7 +11,8 @@ test that guards it. Read the ones of your area before you change it.
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Dynamics | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup head counts](#subgroup-head-counts-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
-| Time | [Physical time](#physical-time-is-not-in-the-model), [windowed observations](#windowed-observations) |
+| Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [windowed observations](#windowed-observations) |
+| Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
 
@@ -154,6 +155,20 @@ on purpose, because they have no fixed length in steps.
 
 **Guard:** `test_time_scale.py::TestWindowGrid`.
 
+### One step unit in the unit check
+
+The engine applies every flow once per step and converts no value between
+units. So `UnitChecker._step_unit` (`context/_model/units.py`) takes the one
+unit of time that the parameter units use (`step` when there is none), and
+`check_equation_units` requires every flow to be **equal** to
+`<bin unit>/<step unit>`, not only convertible to it (`utils/equations.py`,
+`same_unit`).
+
+**Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
+model would apply a weekly rate every day.
+
+**Guard:** `test_units.py::TestStepUnit`.
+
 ### Windowed observations
 
 An observation with `window_steps = W` is compared with
@@ -164,6 +179,48 @@ statistics also use `windowed_totals`.
 **Guards:** `test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero) and
 `test_probabilistic_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps`.
+
+## Calibration
+
+### One meaning of an observation weight
+
+`LossConfig::term` and `LossConfig::finish` in
+`crates/commol-calibration/src/types.rs` compute every loss: `sse` is
+`Σ w·r²`, `rmse` is `√(Σ w·r² / Σ w)`, `mae` is `Σ w·|r| / Σ w`. The optimizer
+(`calibration_problem.rs`), the ensemble central loss
+(`probabilistic/ensemble/mod.rs`) and Python (`central_fit_loss`, through
+`LossConfig.aggregate`) all call them.
+
+**Rule:** never write a loss formula elsewhere. The central-fit gate compares
+the ensemble loss with the optimizer loss, so both must measure the same way.
+
+**Guards:** `types.rs` `loss_tests`;
+`ensemble::tests::central_loss_uses_observation_weights_in_every_metric`;
+`test_probabilistic_performance.py::test_central_fit_loss_uses_weights_in_every_metric`.
+
+### Nelder-Mead searches inside the bounds
+
+The objective clamps values to their bounds, so the loss is flat outside them,
+and a simplex that crosses a bound collapses there. Nelder-Mead therefore
+searches an unbounded `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2`
+(`SineTransform` and `BoundedProblem` in `optimization.rs`). Its evaluations
+and its result are recorded in `x`. `converged` is true only for
+`SolverConverged` and `TargetCostReached` (`optimization::converged`).
+
+**Rule:** report and record values in `x`, never in `u`. Every optimizer run,
+the verbose one included, goes through `optimize_observed`.
+
+**Guards:** `optimization::tests`; `test_optimizer_convergence.py`.
+
+### A `Simulation` follows its model
+
+`Simulation` keeps the JSON its engine was built from. `run`, `engine` and
+`simulation_outputs` compare it with `model_dump_json()` and rebuild the engine
+when it differs (`Simulation._sync_engine`), and `run` resets the engine first.
+`Calibrator` takes `simulation.engine` when it is created, so the check is in
+the property, not only in `run`.
+
+**Guard:** `test_simulation_runs.py`.
 
 ## Results
 

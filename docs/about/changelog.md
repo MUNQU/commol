@@ -59,7 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   degenerate at 0, and could collapse on a bound and report `converged=True`.
 - The verbose Nelder-Mead run uses the configured simplex. Before, it always
   used a 10% perturbation.
-
 - `Model.check_unit_consistency` names every bin without a unit. Before, it
   failed with "'None' is not defined in the unit registry".
 - A `Simulation` follows its model: `run` and `engine` rebuild the engine when
@@ -93,10 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   models, transitions, expressions, time patterns, units, simulations, and six
   calibration pages). Every example runs in CI, and every claim was checked
   against the engine. Behaviors that were described wrongly are now documented
-  as they are, among them: transition `condition`s are not evaluated, a second
-  `Simulation.run` continues the first one, a `Simulation` keeps the model it
-  was created with, `"sse"` uses observation weights (squared), and a violated
-  constraint replaces the loss with a penalty.
+  as they are, among them: a violated constraint replaces the loss with a
+  penalty.
 - The API reference documents every public name, and `Model`, plotting and
   reports have their own pages.
 - The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks
