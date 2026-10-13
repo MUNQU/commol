@@ -58,7 +58,7 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns |
 |---|---|
-| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `time_patterns/`, `initial_conditions/`, `simulation/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`), and `support/` with the shared model factories, the reference solver and the assertions. See [Tests](conventions.md#tests). |
+| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `time_patterns/`, `initial_conditions/`, `simulation/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; and `support/` with the shared model factories, the flow models, the reference solver, the oracles and the assertions. See [Tests](conventions.md#tests). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `odd/` | Task records and review ledgers of past work. History, not specification. |
