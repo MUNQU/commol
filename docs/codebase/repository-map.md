@@ -51,7 +51,7 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns |
 |---|---|
-| `py-commol/tests/` | Python tests, including end-to-end model tests in `test_models_execution/` and `test_transition_rate/`. |
+| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `time_patterns/`, `initial_conditions/`, `simulation/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`), and `support/` with the shared model factories, the reference solver and the assertions. See [Tests](conventions.md#tests). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `odd/` | Task records and review ledgers of past work. History, not specification. |
@@ -61,15 +61,15 @@ Use this page when you know what to change but not where it belongs.
 
 | Task | Start with | Then check |
 |---|---|---|
-| Change how a model expands | `builder.rs` (`expand`) | `layout.rs`, `engine_state.py`, `test_simulation_outputs.py` |
-| Change how transitions become flows | `flows.rs` | `helpers.rs`, `context/_model/equations.py`, `test_transition_flows.py` |
+| Change how a model expands | `builder.rs` (`expand`) | `layout.rs`, `engine_state.py`, `tests/building/`, `tests/simulation/test_outputs.py` |
+| Change how transitions become flows | `flows.rs` | `helpers.rs`, `context/_model/equations.py`, `tests/transitions/` |
 | Change the simulation step | `simulation.rs` | `simulation_engine.rs` |
 | Add an expression function or variable | `math_expression/` | `utils/security.py`, `docs/guide/mathematical-expressions.md` |
-| Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `test_compartment_initial_conditions.py` |
-| Change calibration | `calibration_problem.rs` | `initial_conditions.rs`, `api/calibrator.py`, `test_calibrator.py` |
+| Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `tests/initial_conditions/` |
+| Change calibration | `calibration_problem.rs` | `initial_conditions.rs`, `api/calibrator.py`, `tests/calibration/` |
 | Change ensembles | `api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Expose an engine rule to Python | `py-commol/src/` | `_commol_rs.pyi`, `engine_state.py` |
-| Change a report | `api/reporting.py` | [Design decisions](design-decisions.md#reports), `test_reporting.py` |
+| Change a report | `api/reporting.py` | [Design decisions](design-decisions.md#reports), `tests/reporting/` |
 
 ## Placement rule
 

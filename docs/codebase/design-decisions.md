@@ -51,7 +51,7 @@ names in engine order. It uses the engine expansion (`expanded_outputs`), so
 `Simulation.outputs_for`, `group_outputs` and `total_series` group outputs by
 label, not by name.
 
-**Guards:** `test_simulation_outputs.py::test_expansion_matches_the_engine_output_names`
+**Guards:** `tests/simulation/test_outputs.py::TestOutputsBySource::test_expansion_matches_the_engine_output_names`
 (order) and `TestSourceIdSharingAPrefix` (a bin and an accumulator that share
 a prefix).
 
@@ -69,7 +69,7 @@ calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
 **Guards:** `builder.rs` tests
 `parameter_id_cannot_be_a_compartment_or_a_subpopulation` and
 `subpopulation_variable_out_of_declaration_order_is_a_build_error`;
-`test_reserved_names.py`.
+`tests/building/test_reserved_names.py`.
 
 ## Dynamics
 
@@ -90,7 +90,7 @@ A transition with several sources and a per-capita rate is rejected, because
 it has no single source to multiply. `print_equations` shows the planned flows,
 so a per-capita rate prints as `k1 * A`.
 
-**Guard:** `test_transition_flows.py`.
+**Guard:** `tests/transitions/test_flows.py`.
 
 ### The most specific stratified rate wins
 
@@ -124,7 +124,7 @@ multiply along the chain: `N × fraction(group1) × fraction(cat1)`.
 `InitialConditions.subgroup_population` owns this; `Model.subgroup_population`
 and `Model.get_conditioning_categories` delegate to it.
 
-**Guard:** `test_simulation_outputs.py::TestSubgroupPopulation` compares the
+**Guard:** `tests/simulation/test_outputs.py::TestSubgroupPopulation` compares the
 result with the population the engine starts from.
 
 ### Calibrated initial conditions are applied in layers
@@ -140,7 +140,7 @@ fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.
 
 **Guard:**
-`test_calibrator.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`.
+`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`.
 See also [Per-compartment initial conditions](../development/design-per-compartment-initial-conditions.md).
 
 ## Time
@@ -153,7 +153,7 @@ durations, probabilities and window grids. Conversions **raise** when a period
 is not a whole number of steps, instead of rounding. Months and years are absent
 on purpose, because they have no fixed length in steps.
 
-**Guard:** `test_time_scale.py::TestWindowGrid`.
+**Guard:** `tests/simulation/test_time_scale.py::TestWindowGrid`.
 
 ### One step unit in the unit check
 
@@ -167,7 +167,7 @@ unit of time that the parameter units use (`step` when there is none), and
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
 model would apply a weekly rate every day.
 
-**Guard:** `test_units.py::TestStepUnit`.
+**Guard:** `tests/units/test_model_units.py::TestStepUnit`.
 
 ### Windowed observations
 
@@ -176,9 +176,9 @@ An observation with `window_steps = W` is compared with
 `windowed_totals` (`api/windows.py`) must give the same number; the ensemble
 statistics also use `windowed_totals`.
 
-**Guards:** `test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
+**Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero) and
-`test_probabilistic_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps`.
+`tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps`.
 
 ## Calibration
 
@@ -196,7 +196,7 @@ the ensemble loss with the optimizer loss, so both must measure the same way.
 
 **Guards:** `types.rs` `loss_tests`;
 `ensemble::tests::central_loss_uses_observation_weights_in_every_metric`;
-`test_probabilistic_performance.py::test_central_fit_loss_uses_weights_in_every_metric`.
+`tests/probabilistic/test_selection.py::test_central_fit_loss_uses_weights_in_every_metric`.
 
 ### Nelder-Mead searches inside the bounds
 
@@ -210,7 +210,7 @@ and its result are recorded in `x`. `converged` is true only for
 **Rule:** report and record values in `x`, never in `u`. Every optimizer run,
 the verbose one included, goes through `optimize_observed`.
 
-**Guards:** `optimization::tests`; `test_optimizer_convergence.py`.
+**Guards:** `optimization::tests`; `tests/calibration/test_optimizers.py`.
 
 ### A `Simulation` follows its model
 
@@ -220,7 +220,7 @@ when it differs (`Simulation._sync_engine`), and `run` resets the engine first.
 `Calibrator` takes `simulation.engine` when it is created, so the check is in
 the property, not only in `run`.
 
-**Guard:** `test_simulation_runs.py`.
+**Guard:** `tests/simulation/test_runs.py`.
 
 ## Results
 
@@ -245,7 +245,7 @@ members. Taking percentiles first gives a band that describes no member.
 - Labels and summary figures belong to the caller, because they carry domain
   vocabulary.
 
-**Guard:** `test_reporting.py`.
+**Guard:** `tests/reporting/`.
 
 ### Model files are written in full
 

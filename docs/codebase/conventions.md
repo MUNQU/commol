@@ -18,6 +18,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
+| Tests | One package per guide page; shared factories; every test checks a result | Review; pytest 10 deprecations fail the run (`filterwarnings`) |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -102,7 +103,7 @@ every match.
   parameters `k1`, `alpha`. No names from epidemiology, chemistry or any other
   field.
 - Every Python block runs, top to bottom within its page, in one namespace and
-  from a temporary directory (`py-commol/tests/test_docs_examples.py`). Define
+  from a temporary directory (`py-commol/tests/docs/test_examples.py`). Define
   what a block needs in an earlier block of the same page.
 - A block that cannot run alone (a signature, a fragment) is marked on the line
   just before its fence, with a reason:
@@ -129,7 +130,7 @@ every match.
 | The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
-| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/test_docs_reference.py`) | CI (Code Quality) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
 | Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |
@@ -145,6 +146,79 @@ The same pages serve both. An agent reads the Markdown source by path, so:
 - keep each page self-contained, with its links;
 - name files and functions exactly, in code format;
 - put the rule before the explanation.
+
+## Tests
+
+Where a Python test goes, how it builds its model, and what it must check.
+The tests live in `py-commol/tests/`.
+
+### Layout: one package per guide page
+
+A test goes in the package of the guide page that documents the behavior it
+checks, so "where is the test of X" has the same answer as "where is the guide
+of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
+`api/probabilistic/`) goes in the package of its feature.
+
+| Package | Tests of | Guide page |
+|---|---|---|
+| `building/` | The builder, parameters, stratifications, reserved names, save and load | [Building Models](../guide/building-models.md) |
+| `transitions/` | Flows, `$compartment`, stratified rates | [Transitions](../guide/transitions.md) |
+| `rates/` | Formulas, functions, variables, expression security | [Mathematical Expressions](../guide/mathematical-expressions.md) |
+| `time_patterns/` | `TimePattern` formulas, runs and schedules | [Time Patterns](../guide/time-patterns.md) |
+| `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#initial-conditions) |
+| `simulation/` | Runs, outputs, windowed totals, `TimeScale` | [Running Simulations](../guide/simulations.md) |
+| `units/` | Unit checks and `print_equations` | [Units and Equations](../guide/units-and-equations.md) |
+| `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
+| `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |
+| `reporting/` | Reports | [Reports](../guide/reports.md) |
+| `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
+| `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
+| `support/` | No tests: the code the tests share | — |
+
+Keep a test module under about 600 lines. When it grows past that, split it by
+topic inside its package.
+
+### Models: use the factories
+
+- Build models with the factories of `tests/support/models.py`:
+  `sir_builder`, `seir_builder` and `a_to_b_builder`, and the special models
+  `override_builder`, `shared_category_builder` and
+  `conditional_pathway_builder`. A keyword overrides one part of the default
+  model, so a test names only what it changes. `build` builds for difference
+  equations; `run` builds and simulates.
+- Build a model by hand only when one test needs it and no factory keyword
+  expresses it. A model that a second file needs goes to `support/`.
+- Fixtures: `sir_model` and `sir_simulation` (`tests/conftest.py`); `truth`
+  and `truth_run` (`tests/calibration/conftest.py`). A fixture is
+  function-scoped unless its cost is measured; a wider scope never holds an
+  object a test can change. A class-scoped fixture is never an instance
+  method (removed in pytest 10).
+
+### Every test checks a result
+
+A test compares a result with an oracle:
+
+| Oracle | Example |
+|---|---|
+| A value computed by hand in the test | `reference_run` (`tests/support/reference.py`) evaluates the flows in plain Python, as the engine does: every flow from the state at the start of the step, no clamping. `tests/rates/test_formulas.py` compares whole trajectories with it. |
+| An analytic value | A death rate `d` on every bin gives `N(t) = N(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
+| An invariant | Conservation of the population (`assert_population_conserved`); two paths that must agree, such as a bin id and the explicit sum of its compartments. |
+
+"It runs" is not a result. A test whose only check is that no exception
+occurs is allowed only when the exception is its subject, such as a validator
+that accepts a valid input.
+
+### Tolerances
+
+- `assert_close(actual, expected, rel=…, abs=…)` (`tests/support/assertions.py`)
+  needs a stated tolerance, and reports the key and the index of the first
+  difference.
+- `ENGINE_REL = 1e-9` compares the engine with a hand computation of the same
+  arithmetic: only the order of the floating-point operations differs.
+- `pytest.approx` with its default (relative `1e-6`) suits a single value
+  computed by hand.
+- An optimizer result states the tolerance its convergence allows, for example
+  `abs=1e-5` for Nelder-Mead on noise-free data.
 
 ## Commits
 

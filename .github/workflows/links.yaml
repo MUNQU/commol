@@ -37,7 +37,7 @@ jobs:
           # Local addresses (such as `mkdocs serve`) are examples, not links, and
           # the release template's compare link is a placeholder.
           # Links to this site are checked against docs/ by
-          # py-commol/tests/test_docs_reference.py, because new pages reach
+          # py-commol/tests/docs/test_reference.py, because new pages reach
           # the published site only after a release.
           args: >-
             --no-progress
