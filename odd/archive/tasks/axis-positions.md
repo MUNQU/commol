@@ -140,13 +140,13 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Engine trait on positions (D2); each engine checks its positions; remove C1–C3; a benchmark test of `run(n)` against `run_at` on the full grid | direct | done (uncommitted) |
-| T2 | S2 | Results with positions (D1), in `Simulation` and the ensemble predictions | direct | done (uncommitted) |
-| T3 | S3 | Windows, reports, plots and ensemble statistics by position; window grid into `windows.py` | direct | done (uncommitted) |
-| T4 | S4 | Time-series parameters at `float` positions (D4); restarts at their points | direct | done (uncommitted) |
-| T5 | S5 | `window` and `linear_ramp` on `t` with `float` bounds | direct | done (uncommitted) |
-| T6 | S6 | Names (D3, L7, L8); `extra="forbid"` on every public Pydantic class, with a test over `commol.__all__`; docs, API pages, design decisions, changelog | direct | done (uncommitted) |
-| T7 | all | Final audit: every runner | direct | done (2026-10-13) |
+| T1 | S1 | Engine trait on positions (D2); each engine checks its positions; remove C1–C3; a benchmark test of `run(n)` against `run_at` on the full grid | direct | done (`729894c`) |
+| T2 | S2 | Results with positions (D1), in `Simulation` and the ensemble predictions | direct | done (`729894c`) |
+| T3 | S3 | Windows, reports, plots and ensemble statistics by position; window grid into `windows.py` | direct | done (`729894c`) |
+| T4 | S4 | Time-series parameters at `float` positions (D4); restarts at their points | direct | done (`729894c`) |
+| T5 | S5 | `window` and `linear_ramp` on `t` with `float` bounds | direct | done (`729894c`) |
+| T6 | S6 | Names (D3, L7, L8); `extra="forbid"` on every public Pydantic class, with a test over `commol.__all__`; docs, API pages, design decisions, changelog | direct | done (`729894c`) |
+| T7 | all | Final audit: every runner | direct | done (`729894c`) |
 
 ## Delivery
 
@@ -228,3 +228,5 @@ Branch `refactor/axis-positions` from `develop` at `a001e2a`, 2026-10-13.
   loaded it now expects the error); a test passed `seed=` to
   `ParticleSwarmConfig`, which dropped it with no error; the test now relies on
   the problem's seed.
+- L14 (user, 2026-10-13): approved the implementation; committed as
+  `729894c`, PR #104 to `develop`, and the ODD archived in the same PR.

@@ -10,7 +10,7 @@ Motivation: audit T0 of `odd/tasks/axis-scale-refactor.md` (theme D, and the
 of commol includes other model types later (for example stochastic, delay or
 spatial models).
 Branch: `refactor/model-type-registry` from `develop`, after
-`odd/tasks/axis-positions.md` is merged.
+`odd/archive/tasks/axis-positions.md` is merged.
 Second of four ODDs; the order of all pending work is in
 `odd/execution-order.md`.
 Engram mirror: topic `odd/model-type-registry/tasks` (project `commol`).

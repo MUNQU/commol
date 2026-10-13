@@ -11,7 +11,7 @@ independent variable it differentiates over (time is one case), and a
 time axis and discrete-time rates. Audit T0 below found that more of the API
 assumes one model type; that work is split into three ODDs (L5).
 Branch: `refactor/axis-scale` from `develop`, after
-`odd/tasks/axis-positions.md`, `odd/tasks/model-type-registry.md` and
+`odd/archive/tasks/axis-positions.md`, `odd/tasks/model-type-registry.md` and
 `odd/tasks/model-kind-interface.md` are merged.
 Last of four ODDs; the order of all pending work is in
 `odd/execution-order.md`.
@@ -39,7 +39,7 @@ Where the audit findings go:
 
 | Themes | ODD |
 |---|---|
-| A, B, C (positions, results, rules Python repeats); the window grid of `TimeScale`; `TimePattern.window` and `linear_ramp` | `odd/tasks/axis-positions.md` |
+| A, B, C (positions, results, rules Python repeats); the window grid of `TimeScale`; `TimePattern.window` and `linear_ramp` | `odd/archive/tasks/axis-positions.md` |
 | D (model types); what a rate means per type, as the engine's answer | `odd/tasks/model-type-registry.md` |
 | E (rate conversions and wording), F (units), `TimeScale` | this ODD |
 | E3 (pulses) | none: `ode-engine` D12 stays |
