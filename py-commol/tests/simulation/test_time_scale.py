@@ -152,3 +152,13 @@ class TestWindowGrid:
     def test_non_positive_period_is_rejected(self, period_steps: int) -> None:
         with pytest.raises(ValueError, match="period_steps must be positive"):
             HOURLY.window_end(0, period_steps)
+
+
+class TestFromStepUnit:
+    def test_a_unit_of_time_gives_its_length(self) -> None:
+        assert TimeScale.from_step_unit("day").step_seconds == 86400.0
+        assert TimeScale.from_step_unit("h").step_seconds == 3600.0
+
+    def test_a_step_unit_that_is_not_time_is_named(self) -> None:
+        with pytest.raises(ValueError, match="'meter'"):
+            TimeScale.from_step_unit("meter")

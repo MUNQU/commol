@@ -1,4 +1,3 @@
-from commol.constants import ModelTypes
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
     UnitConsistencyError,
@@ -13,7 +12,47 @@ DEFAULT_STEP_UNIT = "step"
 """Step unit of a model whose parameters name no unit of time."""
 
 TIME_DIMENSIONS = ("[time]", "[step]")
-"""Dimensions of a unit that can be the length of one step."""
+"""Dimensions of a unit the check infers as the step unit."""
+
+
+def check_step_unit(unit: str) -> str:
+    """
+    Check that a declared step unit is one unit of one dimension.
+
+    The axis of a model is its independent variable, of any kind: time
+    (``day``), a length (``meter``) or any other quantity. So any single
+    dimension is accepted, with exponent 1: ``1/day`` and ``m**2`` are
+    not lengths of a step.
+
+    Parameters
+    ----------
+    unit : str
+        The declared step unit.
+
+    Returns
+    -------
+    str
+        The unit, unchanged.
+
+    Raises
+    ------
+    UnitConsistencyError
+        If the unit is not defined, or does not have exactly one dimension
+        with exponent 1.
+    """
+    try:
+        dimensionality = ureg.parse_units(unit).dimensionality
+    except Exception as error:
+        raise UnitConsistencyError(
+            f"The step unit '{unit}' is not a unit: {error}"
+        ) from error
+    exponents = list(dict(dimensionality).values())
+    if exponents != [1]:
+        raise UnitConsistencyError(
+            f"The step unit '{unit}' must have one dimension with exponent 1 "
+            f"(such as 'day' or 'meter'), got '{dimensionality}'."
+        )
+    return unit
 
 
 class UnitChecker:
@@ -21,8 +60,9 @@ class UnitChecker:
     Validates unit consistency of model equations.
 
     The engine applies every flow once per step and never converts values
-    between units. So the check infers one step unit from the parameters and
-    requires every flow to be exactly ``<bin unit>/<step unit>``.
+    between units. So the check uses one step unit, declared on the model or
+    inferred from the parameters, and requires every flow to be exactly
+    ``<bin unit>/<step unit>`` and every impulse to be ``<bin unit>``.
     """
 
     def __init__(self, model) -> None:
@@ -73,12 +113,6 @@ class UnitChecker:
                 f"ModelBuilder, or unit in add_bin."
             )
 
-        if self._model.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
-            raise ValueError(
-                f"Unit checking is only supported for DifferenceEquations models. "
-                f"Current model type: {self._model.dynamics.typology}"
-            )
-
     def _collect_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
         """Collect unit consistency errors from all transitions."""
         errors: list[str] = []
@@ -89,6 +123,7 @@ class UnitChecker:
                     transition.rate,
                     transition.id,
                     variable_units,
+                    transition.is_impulse,
                 )
                 if not is_consistent and error_msg:
                     errors.append(error_msg)
@@ -99,6 +134,7 @@ class UnitChecker:
                         strat_rate.rate,
                         f"{transition.id} (stratified rate {idx + 1})",
                         variable_units,
+                        transition.is_impulse,
                     )
                     if not is_consistent and error_msg:
                         errors.append(error_msg)
@@ -107,7 +143,8 @@ class UnitChecker:
 
     def _step_unit(self) -> str:
         """
-        The step unit: the one unit of time that the parameter units use.
+        The step unit: the declared ``step_unit`` of the model or, when there
+        is none, the one unit of time that the parameter units use.
 
         A unit of time is a unit of dimension ``[time]`` (such as ``day``) or
         ``[step]`` (``step``), with any exponent: ``1/day`` and ``day`` both use
@@ -117,8 +154,12 @@ class UnitChecker:
         Raises
         ------
         UnitConsistencyError
-            If the parameters use more than one unit of time.
+            If the declared step unit is not one unit of one dimension, or no
+            unit is declared and the parameters use more than one unit of time.
         """
+        if self._model.step_unit is not None:
+            return check_step_unit(self._model.step_unit)
+
         uses: list[tuple[str, str, str]] = []
         for param in self._model.parameters:
             if param.unit is None:
@@ -146,8 +187,14 @@ class UnitChecker:
         rate: str,
         transition_id: str,
         variable_units: dict[str, str],
+        is_impulse: bool = False,
     ) -> tuple[bool, str | None]:
-        """Check units for a single transition rate."""
+        """
+        Check units for a single transition rate.
+
+        A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
+        at once.
+        """
         variables = get_expression_variables(rate)
 
         rate_variable_units: dict[str, str] = {}
@@ -167,7 +214,9 @@ class UnitChecker:
         if not bin_unit:
             bin_unit = self._model.population.bins[0].unit
 
-        expected_unit = f"{bin_unit}/{self._step_unit()}"
+        expected_unit = (
+            str(bin_unit) if is_impulse else f"{bin_unit}/{self._step_unit()}"
+        )
 
         is_consistent, error_msg = check_equation_units(
             rate, rate_variable_units, expected_unit

@@ -5,7 +5,7 @@ import pytest
 from commol import ModelBuilder
 from commol.context.model import Model
 from commol.utils.equations import UnitConsistencyError
-from tests.support import a_to_b_builder, build, seir_builder, sir_builder
+from tests.support import a_to_b_builder, build, build_ode, seir_builder, sir_builder
 
 DAILY = {"beta": "1/day", "gamma": "1/day"}
 FAILED = "Unit consistency check failed"
@@ -354,10 +354,17 @@ class TestInconsistentModels:
         assert "pow(I / N, threshold)" in str(error.value)
 
 
-def _two_rates(k1_unit: str, k2_unit: str, bin_unit: str | None = "person") -> Model:
+def _two_rates(
+    k1_unit: str,
+    k2_unit: str,
+    bin_unit: str | None = "person",
+    *,
+    step_unit: str | None = None,
+    ode: bool = False,
+) -> Model:
     """A → B → C, each transition with its own rate parameter."""
-    return build(
-        ModelBuilder(name="Step unit", bin_unit=bin_unit)
+    return (build_ode if ode else build)(
+        ModelBuilder(name="Step unit", bin_unit=bin_unit, step_unit=step_unit)
         .add_bin(id="A", name="A")
         .add_bin(id="B", name="B")
         .add_bin(id="C", name="C")
@@ -413,3 +420,53 @@ class TestStepUnit:
     def test_a_bin_without_a_unit_is_named(self) -> None:
         with pytest.raises(UnitConsistencyError, match="no unit: A, B, C"):
             _two_rates("1/day", "1/day", bin_unit=None).check_unit_consistency()
+
+
+class TestAxisUnit:
+    """A declared step unit of any single dimension: the axis need not be time."""
+
+    def test_a_model_in_one_per_meter_passes_with_its_step_unit(self) -> None:
+        _two_rates("1/meter", "1/meter", step_unit="meter").check_unit_consistency()
+
+    def test_without_a_declared_unit_a_length_is_not_the_step(self) -> None:
+        with pytest.raises(UnitConsistencyError, match="person/step"):
+            _two_rates("1/meter", "1/meter").check_unit_consistency()
+
+    def test_one_per_meter_mixed_with_one_per_day_names_both(self) -> None:
+        with pytest.raises(UnitConsistencyError) as error:
+            _two_rates("1/meter", "1/day", step_unit="meter").check_unit_consistency()
+
+        message = str(error.value)
+        assert "person / day" in message or "person/day" in message
+        assert "person/meter" in message
+
+    @pytest.mark.parametrize("unit", ["1/day", "meter**2", "not_a_unit"])
+    def test_the_step_unit_is_one_unit_of_one_dimension(self, unit: str) -> None:
+        with pytest.raises(UnitConsistencyError, match="step unit"):
+            _two_rates("1/day", "1/day", step_unit=unit).check_unit_consistency()
+
+    def test_a_differential_model_in_one_per_day_passes(self) -> None:
+        _two_rates("1/day", "1/day", ode=True).check_unit_consistency()
+
+    def test_an_impulse_moves_an_amount_of_the_bin_unit(self) -> None:
+        def impulse(unit: str) -> Model:
+            return build(
+                ModelBuilder(name="impulse", bin_unit="person")
+                .add_bin(id="A", name="A")
+                .add_bin(id="B", name="B")
+                .add_parameter(id="p", value=0.1, unit=unit)
+                .add_transition(
+                    id="t_ab", source=["A"], target=["B"], rate="p * A", impulse_at=[1]
+                )
+                .set_initial_conditions(
+                    population_size=1000,
+                    bin_fractions=[
+                        {"bin": "A", "fraction": 1.0},
+                        {"bin": "B", "fraction": 0.0},
+                    ],
+                )
+            )
+
+        impulse("dimensionless").check_unit_consistency()
+        with pytest.raises(UnitConsistencyError, match="expected 'person'"):
+            impulse("1/day").check_unit_consistency()
