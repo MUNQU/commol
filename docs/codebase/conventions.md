@@ -11,7 +11,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 |---|---|---|
 | Python style | Ruff, line length 88 | `ruff check`, `ruff format` (pre-commit, CI) |
 | Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
-| Python dead code | No unused code | `vulture` (CI) |
+| Python dead code | No unused code; a name used only in a string annotation goes in `py-commol/.vulture_allowlist.py` | `vulture` (pre-commit, CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
 | Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
 | Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |

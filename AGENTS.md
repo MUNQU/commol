@@ -33,7 +33,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Build the extension | `source .venv/bin/activate && maturin develop --release` |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
-| Python lint and types | `ruff check . && ruff format --check . && ty check commol` |
+| Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
