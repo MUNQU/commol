@@ -1,7 +1,7 @@
 # Feature: Fix the code findings F1–F12
 
 Goal: fix the eleven code defects that the documentation overhaul found
-(`odd/tasks/documentation-overhaul.md`, Evidence T3–T6, T14), plus the
+(`odd/archive/tasks/documentation-overhaul.md`, Evidence T3–T6, T14), plus the
 Nelder-Mead note of T6 (F12), and remove the "known issue" notes that the docs
 carry for them.
 Branch: `fix/code-findings` from `develop`, one PR, squash-merged (see Delivery).

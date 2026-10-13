@@ -94,7 +94,7 @@ Branch: `feature/per-compartment-initial-conditions`
 
 ## Residual resolution after Judgment Day ESCALATED (user decision: keep delta, resolve now)
 
-Design decisions (recorded in odd/judgment-day/per-compartment-initial-conditions-ledger.md):
+Design decisions (recorded in odd/archive/judgment-day/per-compartment-initial-conditions-ledger.md):
 
 - ESC-1 policy: the model definition may represent any state the engine can hold.
   Total guards live in authoring paths only (ModelBuilder construction, public
