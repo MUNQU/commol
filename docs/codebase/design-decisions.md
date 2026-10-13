@@ -152,14 +152,15 @@ A `Model` records no step length: rates are per step and periods are step
 counts. The axis of a model is its independent variable, whatever quantity it
 is (time is one case), so the engines never ask which dimension it has. `Model.step_unit` is optional and only the unit check
 reads it. `TimeScale` (`api/time_scale.py`) holds the length of a step of time
-and converts durations, probabilities and window grids. Conversions **raise**
+and converts durations and probabilities; the window grid is in
+`api/windows.py`. Conversions **raise**
 when a period is not a whole number of steps, instead of rounding. Months and
 years are absent on purpose, because they have no fixed length in steps.
 `TimeScale` applies only when that variable is time:
 `TimeScale.from_step_unit` raises for a step unit that is not time.
 
-**Guards:** `tests/simulation/test_time_scale.py::TestWindowGrid`,
-`tests/simulation/test_time_scale.py::TestFromStepUnit`.
+**Guards:** `tests/simulation/test_time_scale.py::TestFromStepUnit`,
+`tests/simulation/test_windows.py::TestWindowGrid`.
 
 ### One step unit in the unit check
 
@@ -183,20 +184,32 @@ model would apply a weekly rate every day.
 
 A differential model integrates in continuous time, but on `[n, n + 1)` its
 rates see `step = n`: `t` is continuous, `step` is the floor of `t`. A rate that
-reads `step`, a time series or a time pattern is therefore constant on its unit
-interval. When the right-hand side reads one of them
-(`CompiledModel::depends_on_step`), the engine ends a piece of integration at
-every integer, so each jump of the rate is the start of a piece
-(`breakpoints` in `crates/commol-differential/src/solve.rs`).
+reads `step` or a `"pulse"` series (and so `AxisPattern.pulse`, `pulses`,
+`periodic`) is therefore constant on its unit interval. When the right-hand
+side reads one of them (`CompiledModel::depends_on_step`), the engine ends a
+piece of integration at every integer, so each jump of the rate is the start of
+a piece (`breakpoints` in `crates/commol-differential/src/solve.rs`).
+
+A `"step_function"` or `"linear"` series reads `t`
+(`SeriesParameter::evaluate`), so it holds or interpolates from any position.
+The engine ends a piece at each of its points (`CompiledModel::series_points`),
+where the series jumps or bends. A difference engine reads `t = step`, so it
+gives the same values as before, and it rejects a point between integers.
 
 A rate can also jump where `t` reaches a value it compares `t` with
-(`t >= t_on`). The compiler collects those values when they read only numbers,
-`pi`, `e` and parameters that do not change during a run
-(`time_thresholds` in `crates/commol-model/src/builder.rs`), and the engine
-evaluates them with the current parameters and ends a piece there. Without
-that, an adaptive solver whose rate is 0 before a short window grows its step
-and steps over the window. A comparison with the state is a state event, which
-the engine does not detect.
+(`t >= t_on`, and so `AxisPattern.interval` and `linear_ramp`). The compiler
+collects those values when they read only numbers, `pi`, `e` and parameters
+that do not change during a run (`time_thresholds` in
+`crates/commol-model/src/builder.rs`), and the engine evaluates them with the
+current parameters and ends a piece there. Without that, an adaptive solver
+whose rate is 0 before a short window grows its step and steps over the window.
+A comparison with the state is a state event, which the engine does not
+detect.
+
+On a piece `[start, end)` the right-hand side sees `t` no larger than the
+float just below `end` (`RightHandSide::last_t`). A Runge–Kutta step evaluates
+the right-hand side at the end of its interval; without the limit, a value that
+jumps at `end` would already act on the last step of the piece.
 
 Whether an expression reads `step` comes from `reads_variable`, not from
 `get_variables`: `get_variables` leaves out the special variables, because it
@@ -211,7 +224,10 @@ length, so it would never act.
 `crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`,
 `a_rate_reads_the_step_of_its_unit_interval`,
 `a_rate_that_switches_on_t_acts_only_on_its_window`,
-`crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold`.
+`a_linear_series_matches_the_integral_of_its_interpolant`,
+`a_step_function_series_holds_from_a_position_between_steps`,
+`crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold`,
+`tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration`.
 
 ### Impulses come before the flows of their step
 
@@ -229,17 +245,58 @@ impulse step and restarts from the new state, so `diffsol` needs no event.
 
 ### Windowed observations
 
-An observation with `window_steps = W` is compared with
-`series[step] - series[step - W]`, anchored at its own step. The Rust loss and
+An observation at `at` with `window = W` is compared with
+`output(at) - output(at - W)`, anchored at its own position. The Rust loss and
 `windowed_totals` (`api/windows.py`) must give the same number, and so must the
-ensemble statistics (`StatisticsCalculator._member_window_value`). A
-differential model may observe at non-integer steps: the statistics then read
-the engine at those positions (`StatisticsCalculator._point_values`), never an
-interpolation of the integer trajectory.
+ensemble statistics (`StatisticsCalculator._member_window_value`). Window `w`
+covers `(w · W, (w + 1) · W]`; `window_index` places a position with
+`max(ceil(at / W) − 1, 0)`, and `observed_report` calls it.
 
 **Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
-the generating parameters is zero) and
-`tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps`.
+the generating parameters is zero),
+`tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index`
+and
+`tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_positions`.
+
+### The engine owns positions
+
+A position on the axis is an `f64` in every engine call and a `float` in every
+public Python name (`at`); a length is `window` or `period`; a count of steps
+keeps `num_steps`. The `SimulationEngine` trait
+(`crates/commol-core/src/simulation_engine.rs`) runs only at positions
+(`run_at_positions_into_buffer`); `run(n)` runs on the grid the engine builds,
+`grid(n)`, and returns it. Each engine says which positions its model type
+accepts (`check_position`): a difference engine non-negative integers, a
+differential engine any finite, non-negative position. The engine checks every
+position where it receives it, and its message names the object that holds a
+rejected one: the observation or constraint (`check_positions` in
+`crates/commol-calibration/src/calibration_problem.rs`), the impulse transition
+or series parameter (`DifferenceEquations::from_compiled`).
+
+**Rule:** Python passes positions on and shows the engine's message. It never
+checks whether a model type accepts a position.
+
+**Guards:** `crates/commol-calibration/tests/test_positions.rs`,
+`crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected`,
+`crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps`,
+`tests/calibration/test_observations.py::TestPositionsAndTypology`.
+
+### Results carry their positions
+
+`Simulation.run` and `run_at` return `SimulationResults`
+(`api/results.py`): a `dict` from output name to values, with the positions in
+`positions` and the rows in `rows()`. A `dict` keeps `results["A"]`,
+`json.dumps` and `pandas.DataFrame(results)` working; a reserved key could clash
+with an output name. Windows, reports, plots and ensemble statistics read a
+value at a position (`index_at`, which matches within a relative `1e-9`), never
+at a list index, so a model type that reports between integers fits them. The
+ensemble trajectories hold `StatisticsCalculator.positions`: the unit grid and
+every observation position and window start.
+
+**Guards:** `tests/simulation/test_runs.py::TestResults`,
+`tests/reporting/test_simulation_report.py::TestNonIntegerPositions`,
+`tests/plotting/test_plotter.py::TestDifferentialModel`,
+`tests/probabilistic/test_differential.py`.
 
 ## Engines
 
@@ -347,6 +404,14 @@ would lose a required key and fail to reload. `render_json`
 (`context/_model/serialization.py`) keeps files readable by writing long numeric
 arrays on one line. It is internal on purpose: an output format in the public
 API becomes a compatibility promise.
+
+### Public models forbid unknown fields
+
+Every public Pydantic class sets `model_config = ConfigDict(extra="forbid")`.
+An unknown field, such as a misspelt or an old name (`window_steps`), raises a
+`ValidationError` that names it, instead of being dropped with no error.
+
+**Guard:** `tests/building/test_unknown_fields.py`.
 
 ## Security
 

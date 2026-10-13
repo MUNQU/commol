@@ -42,7 +42,7 @@ Simulation(model)                  -> engine_state.build_engine(model JSON)
                                         build the initial state
                                         plan the transition flows and compile the rates
                                         derivatives(step, t, X) = Σ flows
-Simulation.run(n) / run_at(steps)  -> difference: X += derivatives, once per step
+Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per step
                                       differential: diffsol integrates derivatives
 Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...)
 ```

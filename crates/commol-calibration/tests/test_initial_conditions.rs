@@ -64,8 +64,18 @@ impl TestEngine {
 }
 
 impl SimulationEngine for TestEngine {
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        Ok((0..=num_steps).map(|_| self.population.clone()).collect())
+    fn check_position(&self, _position: f64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        buffer.clear();
+        buffer.extend(positions.iter().map(|_| self.population.clone()));
+        Ok(())
     }
 
     fn step(&mut self) -> Result<(), String> {
@@ -110,7 +120,7 @@ impl SimulationEngine for TestEngine {
         &self.parameters
     }
 
-    fn current_step(&self) -> f64 {
+    fn current_position(&self) -> f64 {
         0.0
     }
 

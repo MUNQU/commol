@@ -32,12 +32,12 @@ def _problem(
     ),
 ) -> CalibrationProblem:
     simulation = Simulation(sir_model)
-    true_results = simulation.run(30, output_format="dict_of_lists")
+    true_results = simulation.run(30)
     noise = np.random.default_rng(SEED).normal(0.0, 3.0, size=30)
     observations = [
         ObservedDataPoint(
-            step=step,
-            compartment="I",
+            at=step,
+            output="I",
             value=max(0.0, true_results["I"][step] + noise[step]),
         )
         for step in range(30)
@@ -146,8 +146,8 @@ def test_invalid_observed_compartment_is_rejected(sir_model) -> None:
     problem = CalibrationProblem(
         observed_data=[
             ObservedDataPoint(
-                step=0,
-                compartment="not-a-model-output",
+                at=0,
+                output="not-a-model-output",
                 value=1.0,
             )
         ],
@@ -162,7 +162,7 @@ def test_invalid_observed_compartment_is_rejected(sir_model) -> None:
 
 def _single_parameter_problem(loss_function: str) -> CalibrationProblem:
     return CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=0, compartment="I", value=1.0)],
+        observed_data=[ObservedDataPoint(at=0, output="I", value=1.0)],
         parameters=[bounded("beta")],
         loss_function=loss_function,
         optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
@@ -245,10 +245,10 @@ def _windowed_problem(sir_model, steps: list[int], window: int) -> CalibrationPr
     truth = simulation.run(max(steps))
     observations = [
         ObservedDataPoint(
-            step=step,
-            compartment="I",
+            at=step,
+            output="I",
             value=truth["I"][step] - truth["I"][step - window],
-            window_steps=window,
+            window=window,
         )
         for step in steps
     ]
@@ -271,7 +271,7 @@ def _windowed_problem(sir_model, steps: list[int], window: int) -> CalibrationPr
     return problem
 
 
-def test_windowed_bands_are_taken_at_the_observation_steps(sir_model) -> None:
+def test_windowed_bands_are_taken_at_the_observation_positions(sir_model) -> None:
     """
     Windowed values are anchored where the observations are.
 
@@ -286,7 +286,7 @@ def test_windowed_bands_are_taken_at_the_observation_steps(sir_model) -> None:
     ).run_probabilistic()
     ensemble = result.selected_ensemble
 
-    assert ensemble.windowed_prediction_steps["I"] == steps
+    assert ensemble.windowed_prediction_positions["I"] == steps
     assert len(ensemble.windowed_prediction_median["I"]) == len(steps)
     assert len(ensemble.windowed_prediction_ci_lower["I"]) == len(steps)
     assert len(ensemble.windowed_prediction_ci_upper["I"]) == len(steps)

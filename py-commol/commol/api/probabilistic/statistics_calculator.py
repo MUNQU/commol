@@ -5,6 +5,8 @@ including parameter statistics, prediction intervals, and coverage metrics.
 """
 
 import logging
+import math
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -16,10 +18,11 @@ from commol.api.probabilistic.normalization import (
     central_fit_loss,
     series_normalization_factors,
 )
+from commol.api.results import index_at, same_position
 
 if TYPE_CHECKING:
     from commol.api.simulation import Simulation
-    from commol.context.calibration import CalibrationProblem
+    from commol.context.calibration import CalibrationProblem, ObservedDataPoint
 
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
@@ -29,11 +32,36 @@ from commol.context.probabilistic_calibration import (
 logger = logging.getLogger(__name__)
 
 
-def _as_step(position: int | float) -> int | float:
-    """A whole-number position as an int, so it indexes a trajectory."""
-    if isinstance(position, float) and position.is_integer():
-        return int(position)
-    return position
+def prediction_positions(observed_data: Iterable["ObservedDataPoint"]) -> list[float]:
+    """
+    Positions the ensemble trajectories are reported at.
+
+    The unit grid ``0, 1, ..., floor(last) + 1``, where ``last`` is the last
+    observation position, and every observation position and window start,
+    sorted and unique. A DifferenceEquations model observes at integers only,
+    so its positions are the grid.
+
+    Parameters
+    ----------
+    observed_data : Iterable[ObservedDataPoint]
+        The observations of the problem; there is at least one.
+
+    Returns
+    -------
+    list[float]
+        Ascending positions.
+    """
+    points: list[float] = []
+    for obs in observed_data:
+        points.append(float(obs.at))
+        if obs.window is not None:
+            points.append(float(obs.at - obs.window))
+    grid = [float(k) for k in range(math.floor(max(points)) + 2)]
+    positions: list[float] = []
+    for position in sorted(grid + points):
+        if not positions or not same_position(positions[-1], position):
+            positions.append(position)
+    return positions
 
 
 class StatisticsCalculator:
@@ -65,88 +93,18 @@ class StatisticsCalculator:
         self.problem = problem
         self.confidence_level = confidence_level
         self._calibration_runner = CalibrationRunner(simulation, problem, seed=0)
-        self._point_values_cache: (
-            tuple[tuple[int, ...], dict[tuple[str, float], list[float]]] | None
-        ) = None
-
-    def _non_integer_points(self) -> list[tuple[str, float]]:
-        """``(output, step)`` of every observation read at a non-integer step."""
-        output_ids = set(self.simulation.simulation_outputs)
-        points: list[tuple[str, float]] = []
-        for obs in self.problem.observed_data:
-            positions = [obs.step]
-            if obs.window_steps is not None:
-                positions.append(obs.step - obs.window_steps)
-            for position in positions:
-                if float(position).is_integer():
-                    continue
-                for output in obs.compartments or [obs.compartment]:
-                    if output in output_ids and (output, position) not in points:
-                        points.append((output, position))
-        return points
-
-    def _point_values(
-        self,
-        ensemble_params: list[CalibrationEvaluation],
-    ) -> dict[tuple[str, float], list[float]]:
-        """
-        Exact value of each output at each non-integer step the problem uses.
-
-        Ensemble trajectories hold integer steps only. A DifferentialEquations
-        model may observe between them, so the engine reports those positions
-        directly, once per ensemble. Keys are ``(output, step)``; each value
-        has one entry per ensemble member.
-        """
-        cache_key = tuple(id(params) for params in ensemble_params)
-        if self._point_values_cache is not None:
-            cached_key, cached_values = self._point_values_cache
-            if cached_key == cache_key:
-                return cached_values
-
-        points = self._non_integer_points()
-        values: dict[tuple[str, float], list[float]] = {point: [] for point in points}
-        if points:
-            output_index = {
-                name: idx for idx, name in enumerate(self.simulation.simulation_outputs)
-            }
-            runner = self._calibration_runner
-            generate = (
-                commol_rs.calibration.generate_calibrated_predictions_at_points_parallel
-            )
-            predictions = generate(
-                self.simulation.engine,
-                runner.build_rust_observed_data(),
-                runner.build_rust_parameters(),
-                runner.build_rust_constraints(),
-                runner.build_loss_config(),
-                runner.initial_population_size(),
-                [params.parameters for params in ensemble_params],
-                [(float(step), output_index[output]) for output, step in points],
-                initial_condition_remainder=runner.problem.initial_condition_remainder,
-            )
-            for member in predictions:
-                for point, value in zip(points, member, strict=True):
-                    values[point].append(value)
-        self._point_values_cache = (cache_key, values)
-        return values
+        self.positions: list[float] = prediction_positions(problem.observed_data)
+        """Positions every ensemble trajectory holds, ascending."""
 
     def _member_value(
         self,
         all_predictions: dict[str, list[list[float]]],
-        ensemble_params: list[CalibrationEvaluation],
         output: str,
         member_idx: int,
-        step: int | float,
-    ) -> float | None:
-        """
-        Value of one output for one ensemble member at a step, or None when
-        the trajectory does not reach that step.
-        """
-        if isinstance(step, int):
-            trajectory = all_predictions[output][member_idx]
-            return trajectory[step] if step < len(trajectory) else None
-        values = self._point_values(ensemble_params).get((output, step))
-        return values[member_idx] if values else None
+        at: float,
+    ) -> float:
+        """Value of one output for one ensemble member at a position."""
+        return all_predictions[output][member_idx][index_at(self.positions, at)]
 
     def calculate_parameter_statistics(
         self,
@@ -189,9 +147,8 @@ class StatisticsCalculator:
         self,
         ensemble_params: list[CalibrationEvaluation],
         simulation_output_ids: list[str],
-        time_steps: int,
     ) -> dict[str, list[list[float]]]:
-        """Generate or reuse predictions for each ensemble member.
+        """Generate the trajectory of each ensemble member at :attr:`positions`.
 
         Parameters
         ----------
@@ -199,71 +156,40 @@ class StatisticsCalculator:
             List of parameter sets in the ensemble
         simulation_output_ids : list[str]
             List of simulation output IDs to generate predictions for
-        time_steps : int
-            Number of time steps to simulate
 
         Returns
         -------
         dict[str, list[list[float]]]
-            Dictionary mapping simulation output IDs to prediction trajectories
+            Each output mapped to one trajectory per member, with one value
+            per position of :attr:`positions`.
         """
-        cached_predictions = [ep.predictions for ep in ensemble_params]
-        n_outputs = len(self.simulation.simulation_outputs)
-        if all(
-            predictions is not None
-            and len(predictions) == time_steps
-            and all(len(step) >= n_outputs for step in predictions)
-            for predictions in cached_predictions
-        ):
-            all_predictions_raw = [
-                predictions
-                for predictions in cached_predictions
-                if predictions is not None
-            ]
-        else:
-            parameter_sets = [ep.parameters for ep in ensemble_params]
-            all_predictions_raw = (
-                commol_rs.calibration.generate_calibrated_predictions_parallel(
-                    self.simulation.engine,
-                    self._calibration_runner.build_rust_observed_data(),
-                    self._calibration_runner.build_rust_parameters(),
-                    self._calibration_runner.build_rust_constraints(),
-                    self._calibration_runner.build_loss_config(),
-                    self._calibration_runner.initial_population_size(),
-                    parameter_sets,
-                    time_steps,
-                    initial_condition_remainder=(
-                        self._calibration_runner.problem.initial_condition_remainder
-                    ),
-                )
+        runner = self._calibration_runner
+        all_predictions_raw = (
+            commol_rs.calibration.generate_calibrated_predictions_parallel(
+                self.simulation.engine,
+                runner.build_rust_observed_data(),
+                runner.build_rust_parameters(),
+                runner.build_rust_constraints(),
+                runner.build_loss_config(),
+                runner.initial_population_size(),
+                [ep.parameters for ep in ensemble_params],
+                self.positions,
+                initial_condition_remainder=runner.problem.initial_condition_remainder,
             )
+        )
 
-        # Reorganize predictions by simulation output.
-        # all_predictions_raw is list[list[list[float]]] where:
-        # - outer list: one per parameter set
-        # - middle list: one per time step
-        # - inner list: one per simulation output
-        all_predictions: dict[str, list[list[float]]] = {
-            output_id: [] for output_id in simulation_output_ids
-        }
-
-        simulation_output_idx_map = {
+        # all_predictions_raw[member][position][output] -> output: member: position
+        output_index = {
             output_id: idx
             for idx, output_id in enumerate(self.simulation.simulation_outputs)
         }
-
-        for predictions_per_param_set in all_predictions_raw:
-            # predictions_per_param_set is list[list[float]]
-            # where [time_step][simulation_output_idx]
-            for output_id in simulation_output_ids:
-                output_idx = simulation_output_idx_map[output_id]
-                trajectory = [
-                    predictions_per_param_set[t][output_idx]
-                    for t in range(len(predictions_per_param_set))
-                ]
-                all_predictions[output_id].append(trajectory)
-
-        return all_predictions
+        return {
+            output_id: [
+                [row[output_index[output_id]] for row in member]
+                for member in all_predictions_raw
+            ]
+            for output_id in simulation_output_ids
+        }
 
     def calculate_prediction_intervals(
         self,
@@ -310,47 +236,47 @@ class StatisticsCalculator:
         dict[str, list[float]],
         dict[str, list[float]],
         dict[str, list[float]],
-        dict[str, list[int | float]],
+        dict[str, list[float]],
     ]:
         """Calculate median and CI from windowed (per-period) trajectories.
 
         For outputs with windowed observations, computes the windowed value
-        (series[t] - series[t - window_steps]) per ensemble member *before*
-        taking percentiles, so the resulting CI is the percentile of differences
-        rather than the difference of percentiles.
+        (the series at the position minus the series a window before) per
+        ensemble member *before* taking percentiles, so the resulting CI is the
+        percentile of differences rather than the difference of percentiles.
 
-        Each value is taken at the step of an observation, using that
+        Each value is taken at the position of an observation, using that
         observation's own window, so the result lines up with the observations
-        of that output sorted by step and matches what the loss compared
+        of that output sorted by position and matches what the loss compared
         against.
 
-        Also returns the step each windowed value was taken at.
+        Also returns the position each windowed value was taken at.
 
-        Returns empty dicts if no observed data has window_steps set.
+        Returns empty dicts if no observed data sets a window.
         """
         windowed_observations: dict[
             str,
-            tuple[list[str], str | None, list[tuple[int | float, int | float]]],
+            tuple[list[str], str | None, list[tuple[float, float]]],
         ] = {}
         for obs in self.problem.observed_data:
-            if obs.window_steps is None:
+            if obs.window is None:
                 continue
             entry = windowed_observations.setdefault(
-                obs.compartment,
-                (obs.compartments or [obs.compartment], obs.scale_id, []),
+                obs.label,
+                (obs.observed_outputs, obs.factor_id, []),
             )
-            entry[2].append((obs.step, obs.window_steps))
+            entry[2].append((float(obs.at), float(obs.window)))
 
         prediction_median: dict[str, list[float]] = {}
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
-        prediction_steps: dict[str, list[int | float]] = {}
+        prediction_positions: dict[str, list[float]] = {}
 
         ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
         for output_id, (
             component_ids,
-            scale_id,
+            factor_id,
             observation_windows,
         ) in windowed_observations.items():
             if any(
@@ -358,32 +284,25 @@ class StatisticsCalculator:
             ):
                 continue
             windows = sorted(set(observation_windows))
-            windowed_rows: list[list[float]] = []
-            kept: list[tuple[int | float, int | float]] = []
-            for step, window_steps in windows:
-                row = [
-                    self._member_window_value(
-                        all_predictions,
-                        ensemble_params,
-                        component_ids,
-                        scale_id,
-                        member_idx,
-                        step,
-                        window_steps,
-                    )
-                    for member_idx in range(len(ensemble_params))
+            windowed = np.array(
+                [
+                    [
+                        self._member_window_value(
+                            all_predictions,
+                            ensemble_params,
+                            component_ids,
+                            factor_id,
+                            member_idx,
+                            at,
+                            window,
+                        )
+                        for member_idx in range(len(ensemble_params))
+                    ]
+                    for at, window in windows
                 ]
-                values = [value for value in row if value is not None]
-                if step - window_steps < 0 or len(values) != len(row):
-                    continue
-                kept.append((step, window_steps))
-                windowed_rows.append(values)
-            if not kept:
-                continue
-            windows = kept
-            windowed = np.array(windowed_rows).T
+            ).T
 
-            prediction_steps[output_id] = [step for step, _ in windows]
+            prediction_positions[output_id] = [at for at, _ in windows]
             prediction_median[output_id] = np.median(windowed, axis=0).tolist()
             prediction_ci_lower[output_id] = np.percentile(
                 windowed, ci_lower_percentile, axis=0
@@ -396,7 +315,7 @@ class StatisticsCalculator:
             prediction_median,
             prediction_ci_lower,
             prediction_ci_upper,
-            prediction_steps,
+            prediction_positions,
         )
 
     def _member_window_value(
@@ -404,30 +323,18 @@ class StatisticsCalculator:
         all_predictions: dict[str, list[list[float]]],
         ensemble_params: list[CalibrationEvaluation],
         component_ids: list[str],
-        scale_id: str | None,
+        factor_id: str | None,
         member_idx: int,
-        step: int | float,
-        window_steps: int | float,
-    ) -> float | None:
+        at: float,
+        window: float,
+    ) -> float:
         """Summed, optionally scaled windowed value of one ensemble member."""
-        total = 0.0
-        for component_id in component_ids:
-            end = self._member_value(
-                all_predictions, ensemble_params, component_id, member_idx, step
-            )
-            start = self._member_value(
-                all_predictions,
-                ensemble_params,
-                component_id,
-                member_idx,
-                _as_step(step - window_steps),
-            )
-            if end is None or start is None:
-                return None
-            total += end - start
-        return self._scale_observation_value(
-            total, scale_id, ensemble_params[member_idx]
+        total = sum(
+            self._member_value(all_predictions, component_id, member_idx, at)
+            - self._member_value(all_predictions, component_id, member_idx, at - window)
+            for component_id in component_ids
         )
+        return self._apply_factor(total, factor_id, ensemble_params[member_idx])
 
     def calculate_central_loss(
         self,
@@ -457,7 +364,7 @@ class StatisticsCalculator:
                 continue
             residuals.append(float(np.median(values)) - observation.value)
             weights.append(observation.weight)
-            factors.append(normalization[observation.compartment])
+            factors.append(normalization[observation.label])
         return central_fit_loss(residuals, weights, factors, self.problem.loss_function)
 
     def calculate_observation_diagnostics(
@@ -480,7 +387,7 @@ class StatisticsCalculator:
             lower = float(np.percentile(values, lower_percentile))
             upper = float(np.percentile(values, upper_percentile))
             diagnostics = totals.setdefault(
-                observation.compartment,
+                observation.label,
                 {"n_points": 0.0, "covered_points": 0.0, "total_ci_width": 0.0},
             )
             diagnostics["n_points"] += 1.0
@@ -537,47 +444,39 @@ class StatisticsCalculator:
         total_ci_width = 0.0
 
         for obs in self.problem.observed_data:
-            comp_id = obs.compartment
-            component_ids = obs.compartments or [comp_id]
-            step = obs.step
-            observed_value = obs.value
-            previous_step = (
-                _as_step(step - obs.window_steps) if obs.window_steps is not None else 0
-            )
-            # The intervals hold integer steps only.
-            if not isinstance(step, int) or not isinstance(previous_step, int):
-                continue
-
-            if all(
-                component_id in prediction_ci_lower
-                and step < len(prediction_ci_lower[component_id])
+            component_ids = obs.observed_outputs
+            if any(
+                component_id not in prediction_ci_lower
                 for component_id in component_ids
             ):
-                if obs.window_steps is None:
-                    ci_lower = sum(
-                        prediction_ci_lower[component_id][step]
-                        for component_id in component_ids
-                    )
-                    ci_upper = sum(
-                        prediction_ci_upper[component_id][step]
-                        for component_id in component_ids
-                    )
-                else:
-                    ci_lower = sum(
-                        prediction_ci_lower[component_id][step]
-                        - prediction_ci_upper[component_id][previous_step]
-                        for component_id in component_ids
-                    )
-                    ci_upper = sum(
-                        prediction_ci_upper[component_id][step]
-                        - prediction_ci_lower[component_id][previous_step]
-                        for component_id in component_ids
-                    )
+                continue
+            end = index_at(self.positions, obs.at)
+            if obs.window is None:
+                ci_lower = sum(
+                    prediction_ci_lower[component_id][end]
+                    for component_id in component_ids
+                )
+                ci_upper = sum(
+                    prediction_ci_upper[component_id][end]
+                    for component_id in component_ids
+                )
+            else:
+                start = index_at(self.positions, obs.at - obs.window)
+                ci_lower = sum(
+                    prediction_ci_lower[component_id][end]
+                    - prediction_ci_upper[component_id][start]
+                    for component_id in component_ids
+                )
+                ci_upper = sum(
+                    prediction_ci_upper[component_id][end]
+                    - prediction_ci_lower[component_id][start]
+                    for component_id in component_ids
+                )
 
-                if ci_lower <= observed_value <= ci_upper:
-                    points_in_ci += 1
+            if ci_lower <= obs.value <= ci_upper:
+                points_in_ci += 1
 
-                total_ci_width += ci_upper - ci_lower
+            total_ci_width += ci_upper - ci_lower
 
         coverage_percentage = (
             (points_in_ci / total_points * 100) if total_points > 0 else 0.0
@@ -624,7 +523,7 @@ class StatisticsCalculator:
         all_predictions: dict[str, list[list[float]]],
         ensemble_params: list[CalibrationEvaluation],
     ) -> list[float]:
-        component_ids = obs.compartments or [obs.compartment]
+        component_ids = obs.observed_outputs
         if any(component_id not in all_predictions for component_id in component_ids):
             return []
 
@@ -636,47 +535,35 @@ class StatisticsCalculator:
             return []
 
         values = []
-        previous_step = (
-            _as_step(obs.step - obs.window_steps)
-            if obs.window_steps is not None
-            else None
-        )
         for member_idx, params in enumerate(ensemble_params):
             value = 0.0
             for component_id in component_ids:
-                component_value = self._member_value(
-                    all_predictions, ensemble_params, component_id, member_idx, obs.step
+                value += self._member_value(
+                    all_predictions, component_id, member_idx, obs.at
                 )
-                if component_value is None:
-                    return []
-                if previous_step is not None:
-                    previous_value = self._member_value(
+                if obs.window is not None:
+                    value -= self._member_value(
                         all_predictions,
-                        ensemble_params,
                         component_id,
                         member_idx,
-                        previous_step,
+                        obs.at - obs.window,
                     )
-                    if previous_value is None:
-                        return []
-                    component_value -= previous_value
-                value += component_value
-            values.append(self._scale_observation_value(value, obs.scale_id, params))
+            values.append(self._apply_factor(value, obs.factor_id, params))
         return values
 
     @staticmethod
-    def _scale_observation_value(
+    def _apply_factor(
         value: float,
-        scale_id: str | None,
+        factor_id: str | None,
         params: CalibrationEvaluation,
     ) -> float:
-        if scale_id is None:
+        if factor_id is None:
             return value
         try:
-            scale_idx = params.parameter_names.index(scale_id)
+            factor_idx = params.parameter_names.index(factor_id)
         except ValueError as exc:
             raise ValueError(
-                f"Scale parameter '{scale_id}' is not present in calibration "
+                f"Factor parameter '{factor_id}' is not present in calibration "
                 "evaluation parameter names."
             ) from exc
-        return value * params.parameters[scale_idx]
+        return value * params.parameters[factor_idx]

@@ -23,14 +23,14 @@ STEPS = [0.5 + 1.5 * j for j in range(20)]
 def test_observations_at_non_integer_steps_give_an_ensemble() -> None:
     truth = Simulation(build_ode(sir_builder(accumulator="cases"))).run_at(STEPS)
     observed = [
-        ObservedDataPoint(step=step, compartment="I", value=value)
+        ObservedDataPoint(at=step, output="I", value=value)
         for step, value in zip(STEPS, truth["I"], strict=True)
     ] + [
         ObservedDataPoint(
-            step=STEPS[i],
-            compartment="cases",
+            at=STEPS[i],
+            output="cases",
             value=truth["cases"][i] - truth["cases"][i - 2],
-            window_steps=3.0,
+            window=3.0,
         )
         for i in range(2, 20, 2)
     ]
@@ -58,5 +58,5 @@ def test_observations_at_non_integer_steps_give_an_ensemble() -> None:
     assert ensemble.point_parameters == pytest.approx(
         {"beta": 0.3, "gamma": 0.1}, rel=1e-2
     )
-    assert ensemble.windowed_prediction_steps["cases"] == STEPS[2:20:2]
+    assert ensemble.windowed_prediction_positions["cases"] == STEPS[2:20:2]
     assert ensemble.coverage_percentage > 0

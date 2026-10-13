@@ -71,7 +71,7 @@ pub mod probabilistic;
 pub mod types;
 
 // Re-export commonly used items
-pub use calibration_problem::CalibrationProblem;
+pub use calibration_problem::{check_positions, CalibrationProblem};
 pub use initial_conditions::{
     calibrated_initial_population, check_initial_conditions, CalibratedInitialPopulation,
 };

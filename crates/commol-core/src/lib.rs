@@ -27,7 +27,7 @@ pub use math_expression::{
 };
 
 // Re-export simulation engine trait
-pub use simulation_engine::{OutputLabels, SimulationEngine, integer_steps};
+pub use simulation_engine::{OutputLabels, SimulationEngine, Trajectory, check_positions};
 
 // Re-export all public types from the types module for convenient access
 pub use types::{

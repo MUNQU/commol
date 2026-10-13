@@ -1,7 +1,7 @@
-"""Conditions and stratified rates of time-pattern schedules."""
+"""Conditions and stratified rates of axis-pattern schedules."""
 
-from commol import TimePattern
-from commol.api.time_patterns import ConditionDict, StratifiedRateDict
+from commol import AxisPattern
+from commol.api.patterns import ConditionDict, StratifiedRateDict
 
 
 def condition(
@@ -14,7 +14,7 @@ def condition(
     return result
 
 
-def stratified_rates(rate: TimePattern) -> list[StratifiedRateDict]:
+def stratified_rates(rate: AxisPattern) -> list[StratifiedRateDict]:
     """The stratified rates a schedule hands to ``add_transition``."""
     rates = rate._builder_stratified_rates()
     assert rates is not None

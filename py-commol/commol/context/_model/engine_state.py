@@ -20,12 +20,18 @@ from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
+        CalibrationConstraintProtocol,
         CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
         EngineProtocol,
+        ObservedDataPointProtocol,
         RustModelProtocol,
     )
-    from commol.context.calibration import CalibrationParameter
+    from commol.context.calibration import (
+        CalibrationConstraint,
+        CalibrationParameter,
+        ObservedDataPoint,
+    )
     from commol.context.model import Model
 
 
@@ -232,8 +238,8 @@ def _rust_parameter_type(parameter_type: str) -> "CalibrationParameterTypeProtoc
         return rust_types.Parameter
     if parameter_type == CalibrationParameterType.INITIAL_CONDITION:
         return rust_types.InitialCondition
-    if parameter_type == CalibrationParameterType.SCALE:
-        return rust_types.Scale
+    if parameter_type == CalibrationParameterType.FACTOR:
+        return rust_types.Factor
     raise ValueError(f"Unknown parameter type: {parameter_type}")
 
 
@@ -250,6 +256,70 @@ def _rust_parameters(
         )
         for param in parameters
     ]
+
+
+def rust_observed_data(
+    points: Sequence["ObservedDataPoint"],
+) -> list["ObservedDataPointProtocol"]:
+    """The observations of a calibration problem, as the engine takes them."""
+    return [
+        commol_rs.calibration.ObservedDataPoint(
+            at=point.at,
+            label=point.label,
+            outputs=point.observed_outputs,
+            value=point.value,
+            weight=point.weight,
+            factor_id=point.factor_id,
+            window=point.window,
+        )
+        for point in points
+    ]
+
+
+def rust_constraints(
+    constraints: Sequence["CalibrationConstraint"],
+) -> list["CalibrationConstraintProtocol"]:
+    """The constraints of a calibration problem, as the engine takes them."""
+    return [
+        commol_rs.calibration.CalibrationConstraint(
+            id=constraint.id,
+            expression=constraint.expression,
+            description=constraint.description,
+            weight=constraint.weight,
+            at=constraint.at,
+        )
+        for constraint in constraints
+    ]
+
+
+def check_positions(
+    engine: "EngineProtocol",
+    observed_data: Sequence["ObservedDataPoint"],
+    constraints: Sequence["CalibrationConstraint"] = (),
+) -> None:
+    """
+    Check every position of a calibration problem with the engine.
+
+    The engine decides which positions its model type accepts, and its
+    message names the observation or constraint that holds a rejected one.
+
+    Parameters
+    ----------
+    engine : EngineProtocol
+        The engine the calibration runs on.
+    observed_data : Sequence[ObservedDataPoint]
+        Observations, at their positions and windows.
+    constraints : Sequence[CalibrationConstraint]
+        Constraints, at their positions.
+
+    Raises
+    ------
+    ValueError
+        If the engine does not report at a position.
+    """
+    commol_rs.calibration.check_positions(
+        engine, rust_observed_data(observed_data), rust_constraints(constraints)
+    )
 
 
 def check_initial_conditions(

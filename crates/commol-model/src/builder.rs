@@ -5,8 +5,8 @@ use crate::helpers::rate_to_string;
 use crate::layout::CompartmentLayout;
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp,
-    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SubpopulationLayout,
-    SubpopulationMapping, TimeSeriesParameter, TransitionFlow, VarSlot,
+    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter, SubpopulationLayout,
+    SubpopulationMapping, TransitionFlow, VarSlot,
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
@@ -16,12 +16,12 @@ use commol_core::math_expression::preprocessing::{
 use commol_core::{MathExpression, MathExpressionContext, Model, OutputLabels, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
-/// Time-series parameter payload collected before parameter slots are
-/// reserved, so the final [`TimeSeriesParameter`] can be constructed with the
+/// Series parameter payload collected before parameter slots are
+/// reserved, so the final [`SeriesParameter`] can be constructed with the
 /// correct index up front.
-struct TimeSeriesPayload {
+struct SeriesPayload {
     name: String,
-    data: Vec<(u64, f64)>,
+    data: Vec<(f64, f64)>,
     mode: commol_core::SeriesMode,
 }
 
@@ -99,10 +99,10 @@ impl CompiledModel {
         // values do not change during a run.
         let mut fixed_parameters: HashSet<String> = HashSet::new();
         let mut formula_parameters: Vec<(String, RateMathExpression)> = Vec::new();
-        // Collect time-series payloads first; final struct construction happens
+        // Collect series payloads first; final struct construction happens
         // after parameter slots are reserved so indices can be filled in once,
         // up front, instead of being patched in afterwards.
-        let mut series_payloads: Vec<TimeSeriesPayload> = Vec::new();
+        let mut series_payloads: Vec<SeriesPayload> = Vec::new();
 
         for p in &model.parameters {
             match &p.value {
@@ -114,8 +114,8 @@ impl CompiledModel {
                     let rate_expr = RateMathExpression::from_string(formula.clone());
                     formula_parameters.push((p.id.clone(), rate_expr));
                 }
-                Some(commol_core::ParameterValue::TimeSeries { data, mode }) => {
-                    series_payloads.push(TimeSeriesPayload {
+                Some(commol_core::ParameterValue::Series { data, mode }) => {
+                    series_payloads.push(SeriesPayload {
                         name: p.id.clone(),
                         data: data.clone(),
                         mode: mode.clone(),
@@ -180,15 +180,15 @@ impl CompiledModel {
             })
             .collect();
 
-        let series_parameters: Vec<TimeSeriesParameter> = series_payloads
+        let series_parameters: Vec<SeriesParameter> = series_payloads
             .into_iter()
             .map(|payload| {
                 let parameter_index = expression_context
                     .parameter_index(&payload.name)
-                    .expect("time-series parameter slot must be reserved");
-                TimeSeriesParameter::new(payload.name, parameter_index, payload.data, payload.mode)
+                    .expect("series parameter slot must be reserved");
+                SeriesParameter::new(payload.name, parameter_index, payload.data, payload.mode)
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         // Plan the transition flows and compile them
         let planned_flows =
@@ -228,7 +228,7 @@ impl CompiledModel {
                 .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
             &formula_parameters,
         );
-        let depends_on_step = !series_parameters.is_empty()
+        let depends_on_step = series_parameters.iter().any(SeriesParameter::reads_step)
             || reads_step(
                 transition_flows
                     .iter()

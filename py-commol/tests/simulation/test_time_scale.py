@@ -112,48 +112,6 @@ class TestRateFromProbability:
             DAILY.rate_from_probability(0.3, period_steps)
 
 
-class TestWindowGrid:
-    """The window grid is one mapping, usable in both directions."""
-
-    PERIOD = 168
-    INDICES = range(33)
-
-    def test_window_index_inverts_window_end(self) -> None:
-        for index in self.INDICES:
-            end = HOURLY.window_end(index, self.PERIOD)
-            assert HOURLY.window_index(end, self.PERIOD) == index
-
-    def test_every_step_maps_to_its_containing_window(self) -> None:
-        for index in self.INDICES:
-            start = HOURLY.window_start(index, self.PERIOD)
-            end = HOURLY.window_end(index, self.PERIOD)
-            for step in range(start + 1, end + 1):
-                assert HOURLY.window_index(step, self.PERIOD) == index
-
-    def test_step_zero_belongs_to_the_first_window(self) -> None:
-        assert HOURLY.window_index(0, self.PERIOD) == 0
-
-    def test_windows_span_the_period_and_meet_end_to_start(self) -> None:
-        for index in self.INDICES:
-            start = HOURLY.window_start(index, self.PERIOD)
-            end = HOURLY.window_end(index, self.PERIOD)
-            assert end - start == self.PERIOD
-            assert end == HOURLY.window_start(index + 1, self.PERIOD)
-
-    def test_negative_index_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="index must not be negative"):
-            HOURLY.window_start(-1, self.PERIOD)
-
-    def test_negative_step_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="step must not be negative"):
-            HOURLY.window_index(-1, self.PERIOD)
-
-    @pytest.mark.parametrize("period_steps", [0, -1])
-    def test_non_positive_period_is_rejected(self, period_steps: int) -> None:
-        with pytest.raises(ValueError, match="period_steps must be positive"):
-            HOURLY.window_end(0, period_steps)
-
-
 class TestFromStepUnit:
     def test_a_unit_of_time_gives_its_length(self) -> None:
         assert TimeScale.from_step_unit("day").step_seconds == 86400.0

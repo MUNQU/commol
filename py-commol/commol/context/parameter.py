@@ -1,43 +1,52 @@
-"""Model parameters: constants, formulas, time series and uncalibrated values."""
+"""Model parameters: constants, formulas, series and uncalibrated values."""
 
 import math
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class TimeSeriesValue(BaseModel):
+class SeriesValue(BaseModel):
     """
-    An empirical time series for a parameter value.
+    An empirical series for a parameter value.
 
     Attributes
     ----------
-    data : list[tuple[int, float]]
-        (step, value) pairs. Need not be pre-sorted; the engine sorts them.
+    data : list[tuple[float, float]]
+        (position, value) points on the axis. Need not be pre-sorted; the
+        engine sorts them.
     mode : str
-        Interpolation mode: ``"pulse"`` (non-zero only at listed steps),
-        ``"step_function"`` (zero-order hold), or ``"linear"`` (interpolation).
+        How the series is read between its points: ``"pulse"`` (the value on
+        the step of a point, 0 on every other step; integer positions only),
+        ``"step_function"`` (the value of the last point at or before ``t``),
+        or ``"linear"`` (linear interpolation in ``t``). The engine decides
+        which positions its model type accepts: a DifferenceEquations model
+        only integer steps.
     """
 
-    data: list[tuple[int, float]]
+    model_config = ConfigDict(extra="forbid")
+
+    data: list[tuple[float, float]]
     mode: str = Field(default="pulse", pattern="^(pulse|step_function|linear)$")
 
     @field_validator("data")
     @classmethod
-    def validate_data(cls, value: list[tuple[int, float]]) -> list[tuple[int, float]]:
-        """Validate time-series points before they reach the Rust engine."""
+    def validate_data(
+        cls, value: list[tuple[float, float]]
+    ) -> list[tuple[float, float]]:
+        """Validate series points before they reach the Rust engine."""
         if not value:
-            raise ValueError("Time-series data must contain at least one point")
+            raise ValueError("Series data must contain at least one point")
 
-        steps: list[int] = []
-        for step, amount in value:
-            if step < 0:
-                raise ValueError("Time-series steps must be non-negative")
+        positions: list[float] = []
+        for position, amount in value:
+            if not (math.isfinite(position) and position >= 0):
+                raise ValueError("Series positions must be finite and non-negative")
             if not math.isfinite(amount):
-                raise ValueError("Time-series values must be finite")
-            steps.append(step)
+                raise ValueError("Series values must be finite")
+            positions.append(position)
 
-        if len(steps) != len(set(steps)):
-            raise ValueError("Time-series steps must be unique")
+        if len(positions) != len(set(positions)):
+            raise ValueError("Series positions must be unique")
 
         return value
 
@@ -50,13 +59,13 @@ class Parameter(BaseModel):
     ----------
     id : str
         The identifier of the parameter.
-    value : float | str | TimeSeriesValue | None
+    value : float | str | SeriesValue | None
         Value of the parameter. Can be:
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
-               special variables (N, N_category, step/t, pi, e), or contain
+               special variables (N, N_category, step, t, pi, e), or contain
                mathematical expressions
-        - TimeSeriesValue: An empirical time series evaluated via binary search
+        - SeriesValue: An empirical series evaluated via binary search
         - None: Indicates that the parameter needs to be calibrated before use
     description : str | None
         A human-readable description of the parameter.
@@ -65,12 +74,14 @@ class Parameter(BaseModel):
         If None, the parameter has no unit specified.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(default=..., description="Identifier of the parameter.")
-    value: float | str | TimeSeriesValue | None = Field(
+    value: float | str | SeriesValue | None = Field(
         default=...,
         description=(
             "Value of the parameter. Can be a float (constant), "
-            "str (formula), TimeSeriesValue (empirical series), "
+            "str (formula), SeriesValue (empirical series), "
             "or None (requires calibration)."
         ),
     )
@@ -85,10 +96,10 @@ class Parameter(BaseModel):
     @field_validator("value")
     @classmethod
     def validate_value(
-        cls, value: float | str | TimeSeriesValue | None
-    ) -> float | str | TimeSeriesValue | None:
+        cls, value: float | str | SeriesValue | None
+    ) -> float | str | SeriesValue | None:
         """Validate the parameter value."""
-        if value is None or isinstance(value, TimeSeriesValue):
+        if value is None or isinstance(value, SeriesValue):
             return value
         if isinstance(value, (int, float)):
             return float(value)

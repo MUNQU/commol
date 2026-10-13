@@ -68,10 +68,10 @@ plugins:
           - getting-started/*.md
         User guide:
           - guide/core-concepts.md: Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
-          - guide/building-models.md: Every ModelBuilder method and argument, time-series parameters, validation rules, save and load
+          - guide/building-models.md: Every ModelBuilder method and argument, series parameters, validation rules, save and load
           - guide/transitions.md: Absolute and per-capita rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
           - guide/mathematical-expressions.md: Operators, variables, subpopulation sums, functions and security limits of rate formulas
-          - guide/time-patterns.md: TimePattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
+          - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
           - guide/units-and-equations.md: Unit checking and print_equations (text and LaTeX)
           - guide/simulations.md: Simulation.run, output formats, totals by bin and category, windowed totals, plotting
           - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, results and writing results back
@@ -129,7 +129,7 @@ nav:
           - Model Builder: guide/building-models.md
           - Transitions: guide/transitions.md
           - Mathematical Expressions: guide/mathematical-expressions.md
-          - Time Patterns: guide/time-patterns.md
+          - Axis Patterns: guide/axis-patterns.md
           - Units and Equations: guide/units-and-equations.md
       - Running Simulations: guide/simulations.md
       - Calibration:
@@ -147,7 +147,7 @@ nav:
       - Model: api/model.md
       - Simulation: api/simulation.md
       - Plotting: api/plotting.md
-      - TimePattern: api/time-patterns.md
+      - AxisPattern: api/axis-patterns.md
       - TimeScale: api/time-scale.md
       - Calibration: api/calibrator.md
       - Probabilistic Calibration: api/probabilistic-calibrator.md

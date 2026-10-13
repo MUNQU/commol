@@ -3,7 +3,7 @@
 import math
 from typing import Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
 from commol.context.bin import Accumulator, Bin
 from commol.context.dynamics import Transition
@@ -24,6 +24,8 @@ class Population(BaseModel):
     initial_conditions: Initialization
         Initial state of the subpopulations and stratifications.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     bins: list[Bin]
     accumulators: list[Accumulator] = Field(default_factory=list)

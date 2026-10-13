@@ -3,12 +3,12 @@
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NotRequired, TypedDict
 
-import math
 import numpy as np
 
 from commol.api.probabilistic.intervals import member_statistics
+from commol.api.results import SimulationResults, sample
 from commol.api.simulation import Simulation
-from commol.api.windows import windowed_totals
+from commol.api.windows import window_end, window_index, windowed_totals
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -158,8 +158,8 @@ def applied_parameters_report(
     it, so entries the calibration left alone appear alongside the fitted ones.
 
     Parameters that are not a single number, such as a formula or a
-    time-series, are omitted: they are inputs rather than fitted values.
-    ``scale`` parameters have no place in the model, so they are reported from
+    series, are omitted: they are inputs rather than fitted values.
+    ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
     Initial conditions carry the effective head ``value`` the engine builds
@@ -186,7 +186,7 @@ def applied_parameters_report(
         The calibration outcome, or a mapping of parameter id to value such as
         one ensemble member's parameters.
     problem : CalibrationProblem | None, optional
-        The problem the result came from, used to report scale parameters.
+        The problem the result came from, used to report factor parameters.
     parameter_statistics : Mapping[str, ParameterSetStatistics] | None, optional
         Ensemble spread per entry. Taken from `result` when it is a
         probabilistic result and this is not given.
@@ -213,10 +213,10 @@ def applied_parameters_report(
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for scale_id in _scale_ids(problem):
-        if scale_id in calibrated:
-            parameters[scale_id] = _parameter_entry(
-                scale_id, calibrated[scale_id], calibrated_ids, parameter_statistics
+    for factor_id in _factor_ids(problem):
+        if factor_id in calibrated:
+            parameters[factor_id] = _parameter_entry(
+                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
             )
 
     initial_conditions = _initial_conditions_report(
@@ -235,14 +235,14 @@ def applied_parameters_report(
     }
 
 
-def _scale_ids(problem: CalibrationProblem | None) -> list[str]:
-    """Ids of the problem's scale parameters, in declaration order."""
+def _factor_ids(problem: CalibrationProblem | None) -> list[str]:
+    """Ids of the problem's factor parameters, in declaration order."""
     if problem is None:
         return []
     return [
         parameter.id
         for parameter in problem.parameters
-        if parameter.parameter_type == CalibrationParameterType.SCALE
+        if parameter.parameter_type == CalibrationParameterType.FACTOR
     ]
 
 
@@ -403,8 +403,8 @@ class ObservedSeries(TypedDict):
 
     values: list[float | None]
     weights: NotRequired[list[float | None]]
-    compartments: NotRequired[list[str]]
-    scale_id: NotRequired[str]
+    outputs: NotRequired[list[str]]
+    factor_id: NotRequired[str]
 
 
 class WindowedAccumulator(TypedDict):
@@ -431,9 +431,9 @@ class SimulationReport(TypedDict):
 
 
 def _reduce(
-    reduce_fn: Callable[[Mapping[str, Sequence[float]]], float | list[float]],
-    results: Mapping[str, Sequence[float]],
-    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None,
+    reduce_fn: Callable[[SimulationResults], float | list[float]],
+    results: SimulationResults,
+    ensemble_runs: Sequence[SimulationResults] | None,
     confidence_level: float | None,
 ) -> ReportLeaf:
     """
@@ -449,31 +449,9 @@ def _reduce(
     return member_statistics(members, confidence_level)
 
 
-def sample(series: Sequence[float], steps: Iterable[int]) -> list[float]:
-    """
-    Read a series at the given steps.
-
-    Compartment counts are instantaneous, so they are read at the step rather
-    than averaged over the interval leading to it.
-
-    Parameters
-    ----------
-    series : Sequence[float]
-        A series indexed by simulation step.
-    steps : Iterable[int]
-        Steps to read.
-
-    Returns
-    -------
-    list[float]
-        One value per step.
-    """
-    return [series[step] for step in steps]
-
-
 def observed_report(
     observed_data: Iterable[ObservedDataPoint],
-    window_steps: int,
+    window: float,
     num_windows: int,
 ) -> dict[str, ObservedSeries]:
     """
@@ -481,16 +459,17 @@ def observed_report(
 
     Each series becomes one array of `num_windows` entries, padded with null
     where there is no observation, so it lines up index for index with the
-    windowed accumulator series. ``weights``, ``compartments`` and ``scale_id``
-    appear only on series that use them; a series whose weights are all 1.0
-    omits them.
+    windowed accumulator series. An observation goes to the window that holds
+    its position (:func:`commol.window_index`). ``weights``, ``outputs``
+    and ``factor_id`` appear only on series that use them; a series whose
+    weights are all 1.0 omits them.
 
     Parameters
     ----------
     observed_data : Iterable[ObservedDataPoint]
         The observations to report.
-    window_steps : int
-        Length of one window, in steps.
+    window : float
+        Length of one window on the axis.
     num_windows : int
         Number of windows on the reported axis.
 
@@ -502,22 +481,21 @@ def observed_report(
     series: dict[str, ObservedSeries] = {}
     for point in observed_data:
         entry: ObservedSeries = series.setdefault(
-            point.compartment,
+            point.label,
             {
                 "values": [None] * num_windows,
                 "weights": [None] * num_windows,
             },
         )
-        # Window w covers steps (w * window_steps, (w + 1) * window_steps].
-        window = max(math.ceil(point.step / window_steps) - 1, 0)
-        if not 0 <= window < num_windows:
+        index = window_index(point.at, window)
+        if not 0 <= index < num_windows:
             continue
-        entry["values"][window] = point.value
-        entry["weights"][window] = point.weight
-        if point.compartments:
-            entry["compartments"] = list(point.compartments)
-        if point.scale_id:
-            entry["scale_id"] = point.scale_id
+        entry["values"][index] = point.value
+        entry["weights"][index] = point.weight
+        if point.outputs:
+            entry["outputs"] = list(point.outputs)
+        if point.factor_id:
+            entry["factor_id"] = point.factor_id
 
     for entry in series.values():
         if all(weight in (None, 1.0) for weight in entry["weights"]):
@@ -527,14 +505,14 @@ def observed_report(
 
 def series_report(
     simulation: Simulation,
-    results: Mapping[str, Sequence[float]],
-    steps: Sequence[int],
+    results: SimulationResults,
+    at: Sequence[float],
     accumulators: Iterable[str] = (),
-    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    ensemble_runs: Sequence[SimulationResults] | None = None,
     confidence_level: float | None = None,
 ) -> dict[str, ReportLeaf]:
     """
-    Report every compartment series, sampled at the given steps.
+    Report every compartment series, sampled at the given positions.
 
     Outputs belonging to the named accumulators are excluded, since they are
     reported separately by :func:`accumulators_report`.
@@ -543,13 +521,14 @@ def series_report(
     ----------
     simulation : Simulation
         The simulation the results came from.
-    results : Mapping[str, Sequence[float]]
-        Results in `dict_of_lists` form.
-    steps : Sequence[int]
-        Steps the series are sampled at.
+    results : SimulationResults
+        Results of a run, with their positions.
+    at : Sequence[float]
+        Positions the series are sampled at; each must be a position of the
+        results.
     accumulators : Iterable[str], optional
         Accumulator ids whose outputs are left out.
-    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+    ensemble_runs : Sequence[SimulationResults] | None, optional
         One results mapping per ensemble member.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
@@ -558,6 +537,11 @@ def series_report(
     -------
     dict[str, ReportLeaf]
         One entry per compartment output, sorted by name.
+
+    Raises
+    ------
+    ValueError
+        If the results have no value at a position of `at`.
     """
     excluded = {
         name
@@ -566,7 +550,7 @@ def series_report(
     }
     return {
         name: _reduce(
-            lambda run, output=name: sample(run[output], steps),
+            lambda run, output=name: sample(run[output], run.positions, at),
             results,
             ensemble_runs,
             confidence_level,
@@ -578,37 +562,38 @@ def series_report(
 
 def accumulators_report(
     simulation: Simulation,
-    results: Mapping[str, Sequence[float]],
+    results: SimulationResults,
     accumulators: Iterable[str],
-    steps: Sequence[int],
-    window_steps: int,
+    at: Sequence[float],
+    window: float,
     num_windows: int,
-    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    ensemble_runs: Sequence[SimulationResults] | None = None,
     confidence_level: float | None = None,
 ) -> dict[str, AccumulatorReport]:
     """
     Report both readings of each accumulator.
 
     ``windowed`` is the per-window increment the loss compares observations
-    against, so it stays on the window axis whatever `steps` are sampled and
-    lines up with :func:`observed_report`. ``cumulative`` follows `steps` like
-    the compartment series do. Both are given as a total and per output.
+    against, so it stays on the window axis whatever positions `at` samples
+    and lines up with :func:`observed_report`. It holds the windows that end
+    within the results. ``cumulative`` follows `at` like the compartment
+    series do. Both are given as a total and per output.
 
     Parameters
     ----------
     simulation : Simulation
         The simulation the results came from.
-    results : Mapping[str, Sequence[float]]
-        Results in `dict_of_lists` form.
+    results : SimulationResults
+        Results of a run, with their positions.
     accumulators : Iterable[str]
         Accumulator ids to report.
-    steps : Sequence[int]
-        Steps the cumulative series are sampled at.
-    window_steps : int
-        Length of one window, in steps.
+    at : Sequence[float]
+        Positions the cumulative series are sampled at.
+    window : float
+        Length of one window on the axis.
     num_windows : int
         Number of windows on the reported axis.
-    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+    ensemble_runs : Sequence[SimulationResults] | None, optional
         One results mapping per ensemble member.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
@@ -617,12 +602,19 @@ def accumulators_report(
     -------
     dict[str, AccumulatorReport]
         One entry per accumulator that has outputs.
-    """
-    anchors = [(window + 1) * window_steps for window in range(num_windows)]
 
-    def windowed(series: Sequence[float]) -> list[float]:
+    Raises
+    ------
+    ValueError
+        If the results have no value at a position of `at`, or at the start
+        or the end of a window that ends within them.
+    """
+    ends = [window_end(index, window) for index in range(num_windows)]
+
+    def windowed(series: Sequence[float], positions: Sequence[float]) -> list[float]:
+        last = positions[-1] if positions else 0.0
         return windowed_totals(
-            series, window_steps, [step for step in anchors if step < len(series)]
+            series, positions, window, [end for end in ends if end <= last]
         )
 
     block: dict[str, AccumulatorReport] = {}
@@ -632,7 +624,7 @@ def accumulators_report(
             continue
 
         def leaf(
-            reduce_fn: Callable[[Mapping[str, Sequence[float]]], float | list[float]],
+            reduce_fn: Callable[[SimulationResults], float | list[float]],
         ) -> ReportLeaf:
             return _reduce(reduce_fn, results, ensemble_runs, confidence_level)
 
@@ -641,22 +633,26 @@ def accumulators_report(
             "windowed": {
                 "total": leaf(
                     lambda run, acc=accumulator_id: windowed(
-                        simulation.total_series(run, [acc])
+                        simulation.total_series(run, [acc]), run.positions
                     )
                 ),
                 "by_output": {
-                    name: leaf(lambda run, output=name: windowed(run[output]))
+                    name: leaf(
+                        lambda run, output=name: windowed(run[output], run.positions)
+                    )
                     for name in outputs
                 },
             },
             "cumulative": {
                 "total": leaf(
                     lambda run, acc=accumulator_id: sample(
-                        simulation.total_series(run, [acc]), steps
+                        simulation.total_series(run, [acc]), run.positions, at
                     )
                 ),
                 "by_output": {
-                    name: leaf(lambda run, output=name: sample(run[output], steps))
+                    name: leaf(
+                        lambda run, output=name: sample(run[output], run.positions, at)
+                    )
                     for name in outputs
                 },
             },
@@ -667,13 +663,13 @@ def accumulators_report(
 
 def simulation_report(
     simulation: Simulation,
-    results: Mapping[str, Sequence[float]],
-    steps: Sequence[int],
-    window_steps: int,
+    results: SimulationResults,
+    at: Sequence[float],
+    window: float,
     num_windows: int,
     observed_data: Iterable[ObservedDataPoint] = (),
     accumulators: Iterable[str] = (),
-    ensemble_runs: Sequence[Mapping[str, Sequence[float]]] | None = None,
+    ensemble_runs: Sequence[SimulationResults] | None = None,
     confidence_level: float | None = None,
 ) -> SimulationReport:
     """
@@ -692,19 +688,19 @@ def simulation_report(
     ----------
     simulation : Simulation
         The simulation the results came from.
-    results : Mapping[str, Sequence[float]]
-        Results in `dict_of_lists` form.
-    steps : Sequence[int]
-        Steps the series and cumulative accumulators are sampled at.
-    window_steps : int
-        Length of one window, in steps.
+    results : SimulationResults
+        Results of a run, with their positions.
+    at : Sequence[float]
+        Positions the series and cumulative accumulators are sampled at.
+    window : float
+        Length of one window on the axis.
     num_windows : int
         Number of windows on the observed and windowed axes.
     observed_data : Iterable[ObservedDataPoint], optional
         The calibration targets to report alongside the run.
     accumulators : Iterable[str], optional
         Accumulator ids to report.
-    ensemble_runs : Sequence[Mapping[str, Sequence[float]]] | None, optional
+    ensemble_runs : Sequence[SimulationResults] | None, optional
         One results mapping per ensemble member.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
@@ -713,14 +709,19 @@ def simulation_report(
     -------
     SimulationReport
         Keys ``observed``, ``series`` and ``accumulators``.
+
+    Raises
+    ------
+    ValueError
+        If the results have no value at a position the report reads.
     """
     accumulator_ids = list(accumulators)
     return {
-        "observed": observed_report(observed_data, window_steps, num_windows),
+        "observed": observed_report(observed_data, window, num_windows),
         "series": series_report(
             simulation,
             results,
-            steps,
+            at,
             accumulator_ids,
             ensemble_runs,
             confidence_level,
@@ -729,8 +730,8 @@ def simulation_report(
             simulation,
             results,
             accumulator_ids,
-            steps,
-            window_steps,
+            at,
+            window,
             num_windows,
             ensemble_runs,
             confidence_level,

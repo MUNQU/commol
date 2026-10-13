@@ -8,7 +8,9 @@
 //!   its Jacobian from a finite-difference Jacobian-vector product, dense below
 //!   [`SPARSE_THRESHOLD`] state components and sparse from there.
 //! - Time: on `[n, n + 1)` rates see `step = n` and the continuous `t`, so a
-//!   rate that reads `step` or a time series is constant on the interval.
+//!   rate that reads `step` or a pulse series is constant on the interval. A
+//!   `"step_function"` or `"linear"` series is read at `t`, and the
+//!   integration restarts at its points.
 //! - Accumulators are state components: `dA/dt = Σ counted flows`.
 //! - Impulses act at their positions: the integration stops there, the state
 //!   jumps and the integration restarts from the new state.
@@ -18,6 +20,7 @@
 //! ## Example Usage
 //!
 //! ```rust,ignore
+//! use commol_core::SimulationEngine;
 //! use commol_differential::DifferentialEquations;
 //!
 //! let mut engine = DifferentialEquations::try_from_model(&model)?;
@@ -137,15 +140,15 @@ impl DifferentialEquations {
     ///
     /// # Errors
     ///
-    /// Returns a message when the positions are not sorted, unique, finite
-    /// and not before the current time, when a rate cannot be evaluated, or
-    /// when the solver fails.
-    pub fn run_at_into_buffer(
+    /// Returns a message when the positions are not sorted, unique, finite,
+    /// non-negative and not before the current time, when a rate cannot be
+    /// evaluated, or when the solver fails.
+    fn integrate_to(
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
-        check_positions(positions, self.current_time)?;
+        commol_core::check_positions(positions, self.current_time, check_time)?;
         let output_len = self.state.len();
         buffer.resize_with(positions.len(), Vec::new);
         for row in buffer.iter_mut() {
@@ -177,58 +180,37 @@ impl DifferentialEquations {
         self.settled = true;
         Ok(())
     }
-
-    /// Integrate through the last of `positions` and return the state at
-    /// each of them. See [`Self::run_at_into_buffer`].
-    ///
-    /// # Errors
-    ///
-    /// See [`Self::run_at_into_buffer`].
-    pub fn run_at(&mut self, positions: &[f64]) -> Result<Vec<Vec<f64>>, String> {
-        let mut buffer = Vec::with_capacity(positions.len());
-        self.run_at_into_buffer(positions, &mut buffer)?;
-        Ok(buffer)
-    }
-
-    /// The positions `t, t + 1, …, t + num_steps` from the current time `t`.
-    fn unit_positions(&self, num_steps: u32) -> Vec<f64> {
-        (0..=num_steps)
-            .map(|k| self.current_time + f64::from(k))
-            .collect()
-    }
 }
 
-/// Check that positions are finite, sorted, unique and not before `from`.
-fn check_positions(positions: &[f64], from: f64) -> Result<(), String> {
-    if let Some(bad) = positions.iter().find(|p| !p.is_finite()) {
-        return Err(format!("Output positions must be finite, got {bad}"));
+/// Why a differential engine does not report at `position`, if it does not.
+fn check_time(position: f64) -> Result<(), String> {
+    if position.is_finite() && position >= 0.0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "a differential-equations model reports at finite, non-negative positions; \
+             {position} is not one"
+        ))
     }
-    if let Some(window) = positions.windows(2).find(|pair| pair[0] >= pair[1]) {
-        return Err(format!(
-            "Output positions must be sorted and unique, got {} before {}",
-            window[0], window[1]
-        ));
-    }
-    if let Some(&first) = positions.first()
-        && first < from
-    {
-        return Err(format!(
-            "Output position {first} is before the current time {from}"
-        ));
-    }
-    Ok(())
 }
 
 impl commol_core::SimulationEngine for DifferentialEquations {
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        let positions = self.unit_positions(num_steps);
-        self.run_at(&positions)
+    fn check_position(&self, position: f64) -> Result<(), String> {
+        check_time(position)
     }
 
     fn step(&mut self) -> Result<(), String> {
         let end = self.current_time + 1.0;
         let mut buffer = Vec::with_capacity(1);
-        self.run_at_into_buffer(&[end], &mut buffer)
+        self.integrate_to(&[end], &mut buffer)
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        self.integrate_to(positions, buffer)
     }
 
     fn compartments(&self) -> Vec<String> {
@@ -262,34 +244,8 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         self.model.parameters()
     }
 
-    fn current_step(&self) -> f64 {
+    fn current_position(&self) -> f64 {
         self.current_time
-    }
-
-    fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let positions = self.unit_positions(num_steps);
-        self.run_at_into_buffer(&positions, buffer)
-    }
-
-    fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let positions: Vec<f64> = time_steps.iter().map(|&step| f64::from(step)).collect();
-        self.run_at_into_buffer(&positions, buffer)
-    }
-
-    fn run_at_positions_into_buffer(
-        &mut self,
-        positions: &[f64],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        self.run_at_into_buffer(positions, buffer)
     }
 
     fn set_initial_condition(

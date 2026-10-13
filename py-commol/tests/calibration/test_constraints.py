@@ -102,7 +102,7 @@ class TestOutputConstraints:
         constraint = CalibrationConstraint(
             id="peak_infected",
             expression="100.0 - I",
-            time_steps=[10, 20, 30, 40, 50],
+            at=[10, 20, 30, 40, 50],
         )
 
         fitted = _fit(truth, truth_run, [constraint], gamma_bound=None)
@@ -113,7 +113,7 @@ class TestOutputConstraints:
 
     def test_a_bound_on_a_sum_of_outputs(self, truth: Model, truth_run) -> None:
         constraint = CalibrationConstraint(
-            id="min_recovered", expression="950.0 - (S + I)", time_steps=[30, 50, 70]
+            id="min_recovered", expression="950.0 - (S + I)", at=[30, 50, 70]
         )
 
         fitted = _fit(
@@ -159,7 +159,7 @@ class TestOutputConstraints:
                 CalibrationConstraint(
                     id="max_cumulative_infections",
                     expression="0.5 * N - cumulative_infections",
-                    time_steps=[200],
+                    at=[200],
                 ),
             ],
             loss_function="sse",
@@ -179,7 +179,7 @@ class TestOutputConstraints:
 
 class TestExpressionSecurity:
     @pytest.mark.parametrize(
-        ("expression", "time_steps"),
+        ("expression", "at"),
         [
             ("eval(beta)", None),
             ("import os", None),
@@ -189,22 +189,18 @@ class TestExpressionSecurity:
         ],
     )
     def test_a_dangerous_expression_is_rejected(
-        self, expression: str, time_steps: list[int] | None
+        self, expression: str, at: list[int] | None
     ) -> None:
         with pytest.raises(ValidationError, match="Security validation failed"):
-            CalibrationConstraint(
-                id="evil", expression=expression, time_steps=time_steps
-            )
+            CalibrationConstraint(id="evil", expression=expression, at=at)
 
     @pytest.mark.parametrize(
-        ("expression", "time_steps"),
+        ("expression", "at"),
         [("5.0 - beta/gamma", None), ("500.0 - I", [10, 20, 30])],
     )
     def test_a_safe_expression_is_kept(
-        self, expression: str, time_steps: list[int] | None
+        self, expression: str, at: list[int] | None
     ) -> None:
-        constraint = CalibrationConstraint(
-            id="safe", expression=expression, time_steps=time_steps
-        )
+        constraint = CalibrationConstraint(id="safe", expression=expression, at=at)
 
         assert constraint.expression == expression

@@ -6,8 +6,8 @@ rate schedules — discrete pulses, periodic events, sliding windows, seasonal
 curves, and arbitrary user formulas — as mathematical expressions that the
 Commol engine can evaluate at each simulation step.
 
-The only public symbol from this module is :class:`TimePattern`. Multi-group
-schedules are built by calling ``TimePattern.add_group(...)`` directly on
+The only public symbol from this module is :class:`AxisPattern`. Multi-group
+schedules are built by calling ``AxisPattern.add_group(...)`` directly on
 the class and chaining further ``add_group`` / ``set_default`` calls on the
 returned instance. The user never instantiates or names any other class.
 """
@@ -16,7 +16,14 @@ from collections.abc import Iterable
 from enum import StrEnum
 from typing import Annotated, ClassVar, NotRequired, Protocol, Self, TypedDict
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    BaseModel,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from commol.utils.security import (
     SecurityConfig,
@@ -25,7 +32,7 @@ from commol.utils.security import (
 
 
 class ConditionDict(TypedDict):
-    """Shape of a single stratification condition used by ``TimePattern``.
+    """Shape of a single stratification condition used by ``AxisPattern``.
 
     Also re-exported by :mod:`commol.api.model_builder` as
     ``StratificationConditionDict``.
@@ -54,22 +61,22 @@ class StratifiedRateDict(TypedDict):
 
 
 class AddGroupFn(Protocol):
-    """Signature exposed by the ``TimePattern.add_group`` descriptor."""
+    """Signature exposed by the ``AxisPattern.add_group`` descriptor."""
 
     def __call__(
         self,
         conditions: list[ConditionDict],
-        schedule: "TimePattern",
+        schedule: "AxisPattern",
         *,
         source_compartment: str | None = None,
         absolute: bool | None = None,
-    ) -> "TimePattern":
-        """Add a group to a schedule; see `TimePattern.add_group`."""
+    ) -> "AxisPattern":
+        """Add a group to a schedule; see `AxisPattern.add_group`."""
         ...
 
 
 class CombineMode(StrEnum):
-    """Combination modes for ``TimePattern.combine``."""
+    """Combination modes for ``AxisPattern.combine``."""
 
     SUM = "sum"
     MAX = "max"
@@ -79,6 +86,15 @@ class CombineMode(StrEnum):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+FinitePosition = Annotated[float, Field(allow_inf_nan=False)]
+"""A position on the axis in a pattern bound."""
+
+
+def _number(value: float) -> str:
+    """A bound as written in a formula: a whole number without ``.0``."""
+    return str(int(value)) if float(value).is_integer() else repr(float(value))
 
 
 def _validate_amount_string(amount: float | str) -> None:
@@ -91,7 +107,7 @@ def _validate_amount_string(amount: float | str) -> None:
 
 
 def _require_consistent_group(
-    patterns: "tuple[TimePattern, ...]",
+    patterns: "tuple[AxisPattern, ...]",
 ) -> "tuple[list[ConditionDict] | None, str | None]":
     """Verify shared conditions/source_compartment; return the shared pair."""
     first = patterns[0]
@@ -173,26 +189,26 @@ class _AddGroupDescriptor:
     appends to that schedule.
     """
 
-    _owner: type["TimePattern"]
+    _owner: type["AxisPattern"]
 
-    def __set_name__(self, owner: type["TimePattern"], name: str) -> None:
+    def __set_name__(self, owner: type["AxisPattern"], name: str) -> None:
         self._owner = owner
 
     def __get__(
         self,
-        instance: "TimePattern | None",
-        owner: type["TimePattern"],
+        instance: "AxisPattern | None",
+        owner: type["AxisPattern"],
     ) -> AddGroupFn:
         if instance is None:
 
             def factory(
                 conditions: list[ConditionDict],
-                schedule: "TimePattern",
+                schedule: "AxisPattern",
                 *,
                 source_compartment: str | None = None,
                 absolute: bool | None = None,
-            ) -> "TimePattern":
-                empty = _ScheduleTimePattern()
+            ) -> "AxisPattern":
+                empty = _ScheduleAxisPattern()
                 return empty._append_group(
                     conditions,
                     schedule,
@@ -202,32 +218,32 @@ class _AddGroupDescriptor:
 
             return factory
 
-        if not isinstance(instance, _ScheduleTimePattern):
+        if not isinstance(instance, _ScheduleAxisPattern):
 
             def reject(
                 conditions: list[ConditionDict],  # noqa: ARG001
-                schedule: "TimePattern",  # noqa: ARG001
+                schedule: "AxisPattern",  # noqa: ARG001
                 *,
                 source_compartment: str | None = None,  # noqa: ARG001
                 absolute: bool | None = None,  # noqa: ARG001
-            ) -> "TimePattern":
+            ) -> "AxisPattern":
                 raise TypeError(
-                    "add_group on a single TimePattern is only valid as a "
-                    "class-level factory (TimePattern.add_group(...)); call "
+                    "add_group on a single AxisPattern is only valid as a "
+                    "class-level factory (AxisPattern.add_group(...)); call "
                     "it on the class to start a new schedule."
                 )
 
             return reject
 
-        schedule_instance: "_ScheduleTimePattern" = instance
+        schedule_instance: "_ScheduleAxisPattern" = instance
 
         def bound(
             conditions: list[ConditionDict],
-            schedule: "TimePattern",
+            schedule: "AxisPattern",
             *,
             source_compartment: str | None = None,
             absolute: bool | None = None,
-        ) -> "TimePattern":
+        ) -> "AxisPattern":
             return schedule_instance._append_group(
                 conditions,
                 schedule,
@@ -243,7 +259,7 @@ class _AddGroupDescriptor:
 # ---------------------------------------------------------------------------
 
 
-class TimePattern(BaseModel):
+class AxisPattern(BaseModel):
     """
     A time-varying expression usable as (or within) a transition rate.
 
@@ -251,32 +267,34 @@ class TimePattern(BaseModel):
     ``periodic``, ``window``, etc.). Each instance may carry stratification
     conditions that restrict it to a specific sub-group via ``for_group``.
 
-    Multi-group schedules are built by calling ``TimePattern.add_group(...)``
+    Multi-group schedules are built by calling ``AxisPattern.add_group(...)``
     directly on the class. The first call returns a new schedule; chain
     further ``add_group`` and ``set_default`` calls on the returned instance.
 
-    A ``TimePattern`` is accepted directly by
+    A ``AxisPattern`` is accepted directly by
     :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the
     ``rate`` argument; no auxiliary conversion is required.
 
     Examples
     --------
-    >>> from commol import TimePattern
+    >>> from commol import AxisPattern
     >>> # Single pattern
-    >>> rate = TimePattern.pulse(at=10, amount=0.05)
+    >>> rate = AxisPattern.pulse(at=10, amount=0.05)
     >>> str(rate)
     '(if(step == 10, 0.05, 0))'
     >>> # Multi-group schedule
-    >>> rate = TimePattern.add_group(
+    >>> rate = AxisPattern.add_group(
     ...     conditions=[{"stratification": "group", "category": "cat1"}],
-    ...     schedule=TimePattern.pulse(at=10, amount=0.05),
+    ...     schedule=AxisPattern.pulse(at=10, amount=0.05),
     ... ).add_group(
     ...     conditions=[{"stratification": "group", "category": "cat2"}],
-    ...     schedule=TimePattern.pulse(at=10, amount=0.02),
+    ...     schedule=AxisPattern.pulse(at=10, amount=0.02),
     ... )
     """
 
-    # Combine-mode constants — public; usable as TimePattern.SUM, .MAX, .MIN
+    model_config = ConfigDict(extra="forbid")
+
+    # Combine-mode constants — public; usable as AxisPattern.SUM, .MAX, .MIN
     SUM: ClassVar[CombineMode] = CombineMode.SUM
     MAX: ClassVar[CombineMode] = CombineMode.MAX
     MIN: ClassVar[CombineMode] = CombineMode.MIN
@@ -293,12 +311,12 @@ class TimePattern(BaseModel):
         """The mathematical expression for this pattern (always parenthesised)."""
         raise NotImplementedError("Subclasses must implement formula")
 
-    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
-        """Return pulse data as (step, value) pairs if representable as TimeSeries.
+    def _as_series_data(self) -> list[tuple[int, float]] | None:
+        """Return pulse data as (step, value) points if representable as a series.
 
         Returns None for patterns that cannot be expressed as a numeric
-        time series (e.g. formula amounts, mathematical patterns).
-        Overridden only by ``_PulseTimePattern`` and ``_PulsesTimePattern``.
+        series (e.g. formula amounts, mathematical patterns).
+        Overridden only by ``_PulseAxisPattern`` and ``_PulsesAxisPattern``.
         """
         return None
 
@@ -343,7 +361,7 @@ class TimePattern(BaseModel):
     # Builder-consumption hooks
     # ------------------------------------------------------------------
     # The methods below are what ModelBuilder.add_transition reads when it
-    # receives a TimePattern as `rate=`. Users do not call them directly.
+    # receives a AxisPattern as `rate=`. Users do not call them directly.
 
     def _builder_rate(self) -> str | float | None:
         """Default rate string to pass to add_transition (or None)."""
@@ -361,11 +379,11 @@ class TimePattern(BaseModel):
     # Methods only meaningful on schedules — base raises by default.
     # ------------------------------------------------------------------
 
-    def set_default(self, pattern: "TimePattern") -> "TimePattern":  # noqa: ARG002
+    def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
         """Register the condition-free fallback pattern (schedules only)."""
         raise TypeError(
-            "set_default is only valid on a schedule TimePattern; "
-            "start one with TimePattern.add_group(...) first."
+            "set_default is only valid on a schedule AxisPattern; "
+            "start one with AxisPattern.add_group(...) first."
         )
 
     # ------------------------------------------------------------------
@@ -373,17 +391,17 @@ class TimePattern(BaseModel):
     # ------------------------------------------------------------------
 
     @classmethod
-    def pulse(cls, at: int, amount: float | str) -> "TimePattern":
+    def pulse(cls, at: int, amount: float | str) -> "AxisPattern":
         """Single-step pulse: rate = ``amount`` at step ``at``, else 0."""
         _validate_amount_string(amount)
-        return _PulseTimePattern(at=at, amount=amount)
+        return _PulseAxisPattern(at=at, amount=amount)
 
     @classmethod
     def pulses(
         cls,
         at: Iterable[int],
         amount: float | str | Iterable[float | str],
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """Multi-step discrete pulses. Steps must be unique and non-negative.
 
         Parameters
@@ -399,7 +417,7 @@ class TimePattern(BaseModel):
         )
         if isinstance(amount_resolved, (float, int, str)):
             _validate_amount_string(amount_resolved)
-        return _PulsesTimePattern(steps=list(at), amount=amount_resolved)
+        return _PulsesAxisPattern(steps=list(at), amount=amount_resolved)
 
     @classmethod
     def periodic(
@@ -407,21 +425,27 @@ class TimePattern(BaseModel):
         period: int,
         amount: float | str,
         offset: int = 0,
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """Periodic pulse every ``period`` steps starting at ``offset``."""
         _validate_amount_string(amount)
-        return _PeriodicTimePattern(period=period, amount=amount, offset=offset)
+        return _PeriodicAxisPattern(period=period, amount=amount, offset=offset)
 
     @classmethod
-    def window(
+    def interval(
         cls,
-        start: int,
-        end: int,
+        start: float,
+        end: float,
         amount: float | str,
-    ) -> "TimePattern":
-        """Constant rate ``amount`` for step in ``[start, end)``."""
+    ) -> "AxisPattern":
+        """Constant rate ``amount`` while ``t`` is in ``[start, end)``, else 0.
+
+        In a DifferenceEquations model ``t`` is the step, so the rate acts on
+        the steps ``start <= step < end``. In a DifferentialEquations model the
+        interval opens and closes at any position, and the engine restarts its
+        integration at both ends.
+        """
         _validate_amount_string(amount)
-        return _WindowTimePattern(start=start, end=end, amount=amount)
+        return _IntervalAxisPattern(start=start, end=end, amount=amount)
 
     @classmethod
     def seasonal(
@@ -430,9 +454,9 @@ class TimePattern(BaseModel):
         period: float | str,
         phase: float | str = 0,
         baseline: float | str = 0,
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-        return _SeasonalTimePattern(
+        return _SeasonalAxisPattern(
             amplitude=amplitude,
             period=period,
             phase=phase,
@@ -445,20 +469,25 @@ class TimePattern(BaseModel):
         center: float,
         width: float,
         peak: float | str,
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """Gaussian bell pulse: ``peak * exp(-(t - center)^2 / (2 * width^2))``."""
-        return _GaussianPulseTimePattern(center=center, width=width, peak=peak)
+        return _GaussianPulseAxisPattern(center=center, width=width, peak=peak)
 
     @classmethod
     def linear_ramp(
         cls,
-        start: int,
-        end: int,
+        start: float,
+        end: float,
         start_value: float,
         end_value: float,
-    ) -> "TimePattern":
-        """Linear interpolation from ``start_value`` to ``end_value`` over ``[start, end)``."""  # noqa: E501
-        return _LinearRampTimePattern(
+    ) -> "AxisPattern":
+        """Linear in ``t`` from ``start_value`` to ``end_value`` on ``[start, end)``.
+
+        The rate is 0 outside the interval. In a DifferenceEquations model
+        ``t`` is the step, so the ramp is read at each step; in a
+        DifferentialEquations model it is continuous.
+        """
+        return _LinearRampAxisPattern(
             start=start,
             end=end,
             start_value=start_value,
@@ -468,10 +497,10 @@ class TimePattern(BaseModel):
     @classmethod
     def combine(
         cls,
-        *patterns: "TimePattern",
+        *patterns: "AxisPattern",
         mode: CombineMode = CombineMode.SUM,
         config: SecurityConfig | None = None,
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
 
@@ -491,7 +520,7 @@ class TimePattern(BaseModel):
         result = _compose_formulas([p.formula for p in patterns], mode)
         _enforce_length_cap(result, config)
 
-        return _ComputedTimePattern(
+        return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
             source_compartment=shared_source,
@@ -502,7 +531,7 @@ class TimePattern(BaseModel):
         cls,
         expr: str,
         config: SecurityConfig | None = None,
-    ) -> "TimePattern":
+    ) -> "AxisPattern":
         """
         Create a pattern from an arbitrary expression string.
 
@@ -513,7 +542,7 @@ class TimePattern(BaseModel):
             raise ValueError("'expr' must be a non-empty expression")
         wrapped = f"({expr})"
         validate_expression_security(wrapped, config)
-        return _ComputedTimePattern(computed_formula=wrapped)
+        return _ComputedAxisPattern(computed_formula=wrapped)
 
 
 # ---------------------------------------------------------------------------
@@ -521,7 +550,7 @@ class TimePattern(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class _PulseTimePattern(TimePattern):
+class _PulseAxisPattern(AxisPattern):
     at: Annotated[int, Field(ge=0)]
     amount: float | str
 
@@ -529,13 +558,13 @@ class _PulseTimePattern(TimePattern):
     def formula(self) -> str:
         return f"(if(step == {self.at}, {self.amount}, 0))"
 
-    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
+    def _as_series_data(self) -> list[tuple[int, float]] | None:
         if not isinstance(self.amount, (int, float)):
             return None
         return [(self.at, float(self.amount))]
 
 
-class _PulsesTimePattern(TimePattern):
+class _PulsesAxisPattern(AxisPattern):
     steps: list[Annotated[int, Field(ge=0)]]
     amount: float | str | list[float | str]
 
@@ -549,7 +578,7 @@ class _PulsesTimePattern(TimePattern):
         return v
 
     @model_validator(mode="after")
-    def validate_amount_list(self) -> "_PulsesTimePattern":
+    def validate_amount_list(self) -> "_PulsesAxisPattern":
         if isinstance(self.amount, list):
             if len(self.amount) != len(self.steps):
                 raise ValueError(
@@ -570,7 +599,7 @@ class _PulsesTimePattern(TimePattern):
             terms = " + ".join(f"if(step == {s}, {self.amount}, 0)" for s in self.steps)
         return f"({terms})"
 
-    def _as_time_series_data(self) -> list[tuple[int, float]] | None:
+    def _as_series_data(self) -> list[tuple[int, float]] | None:
         if isinstance(self.amount, list):
             if not all(isinstance(a, (int, float)) for a in self.amount):
                 return None
@@ -580,13 +609,13 @@ class _PulsesTimePattern(TimePattern):
         return [(s, float(self.amount)) for s in self.steps]
 
 
-class _PeriodicTimePattern(TimePattern):
+class _PeriodicAxisPattern(AxisPattern):
     period: Annotated[int, Field(gt=0)]
     amount: float | str
     offset: Annotated[int, Field(ge=0)] = 0
 
     @model_validator(mode="after")
-    def validate_offset_lt_period(self) -> "_PeriodicTimePattern":
+    def validate_offset_lt_period(self) -> "_PeriodicAxisPattern":
         if self.offset >= self.period:
             raise ValueError(
                 f"'offset' ({self.offset}) must be less than 'period' ({self.period})"
@@ -605,13 +634,13 @@ class _PeriodicTimePattern(TimePattern):
         )
 
 
-class _WindowTimePattern(TimePattern):
-    start: int
-    end: int
+class _IntervalAxisPattern(AxisPattern):
+    start: FinitePosition
+    end: FinitePosition
     amount: float | str
 
     @model_validator(mode="after")
-    def validate_window_bounds(self) -> "_WindowTimePattern":
+    def validate_interval_bounds(self) -> "_IntervalAxisPattern":
         if self.start >= self.end:
             raise ValueError(
                 f"'start' ({self.start}) must be less than 'end' ({self.end})"
@@ -620,10 +649,11 @@ class _WindowTimePattern(TimePattern):
 
     @property
     def formula(self) -> str:
-        return f"(if(step >= {self.start}, if(step < {self.end}, {self.amount}, 0), 0))"
+        start, end = _number(self.start), _number(self.end)
+        return f"(if(t >= {start}, if(t < {end}, {self.amount}, 0), 0))"
 
 
-class _SeasonalTimePattern(TimePattern):
+class _SeasonalAxisPattern(AxisPattern):
     amplitude: float | str
     period: float | str
     phase: float | str = 0
@@ -652,7 +682,7 @@ class _SeasonalTimePattern(TimePattern):
         )
 
 
-class _GaussianPulseTimePattern(TimePattern):
+class _GaussianPulseAxisPattern(AxisPattern):
     center: float
     width: Annotated[float, Field(gt=0)]
     peak: float | str
@@ -665,14 +695,14 @@ class _GaussianPulseTimePattern(TimePattern):
         )
 
 
-class _LinearRampTimePattern(TimePattern):
-    start: int
-    end: int
+class _LinearRampAxisPattern(AxisPattern):
+    start: FinitePosition
+    end: FinitePosition
     start_value: float
     end_value: float
 
     @model_validator(mode="after")
-    def validate_ramp_bounds(self) -> "_LinearRampTimePattern":
+    def validate_ramp_bounds(self) -> "_LinearRampAxisPattern":
         if self.start >= self.end:
             raise ValueError(
                 f"'start' ({self.start}) must be less than 'end' ({self.end})"
@@ -682,12 +712,13 @@ class _LinearRampTimePattern(TimePattern):
     @property
     def formula(self) -> str:
         slope = self.end_value - self.start_value
-        span = self.end - self.start
-        inner = f"{self.start_value} + {slope} * (step - {self.start}) / {span}"
-        return f"(if(step >= {self.start}, if(step < {self.end}, {inner}, 0), 0))"
+        start, end = _number(self.start), _number(self.end)
+        span = _number(self.end - self.start)
+        inner = f"{self.start_value} + {slope} * (t - {start}) / {span}"
+        return f"(if(t >= {start}, if(t < {end}, {inner}, 0), 0))"
 
 
-class _ComputedTimePattern(TimePattern):
+class _ComputedAxisPattern(AxisPattern):
     computed_formula: Annotated[str, Field(min_length=1)]
 
     @field_validator("computed_formula")
@@ -714,20 +745,20 @@ class _ComputedTimePattern(TimePattern):
 class _GroupEntry(BaseModel):
     """Pairs a pattern with its absolute-flow flag inside a schedule."""
 
-    pattern: TimePattern
+    pattern: AxisPattern
     absolute: bool | None = None
 
 
 # ---------------------------------------------------------------------------
-# Schedule: private subclass exposed to users only through TimePattern methods
+# Schedule: private subclass exposed to users only through AxisPattern methods
 # ---------------------------------------------------------------------------
 
 
-class _ScheduleTimePattern(TimePattern):
+class _ScheduleAxisPattern(AxisPattern):
     """
-    Internal: a TimePattern that holds a list of grouped sub-patterns and an
+    Internal: a AxisPattern that holds a list of grouped sub-patterns and an
     optional default. Users never name this type — they obtain instances by
-    calling ``TimePattern.add_group(...)`` on the class.
+    calling ``AxisPattern.add_group(...)`` on the class.
     """
 
     patterns: list[_GroupEntry] = Field(default_factory=list)
@@ -736,13 +767,13 @@ class _ScheduleTimePattern(TimePattern):
     @property
     def formula(self) -> str:
         raise TypeError(
-            "a schedule TimePattern has no single formula; "
+            "a schedule AxisPattern has no single formula; "
             "pass it to ModelBuilder.add_transition(rate=...) instead."
         )
 
     def __str__(self) -> str:  # pragma: no cover — descriptive only
         return (
-            f"<TimePattern schedule with {len(self.patterns)} pattern(s), "
+            f"<AxisPattern schedule with {len(self.patterns)} pattern(s), "
             f"default={'set' if self._has_default else 'unset'}>"
         )
 
@@ -751,11 +782,11 @@ class _ScheduleTimePattern(TimePattern):
     def _append_group(
         self,
         conditions: list[ConditionDict],
-        schedule: TimePattern,
+        schedule: AxisPattern,
         *,
         source_compartment: str | None,
         absolute: bool | None = None,
-    ) -> "_ScheduleTimePattern":
+    ) -> "_ScheduleAxisPattern":
         if not conditions:
             raise ValueError(
                 "'conditions' must be non-empty. "
@@ -774,7 +805,7 @@ class _ScheduleTimePattern(TimePattern):
         self.patterns.append(_GroupEntry(pattern=pattern, absolute=absolute))
         return self
 
-    def set_default(self, pattern: TimePattern) -> "_ScheduleTimePattern":
+    def set_default(self, pattern: AxisPattern) -> "_ScheduleAxisPattern":
         """
         Register the condition-free fallback pattern.
 
@@ -823,5 +854,5 @@ __all__ = [
     "CombineMode",
     "ConditionDict",
     "StratifiedRateDict",
-    "TimePattern",
+    "AxisPattern",
 ]

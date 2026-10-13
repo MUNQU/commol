@@ -20,7 +20,7 @@ Model                      name, description, version, step_unit
 │       ├── stratification_fractions: [StratificationFractions]
 │       │   └── fractions: [StratificationFraction]
 │       └── compartment_fractions: [CompartmentFraction]
-├── parameters: [Parameter]                (a value may be a TimeSeriesValue)
+├── parameters: [Parameter]                (a value may be a SeriesValue)
 └── dynamics: Dynamics
     ├── typology: "DifferenceEquations" or "DifferentialEquations"
     ├── solver: OdeSolver | None            (differential models only)
@@ -49,7 +49,7 @@ Model                      name, description, version, step_unit
 
 ::: commol.context.parameter.Parameter
 
-::: commol.context.parameter.TimeSeriesValue
+::: commol.context.parameter.SeriesValue
 
 ## Dynamics
 

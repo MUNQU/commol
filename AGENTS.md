@@ -64,6 +64,8 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change the difference step | `crates/commol-difference/src/simulation.rs` | `crates/commol-core/src/simulation_engine.rs` |
 | Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/dynamics.rs` (`OdeSolver`), `py-commol/commol/context/dynamics.py` |
 | Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/dynamics.py` |
+| Change which positions a model type accepts | `crates/commol-core/src/simulation_engine.rs` (`check_position`) | each engine's `check_position`, `crates/commol-calibration/src/calibration_problem.rs` (`check_positions`) |
+| Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/probabilistic/statistics_calculator.py` |
 | Add a function or variable to rate expressions | `crates/commol-core/src/math_expression/` | `py-commol/commol/utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `docs/guide/building-models.md` |
 | Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |

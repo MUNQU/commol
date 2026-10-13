@@ -33,7 +33,7 @@ def _model() -> Model:
 
 def _problem(parameter_id: str) -> CalibrationProblem:
     return CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=1, compartment="B_g1_y", value=10.0)],
+        observed_data=[ObservedDataPoint(at=1, output="B_g1_y", value=10.0)],
         parameters=[bounded(parameter_id, 0.0, 0.5, kind="initial_condition")],
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=5),
@@ -67,7 +67,7 @@ class TestIds:
 
     def test_an_unknown_bin_of_an_unstratified_model_is_rejected(self) -> None:
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=10, compartment="I", value=50.0)],
+            observed_data=[ObservedDataPoint(at=10, output="I", value=50.0)],
             parameters=[bounded("X", 0.0, 100.0, kind="initial_condition")],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=100),

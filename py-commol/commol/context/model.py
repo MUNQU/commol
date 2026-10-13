@@ -5,7 +5,7 @@ from itertools import combinations, product
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import ConfigDict, BaseModel, Field, model_validator
 
 from commol.constants import RESERVED_VARIABLE_NAMES, PrintEquationsOutputFormat
 from commol.context._model import engine_state
@@ -51,6 +51,8 @@ class Model(BaseModel):
         ``"meter"``). The unit check uses it; when None, the check infers it
         from the parameter units of dimension time (or uses ``step``).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., description="Name which identifies the model.")
     description: str | None = Field(
@@ -108,7 +110,7 @@ class Model(BaseModel):
         Every field is written, including those left unset, so the file always
         reloads through :meth:`from_json` to an equal model.
 
-        Long numeric arrays, such as a time-series parameter, are written on a
+        Long numeric arrays, such as a series parameter, are written on a
         single line.
 
         Parameters

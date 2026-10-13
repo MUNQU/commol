@@ -9,23 +9,25 @@ pub enum CalibrationParameterType {
     Parameter,
     /// Initial population in a compartment (e.g., initial I value)
     InitialCondition,
-    /// Scaling factor for observed data (multiplies model output before comparison)
-    Scale,
+    /// Factor that multiplies the model output of an observation before
+    /// comparison
+    Factor,
 }
 
 /// Represents an observed data point to fit against
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservedDataPoint {
-    /// Position on the axis (step) of the observation. A
-    /// difference-equations model requires an integer.
-    pub time_step: f64,
+    /// Position of the observation on the axis. The engine decides which
+    /// positions its model type accepts.
+    pub at: f64,
 
-    /// Name of the compartment being observed
-    pub compartment: String,
+    /// Name of the observed series: the output itself, or the name of an
+    /// aggregate of several outputs. Messages and the per-series
+    /// normalization use it.
+    pub label: String,
 
-    /// Optional list of output names to sum before comparison.
-    /// When omitted, `compartment` is used as the single observed output.
-    pub compartments: Option<Vec<String>>,
+    /// Outputs summed before comparison; at least one.
+    pub outputs: Vec<String>,
 
     /// Observed value (e.g., number of infected individuals)
     pub value: f64,
@@ -34,86 +36,75 @@ pub struct ObservedDataPoint {
     /// Higher weights give more importance to this data point in the loss function
     pub weight: f64,
 
-    /// Optional scale parameter ID to apply to model output before comparison
-    /// If provided, the model's predicted value will be multiplied by this scale parameter
-    /// before computing the loss. Useful when observed data is in different units or
-    /// there's an unknown proportionality constant.
-    pub scale_id: Option<String>,
+    /// Optional factor parameter ID that multiplies the model output before
+    /// comparison. Useful when observed data is in different units or there
+    /// is an unknown proportionality constant.
+    pub factor_id: Option<String>,
 
-    /// Optional window size for cumulative-output observations.
-    /// When set, the predicted value is output(time_step) - output(time_step - window_steps).
-    pub window_steps: Option<f64>,
+    /// Optional window length for cumulative-output observations.
+    /// When set, the predicted value is `output(at) - output(at - window)`.
+    pub window: Option<f64>,
 }
 
 impl ObservedDataPoint {
-    /// Create a new observed data point with default weight of 1.0
-    pub fn new(time_step: f64, compartment: String, value: f64) -> Self {
+    /// Create an observation of one output with default weight of 1.0
+    pub fn new(at: f64, output: String, value: f64) -> Self {
         Self {
-            time_step,
-            compartment,
-            compartments: None,
+            at,
+            label: output.clone(),
+            outputs: vec![output],
             value,
             weight: 1.0,
-            scale_id: None,
-            window_steps: None,
+            factor_id: None,
+            window: None,
         }
     }
 
-    /// Create a new observed data point with a custom weight
-    pub fn with_weight(time_step: f64, compartment: String, value: f64, weight: f64) -> Self {
+    /// Create an observation of the sum of several outputs, named `label`
+    pub fn of_sum(at: f64, label: String, outputs: Vec<String>, value: f64) -> Self {
         Self {
-            time_step,
-            compartment,
-            compartments: None,
-            value,
+            label,
+            outputs,
+            ..Self::new(at, String::new(), value)
+        }
+    }
+
+    /// Create an observation of one output with a custom weight
+    pub fn with_weight(at: f64, output: String, value: f64, weight: f64) -> Self {
+        Self {
             weight,
-            scale_id: None,
-            window_steps: None,
+            ..Self::new(at, output, value)
         }
     }
 
-    /// Create a new observed data point with a scale parameter
-    pub fn with_scale(time_step: f64, compartment: String, value: f64, scale_id: String) -> Self {
+    /// Create an observation of one output with a factor parameter
+    pub fn with_factor(at: f64, output: String, value: f64, factor_id: String) -> Self {
         Self {
-            time_step,
-            compartment,
-            compartments: None,
-            value,
-            weight: 1.0,
-            scale_id: Some(scale_id),
-            window_steps: None,
+            factor_id: Some(factor_id),
+            ..Self::new(at, output, value)
         }
     }
 
-    /// Create a new observed data point with both weight and scale
-    pub fn with_weight_and_scale(
-        time_step: f64,
-        compartment: String,
+    /// Create an observation of one output with both weight and factor
+    pub fn with_weight_and_factor(
+        at: f64,
+        output: String,
         value: f64,
         weight: f64,
-        scale_id: String,
+        factor_id: String,
     ) -> Self {
         Self {
-            time_step,
-            compartment,
-            compartments: None,
-            value,
             weight,
-            scale_id: Some(scale_id),
-            window_steps: None,
+            factor_id: Some(factor_id),
+            ..Self::new(at, output, value)
         }
     }
 
-    /// Create a windowed observation for a cumulative output.
-    pub fn with_window(time_step: f64, compartment: String, value: f64, window_steps: f64) -> Self {
+    /// Create a windowed observation of a cumulative output.
+    pub fn with_window(at: f64, output: String, value: f64, window: f64) -> Self {
         Self {
-            time_step,
-            compartment,
-            compartments: None,
-            value,
-            weight: 1.0,
-            scale_id: None,
-            window_steps: Some(window_steps),
+            window: Some(window),
+            ..Self::new(at, output, value)
         }
     }
 }
@@ -290,12 +281,12 @@ impl std::fmt::Display for LossConfig {
 ///
 /// # Constraint Types
 ///
-/// **Parameter-only constraints** (`time_steps: None`):
+/// **Parameter-only constraints** (`at: None`):
 /// - Evaluated once before simulation starts
 /// - Can only reference calibration parameter IDs
 /// - Use for relationships between parameters
 ///
-/// **Time-dependent constraints** (`time_steps: Some(vec)`):
+/// **Constraints at positions** (`at: Some(vec)`):
 /// - Evaluated at specified time steps during simulation
 /// - Can reference both parameter IDs AND compartment names
 /// - Use for constraining compartment values or dynamic relationships
@@ -323,28 +314,28 @@ impl std::fmt::Display for LossConfig {
 /// )
 /// ```
 ///
-/// ## Time-dependent (compartment value) constraints:
+/// ## Constraints at positions (output values):
 /// ```rust,ignore
-/// // Infected compartment must stay <= 500 at specific time steps
+/// // Infected compartment must stay <= 500 at specific positions
 /// CalibrationConstraint::new(
 ///     "max_infected".to_string(),
 ///     "500.0 - I".to_string(),
 /// )
-/// .with_time_steps(vec![10.0, 20.0, 30.0, 40.0])
+/// .with_positions(vec![10.0, 20.0, 30.0, 40.0])
 ///
 /// // Total population must stay <= 1000
 /// CalibrationConstraint::new(
 ///     "population_bound".to_string(),
 ///     "1000.0 - (S + I + R)".to_string(),
 /// )
-/// .with_time_steps(vec![0.0, 5.0, 10.0, 15.0, 20.0])
+/// .with_positions(vec![0.0, 5.0, 10.0, 15.0, 20.0])
 ///
 /// // Ratio of compartments with parameter reference
 /// CalibrationConstraint::new(
 ///     "ratio_bound".to_string(),
 ///     "threshold - I/S".to_string(),
 /// )
-/// .with_time_steps(vec![10.0, 20.0, 30.0])
+/// .with_positions(vec![10.0, 20.0, 30.0])
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationConstraint {
@@ -354,14 +345,14 @@ pub struct CalibrationConstraint {
     /// Mathematical expression that must evaluate >= 0 for constraint satisfaction
     ///
     /// The expression can reference calibration parameters by their IDs.
-    /// When time_steps is specified, the expression can also reference
-    /// compartment values (S, I, R, etc.) at those time steps.
+    /// When `at` is specified, the expression can also reference output
+    /// values (S, I, R, etc.) at those positions.
     ///
     /// Examples:
     /// - "5.0 - beta/gamma" → R0 = beta/gamma must be <= 5
     /// - "beta - gamma" → beta >= gamma
     /// - "1.0 - (param1 + param2)" → param1 + param2 <= 1.0
-    /// - "500.0 - I" (with time_steps) → Infected compartment <= 500 at specified times
+    /// - "500.0 - I" (with `at`) → Infected compartment <= 500 at those positions
     pub expression: String,
 
     /// Human-readable description (optional, for diagnostics)
@@ -373,12 +364,12 @@ pub struct CalibrationConstraint {
     /// The penalty for violating this constraint is: weight * violation^2
     pub weight: f64,
 
-    /// Optional time steps at which to evaluate this constraint
+    /// Optional positions on the axis at which to evaluate this constraint
     ///
     /// - If None: Constraint is evaluated once before simulation using parameter values only
-    /// - If Some(vec): Constraint is evaluated at each specified time step during simulation,
-    ///   and can reference both parameters and compartment values
-    pub time_steps: Option<Vec<f64>>,
+    /// - If Some(vec): Constraint is evaluated at each position during simulation,
+    ///   and can reference both parameters and output values
+    pub at: Option<Vec<f64>>,
 }
 
 impl CalibrationConstraint {
@@ -389,7 +380,7 @@ impl CalibrationConstraint {
             expression,
             description: None,
             weight: 1.0,
-            time_steps: None,
+            at: None,
         }
     }
 
@@ -405,20 +396,20 @@ impl CalibrationConstraint {
         self
     }
 
-    /// Set the time steps
-    pub fn with_time_steps(mut self, time_steps: Vec<f64>) -> Self {
-        self.time_steps = Some(time_steps);
+    /// Set the positions at which the constraint is evaluated
+    pub fn with_positions(mut self, at: Vec<f64>) -> Self {
+        self.at = Some(at);
         self
     }
 
     /// Check if this is a parameter-only constraint
     pub fn is_parameter_only(&self) -> bool {
-        self.time_steps.is_none()
+        self.at.is_none()
     }
 
-    /// Check if this is a time-dependent constraint
-    pub fn is_time_dependent(&self) -> bool {
-        self.time_steps.is_some()
+    /// Check if this constraint is evaluated at positions of a run
+    pub fn has_positions(&self) -> bool {
+        self.at.is_some()
     }
 }
 

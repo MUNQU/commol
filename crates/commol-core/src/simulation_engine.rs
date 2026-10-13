@@ -36,33 +36,57 @@ impl OutputLabels {
     }
 }
 
-/// Convert positions on the axis to integer steps.
+/// Outputs of a run and the positions on the axis they were reported at.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Trajectory {
+    /// Positions on the axis, ascending; `rows[i]` is the state at `positions[i]`.
+    pub positions: Vec<f64>,
+    /// One output row per position, in the order of `output_names()`.
+    pub rows: Vec<Vec<f64>>,
+}
+
+/// Check that positions are sorted, unique, not before `from`, and each one
+/// accepted by `accept`.
+///
+/// Engines call it before they run, so the rule on which positions a model
+/// type accepts lives in `accept` and nowhere else.
 ///
 /// # Errors
 ///
-/// Returns a message that names the first position that is not a
-/// non-negative integer, because a difference engine only reports at steps.
-pub fn integer_steps(positions: &[f64]) -> Result<Vec<u32>, String> {
-    positions
-        .iter()
-        .map(|&position| {
-            if position >= 0.0 && position.fract() == 0.0 && position <= u32::MAX as f64 {
-                Ok(position as u32)
-            } else {
-                Err(format!(
-                    "A difference-equations model reports only at integer steps; \
-                     {position} is not one"
-                ))
-            }
-        })
-        .collect()
+/// Returns the message of `accept` for the first position it rejects, or a
+/// message that names the first pair out of order or the first position
+/// before `from`.
+pub fn check_positions(
+    positions: &[f64],
+    from: f64,
+    accept: impl Fn(f64) -> Result<(), String>,
+) -> Result<(), String> {
+    for &position in positions {
+        accept(position)?;
+    }
+    if let Some(pair) = positions.windows(2).find(|pair| pair[0] >= pair[1]) {
+        return Err(format!(
+            "Positions must be sorted and unique, got {} before {}",
+            pair[0], pair[1]
+        ));
+    }
+    if let Some(&first) = positions.first()
+        && first < from
+    {
+        return Err(format!(
+            "Position {first} is before the current position {from}"
+        ));
+    }
+    Ok(())
 }
 
 /// Common interface that all model engines must implement
 /// to be compatible with calibration and other analysis tools.
 ///
 /// Calibration and optimization only use this trait, so they work with any
-/// engine that implements it.
+/// engine that implements it. A position on the axis is an `f64` everywhere;
+/// each engine decides which positions its model type accepts
+/// ([`Self::check_position`]).
 ///
 /// # Example Implementation
 ///
@@ -76,7 +100,7 @@ pub fn integer_steps(positions: &[f64]) -> Result<Vec<u32>, String> {
 /// }
 ///
 /// impl SimulationEngine for MyModel {
-///     fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
+///     fn check_position(&self, position: f64) -> Result<(), String> {
 ///         // Implementation
 ///     }
 ///
@@ -84,29 +108,65 @@ pub fn integer_steps(positions: &[f64]) -> Result<Vec<u32>, String> {
 /// }
 /// ```
 pub trait SimulationEngine: Clone {
-    /// Run the simulation for a given number of steps.
+    /// Check that the engine can report at a position on the axis.
     ///
-    /// Returns a matrix where:
-    /// - First dimension (rows): time steps (0 to num_steps inclusive)
-    /// - Second dimension (columns): compartment values
+    /// # Errors
     ///
-    /// # Arguments
+    /// Returns why the position is not accepted, without naming the object
+    /// that holds it: the caller adds that name. A difference engine accepts
+    /// only non-negative integers; a differential engine any finite,
+    /// non-negative position.
+    fn check_position(&self, position: f64) -> Result<(), String>;
+
+    /// Run from the current position through the last of `positions`,
+    /// recording the outputs at each of them into a reusable buffer.
     ///
-    /// * `num_steps` - Number of simulation steps to execute
+    /// The output rows are aligned with `positions`.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// A vector of vectors where `result[t][c]` is the population in compartment `c`
-    /// at time step `t`. The result includes the initial state (t=0) plus all steps,
-    /// so the length is `num_steps + 1`.
+    /// Returns a message when a position is rejected by
+    /// [`Self::check_position`], when the positions are not sorted and unique
+    /// or one is before the current position (see [`check_positions`]), or
+    /// when the simulation fails.
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String>;
+
+    /// Run through the last of `positions` and return the outputs at each of
+    /// them. See [`Self::run_at_positions_into_buffer`].
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::run_at_positions_into_buffer`].
+    fn run_at(&mut self, positions: &[f64]) -> Result<Vec<Vec<f64>>, String> {
+        let mut buffer = Vec::with_capacity(positions.len());
+        self.run_at_positions_into_buffer(positions, &mut buffer)?;
+        Ok(buffer)
+    }
+
+    /// The default grid of a run of `num_steps` steps: the current position
+    /// and the `num_steps` positions one unit apart after it.
+    fn grid(&self, num_steps: u32) -> Vec<f64> {
+        let start = self.current_position();
+        (0..=num_steps).map(|k| start + f64::from(k)).collect()
+    }
+
+    /// Run on the default grid of `num_steps` steps ([`Self::grid`]).
     ///
     /// # Errors
     ///
     /// Returns an error string if the simulation fails (e.g., invalid parameters,
     /// numerical instability, etc.)
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String>;
+    fn run(&mut self, num_steps: u32) -> Result<Trajectory, String> {
+        let positions = self.grid(num_steps);
+        let rows = self.run_at(&positions)?;
+        Ok(Trajectory { positions, rows })
+    }
 
-    /// Execute a single simulation step, advancing the model state by one time unit.
+    /// Advance the state by one unit of the axis.
     ///
     /// # Errors
     ///
@@ -115,7 +175,7 @@ pub trait SimulationEngine: Clone {
 
     /// Get the names of all compartments in order.
     ///
-    /// The order must match the column order in the matrices returned by `run()`
+    /// The order must match the column order in the rows returned by `run()`
     /// and `population()`.
     ///
     /// # Example
@@ -148,7 +208,7 @@ pub trait SimulationEngine: Clone {
     /// Reset the simulation to its initial state.
     ///
     /// After calling this method:
-    /// - `current_step()` should return 0.0
+    /// - `current_position()` should return 0.0
     /// - `population()` should return initial conditions
     /// - Parameters remain unchanged (use `set_parameter()` to modify them)
     ///
@@ -188,92 +248,10 @@ pub trait SimulationEngine: Clone {
     /// ```
     fn get_parameters(&self) -> &HashMap<String, f64>;
 
-    /// Get the current simulation time step.
-    ///
-    /// For discrete-time models, this is typically an integer counter.
-    /// For continuous-time models, this represents the current time value.
+    /// The current position on the axis.
     ///
     /// Should return 0.0 immediately after construction or `reset()`.
-    fn current_step(&self) -> f64;
-
-    /// Run the simulation for a given number of steps, writing results into a pre-allocated buffer.
-    ///
-    /// This is a performance optimization for calibration that avoids repeated allocations.
-    /// The buffer should be pre-allocated with capacity for `num_steps + 1` rows and
-    /// `num_compartments` columns.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_steps` - Number of simulation steps to execute
-    /// * `buffer` - Pre-allocated buffer to write results into. Will be cleared and resized if needed.
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` if successful, error string otherwise
-    ///
-    /// # Default Implementation
-    ///
-    /// The default implementation calls `run()` and copies the result. Engines should
-    /// override this for better performance.
-    fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let results = self.run(num_steps)?;
-        buffer.clear();
-        buffer.extend(results);
-        Ok(())
-    }
-
-    /// Run the simulation through the largest requested step, recording only
-    /// selected time steps into a reusable buffer.
-    ///
-    /// `time_steps` must be sorted in ascending order and contain unique values.
-    /// The output rows are aligned with `time_steps`, not with absolute time.
-    fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let Some(&max_step) = time_steps.last() else {
-            buffer.clear();
-            return Ok(());
-        };
-
-        let results = self.run(max_step)?;
-        buffer.clear();
-        buffer.reserve(time_steps.len());
-        for &step in time_steps {
-            let row = results
-                .get(step as usize)
-                .ok_or_else(|| format!("Missing simulation result for step {}", step))?;
-            buffer.push(row.clone());
-        }
-        Ok(())
-    }
-
-    /// Run the simulation through the largest requested position on the axis,
-    /// recording only those positions into a reusable buffer.
-    ///
-    /// `positions` must be sorted in ascending order and contain unique,
-    /// non-negative values. The output rows are aligned with `positions`. An
-    /// engine that steps in continuous time reports at any position; the
-    /// default implementation accepts only integer positions and delegates to
-    /// [`Self::run_at_steps_into_buffer`].
-    ///
-    /// # Errors
-    ///
-    /// The default implementation returns a message that names the first
-    /// position that is not an integer.
-    fn run_at_positions_into_buffer(
-        &mut self,
-        positions: &[f64],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let steps = integer_steps(positions)?;
-        self.run_at_steps_into_buffer(&steps, buffer)
-    }
+    fn current_position(&self) -> f64;
 
     /// Set the initial condition for a specific compartment.
     ///

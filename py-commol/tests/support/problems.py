@@ -21,7 +21,7 @@ def initial_condition_problem(
     """
     return CalibrationProblem(
         initial_condition_remainder=remainder,
-        observed_data=[ObservedDataPoint(step=1, compartment="A", value=1.0)],
+        observed_data=[ObservedDataPoint(at=1, output="A", value=1.0)],
         parameters=[
             CalibrationParameter(
                 id=entry_id,
@@ -56,19 +56,19 @@ def bounded(
 
 def observed(
     results: dict[str, list[float]],
-    compartment: str,
-    steps: Iterable[int],
+    output: str,
+    at: Iterable[int],
     *,
-    scale: float = 1.0,
-    scale_id: str | None = None,
+    factor: float = 1.0,
+    factor_id: str | None = None,
 ) -> list[ObservedDataPoint]:
-    """Observations of one output of a run, at the given steps."""
+    """Observations of one output of a run, at the given integer positions."""
     return [
         ObservedDataPoint(
-            step=step,
-            compartment=compartment,
-            value=results[compartment][step] * scale,
-            scale_id=scale_id,
+            at=step,
+            output=output,
+            value=results[output][step] * factor,
+            factor_id=factor_id,
         )
-        for step in steps
+        for step in at
     ]

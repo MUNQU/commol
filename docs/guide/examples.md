@@ -17,8 +17,8 @@ shows one technique:
 | 8. Subpopulation-normalized rate | `N_<category>` variables |
 | 9. Conditional stratification | A stratification that splits one group only |
 | 10. Parameter calibration | `Calibrator` |
-| Time-pattern transition | `TimePattern` as a rate |
-| Schedules per subgroup | `TimePattern.add_group` |
+| Time-pattern transition | `AxisPattern` as a rate |
+| Schedules per subgroup | `AxisPattern.add_group` |
 
 ## Example 1: Basic Three-State Model
 
@@ -493,13 +493,13 @@ model = (
 )
 
 observed_data = [
-    ObservedDataPoint(step=0,  compartment="B", value=10.0),
-    ObservedDataPoint(step=10, compartment="B", value=45.2),
-    ObservedDataPoint(step=20, compartment="B", value=78.5),
-    ObservedDataPoint(step=30, compartment="B", value=62.3),
-    ObservedDataPoint(step=40, compartment="B", value=38.1),
-    ObservedDataPoint(step=50, compartment="B", value=18.7),
-    ObservedDataPoint(step=60, compartment="B", value=8.2),
+    ObservedDataPoint(at=0,  output="B", value=10.0),
+    ObservedDataPoint(at=10, output="B", value=45.2),
+    ObservedDataPoint(at=20, output="B", value=78.5),
+    ObservedDataPoint(at=30, output="B", value=62.3),
+    ObservedDataPoint(at=40, output="B", value=38.1),
+    ObservedDataPoint(at=50, output="B", value=18.7),
+    ObservedDataPoint(at=60, output="B", value=8.2),
 ]
 
 simulation = Simulation(model)
@@ -552,12 +552,12 @@ A composed time-varying transition: an opening pulse, a monthly periodic
 event, and a continuous seasonal baseline.
 
 ```python
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 
-rate = TimePattern.combine(
-    TimePattern.pulse(at=0, amount=0.3),
-    TimePattern.periodic(period=30, amount=0.05),
-    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+rate = AxisPattern.combine(
+    AxisPattern.pulse(at=0, amount=0.3),
+    AxisPattern.periodic(period=30, amount=0.05),
+    AxisPattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
 )
 
 model = (
@@ -581,20 +581,20 @@ results = Simulation(model).run(num_steps=365)
 ## Example: Sub-Group Specific Schedules
 
 Different stratification sub-groups receive different patterns. The schedule
-is built by chaining `TimePattern.add_group(...)` calls — the first call
+is built by chaining `AxisPattern.add_group(...)` calls — the first call
 on the class itself, subsequent calls on the returned instance:
 
 ```python
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 
 rate = (
-    TimePattern.add_group(
+    AxisPattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=TimePattern.periodic(period=7, amount=0.05),
+        schedule=AxisPattern.periodic(period=7, amount=0.05),
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=TimePattern.periodic(period=30, amount=0.05),
+        schedule=AxisPattern.periodic(period=30, amount=0.05),
     )
 )
 
@@ -631,5 +631,5 @@ results = Simulation(model).run(num_steps=60)
 - [API Reference](../api/model-builder.md) - Complete API documentation
 - [Calibration Guide](calibration.md) - Comprehensive calibration documentation
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
-- [Time Patterns](time-patterns.md) - Time-varying rate helpers
+- [Axis Patterns](axis-patterns.md) - Time-varying rate helpers
 - [Contributing](../development/contributing.md) - Build your own examples

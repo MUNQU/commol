@@ -12,7 +12,7 @@ use crate::engine::EngineArg;
 pub enum PyCalibrationParameterType {
     Parameter,
     InitialCondition,
-    Scale,
+    Factor,
 }
 
 impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParameterType {
@@ -24,8 +24,8 @@ impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParamet
             PyCalibrationParameterType::InitialCondition => {
                 commol_calibration::CalibrationParameterType::InitialCondition
             }
-            PyCalibrationParameterType::Scale => {
-                commol_calibration::CalibrationParameterType::Scale
+            PyCalibrationParameterType::Factor => {
+                commol_calibration::CalibrationParameterType::Factor
             }
         }
     }
@@ -43,48 +43,42 @@ impl PyObservedDataPoint {
     /// Create a new observed data point
     ///
     /// Args:
-    ///     step: Step of observation
-    ///     compartment: Name of the compartment being observed
+    ///     at: Position of the observation on the axis
+    ///     label: Name of the observed series
+    ///     outputs: Outputs summed before comparison; at least one
     ///     value: Observed value
     ///     weight: Optional weight for this observation (default: 1.0)
-    ///     scale_id: Optional scale parameter ID to apply to model output
+    ///     factor_id: Optional factor parameter ID that multiplies the model output
+    ///     window: Optional window length for a cumulative output
     #[new]
-    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None, window_steps=None, compartments=None))]
+    #[pyo3(signature = (at, label, outputs, value, weight=None, factor_id=None, window=None))]
     fn new(
-        step: f64,
-        compartment: String,
+        at: f64,
+        label: String,
+        outputs: Vec<String>,
         value: f64,
         weight: Option<f64>,
-        scale_id: Option<String>,
-        window_steps: Option<f64>,
-        compartments: Option<Vec<String>>,
+        factor_id: Option<String>,
+        window: Option<f64>,
     ) -> Self {
-        let mut inner = match (weight, scale_id) {
-            (Some(w), Some(s)) => commol_calibration::ObservedDataPoint::with_weight_and_scale(
-                step,
-                compartment,
-                value,
-                w,
-                s,
-            ),
-            (Some(w), None) => {
-                commol_calibration::ObservedDataPoint::with_weight(step, compartment, value, w)
-            }
-            (None, Some(s)) => {
-                commol_calibration::ObservedDataPoint::with_scale(step, compartment, value, s)
-            }
-            (None, None) => commol_calibration::ObservedDataPoint::new(step, compartment, value),
-        };
-        inner.window_steps = window_steps;
-        inner.compartments = compartments;
+        let mut inner = commol_calibration::ObservedDataPoint::of_sum(at, label, outputs, value);
+        inner.weight = weight.unwrap_or(1.0);
+        inner.factor_id = factor_id;
+        inner.window = window;
         Self { inner }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ObservedDataPoint(time_step={}, compartment='{}', value={})",
-            self.inner.time_step, self.inner.compartment, self.inner.value
+            "ObservedDataPoint(at={}, label='{}', value={})",
+            self.inner.at, self.inner.label, self.inner.value
         )
+    }
+
+    /// Position of the observation on the axis
+    #[getter]
+    fn at(&self) -> f64 {
+        self.inner.at
     }
 }
 
@@ -158,15 +152,16 @@ impl PyCalibrationConstraint {
     ///     expression: Mathematical expression that must evaluate >= 0
     ///     description: Optional human-readable description
     ///     weight: Penalty weight multiplier (default: 1.0)
-    ///     time_steps: Optional time steps at which to evaluate (for time-dependent constraints)
+    ///     at: Optional positions on the axis at which to evaluate the
+    ///         constraint; it can then read output values
     #[new]
-    #[pyo3(signature = (id, expression, description=None, weight=1.0, time_steps=None))]
+    #[pyo3(signature = (id, expression, description=None, weight=1.0, at=None))]
     fn new(
         id: String,
         expression: String,
         description: Option<String>,
         weight: f64,
-        time_steps: Option<Vec<f64>>,
+        at: Option<Vec<f64>>,
     ) -> Self {
         let mut constraint = commol_calibration::CalibrationConstraint::new(id, expression);
 
@@ -176,8 +171,8 @@ impl PyCalibrationConstraint {
 
         constraint = constraint.with_weight(weight);
 
-        if let Some(steps) = time_steps {
-            constraint = constraint.with_time_steps(steps);
+        if let Some(positions) = at {
+            constraint = constraint.with_positions(positions);
         }
 
         Self { inner: constraint }
@@ -289,7 +284,7 @@ impl PyNelderMeadConfig {
     /// Args:
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     sd_tolerance: Convergence tolerance (default: 1e-6)
-    ///     initial_step: Size of the initial simplex, as a fraction of each bound width (default: 0.1)
+    ///     initial_simplex_size: Size of the initial simplex, as a fraction of each bound width (default: 0.1)
     ///     alpha: Reflection coefficient (default: None, uses argmin's default)
     ///     gamma: Expansion coefficient (default: None, uses argmin's default)
     ///     rho: Contraction coefficient (default: None, uses argmin's default)
@@ -297,12 +292,12 @@ impl PyNelderMeadConfig {
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_step=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
+    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_simplex_size=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
-        initial_step: f64,
+        initial_simplex_size: f64,
         alpha: Option<f64>,
         gamma: Option<f64>,
         rho: Option<f64>,
@@ -314,7 +309,7 @@ impl PyNelderMeadConfig {
             inner: commol_calibration::NelderMeadConfig {
                 max_iterations,
                 sd_tolerance,
-                initial_step,
+                initial_simplex_size,
                 alpha,
                 gamma,
                 rho,
@@ -1323,16 +1318,17 @@ fn deduplicate_evaluations(
 ///     engine: Simulation engine (DifferenceEquations or DifferentialEquations)
 ///     parameter_sets: List of parameter value lists (one per parameter set)
 ///     parameter_names: List of parameter names (must match model parameter IDs)
-///     time_steps: Number of time steps to simulate
+///     positions: Sorted, unique positions on the axis to report at
 ///
 /// Returns:
-///     List of predictions, where each prediction is a 2D list [time_step][compartment_idx]
+///     List of predictions, where each prediction is a 2D list
+///     [position_idx][output_idx], aligned with `positions`
 #[pyfunction]
 fn generate_predictions_parallel(
     engine: EngineArg<'_>,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
-    time_steps: u32,
+    positions: Vec<f64>,
 ) -> PyResult<Vec<Vec<Vec<f64>>>> {
     let base_engine = &engine.engine();
 
@@ -1340,7 +1336,7 @@ fn generate_predictions_parallel(
         base_engine,
         parameter_sets,
         parameter_names,
-        time_steps,
+        positions,
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -1348,9 +1344,9 @@ fn generate_predictions_parallel(
 }
 
 /// Generate predictions for calibration parameter sets, including calibrated
-/// initial conditions.
+/// initial conditions, with one row per position, aligned with `positions`.
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, time_steps, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, positions, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_parallel(
     engine: EngineArg<'_>,
@@ -1360,7 +1356,7 @@ fn generate_calibrated_predictions_parallel(
     loss_config: &PyLossConfig,
     initial_population_size: u64,
     parameter_sets: Vec<Vec<f64>>,
-    time_steps: u32,
+    positions: Vec<f64>,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<Vec<Vec<Vec<f64>>>> {
     let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
@@ -1381,7 +1377,7 @@ fn generate_calibrated_predictions_parallel(
     let predictions = commol_calibration::generate_calibrated_predictions_parallel(
         &problem,
         parameter_sets,
-        time_steps,
+        positions,
     )
     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -1458,6 +1454,28 @@ fn check_initial_conditions(
         initial_condition_remainder.as_deref(),
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
+/// Check every position of a calibration problem with the engine
+///
+/// Args:
+///     engine: Engine built from the model definition
+///     observed_data: Observations, at their positions and windows
+///     constraints: Constraints, at their positions
+///
+/// Raises:
+///     ValueError: If the engine does not report at a position; the message
+///         names the observation or constraint that holds it
+#[pyfunction]
+fn check_positions(
+    engine: EngineArg<'_>,
+    observed_data: Vec<PyObservedDataPoint>,
+    constraints: Vec<PyCalibrationConstraint>,
+) -> PyResult<()> {
+    let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
+    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
+    commol_calibration::check_positions(&engine.engine(), &observed_data, &constraints)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
 /// Generate compact predictions for selected metric points.
@@ -1727,6 +1745,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;
     m.add_function(wrap_pyfunction!(generate_predictions_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(check_positions, m)?)?;
     m.add_function(wrap_pyfunction!(
         generate_calibrated_predictions_parallel,
         m

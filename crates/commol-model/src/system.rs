@@ -155,7 +155,7 @@ impl CompiledModel {
         !self.impulse_flows.is_empty()
     }
 
-    /// Whether a rate or a formula parameter reads `step` or a time series.
+    /// Whether a rate or a formula parameter reads `step` or a pulse series.
     ///
     /// When it does, the right-hand side may jump at every integer position,
     /// so a differential engine restarts its integration there.
@@ -202,6 +202,31 @@ impl CompiledModel {
         positions.sort_by(f64::total_cmp);
         positions.dedup();
         Ok(positions)
+    }
+
+    /// Positions in `(from, to)` where a series parameter read at `t` jumps or
+    /// bends: the points of every `"step_function"` and `"linear"` series,
+    /// ascending and without duplicates.
+    pub fn series_points(&self, from: f64, to: f64) -> Vec<f64> {
+        let mut positions: Vec<f64> = self
+            .series_parameters
+            .iter()
+            .filter(|series| !series.reads_step())
+            .flat_map(|series| series.points_in(from, to))
+            .collect();
+        positions.sort_by(f64::total_cmp);
+        positions.dedup();
+        positions
+    }
+
+    /// The first series point that is not an integer, with its parameter
+    /// name, if any. A difference engine only steps at integers.
+    pub fn first_non_integer_series_point(&self) -> Option<(String, f64)> {
+        self.series_parameters.iter().find_map(|series| {
+            series
+                .first_non_integer()
+                .map(|position| (series.parameter_name.clone(), position))
+        })
     }
 
     /// The first impulse position that is not an integer, with its
@@ -314,10 +339,9 @@ impl CompiledModel {
             )?;
         }
 
-        // Time series are piecewise constant on the step (O(log N) search).
-        let step_u64 = step as u64;
+        // A pulse series is read at `step`, the others at `t` (O(log N) search).
         for ts in &self.series_parameters {
-            let value = ts.evaluate(step_u64);
+            let value = ts.evaluate(step, t);
             set_step_parameter(
                 &mut self.expression_context,
                 &ts.parameter_name,

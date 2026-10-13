@@ -1,6 +1,7 @@
 """Scale factors fit observations that see only a share of an output."""
 
 import pytest
+from pydantic import ValidationError
 
 from commol import (
     CalibrationConstraint,
@@ -43,13 +44,13 @@ def _fit(
 class TestScaleFactors:
     def test_a_scale_alone_is_recovered(self, truth: Model, truth_run) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 10), scale=0.5, scale_id="detection_rate"
+            truth_run, "I", range(0, 100, 10), factor=0.5, factor_id="detection_rate"
         )
 
         result = _fit(
             truth,
             observations,
-            [bounded("detection_rate", 0.1, 1.0, kind="scale", initial_guess=0.7)],
+            [bounded("detection_rate", 0.1, 1.0, kind="factor", initial_guess=0.7)],
             NelderMeadConfig(max_iterations=500, verbose=False),
         )
 
@@ -60,13 +61,13 @@ class TestScaleFactors:
         self, truth: Model, truth_run
     ) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 5), scale=0.3, scale_id="detection_rate"
+            truth_run, "I", range(0, 100, 5), factor=0.3, factor_id="detection_rate"
         )
 
         result = _fit(
             truth,
             observations,
-            [bounded("beta"), bounded("detection_rate", 0.1, 1.0, kind="scale")],
+            [bounded("beta"), bounded("detection_rate", 0.1, 1.0, kind="factor")],
             ParticleSwarmConfig(max_iterations=300, num_particles=25, verbose=False),
         )
 
@@ -76,17 +77,17 @@ class TestScaleFactors:
 
     def test_each_output_has_its_own_scale(self, truth: Model, truth_run) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 10), scale=0.6, scale_id="i_detection_rate"
+            truth_run, "I", range(0, 100, 10), factor=0.6, factor_id="i_detection_rate"
         ) + observed(
-            truth_run, "R", range(0, 100, 10), scale=0.9, scale_id="r_detection_rate"
+            truth_run, "R", range(0, 100, 10), factor=0.9, factor_id="r_detection_rate"
         )
 
         result = _fit(
             truth,
             observations,
             [
-                bounded("i_detection_rate", 0.1, 1.0, kind="scale"),
-                bounded("r_detection_rate", 0.1, 1.0, kind="scale"),
+                bounded("i_detection_rate", 0.1, 1.0, kind="factor"),
+                bounded("r_detection_rate", 0.1, 1.0, kind="factor"),
             ],
             NelderMeadConfig(max_iterations=500, verbose=False),
         )
@@ -113,7 +114,7 @@ class TestStepsBetweenIntegers:
         results = Simulation(truth).run_at(STEPS)
         problem = CalibrationProblem(
             observed_data=[
-                ObservedDataPoint(step=step, compartment="I", value=value)
+                ObservedDataPoint(at=step, output="I", value=value)
                 for step, value in zip(STEPS, results["I"], strict=True)
             ],
             parameters=[
@@ -135,10 +136,10 @@ class TestStepsBetweenIntegers:
         results = Simulation(truth).run_at([0.5, 3.5, 6.5])
         observations = [
             ObservedDataPoint(
-                step=end,
-                compartment="moved",
+                at=end,
+                output="moved",
                 value=results["moved"][i + 1] - results["moved"][i],
-                window_steps=3.0,
+                window=3.0,
             )
             for i, end in enumerate([3.5, 6.5])
         ]
@@ -157,38 +158,41 @@ class TestStepsBetweenIntegers:
         assert fitted["k"] == pytest.approx(0.2, rel=1e-5)
 
 
-class TestStepsAndTypology:
-    def test_a_whole_step_is_stored_as_an_int(self) -> None:
-        point = ObservedDataPoint(
-            step=3.0, compartment="I", value=1.0, window_steps=2.0
-        )
+class TestPositionsAndTypology:
+    def test_one_output_names_its_series(self) -> None:
+        point = ObservedDataPoint(at=3, output="I", value=1.0)
 
-        assert point.step == 3 and isinstance(point.step, int)
-        assert isinstance(point.window_steps, int)
+        assert point.label == "I" and point.observed_outputs == ["I"]
+
+    def test_a_sum_of_outputs_needs_a_label(self) -> None:
+        with pytest.raises(ValidationError, match="label"):
+            ObservedDataPoint(at=3, outputs=["I", "R"], value=1.0)
+
+    def test_output_and_outputs_exclude_each_other(self) -> None:
+        with pytest.raises(ValidationError, match="exactly one"):
+            ObservedDataPoint(at=3, output="I", outputs=["R"], label="x", value=1.0)
 
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=2.5, compartment="A", value=1.0)],
+            observed_data=[ObservedDataPoint(at=2.5, output="A", value=1.0)],
             parameters=[bounded("k")],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=1),
         )
         model = build(a_to_b_builder(parameters={"k": None}))
 
-        with pytest.raises(ValueError, match="Observation 'A' has step=2.5"):
+        with pytest.raises(ValueError, match="Observation 'A': .*2.5 is not one"):
             Calibrator(Simulation(model), problem)
 
     def test_a_difference_model_rejects_a_non_integer_constraint_step(self) -> None:
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=2, compartment="A", value=1.0)],
+            observed_data=[ObservedDataPoint(at=2, output="A", value=1.0)],
             parameters=[bounded("k")],
-            constraints=[
-                CalibrationConstraint(id="cap", expression="1 - A", time_steps=[1.5])
-            ],
+            constraints=[CalibrationConstraint(id="cap", expression="1 - A", at=[1.5])],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=1),
         )
         model = build(a_to_b_builder(parameters={"k": None}))
 
-        with pytest.raises(ValueError, match="Constraint 'cap'.*1.5"):
+        with pytest.raises(ValueError, match="Constraint 'cap': .*1.5 is not one"):
             Calibrator(Simulation(model), problem)

@@ -54,7 +54,7 @@ def basic_model(k1: float | None, k2: float | None):
 # Observations generated from k1 = 0.4, k2 = 0.1
 truth = Simulation(basic_model(0.4, 0.1)).run(num_steps=50)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="B", value=truth["B"][step])
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 51, 5)
 ]
 
@@ -106,20 +106,21 @@ also when it was created while a parameter was `None`. See
 
 | `ObservedDataPoint` field | Type | Default | Meaning |
 |---|---|---|---|
-| `step` | `int` | required | The step of the observation. |
-| `compartment` | `str` | required | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. With `compartments`, a label. |
+| `at` | `float` | required | The position of the observation on the axis. A difference model accepts integer steps only. |
+| `output` | `str \| None` | `None` | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. Give `output` or `outputs`. |
+| `outputs` | `list[str] \| None` | `None` | Outputs to sum before the comparison; needs a `label`. |
+| `label` | `str` | `output` | The name of the observed series in reports, plots and the normalization. |
 | `value` | `float` | required | The observed value. |
 | `weight` | `float` | `1.0` | How much the observation counts in every loss; see [Losses](#losses). |
-| `compartments` | `list[str] \| None` | `None` | Outputs to sum before the comparison. |
-| `scale_id` | `str \| None` | `None` | A `scale` parameter that multiplies the prediction. |
-| `window_steps` | `int \| None` | `None` | Compares with the gain over the last `window_steps` steps instead of the value. |
+| `factor_id` | `str \| None` | `None` | A `factor` parameter that multiplies the prediction. |
+| `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
 
 ### Unknowns
 
 | `CalibrationParameter` field | Type | Default | Meaning |
 |---|---|---|---|
 | `id` | `str` | required | What to calibrate; depends on `parameter_type`. |
-| `parameter_type` | `str` | required | `"parameter"`, `"initial_condition"` or `"scale"`. |
+| `parameter_type` | `str` | required | `"parameter"`, `"initial_condition"` or `"factor"`. |
 | `min_bound`, `max_bound` | `float` | required | The search interval. |
 | `initial_guess` | `float \| None` | `None` | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
@@ -127,7 +128,7 @@ also when it was created while a parameter was `None`. See
 |---|---|---|
 | `"parameter"` | A model parameter, usually declared with `value=None` | The parameter value |
 | `"initial_condition"` | A bin, a category, or an expanded compartment | A fraction of the population; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
-| `"scale"` | Any new id, used by observations through `scale_id` | A factor on the predictions; not part of the model |
+| `"factor"` | Any new id, used by observations through `factor_id` | A factor on the predictions; not part of the model |
 
 ## Losses
 
@@ -146,7 +147,7 @@ also when it was created while a parameter was `None`. See
     and for the ensemble central loss.
 
 With `normalize_observations=True`, each residual is first divided by the RMS
-of the observations of its series (its output, or its aggregate label).
+of the observations of its series (its `label`).
 
 ## Results
 
@@ -182,7 +183,7 @@ value into the model, routed by its `parameter_type`:
 |---|---|
 | `"parameter"` | The model parameter with that id |
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the population the optimizer scored |
-| `"scale"` | Nothing: it describes the observations, not the model |
+| `"factor"` | Nothing: it describes the observations, not the model |
 
 It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then
 applies the ensemble's `point_parameters`) or a plain `{id: value}` mapping. It

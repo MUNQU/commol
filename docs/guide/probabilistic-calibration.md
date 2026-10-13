@@ -49,7 +49,7 @@ def model(k1: float | None, k2: float | None):
 truth = Simulation(model(0.4, 0.1)).run(num_steps=50)
 noise = random.Random(1)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="B", value=truth["B"][step] * (1 + noise.gauss(0, 0.05)))
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step] * (1 + noise.gauss(0, 0.05)))
     for step in range(5, 51, 5)
 ]
 
@@ -254,8 +254,9 @@ prefer a small prediction-novel tail (`tail_max_*`) over a larger
 | `point_parameters`, `point_loss` | The lowest-loss member: the only parameter set that describes one calibrated model. |
 | `ensemble_parameters`, `ensemble_size` | Every member. |
 | `parameter_statistics` | Per parameter: `mean`, `median`, `std`, `percentile_lower`, `percentile_upper`, `min`, `max`. |
-| `prediction_median`, `prediction_ci_lower`, `prediction_ci_upper` | Per output, per step. |
-| `windowed_prediction_*` | The same for windowed observations, at the steps in `windowed_prediction_steps`. |
+| `prediction_positions` | The positions of the prediction series: the unit grid up to one past the last observation, and every observation position and window start. |
+| `prediction_median`, `prediction_ci_lower`, `prediction_ci_upper` | Per output, one value per position of `prediction_positions`. |
+| `windowed_prediction_*` | The same for windowed observations, at the positions in `windowed_prediction_positions`. |
 | `coverage_percentage`, `average_ci_width` | Share of observations inside the band, and the band's mean width. |
 | `central_loss` | The loss of the member-wise median prediction. |
 | `observation_diagnostics` | Coverage and width **per observed series**. |

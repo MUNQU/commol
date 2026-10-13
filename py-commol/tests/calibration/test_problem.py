@@ -26,7 +26,7 @@ class TestLosses:
     ) -> None:
         """The problem's normalize_observations must reach the Rust LossConfig."""
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(step=0, compartment="I", value=10.0)],
+            observed_data=[ObservedDataPoint(at=0, output="I", value=10.0)],
             parameters=[bounded("beta")],
             loss_function=loss_function,
             normalize_observations=normalize,
@@ -44,7 +44,7 @@ class TestLosses:
         # Biased targets: no parameter choice drives the residuals to zero,
         # otherwise both losses collapse to 0 and cannot be told apart.
         observations = [
-            ObservedDataPoint(step=i, compartment="I", value=truth_run["I"][i] + 25.0)
+            ObservedDataPoint(at=i, output="I", value=truth_run["I"][i] + 25.0)
             for i in range(100)
         ]
 

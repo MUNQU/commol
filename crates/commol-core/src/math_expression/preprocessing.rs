@@ -7,9 +7,10 @@ use std::collections::HashSet;
 
 /// Total population.
 pub const SPECIAL_VAR_N: &str = "N";
-/// Current step.
+/// The step that holds the current position: `floor(t)`.
 pub const SPECIAL_VAR_STEP: &str = "step";
-/// Alias of `step`.
+/// The current position on the axis. A difference engine reads it at each
+/// step, so there it equals `step`; a differential engine reads it anywhere.
 pub const SPECIAL_VAR_T: &str = "t";
 /// The constant π.
 pub const SPECIAL_VAR_PI: &str = "pi";

@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
 # Separator of a qualified category id, as in ``sex:female``.
 CATEGORY_SEPARATOR = ":"
@@ -22,6 +22,8 @@ class BinFraction(BaseModel):
         The fractional size of this bin. Set to None if this initial condition
         needs to be calibrated.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     bin: str = Field(default=..., description="The bin id.")
     fraction: float | None = Field(
@@ -49,6 +51,8 @@ class StratificationFraction(BaseModel):
         The fractional size of this category.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     category: str = Field(default=..., description="The stratification category name.")
     fraction: float = Field(
         default=..., description="The fractional size of this category."
@@ -66,6 +70,8 @@ class StratificationFractions(BaseModel):
     fractions : list[StratificationFraction]
         List of category fractions for this stratification.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     stratification: str = Field(..., description="The stratification id.")
     fractions: list[StratificationFraction] = Field(
@@ -85,6 +91,8 @@ class CompartmentFraction(BaseModel):
         The fraction of the total population in this compartment,
         between 0.0 and 1.0.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     compartment: str = Field(default=..., description="The expanded compartment name.")
     fraction: float = Field(
@@ -120,6 +128,8 @@ class InitialConditions(BaseModel):
         item contains an expanded compartment name and the fraction of the total
         population it holds.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     population_size: int = Field(..., description="Population size.")
     bin_fractions: list[BinFraction] = Field(

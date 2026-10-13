@@ -1,6 +1,6 @@
 """Conditions on stratification categories."""
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 
 class StratificationCondition(BaseModel):
@@ -22,6 +22,8 @@ class StratificationCondition(BaseModel):
         this category instead of the source compartment's category for this
         stratification.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     stratification: str = Field(default=..., description="ID of the stratification")
     category: str | None = Field(

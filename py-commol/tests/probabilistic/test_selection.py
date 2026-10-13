@@ -25,9 +25,9 @@ from tests.support import bounded
 def _problem() -> CalibrationProblem:
     return CalibrationProblem(
         observed_data=[
-            ObservedDataPoint(step=0, compartment="reported", value=10.5),
-            ObservedDataPoint(step=1, compartment="reported", value=19.5),
-            ObservedDataPoint(step=0, compartment="admissions", value=5.0),
+            ObservedDataPoint(at=0, output="reported", value=10.5),
+            ObservedDataPoint(at=1, output="reported", value=19.5),
+            ObservedDataPoint(at=0, output="admissions", value=5.0),
         ],
         parameters=[bounded("rate")],
         loss_function="sse",
@@ -49,14 +49,14 @@ def _normalized_weight_problem(case_weight: float) -> CalibrationProblem:
     return CalibrationProblem(
         observed_data=[
             ObservedDataPoint(
-                step=0,
-                compartment="reported",
+                at=0,
+                output="reported",
                 value=100.0,
                 weight=case_weight,
             ),
             ObservedDataPoint(
-                step=0,
-                compartment="admissions",
+                at=0,
+                output="admissions",
                 value=10.0,
                 weight=1.0,
             ),
@@ -269,6 +269,7 @@ def test_normalized_central_loss_respects_explicit_relative_series_weights() -> 
 
     calculator = StatisticsCalculator.__new__(StatisticsCalculator)
     calculator.confidence_level = 0.95
+    calculator.positions = [0.0]
 
     calculator.problem = _normalized_weight_problem(1.0)
     equal_weight_loss = calculator.calculate_central_loss(predictions, ensemble)
@@ -311,6 +312,7 @@ def test_observation_diagnostics_reports_each_series() -> None:
     calculator = StatisticsCalculator.__new__(StatisticsCalculator)
     calculator.problem = _problem()
     calculator.confidence_level = 0.95
+    calculator.positions = [0.0, 1.0]
     ensemble = [
         CalibrationEvaluation([1.0], 1.0, ["rate"]),
         CalibrationEvaluation([1.0], 1.1, ["rate"]),

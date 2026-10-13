@@ -3,9 +3,10 @@
 [Back to Home](../index.md)
 
 `Simulation` runs a built `Model` in the Rust engine and returns its outputs:
-one series per compartment and per accumulator. This page covers running a
-model, reading and aggregating its outputs, running it in continuous time as
-differential equations, and plotting them.
+one series per compartment and per accumulator, with the positions on the axis
+they were read at. This page covers running a model, reading and aggregating
+its outputs, running it in continuous time as differential equations, and
+plotting them.
 
 ## Quick path
 
@@ -47,13 +48,13 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Member | Returns | What it does |
 |---|---|---|
 | `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
-| `run(num_steps, output_format="dict_of_lists")` | results | Runs `num_steps` steps from the initial state, with the model as it is now; see below. Raises `ValueError` if a parameter is still `None`. |
-| `run_at(steps, output_format="dict_of_lists")` | results | Runs from the initial state and reports at the given sorted steps only. A `DifferentialEquations` model takes any step, such as `0.5`; a `DifferenceEquations` model only integer steps (`ValueError` otherwise). See [Differential equations](#differential-equations). |
+| `run(num_steps)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`. |
+| `run_at(at)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
 | `simulation_outputs` | `list[str]` | The output names, in engine order: compartments first, then accumulators. |
 | `outputs_for(id)` | `list[str]` | The outputs of one bin or accumulator. |
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
-| `total_series(results, ids)` | `list[float]` | The sum of all outputs of the given ids, at each step. |
-| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]` | What the given accumulators gained in each window. |
+| `total_series(results, ids)` | `list[float]` | The sum of all outputs of the given ids, at each position of the results. |
+| `windowed_totals(results, ids, window, at=None)` | `list[float]` | What the given accumulators gained in each window. |
 | `engine` | engine | The underlying Rust engine, for the model as it is now: `DifferenceEquations` or `DifferentialEquations`, as the typology names. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
 Every `run` starts again from the initial state, so two calls with the same
@@ -82,20 +83,28 @@ print(frozen["A"][10] == frozen["A"][0])  # True: k1 = 0 stops A → B
 model.update_parameters({"k1": 0.3})
 ```
 
-## Output formats
+## Results
 
-| `output_format` | Shape | Use for |
+`run` and `run_at` return `SimulationResults` (`py-commol/commol/api/results.py`):
+a `dict` from output name to one value per position, so `results["A"]`,
+`json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping.
+The positions the values were read at are in `results.positions`.
+
+| Member | Shape | Use for |
 |---|---|---|
-| `"dict_of_lists"` (default) | `{output name: [value at step 0, …, value at step n]}` | Reading one output, plotting |
-| `"list_of_lists"` | `[[every output at step 0], …, [every output at step n]]`, in `simulation_outputs` order | Matrix operations, export |
+| `results[name]` | `[value at positions[0], …]` | Reading one output, plotting |
+| `results.positions` | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at` | Reading a value at a position, windows, reports |
+| `results.rows()` | `[[every output at positions[0]], …]`, in `simulation_outputs` order | Matrix operations, export |
 
-Both contain `num_steps + 1` values per output: step 0 is the initial state.
+`run(num_steps)` holds `num_steps + 1` positions: position 0 is the initial
+state.
 
 ```python
-rows = simulation.run(num_steps=100, output_format="list_of_lists")
+rows = results.rows()
 
-print(len(rows))         # 101
-print(len(rows[0]))      # 4: A, B, C and cum_ab
+print(results.positions[:3])  # [0.0, 1.0, 2.0]
+print(len(rows))              # 101
+print(len(rows[0]))           # 4: A, B, C and cum_ab
 print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 ```
 
@@ -159,7 +168,7 @@ print(stratified_simulation.group_outputs(["A", "cum_ab"])["cum_ab"])
 
 ### Totals by bin
 
-`total_series` sums every output of the ids you give, at each step:
+`total_series` sums every output of the ids you give, at each position:
 
 ```python
 total_b = stratified_simulation.total_series(stratified_results, ["B"])
@@ -196,11 +205,13 @@ print(round(total_g1[-1]))  # 500: g1 started with half of the population
 ## Windowed totals
 
 `windowed_totals` turns a cumulative output into the amount it gained in each
-window of `window_steps` steps. A window covers the steps `(end − window, end]`.
+window of length `window` on the axis. Window `w` covers `(w · window,
+(w + 1) · window]`, and each value is the output at the end of the window minus
+the output at its start. Both must be positions of the results.
 
 ```python
 per_week = stratified_simulation.windowed_totals(
-    stratified_results, ["cum_ab"], window_steps=7
+    stratified_results, ["cum_ab"], window=7
 )
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
@@ -208,17 +219,29 @@ print(len(per_week))  # 7: the complete windows of a 50-step run
 | Argument | Meaning |
 |---|---|
 | `ids` | Accumulator ids; their outputs are summed first. |
-| `window_steps` | The window length, in steps. Must be positive. |
-| `at_steps` | The steps where windows close. By default, every complete window of the run. Pass observation steps to get the values a calibration compares against. |
+| `window` | The window length on the axis. Must be positive. |
+| `at` | The positions where windows close. By default, every complete window of the results (`window_ends`). Pass observation positions to get the values a calibration compares against. |
 
-The same reduction works on any series with the module-level functions:
+The window grid and the same reduction work on any series with the
+module-level functions of `py-commol/commol/api/windows.py`:
+
+| Function | Returns |
+|---|---|
+| `window_start(i, window)`, `window_end(i, window)` | The positions that bound window `i`: `i · window` and `(i + 1) · window` |
+| `window_index(at, window)` | The window that holds a position, `max(ceil(at / window) − 1, 0)`; the inverse of `window_end`. Reports place observations with it. |
+| `window_ends(window, end)` | Every complete window end up to `end` |
+| `windowed_totals(series, positions, window, at=None)` | The gain of a series over each window |
 
 ```python
-from commol import window_end_steps, windowed_totals
+from commol import window_end, window_ends, window_index, windowed_totals
 
-print(window_end_steps(window_steps=7, num_steps=30))        # [7, 14, 21, 28]
-print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], 3))       # [6, 15]
+print(window_ends(window=7, end=30))                       # [7, 14, 21, 28]
+print(window_end(0, 7), window_index(7, 7), window_index(7.5, 7))  # 7 0 1
+print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
 ```
+
+A window need not be a whole number of steps: see
+[Reporting at any position](#reporting-at-any-position).
 
 ## Differential equations
 
@@ -273,13 +296,19 @@ from there (`crates/commol-differential/src/solve.rs`).
 
 ### Time inside a step
 
-On `[n, n + 1)` a rate sees `step = n` and the continuous time `t`. So a rate
-that reads `step`, a time series or a time pattern is constant on its unit
-interval, and the engine restarts the integration at each integer where such a
-rate can jump. A per-capita pulse `p` on step `n` acts as the constant rate
-`p` for one time unit: it moves `1 − e^(−p)` of its source, not `p` as in a
-difference model. To move a fraction at once, use an
-[impulse](transitions.md#impulses).
+On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves
+continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern
+(`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval,
+and the engine restarts the integration at each integer where such a rate can
+jump. A per-capita pulse `p` on step `n` acts as the constant rate `p` for one
+unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To
+move a fraction at once, use an [impulse](transitions.md#impulses).
+
+A `"step_function"` or `"linear"` [series](building-models.md#series-parameters)
+and the patterns `AxisPattern.interval` and `linear_ramp` read `t`, so they
+change at any position, and the engine restarts the integration at their
+points and bounds. In a difference model `t` equals `step`, so they give the
+same results as a rate that reads `step`.
 
 A rate can also jump where `t` reaches a value that it compares `t` with, such
 as `if(t >= t_on, beta, 0)`. The engine restarts the integration there too, so
@@ -293,13 +322,13 @@ probabilities for difference models. A differential model needs the
 continuous rate; see [Steps and physical time](core-concepts.md#steps-and-physical-time).
 
 ```python
-from commol import TimePattern
+from commol import AxisPattern
 
 pulse_model = (
     ModelBuilder(name="Pulse")
     .add_bin(id="A", name="A")
     .add_bin(id="B", name="B")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate=TimePattern.pulse(at=2, amount=0.2))
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, amount=0.2))
     .set_initial_conditions(
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
@@ -309,14 +338,26 @@ ode_pulse = Simulation(pulse_model.build(typology="DifferentialEquations")).run(
 print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^−0.2)
 ```
 
-### Reporting at any step
+### Reporting at any position
 
-`run_at(steps)` reports at sorted positions on the axis, from the dense output
-of the solver. Observations (`ObservedDataPoint.step`), windows
-(`window_steps`) and constraint steps may be non-integer for a differential
+`run_at(at)` reports at sorted positions on the axis, from the dense output of
+the solver. Observations (`ObservedDataPoint.at`), windows
+(`ObservedDataPoint.window`) and constraint positions
+(`CalibrationConstraint.at`) may lie between integers for a differential
 model: the calibration reads the engine at those positions
-([Observations](calibration-observations.md#steps-between-integers)). A
-difference model reports only at integer steps.
+([Observations](calibration-observations.md#positions-between-integers)). A
+difference model reports only at integer steps; the engine rejects any other
+position and names the object that holds it.
+
+Windows, reports and plots read a value at a position of the results, so a
+window of `2.5` works once the results hold its ends:
+
+```python
+ends = window_ends(window=2.5, end=10)    # [2.5, 5.0, 7.5, 10.0]
+ode_windows = ode.run_at([0.0, *ends])
+gained = ode.windowed_totals(ode_windows, ["moved"], window=2.5)
+print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
+```
 
 ## Plotting
 
@@ -336,7 +377,7 @@ plotter.plot_series(
     series=["B", "C"],
     x_label="Week",
     tick_every=10,
-    step_to_label=lambda step: f"w{step // 7}",
+    position_label=lambda at: f"w{int(at) // 7}",
     linewidth=2.5,
     alpha=0.8,
 )
@@ -346,11 +387,11 @@ plotter.plot_series(
 |---|---|---|
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
 | `series` | `None` (every output) | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
-| `observed_data` | `None` | `ObservedDataPoint`s to draw on the matching subplots, at their steps (a differential model may observe between integers). A windowed line needs a whole number of `window_steps`. |
-| `calibration_result` | `None` | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations. |
+| `observed_data` | `None` | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one). |
+| `calibration_result` | `None` | With a probabilistic result, draws the median and the confidence band; factor parameters are applied to the observations. |
 | `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |
 | `show_legend` | `True` | `plot_series` only. |
-| `x_label`, `tick_every`, `step_to_label` | `"Step"`, every step, the step | `plot_series` only. Label the x axis, for example in weeks. |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. |
 | other keyword arguments | — | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`. |
 
 | `PlotConfig` field | Default | Values |
@@ -368,8 +409,8 @@ To compare with observations:
 from commol import ObservedDataPoint
 
 observed = [
-    ObservedDataPoint(step=10, compartment="B", value=45.2),
-    ObservedDataPoint(step=20, compartment="B", value=78.5),
+    ObservedDataPoint(at=10, output="B", value=45.2),
+    ObservedDataPoint(at=20, output="B", value=78.5),
 ]
 plotter.plot_series(output_file="with_data.png", observed_data=observed)
 ```

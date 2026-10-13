@@ -3,7 +3,7 @@
 import math
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
 try:
     from commol.commol_rs import _commol_rs as commol_rs
@@ -25,6 +25,8 @@ class StratifiedRate(BaseModel):
     rate : str
         Rate expression for compartments matching these conditions
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     conditions: list[StratificationCondition] = Field(
         default=..., description="Stratification conditions that must match"
@@ -113,6 +115,8 @@ class Transition(BaseModel):
         all specified stratification conditions.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(default=..., description="Id of the transition.")
     source: list[str] = Field(default=..., description="Origin compartments.")
     target: list[str] = Field(default=..., description="Destination compartments.")
@@ -165,19 +169,6 @@ class Transition(BaseModel):
     def is_impulse(self) -> bool:
         """Whether the transition is an impulse rather than a continuous flow."""
         return self.impulse_at is not None or self.impulse_every is not None
-
-    def impulse_positions(self) -> list[float]:
-        """
-        The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
-
-        These are the values that must be integers in a difference model.
-        """
-        if self.impulse_at is not None:
-            return list(self.impulse_at)
-        if self.impulse_every is not None:
-            period, offset = self.impulse_every
-            return [offset, period]
-        return []
 
     @model_validator(mode="after")
     def validate_impulse(self) -> Self:
@@ -242,6 +233,8 @@ class OdeSolver(BaseModel):
         Absolute tolerance of each state component, in the unit of the bins.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
@@ -264,6 +257,8 @@ class Dynamics(BaseModel):
         defaults of `OdeSolver`. A difference-equations model has none.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     typology: Literal[
         ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
     ]
@@ -275,24 +270,12 @@ class Dynamics(BaseModel):
 
     @model_validator(mode="after")
     def validate_typology_settings(self) -> Self:
-        """
-        A solver needs a differential model; a difference model steps only at
-        integers, so its impulse positions must be integers.
-        """
-        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-            if self.solver is not None:
-                raise ValueError(
-                    "Solver settings apply only to a DifferentialEquations model; "
-                    "a DifferenceEquations model has no solver."
-                )
-            for transition in self.transitions:
-                bad = [p for p in transition.impulse_positions() if p != int(p)]
-                if bad:
-                    raise ValueError(
-                        f"Transition '{transition.id}': impulse position {bad[0]} "
-                        f"is not an integer step; a DifferenceEquations model "
-                        f"steps only at integers."
-                    )
+        """A solver needs a differential model."""
+        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
+            raise ValueError(
+                "Solver settings apply only to a DifferentialEquations model; "
+                "a DifferenceEquations model has no solver."
+            )
         return self
 
     @field_validator("transitions")

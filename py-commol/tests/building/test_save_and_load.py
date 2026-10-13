@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from commol.context.model import Model
-from commol.context.parameter import TimeSeriesValue
+from commol.context.parameter import SeriesValue
 from tests.support import a_to_b_builder, build
 
 
@@ -57,7 +57,7 @@ class TestToJson:
 
     def test_long_numeric_arrays_are_written_on_one_line(self, tmp_path: Path) -> None:
         model = _model()
-        model.parameters[0].value = TimeSeriesValue(
+        model.parameters[0].value = SeriesValue(
             data=[(step, float(step)) for step in range(20)]
         )
         path = tmp_path / "model.json"
