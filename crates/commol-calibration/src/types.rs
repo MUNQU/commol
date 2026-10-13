@@ -209,21 +209,66 @@ impl CalibrationParameter {
     }
 }
 
-/// Configuration for loss function calculation
+/// Configuration for loss function calculation.
+///
+/// Every loss uses the observation weight `w` the same way. With a residual
+/// `r = (observed - predicted) × normalization`:
+///
+/// | Loss | Value |
+/// |---|---|
+/// | `SumSquaredError` | `Σ w·r²` |
+/// | `RootMeanSquaredError` | `√(Σ w·r² / Σ w)` |
+/// | `MeanAbsoluteError` | `Σ w·|r| / Σ w` |
+///
+/// With every weight at 1 they are the usual unweighted losses.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum LossConfig {
-    /// Sum of squared errors: sum(observed - predicted) ** 2
+    /// Weighted sum of squared errors: `Σ w·r²`.
     #[default]
     SumSquaredError,
 
-    /// Root mean squared error: sqrt(sum(observed - predicted) ** 2 / n)
+    /// Weighted root mean squared error: `√(Σ w·r² / Σ w)`.
     RootMeanSquaredError,
 
-    /// Mean absolute error: sum(abs(observed - predicted)) / n
+    /// Weighted mean absolute error: `Σ w·|r| / Σ w`.
     MeanAbsoluteError,
+}
 
-    /// Weighted sum of squared errors (uses observation weights)
-    WeightedSSE,
+impl LossConfig {
+    /// Contribution of one residual with weight `weight` to the running sum.
+    #[inline]
+    pub fn term(self, residual: f64, weight: f64) -> f64 {
+        match self {
+            LossConfig::SumSquaredError | LossConfig::RootMeanSquaredError => {
+                weight * residual * residual
+            }
+            LossConfig::MeanAbsoluteError => weight * residual.abs(),
+        }
+    }
+
+    /// Loss from the running sum of [`Self::term`] and the sum of the weights.
+    ///
+    /// Returns 0 for a mean loss whose weights sum to 0.
+    #[inline]
+    pub fn finish(self, sum: f64, weight_sum: f64) -> f64 {
+        match self {
+            LossConfig::SumSquaredError => sum,
+            LossConfig::RootMeanSquaredError if weight_sum > 0.0 => (sum / weight_sum).sqrt(),
+            LossConfig::MeanAbsoluteError if weight_sum > 0.0 => sum / weight_sum,
+            _ => 0.0,
+        }
+    }
+
+    /// Loss of `(residual, weight)` pairs.
+    pub fn aggregate(self, residuals: impl IntoIterator<Item = (f64, f64)>) -> f64 {
+        let (sum, weight_sum) =
+            residuals
+                .into_iter()
+                .fold((0.0, 0.0), |(sum, weight_sum), (residual, weight)| {
+                    (sum + self.term(residual, weight), weight_sum + weight)
+                });
+        self.finish(sum, weight_sum)
+    }
 }
 
 impl std::fmt::Display for LossConfig {
@@ -232,7 +277,6 @@ impl std::fmt::Display for LossConfig {
             LossConfig::SumSquaredError => write!(f, "Sum Squared Error"),
             LossConfig::RootMeanSquaredError => write!(f, "Root Mean Squared Error"),
             LossConfig::MeanAbsoluteError => write!(f, "Mean Absolute Error"),
-            LossConfig::WeightedSSE => write!(f, "Weighted Sum Squared Error"),
         }
     }
 }
@@ -469,5 +513,50 @@ impl CalibrationResultWithHistory {
             .zip(self.best_parameters.iter())
             .map(|(name, value)| (name.clone(), *value))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod loss_tests {
+    use super::LossConfig;
+
+    // Residuals 3 and -1 with weights 2 and 0.5.
+    const WEIGHTED: [(f64, f64); 2] = [(3.0, 2.0), (-1.0, 0.5)];
+    const UNWEIGHTED: [(f64, f64); 2] = [(3.0, 1.0), (-1.0, 1.0)];
+
+    #[test]
+    fn sse_multiplies_each_squared_residual_by_its_weight() {
+        let loss = LossConfig::SumSquaredError.aggregate(WEIGHTED);
+        assert!((loss - (2.0 * 9.0 + 0.5 * 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rmse_is_the_weighted_root_mean_square() {
+        let loss = LossConfig::RootMeanSquaredError.aggregate(WEIGHTED);
+        assert!((loss - (18.5_f64 / 2.5).sqrt()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn mae_is_the_weighted_mean_absolute_residual() {
+        let loss = LossConfig::MeanAbsoluteError.aggregate(WEIGHTED);
+        assert!((loss - (2.0 * 3.0 + 0.5 * 1.0) / 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unit_weights_give_the_unweighted_losses() {
+        assert!((LossConfig::SumSquaredError.aggregate(UNWEIGHTED) - 10.0).abs() < 1e-12);
+        assert!(
+            (LossConfig::RootMeanSquaredError.aggregate(UNWEIGHTED) - 5.0_f64.sqrt()).abs() < 1e-12
+        );
+        assert!((LossConfig::MeanAbsoluteError.aggregate(UNWEIGHTED) - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn mean_losses_of_zero_total_weight_are_zero() {
+        assert_eq!(
+            LossConfig::RootMeanSquaredError.aggregate([(3.0, 0.0)]),
+            0.0
+        );
+        assert_eq!(LossConfig::MeanAbsoluteError.aggregate([]), 0.0);
     }
 }

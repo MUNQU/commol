@@ -232,7 +232,7 @@ def _single_parameter_problem(loss_function: str) -> CalibrationProblem:
 
 def test_probabilistic_config_accepts_any_loss_family() -> None:
     """Every loss is allowed; the central-fit gate adapts to the chosen loss."""
-    for loss in ("sse", "weighted_sse", "rmse", "mae"):
+    for loss in ("sse", "rmse", "mae"):
         problem = _single_parameter_problem(loss)
         problem.probabilistic_config = ProbabilisticCalibrationConfig()
         assert problem.probabilistic_config is not None
@@ -293,12 +293,10 @@ def test_greedy_automatic_size_mode_pipeline(model) -> None:
     assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
 
 
-def test_weighted_sse_loss_pipeline(model) -> None:
-    """A weighted-SSE loss is an accepted SSE-family loss for the pipeline."""
-    problem = _problem(model, loss_function="weighted_sse")
-    result = Calibrator(Simulation(model), problem).run_probabilistic()
-
-    assert result.selected_ensemble.ensemble_size >= 4
+def test_weighted_sse_is_not_a_loss(model) -> None:
+    """Every loss uses weights, so there is no separate weighted SSE."""
+    with pytest.raises(ValueError, match="weighted_sse"):
+        _problem(model, loss_function="weighted_sse")
 
 
 def _windowed_problem(model, steps: list[int], window: int) -> CalibrationProblem:

@@ -291,8 +291,6 @@ class Calibrator:
             loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = rust_calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 

@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `bins`. An entry is an output name or a bin or accumulator id; an id plots
   the sum of its outputs, so a bin of a stratified model can be plotted. There
   is no `bins` alias: rename the argument.
+- Every loss uses the observation weights the same way: `"sse"` is
+  `Σ w·r²`, `"rmse"` is `√(Σ w·r² / Σ w)` and `"mae"` is `Σ w·|r| / Σ w`.
+  Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With
+  every weight at 1 nothing changes. The ensemble central loss follows the same
+  rule.
+
+### Removed
+
+- The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`,
+  which uses the weights.
 
 ### Fixed
 

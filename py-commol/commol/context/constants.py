@@ -36,14 +36,11 @@ class LossFunction(StrEnum):
         Root Mean Squared Error
     MAE
         Mean Absolute Error
-    WEIGHTED_SSE
-        Weighted Sum of Squared Errors
     """
 
     SSE = "sse"
     RMSE = "rmse"
     MAE = "mae"
-    WEIGHTED_SSE = "weighted_sse"
 
 
 @unique

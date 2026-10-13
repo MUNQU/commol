@@ -188,8 +188,6 @@ class CalibrationRunner:
             loss_config = commol_rs.calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = commol_rs.calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = commol_rs.calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}")
 

@@ -256,11 +256,23 @@ def test_central_fit_loss_matches_configured_metric() -> None:
     normalization = [1.0, 1.0]
 
     assert np.isclose(central_fit_loss(residuals, weights, normalization, "sse"), 18.0)
-    assert np.isclose(
-        central_fit_loss(residuals, weights, normalization, "weighted_sse"), 18.0
-    )
     assert np.isclose(central_fit_loss(residuals, weights, normalization, "rmse"), 3.0)
     assert np.isclose(central_fit_loss(residuals, weights, normalization, "mae"), 3.0)
+
+
+def test_central_fit_loss_uses_weights_in_every_metric() -> None:
+    """Residuals 3 and 1 with weights 2 and 0.5."""
+    residuals = [3.0, 1.0]
+    weights = [2.0, 0.5]
+    normalization = [1.0, 1.0]
+
+    assert np.isclose(central_fit_loss(residuals, weights, normalization, "sse"), 18.5)
+    assert np.isclose(
+        central_fit_loss(residuals, weights, normalization, "rmse"), (18.5 / 2.5) ** 0.5
+    )
+    assert np.isclose(
+        central_fit_loss(residuals, weights, normalization, "mae"), 6.5 / 2.5
+    )
 
 
 def test_normalized_central_loss_respects_explicit_relative_series_weights() -> None:
@@ -277,8 +289,9 @@ def test_normalized_central_loss_respects_explicit_relative_series_weights() -> 
     calculator.problem = _normalized_weight_problem(0.1)
     low_case_weight_loss = calculator.calculate_central_loss(predictions, ensemble)
 
+    # Each normalized residual is 0.1, so r² = 0.01 per series: Σ w·r².
     assert np.isclose(equal_weight_loss, 0.02)
-    assert np.isclose(low_case_weight_loss, 0.0101)
+    assert np.isclose(low_case_weight_loss, 0.1 * 0.01 + 0.01)
 
 
 def test_ensemble_selection_configs_expose_both_algorithms() -> None:

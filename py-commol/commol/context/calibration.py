@@ -41,7 +41,10 @@ class ObservedDataPoint(BaseModel):
     value : float
         Observed value
     weight : float
-        Weight for this observation in the loss function (default: 1.0)
+        How much this observation counts in the loss (default: 1.0). Every
+        loss multiplies the squared or absolute residual by it: ``sse`` is
+        ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
+        ``Σ w·|r| / Σ w``.
     scale_id : str | None
         Optional scale parameter ID to apply to model output before comparison
     """
@@ -918,7 +921,8 @@ class CalibrationProblem(BaseModel):
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
-        Loss function to use for measuring fit quality (default: "sse")
+        Loss function to use for measuring fit quality: "sse" (default),
+        "rmse" or "mae". Every loss uses the observation weights.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False).

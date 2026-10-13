@@ -111,7 +111,7 @@ calibrated = Simulation(model).run(num_steps=100)
 | `step` | `int` | required | The step of the observation. |
 | `compartment` | `str` | required | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. With `compartments`, a label. |
 | `value` | `float` | required | The observed value. |
-| `weight` | `float` | `1.0` | Multiplies its residual in `"sse"` and `"weighted_sse"`; see [Losses](#losses). |
+| `weight` | `float` | `1.0` | How much the observation counts in every loss; see [Losses](#losses). |
 | `compartments` | `list[str] \| None` | `None` | Outputs to sum before the comparison. |
 | `scale_id` | `str \| None` | `None` | A `scale` parameter that multiplies the prediction. |
 | `window_steps` | `int \| None` | `None` | Compares with the gain over the last `window_steps` steps instead of the value. |
@@ -133,18 +133,19 @@ calibrated = Simulation(model).run(num_steps=100)
 
 ## Losses
 
-| `loss_function` | Formula (residual `r = observed − predicted`) | Use when |
+| `loss_function` | Formula (residual `r = observed − predicted`, weight `w`) | Use when |
 |---|---|---|
-| `"sse"` (default) | `Σ (weight × r)²` | The usual choice |
-| `"weighted_sse"` | `Σ (weight × r)²`, the same as `"sse"` | Kept as an explicit name when you set weights |
-| `"rmse"` | `√(Σ r² / n)` | You want the error in the data's unit; weights are ignored |
-| `"mae"` | `Σ |r| / n` | The data has outliers; weights are ignored |
+| `"sse"` (default) | `Σ w·r²` | The usual choice |
+| `"rmse"` | `√(Σ w·r² / Σ w)` | You want the error in the data's unit |
+| `"mae"` | `Σ w·|r| / Σ w` | The data has outliers |
 
 !!! note "How weights count"
-    A weight multiplies the residual **before** it is squared, so
-    `weight=2.0` makes an observation count four times as much. With every
-    weight at its default of 1.0, `"sse"` is the plain sum of squared
-    residuals.
+    Every loss uses a weight the same way: `weight=2.0` makes an observation
+    count twice as much as one with weight 1.0. With every weight at its
+    default of 1.0, the losses are the plain sum of squares, root mean square
+    and mean absolute error. `LossConfig` in
+    `crates/commol-calibration/src/types.rs` computes them, for the optimizer
+    and for the ensemble central loss.
 
 With `normalize_observations=True`, each residual is first divided by the RMS
 of the observations of its series (its output, or its aggregate label).

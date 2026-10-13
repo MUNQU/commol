@@ -214,7 +214,7 @@ class TestCalibrator:
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
 
-    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae", "weighted_sse"])
+    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae"])
     @pytest.mark.parametrize("normalize", [False, True])
     def test_loss_config_carries_normalization_flag(
         self, model: Model, loss_function: str, normalize: bool

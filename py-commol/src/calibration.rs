@@ -236,15 +236,6 @@ impl PyLossConfig {
         }
     }
 
-    /// Weighted sum of squared errors
-    #[staticmethod]
-    fn weighted_sse() -> Self {
-        Self {
-            inner: commol_calibration::LossConfig::WeightedSSE,
-            normalize_observations: false,
-        }
-    }
-
     /// Return a copy with per-series observation normalization enabled or disabled.
     ///
     /// Normalization is orthogonal to the metric: each residual is divided by the
@@ -262,6 +253,24 @@ impl PyLossConfig {
     #[getter]
     fn normalize_observations(&self) -> bool {
         self.normalize_observations
+    }
+
+    /// Loss of residuals with their observation weights
+    ///
+    /// The residuals are used as given: scale them by their normalization
+    /// factor first when normalization applies.
+    ///
+    /// Raises:
+    ///     ValueError: If `residuals` and `weights` differ in length
+    fn aggregate(&self, residuals: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
+        if residuals.len() != weights.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "{} residuals but {} weights",
+                residuals.len(),
+                weights.len()
+            )));
+        }
+        Ok(self.inner.aggregate(residuals.into_iter().zip(weights)))
     }
 }
 
@@ -1513,7 +1522,7 @@ fn generate_calibrated_predictions_at_points_parallel(
 
 /// Select an ensemble from compact observation-space predictions.
 #[pyfunction]
-#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="weighted_sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
+#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
 #[allow(clippy::too_many_arguments)]
 fn select_compact_ensemble(
     candidates: Vec<PyCalibrationEvaluation>,
@@ -1552,13 +1561,12 @@ fn select_compact_ensemble(
     // Keep the gate's central loss coherent with the optimizer's member loss:
     // the same loss family is used on both sides of the fit gate.
     let central_loss_metric = match central_loss_metric {
-        "sse" | "weighted_sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
+        "sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
         "rmse" => commol_calibration::CentralLossMetric::RootMeanSquared,
         "mae" => commol_calibration::CentralLossMetric::MeanAbsolute,
         _ => {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid central_loss_metric: '{}'. Must be 'sse', 'weighted_sse', \
-                 'rmse', or 'mae'",
+                "Invalid central_loss_metric: '{}'. Must be 'sse', 'rmse', or 'mae'",
                 central_loss_metric
             )));
         }

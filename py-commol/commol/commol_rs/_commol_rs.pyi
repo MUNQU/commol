@@ -178,9 +178,8 @@ class LossConfigProtocol(Protocol):
     def rmse() -> LossConfigProtocol: ...
     @staticmethod
     def mae() -> LossConfigProtocol: ...
-    @staticmethod
-    def weighted_sse() -> LossConfigProtocol: ...
     def normalized(self, enabled: bool = True) -> LossConfigProtocol: ...
+    def aggregate(self, residuals: list[float], weights: list[float]) -> float: ...
     @property
     def normalize_observations(self) -> bool: ...
 
@@ -476,7 +475,7 @@ class CalibrationModule(Protocol):
         series_ids: list[str],
         confidence_level: float,
         seed: int,
-        central_loss_metric: str = "weighted_sse",
+        central_loss_metric: str = "sse",
         ensemble_algorithm: str = "nsga2",
         ensemble_size_mode: str = "automatic",
         ensemble_size: int | None = None,
