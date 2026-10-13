@@ -60,7 +60,7 @@ ruff check . && ruff format --check . && ty check commol && pytest
 # Rust, from the repository root
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-difference -p commol-calibration
+cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration
 ```
 
 The pre-commit hooks run most of them on every commit; see

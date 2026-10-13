@@ -251,6 +251,15 @@ routed = Simulation(routing).run(num_steps=2)
 print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
 ```
 
+## Patterns in a differential model
+
+A pattern reads `step`. In a `DifferentialEquations` model, `step` is constant
+on each unit interval `[n, n + 1)`, so a pattern is a rate that holds for one
+time unit. A per-capita `pulse` of `amount` moves `1 − e^(−amount)` of its
+source there, and `amount` in a difference model. To move a fraction at once in
+both engines, use an [impulse](transitions.md#impulses). See
+[Time inside a step](simulations.md#time-inside-a-step).
+
 ## How patterns are stored
 
 Numeric `pulse` and `pulses` patterns become

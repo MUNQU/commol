@@ -3,8 +3,9 @@
 [Back to Codebase Guide](index.md)
 
 Commol builds compartment models from a declarative definition and runs them
-as difference equations. Python owns the user-facing API and validation; Rust
-owns every rule about how a model becomes numbers.
+as difference equations or as ordinary differential equations. Python owns the
+user-facing API and validation; Rust owns every rule about how a model becomes
+numbers.
 
 ## What Commol is
 
@@ -12,7 +13,9 @@ owns every rule about how a model becomes numbers.
 |---|---|
 | A Python library with a fluent builder | `py-commol/commol/api/model_builder.py` |
 | A validated, serializable model definition | `py-commol/commol/context/` (Pydantic) |
+| One model compiler for both engines: expansion, flows, rates, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
+| A Rust ODE engine on `diffsol` | `crates/commol-differential/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
 | A calibration toolkit: optimizers, constraints, ensembles | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py`, `probabilistic_calibrator.py` |
 
@@ -21,28 +24,33 @@ owns every rule about how a model becomes numbers.
 | It is not | Boundary |
 |---|---|
 | A domain library | It knows bins, categories and rates, not diseases or drugs. Domain vocabulary belongs in user scripts. |
-| An ODE solver | `ModelTypes::DifferentialEquations` exists so any model can be expanded, but no engine runs it: the difference engine rejects that typology. |
-| A clock | A model has no physical time: rates are per step and periods are step counts. `TimeScale` converts at the edges (see [Design decisions](design-decisions.md#physical-time-is-not-in-the-model)). |
+| A numerical-methods library | The differential engine delegates the integration to `diffsol`; Commol keeps no ODE method of its own (see [Design decisions](design-decisions.md#the-solver-is-diffsol)). |
+| A clock | A model has no physical time: rates are per step and periods are step counts, and the axis is the independent variable of the model, whatever quantity it is. `TimeScale` converts at the edges (see [Design decisions](design-decisions.md#physical-time-is-not-in-the-model)). |
 | A rule engine for transitions | A transition has no condition. A rate expresses a gate, such as `if(A > 0, k, 0)` (see [Mathematical expressions](../guide/mathematical-expressions.md)), and [stratified rates](../guide/transitions.md#stratified-rates) set a rate per category. |
 
 ## How a model flows through the layers
 
 ```text
 ModelBuilder ... .build()          -> commol.context.Model (Pydantic validation)
-Simulation(model)                  -> Model.model_dump_json()
+Simulation(model)                  -> engine_state.build_engine(model JSON)
                                    -> commol_rs.core.Model.from_json(...)
-                                   -> commol_rs.difference.DifferenceEquations(...)
+                                   -> by typology:
+                                        commol_rs.difference.DifferenceEquations(...)
+                                        commol_rs.differential.DifferentialEquations(...)
+                                   both compile it with commol-model (CompiledModel):
                                         expand bins and stratifications into compartments
                                         build the initial state
-                                        plan the transition flows
-Simulation.run(n)                  -> DifferenceEquations.run(n) -> rows of outputs
+                                        plan the transition flows and compile the rates
+                                        derivatives(step, t, X) = Σ flows
+Simulation.run(n) / run_at(steps)  -> difference: X += derivatives, once per step
+                                      differential: diffsol integrates derivatives
 Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...)
 ```
 
-The same engine functions also answer questions without a simulation:
+The same model functions also answer questions without a simulation:
 `Model.initial_state()`, `print_equations` and the unit checker call
-`initial_state`, `transition_flows` and `expanded_outputs` through
-`py-commol/commol/context/_model/engine_state.py`.
+`initial_state`, `transition_flows` and `expanded_outputs` of `commol_rs.model`
+through `py-commol/commol/context/_model/engine_state.py`.
 
 ## Invariants
 

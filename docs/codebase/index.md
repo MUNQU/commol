@@ -40,7 +40,9 @@ py-commol/src/               PyO3 bindings (module commol.commol_rs._commol_rs)
   |
   v
 crates/commol-core/          model types, expressions (Cranelift JIT), SimulationEngine trait
-crates/commol-difference/    expansion, initial state, flow planning, simulation
+crates/commol-model/         expansion, initial state, flow planning, rates, derivatives
+crates/commol-difference/    the discrete step: X += derivatives
+crates/commol-differential/  the ODE engine: diffsol integrates derivatives
 crates/commol-calibration/   loss, optimizers (argmin fork), ensembles
 ```
 

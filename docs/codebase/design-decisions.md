@@ -11,7 +11,8 @@ test that guards it. Read the ones of your area before you change it.
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Dynamics | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup head counts](#subgroup-head-counts-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
-| Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [windowed observations](#windowed-observations) |
+| Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
+| Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
@@ -24,7 +25,7 @@ A compartment is a bin plus one category for each stratification that applies
 to it, in declaration order. Its name, `{bin}_{category}_{category}…`, is for
 display only. Its identity is its label: `OutputLabels` in
 `crates/commol-core/src/simulation_engine.rs` and `CompartmentLayout` in
-`crates/commol-difference/src/layout.rs`.
+`crates/commol-model/src/layout.rs`.
 
 **Rule:** never parse a compartment name or match it by prefix. Bin `A` and bin
 `A_x` both produce names that start with `A_`, and a conditional
@@ -34,7 +35,7 @@ queries return in Python.
 
 ### Stratification order is part of the model
 
-`expand` in `crates/commol-difference/src/builder.rs` applies the
+`expand` in `crates/commol-model/src/builder.rs` applies the
 stratifications in declaration order. A stratification with `conditions` only
 expands the compartments whose earlier categories satisfy all of them, so the
 result can be a non-uniform product. A condition may only reference a
@@ -59,7 +60,7 @@ a prefix).
 
 The engine sets one variable per expanded compartment and per subpopulation
 total (`N_<categories>`, bin totals and partial bin totals).
-`check_names` in `crates/commol-difference/src/builder.rs` rejects a parameter
+`check_names` in `crates/commol-model/src/builder.rs` rejects a parameter
 id that is one of those names, and an `N_…` variable in a rate or a formula
 parameter that names no subpopulation. `Model.validate_names_with_engine`
 calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
@@ -76,7 +77,7 @@ calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
 ### Absolute and per-capita rates
 
 The flow planner (`plan_transition_flows` in
-`crates/commol-difference/src/flows.rs`) decides for each flow whether the rate
+`crates/commol-model/src/flows.rs`) decides for each flow whether the rate
 is absolute or per-capita:
 
 | Case | Rate is | Flow per step |
@@ -148,37 +149,112 @@ See also [Per-compartment initial conditions](../development/design-per-compartm
 ### Physical time is not in the model
 
 A `Model` records no step length: rates are per step and periods are step
-counts. `TimeScale` (`api/time_scale.py`) holds the step length and converts
-durations, probabilities and window grids. Conversions **raise** when a period
-is not a whole number of steps, instead of rounding. Months and years are absent
-on purpose, because they have no fixed length in steps.
+counts. The axis of a model is its independent variable, whatever quantity it
+is (time is one case), so the engines never ask which dimension it has. `Model.step_unit` is optional and only the unit check
+reads it. `TimeScale` (`api/time_scale.py`) holds the length of a step of time
+and converts durations, probabilities and window grids. Conversions **raise**
+when a period is not a whole number of steps, instead of rounding. Months and
+years are absent on purpose, because they have no fixed length in steps.
+`TimeScale` applies only when that variable is time:
+`TimeScale.from_step_unit` raises for a step unit that is not time.
 
-**Guard:** `tests/simulation/test_time_scale.py::TestWindowGrid`.
+**Guards:** `tests/simulation/test_time_scale.py::TestWindowGrid`,
+`tests/simulation/test_time_scale.py::TestFromStepUnit`.
 
 ### One step unit in the unit check
 
 The engine applies every flow once per step and converts no value between
-units. So `UnitChecker._step_unit` (`context/_model/units.py`) takes the one
-unit of time that the parameter units use (`step` when there is none), and
-`check_equation_units` requires every flow to be **equal** to
-`<bin unit>/<step unit>`, not only convertible to it (`utils/equations.py`,
-`same_unit`).
+units. So `UnitChecker._step_unit` (`context/_model/units.py`) uses one step
+unit: the declared `Model.step_unit`, of any single dimension
+(`check_step_unit`), or else the one unit of time that the parameter units use
+(`step` when there is none). `check_equation_units` requires every flow to be
+**equal** to `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not
+only convertible to it (`utils/equations.py`, `same_unit`). Inference never
+takes a unit that is not time: a parameter in `1/(item·meter)` may be a
+density, not a rate along the axis, so the check does not guess.
 
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
 model would apply a weekly rate every day.
 
-**Guard:** `tests/units/test_model_units.py::TestStepUnit`.
+**Guards:** `tests/units/test_model_units.py::TestStepUnit`,
+`tests/units/test_model_units.py::TestAxisUnit`.
+
+### Time inside a step
+
+A differential model integrates in continuous time, but on `[n, n + 1)` its
+rates see `step = n`: `t` is continuous, `step` is the floor of `t`. A rate that
+reads `step`, a time series or a time pattern is therefore constant on its unit
+interval. When the right-hand side reads one of them
+(`CompiledModel::depends_on_step`), the engine ends a piece of integration at
+every integer, so each jump of the rate is the start of a piece
+(`breakpoints` in `crates/commol-differential/src/solve.rs`).
+
+**Consequence:** a per-capita pulse `p` moves `p` of its source in a difference
+model and `1 − e^(−p)` in a differential model. An impulse moves `p` in both.
+The alternative, `step = t`, makes a pulse `step == n` true on a set of zero
+length, so it would never act.
+
+**Guards:** `tests/simulation/test_differential.py::TestTimeInsideAStep`,
+`crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`.
+
+### Impulses come before the flows of their step
+
+At step `n` the state jumps first, then the flows of the step run from the new
+state, in both engines (`CompiledModel::apply_impulses`). Every jump of one
+step is computed from the state before any of them. The output at `n` shows the
+state after the jump. With the other order, the differential output at `n`
+would show the state before the jump and the difference output the state after
+it, so the two engines would disagree at the output steps. A difference model
+needs integer impulse steps; a differential model stops its integration at each
+impulse step and restarts from the new state, so `diffsol` needs no event.
+
+**Guards:** `tests/transitions/test_impulses.py::TestJump`,
+`crates/commol-differential/src/tests.rs::an_impulse_moves_its_fraction_at_once_in_both_engines`.
 
 ### Windowed observations
 
 An observation with `window_steps = W` is compared with
 `series[step] - series[step - W]`, anchored at its own step. The Rust loss and
-`windowed_totals` (`api/windows.py`) must give the same number; the ensemble
-statistics also use `windowed_totals`.
+`windowed_totals` (`api/windows.py`) must give the same number, and so must the
+ensemble statistics (`StatisticsCalculator._member_window_value`). A
+differential model may observe at non-integer steps: the statistics then read
+the engine at those positions (`StatisticsCalculator._point_values`), never an
+interpolation of the integer trajectory.
 
 **Guards:** `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` (the loss at
 the generating parameters is zero) and
 `tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps`.
+
+## Engines
+
+### One right-hand side, two engines
+
+`CompiledModel::derivatives` (`crates/commol-model/src/system.rs`) computes
+every flow from one snapshot of the state: it is the right-hand side
+`dX/dt = Σ flows`. The difference engine adds it once per step
+(`X(n + 1) = X(n) + derivatives(n, X(n))`); the differential engine integrates
+it. Neither engine has flow logic of its own, so both run the same model.
+Accumulators are state components: a difference step adds the counted flows, a
+differential engine integrates them.
+
+**Guard:**
+`crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`.
+
+### The solver is `diffsol`
+
+The differential engine keeps no numerical method of its own: `diffsol`
+(pinned to a minor version, `~0.17.1`) solves the system with `tsit45` or
+`bdf`. `bdf` takes the Jacobian-vector product by finite differences
+(`RightHandSide::jac_mul`), one extra right-hand-side evaluation, because a
+symbolic derivative of every rate would be new numerical code. The matrix is
+dense (`nalgebra`) below `SPARSE_THRESHOLD` state components and sparse
+(`faer`) from there; `diffsol` finds the sparse pattern by passing NaN through
+`J·v`. Solver settings live in the model (`Dynamics.solver`), so a saved model
+reproduces a run.
+
+**Guards:** `crates/commol-differential/src/tests.rs`
+(`bdf_solves_a_stiff_model_within_the_tolerance`,
+`a_large_stiff_model_uses_the_sparse_path`).
 
 ## Calibration
 
