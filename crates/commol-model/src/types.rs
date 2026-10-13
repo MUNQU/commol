@@ -1,6 +1,6 @@
 //! Data types of a compiled model.
 
-use commol_core::{MathExpressionContext, RateMathExpression, SeriesMode};
+use commol_core::{MathExpression, MathExpressionContext, RateMathExpression, SeriesMode};
 
 /// Pre-resolved storage location for a JIT-compiled rate's input variable.
 ///
@@ -279,6 +279,9 @@ pub struct CompiledModel {
     /// Whether a rate or a formula parameter reads `step` or a time series,
     /// so the right-hand side jumps at integer positions.
     pub(crate) depends_on_step: bool,
+    /// Values that a rate or a formula parameter compares `t` with, such as
+    /// `t_on` in `t >= t_on`: the right-hand side jumps where `t` reaches them.
+    pub(crate) time_thresholds: Vec<MathExpression>,
     /// Pre-computed subpopulation mappings for stratifications
     pub(crate) subpopulation_mappings: Vec<SubpopulationMapping>,
     /// Parameters defined as formulas that need to be evaluated each step

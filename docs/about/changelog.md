@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`commol_rs.differential.DifferentialEquations`). It has the same flows,
   outputs, accumulators, calibration, ensembles, reports and plots as a
   difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous
-  `t`.
+  `t`. The engine restarts its integration at each integer when a rate reads
+  `step`, and where `t` reaches a value a rate compares it with
+  (`t >= t_on`), so the solver cannot step over a jump.
 - `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the
   model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
 - `Simulation.run_at(steps)`: the outputs at the given sorted steps. A

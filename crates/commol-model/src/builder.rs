@@ -10,8 +10,10 @@ use crate::types::{
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
-use commol_core::math_expression::preprocessing::{SPECIAL_VAR_E, SPECIAL_VAR_PI};
-use commol_core::{MathExpressionContext, Model, OutputLabels, RateMathExpression};
+use commol_core::math_expression::preprocessing::{
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
+};
+use commol_core::{MathExpression, MathExpressionContext, Model, OutputLabels, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
 /// Time-series parameter payload collected before parameter slots are
@@ -93,6 +95,9 @@ impl CompiledModel {
         // Store constant parameters for quick lookup
         // Formula parameters will be evaluated on each step
         let mut constant_parameters: HashMap<String, f64> = HashMap::new();
+        // Constant parameters and parameters that calibration sets: their
+        // values do not change during a run.
+        let mut fixed_parameters: HashSet<String> = HashSet::new();
         let mut formula_parameters: Vec<(String, RateMathExpression)> = Vec::new();
         // Collect time-series payloads first; final struct construction happens
         // after parameter slots are reserved so indices can be filled in once,
@@ -103,6 +108,7 @@ impl CompiledModel {
             match &p.value {
                 Some(commol_core::ParameterValue::Constant(val)) => {
                     constant_parameters.insert(p.id.clone(), *val);
+                    fixed_parameters.insert(p.id.clone());
                 }
                 Some(commol_core::ParameterValue::Formula(formula)) => {
                     let rate_expr = RateMathExpression::from_string(formula.clone());
@@ -118,6 +124,7 @@ impl CompiledModel {
                 None => {
                     // Parameter needs calibration - skip it for now
                     // During calibration, set_parameter() will provide the value
+                    fixed_parameters.insert(p.id.clone());
                 }
             }
         }
@@ -221,8 +228,20 @@ impl CompiledModel {
                 .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
             &formula_parameters,
         );
-        let depends_on_step =
-            !series_parameters.is_empty() || used_context_variables.contains("step");
+        let depends_on_step = !series_parameters.is_empty()
+            || reads_step(
+                transition_flows
+                    .iter()
+                    .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
+                &formula_parameters,
+            );
+        let time_thresholds = time_thresholds(
+            transition_flows
+                .iter()
+                .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
+            &formula_parameters,
+            &fixed_parameters,
+        );
         subpopulation_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
@@ -255,6 +274,7 @@ impl CompiledModel {
             transition_flows,
             impulse_flows,
             depends_on_step,
+            time_thresholds,
             subpopulation_mappings,
             formula_parameters,
             series_parameters,
@@ -803,6 +823,110 @@ pub fn check_names(model: &Model) -> Result<(), String> {
     ))
 }
 
+/// Whether a rate or a formula parameter reads `step`.
+fn reads_step<'a>(
+    transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
+    formula_parameters: &[(String, RateMathExpression)],
+) -> bool {
+    transition_flows
+        .into_iter()
+        .map(|flow| &flow.rate_expression)
+        .chain(formula_parameters.iter().map(|(_, expression)| expression))
+        .any(|expression| expression.reads_variable(SPECIAL_VAR_STEP))
+}
+
+/// The values that a rate or a formula parameter compares `t` with (`t < c`,
+/// `c <= t`, ...), when `c` reads only numbers and `fixed_parameters`.
+///
+/// A rate that reads `t` can jump where `t` reaches such a value; a
+/// differential engine restarts its integration there, so it cannot step over
+/// a short window. A comparison of `t` with the state is not a fixed position
+/// and is not collected.
+fn time_thresholds<'a>(
+    transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
+    formula_parameters: &[(String, RateMathExpression)],
+    fixed_parameters: &HashSet<String>,
+) -> Vec<MathExpression> {
+    let mut thresholds = Vec::new();
+    let expressions = transition_flows
+        .into_iter()
+        .map(|flow| &flow.rate_expression)
+        .chain(formula_parameters.iter().map(|(_, expression)| expression));
+    for expression in expressions {
+        if let RateMathExpression::Formula(formula) = expression
+            && let Ok(ast) = parse_expression(formula.preprocessed())
+        {
+            collect_time_thresholds(&ast, fixed_parameters, &mut thresholds);
+        }
+    }
+    let mut seen = HashSet::new();
+    thresholds
+        .into_iter()
+        .map(|threshold| threshold.to_string())
+        .filter(|threshold| seen.insert(threshold.clone()))
+        .map(MathExpression::new)
+        .collect()
+}
+
+fn collect_time_thresholds(expr: &Expr, fixed_parameters: &HashSet<String>, out: &mut Vec<Expr>) {
+    match expr {
+        Expr::Constant(_) | Expr::Variable(_) => {}
+        Expr::BinaryOp { op, left, right } => {
+            if matches!(
+                op,
+                BinaryOperator::Lt | BinaryOperator::Gt | BinaryOperator::Le | BinaryOperator::Ge
+            ) {
+                let is_t =
+                    |side: &Expr| matches!(side, Expr::Variable(name) if name == SPECIAL_VAR_T);
+                if is_t(left) && is_fixed(right, fixed_parameters) {
+                    out.push((**right).clone());
+                } else if is_t(right) && is_fixed(left, fixed_parameters) {
+                    out.push((**left).clone());
+                }
+            }
+            collect_time_thresholds(left, fixed_parameters, out);
+            collect_time_thresholds(right, fixed_parameters, out);
+        }
+        Expr::UnaryOp { operand, .. } => collect_time_thresholds(operand, fixed_parameters, out),
+        Expr::FunctionCall { args, .. } => {
+            for arg in args {
+                collect_time_thresholds(arg, fixed_parameters, out);
+            }
+        }
+        Expr::Conditional {
+            condition,
+            true_expr,
+            false_expr,
+        } => {
+            for part in [condition, true_expr, false_expr] {
+                collect_time_thresholds(part, fixed_parameters, out);
+            }
+        }
+    }
+}
+
+/// Whether an expression reads only numbers, `pi`, `e` and `fixed_parameters`.
+fn is_fixed(expr: &Expr, fixed_parameters: &HashSet<String>) -> bool {
+    match expr {
+        Expr::Constant(_) => true,
+        Expr::Variable(name) => {
+            name == SPECIAL_VAR_PI || name == SPECIAL_VAR_E || fixed_parameters.contains(name)
+        }
+        Expr::BinaryOp { left, right, .. } => {
+            is_fixed(left, fixed_parameters) && is_fixed(right, fixed_parameters)
+        }
+        Expr::UnaryOp { operand, .. } => is_fixed(operand, fixed_parameters),
+        Expr::FunctionCall { args, .. } => args.iter().all(|arg| is_fixed(arg, fixed_parameters)),
+        Expr::Conditional {
+            condition,
+            true_expr,
+            false_expr,
+        } => [condition, true_expr, false_expr]
+            .into_iter()
+            .all(|part| is_fixed(part, fixed_parameters)),
+    }
+}
+
 fn collect_used_context_variables<'a>(
     transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
     formula_parameters: &[(String, RateMathExpression)],
@@ -1281,6 +1405,34 @@ mod tests {
                 solver: None,
             },
         }
+    }
+
+    /// The thresholds `collect_time_thresholds` finds in `formula`, as text.
+    fn thresholds_of(formula: &str) -> Vec<String> {
+        let fixed: HashSet<String> = ["t_on", "k"].map(String::from).into();
+        let expression = MathExpression::new(formula.to_string());
+        let ast = parse_expression(expression.preprocessed()).unwrap();
+        let mut thresholds = Vec::new();
+        collect_time_thresholds(&ast, &fixed, &mut thresholds);
+        thresholds.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn a_comparison_of_t_with_a_fixed_value_is_a_threshold() {
+        assert_eq!(thresholds_of("if(t >= 10, k, 0)"), ["10"]);
+        assert_eq!(thresholds_of("if(t_on + 1.5 > t, k, 0)"), ["(t_on + 1.5)"]);
+        assert_eq!(
+            thresholds_of("k * max(if(t < t_on, 1, 0), if(t >= 2 * pi, 1, 0))"),
+            ["t_on", "(2 * pi)"]
+        );
+    }
+
+    #[test]
+    fn a_comparison_of_t_with_the_state_or_a_formula_is_not_a_threshold() {
+        assert!(thresholds_of("if(t >= A, k, 0)").is_empty());
+        assert!(thresholds_of("if(t >= r, k, 0)").is_empty());
+        assert!(thresholds_of("if(t - 10 >= 0, k, 0)").is_empty());
+        assert!(thresholds_of("if(step >= 10, k, 0)").is_empty());
     }
 
     #[test]

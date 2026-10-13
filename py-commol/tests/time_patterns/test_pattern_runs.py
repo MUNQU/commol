@@ -1,10 +1,12 @@
 """Time patterns drive the flow of a run at the steps they name."""
 
+import math
+
 import pytest
 
-from commol import ModelBuilder, TimePattern
+from commol import ModelBuilder, Simulation, TimePattern
 from commol.context.model import Model
-from tests.support import a_to_b_builder, build, run
+from tests.support import a_to_b_builder, assert_close, build, build_ode, run
 
 
 def _run_ab(rate: str, *, steps: int = 20, pop: int = 1000) -> dict[str, list[float]]:
@@ -73,6 +75,26 @@ class TestWindowIntegration:
         # At end and after (steps 10-14): no change
         for t in range(10, 15):
             assert a[t] - a[t + 1] == pytest.approx(0.0, abs=1e-6)
+
+
+class TestDifferentialIntegration:
+    """A pattern holds for one time unit: `amount` acts as a constant rate."""
+
+    @staticmethod
+    def _run_ode(pattern: TimePattern, steps: int) -> list[float]:
+        builder = a_to_b_builder(rate=str(pattern), parameters={})
+        return Simulation(build_ode(builder)).run(steps)["A"]
+
+    def test_window_acts_on_its_unit_intervals(self):
+        a = self._run_ode(TimePattern.window(start=2, end=4, amount=0.5), steps=6)
+        assert_close(a[2], 1000.0, rel=1e-12)
+        assert_close(a[4], 1000.0 * math.exp(-1.0), rel=1e-7)
+        assert_close(a[6], a[4], rel=1e-12)
+
+    def test_periodic_acts_on_each_period_start(self):
+        a = self._run_ode(TimePattern.periodic(period=5, amount=0.5), steps=20)
+        # [0, 1), [5, 6), [10, 11) and [15, 16): four time units.
+        assert_close(a[20], 1000.0 * math.exp(-2.0), rel=1e-7)
 
 
 class TestSeasonalIntegration:

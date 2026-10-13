@@ -74,7 +74,7 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 | A compartment name, such as `A_g1` | That compartment's population |
 | A bin id, with stratifications | The total of all its compartments |
 | `N` | The total population |
-| `step`, `t` | The current step: 0, 1, 2, … |
+| `step`, `t` | The current step: 0, 1, 2, … In a differential model, `t` is the continuous time and `step` its floor; see [Time inside a step](simulations.md#time-inside-a-step) |
 | `pi`, `e` | π and e |
 
 ### Subpopulation variables
