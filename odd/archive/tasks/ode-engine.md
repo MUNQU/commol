@@ -224,15 +224,15 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Extract `derivatives` from `step`; equality tests | direct | done (uncommitted) |
-| T2 | S2 | New compilation crate (D2); move expansion, flows and Python helpers; suites unchanged | direct | done (uncommitted) |
-| T3 | S3, S5 | Probe of the sparse path (pattern with closures, D7); then `commol-differential` on `diffsol` (`tsit45`, `bdf` with finite-difference `J·v`), unit intervals, accumulators as state; closed-form tests | direct | done (uncommitted) |
-| T4 | S4, S7 | Time rule, units, `run_at` and non-integer-step observations, windows, reports and plots (D5, D10); tests | direct | done (uncommitted) |
-| T4b | S9 | Impulses (D8, D9): model type, builder, serialization, both engines; tests incl. pulse-vaccination orbit | direct | done (uncommitted) |
-| T4c | S10 | Axis unit of any dimension (D11) in `units.py`, builder, model, `TimeScale` guard; tests | direct | done (uncommitted) |
-| T5 | S6 | Bindings (engine enum), `Simulation`, protocols, solver settings (D4), `.pyi`; workflow tests | direct | done (uncommitted) |
-| T6 | S8 | Documentation and changelog | direct | done (uncommitted) |
-| T7 | all | Final audit: every runner, `pytest -m docs`, cost table in Evidence, dense–sparse threshold benchmark (D7) | direct | done (uncommitted) |
+| T1 | S1 | Extract `derivatives` from `step`; equality tests | direct | #101 (`3c13102`) |
+| T2 | S2 | New compilation crate (D2); move expansion, flows and Python helpers; suites unchanged | direct | #101 (`3c13102`) |
+| T3 | S3, S5 | Probe of the sparse path (pattern with closures, D7); then `commol-differential` on `diffsol` (`tsit45`, `bdf` with finite-difference `J·v`), unit intervals, accumulators as state; closed-form tests | direct | #101 (`3c13102`) |
+| T4 | S4, S7 | Time rule, units, `run_at` and non-integer-step observations, windows, reports and plots (D5, D10); tests | direct | #101 (`3c13102`) |
+| T4b | S9 | Impulses (D8, D9): model type, builder, serialization, both engines; tests incl. pulse-vaccination orbit | direct | #101 (`3c13102`) |
+| T4c | S10 | Axis unit of any dimension (D11) in `units.py`, builder, model, `TimeScale` guard; tests | direct | #101 (`3c13102`) |
+| T5 | S6 | Bindings (engine enum), `Simulation`, protocols, solver settings (D4), `.pyi`; workflow tests | direct | #101 (`3c13102`) |
+| T6 | S8 | Documentation and changelog | direct | #101 (`3c13102`) |
+| T7 | all | Final audit: every runner, `pytest -m docs`, cost table in Evidence, dense–sparse threshold benchmark (D7) | direct | #101 (`3c13102`) |
 
 ## Delivery
 
@@ -247,7 +247,7 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-Verified 2026-10-13 on `feat/ode-engine` (not committed), Apple M-series,
+Verified 2026-10-13 on `feat/ode-engine` before the merge, Apple M-series,
 `--release`.
 
 - Runners: `cargo fmt --check`, `cargo clippy --workspace --all-targets
@@ -334,3 +334,5 @@ Verified 2026-10-13 on `feat/ode-engine` (not committed), Apple M-series,
   restart at every integer only when a rate reads `step` or a time series.
   S3 rewritten. D7 (size threshold 128) stays as approved; a density-based
   matrix rule is not part of this PR.
+- L19 (user, 2026-10-13): PR #101 squash-merged into `develop` as `3c13102`;
+  branch `feat/ode-engine` deleted; this ODD archived.

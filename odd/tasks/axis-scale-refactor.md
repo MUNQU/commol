@@ -4,17 +4,17 @@ Goal: replace `TimeScale` with pieces that fit any model axis and both
 engines. Unit conversion works for any independent variable (`Model.step_unit`),
 rate conversions give the right rate for the typology, and window grids live
 with the other window code and accept non-integer steps.
-Motivation: after `odd/tasks/ode-engine.md`, the axis of a model is whatever
+Motivation: after `odd/archive/tasks/ode-engine.md`, the axis of a model is whatever
 independent variable it differentiates over (time is one case), and a
 `DifferentialEquations` model needs continuous rates. `TimeScale` assumes a
 time axis and discrete-time rates.
-Branch: `refactor/axis-scale` from `develop`, after the PR of
-`odd/tasks/ode-engine.md` merges.
+Branch: `refactor/axis-scale` from `develop` (the ODE engine, PR #101, is
+merged as `3c13102`).
 Engram mirror: topic `odd/axis-scale-refactor/tasks` (project `commol`).
 Runners: `pytest` and `pytest -m docs` (from `py-commol/`), `ruff check .`,
 `ty check commol`, `mkdocs build --strict` (from the root).
 
-## Current state (verified 2026-10-13 on `feat/ode-engine`, uncommitted)
+## Current state (verified 2026-10-13 on `develop` at `3c13102`)
 
 `TimeScale` (`py-commol/commol/api/time_scale.py`), public since v0.2.0
 (`1db87df`, tag `v0.2.0`), holds `step_seconds` and mixes three jobs:

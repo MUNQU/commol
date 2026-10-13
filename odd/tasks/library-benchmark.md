@@ -5,7 +5,7 @@ what commol does better or worse than the closest libraries, so that the work
 after this ODD is chosen by evidence. The result also serves as material for a
 software paper.
 Branch: `chore/library-benchmark` from `develop`, after the PRs of
-`odd/tasks/test-suite-refactor.md`, `odd/tasks/ode-engine.md` and
+`odd/tasks/test-suite-refactor.md`, `odd/archive/tasks/ode-engine.md` and
 `odd/tasks/reference-model-tests.md` merge.
 Engram mirror: topic `odd/library-benchmark/tasks` (project `commol`).
 Runners: `pytest` (from `py-commol/`), the benchmark command of S5,
