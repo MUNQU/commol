@@ -2306,8 +2306,10 @@ it and serializes it to JSON. The Rust engine builds and runs it.</p>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  |
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  v
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>crates/commol-core/          model types, expressions (Cranelift JIT), SimulationEngine trait
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>crates/commol-difference/    expansion, initial state, flow planning, simulation
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>crates/commol-calibration/   loss, optimizers (argmin fork), ensembles
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>crates/commol-model/         expansion, initial state, flow planning, rates, derivatives
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>crates/commol-difference/    the discrete step: X += derivatives
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>crates/commol-differential/  the ODE engine: diffsol integrates derivatives
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>crates/commol-calibration/   loss, optimizers (argmin fork), ensembles
 </span></code></pre></div>
 <p><strong>Golden rule: the Rust engine is the single source of truth.</strong> When Python
 needs to know how the engine expands, initializes, plans or simulates a model,

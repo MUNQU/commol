@@ -2324,29 +2324,54 @@
 <td>Code for one engine.</td>
 </tr>
 <tr>
-<td><code>crates/commol-difference/src/builder.rs</code></td>
-<td>Expansion of bins and accumulators over stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), and engine construction.</td>
-<td>Flow planning.</td>
+<td><code>crates/commol-model/src/builder.rs</code></td>
+<td>Expansion of bins and accumulators over stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), name checks (<code>check_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
+<td>Flow planning; stepping.</td>
 </tr>
 <tr>
-<td><code>crates/commol-difference/src/layout.rs</code></td>
+<td><code>crates/commol-model/src/layout.rs</code></td>
 <td><code>CompartmentLayout</code>: compartments in engine order with their labels, and lookups by bin and categories.</td>
 <td>Name parsing.</td>
 </tr>
 <tr>
-<td><code>crates/commol-difference/src/flows.rs</code></td>
+<td><code>crates/commol-model/src/flows.rs</code></td>
 <td>Transition flow planning (<code>plan_transition_flows</code>) and its description for Python (<code>describe_flows</code>).</td>
 <td>Rate evaluation at run time.</td>
 </tr>
 <tr>
-<td><code>crates/commol-difference/src/helpers.rs</code></td>
+<td><code>crates/commol-model/src/helpers.rs</code></td>
 <td>Stratified-rate resolution and rate rewriting helpers.</td>
 <td>New public API.</td>
 </tr>
 <tr>
+<td><code>crates/commol-model/src/rates.rs</code></td>
+<td>Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback.</td>
+<td>Flow logic.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/system.rs</code></td>
+<td>The right-hand side <code>CompiledModel::derivatives</code>, impulses (<code>apply_impulses</code>, <code>impulse_positions</code>) and the accessors both engines use.</td>
+<td>Time stepping.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/types.rs</code></td>
+<td><code>CompiledModel</code>, compiled flows, impulse schedules, time-series lookup.</td>
+<td>Python types.</td>
+</tr>
+<tr>
 <td><code>crates/commol-difference/src/simulation.rs</code></td>
-<td>The simulation step and the <code>SimulationEngine</code> implementation.</td>
-<td>Model validation.</td>
+<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, and its <code>SimulationEngine</code> implementation.</td>
+<td>Model compilation.</td>
+</tr>
+<tr>
+<td><code>crates/commol-differential/src/lib.rs</code></td>
+<td><code>DifferentialEquations</code>: state, output positions, impulses, and its <code>SimulationEngine</code> implementation.</td>
+<td>Numerical methods.</td>
+</tr>
+<tr>
+<td><code>crates/commol-differential/src/solve.rs</code></td>
+<td>The integration with <code>diffsol</code>: pieces between breakpoints, the finite-difference <code>J·v</code>, dense or sparse matrices (<code>SPARSE_THRESHOLD</code>).</td>
+<td>Model compilation.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
@@ -2386,13 +2411,23 @@
 <td>Logic.</td>
 </tr>
 <tr>
-<td><code>py-commol/src/difference.rs</code></td>
-<td><code>DifferenceEquations</code> and the engine queries <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>.</td>
+<td><code>py-commol/src/model.rs</code></td>
+<td>The model queries of <code>commol_rs.model</code>: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>check_names</code>.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/engine.rs</code></td>
+<td><code>Engine</code> (either engine, for calibration), <code>EngineArg</code> (either Python engine object) and <code>engine_class!</code>, which defines the methods both Python engine classes share.</td>
+<td>Engine logic.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/difference.rs</code>, <code>py-commol/src/differential.rs</code></td>
+<td>The Python classes <code>DifferenceEquations</code> and <code>DifferentialEquations</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>Calibration types and functions.</td>
+<td>Calibration types and functions; each takes either engine (<code>EngineArg</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -2419,7 +2454,7 @@
 </tr>
 <tr>
 <td><code>api/simulation.py</code></td>
-<td><code>Simulation</code>: engine construction, runs, output grouping.</td>
+<td><code>Simulation</code>: runs (<code>run</code>, <code>run_at</code>), output grouping.</td>
 <td>Expansion rules.</td>
 </tr>
 <tr>
@@ -2454,7 +2489,7 @@
 </tr>
 <tr>
 <td><code>context/_model/engine_state.py</code></td>
-<td>The only Python access to the engine queries.</td>
+<td>The only Python access to the engine queries, and <code>build_engine</code>, which builds the engine the typology names.</td>
 <td>Python re-implementations of them.</td>
 </tr>
 <tr>
@@ -2517,18 +2552,28 @@
 <tbody>
 <tr>
 <td>Change how a model expands</td>
-<td><code>builder.rs</code> (<code>expand</code>)</td>
+<td><code>commol-model/src/builder.rs</code> (<code>expand</code>)</td>
 <td><code>layout.rs</code>, <code>engine_state.py</code>, <code>tests/building/</code>, <code>tests/simulation/test_outputs.py</code></td>
 </tr>
 <tr>
 <td>Change how transitions become flows</td>
-<td><code>flows.rs</code></td>
-<td><code>helpers.rs</code>, <code>context/_model/equations.py</code>, <code>tests/transitions/</code></td>
+<td><code>commol-model/src/flows.rs</code></td>
+<td><code>helpers.rs</code>, <code>system.rs</code> (<code>derivatives</code>), <code>context/_model/equations.py</code>, <code>tests/transitions/</code></td>
 </tr>
 <tr>
-<td>Change the simulation step</td>
-<td><code>simulation.rs</code></td>
+<td>Change the difference step</td>
+<td><code>commol-difference/src/simulation.rs</code></td>
 <td><code>simulation_engine.rs</code></td>
+</tr>
+<tr>
+<td>Change the ODE integration or the solver settings</td>
+<td><code>commol-differential/src/solve.rs</code></td>
+<td><code>commol-differential/src/lib.rs</code>, <code>commol-core/src/types/dynamics.rs</code> (<code>OdeSolver</code>), <code>context/dynamics.py</code></td>
+</tr>
+<tr>
+<td>Change impulses</td>
+<td><code>commol-model/src/system.rs</code> (<code>apply_impulses</code>)</td>
+<td><code>types.rs</code> (<code>ImpulseSchedule</code>), both engines, <code>context/dynamics.py</code>, <code>tests/transitions/test_impulses.py</code></td>
 </tr>
 <tr>
 <td>Add an expression function or variable</td>

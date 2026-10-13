@@ -2543,8 +2543,8 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 </tr>
 <tr>
 <td>Python dead code</td>
-<td>No unused code</td>
-<td><code>vulture</code> (CI)</td>
+<td>No unused code; a name used only in a string annotation goes in <code>py-commol/.vulture_allowlist.py</code></td>
+<td><code>vulture</code> (pre-commit, CI)</td>
 </tr>
 <tr>
 <td>Rust style</td>
@@ -2821,7 +2821,7 @@ of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scal
 </tr>
 <tr>
 <td><code>transitions/</code></td>
-<td>Flows, <code>$compartment</code>, stratified rates</td>
+<td>Flows, <code>$compartment</code>, stratified rates, impulses</td>
 <td><a href="../../guide/transitions/">Transitions</a></td>
 </tr>
 <tr>
@@ -2841,7 +2841,7 @@ of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scal
 </tr>
 <tr>
 <td><code>simulation/</code></td>
-<td>Runs, outputs, windowed totals, <code>TimeScale</code></td>
+<td>Runs, <code>run_at</code>, differential models, outputs, windowed totals, <code>TimeScale</code></td>
 <td><a href="../../guide/simulations/">Running Simulations</a></td>
 </tr>
 <tr>
@@ -2890,7 +2890,8 @@ topic inside its package.</p>
   <code>override_builder</code>, <code>shared_category_builder</code> and
   <code>conditional_pathway_builder</code>. A keyword overrides one part of the default
   model, so a test names only what it changes. <code>build</code> builds for difference
-  equations; <code>run</code> builds and simulates.</li>
+  equations; <code>build_ode</code> builds for differential equations, with the tight
+  solver settings <code>TIGHT</code> by default; <code>run</code> builds and simulates.</li>
 <li>Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to <code>support/</code>.</li>
 <li>Fixtures: <code>sir_model</code> and <code>sir_simulation</code> (<code>tests/conftest.py</code>); <code>truth</code>

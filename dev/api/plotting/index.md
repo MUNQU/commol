@@ -251,8 +251,8 @@ class SimulationPlotter:
     @staticmethod
     def _apply_x_labels(
         ax: "Axes",
-        time_steps: list[int],
-        step_to_label: Callable[[int], str],
+        time_steps: Sequence[int | float],
+        step_to_label: Callable[..., str],
         tick_every: int | None,
     ) -> None:
         """
@@ -301,10 +301,20 @@ class SimulationPlotter:
         observation step.
 
         Returns None if no observed point has window_steps set.
+
+        Raises
+        ------
+        ValueError
+            If the window is not a whole number of steps.
         """
         window_steps = next((p.window_steps for p in observed if p.window_steps), None)
         if window_steps is None:
             return None
+        if not isinstance(window_steps, int):
+            raise ValueError(
+                f"The windowed line needs a window of whole steps, got "
+                f"{window_steps}; the plotted series holds integer steps only."
+            )
         steps = list(range(window_steps, len(series), window_steps))
         values = [series[t] - series[t - window_steps] for t in steps]
         return steps, values
@@ -542,7 +552,7 @@ class SimulationPlotter:
         self,
         axes: list["Axes"],
         bins_to_plot: list[str],
-        cumulative_observed: dict[str, list[tuple[int, float]]],
+        cumulative_observed: dict[str, list[tuple[int | float, float]]],
         calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
         kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
@@ -829,7 +839,7 @@ class SimulationPlotter:
         self,
         ax: "Axes",
         bin_id: str,
-        cumulative_observed: list[tuple[int, float]],
+        cumulative_observed: list[tuple[int | float, float]],
         prob_result: ProbabilisticCalibrationResult,
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
@@ -939,12 +949,12 @@ class SimulationPlotter:
         self,
         observed_by_bin: dict[str, list[ObservedDataPoint]],
         scale_values: dict[str, float],
-    ) -> dict[str, list[tuple[int, float]]]:
+    ) -> dict[str, list[tuple[int | float, float]]]:
         """
         Calculate cumulative observed data (step, cumulative_value).
         Applies scale if observation has a scale_id.
         """
-        cumulative: dict[str, list[tuple[int, float]]] = {}
+        cumulative: dict[str, list[tuple[int | float, float]]] = {}
 
         for bin_id, points in observed_by_bin.items():
             cumsum = []
@@ -969,7 +979,7 @@ class SimulationPlotter:
         ax: "Axes",
         bin_id: str,
         cumulative_values: list[float],
-        cumulative_observed: list[tuple[int, float]],
+        cumulative_observed: list[tuple[int | float, float]],
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
         """

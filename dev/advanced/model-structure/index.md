@@ -5,7 +5,7 @@
 A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same structure from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
 ```text
-Model                      name, description, version
+Model                      name, description, version, step_unit
 ├── population: Population
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]
@@ -19,8 +19,9 @@ Model                      name, description, version
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a TimeSeriesValue)
 └── dynamics: Dynamics
-    ├── typology: "DifferenceEquations"
-    └── transitions: [Transition]
+    ├── typology: "DifferenceEquations" or "DifferentialEquations"
+    ├── solver: OdeSolver | None            (differential models only)
+    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
         └── stratified_rates: [StratifiedRate]
             └── conditions: [StratificationCondition]
 ```
@@ -1041,6 +1042,7 @@ Attributes:
 | ------------- | --------------------------------------------------------- | ---------------------------------- |
 | `typology`    | `Literal['DifferenceEquations', 'DifferentialEquations']` | The type of model.                 |
 | `transitions` | `List[Transition]`                                        | A list of rules for state changes. |
+| `solver`      | \`OdeSolver                                               | None\`                             |
 
 Source code in `commol/context/dynamics.py`
 
@@ -1055,12 +1057,41 @@ class Dynamics(BaseModel):
         The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
+    solver : OdeSolver | None
+        Solver settings of a differential-equations model; None uses the
+        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     typology: Literal[
         ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
     ]
     transitions: list[Transition]
+    solver: OdeSolver | None = Field(
+        default=None,
+        description="Solver settings of a differential-equations model.",
+    )
+
+    @model_validator(mode="after")
+    def validate_typology_settings(self) -> Self:
+        """
+        A solver needs a differential model; a difference model steps only at
+        integers, so its impulse positions must be integers.
+        """
+        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
+            if self.solver is not None:
+                raise ValueError(
+                    "Solver settings apply only to a DifferentialEquations model; "
+                    "a DifferenceEquations model has no solver."
+                )
+            for transition in self.transitions:
+                bad = [p for p in transition.impulse_positions() if p != int(p)]
+                if bad:
+                    raise ValueError(
+                        f"Transition '{transition.id}': impulse position {bad[0]} "
+                        f"is not an integer step; a DifferenceEquations model "
+                        f"steps only at integers."
+                    )
+        return self
 
     @field_validator("transitions")
     @classmethod
@@ -1085,6 +1116,40 @@ class Dynamics(BaseModel):
 ```
 
 ### Methods:
+
+#### validate_typology_settings
+
+```python
+validate_typology_settings() -> Self
+```
+
+A solver needs a differential model; a difference model steps only at integers, so its impulse positions must be integers.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+@model_validator(mode="after")
+def validate_typology_settings(self) -> Self:
+    """
+    A solver needs a differential model; a difference model steps only at
+    integers, so its impulse positions must be integers.
+    """
+    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
+        if self.solver is not None:
+            raise ValueError(
+                "Solver settings apply only to a DifferentialEquations model; "
+                "a DifferenceEquations model has no solver."
+            )
+        for transition in self.transitions:
+            bad = [p for p in transition.impulse_positions() if p != int(p)]
+            if bad:
+                raise ValueError(
+                    f"Transition '{transition.id}': impulse position {bad[0]} "
+                    f"is not an integer step; a DifferenceEquations model "
+                    f"steps only at integers."
+                )
+    return self
+```
 
 #### validate_transitions_not_empty
 
@@ -1215,6 +1280,73 @@ class Transition(BaseModel):
         ),
     )
 
+    impulse_at: list[float] | None = Field(
+        default=None,
+        description=(
+            "Positions on the axis where the transition is an impulse: at each "
+            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "moved at once. Between them the transition moves nothing."
+        ),
+    )
+
+    impulse_every: tuple[float, float] | None = Field(
+        default=None,
+        description=(
+            "(period, offset): the transition is an impulse at offset, "
+            "offset + period, offset + 2 * period, ..."
+        ),
+    )
+
+    @property
+    def is_impulse(self) -> bool:
+        """Whether the transition is an impulse rather than a continuous flow."""
+        return self.impulse_at is not None or self.impulse_every is not None
+
+    def impulse_positions(self) -> list[float]:
+        """
+        The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+        These are the values that must be integers in a difference model.
+        """
+        if self.impulse_at is not None:
+            return list(self.impulse_at)
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            return [offset, period]
+        return []
+
+    @model_validator(mode="after")
+    def validate_impulse(self) -> Self:
+        """Check the impulse schedule: one kind, valid positions and period."""
+        if self.impulse_at is not None and self.impulse_every is not None:
+            raise ValueError(
+                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
+            )
+        if self.impulse_at is not None:
+            if not self.impulse_at:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse_at needs at least one position."
+                )
+            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
+            if bad:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse positions must be finite "
+                    f"and not negative, got {bad}."
+                )
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            if not (math.isfinite(period) and period > 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse period must be "
+                    f"positive, got {period}."
+                )
+            if not (math.isfinite(offset) and offset >= 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse offset must be finite "
+                    f"and not negative, got {offset}."
+                )
+        return self
+
     @field_validator("rate", mode="before")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
@@ -1231,7 +1363,88 @@ class Transition(BaseModel):
         return value
 ```
 
+### Attributes
+
+#### is_impulse
+
+```python
+is_impulse: bool
+```
+
+Whether the transition is an impulse rather than a continuous flow.
+
 ### Methods:
+
+#### impulse_positions
+
+```python
+impulse_positions() -> list[float]
+```
+
+The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+These are the values that must be integers in a difference model.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+def impulse_positions(self) -> list[float]:
+    """
+    The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+    These are the values that must be integers in a difference model.
+    """
+    if self.impulse_at is not None:
+        return list(self.impulse_at)
+    if self.impulse_every is not None:
+        period, offset = self.impulse_every
+        return [offset, period]
+    return []
+```
+
+#### validate_impulse
+
+```python
+validate_impulse() -> Self
+```
+
+Check the impulse schedule: one kind, valid positions and period.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+@model_validator(mode="after")
+def validate_impulse(self) -> Self:
+    """Check the impulse schedule: one kind, valid positions and period."""
+    if self.impulse_at is not None and self.impulse_every is not None:
+        raise ValueError(
+            f"Transition '{self.id}': set impulse_at or impulse_every, not both."
+        )
+    if self.impulse_at is not None:
+        if not self.impulse_at:
+            raise ValueError(
+                f"Transition '{self.id}': impulse_at needs at least one position."
+            )
+        bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
+        if bad:
+            raise ValueError(
+                f"Transition '{self.id}': impulse positions must be finite "
+                f"and not negative, got {bad}."
+            )
+    if self.impulse_every is not None:
+        period, offset = self.impulse_every
+        if not (math.isfinite(period) and period > 0):
+            raise ValueError(
+                f"Transition '{self.id}': the impulse period must be "
+                f"positive, got {period}."
+            )
+        if not (math.isfinite(offset) and offset >= 0):
+            raise ValueError(
+                f"Transition '{self.id}': the impulse offset must be finite "
+                f"and not negative, got {offset}."
+            )
+    return self
+```
 
 #### validate_rate
 
@@ -1259,6 +1472,8 @@ def validate_rate(cls, value: str | None) -> str | None:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
 ```
+
+`OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
 
 ## StratifiedRate
 

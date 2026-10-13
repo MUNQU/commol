@@ -36,7 +36,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine: "DifferenceEquationsProtocol" = simulation.engine
+        self._engine: "EngineProtocol" = simulation.engine
 
         logger.info(
             (
@@ -496,6 +496,11 @@ class Calibrator:
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
                 )
+        check_steps_for_typology(
+            self.simulation.model_definition.dynamics.typology,
+            self.problem.observed_data,
+            self.problem.constraints,
+        )
 
     def _warn_constraint_time_steps_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""
@@ -609,7 +614,7 @@ def __init__(
     )
     self.simulation: Simulation = simulation
     self.problem: CalibrationProblem = problem
-    self._engine: "DifferenceEquationsProtocol" = simulation.engine
+    self._engine: "EngineProtocol" = simulation.engine
 
     logger.info(
         (
@@ -1087,7 +1092,7 @@ Attributes:
 
 | Name           | Type        | Description                                                                                                                                                                    |
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `step`         | `int`       | Time step of the observation                                                                                                                                                   |
+| `step`         | \`int       | float\`                                                                                                                                                                        |
 | `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set                                                                  |
 | `compartments` | \`list[str] | None\`                                                                                                                                                                         |
 | `value`        | `float`     | Observed value                                                                                                                                                                 |
@@ -1103,8 +1108,10 @@ class ObservedDataPoint(BaseModel):
 
     Attributes
     ----------
-    step : int
-        Time step of the observation
+    step : int | float
+        Position of the observation on the axis. A DifferentialEquations model
+        accepts any non-negative position; a DifferenceEquations model only an
+        integer step. A whole number is stored as an ``int``.
     compartment : str
         Name of the compartment being observed, or a display name for aggregate
         observations when compartments is set
@@ -1121,7 +1128,9 @@ class ObservedDataPoint(BaseModel):
         Optional scale parameter ID to apply to model output before comparison
     """
 
-    step: int = Field(default=..., ge=0, description="Time step of the observation")
+    step: int | float = Field(
+        default=..., ge=0, description="Position (step) of the observation"
+    )
     compartment: str = Field(
         default=..., min_length=1, description="Name of the compartment being observed"
     )
@@ -1139,7 +1148,7 @@ class ObservedDataPoint(BaseModel):
         default=None,
         description="Optional scale parameter ID to apply to model output",
     )
-    window_steps: int | None = Field(
+    window_steps: int | float | None = Field(
         default=None,
         gt=0,
         description=(
@@ -1147,6 +1156,16 @@ class ObservedDataPoint(BaseModel):
             "When set, prediction is value(step) - value(step - window_steps)."
         ),
     )
+
+    @field_validator("step", "window_steps")
+    @classmethod
+    def validate_finite_step(cls, value: int | float | None) -> int | float | None:
+        """Reject infinite or NaN steps; store a whole number as an int."""
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError(f"steps must be finite, got {value}")
+        return _whole_as_int(value)
 
     @model_validator(mode="after")
     def validate_window_steps(self) -> Self:
@@ -1161,6 +1180,30 @@ class ObservedDataPoint(BaseModel):
         if v is not None and not v:
             raise ValueError("compartments must be non-empty when provided")
         return v
+```
+
+### Methods:
+
+#### validate_finite_step
+
+```python
+validate_finite_step(value: int | float | None) -> int | float | None
+```
+
+Reject infinite or NaN steps; store a whole number as an int.
+
+Source code in `commol/context/calibration.py`
+
+```python
+@field_validator("step", "window_steps")
+@classmethod
+def validate_finite_step(cls, value: int | float | None) -> int | float | None:
+    """Reject infinite or NaN steps; store a whole number as an int."""
+    if value is None:
+        return None
+    if not math.isfinite(value):
+        raise ValueError(f"steps must be finite, got {value}")
+    return _whole_as_int(value)
 ```
 
 ## CalibrationParameter
@@ -1297,7 +1340,7 @@ Attributes:
 | `expression`  | `str`       | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When time_steps is specified, can also reference compartment values (S, I, R, etc.) at those time steps. |
 | `description` | \`str       | None\`                                                                                                                                                                                                                                   |
 | `weight`      | `float`     | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                                       |
-| `time_steps`  | \`list[int] | None\`                                                                                                                                                                                                                                   |
+| `time_steps`  | \`list\[int | float\]                                                                                                                                                                                                                                  |
 
 Examples:
 
@@ -1363,8 +1406,9 @@ class CalibrationConstraint(BaseModel):
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
         more important relative to others. The penalty for violating this constraint
         is: weight * violation^2
-    time_steps : list[int] | None
-        Optional time steps at which to evaluate this constraint. If None, constraint
+    time_steps : list[int | float] | None
+        Optional time steps at which to evaluate this constraint. Non-integer
+        steps need a DifferentialEquations model. If None, constraint
         is evaluated once before simulation using parameter values only. If specified,
         constraint is evaluated at each time step and can reference compartment values.
 
@@ -1416,10 +1460,11 @@ class CalibrationConstraint(BaseModel):
         gt=0.0,
         description="Penalty weight multiplier for violations",
     )
-    time_steps: list[int] | None = Field(
+    time_steps: list[int | float] | None = Field(
         default=None,
         description=(
-            "Optional time steps at which to evaluate (for time-dependent constraints)"
+            "Optional time steps at which to evaluate (for time-dependent "
+            "constraints). Non-integer steps need a DifferentialEquations model."
         ),
     )
 
@@ -1444,10 +1489,12 @@ class CalibrationConstraint(BaseModel):
                     f"time_steps for constraint '{self.id}' must not be empty if "
                     "specified"
                 )
-            if any(ts < 0 for ts in self.time_steps):
+            if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must all be non-negative"
+                    f"time_steps for constraint '{self.id}' must all be finite "
+                    "and non-negative"
                 )
+            self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
         return self
 ```
 
@@ -1497,10 +1544,12 @@ def validate_time_steps(self) -> Self:
                 f"time_steps for constraint '{self.id}' must not be empty if "
                 "specified"
             )
-        if any(ts < 0 for ts in self.time_steps):
+        if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
             raise ValueError(
-                f"time_steps for constraint '{self.id}' must all be non-negative"
+                f"time_steps for constraint '{self.id}' must all be finite "
+                "and non-negative"
             )
+        self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
     return self
 ```
 

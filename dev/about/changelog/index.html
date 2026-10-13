@@ -2083,6 +2083,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2144,7 +2155,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2205,7 +2216,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2233,7 +2244,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2325,6 +2336,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2386,7 +2408,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2447,7 +2469,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2475,7 +2497,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2538,12 +2560,48 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>An ODE engine: a model built with <code>typology="DifferentialEquations"</code> runs in
+  continuous time, <code>dX/dt = Σ flows</code>, integrated by <code>diffsol</code>
+  (<code>commol_rs.differential.DifferentialEquations</code>). It has the same flows,
+  outputs, accumulators, calibration, ensembles, reports and plots as a
+  difference model. On <code>[n, n + 1)</code> a rate sees <code>step = n</code> and the continuous
+  <code>t</code>.</li>
+<li><code>OdeSolver</code> (<code>method</code> <code>"tsit45"</code> or <code>"bdf"</code>, <code>rtol</code>, <code>atol</code>), stored in the
+  model as <code>Dynamics.solver</code> and set with <code>ModelBuilder(..., solver=...)</code>.</li>
+<li><code>Simulation.run_at(steps)</code>: the outputs at the given sorted steps. A
+  differential model takes any step, such as <code>0.5</code>.</li>
+<li>Impulses: <code>add_transition(..., impulse_at=[...])</code> or
+  <code>impulse_every=(period, offset)</code> moves the rate (a fraction or an amount) at
+  once at those steps, in both engines, before the flows of the step.
+  <code>print_equations</code> lists impulses apart.</li>
+<li><code>ModelBuilder(..., step_unit=...)</code> (<code>Model.step_unit</code>): the unit of one step
+  for the unit check, of any single dimension: the axis is the independent
+  variable of the model, which need not be time (for example <code>"meter"</code>). Without it, the check infers the unit as before.</li>
+<li><code>TimeScale.from_step_unit(unit)</code>, which raises for a unit that is not time.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> take <code>series</code> instead
+<li><code>ObservedDataPoint.step</code> and <code>window_steps</code>, and
+  <code>CalibrationConstraint.time_steps</code>, accept a float for a differential model.
+  A whole number is stored as an <code>int</code>. A difference model still requires
+  integers, and <code>Calibrator</code> names the observation or constraint that is not.</li>
+<li>The model compiler moved from <code>commol-difference</code> to the new crate
+  <code>commol-model</code>, which both engines use; <code>commol_rs.difference</code> no longer has
+  <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code> and <code>check_names</code>,
+  which are in <code>commol_rs.model</code>. No public Python name changes.</li>
+<li>
+<p><code>SimulationPlotter</code> raises <code>ValueError</code> for a windowed observation whose
+  <code>window_steps</code> is not a whole number, because the plotted series holds
+  integer steps only.</p>
+</li>
+<li>
+<p><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> take <code>series</code> instead
   of <code>bins</code>. An entry is an output name or a bin or accumulator id; an id plots
   the sum of its outputs, so a bin of a stratified model can be plotted. There
-  is no <code>bins</code> alias: rename the argument.</li>
+  is no <code>bins</code> alias: rename the argument.</p>
+</li>
 <li>Every loss uses the observation weights the same way: <code>"sse"</code> is
   <code>Σ w·r²</code>, <code>"rmse"</code> is <code>√(Σ w·r² / Σ w)</code> and <code>"mae"</code> is <code>Σ w·|r| / Σ w</code>.
   Before, <code>"sse"</code> squared the weight and <code>"rmse"</code> and <code>"mae"</code> ignored it. With
@@ -2633,7 +2691,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>README.md</code> is a short landing page with links to the documentation.</li>
 </ul>
 <h2 id="020-2026-10-12">[0.2.0] - 2026-10-12<a class="headerlink" href="#020-2026-10-12" title="Permanent link">&para;</a></h2>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Per-compartment initial conditions: <code>InitialConditions.compartment_fractions</code>
   (Python and Rust) accepts overrides keyed by expanded compartment name,
@@ -2764,7 +2822,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="010-to-013-2026">[0.1.0] to [0.1.3] - 2026<a class="headerlink" href="#010-to-013-2026" title="Permanent link">&para;</a></h2>
 <p>See the <a href="https://github.com/MUNQU/commol/releases">GitHub Releases</a> page for
 the details of these versions.</p>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>GitHub Actions CI/CD pipelines for code quality, building, and PyPI releases</li>
 <li>MkDocs Material documentation site</li>
@@ -2772,7 +2830,7 @@ the details of these versions.</p>
 <li>Contributing guidelines and release process documentation</li>
 </ul>
 <h2 id="001-2025">[0.0.1] - 2025<a class="headerlink" href="#001-2025" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Initial release of Commol</li>
 <li>ModelBuilder fluent API for constructing compartment models</li>

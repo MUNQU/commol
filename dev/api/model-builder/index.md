@@ -61,6 +61,8 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
+        solver: OdeSolver | None = None,
+        step_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -78,11 +80,22 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
+        solver : OdeSolver | None, default=None
+            Solver settings of a DifferentialEquations model (method and
+            tolerances). None uses the defaults of `OdeSolver`. A
+            DifferenceEquations model takes none.
+        step_unit : str | None, default=None
+            Unit of one step on the axis, of any single dimension (for example
+            ``"day"`` or ``"meter"``). The unit check requires every flow to be
+            ``<bin unit>/<step_unit>``. None infers it from the parameter units
+            of dimension time.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
+        self._solver: OdeSolver | None = solver
+        self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -326,6 +339,8 @@ class ModelBuilder:
         stratified_rates: list[StratifiedRateDict] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -404,6 +419,16 @@ class ModelBuilder:
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
 
+        impulse_at : list[float] | None, default=None
+            Make the transition an impulse at these positions on the axis. At
+            each one, ``rate`` is the fraction of the source (per-capita) or the
+            amount (absolute) moved at once, before the flows of that step. A
+            DifferenceEquations model needs integer positions.
+
+        impulse_every : tuple[float, float] | None, default=None
+            ``(period, offset)``: make the transition an impulse at ``offset``,
+            ``offset + period``, ``offset + 2 * period``, ...
+
         Returns
         -------
         ModelBuilder
@@ -421,6 +446,11 @@ class ModelBuilder:
         # specifies the time-varying behaviour, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, TimePattern):
+            if impulse_at is not None or impulse_every is not None:
+                raise ValueError(
+                    f"Transition '{id}': an impulse moves its rate at once; pass "
+                    "a fraction or an amount as `rate=`, not a TimePattern."
+                )
             if stratified_rates is not None:
                 raise ValueError(
                     f"Transition '{id}': pass either a TimePattern as `rate=` "
@@ -461,7 +491,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates
+                id, source, target, rate, stratified_rates, impulse_at, impulse_every
             )
             return self
 
@@ -490,6 +520,8 @@ class ModelBuilder:
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
                 per_compartment=per_compartment,
+                impulse_at=impulse_at,
+                impulse_every=impulse_every,
             )
         )
         logging.info(
@@ -563,6 +595,8 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -581,6 +615,8 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
+        impulse_at, impulse_every : optional
+            Impulse schedule of every expanded transition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -654,6 +690,8 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
+                    impulse_at=impulse_at,
+                    impulse_every=impulse_every,
                 )
             )
 
@@ -888,7 +926,7 @@ class ModelBuilder:
         ----------
         typology : str
             Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations".
+            "DifferenceEquations" or "DifferentialEquations".
 
         Returns
         -------
@@ -920,6 +958,7 @@ class ModelBuilder:
         dynamics = Dynamics(
             typology=validated_typology,
             transitions=self._transitions,
+            solver=self._solver,
         )
 
         model = Model(
@@ -929,6 +968,7 @@ class ModelBuilder:
             population=population,
             parameters=self._parameters,
             dynamics=dynamics,
+            step_unit=self._step_unit,
         )
 
         logging.info(
@@ -943,19 +983,21 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, solver: OdeSolver | None = None, step_unit: str | None = None)
 ```
 
 Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type  | Description                                | Default                                                                                                                                                                                         |
-| ------------- | ----- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                      |
-| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                               |
-| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                |
-| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency(). |
+| Name          | Type        | Description                                | Default                                                                                                                                                                                                            |
+| ------------- | ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str`       | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
+| `description` | \`str       | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
+| `version`     | \`str       | None\`                                     | The version number of the model.                                                                                                                                                                                   |
+| `bin_unit`    | \`str       | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
+| `solver`      | \`OdeSolver | None\`                                     | Solver settings of a DifferentialEquations model (method and tolerances). None uses the defaults of OdeSolver. A DifferenceEquations model takes none.                                                             |
+| `step_unit`   | \`str       | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -966,6 +1008,8 @@ def __init__(
     description: str | None = None,
     version: str | None = None,
     bin_unit: str | None = None,
+    solver: OdeSolver | None = None,
+    step_unit: str | None = None,
 ):
     """
     Initialize the ModelBuilder.
@@ -983,11 +1027,22 @@ def __init__(
         Individual bins can override this with their own unit parameter.
         Units are optional but required for model.print_equations() and
         model.check_unit_consistency().
+    solver : OdeSolver | None, default=None
+        Solver settings of a DifferentialEquations model (method and
+        tolerances). None uses the defaults of `OdeSolver`. A
+        DifferenceEquations model takes none.
+    step_unit : str | None, default=None
+        Unit of one step on the axis, of any single dimension (for example
+        ``"day"`` or ``"meter"``). The unit check requires every flow to be
+        ``<bin unit>/<step_unit>``. None infers it from the parameter units
+        of dimension time.
     """
     self._name: str = name
     self._description: str | None = description
     self._version: str | None = version
     self._bin_unit: str | None = bin_unit
+    self._solver: OdeSolver | None = solver
+    self._step_unit: str | None = step_unit
 
     self._bins: list[Bin] = []
     self._accumulators: list[Accumulator] = []
@@ -1283,7 +1338,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -1310,15 +1365,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type         | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                              |
-| ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`               | `str`        | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                           |
-| `source`           | `list[str]`  | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                           |
-| `target`           | `list[str]`  | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
-| `rate`             | \`str        | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
-| `stratified_rates` | \`list[dict] | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
-| `per_compartment`  | \`bool       | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
-| `accumulators`     | \`list[str]  | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
+| Name               | Type                  | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                              |
+| ------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                           |
+| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                           |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
+| `rate`             | \`str                 | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
+| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
+| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
+| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                       | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (per-capita) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                              |
+| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                       | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                |
 
 Returns:
 
@@ -1344,6 +1401,8 @@ def add_transition(
     stratified_rates: list[StratifiedRateDict] | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
+    impulse_at: list[float] | None = None,
+    impulse_every: tuple[float, float] | None = None,
 ) -> Self:
     """
     Add a transition between states to the model.
@@ -1422,6 +1481,16 @@ def add_transition(
     accumulators : list[str] | None, default=None
         Ids of accumulators that add up the flow of this transition.
 
+    impulse_at : list[float] | None, default=None
+        Make the transition an impulse at these positions on the axis. At
+        each one, ``rate`` is the fraction of the source (per-capita) or the
+        amount (absolute) moved at once, before the flows of that step. A
+        DifferenceEquations model needs integer positions.
+
+    impulse_every : tuple[float, float] | None, default=None
+        ``(period, offset)``: make the transition an impulse at ``offset``,
+        ``offset + period``, ``offset + 2 * period``, ...
+
     Returns
     -------
     ModelBuilder
@@ -1439,6 +1508,11 @@ def add_transition(
     # specifies the time-varying behaviour, so passing `stratified_rates=`
     # alongside it is a conflict.
     if isinstance(rate, TimePattern):
+        if impulse_at is not None or impulse_every is not None:
+            raise ValueError(
+                f"Transition '{id}': an impulse moves its rate at once; pass "
+                "a fraction or an amount as `rate=`, not a TimePattern."
+            )
         if stratified_rates is not None:
             raise ValueError(
                 f"Transition '{id}': pass either a TimePattern as `rate=` "
@@ -1479,7 +1553,7 @@ def add_transition(
     if rate and "$compartment" in rate:
         self._validate_compartment_placeholder(id, source, target)
         self._expand_compartment_transition(
-            id, source, target, rate, stratified_rates
+            id, source, target, rate, stratified_rates, impulse_at, impulse_every
         )
         return self
 
@@ -1508,6 +1582,8 @@ def add_transition(
             rate=rate,
             stratified_rates=stratified_rates_objects,
             per_compartment=per_compartment,
+            impulse_at=impulse_at,
+            impulse_every=impulse_every,
         )
     )
     logging.info(
@@ -1799,9 +1875,9 @@ Build and return the final Model instance.
 
 Parameters:
 
-| Name       | Type  | Description                                                                           | Default    |
-| ---------- | ----- | ------------------------------------------------------------------------------------- | ---------- |
-| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations". | *required* |
+| Name       | Type  | Description                                                                                                      | Default    |
+| ---------- | ----- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations" or "DifferentialEquations". | *required* |
 
 Returns:
 
@@ -1826,7 +1902,7 @@ def build(self, typology: str) -> Model:
     ----------
     typology : str
         Type of the model. Must be one of the valid ModelTypes values:
-        "DifferenceEquations".
+        "DifferenceEquations" or "DifferentialEquations".
 
     Returns
     -------
@@ -1858,6 +1934,7 @@ def build(self, typology: str) -> Model:
     dynamics = Dynamics(
         typology=validated_typology,
         transitions=self._transitions,
+        solver=self._solver,
     )
 
     model = Model(
@@ -1867,6 +1944,7 @@ def build(self, typology: str) -> Model:
         population=population,
         parameters=self._parameters,
         dynamics=dynamics,
+        step_unit=self._step_unit,
     )
 
     logging.info(

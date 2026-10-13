@@ -20,6 +20,7 @@ Attributes:
 | `population`  | `Population`      | Population details, subpopulations, stratifications and initial conditions. |
 | `parameters`  | `list[Parameter]` | A list of global model parameters.                                          |
 | `dynamics`    | `Dynamics`        | The rules that govern system evolution.                                     |
+| `step_unit`   | \`str             | None\`                                                                      |
 
 Source code in `commol/context/model.py`
 
@@ -42,6 +43,10 @@ class Model(BaseModel):
         A list of global model parameters.
     dynamics : Dynamics
         The rules that govern system evolution.
+    step_unit : str | None
+        Unit of one step on the axis, of any single dimension (``"day"``,
+        ``"meter"``). The unit check uses it; when None, the check infers it
+        from the parameter units of dimension time (or uses ``step``).
     """
 
     name: str = Field(..., description="Name which identifies the model.")
@@ -54,6 +59,14 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+    step_unit: str | None = Field(
+        None,
+        description=(
+            "Unit of one step on the axis (the independent variable, of any "
+            "dimension), for the unit check. "
+            "Inferred from the parameter units when None."
+        ),
+    )
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:

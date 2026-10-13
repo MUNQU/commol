@@ -459,7 +459,14 @@ print(sorted(results))   # ['A', 'B', 'C', 'cum_ab']
 print(len(results["A"]))  # 51: step 0 to step 50
 ```
 
-`DifferenceEquations` is the only typology that runs: time advances in whole steps, and each step applies every flow once.
+Two typologies run, with the same model definition:
+
+| Typology                | Time                                                                    | Engine                |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------- |
+| `DifferenceEquations`   | Advances in whole steps; each step applies every flow once.             | `commol-difference`   |
+| `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
+
+See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).
 
 ## Stratifications
 
@@ -732,6 +739,10 @@ print(scale.window_start(0, week), scale.window_end(0, week))  # 0 168
 print(scale.window_index(168, week))                             # 0
 ```
 
+Rates for difference models only
+
+`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities, which a `DifferenceEquations` model applies once per step. A `DifferentialEquations` model integrates its rates in continuous time, so it needs the continuous rate: `1 / duration` for a mean duration and `-ln(1 - p) / period` for a probability `p` over a period, both in steps. With the per-step value, the model moves too little.
+
 A window covers the steps `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
 
 ## Next steps
@@ -873,7 +884,7 @@ builder = (
 
 ### Names the engine sets
 
-The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-difference/src/builder.rs`):
+The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-model/src/builder.rs`):
 
 | Name                        | Example                                   |
 | --------------------------- | ----------------------------------------- |
@@ -1090,7 +1101,7 @@ print(reloaded == stratified_model)  # True
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-A transition moves population at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, and what `build` checks.
+A transition moves population at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, impulses, and what `build` checks.
 
 ## Quick path
 
@@ -1131,6 +1142,8 @@ model.print_equations()  # shows every flow as the engine computes it
 | `stratified_rates` | `list[dict] \| None`                    | `None`   | Rates for some categories; see [Stratified rates](#stratified-rates).                                                                               |
 | `per_compartment`  | `bool \| None`                          | `None`   | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment).                                           |
 | `accumulators`     | `list[str] \| None`                     | `None`   | Accumulators that count the flow; see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#accumulators).                 |
+| `impulse_at`       | `list[float] \| None`                   | `None`   | Makes the transition an impulse at these steps; see [Impulses](#impulses).                                                                          |
+| `impulse_every`    | `tuple[float, float] \| None`           | `None`   | `(period, offset)`: an impulse at `offset`, `offset + period`, …; see [Impulses](#impulses).                                                        |
 
 ## Rates
 
@@ -1437,18 +1450,56 @@ redirect.print_equations()
 
 A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md), a [time-series parameter](https://munqu.github.io/commol/latest/guide/building-models/#time-series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
 
+## Impulses
+
+An impulse moves its amount at once, at given steps, and nothing between them. Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The rate is then a fraction of the source (per-capita) or an amount (absolute), with the same [rules](#absolute-and-per-capita-rates), sources, targets, stratified rates and accumulators as any transition.
+
+```python
+impulse_model = (
+    ModelBuilder(name="Impulses")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_accumulator(id="moved", name="Moved by the impulse")
+    .add_parameter(id="p", value=0.25)
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="jump", source=["A"], target=["B"], rate="p", impulse_at=[1], accumulators=["moved"])
+    .add_transition(id="flow", source=["A"], target=["B"], rate="k")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(typology="DifferenceEquations")
+)
+
+jumped = Simulation(impulse_model).run(num_steps=2)
+print([round(a, 1) for a in jumped["A"]])  # [1000.0, 675.0, 607.5]
+print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
+```
+
+| Rule                         | In both engines                                                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).   |
+| Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                          |
+| Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
+| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                         |
+| `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
+
+An impulse is not a pulse rate. A [`TimePattern.pulse`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one time unit, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+
 ## What building checks
 
 `build` plans every flow in the engine and rejects a transition it cannot simulate as written:
 
-| Rejected                                                                      | Message names                                            |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------- |
-| A source or target that is neither a bin nor a category of one stratification | The transition                                           |
-| A category transition without exactly one source and one target               | The transition                                           |
-| A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names                     |
-| Several sources with a per-capita rate                                        | The transition; use an absolute rate or `$compartment`   |
-| A stratified rate whose `category` conditions match no source compartment     | The categories; use `to` to reach another stratification |
-| A flow that ends in categories no compartment has                             | The transition; add a `to` condition                     |
+| Rejected                                                                                     | Message names                                            |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| A source or target that is neither a bin nor a category of one stratification                | The transition                                           |
+| A category transition without exactly one source and one target                              | The transition                                           |
+| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                     |
+| Several sources with a per-capita rate                                                       | The transition; use an absolute rate or `$compartment`   |
+| A stratified rate whose `category` conditions match no source compartment                    | The categories; use `to` to reach another stratification |
+| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                     |
+| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                           |
+| A non-integer impulse step in a `DifferenceEquations` model                                  | The transition and the step                              |
 
 ## Next steps
 
@@ -1895,6 +1946,10 @@ routed = Simulation(routing).run(num_steps=2)
 print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
 ```
 
+## Patterns in a differential model
+
+A pattern reads `step`. In a `DifferentialEquations` model, `step` is constant on each unit interval `[n, n + 1)`, so a pattern is a rate that holds for one time unit. A per-capita `pulse` of `amount` moves `1 − e^(−amount)` of its source there, and `amount` in a difference model. To move a fraction at once in both engines, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses). See [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step).
+
 ## How patterns are stored
 
 Numeric `pulse` and `pulses` patterns become [time-series parameters](https://munqu.github.io/commol/latest/guide/building-models/#time-series-parameters) instead of long formulas, so equations stay readable and many pulses stay fast:
@@ -1951,7 +2006,7 @@ model.print_equations()
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, and that every function receives a plain number. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -1971,7 +2026,9 @@ model.print_equations()
 
 ### The step unit
 
-The engine applies every flow once per step and converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`):
+The engine applies every flow once per step and converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`).
+
+The axis of a model is its independent variable: the quantity the model steps along or differentiates over. Time is one case; a length, a dose or any other quantity is another. So the step unit may have any single dimension. Declare it with `ModelBuilder(..., step_unit="meter")` (`Model.step_unit`); `check_step_unit` accepts one unit of one dimension with exponent 1, such as `day` or `meter`, and rejects `1/day` or `meter**2`. When it is not declared, the check infers it from the parameters:
 
 | Parameter units                                        | Step unit | Result                                       |
 | ------------------------------------------------------ | --------- | -------------------------------------------- |
@@ -1981,7 +2038,29 @@ The engine applies every flow once per step and converts no value between units.
 | No unit of time                                        | `step`    | Flows must be `<bin unit>/step`              |
 | `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"`  | —         | Error that names each parameter and its unit |
 
-A unit of time is any unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `person/week` does not match `person/day`, because the engine would apply a weekly rate every day.
+Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `person/week` does not match `person/day`, because the engine would apply a weekly rate every day.
+
+```python
+along_a_line = (
+    ModelBuilder(name="Along a line", bin_unit="item", step_unit="meter")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k1", value=0.01, unit="1/meter")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(typology="DifferentialEquations")
+)
+along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
+```
+
+`TimeScale.from_step_unit(unit)` gives the time scale of a step unit of time, and raises `ValueError` for a unit of another dimension, such as `meter`.
+
+### Impulses
+
+An impulse moves an amount at once, so its rate must have the bin unit: `p * A` with `p` in `"dimensionless"` is an amount of `<bin unit>`; `k * A` with `k` in `"1/day"` is a flow and fails with `expected '<bin unit>'`.
 
 ### What the check catches
 
@@ -2069,7 +2148,7 @@ Units appear only when every bin and every constant parameter has one. If only s
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-`Simulation` runs a built `Model` in the Rust engine and returns its outputs: one series per compartment and per accumulator. This page covers running a model, reading and aggregating its outputs, and plotting them.
+`Simulation` runs a built `Model` in the Rust engine and returns its outputs: one series per compartment and per accumulator. This page covers running a model, reading and aggregating its outputs, running it in continuous time as differential equations, and plotting them.
 
 ## Quick path
 
@@ -2108,16 +2187,17 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## `Simulation`
 
-| Member                                                       | Returns                | What it does                                                                                                                                    |
-| ------------------------------------------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Simulation(model)`                                          | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                |
-| `run(num_steps, output_format="dict_of_lists")`              | results                | Runs `num_steps` steps from the initial state, with the model as it is now; see below. Raises `ValueError` if a parameter is still `None`.      |
-| `simulation_outputs`                                         | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                       |
-| `outputs_for(id)`                                            | `list[str]`            | The outputs of one bin or accumulator.                                                                                                          |
-| `group_outputs(ids)`                                         | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                       |
-| `total_series(results, ids)`                                 | `list[float]`          | The sum of all outputs of the given ids, at each step.                                                                                          |
-| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                              |
-| `engine`                                                     | engine                 | The underlying Rust engine, for the model as it is now. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
+| Member                                                       | Returns                | What it does                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Simulation(model)`                                          | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                         |
+| `run(num_steps, output_format="dict_of_lists")`              | results                | Runs `num_steps` steps from the initial state, with the model as it is now; see below. Raises `ValueError` if a parameter is still `None`.                                                                                                                               |
+| `run_at(steps, output_format="dict_of_lists")`               | results                | Runs from the initial state and reports at the given sorted steps only. A `DifferentialEquations` model takes any step, such as `0.5`; a `DifferenceEquations` model only integer steps (`ValueError` otherwise). See [Differential equations](#differential-equations). |
+| `simulation_outputs`                                         | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                |
+| `outputs_for(id)`                                            | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                   |
+| `group_outputs(ids)`                                         | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                |
+| `total_series(results, ids)`                                 | `list[float]`          | The sum of all outputs of the given ids, at each step.                                                                                                                                                                                                                   |
+| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                       |
+| `engine`                                                     | engine                 | The underlying Rust engine, for the model as it is now: `DifferenceEquations` or `DifferentialEquations`, as the typology names. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                 |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
 
@@ -2269,6 +2349,74 @@ print(window_end_steps(window_steps=7, num_steps=30))        # [7, 14, 21, 28]
 print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], 3))       # [6, 15]
 ```
 
+## Differential equations
+
+A model built with `typology="DifferentialEquations"` runs in continuous time. The engine (`crates/commol-differential/`) integrates `dX/dt = Σ flows(t, X)` with the ODE solver [diffsol](https://github.com/martinjrobins/diffsol). The flows are the same as in a difference model: the same transitions, rates, accumulators, outputs, calibration, reports and plots. Only the way the engine advances changes.
+
+```python
+import math
+
+from commol import OdeSolver
+
+ode_model = (
+    ModelBuilder(name="Decay", solver=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8))
+    .add_bin(id="A", name="A")
+    .add_bin(id="B", name="B")
+    .add_parameter(id="k1", value=0.1)
+    .add_accumulator(id="moved", name="Moved from A to B")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(typology="DifferentialEquations")
+)
+
+ode = Simulation(ode_model)
+at = ode.run_at([0, 0.5, 2.25])
+print(round(at["A"][2], 3), round(1000 * math.exp(-0.1 * 2.25), 3))  # 798.516 798.516
+print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of the flow
+```
+
+### Solver settings
+
+`OdeSolver` holds the settings. They are part of the model (`Dynamics.solver`), so a saved model reproduces its runs. Pass them to `ModelBuilder(..., solver=...)`; without them the defaults apply. A `DifferenceEquations` model has no solver settings (`ValidationError`).
+
+| Field    | Default    | Meaning                                                                                                                                                     |
+| -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method` | `"tsit45"` | `"tsit45"`: explicit Runge–Kutta 5(4), for non-stiff models. `"bdf"`: backward differentiation formulas, for stiff models (rates of very different speeds). |
+| `rtol`   | `1e-6`     | Relative tolerance of each state component.                                                                                                                 |
+| `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
+
+`bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
+
+### Time inside a step
+
+On `[n, n + 1)` a rate sees `step = n` and the continuous time `t`. So a rate that reads `step`, a time series or a time pattern is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A per-capita pulse `p` on step `n` acts as the constant rate `p` for one time unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).
+
+`TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step probabilities for difference models. A differential model needs the continuous rate; see [Steps and physical time](https://munqu.github.io/commol/latest/guide/core-concepts/#steps-and-physical-time).
+
+```python
+from commol import TimePattern
+
+pulse_model = (
+    ModelBuilder(name="Pulse")
+    .add_bin(id="A", name="A")
+    .add_bin(id="B", name="B")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate=TimePattern.pulse(at=2, amount=0.2))
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+)
+ode_pulse = Simulation(pulse_model.build(typology="DifferentialEquations")).run(num_steps=3)
+print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^−0.2)
+```
+
+### Reporting at any step
+
+`run_at(steps)` reports at sorted positions on the axis, from the dense output of the solver. Observations (`ObservedDataPoint.step`), windows (`window_steps`) and constraint steps may be non-integer for a differential model: the calibration reads the engine at those positions ([Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#steps-between-integers)). A difference model reports only at integer steps.
+
 ## Plotting
 
 `SimulationPlotter(simulation, results)` draws one subplot per output with seaborn, and returns the matplotlib `Figure`:
@@ -2296,7 +2444,7 @@ plotter.plot_series(
 | ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `output_file`                            | `None`                         | Where to save the figure. `None` only returns it.                                                                                                                                                                         |
 | `series`                                 | `None` (every output)          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
-| `observed_data`                          | `None`                         | `ObservedDataPoint`s to draw on the matching subplots.                                                                                                                                                                    |
+| `observed_data`                          | `None`                         | `ObservedDataPoint`s to draw on the matching subplots, at their steps (a differential model may observe between integers). A windowed line needs a whole number of `window_steps`.                                        |
 | `calibration_result`                     | `None`                         | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations.                                                                                                  |
 | `config`                                 | `PlotConfig()`                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                               |
 | `show_legend`                            | `True`                         | `plot_series` only.                                                                                                                                                                                                       |
@@ -2730,7 +2878,7 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `ObservedDataPoint` says what the model must reproduce: an output at a step. This page shows how to observe several outputs, sums of outputs, partial observations (scale factors) and counts per period (windows), and how to weigh them.
+An `ObservedDataPoint` says what the model must reproduce: an output at a step. This page shows how to observe several outputs, sums of outputs, partial observations (scale factors), counts per period (windows) and steps between integers, and how to weigh them.
 
 ## Quick path
 
@@ -2887,6 +3035,40 @@ print(calibrate_k1(weekly))  # 0.4
 | Combinations           | Works with `scale_id` and `compartments`.                                                     |
 
 `windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+
+## Steps between integers
+
+A `DifferentialEquations` model runs in continuous time, so an observation may be at any step, such as `2.5`, and a window may cover any length. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`). A `DifferenceEquations` model reports only at integer steps: `Calibrator` raises `ValueError`, naming the observation or the constraint, for a step that is not an integer (`check_steps_for_typology` in `py-commol/commol/context/calibration.py`).
+
+```python
+def ode_model(k1: float | None):
+    return (
+        ModelBuilder(name="Observed in continuous time")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_parameter(id="k1", value=k1)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        )
+        .build(typology="DifferentialEquations")
+    )
+
+steps = [0.5, 1.75, 3.25, 6.5]
+observed_b = Simulation(ode_model(0.2)).run_at(steps)["B"]
+problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(step=step, compartment="B", value=value)
+        for step, value in zip(steps, observed_b)
+    ],
+    parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    optimization_config=NelderMeadConfig(max_iterations=500),
+)
+print(round(Calibrator(Simulation(ode_model(None)), problem).run().best_parameters["k1"], 3))  # 0.2
+```
+
+A step that is a whole number is stored as an `int`, so `step=3.0` and `step=3` are the same observation.
 
 ## Stratified models
 
@@ -4296,7 +4478,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)                         | `ModelBuilder`                                                                                                                                                                                                                                                                                                                                   |
 | [Model](https://munqu.github.io/commol/latest/api/model/index.md)                                        | `Model`, `InitialCompartment`, `UnitConsistencyError`                                                                                                                                                                                                                                                                                            |
-| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                              | `Simulation`, `window_end_steps`, `windowed_totals`                                                                                                                                                                                                                                                                                              |
+| [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                              | `Simulation`, `OdeSolver`, `window_end_steps`, `windowed_totals`                                                                                                                                                                                                                                                                                 |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)                                  | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                                                                                |
 | [TimePattern](https://munqu.github.io/commol/latest/api/time-patterns/index.md)                          | `TimePattern`                                                                                                                                                                                                                                                                                                                                    |
 | [TimeScale](https://munqu.github.io/commol/latest/api/time-scale/index.md)                               | `TimeScale`                                                                                                                                                                                                                                                                                                                                      |
@@ -4344,7 +4526,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine: "DifferenceEquationsProtocol" = simulation.engine
+        self._engine: "EngineProtocol" = simulation.engine
 
         logger.info(
             (
@@ -4804,6 +4986,11 @@ class Calibrator:
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
                 )
+        check_steps_for_typology(
+            self.simulation.model_definition.dynamics.typology,
+            self.problem.observed_data,
+            self.problem.constraints,
+        )
 
     def _warn_constraint_time_steps_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""
@@ -4917,7 +5104,7 @@ def __init__(
     )
     self.simulation: Simulation = simulation
     self.problem: CalibrationProblem = problem
-    self._engine: "DifferenceEquationsProtocol" = simulation.engine
+    self._engine: "EngineProtocol" = simulation.engine
 
     logger.info(
         (
@@ -5395,7 +5582,7 @@ Attributes:
 
 | Name           | Type        | Description                                                                                                                                                                    |
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `step`         | `int`       | Time step of the observation                                                                                                                                                   |
+| `step`         | \`int       | float\`                                                                                                                                                                        |
 | `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set                                                                  |
 | `compartments` | \`list[str] | None\`                                                                                                                                                                         |
 | `value`        | `float`     | Observed value                                                                                                                                                                 |
@@ -5411,8 +5598,10 @@ class ObservedDataPoint(BaseModel):
 
     Attributes
     ----------
-    step : int
-        Time step of the observation
+    step : int | float
+        Position of the observation on the axis. A DifferentialEquations model
+        accepts any non-negative position; a DifferenceEquations model only an
+        integer step. A whole number is stored as an ``int``.
     compartment : str
         Name of the compartment being observed, or a display name for aggregate
         observations when compartments is set
@@ -5429,7 +5618,9 @@ class ObservedDataPoint(BaseModel):
         Optional scale parameter ID to apply to model output before comparison
     """
 
-    step: int = Field(default=..., ge=0, description="Time step of the observation")
+    step: int | float = Field(
+        default=..., ge=0, description="Position (step) of the observation"
+    )
     compartment: str = Field(
         default=..., min_length=1, description="Name of the compartment being observed"
     )
@@ -5447,7 +5638,7 @@ class ObservedDataPoint(BaseModel):
         default=None,
         description="Optional scale parameter ID to apply to model output",
     )
-    window_steps: int | None = Field(
+    window_steps: int | float | None = Field(
         default=None,
         gt=0,
         description=(
@@ -5455,6 +5646,16 @@ class ObservedDataPoint(BaseModel):
             "When set, prediction is value(step) - value(step - window_steps)."
         ),
     )
+
+    @field_validator("step", "window_steps")
+    @classmethod
+    def validate_finite_step(cls, value: int | float | None) -> int | float | None:
+        """Reject infinite or NaN steps; store a whole number as an int."""
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError(f"steps must be finite, got {value}")
+        return _whole_as_int(value)
 
     @model_validator(mode="after")
     def validate_window_steps(self) -> Self:
@@ -5469,6 +5670,30 @@ class ObservedDataPoint(BaseModel):
         if v is not None and not v:
             raise ValueError("compartments must be non-empty when provided")
         return v
+```
+
+### Methods:
+
+#### validate_finite_step
+
+```python
+validate_finite_step(value: int | float | None) -> int | float | None
+```
+
+Reject infinite or NaN steps; store a whole number as an int.
+
+Source code in `commol/context/calibration.py`
+
+```python
+@field_validator("step", "window_steps")
+@classmethod
+def validate_finite_step(cls, value: int | float | None) -> int | float | None:
+    """Reject infinite or NaN steps; store a whole number as an int."""
+    if value is None:
+        return None
+    if not math.isfinite(value):
+        raise ValueError(f"steps must be finite, got {value}")
+    return _whole_as_int(value)
 ```
 
 ## CalibrationParameter
@@ -5605,7 +5830,7 @@ Attributes:
 | `expression`  | `str`       | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When time_steps is specified, can also reference compartment values (S, I, R, etc.) at those time steps. |
 | `description` | \`str       | None\`                                                                                                                                                                                                                                   |
 | `weight`      | `float`     | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                                       |
-| `time_steps`  | \`list[int] | None\`                                                                                                                                                                                                                                   |
+| `time_steps`  | \`list\[int | float\]                                                                                                                                                                                                                                  |
 
 Examples:
 
@@ -5671,8 +5896,9 @@ class CalibrationConstraint(BaseModel):
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
         more important relative to others. The penalty for violating this constraint
         is: weight * violation^2
-    time_steps : list[int] | None
-        Optional time steps at which to evaluate this constraint. If None, constraint
+    time_steps : list[int | float] | None
+        Optional time steps at which to evaluate this constraint. Non-integer
+        steps need a DifferentialEquations model. If None, constraint
         is evaluated once before simulation using parameter values only. If specified,
         constraint is evaluated at each time step and can reference compartment values.
 
@@ -5724,10 +5950,11 @@ class CalibrationConstraint(BaseModel):
         gt=0.0,
         description="Penalty weight multiplier for violations",
     )
-    time_steps: list[int] | None = Field(
+    time_steps: list[int | float] | None = Field(
         default=None,
         description=(
-            "Optional time steps at which to evaluate (for time-dependent constraints)"
+            "Optional time steps at which to evaluate (for time-dependent "
+            "constraints). Non-integer steps need a DifferentialEquations model."
         ),
     )
 
@@ -5752,10 +5979,12 @@ class CalibrationConstraint(BaseModel):
                     f"time_steps for constraint '{self.id}' must not be empty if "
                     "specified"
                 )
-            if any(ts < 0 for ts in self.time_steps):
+            if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must all be non-negative"
+                    f"time_steps for constraint '{self.id}' must all be finite "
+                    "and non-negative"
                 )
+            self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
         return self
 ```
 
@@ -5805,10 +6034,12 @@ def validate_time_steps(self) -> Self:
                 f"time_steps for constraint '{self.id}' must not be empty if "
                 "specified"
             )
-        if any(ts < 0 for ts in self.time_steps):
+        if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
             raise ValueError(
-                f"time_steps for constraint '{self.id}' must all be non-negative"
+                f"time_steps for constraint '{self.id}' must all be finite "
+                "and non-negative"
             )
+        self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
     return self
 ```
 
@@ -6809,6 +7040,8 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
+        solver: OdeSolver | None = None,
+        step_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -6826,11 +7059,22 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
+        solver : OdeSolver | None, default=None
+            Solver settings of a DifferentialEquations model (method and
+            tolerances). None uses the defaults of `OdeSolver`. A
+            DifferenceEquations model takes none.
+        step_unit : str | None, default=None
+            Unit of one step on the axis, of any single dimension (for example
+            ``"day"`` or ``"meter"``). The unit check requires every flow to be
+            ``<bin unit>/<step_unit>``. None infers it from the parameter units
+            of dimension time.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
+        self._solver: OdeSolver | None = solver
+        self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -7074,6 +7318,8 @@ class ModelBuilder:
         stratified_rates: list[StratifiedRateDict] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -7152,6 +7398,16 @@ class ModelBuilder:
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
 
+        impulse_at : list[float] | None, default=None
+            Make the transition an impulse at these positions on the axis. At
+            each one, ``rate`` is the fraction of the source (per-capita) or the
+            amount (absolute) moved at once, before the flows of that step. A
+            DifferenceEquations model needs integer positions.
+
+        impulse_every : tuple[float, float] | None, default=None
+            ``(period, offset)``: make the transition an impulse at ``offset``,
+            ``offset + period``, ``offset + 2 * period``, ...
+
         Returns
         -------
         ModelBuilder
@@ -7169,6 +7425,11 @@ class ModelBuilder:
         # specifies the time-varying behaviour, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, TimePattern):
+            if impulse_at is not None or impulse_every is not None:
+                raise ValueError(
+                    f"Transition '{id}': an impulse moves its rate at once; pass "
+                    "a fraction or an amount as `rate=`, not a TimePattern."
+                )
             if stratified_rates is not None:
                 raise ValueError(
                     f"Transition '{id}': pass either a TimePattern as `rate=` "
@@ -7209,7 +7470,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates
+                id, source, target, rate, stratified_rates, impulse_at, impulse_every
             )
             return self
 
@@ -7238,6 +7499,8 @@ class ModelBuilder:
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
                 per_compartment=per_compartment,
+                impulse_at=impulse_at,
+                impulse_every=impulse_every,
             )
         )
         logging.info(
@@ -7311,6 +7574,8 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -7329,6 +7594,8 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
+        impulse_at, impulse_every : optional
+            Impulse schedule of every expanded transition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -7402,6 +7669,8 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
+                    impulse_at=impulse_at,
+                    impulse_every=impulse_every,
                 )
             )
 
@@ -7636,7 +7905,7 @@ class ModelBuilder:
         ----------
         typology : str
             Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations".
+            "DifferenceEquations" or "DifferentialEquations".
 
         Returns
         -------
@@ -7668,6 +7937,7 @@ class ModelBuilder:
         dynamics = Dynamics(
             typology=validated_typology,
             transitions=self._transitions,
+            solver=self._solver,
         )
 
         model = Model(
@@ -7677,6 +7947,7 @@ class ModelBuilder:
             population=population,
             parameters=self._parameters,
             dynamics=dynamics,
+            step_unit=self._step_unit,
         )
 
         logging.info(
@@ -7691,19 +7962,21 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, solver: OdeSolver | None = None, step_unit: str | None = None)
 ```
 
 Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type  | Description                                | Default                                                                                                                                                                                         |
-| ------------- | ----- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                      |
-| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                               |
-| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                |
-| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency(). |
+| Name          | Type        | Description                                | Default                                                                                                                                                                                                            |
+| ------------- | ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str`       | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
+| `description` | \`str       | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
+| `version`     | \`str       | None\`                                     | The version number of the model.                                                                                                                                                                                   |
+| `bin_unit`    | \`str       | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
+| `solver`      | \`OdeSolver | None\`                                     | Solver settings of a DifferentialEquations model (method and tolerances). None uses the defaults of OdeSolver. A DifferenceEquations model takes none.                                                             |
+| `step_unit`   | \`str       | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -7714,6 +7987,8 @@ def __init__(
     description: str | None = None,
     version: str | None = None,
     bin_unit: str | None = None,
+    solver: OdeSolver | None = None,
+    step_unit: str | None = None,
 ):
     """
     Initialize the ModelBuilder.
@@ -7731,11 +8006,22 @@ def __init__(
         Individual bins can override this with their own unit parameter.
         Units are optional but required for model.print_equations() and
         model.check_unit_consistency().
+    solver : OdeSolver | None, default=None
+        Solver settings of a DifferentialEquations model (method and
+        tolerances). None uses the defaults of `OdeSolver`. A
+        DifferenceEquations model takes none.
+    step_unit : str | None, default=None
+        Unit of one step on the axis, of any single dimension (for example
+        ``"day"`` or ``"meter"``). The unit check requires every flow to be
+        ``<bin unit>/<step_unit>``. None infers it from the parameter units
+        of dimension time.
     """
     self._name: str = name
     self._description: str | None = description
     self._version: str | None = version
     self._bin_unit: str | None = bin_unit
+    self._solver: OdeSolver | None = solver
+    self._step_unit: str | None = step_unit
 
     self._bins: list[Bin] = []
     self._accumulators: list[Accumulator] = []
@@ -8031,7 +8317,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -8058,15 +8344,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type         | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                              |
-| ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`               | `str`        | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                           |
-| `source`           | `list[str]`  | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                           |
-| `target`           | `list[str]`  | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
-| `rate`             | \`str        | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
-| `stratified_rates` | \`list[dict] | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
-| `per_compartment`  | \`bool       | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
-| `accumulators`     | \`list[str]  | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
+| Name               | Type                  | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                              |
+| ------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                           |
+| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                           |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
+| `rate`             | \`str                 | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
+| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
+| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
+| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                       | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (per-capita) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                              |
+| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                       | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                |
 
 Returns:
 
@@ -8092,6 +8380,8 @@ def add_transition(
     stratified_rates: list[StratifiedRateDict] | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
+    impulse_at: list[float] | None = None,
+    impulse_every: tuple[float, float] | None = None,
 ) -> Self:
     """
     Add a transition between states to the model.
@@ -8170,6 +8460,16 @@ def add_transition(
     accumulators : list[str] | None, default=None
         Ids of accumulators that add up the flow of this transition.
 
+    impulse_at : list[float] | None, default=None
+        Make the transition an impulse at these positions on the axis. At
+        each one, ``rate`` is the fraction of the source (per-capita) or the
+        amount (absolute) moved at once, before the flows of that step. A
+        DifferenceEquations model needs integer positions.
+
+    impulse_every : tuple[float, float] | None, default=None
+        ``(period, offset)``: make the transition an impulse at ``offset``,
+        ``offset + period``, ``offset + 2 * period``, ...
+
     Returns
     -------
     ModelBuilder
@@ -8187,6 +8487,11 @@ def add_transition(
     # specifies the time-varying behaviour, so passing `stratified_rates=`
     # alongside it is a conflict.
     if isinstance(rate, TimePattern):
+        if impulse_at is not None or impulse_every is not None:
+            raise ValueError(
+                f"Transition '{id}': an impulse moves its rate at once; pass "
+                "a fraction or an amount as `rate=`, not a TimePattern."
+            )
         if stratified_rates is not None:
             raise ValueError(
                 f"Transition '{id}': pass either a TimePattern as `rate=` "
@@ -8227,7 +8532,7 @@ def add_transition(
     if rate and "$compartment" in rate:
         self._validate_compartment_placeholder(id, source, target)
         self._expand_compartment_transition(
-            id, source, target, rate, stratified_rates
+            id, source, target, rate, stratified_rates, impulse_at, impulse_every
         )
         return self
 
@@ -8256,6 +8561,8 @@ def add_transition(
             rate=rate,
             stratified_rates=stratified_rates_objects,
             per_compartment=per_compartment,
+            impulse_at=impulse_at,
+            impulse_every=impulse_every,
         )
     )
     logging.info(
@@ -8547,9 +8854,9 @@ Build and return the final Model instance.
 
 Parameters:
 
-| Name       | Type  | Description                                                                           | Default    |
-| ---------- | ----- | ------------------------------------------------------------------------------------- | ---------- |
-| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations". | *required* |
+| Name       | Type  | Description                                                                                                      | Default    |
+| ---------- | ----- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations" or "DifferentialEquations". | *required* |
 
 Returns:
 
@@ -8574,7 +8881,7 @@ def build(self, typology: str) -> Model:
     ----------
     typology : str
         Type of the model. Must be one of the valid ModelTypes values:
-        "DifferenceEquations".
+        "DifferenceEquations" or "DifferentialEquations".
 
     Returns
     -------
@@ -8606,6 +8913,7 @@ def build(self, typology: str) -> Model:
     dynamics = Dynamics(
         typology=validated_typology,
         transitions=self._transitions,
+        solver=self._solver,
     )
 
     model = Model(
@@ -8615,6 +8923,7 @@ def build(self, typology: str) -> Model:
         population=population,
         parameters=self._parameters,
         dynamics=dynamics,
+        step_unit=self._step_unit,
     )
 
     logging.info(
@@ -8646,6 +8955,7 @@ Attributes:
 | `population`  | `Population`      | Population details, subpopulations, stratifications and initial conditions. |
 | `parameters`  | `list[Parameter]` | A list of global model parameters.                                          |
 | `dynamics`    | `Dynamics`        | The rules that govern system evolution.                                     |
+| `step_unit`   | \`str             | None\`                                                                      |
 
 Source code in `commol/context/model.py`
 
@@ -8668,6 +8978,10 @@ class Model(BaseModel):
         A list of global model parameters.
     dynamics : Dynamics
         The rules that govern system evolution.
+    step_unit : str | None
+        Unit of one step on the axis, of any single dimension (``"day"``,
+        ``"meter"``). The unit check uses it; when None, the check infers it
+        from the parameter units of dimension time (or uses ``step``).
     """
 
     name: str = Field(..., description="Name which identifies the model.")
@@ -8680,6 +8994,14 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+    step_unit: str | None = Field(
+        None,
+        description=(
+            "Unit of one step on the axis (the independent variable, of any "
+            "dimension), for the unit check. "
+            "Inferred from the parameter units when None."
+        ),
+    )
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:
@@ -10822,8 +11144,8 @@ class SimulationPlotter:
     @staticmethod
     def _apply_x_labels(
         ax: "Axes",
-        time_steps: list[int],
-        step_to_label: Callable[[int], str],
+        time_steps: Sequence[int | float],
+        step_to_label: Callable[..., str],
         tick_every: int | None,
     ) -> None:
         """
@@ -10872,10 +11194,20 @@ class SimulationPlotter:
         observation step.
 
         Returns None if no observed point has window_steps set.
+
+        Raises
+        ------
+        ValueError
+            If the window is not a whole number of steps.
         """
         window_steps = next((p.window_steps for p in observed if p.window_steps), None)
         if window_steps is None:
             return None
+        if not isinstance(window_steps, int):
+            raise ValueError(
+                f"The windowed line needs a window of whole steps, got "
+                f"{window_steps}; the plotted series holds integer steps only."
+            )
         steps = list(range(window_steps, len(series), window_steps))
         values = [series[t] - series[t - window_steps] for t in steps]
         return steps, values
@@ -11113,7 +11445,7 @@ class SimulationPlotter:
         self,
         axes: list["Axes"],
         bins_to_plot: list[str],
-        cumulative_observed: dict[str, list[tuple[int, float]]],
+        cumulative_observed: dict[str, list[tuple[int | float, float]]],
         calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None,
         kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
@@ -11400,7 +11732,7 @@ class SimulationPlotter:
         self,
         ax: "Axes",
         bin_id: str,
-        cumulative_observed: list[tuple[int, float]],
+        cumulative_observed: list[tuple[int | float, float]],
         prob_result: ProbabilisticCalibrationResult,
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
@@ -11510,12 +11842,12 @@ class SimulationPlotter:
         self,
         observed_by_bin: dict[str, list[ObservedDataPoint]],
         scale_values: dict[str, float],
-    ) -> dict[str, list[tuple[int, float]]]:
+    ) -> dict[str, list[tuple[int | float, float]]]:
         """
         Calculate cumulative observed data (step, cumulative_value).
         Applies scale if observation has a scale_id.
         """
-        cumulative: dict[str, list[tuple[int, float]]] = {}
+        cumulative: dict[str, list[tuple[int | float, float]]] = {}
 
         for bin_id, points in observed_by_bin.items():
             cumsum = []
@@ -11540,7 +11872,7 @@ class SimulationPlotter:
         ax: "Axes",
         bin_id: str,
         cumulative_values: list[float],
-        cumulative_observed: list[tuple[int, float]],
+        cumulative_observed: list[tuple[int | float, float]],
         plot_kwargs: dict[str, str | int | float | bool | None],
     ) -> None:
         """
@@ -12893,7 +13225,7 @@ Attributes:
 | `prediction_median`         | `dict[str, list[float]]`            | Median predictions for each compartment over time                                                                                             |
 | `prediction_ci_lower`       | `dict[str, list[float]]`            | Lower bound of confidence interval for each compartment over time                                                                             |
 | `prediction_ci_upper`       | `dict[str, list[float]]`            | Upper bound of confidence interval for each compartment over time                                                                             |
-| `windowed_prediction_steps` | `dict[str, list[int]]`              | Steps the windowed values are taken at, one per windowed observation                                                                          |
+| `windowed_prediction_steps` | \`dict\[str, list\[int              | float\]\]\`                                                                                                                                   |
 | `coverage_percentage`       | `float`                             | Percentage of observed data points within the confidence intervals                                                                            |
 | `average_ci_width`          | `float`                             | Average width of confidence intervals across time and compartments                                                                            |
 | `ci_width`                  | `float`                             | Mean observed-data interval width normalized by observation magnitude.                                                                        |
@@ -12931,7 +13263,7 @@ class EnsembleSolution(BaseModel):
         Lower bound of confidence interval for each compartment over time
     prediction_ci_upper : dict[str, list[float]]
         Upper bound of confidence interval for each compartment over time
-    windowed_prediction_steps : dict[str, list[int]]
+    windowed_prediction_steps : dict[str, list[int | float]]
         Steps the windowed values are taken at, one per windowed observation
     coverage_percentage : float
         Percentage of observed data points within the confidence intervals
@@ -12974,7 +13306,7 @@ class EnsembleSolution(BaseModel):
     prediction_ci_upper: dict[str, list[float]] = Field(
         description="Upper bound of confidence interval for each compartment over time"
     )
-    windowed_prediction_steps: dict[str, list[int]] = Field(
+    windowed_prediction_steps: dict[str, list[int | float]] = Field(
         default_factory=dict,
         description=(
             "Steps the windowed values are taken at, one entry per windowed "
@@ -13614,9 +13946,7 @@ class Simulation:
     def _build_engine(self, model_json: str) -> None:
         """Build the engine and its output names from a model JSON."""
         self._model_json: str = model_json
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine(
-            model_json
-        )
+        self._engine: "EngineProtocol" = build_engine(model_json)
         self._compartments: list[str] = self._engine.compartments
         self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
@@ -13664,23 +13994,6 @@ class Simulation:
                 f"Cannot run Simulation: {'; '.join(errors)}. "
                 f"Please calibrate these values before running a simulation."
             )
-
-    def _initialize_engine(self, model_json: str) -> "DifferenceEquationsProtocol":
-        """Internal method to set up the Rust backend."""
-        rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
-        logging.info("Rust model instance created from JSON.")
-
-        # This could be extended if you have more engine types
-        if self.model_definition.dynamics.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-            logging.info("Initializing DifferenceEquations engine.")
-            return difference.DifferenceEquations(rust_model_instance)
-
-        raise NotImplementedError(
-            (
-                f"Engine for typology '{self.model_definition.dynamics.typology}' "
-                f"not implemented."
-            )
-        )
 
     def _run_raw(self, num_steps: int) -> list[list[float]]:
         """
@@ -13757,8 +14070,65 @@ class Simulation:
         else:
             assert_never(output_format)
 
+    def run_at(
+        self,
+        steps: Sequence[float],
+        output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
+    ) -> dict[str, list[float]] | list[list[float]]:
+        """
+        Runs the simulation from the initial state and reports at given steps.
+
+        The steps are positions on the axis, the independent variable of the
+        model (time or any other quantity). A
+        DifferentialEquations model reports at any position, from the dense
+        output of its solver; a DifferenceEquations model only at integer
+        steps.
+
+        Parameters
+        ----------
+        steps : Sequence[float]
+            Sorted, unique, non-negative positions to report at.
+        output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
+            As in `run`: one value per position for each output, or one row
+            per position.
+
+        Returns
+        -------
+        dict[str, list[float]] | list[list[float]]
+            The outputs at each position, in the specified format.
+
+        Raises
+        ------
+        ValueError
+            If a parameter or initial condition has no value, the steps are not
+            sorted and unique, or a step is not an integer in a
+            DifferenceEquations model.
+        """
+        positions = [float(step) for step in steps]
+        if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
+            raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
+        if any(position < 0 for position in positions):
+            raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+        self._validate_all_parameters_calibrated(self.model_definition)
+        self._sync_engine()
+        self._engine.reset()
+        try:
+            rows = self._engine.run_at(positions)
+        except RuntimeError as error:
+            raise ValueError(str(error)) from error
+        if output_format == "list_of_lists":
+            return rows
+        if output_format == "dict_of_lists":
+            if not rows:
+                return {c: [] for c in self._simulation_outputs}
+            return {
+                column: list(values)
+                for column, values in zip(self._simulation_outputs, zip(*rows))
+            }
+        assert_never(output_format)
+
     @property
-    def engine(self) -> "DifferenceEquationsProtocol":
+    def engine(self) -> "EngineProtocol":
         """
         The engine for the current ``model_definition``.
 
@@ -13911,7 +14281,7 @@ class Simulation:
 #### engine
 
 ```python
-engine: DifferenceEquationsProtocol
+engine: EngineProtocol
 ```
 
 The engine for the current `model_definition`.
@@ -14057,6 +14427,96 @@ def run(
 
     else:
         assert_never(output_format)
+```
+
+#### run_at
+
+```python
+run_at(steps: Sequence[float], output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
+```
+
+Runs the simulation from the initial state and reports at given steps.
+
+The steps are positions on the axis, the independent variable of the model (time or any other quantity). A DifferentialEquations model reports at any position, from the dense output of its solver; a DifferenceEquations model only at integer steps.
+
+Parameters:
+
+| Name            | Type                             | Description                                                                 | Default           |
+| --------------- | -------------------------------- | --------------------------------------------------------------------------- | ----------------- |
+| `steps`         | `Sequence[float]`                | Sorted, unique, non-negative positions to report at.                        | *required*        |
+| `output_format` | `(dict_of_lists, list_of_lists)` | As in run: one value per position for each output, or one row per position. | `'dict_of_lists'` |
+
+Returns:
+
+| Type                       | Description           |
+| -------------------------- | --------------------- |
+| \`dict\[str, list[float]\] | list\[list[float]\]\` |
+
+Raises:
+
+| Type         | Description                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a parameter or initial condition has no value, the steps are not sorted and unique, or a step is not an integer in a DifferenceEquations model. |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def run_at(
+    self,
+    steps: Sequence[float],
+    output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
+) -> dict[str, list[float]] | list[list[float]]:
+    """
+    Runs the simulation from the initial state and reports at given steps.
+
+    The steps are positions on the axis, the independent variable of the
+    model (time or any other quantity). A
+    DifferentialEquations model reports at any position, from the dense
+    output of its solver; a DifferenceEquations model only at integer
+    steps.
+
+    Parameters
+    ----------
+    steps : Sequence[float]
+        Sorted, unique, non-negative positions to report at.
+    output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
+        As in `run`: one value per position for each output, or one row
+        per position.
+
+    Returns
+    -------
+    dict[str, list[float]] | list[list[float]]
+        The outputs at each position, in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If a parameter or initial condition has no value, the steps are not
+        sorted and unique, or a step is not an integer in a
+        DifferenceEquations model.
+    """
+    positions = [float(step) for step in steps]
+    if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
+        raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
+    if any(position < 0 for position in positions):
+        raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+    self._validate_all_parameters_calibrated(self.model_definition)
+    self._sync_engine()
+    self._engine.reset()
+    try:
+        rows = self._engine.run_at(positions)
+    except RuntimeError as error:
+        raise ValueError(str(error)) from error
+    if output_format == "list_of_lists":
+        return rows
+    if output_format == "dict_of_lists":
+        if not rows:
+            return {c: [] for c in self._simulation_outputs}
+        return {
+            column: list(values)
+            for column, values in zip(self._simulation_outputs, zip(*rows))
+        }
+    assert_never(output_format)
 ```
 
 #### outputs_for
@@ -14312,6 +14772,45 @@ def windowed_totals(
         window_steps,
         at_steps,
     )
+```
+
+## OdeSolver
+
+Bases: `BaseModel`
+
+Solver settings of a differential-equations model.
+
+Attributes:
+
+| Name     | Type                       | Description                                                                                                                      |
+| -------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `method` | `Literal['tsit45', 'bdf']` | "tsit45": explicit Tsitouras 5(4) Runge-Kutta, for non-stiff models. "bdf": backward differentiation formulas, for stiff models. |
+| `rtol`   | `float`                    | Relative tolerance of each state component.                                                                                      |
+| `atol`   | `float`                    | Absolute tolerance of each state component, in the unit of the bins.                                                             |
+
+Source code in `commol/context/dynamics.py`
+
+```python
+class OdeSolver(BaseModel):
+    """
+    Solver settings of a differential-equations model.
+
+    Attributes
+    ----------
+    method : Literal["tsit45", "bdf"]
+        ``"tsit45"``: explicit Tsitouras 5(4) Runge-Kutta, for non-stiff
+        models. ``"bdf"``: backward differentiation formulas, for stiff models.
+    rtol : float
+        Relative tolerance of each state component.
+    atol : float
+        Absolute tolerance of each state component, in the unit of the bins.
+    """
+
+    method: Literal["tsit45", "bdf"] = Field(
+        default="tsit45", description="Integration method."
+    )
+    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
+    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
 
 ## window_end_steps
@@ -15159,6 +15658,10 @@ A model is defined purely in steps. Attaching a duration to a step makes it poss
 
 Units up to a week have a fixed length and are provided directly. Months and years vary in length and have no single definition in step terms; give them as an explicit number of days.
 
+Warnings
+
+`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities for a DifferenceEquations model. A DifferentialEquations model needs a continuous rate instead: `1 / duration` for a mean duration, and `-ln(1 - p) / period` for a probability `p` over a period (both in steps).
+
 Attributes:
 
 | Name           | Type    | Description                                              |
@@ -15180,6 +15683,14 @@ class TimeScale(BaseModel):
     and years vary in length and have no single definition in step terms; give
     them as an explicit number of days.
 
+    Warnings
+    --------
+    `rate_from_mean_duration` and `rate_from_probability` return per-step
+    probabilities for a DifferenceEquations model. A DifferentialEquations
+    model needs a continuous rate instead: ``1 / duration`` for a mean
+    duration, and ``-ln(1 - p) / period`` for a probability ``p`` over a
+    period (both in steps).
+
     Attributes
     ----------
     step_seconds : float
@@ -15191,6 +15702,44 @@ class TimeScale(BaseModel):
     step_seconds: float = Field(
         gt=0.0, description="Duration of one simulation step, in seconds."
     )
+
+    @classmethod
+    def from_step_unit(cls, unit: str) -> "TimeScale":
+        """
+        Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
+
+        The axis of a model is its independent variable and need not be time
+        (``step_unit="meter"``, for example); a time scale applies only when it
+        is time.
+
+        Parameters
+        ----------
+        unit : str
+            Step unit of a model, of dimension time.
+
+        Returns
+        -------
+        TimeScale
+            A scale with ``step_seconds`` equal to one `unit`.
+
+        Raises
+        ------
+        ValueError
+            If `unit` is not a unit of time; the message names it.
+        """
+        from commol.utils.equations import ureg
+
+        try:
+            quantity = ureg.Quantity(1.0, unit)
+        except Exception as error:
+            raise ValueError(f"'{unit}' is not a unit: {error}") from error
+        if quantity.dimensionality != ureg.second.dimensionality:
+            raise ValueError(
+                f"A TimeScale needs a step unit of time; '{unit}' has dimension "
+                f"{quantity.dimensionality}. A model whose axis is not time has "
+                f"no time scale."
+            )
+        return cls(step_seconds=float(quantity.to("second").magnitude))
 
     def steps_from_seconds(self, seconds: float) -> int:
         """
@@ -15259,6 +15808,10 @@ class TimeScale(BaseModel):
         that an exponential process of that mean duration fires within one
         step.
 
+        This is a rate for a DifferenceEquations model only. A
+        DifferentialEquations model needs the continuous rate
+        ``step_seconds / duration_seconds``.
+
         Parameters
         ----------
         duration_seconds : float
@@ -15286,6 +15839,10 @@ class TimeScale(BaseModel):
 
         Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
         rate that accumulates to `probability` over `period_steps` steps.
+
+        This is a rate for a DifferenceEquations model only. A
+        DifferentialEquations model needs the continuous rate
+        ``-ln(1 - probability) / period_steps``.
 
         Parameters
         ----------
@@ -15429,6 +15986,76 @@ Steps in one week.
 
 ### Methods:
 
+#### from_step_unit
+
+```python
+from_step_unit(unit: str) -> TimeScale
+```
+
+Time scale whose step lasts one `unit`, such as `"day"` or `"h"`.
+
+The axis of a model is its independent variable and need not be time (`step_unit="meter"`, for example); a time scale applies only when it is time.
+
+Parameters:
+
+| Name   | Type  | Description                              | Default    |
+| ------ | ----- | ---------------------------------------- | ---------- |
+| `unit` | `str` | Step unit of a model, of dimension time. | *required* |
+
+Returns:
+
+| Type        | Description                                  |
+| ----------- | -------------------------------------------- |
+| `TimeScale` | A scale with step_seconds equal to one unit. |
+
+Raises:
+
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If unit is not a unit of time; the message names it. |
+
+Source code in `commol/api/time_scale.py`
+
+```python
+@classmethod
+def from_step_unit(cls, unit: str) -> "TimeScale":
+    """
+    Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
+
+    The axis of a model is its independent variable and need not be time
+    (``step_unit="meter"``, for example); a time scale applies only when it
+    is time.
+
+    Parameters
+    ----------
+    unit : str
+        Step unit of a model, of dimension time.
+
+    Returns
+    -------
+    TimeScale
+        A scale with ``step_seconds`` equal to one `unit`.
+
+    Raises
+    ------
+    ValueError
+        If `unit` is not a unit of time; the message names it.
+    """
+    from commol.utils.equations import ureg
+
+    try:
+        quantity = ureg.Quantity(1.0, unit)
+    except Exception as error:
+        raise ValueError(f"'{unit}' is not a unit: {error}") from error
+    if quantity.dimensionality != ureg.second.dimensionality:
+        raise ValueError(
+            f"A TimeScale needs a step unit of time; '{unit}' has dimension "
+            f"{quantity.dimensionality}. A model whose axis is not time has "
+            f"no time scale."
+        )
+    return cls(step_seconds=float(quantity.to("second").magnitude))
+```
+
 #### steps_from_seconds
 
 ```python
@@ -15561,6 +16188,8 @@ Per-step rate of leaving a state with a given mean residence time.
 
 Returns `1 - exp(-step_seconds / duration_seconds)`, the probability that an exponential process of that mean duration fires within one step.
 
+This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `step_seconds / duration_seconds`.
+
 Parameters:
 
 | Name               | Type    | Description                               | Default    |
@@ -15589,6 +16218,10 @@ def rate_from_mean_duration(self, duration_seconds: float) -> float:
     Returns ``1 - exp(-step_seconds / duration_seconds)``, the probability
     that an exponential process of that mean duration fires within one
     step.
+
+    This is a rate for a DifferenceEquations model only. A
+    DifferentialEquations model needs the continuous rate
+    ``step_seconds / duration_seconds``.
 
     Parameters
     ----------
@@ -15622,6 +16255,8 @@ Per-step rate equivalent to a probability over a longer period.
 
 Returns `1 - (1 - probability) ** (1 / period_steps)`, the per-step rate that accumulates to `probability` over `period_steps` steps.
 
+This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `-ln(1 - probability) / period_steps`.
+
 Parameters:
 
 | Name           | Type    | Description                                                      | Default    |
@@ -15650,6 +16285,10 @@ def rate_from_probability(self, probability: float, period_steps: int) -> float:
 
     Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
     rate that accumulates to `probability` over `period_steps` steps.
+
+    This is a rate for a DifferenceEquations model only. A
+    DifferentialEquations model needs the continuous rate
+    ``-ln(1 - probability) / period_steps``.
 
     Parameters
     ----------
@@ -15861,7 +16500,7 @@ def window_index(self, step: int, period_steps: int) -> int:
 A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same structure from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
 ```text
-Model                      name, description, version
+Model                      name, description, version, step_unit
 ├── population: Population
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]
@@ -15875,8 +16514,9 @@ Model                      name, description, version
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a TimeSeriesValue)
 └── dynamics: Dynamics
-    ├── typology: "DifferenceEquations"
-    └── transitions: [Transition]
+    ├── typology: "DifferenceEquations" or "DifferentialEquations"
+    ├── solver: OdeSolver | None            (differential models only)
+    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
         └── stratified_rates: [StratifiedRate]
             └── conditions: [StratificationCondition]
 ```
@@ -16897,6 +17537,7 @@ Attributes:
 | ------------- | --------------------------------------------------------- | ---------------------------------- |
 | `typology`    | `Literal['DifferenceEquations', 'DifferentialEquations']` | The type of model.                 |
 | `transitions` | `List[Transition]`                                        | A list of rules for state changes. |
+| `solver`      | \`OdeSolver                                               | None\`                             |
 
 Source code in `commol/context/dynamics.py`
 
@@ -16911,12 +17552,41 @@ class Dynamics(BaseModel):
         The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
+    solver : OdeSolver | None
+        Solver settings of a differential-equations model; None uses the
+        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     typology: Literal[
         ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
     ]
     transitions: list[Transition]
+    solver: OdeSolver | None = Field(
+        default=None,
+        description="Solver settings of a differential-equations model.",
+    )
+
+    @model_validator(mode="after")
+    def validate_typology_settings(self) -> Self:
+        """
+        A solver needs a differential model; a difference model steps only at
+        integers, so its impulse positions must be integers.
+        """
+        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
+            if self.solver is not None:
+                raise ValueError(
+                    "Solver settings apply only to a DifferentialEquations model; "
+                    "a DifferenceEquations model has no solver."
+                )
+            for transition in self.transitions:
+                bad = [p for p in transition.impulse_positions() if p != int(p)]
+                if bad:
+                    raise ValueError(
+                        f"Transition '{transition.id}': impulse position {bad[0]} "
+                        f"is not an integer step; a DifferenceEquations model "
+                        f"steps only at integers."
+                    )
+        return self
 
     @field_validator("transitions")
     @classmethod
@@ -16941,6 +17611,40 @@ class Dynamics(BaseModel):
 ```
 
 ### Methods:
+
+#### validate_typology_settings
+
+```python
+validate_typology_settings() -> Self
+```
+
+A solver needs a differential model; a difference model steps only at integers, so its impulse positions must be integers.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+@model_validator(mode="after")
+def validate_typology_settings(self) -> Self:
+    """
+    A solver needs a differential model; a difference model steps only at
+    integers, so its impulse positions must be integers.
+    """
+    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
+        if self.solver is not None:
+            raise ValueError(
+                "Solver settings apply only to a DifferentialEquations model; "
+                "a DifferenceEquations model has no solver."
+            )
+        for transition in self.transitions:
+            bad = [p for p in transition.impulse_positions() if p != int(p)]
+            if bad:
+                raise ValueError(
+                    f"Transition '{transition.id}': impulse position {bad[0]} "
+                    f"is not an integer step; a DifferenceEquations model "
+                    f"steps only at integers."
+                )
+    return self
+```
 
 #### validate_transitions_not_empty
 
@@ -17071,6 +17775,73 @@ class Transition(BaseModel):
         ),
     )
 
+    impulse_at: list[float] | None = Field(
+        default=None,
+        description=(
+            "Positions on the axis where the transition is an impulse: at each "
+            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "moved at once. Between them the transition moves nothing."
+        ),
+    )
+
+    impulse_every: tuple[float, float] | None = Field(
+        default=None,
+        description=(
+            "(period, offset): the transition is an impulse at offset, "
+            "offset + period, offset + 2 * period, ..."
+        ),
+    )
+
+    @property
+    def is_impulse(self) -> bool:
+        """Whether the transition is an impulse rather than a continuous flow."""
+        return self.impulse_at is not None or self.impulse_every is not None
+
+    def impulse_positions(self) -> list[float]:
+        """
+        The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+        These are the values that must be integers in a difference model.
+        """
+        if self.impulse_at is not None:
+            return list(self.impulse_at)
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            return [offset, period]
+        return []
+
+    @model_validator(mode="after")
+    def validate_impulse(self) -> Self:
+        """Check the impulse schedule: one kind, valid positions and period."""
+        if self.impulse_at is not None and self.impulse_every is not None:
+            raise ValueError(
+                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
+            )
+        if self.impulse_at is not None:
+            if not self.impulse_at:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse_at needs at least one position."
+                )
+            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
+            if bad:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse positions must be finite "
+                    f"and not negative, got {bad}."
+                )
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            if not (math.isfinite(period) and period > 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse period must be "
+                    f"positive, got {period}."
+                )
+            if not (math.isfinite(offset) and offset >= 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse offset must be finite "
+                    f"and not negative, got {offset}."
+                )
+        return self
+
     @field_validator("rate", mode="before")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
@@ -17087,7 +17858,88 @@ class Transition(BaseModel):
         return value
 ```
 
+### Attributes
+
+#### is_impulse
+
+```python
+is_impulse: bool
+```
+
+Whether the transition is an impulse rather than a continuous flow.
+
 ### Methods:
+
+#### impulse_positions
+
+```python
+impulse_positions() -> list[float]
+```
+
+The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+These are the values that must be integers in a difference model.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+def impulse_positions(self) -> list[float]:
+    """
+    The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+    These are the values that must be integers in a difference model.
+    """
+    if self.impulse_at is not None:
+        return list(self.impulse_at)
+    if self.impulse_every is not None:
+        period, offset = self.impulse_every
+        return [offset, period]
+    return []
+```
+
+#### validate_impulse
+
+```python
+validate_impulse() -> Self
+```
+
+Check the impulse schedule: one kind, valid positions and period.
+
+Source code in `commol/context/dynamics.py`
+
+```python
+@model_validator(mode="after")
+def validate_impulse(self) -> Self:
+    """Check the impulse schedule: one kind, valid positions and period."""
+    if self.impulse_at is not None and self.impulse_every is not None:
+        raise ValueError(
+            f"Transition '{self.id}': set impulse_at or impulse_every, not both."
+        )
+    if self.impulse_at is not None:
+        if not self.impulse_at:
+            raise ValueError(
+                f"Transition '{self.id}': impulse_at needs at least one position."
+            )
+        bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
+        if bad:
+            raise ValueError(
+                f"Transition '{self.id}': impulse positions must be finite "
+                f"and not negative, got {bad}."
+            )
+    if self.impulse_every is not None:
+        period, offset = self.impulse_every
+        if not (math.isfinite(period) and period > 0):
+            raise ValueError(
+                f"Transition '{self.id}': the impulse period must be "
+                f"positive, got {period}."
+            )
+        if not (math.isfinite(offset) and offset >= 0):
+            raise ValueError(
+                f"Transition '{self.id}': the impulse offset must be finite "
+                f"and not negative, got {offset}."
+            )
+    return self
+```
 
 #### validate_rate
 
@@ -17115,6 +17967,8 @@ def validate_rate(cls, value: str | None) -> str | None:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
 ```
+
+`OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
 
 ## StratifiedRate
 
@@ -18530,8 +19384,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- An ODE engine: a model built with `typology="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol_rs.differential.DifferentialEquations`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`.
+- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
+- `Simulation.run_at(steps)`: the outputs at the given sorted steps. A differential model takes any step, such as `0.5`.
+- Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.
+- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the check infers the unit as before.
+- `TimeScale.from_step_unit(unit)`, which raises for a unit that is not time.
+
 ### Changed
 
+- `ObservedDataPoint.step` and `window_steps`, and `CalibrationConstraint.time_steps`, accept a float for a differential model. A whole number is stored as an `int`. A difference model still requires integers, and `Calibrator` names the observation or constraint that is not.
+- The model compiler moved from `commol-difference` to the new crate `commol-model`, which both engines use; `commol_rs.difference` no longer has `initial_state`, `expanded_outputs`, `transition_flows` and `check_names`, which are in `commol_rs.model`. No public Python name changes.
+- `SimulationPlotter` raises `ValueError` for a windowed observation whose `window_steps` is not a whole number, because the plotted series holds integer steps only.
 - `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead of `bins`. An entry is an output name or a bin or accumulator id; an id plots the sum of its outputs, so a bin of a stratified model can be plotted. There is no `bins` alias: rename the argument.
 - Every loss uses the observation weights the same way: `"sse"` is `Σ w·r²`, `"rmse"` is `√(Σ w·r² / Σ w)` and `"mae"` is `Σ w·|r| / Σ w`. Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With every weight at 1 nothing changes. The ensemble central loss follows the same rule.
 - `Simulation.run` starts from the initial state at every call, so two calls give the same result. Before, a second `run` continued the first one. To continue a run, call `simulation.engine.step()`.

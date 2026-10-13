@@ -8,8 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- An ODE engine: a model built with `typology="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol_rs.differential.DifferentialEquations`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`.
+- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
+- `Simulation.run_at(steps)`: the outputs at the given sorted steps. A differential model takes any step, such as `0.5`.
+- Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.
+- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the check infers the unit as before.
+- `TimeScale.from_step_unit(unit)`, which raises for a unit that is not time.
+
 ### Changed
 
+- `ObservedDataPoint.step` and `window_steps`, and `CalibrationConstraint.time_steps`, accept a float for a differential model. A whole number is stored as an `int`. A difference model still requires integers, and `Calibrator` names the observation or constraint that is not.
+- The model compiler moved from `commol-difference` to the new crate `commol-model`, which both engines use; `commol_rs.difference` no longer has `initial_state`, `expanded_outputs`, `transition_flows` and `check_names`, which are in `commol_rs.model`. No public Python name changes.
+- `SimulationPlotter` raises `ValueError` for a windowed observation whose `window_steps` is not a whole number, because the plotted series holds integer steps only.
 - `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead of `bins`. An entry is an output name or a bin or accumulator id; an id plots the sum of its outputs, so a bin of a stratified model can be plotted. There is no `bins` alias: rename the argument.
 - Every loss uses the observation weights the same way: `"sse"` is `Σ w·r²`, `"rmse"` is `√(Σ w·r² / Σ w)` and `"mae"` is `Σ w·|r| / Σ w`. Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With every weight at 1 nothing changes. The ensemble central loss follows the same rule.
 - `Simulation.run` starts from the initial state at every call, so two calls give the same result. Before, a second `run` continued the first one. To continue a run, call `simulation.engine.step()`.

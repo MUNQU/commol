@@ -2,7 +2,7 @@
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `ObservedDataPoint` says what the model must reproduce: an output at a step. This page shows how to observe several outputs, sums of outputs, partial observations (scale factors) and counts per period (windows), and how to weigh them.
+An `ObservedDataPoint` says what the model must reproduce: an output at a step. This page shows how to observe several outputs, sums of outputs, partial observations (scale factors), counts per period (windows) and steps between integers, and how to weigh them.
 
 ## Quick path
 
@@ -159,6 +159,40 @@ print(calibrate_k1(weekly))  # 0.4
 | Combinations           | Works with `scale_id` and `compartments`.                                                     |
 
 `windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
+
+## Steps between integers
+
+A `DifferentialEquations` model runs in continuous time, so an observation may be at any step, such as `2.5`, and a window may cover any length. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`). A `DifferenceEquations` model reports only at integer steps: `Calibrator` raises `ValueError`, naming the observation or the constraint, for a step that is not an integer (`check_steps_for_typology` in `py-commol/commol/context/calibration.py`).
+
+```python
+def ode_model(k1: float | None):
+    return (
+        ModelBuilder(name="Observed in continuous time")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_parameter(id="k1", value=k1)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+        .set_initial_conditions(
+            population_size=1000,
+            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        )
+        .build(typology="DifferentialEquations")
+    )
+
+steps = [0.5, 1.75, 3.25, 6.5]
+observed_b = Simulation(ode_model(0.2)).run_at(steps)["B"]
+problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(step=step, compartment="B", value=value)
+        for step, value in zip(steps, observed_b)
+    ],
+    parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    optimization_config=NelderMeadConfig(max_iterations=500),
+)
+print(round(Calibrator(Simulation(ode_model(None)), problem).run().best_parameters["k1"], 3))  # 0.2
+```
+
+A step that is a whole number is stored as an `int`, so `step=3.0` and `step=3` are the same observation.
 
 ## Stratified models
 

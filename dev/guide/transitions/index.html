@@ -943,6 +943,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#impulses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impulses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-building-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2445,6 +2456,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#impulses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Impulses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-building-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2491,7 +2513,7 @@
 <p>A transition moves population at every step: from its <code>source</code> compartments to
 its <code>target</code> compartments, at the rate you give. This page documents
 <code>ModelBuilder.add_transition</code> completely: rates, several sources, transitions
-between categories, stratified rates, and what <code>build</code> checks.</p>
+between categories, stratified rates, impulses, and what <code>build</code> checks.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -2569,6 +2591,18 @@ between categories, stratified rates, and what <code>build</code> checks.</p>
 <td><code>list[str] \| None</code></td>
 <td><code>None</code></td>
 <td>Accumulators that count the flow; see <a href="../building-models/#accumulators">Building Models</a>.</td>
+</tr>
+<tr>
+<td><code>impulse_at</code></td>
+<td><code>list[float] \| None</code></td>
+<td><code>None</code></td>
+<td>Makes the transition an impulse at these steps; see <a href="#impulses">Impulses</a>.</td>
+</tr>
+<tr>
+<td><code>impulse_every</code></td>
+<td><code>tuple[float, float] \| None</code></td>
+<td><code>None</code></td>
+<td><code>(period, offset)</code>: an impulse at <code>offset</code>, <code>offset + period</code>, …; see <a href="#impulses">Impulses</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3002,6 +3036,67 @@ rate with <code>if</code>, as in <code>"if(step &gt; 30, k, 0)"</code>, or use a
 <a href="../building-models/#time-series-parameters">time-series parameter</a> or a
 <a href="#stratified-rates">stratified rate</a>. A comparison alone is a boolean, so
 <code>"k * (step &gt; 30)"</code> is rejected.</p>
+<h2 id="impulses">Impulses<a class="headerlink" href="#impulses" title="Permanent link">&para;</a></h2>
+<p>An impulse moves its amount at once, at given steps, and nothing between them.
+Give the steps with <code>impulse_at=[…]</code> or <code>impulse_every=(period, offset)</code>. The
+rate is then a fraction of the source (per-capita) or an amount (absolute),
+with the same <a href="#absolute-and-per-capita-rates">rules</a>, sources, targets,
+stratified rates and accumulators as any transition.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">impulse_model</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Impulses&quot;</span><span class="p">)</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="o">.</span><span class="n">add_accumulator</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;moved&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Moved by the impulse&quot;</span><span class="p">)</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;jump&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="n">impulse_at</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">])</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}],</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="p">)</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">typology</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="p">)</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="n">jumped</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">impulse_model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">jumped</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">]])</span>  <span class="c1"># [1000.0, 675.0, 607.5]</span>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">jumped</span><span class="p">[</span><span class="s2">&quot;moved&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># 225.0: a quarter of the 900 left at step 1</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>In both engines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Order</td>
+<td>At step <code>n</code> the state jumps first; then the flows of the step run from the new state. The output at <code>n</code> shows the state after the jump (<code>CompiledModel::apply_impulses</code> in <code>crates/commol-model/src/system.rs</code>).</td>
+</tr>
+<tr>
+<td>Several impulses at one step</td>
+<td>Every jump is computed from the state before any of them.</td>
+</tr>
+<tr>
+<td>Steps</td>
+<td>A <code>DifferentialEquations</code> model takes any steps, such as <code>0.5</code>: the engine stops there, applies the jump and restarts. A <code>DifferenceEquations</code> model needs integer steps (<code>ValidationError</code> names the transition).</td>
+</tr>
+<tr>
+<td>Units</td>
+<td>The rate of an impulse is an amount, <code>&lt;bin unit&gt;</code>, not a flow per step (<a href="../units-and-equations/#impulses">Units and Equations</a>).</td>
+</tr>
+<tr>
+<td><code>print_equations</code></td>
+<td>Lists impulses apart from the equations, with their steps.</td>
+</tr>
+</tbody>
+</table>
+<p>An impulse is not a pulse rate. A <a href="../time-patterns/"><code>TimePattern.pulse</code></a> is a
+rate: a difference model applies it for one step with the other flows, and a
+differential model applies it as a constant rate for one time unit, so it
+moves <code>1 − e^(−p)</code> of its source. An impulse moves exactly <code>p</code> of its source in
+both engines.</p>
 <h2 id="what-building-checks">What building checks<a class="headerlink" href="#what-building-checks" title="Permanent link">&para;</a></h2>
 <p><code>build</code> plans every flow in the engine and rejects a transition it cannot
 simulate as written:</p>
@@ -3036,6 +3131,14 @@ simulate as written:</p>
 <tr>
 <td>A flow that ends in categories no compartment has</td>
 <td>The transition; add a <code>to</code> condition</td>
+</tr>
+<tr>
+<td><code>impulse_at</code> and <code>impulse_every</code> together, a negative step, or a period that is not positive</td>
+<td>The transition</td>
+</tr>
+<tr>
+<td>A non-integer impulse step in a <code>DifferenceEquations</code> model</td>
+<td>The transition and the step</td>
 </tr>
 </tbody>
 </table>

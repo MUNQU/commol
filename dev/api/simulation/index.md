@@ -40,9 +40,7 @@ class Simulation:
     def _build_engine(self, model_json: str) -> None:
         """Build the engine and its output names from a model JSON."""
         self._model_json: str = model_json
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine(
-            model_json
-        )
+        self._engine: "EngineProtocol" = build_engine(model_json)
         self._compartments: list[str] = self._engine.compartments
         self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
@@ -90,23 +88,6 @@ class Simulation:
                 f"Cannot run Simulation: {'; '.join(errors)}. "
                 f"Please calibrate these values before running a simulation."
             )
-
-    def _initialize_engine(self, model_json: str) -> "DifferenceEquationsProtocol":
-        """Internal method to set up the Rust backend."""
-        rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
-        logging.info("Rust model instance created from JSON.")
-
-        # This could be extended if you have more engine types
-        if self.model_definition.dynamics.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-            logging.info("Initializing DifferenceEquations engine.")
-            return difference.DifferenceEquations(rust_model_instance)
-
-        raise NotImplementedError(
-            (
-                f"Engine for typology '{self.model_definition.dynamics.typology}' "
-                f"not implemented."
-            )
-        )
 
     def _run_raw(self, num_steps: int) -> list[list[float]]:
         """
@@ -183,8 +164,65 @@ class Simulation:
         else:
             assert_never(output_format)
 
+    def run_at(
+        self,
+        steps: Sequence[float],
+        output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
+    ) -> dict[str, list[float]] | list[list[float]]:
+        """
+        Runs the simulation from the initial state and reports at given steps.
+
+        The steps are positions on the axis, the independent variable of the
+        model (time or any other quantity). A
+        DifferentialEquations model reports at any position, from the dense
+        output of its solver; a DifferenceEquations model only at integer
+        steps.
+
+        Parameters
+        ----------
+        steps : Sequence[float]
+            Sorted, unique, non-negative positions to report at.
+        output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
+            As in `run`: one value per position for each output, or one row
+            per position.
+
+        Returns
+        -------
+        dict[str, list[float]] | list[list[float]]
+            The outputs at each position, in the specified format.
+
+        Raises
+        ------
+        ValueError
+            If a parameter or initial condition has no value, the steps are not
+            sorted and unique, or a step is not an integer in a
+            DifferenceEquations model.
+        """
+        positions = [float(step) for step in steps]
+        if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
+            raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
+        if any(position < 0 for position in positions):
+            raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+        self._validate_all_parameters_calibrated(self.model_definition)
+        self._sync_engine()
+        self._engine.reset()
+        try:
+            rows = self._engine.run_at(positions)
+        except RuntimeError as error:
+            raise ValueError(str(error)) from error
+        if output_format == "list_of_lists":
+            return rows
+        if output_format == "dict_of_lists":
+            if not rows:
+                return {c: [] for c in self._simulation_outputs}
+            return {
+                column: list(values)
+                for column, values in zip(self._simulation_outputs, zip(*rows))
+            }
+        assert_never(output_format)
+
     @property
-    def engine(self) -> "DifferenceEquationsProtocol":
+    def engine(self) -> "EngineProtocol":
         """
         The engine for the current ``model_definition``.
 
@@ -337,7 +375,7 @@ class Simulation:
 #### engine
 
 ```python
-engine: DifferenceEquationsProtocol
+engine: EngineProtocol
 ```
 
 The engine for the current `model_definition`.
@@ -483,6 +521,96 @@ def run(
 
     else:
         assert_never(output_format)
+```
+
+#### run_at
+
+```python
+run_at(steps: Sequence[float], output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
+```
+
+Runs the simulation from the initial state and reports at given steps.
+
+The steps are positions on the axis, the independent variable of the model (time or any other quantity). A DifferentialEquations model reports at any position, from the dense output of its solver; a DifferenceEquations model only at integer steps.
+
+Parameters:
+
+| Name            | Type                             | Description                                                                 | Default           |
+| --------------- | -------------------------------- | --------------------------------------------------------------------------- | ----------------- |
+| `steps`         | `Sequence[float]`                | Sorted, unique, non-negative positions to report at.                        | *required*        |
+| `output_format` | `(dict_of_lists, list_of_lists)` | As in run: one value per position for each output, or one row per position. | `'dict_of_lists'` |
+
+Returns:
+
+| Type                       | Description           |
+| -------------------------- | --------------------- |
+| \`dict\[str, list[float]\] | list\[list[float]\]\` |
+
+Raises:
+
+| Type         | Description                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a parameter or initial condition has no value, the steps are not sorted and unique, or a step is not an integer in a DifferenceEquations model. |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def run_at(
+    self,
+    steps: Sequence[float],
+    output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
+) -> dict[str, list[float]] | list[list[float]]:
+    """
+    Runs the simulation from the initial state and reports at given steps.
+
+    The steps are positions on the axis, the independent variable of the
+    model (time or any other quantity). A
+    DifferentialEquations model reports at any position, from the dense
+    output of its solver; a DifferenceEquations model only at integer
+    steps.
+
+    Parameters
+    ----------
+    steps : Sequence[float]
+        Sorted, unique, non-negative positions to report at.
+    output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
+        As in `run`: one value per position for each output, or one row
+        per position.
+
+    Returns
+    -------
+    dict[str, list[float]] | list[list[float]]
+        The outputs at each position, in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If a parameter or initial condition has no value, the steps are not
+        sorted and unique, or a step is not an integer in a
+        DifferenceEquations model.
+    """
+    positions = [float(step) for step in steps]
+    if any(later <= earlier for earlier, later in zip(positions, positions[1:])):
+        raise ValueError(f"Steps must be sorted and unique, got {list(steps)}.")
+    if any(position < 0 for position in positions):
+        raise ValueError(f"Steps must not be negative, got {list(steps)}.")
+    self._validate_all_parameters_calibrated(self.model_definition)
+    self._sync_engine()
+    self._engine.reset()
+    try:
+        rows = self._engine.run_at(positions)
+    except RuntimeError as error:
+        raise ValueError(str(error)) from error
+    if output_format == "list_of_lists":
+        return rows
+    if output_format == "dict_of_lists":
+        if not rows:
+            return {c: [] for c in self._simulation_outputs}
+        return {
+            column: list(values)
+            for column, values in zip(self._simulation_outputs, zip(*rows))
+        }
+    assert_never(output_format)
 ```
 
 #### outputs_for
@@ -738,6 +866,45 @@ def windowed_totals(
         window_steps,
         at_steps,
     )
+```
+
+## OdeSolver
+
+Bases: `BaseModel`
+
+Solver settings of a differential-equations model.
+
+Attributes:
+
+| Name     | Type                       | Description                                                                                                                      |
+| -------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `method` | `Literal['tsit45', 'bdf']` | "tsit45": explicit Tsitouras 5(4) Runge-Kutta, for non-stiff models. "bdf": backward differentiation formulas, for stiff models. |
+| `rtol`   | `float`                    | Relative tolerance of each state component.                                                                                      |
+| `atol`   | `float`                    | Absolute tolerance of each state component, in the unit of the bins.                                                             |
+
+Source code in `commol/context/dynamics.py`
+
+```python
+class OdeSolver(BaseModel):
+    """
+    Solver settings of a differential-equations model.
+
+    Attributes
+    ----------
+    method : Literal["tsit45", "bdf"]
+        ``"tsit45"``: explicit Tsitouras 5(4) Runge-Kutta, for non-stiff
+        models. ``"bdf"``: backward differentiation formulas, for stiff models.
+    rtol : float
+        Relative tolerance of each state component.
+    atol : float
+        Absolute tolerance of each state component, in the unit of the bins.
+    """
+
+    method: Literal["tsit45", "bdf"] = Field(
+        default="tsit45", description="Integration method."
+    )
+    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
+    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
 
 ## window_end_steps

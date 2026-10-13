@@ -921,6 +921,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#patterns-in-a-differential-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patterns in a differential model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-patterns-are-stored" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2289,6 +2300,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#patterns-in-a-differential-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patterns in a differential model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-patterns-are-stored" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2673,6 +2695,13 @@ the same:</p>
 </span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="n">routed</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">routing</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="nb">print</span><span class="p">(</span><span class="n">routed</span><span class="p">[</span><span class="s2">&quot;A_s0&quot;</span><span class="p">],</span> <span class="n">routed</span><span class="p">[</span><span class="s2">&quot;A_s1&quot;</span><span class="p">])</span>  <span class="c1"># [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]</span>
 </span></code></pre></div>
+<h2 id="patterns-in-a-differential-model">Patterns in a differential model<a class="headerlink" href="#patterns-in-a-differential-model" title="Permanent link">&para;</a></h2>
+<p>A pattern reads <code>step</code>. In a <code>DifferentialEquations</code> model, <code>step</code> is constant
+on each unit interval <code>[n, n + 1)</code>, so a pattern is a rate that holds for one
+time unit. A per-capita <code>pulse</code> of <code>amount</code> moves <code>1 − e^(−amount)</code> of its
+source there, and <code>amount</code> in a difference model. To move a fraction at once in
+both engines, use an <a href="../transitions/#impulses">impulse</a>. See
+<a href="../simulations/#time-inside-a-step">Time inside a step</a>.</p>
 <h2 id="how-patterns-are-stored">How patterns are stored<a class="headerlink" href="#how-patterns-are-stored" title="Permanent link">&para;</a></h2>
 <p>Numeric <code>pulse</code> and <code>pulses</code> patterns become
 <a href="../building-models/#time-series-parameters">time-series parameters</a> instead of

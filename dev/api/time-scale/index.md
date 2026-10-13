@@ -14,6 +14,10 @@ A model is defined purely in steps. Attaching a duration to a step makes it poss
 
 Units up to a week have a fixed length and are provided directly. Months and years vary in length and have no single definition in step terms; give them as an explicit number of days.
 
+Warnings
+
+`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities for a DifferenceEquations model. A DifferentialEquations model needs a continuous rate instead: `1 / duration` for a mean duration, and `-ln(1 - p) / period` for a probability `p` over a period (both in steps).
+
 Attributes:
 
 | Name           | Type    | Description                                              |
@@ -35,6 +39,14 @@ class TimeScale(BaseModel):
     and years vary in length and have no single definition in step terms; give
     them as an explicit number of days.
 
+    Warnings
+    --------
+    `rate_from_mean_duration` and `rate_from_probability` return per-step
+    probabilities for a DifferenceEquations model. A DifferentialEquations
+    model needs a continuous rate instead: ``1 / duration`` for a mean
+    duration, and ``-ln(1 - p) / period`` for a probability ``p`` over a
+    period (both in steps).
+
     Attributes
     ----------
     step_seconds : float
@@ -46,6 +58,44 @@ class TimeScale(BaseModel):
     step_seconds: float = Field(
         gt=0.0, description="Duration of one simulation step, in seconds."
     )
+
+    @classmethod
+    def from_step_unit(cls, unit: str) -> "TimeScale":
+        """
+        Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
+
+        The axis of a model is its independent variable and need not be time
+        (``step_unit="meter"``, for example); a time scale applies only when it
+        is time.
+
+        Parameters
+        ----------
+        unit : str
+            Step unit of a model, of dimension time.
+
+        Returns
+        -------
+        TimeScale
+            A scale with ``step_seconds`` equal to one `unit`.
+
+        Raises
+        ------
+        ValueError
+            If `unit` is not a unit of time; the message names it.
+        """
+        from commol.utils.equations import ureg
+
+        try:
+            quantity = ureg.Quantity(1.0, unit)
+        except Exception as error:
+            raise ValueError(f"'{unit}' is not a unit: {error}") from error
+        if quantity.dimensionality != ureg.second.dimensionality:
+            raise ValueError(
+                f"A TimeScale needs a step unit of time; '{unit}' has dimension "
+                f"{quantity.dimensionality}. A model whose axis is not time has "
+                f"no time scale."
+            )
+        return cls(step_seconds=float(quantity.to("second").magnitude))
 
     def steps_from_seconds(self, seconds: float) -> int:
         """
@@ -114,6 +164,10 @@ class TimeScale(BaseModel):
         that an exponential process of that mean duration fires within one
         step.
 
+        This is a rate for a DifferenceEquations model only. A
+        DifferentialEquations model needs the continuous rate
+        ``step_seconds / duration_seconds``.
+
         Parameters
         ----------
         duration_seconds : float
@@ -141,6 +195,10 @@ class TimeScale(BaseModel):
 
         Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
         rate that accumulates to `probability` over `period_steps` steps.
+
+        This is a rate for a DifferenceEquations model only. A
+        DifferentialEquations model needs the continuous rate
+        ``-ln(1 - probability) / period_steps``.
 
         Parameters
         ----------
@@ -284,6 +342,76 @@ Steps in one week.
 
 ### Methods:
 
+#### from_step_unit
+
+```python
+from_step_unit(unit: str) -> TimeScale
+```
+
+Time scale whose step lasts one `unit`, such as `"day"` or `"h"`.
+
+The axis of a model is its independent variable and need not be time (`step_unit="meter"`, for example); a time scale applies only when it is time.
+
+Parameters:
+
+| Name   | Type  | Description                              | Default    |
+| ------ | ----- | ---------------------------------------- | ---------- |
+| `unit` | `str` | Step unit of a model, of dimension time. | *required* |
+
+Returns:
+
+| Type        | Description                                  |
+| ----------- | -------------------------------------------- |
+| `TimeScale` | A scale with step_seconds equal to one unit. |
+
+Raises:
+
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `ValueError` | If unit is not a unit of time; the message names it. |
+
+Source code in `commol/api/time_scale.py`
+
+```python
+@classmethod
+def from_step_unit(cls, unit: str) -> "TimeScale":
+    """
+    Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
+
+    The axis of a model is its independent variable and need not be time
+    (``step_unit="meter"``, for example); a time scale applies only when it
+    is time.
+
+    Parameters
+    ----------
+    unit : str
+        Step unit of a model, of dimension time.
+
+    Returns
+    -------
+    TimeScale
+        A scale with ``step_seconds`` equal to one `unit`.
+
+    Raises
+    ------
+    ValueError
+        If `unit` is not a unit of time; the message names it.
+    """
+    from commol.utils.equations import ureg
+
+    try:
+        quantity = ureg.Quantity(1.0, unit)
+    except Exception as error:
+        raise ValueError(f"'{unit}' is not a unit: {error}") from error
+    if quantity.dimensionality != ureg.second.dimensionality:
+        raise ValueError(
+            f"A TimeScale needs a step unit of time; '{unit}' has dimension "
+            f"{quantity.dimensionality}. A model whose axis is not time has "
+            f"no time scale."
+        )
+    return cls(step_seconds=float(quantity.to("second").magnitude))
+```
+
 #### steps_from_seconds
 
 ```python
@@ -416,6 +544,8 @@ Per-step rate of leaving a state with a given mean residence time.
 
 Returns `1 - exp(-step_seconds / duration_seconds)`, the probability that an exponential process of that mean duration fires within one step.
 
+This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `step_seconds / duration_seconds`.
+
 Parameters:
 
 | Name               | Type    | Description                               | Default    |
@@ -444,6 +574,10 @@ def rate_from_mean_duration(self, duration_seconds: float) -> float:
     Returns ``1 - exp(-step_seconds / duration_seconds)``, the probability
     that an exponential process of that mean duration fires within one
     step.
+
+    This is a rate for a DifferenceEquations model only. A
+    DifferentialEquations model needs the continuous rate
+    ``step_seconds / duration_seconds``.
 
     Parameters
     ----------
@@ -477,6 +611,8 @@ Per-step rate equivalent to a probability over a longer period.
 
 Returns `1 - (1 - probability) ** (1 / period_steps)`, the per-step rate that accumulates to `probability` over `period_steps` steps.
 
+This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `-ln(1 - probability) / period_steps`.
+
 Parameters:
 
 | Name           | Type    | Description                                                      | Default    |
@@ -505,6 +641,10 @@ def rate_from_probability(self, probability: float, period_steps: int) -> float:
 
     Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
     rate that accumulates to `probability` over `period_steps` steps.
+
+    This is a rate for a DifferenceEquations model only. A
+    DifferentialEquations model needs the continuous rate
+    ``-ln(1 - probability) / period_steps``.
 
     Parameters
     ----------

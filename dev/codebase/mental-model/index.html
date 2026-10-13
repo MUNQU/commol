@@ -2276,8 +2276,9 @@
 <h1 id="mental-model">Mental Model<a class="headerlink" href="#mental-model" title="Permanent link">&para;</a></h1>
 <p><a href="../">Back to Codebase Guide</a></p>
 <p>Commol builds compartment models from a declarative definition and runs them
-as difference equations. Python owns the user-facing API and validation; Rust
-owns every rule about how a model becomes numbers.</p>
+as difference equations or as ordinary differential equations. Python owns the
+user-facing API and validation; Rust owns every rule about how a model becomes
+numbers.</p>
 <h2 id="what-commol-is">What Commol is<a class="headerlink" href="#what-commol-is" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2296,8 +2297,16 @@ owns every rule about how a model becomes numbers.</p>
 <td><code>py-commol/commol/context/</code> (Pydantic)</td>
 </tr>
 <tr>
+<td>One model compiler for both engines: expansion, flows, rates, the right-hand side</td>
+<td><code>crates/commol-model/</code></td>
+</tr>
+<tr>
 <td>A Rust difference-equations engine</td>
 <td><code>crates/commol-difference/</code></td>
+</tr>
+<tr>
+<td>A Rust ODE engine on <code>diffsol</code></td>
+<td><code>crates/commol-differential/</code></td>
 </tr>
 <tr>
 <td>A JIT compiler for rate expressions</td>
@@ -2323,12 +2332,12 @@ owns every rule about how a model becomes numbers.</p>
 <td>It knows bins, categories and rates, not diseases or drugs. Domain vocabulary belongs in user scripts.</td>
 </tr>
 <tr>
-<td>An ODE solver</td>
-<td><code>ModelTypes::DifferentialEquations</code> exists so any model can be expanded, but no engine runs it: the difference engine rejects that typology.</td>
+<td>A numerical-methods library</td>
+<td>The differential engine delegates the integration to <code>diffsol</code>; Commol keeps no ODE method of its own (see <a href="../design-decisions/#the-solver-is-diffsol">Design decisions</a>).</td>
 </tr>
 <tr>
 <td>A clock</td>
-<td>A model has no physical time: rates are per step and periods are step counts. <code>TimeScale</code> converts at the edges (see <a href="../design-decisions/#physical-time-is-not-in-the-model">Design decisions</a>).</td>
+<td>A model has no physical time: rates are per step and periods are step counts, and the axis is the independent variable of the model, whatever quantity it is. <code>TimeScale</code> converts at the edges (see <a href="../design-decisions/#physical-time-is-not-in-the-model">Design decisions</a>).</td>
 </tr>
 <tr>
 <td>A rule engine for transitions</td>
@@ -2338,19 +2347,24 @@ owns every rule about how a model becomes numbers.</p>
 </table>
 <h2 id="how-a-model-flows-through-the-layers">How a model flows through the layers<a class="headerlink" href="#how-a-model-flows-through-the-layers" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ModelBuilder ... .build()          -&gt; commol.context.Model (Pydantic validation)
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Simulation(model)                  -&gt; Model.model_dump_json()
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Simulation(model)                  -&gt; engine_state.build_engine(model JSON)
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                                   -&gt; commol_rs.core.Model.from_json(...)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                                   -&gt; commol_rs.difference.DifferenceEquations(...)
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                        expand bins and stratifications into compartments
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                        build the initial state
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                        plan the transition flows
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>Simulation.run(n)                  -&gt; DifferenceEquations.run(n) -&gt; rows of outputs
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...)
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                                   -&gt; by typology:
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                        commol_rs.difference.DifferenceEquations(...)
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                        commol_rs.differential.DifferentialEquations(...)
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                   both compile it with commol-model (CompiledModel):
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                        expand bins and stratifications into compartments
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                        build the initial state
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                                        plan the transition flows and compile the rates
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                        derivatives(step, t, X) = Σ flows
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Simulation.run(n) / run_at(steps)  -&gt; difference: X += derivatives, once per step
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                      differential: diffsol integrates derivatives
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...)
 </span></code></pre></div>
-<p>The same engine functions also answer questions without a simulation:
+<p>The same model functions also answer questions without a simulation:
 <code>Model.initial_state()</code>, <code>print_equations</code> and the unit checker call
-<code>initial_state</code>, <code>transition_flows</code> and <code>expanded_outputs</code> through
-<code>py-commol/commol/context/_model/engine_state.py</code>.</p>
+<code>initial_state</code>, <code>transition_flows</code> and <code>expanded_outputs</code> of <code>commol_rs.model</code>
+through <code>py-commol/commol/context/_model/engine_state.py</code>.</p>
 <h2 id="invariants">Invariants<a class="headerlink" href="#invariants" title="Permanent link">&para;</a></h2>
 <p>These hold for every change. A pull request that breaks one needs a design
 discussion first.</p>

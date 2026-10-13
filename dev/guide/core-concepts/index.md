@@ -118,7 +118,14 @@ print(sorted(results))   # ['A', 'B', 'C', 'cum_ab']
 print(len(results["A"]))  # 51: step 0 to step 50
 ```
 
-`DifferenceEquations` is the only typology that runs: time advances in whole steps, and each step applies every flow once.
+Two typologies run, with the same model definition:
+
+| Typology                | Time                                                                    | Engine                |
+| ----------------------- | ----------------------------------------------------------------------- | --------------------- |
+| `DifferenceEquations`   | Advances in whole steps; each step applies every flow once.             | `commol-difference`   |
+| `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
+
+See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).
 
 ## Stratifications
 
@@ -390,6 +397,10 @@ week = scale.steps_per_week
 print(scale.window_start(0, week), scale.window_end(0, week))  # 0 168
 print(scale.window_index(168, week))                             # 0
 ```
+
+Rates for difference models only
+
+`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities, which a `DifferenceEquations` model applies once per step. A `DifferentialEquations` model integrates its rates in continuous time, so it needs the continuous rate: `1 / duration` for a mean duration and `-ln(1 - p) / period` for a probability `p` over a period, both in steps. With the per-step value, the model moves too little.
 
 A window covers the steps `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
 

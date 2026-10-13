@@ -128,7 +128,7 @@ builder = (
 
 ### Names the engine sets
 
-The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-difference/src/builder.rs`):
+The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-model/src/builder.rs`):
 
 | Name                        | Example                                   |
 | --------------------------- | ----------------------------------------- |
