@@ -3,7 +3,9 @@
 from .assertions import ENGINE_REL, assert_close, assert_population_conserved
 from .models import (
     a_to_b_builder,
+    TIGHT,
     build,
+    build_ode,
     conditional_pathway_builder,
     override_builder,
     seir_builder,
@@ -22,7 +24,9 @@ __all__ = [
     "assert_close",
     "assert_population_conserved",
     "bounded",
+    "TIGHT",
     "build",
+    "build_ode",
     "conditional_pathway_builder",
     "initial_condition_problem",
     "initial_population",

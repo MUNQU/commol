@@ -13,7 +13,9 @@ class EquationPrinter:
 
     The flows come from the engine, so the printed equations are the ones the
     engine simulates: each flow moves population from one compartment to
-    another, and a per-capita rate is shown multiplied by its source.
+    another, and a per-capita rate is shown multiplied by its source. An
+    impulse is not part of the equations: it is listed apart, with the
+    positions where it moves its amount at once.
     """
 
     def __init__(self, model) -> None:
@@ -42,6 +44,10 @@ class EquationPrinter:
         lines.extend(self._generate_compact_form(format=format))
         lines.append("")
         lines.extend(self._generate_expanded_form(format=format))
+        impulses = self._generate_impulses(format=format)
+        if impulses:
+            lines.append("")
+            lines.extend(impulses)
 
         output = "\n".join(lines)
         _write_output(output, output_file)
@@ -150,7 +156,8 @@ class EquationPrinter:
     ) -> list[str]:
         source_str = ", ".join(sorted(set(transition.source))) or "none"
         target_str = ", ".join(sorted(set(transition.target))) or "none"
-        lines = [f"{transition.id} ({source_str} -> {target_str}):"]
+        schedule = f", {_impulse_schedule(transition)}" if transition.is_impulse else ""
+        lines = [f"{transition.id} ({source_str} -> {target_str}{schedule}):"]
         if not flows:
             # The engine creates no flow, for example when the rate is missing.
             lines.append("  (no flows)")
@@ -202,7 +209,10 @@ class EquationPrinter:
         net: dict[str, dict[str, int]] = {
             compartment.name: {} for compartment in compartments
         }
+        impulse_ids = {t.id for t in self._model.dynamics.transitions if t.is_impulse}
         for flow in self._transition_flows():
+            if flow.transition in impulse_ids:
+                continue
             for name, sign in ((flow.source, -1), (flow.target, 1)):
                 if name is not None:
                     terms = net[name]
@@ -228,6 +238,27 @@ class EquationPrinter:
             else:
                 lines.append(f"{lhs} = {equation}")
 
+        return lines
+
+    def _generate_impulses(self, format: str) -> list[str]:
+        """Each impulse transition: where it acts and the amounts it moves."""
+        transitions = [t for t in self._model.dynamics.transitions if t.is_impulse]
+        if not transitions:
+            return []
+        lines = ["=" * 40, "IMPULSES", "=" * 40]
+        for transition in transitions:
+            lines.append(f"{transition.id}, {_impulse_schedule(transition)}:")
+            for flow in self._transition_flows():
+                if flow.transition != transition.id:
+                    continue
+                source = self._display_name(flow.source, format)
+                target = self._display_name(flow.target, format)
+                amount = self._format_rate_expr(flow.term, format)
+                if format == PrintEquationsOutputFormat.LATEX:
+                    arrow = _latex_transition_arrow(source, target)
+                    lines.append(f"  ${arrow}: {amount}$")
+                else:
+                    lines.append(f"  {source} -> {target}: {amount}")
         return lines
 
     def _format_equation(self, raw_terms: list[tuple[int, str]], format: str) -> str:
@@ -262,6 +293,14 @@ class EquationPrinter:
 # ======================================================================
 # Module-level functions (no model dependency)
 # ======================================================================
+
+
+def _impulse_schedule(transition) -> str:
+    """Where an impulse acts, in words: ``impulse at 1, 3`` or ``every 7 from 0``."""
+    if transition.impulse_at is not None:
+        return "impulse at " + ", ".join(f"{p:g}" for p in transition.impulse_at)
+    period, offset = transition.impulse_every
+    return f"impulse every {period:g} from {offset:g}"
 
 
 def _write_output(output: str, output_file: str | None) -> None:

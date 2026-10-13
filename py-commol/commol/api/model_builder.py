@@ -16,6 +16,7 @@ from commol.constants import ModelTypes
 from commol.context.bin import Accumulator, Bin
 from commol.context.dynamics import (
     Dynamics,
+    OdeSolver,
     StratificationCondition,
     StratifiedRate,
     Transition,
@@ -98,6 +99,8 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
+        solver: OdeSolver | None = None,
+        step_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -115,11 +118,22 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
+        solver : OdeSolver | None, default=None
+            Solver settings of a DifferentialEquations model (method and
+            tolerances). None uses the defaults of `OdeSolver`. A
+            DifferenceEquations model takes none.
+        step_unit : str | None, default=None
+            Unit of one step on the axis, of any single dimension (for example
+            ``"day"`` or ``"meter"``). The unit check requires every flow to be
+            ``<bin unit>/<step_unit>``. None infers it from the parameter units
+            of dimension time.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
+        self._solver: OdeSolver | None = solver
+        self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -363,6 +377,8 @@ class ModelBuilder:
         stratified_rates: list[StratifiedRateDict] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -441,6 +457,16 @@ class ModelBuilder:
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
 
+        impulse_at : list[float] | None, default=None
+            Make the transition an impulse at these positions on the axis. At
+            each one, ``rate`` is the fraction of the source (per-capita) or the
+            amount (absolute) moved at once, before the flows of that step. A
+            DifferenceEquations model needs integer positions.
+
+        impulse_every : tuple[float, float] | None, default=None
+            ``(period, offset)``: make the transition an impulse at ``offset``,
+            ``offset + period``, ``offset + 2 * period``, ...
+
         Returns
         -------
         ModelBuilder
@@ -458,6 +484,11 @@ class ModelBuilder:
         # specifies the time-varying behaviour, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, TimePattern):
+            if impulse_at is not None or impulse_every is not None:
+                raise ValueError(
+                    f"Transition '{id}': an impulse moves its rate at once; pass "
+                    "a fraction or an amount as `rate=`, not a TimePattern."
+                )
             if stratified_rates is not None:
                 raise ValueError(
                     f"Transition '{id}': pass either a TimePattern as `rate=` "
@@ -498,7 +529,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates
+                id, source, target, rate, stratified_rates, impulse_at, impulse_every
             )
             return self
 
@@ -527,6 +558,8 @@ class ModelBuilder:
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
                 per_compartment=per_compartment,
+                impulse_at=impulse_at,
+                impulse_every=impulse_every,
             )
         )
         logging.info(
@@ -600,6 +633,8 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -618,6 +653,8 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
+        impulse_at, impulse_every : optional
+            Impulse schedule of every expanded transition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -691,6 +728,8 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
+                    impulse_at=impulse_at,
+                    impulse_every=impulse_every,
                 )
             )
 
@@ -925,7 +964,7 @@ class ModelBuilder:
         ----------
         typology : str
             Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations".
+            "DifferenceEquations" or "DifferentialEquations".
 
         Returns
         -------
@@ -957,6 +996,7 @@ class ModelBuilder:
         dynamics = Dynamics(
             typology=validated_typology,
             transitions=self._transitions,
+            solver=self._solver,
         )
 
         model = Model(
@@ -966,6 +1006,7 @@ class ModelBuilder:
             population=population,
             parameters=self._parameters,
             dynamics=dynamics,
+            step_unit=self._step_unit,
         )
 
         logging.info(

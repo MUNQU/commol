@@ -8,7 +8,7 @@ if TYPE_CHECKING:
         CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
         CalibrationResultWithHistoryProtocol,
-        DifferenceEquationsProtocol,
+        EngineProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
     )
@@ -17,7 +17,6 @@ try:
     from commol.commol_rs import _commol_rs as commol_rs
 
     rust_core = commol_rs.core
-    rust_difference = commol_rs.difference
     rust_calibration = commol_rs.calibration
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
@@ -26,6 +25,7 @@ from commol.api.simulation import Simulation
 from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationProblem,
+    check_steps_for_typology,
     CalibrationResult,
     NelderMeadConfig,
     ParticleSwarmConfig,
@@ -68,7 +68,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine: "DifferenceEquationsProtocol" = simulation.engine
+        self._engine: "EngineProtocol" = simulation.engine
 
         logger.info(
             (
@@ -528,6 +528,11 @@ class Calibrator:
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
                 )
+        check_steps_for_typology(
+            self.simulation.model_definition.dynamics.typology,
+            self.problem.observed_data,
+            self.problem.constraints,
+        )
 
     def _warn_constraint_time_steps_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""

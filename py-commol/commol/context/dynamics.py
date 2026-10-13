@@ -1,5 +1,6 @@
 """Transitions, stratified rates and the dynamics of a model."""
 
+import math
 from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -143,6 +144,73 @@ class Transition(BaseModel):
         ),
     )
 
+    impulse_at: list[float] | None = Field(
+        default=None,
+        description=(
+            "Positions on the axis where the transition is an impulse: at each "
+            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "moved at once. Between them the transition moves nothing."
+        ),
+    )
+
+    impulse_every: tuple[float, float] | None = Field(
+        default=None,
+        description=(
+            "(period, offset): the transition is an impulse at offset, "
+            "offset + period, offset + 2 * period, ..."
+        ),
+    )
+
+    @property
+    def is_impulse(self) -> bool:
+        """Whether the transition is an impulse rather than a continuous flow."""
+        return self.impulse_at is not None or self.impulse_every is not None
+
+    def impulse_positions(self) -> list[float]:
+        """
+        The positions of `impulse_at`, or `[offset, period]` of `impulse_every`.
+
+        These are the values that must be integers in a difference model.
+        """
+        if self.impulse_at is not None:
+            return list(self.impulse_at)
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            return [offset, period]
+        return []
+
+    @model_validator(mode="after")
+    def validate_impulse(self) -> Self:
+        """Check the impulse schedule: one kind, valid positions and period."""
+        if self.impulse_at is not None and self.impulse_every is not None:
+            raise ValueError(
+                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
+            )
+        if self.impulse_at is not None:
+            if not self.impulse_at:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse_at needs at least one position."
+                )
+            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
+            if bad:
+                raise ValueError(
+                    f"Transition '{self.id}': impulse positions must be finite "
+                    f"and not negative, got {bad}."
+                )
+        if self.impulse_every is not None:
+            period, offset = self.impulse_every
+            if not (math.isfinite(period) and period > 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse period must be "
+                    f"positive, got {period}."
+                )
+            if not (math.isfinite(offset) and offset >= 0):
+                raise ValueError(
+                    f"Transition '{self.id}': the impulse offset must be finite "
+                    f"and not negative, got {offset}."
+                )
+        return self
+
     @field_validator("rate", mode="before")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
@@ -159,6 +227,28 @@ class Transition(BaseModel):
         return value
 
 
+class OdeSolver(BaseModel):
+    """
+    Solver settings of a differential-equations model.
+
+    Attributes
+    ----------
+    method : Literal["tsit45", "bdf"]
+        ``"tsit45"``: explicit Tsitouras 5(4) Runge-Kutta, for non-stiff
+        models. ``"bdf"``: backward differentiation formulas, for stiff models.
+    rtol : float
+        Relative tolerance of each state component.
+    atol : float
+        Absolute tolerance of each state component, in the unit of the bins.
+    """
+
+    method: Literal["tsit45", "bdf"] = Field(
+        default="tsit45", description="Integration method."
+    )
+    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
+    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+
+
 class Dynamics(BaseModel):
     """
     Defines how the system evolves.
@@ -169,12 +259,41 @@ class Dynamics(BaseModel):
         The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
+    solver : OdeSolver | None
+        Solver settings of a differential-equations model; None uses the
+        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     typology: Literal[
         ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
     ]
     transitions: list[Transition]
+    solver: OdeSolver | None = Field(
+        default=None,
+        description="Solver settings of a differential-equations model.",
+    )
+
+    @model_validator(mode="after")
+    def validate_typology_settings(self) -> Self:
+        """
+        A solver needs a differential model; a difference model steps only at
+        integers, so its impulse positions must be integers.
+        """
+        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS:
+            if self.solver is not None:
+                raise ValueError(
+                    "Solver settings apply only to a DifferentialEquations model; "
+                    "a DifferenceEquations model has no solver."
+                )
+            for transition in self.transitions:
+                bad = [p for p in transition.impulse_positions() if p != int(p)]
+                if bad:
+                    raise ValueError(
+                        f"Transition '{transition.id}': impulse position {bad[0]} "
+                        f"is not an integer step; a DifferenceEquations model "
+                        f"steps only at integers."
+                    )
+        return self
 
     @field_validator("transitions")
     @classmethod

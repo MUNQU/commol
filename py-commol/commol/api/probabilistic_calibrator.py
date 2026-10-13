@@ -4,6 +4,7 @@ This module provides the main ProbabilisticCalibrator class that orchestrates
 the probabilistic calibration workflow using focused helper classes.
 """
 
+import math
 import logging
 import random
 import secrets
@@ -27,6 +28,7 @@ from commol.api.probabilistic.ensemble_selector import (
 from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
 from commol.context._model import engine_state
+from commol.context.calibration import check_steps_for_typology
 from commol.context.constants import CalibrationParameterType
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
@@ -179,6 +181,11 @@ class ProbabilisticCalibrator:
                     f"Observed data contains negative time step: {min_step}. "
                     "Time steps must be non-negative."
                 )
+        check_steps_for_typology(
+            self.simulation.model_definition.dynamics.typology,
+            self.problem.observed_data,
+            self.problem.constraints,
+        )
 
     def _warn_constraint_time_steps_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""
@@ -682,7 +689,9 @@ class ProbabilisticCalibrator:
     ) -> ProbabilisticCalibrationResult:
         """Calculate statistics and build final result."""
         max_time_step = max(obs.step for obs in self.problem.observed_data)
-        time_steps = max_time_step + 1
+        # Trajectories hold the integer steps; a non-integer observation is
+        # read from the engine at its position.
+        time_steps = math.floor(max_time_step) + 1
         simulation_output_ids = list(self.simulation.simulation_outputs)
 
         selected_solution = self._build_ensemble_solution(

@@ -106,7 +106,7 @@ class TestInitialState:
         model = build(conditional_pathway_builder())
         rust_model = commol_rs.core.Model.from_json(model.model_dump_json())
 
-        state = commol_rs.difference.initial_state(rust_model)
+        state = commol_rs.model.initial_state(rust_model)
 
         assert state[0] == ("S_y60", "S", [("age", "y60")], 450.0)
         assert [name for name, _, _, _ in state] == Simulation(

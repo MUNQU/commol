@@ -8,7 +8,7 @@ RESERVED_VARIABLE_NAMES: tuple[str, ...] = ("N", "step", "t", "pi", "e")
 
 @unique
 class ModelTypes(StrEnum):
-    """Model typologies. Only `DIFFERENCE_EQUATIONS` can be simulated."""
+    """Model typologies: discrete time (difference) or continuous (differential)."""
 
     DIFFERENCE_EQUATIONS = "DifferenceEquations"
     DIFFERENTIAL_EQUATIONS = "DifferentialEquations"

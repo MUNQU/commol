@@ -6,6 +6,7 @@ overrides apply, and how calibrated values reach the initial population.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
+import json
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -14,13 +15,14 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
+from commol.constants import ModelTypes
 from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
         CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
-        DifferenceEquationsProtocol,
+        EngineProtocol,
         RustModelProtocol,
     )
     from commol.context.calibration import CalibrationParameter
@@ -74,6 +76,38 @@ def _rust_model(model: "Model") -> "RustModelProtocol":
     return commol_rs.core.Model.from_json(model.model_dump_json())
 
 
+def build_engine(model: "Model | str") -> "EngineProtocol":
+    """
+    Build the engine that the typology of a model names.
+
+    Parameters
+    ----------
+    model : Model | str
+        The model definition, or its JSON.
+
+    Returns
+    -------
+    EngineProtocol
+        A ``DifferenceEquations`` engine for a difference-equations model, a
+        ``DifferentialEquations`` engine for a differential-equations model.
+
+    Raises
+    ------
+    RuntimeError
+        If the engine cannot compile the model.
+    """
+    if isinstance(model, str):
+        model_json = model
+        typology = json.loads(model_json)["dynamics"]["typology"]
+    else:
+        model_json = model.model_dump_json()
+        typology = model.dynamics.typology
+    rust_model = commol_rs.core.Model.from_json(model_json)
+    if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
+        return commol_rs.differential.DifferentialEquations(rust_model)
+    return commol_rs.difference.DifferenceEquations(rust_model)
+
+
 def initial_state(model: "Model") -> list[InitialCompartment]:
     """
     Expand a model into its compartments and their initial populations.
@@ -97,7 +131,7 @@ def initial_state(model: "Model") -> list[InitialCompartment]:
     """
     return [
         InitialCompartment(name, bin_id, dict(categories), population)
-        for name, bin_id, categories, population in commol_rs.difference.initial_state(
+        for name, bin_id, categories, population in commol_rs.model.initial_state(
             _rust_model(model)
         )
     ]
@@ -119,9 +153,7 @@ def expanded_outputs(
     tuple[list[ExpandedOutput], list[ExpandedOutput]]
         The expanded compartments and accumulator outputs, in engine order.
     """
-    compartments, accumulators = commol_rs.difference.expanded_outputs(
-        _rust_model(model)
-    )
+    compartments, accumulators = commol_rs.model.expanded_outputs(_rust_model(model))
     return (
         [
             ExpandedOutput(name, source, dict(cats))
@@ -190,7 +222,7 @@ def transition_flows(model: "Model") -> list[TransitionFlow]:
     """
     return [
         TransitionFlow(*flow)
-        for flow in commol_rs.difference.transition_flows(_rust_model(model))
+        for flow in commol_rs.model.transition_flows(_rust_model(model))
     ]
 
 
@@ -221,7 +253,7 @@ def _rust_parameters(
 
 
 def check_initial_conditions(
-    engine: "DifferenceEquationsProtocol",
+    engine: "EngineProtocol",
     parameters: Sequence["CalibrationParameter"],
     remainder: str | None = None,
 ) -> None:
@@ -234,7 +266,7 @@ def check_initial_conditions(
 
     Parameters
     ----------
-    engine : DifferenceEquationsProtocol
+    engine : EngineProtocol
         The engine the calibration runs on.
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
@@ -312,7 +344,7 @@ def calibrated_initial_population(
         If an initial-condition id or the remainder cannot be resolved, or the
         initial population exceeds the population size.
     """
-    engine = commol_rs.difference.DifferenceEquations(_rust_model(model))
+    engine = build_engine(model)
     applied, population, covered = commol_rs.calibration.calibrated_initial_population(
         engine,
         _rust_parameters(parameters),
@@ -343,4 +375,4 @@ def check_names(model: "Model") -> None:
         or a rate or formula parameter uses an ``N_…`` name that is not a
         subpopulation of the model.
     """
-    commol_rs.difference.check_names(_rust_model(model))
+    commol_rs.model.check_names(_rust_model(model))

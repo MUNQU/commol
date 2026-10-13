@@ -3,14 +3,23 @@
 import pytest
 
 from commol import (
+    CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ObservedDataPoint,
     ParticleSwarmConfig,
     Simulation,
 )
 from commol.context.model import Model
-from tests.support import bounded, observed
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    build_ode,
+    observed,
+    sir_builder,
+)
 
 SEED = 42
 
@@ -85,3 +94,101 @@ class TestScaleFactors:
         assert result.best_parameters == pytest.approx(
             {"i_detection_rate": 0.6, "r_detection_rate": 0.9}, abs=1e-3
         )
+
+
+ODE_TRUTH = {"beta": 0.3, "gamma": 0.1}
+STEPS = [0.5 + 1.5 * j for j in range(40)]
+"""Observation steps, none of them an integer."""
+
+
+def _fit_ode(problem: CalibrationProblem, model) -> dict[str, float]:
+    return Calibrator(Simulation(model), problem).run().best_parameters
+
+
+class TestStepsBetweenIntegers:
+    """A DifferentialEquations model observed at any step."""
+
+    def test_observations_at_non_integer_steps_recover_the_parameters(self) -> None:
+        truth = build_ode(sir_builder())
+        results = Simulation(truth).run_at(STEPS)
+        problem = CalibrationProblem(
+            observed_data=[
+                ObservedDataPoint(step=step, compartment="I", value=value)
+                for step, value in zip(STEPS, results["I"], strict=True)
+            ],
+            parameters=[
+                bounded("beta", initial_guess=0.5),
+                bounded("gamma", high=0.5, initial_guess=0.2),
+            ],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=2000, verbose=False),
+        )
+
+        fitted = _fit_ode(
+            problem, build_ode(sir_builder(parameters={"beta": None, "gamma": None}))
+        )
+
+        assert fitted == pytest.approx(ODE_TRUTH, rel=1e-4)
+
+    def test_a_window_over_non_integer_steps_recovers_the_rate(self) -> None:
+        truth = build_ode(a_to_b_builder(parameters={"k": 0.2}, accumulator="moved"))
+        results = Simulation(truth).run_at([0.5, 3.5, 6.5])
+        observations = [
+            ObservedDataPoint(
+                step=end,
+                compartment="moved",
+                value=results["moved"][i + 1] - results["moved"][i],
+                window_steps=3.0,
+            )
+            for i, end in enumerate([3.5, 6.5])
+        ]
+        problem = CalibrationProblem(
+            observed_data=observations,
+            parameters=[bounded("k", initial_guess=0.5)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=500, verbose=False),
+        )
+
+        fitted = _fit_ode(
+            problem,
+            build_ode(a_to_b_builder(parameters={"k": None}, accumulator="moved")),
+        )
+
+        assert fitted["k"] == pytest.approx(0.2, rel=1e-5)
+
+
+class TestStepsAndTypology:
+    def test_a_whole_step_is_stored_as_an_int(self) -> None:
+        point = ObservedDataPoint(
+            step=3.0, compartment="I", value=1.0, window_steps=2.0
+        )
+
+        assert point.step == 3 and isinstance(point.step, int)
+        assert isinstance(point.window_steps, int)
+
+    def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(step=2.5, compartment="A", value=1.0)],
+            parameters=[bounded("k")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        model = build(a_to_b_builder(parameters={"k": None}))
+
+        with pytest.raises(ValueError, match="Observation 'A' has step=2.5"):
+            Calibrator(Simulation(model), problem)
+
+    def test_a_difference_model_rejects_a_non_integer_constraint_step(self) -> None:
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(step=2, compartment="A", value=1.0)],
+            parameters=[bounded("k")],
+            constraints=[
+                CalibrationConstraint(id="cap", expression="1 - A", time_steps=[1.5])
+            ],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        model = build(a_to_b_builder(parameters={"k": None}))
+
+        with pytest.raises(ValueError, match="Constraint 'cap'.*1.5"):
+            Calibrator(Simulation(model), problem)
