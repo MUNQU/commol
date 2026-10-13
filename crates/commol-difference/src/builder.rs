@@ -9,6 +9,7 @@ use crate::types::{
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
+use commol_core::math_expression::preprocessing::{SPECIAL_VAR_E, SPECIAL_VAR_PI};
 use commol_core::{MathExpressionContext, Model, OutputLabels, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
@@ -983,6 +984,10 @@ fn resolve_var_slot(
         VarSlot::Compartment(idx)
     } else if name == "step" || name == "t" {
         VarSlot::Step
+    } else if name == SPECIAL_VAR_PI {
+        VarSlot::Constant(std::f64::consts::PI)
+    } else if name == SPECIAL_VAR_E {
+        VarSlot::Constant(std::f64::consts::E)
     } else if let Some(idx) = expression_context.parameter_index(name) {
         VarSlot::ParameterIndex(idx)
     } else {

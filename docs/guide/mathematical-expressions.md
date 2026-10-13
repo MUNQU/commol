@@ -74,14 +74,7 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 | A bin id, with stratifications | The total of all its compartments |
 | `N` | The total population |
 | `step`, `t` | The current step: 0, 1, 2, … |
-| `pi`, `e` | π and e; see the warning below |
-
-!!! warning "Known issue: `pi` and `e` in rates"
-    In a transition rate, `pi` and `e` only work inside a function argument,
-    such as `sin(2 * pi * step / 365)`. Elsewhere (`"k1 * pi"`) the simulation
-    fails with "Variable 'pi' not found". Formula parameters accept them
-    everywhere, so define `two_pi = "2 * pi"` as a parameter, or write the
-    number.
+| `pi`, `e` | π and e |
 
 ### Subpopulation variables
 

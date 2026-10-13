@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before,
+  outside a function argument, the simulation failed with "Variable 'pi' not
+  found".
+
 ### Documentation
 
 - The guide is rewritten and split into pages with one job each (building
