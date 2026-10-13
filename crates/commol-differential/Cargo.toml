@@ -1,0 +1,23 @@
+[package]
+name = "commol-differential"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Mathematical compartment modelling with ordinary differential equations"
+
+[lib]
+name = "commol_differential"
+crate-type = ["rlib"]
+
+[dependencies]
+commol-core = { path = "../commol-core" }
+commol-model = { path = "../commol-model" }
+# Pinned to a minor version: its API changes between minor versions.
+diffsol = "~0.17.1"
+
+[dev-dependencies]
+commol-difference = { path = "../commol-difference" }
+serde_json = "1.0"

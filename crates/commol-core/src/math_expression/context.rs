@@ -19,6 +19,9 @@ pub struct MathExpressionContext {
     parameter_values: Vec<Option<f64>>,
     pub(crate) compartments: HashMap<String, f64>,
     pub(crate) step: f64,
+    /// Continuous time `t`. Equal to `step` in a difference model; inside a
+    /// step of a differential model `step` stays at the step that holds `t`.
+    pub(crate) time: f64,
     /// Cached compartment names for index-based updates
     compartment_names: Vec<String>,
     /// Cached evalexpr context to avoid rebuilding
@@ -37,6 +40,7 @@ impl MathExpressionContext {
             parameter_values: Vec::new(),
             compartments: HashMap::new(),
             step: 0.0,
+            time: 0.0,
             compartment_names: Vec::new(),
             cached_evalexpr_context: None,
             cache_dirty: true,
@@ -135,15 +139,31 @@ impl MathExpressionContext {
         self.cache_dirty = true;
     }
 
-    /// Set the current step
+    /// Set the current step, and the time `t` to the same value.
     pub fn set_step(&mut self, step: f64) {
         self.step = step;
+        self.time = step;
 
         // Update cached context directly if it exists
         if let Some(ref mut ctx) = self.cached_evalexpr_context {
             ctx.set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(step))
                 .ok();
             ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(step))
+                .ok();
+        } else {
+            self.cache_dirty = true;
+        }
+    }
+
+    /// Set the time `t` and leave `step` as it is.
+    ///
+    /// A differential engine calls it after [`Self::set_step`], so `step` is
+    /// the step that holds `t`.
+    pub fn set_time(&mut self, time: f64) {
+        self.time = time;
+
+        if let Some(ref mut ctx) = self.cached_evalexpr_context {
+            ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(time))
                 .ok();
         } else {
             self.cache_dirty = true;
@@ -251,7 +271,7 @@ impl MathExpressionContext {
                 .set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(self.step))
                 .ok();
             context
-                .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.step))
+                .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.time))
                 .ok();
             context
                 .set_value(

@@ -11,7 +11,9 @@ crate-type = ["cdylib"]
 pyo3 = { workspace = true }
 serde_json = "1.0"
 commol-core = { path = "../crates/commol-core" }
+commol-model = { path = "../crates/commol-model" }
 commol-difference = { path = "../crates/commol-difference" }
+commol-differential = { path = "../crates/commol-differential" }
 commol-calibration = { path = "../crates/commol-calibration" }
 
 # Required for custom argmin observer

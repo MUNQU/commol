@@ -18,7 +18,9 @@ pub mod parameters;
 pub mod population;
 
 // Re-export all public types for convenient access
-pub use dynamics::{Dynamics, ModelTypes, StratificationCondition, StratifiedRate, Transition};
+pub use dynamics::{
+    Dynamics, ModelTypes, OdeMethod, OdeSolver, StratificationCondition, StratifiedRate, Transition,
+};
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};
 pub use population::{

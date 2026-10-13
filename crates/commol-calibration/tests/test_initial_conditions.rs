@@ -221,7 +221,7 @@ fn category_splits_apply_after_bin_values_whatever_the_parameter_order() {
 fn infeasible_initial_conditions_are_penalized() {
     let problem = CalibrationProblem::new(
         TestEngine::with_fixed_h(),
-        vec![ObservedDataPoint::new(0, "A_cat0".to_string(), 300.0)],
+        vec![ObservedDataPoint::new(0.0, "A_cat0".to_string(), 300.0)],
         vec![initial_condition("A")],
         vec![],
         LossConfig::SumSquaredError,
@@ -241,7 +241,7 @@ fn infeasible_initial_conditions_are_penalized() {
 fn aggregate_initial_conditions_keep_existing_subgroup_percentages() {
     let problem = CalibrationProblem::new(
         TestEngine::new(),
-        vec![ObservedDataPoint::new(0, "A_cat0".to_string(), 390.0)],
+        vec![ObservedDataPoint::new(0.0, "A_cat0".to_string(), 390.0)],
         vec![
             CalibrationParameter::with_type_and_guess(
                 "A".to_string(),
@@ -276,8 +276,8 @@ fn paired_category_initial_condition_redistributes_without_changing_pair_totals(
     let problem = CalibrationProblem::new(
         TestEngine::new(),
         vec![
-            ObservedDataPoint::new(0, "A_cat0".to_string(), 450.0),
-            ObservedDataPoint::new(0, "A_cat1".to_string(), 50.0),
+            ObservedDataPoint::new(0.0, "A_cat0".to_string(), 450.0),
+            ObservedDataPoint::new(0.0, "A_cat1".to_string(), 50.0),
         ],
         vec![CalibrationParameter::with_type_and_guess(
             "cat1".to_string(),
@@ -302,8 +302,8 @@ fn paired_category_initial_condition_can_target_either_binary_category() {
     let problem = CalibrationProblem::new(
         TestEngine::new(),
         vec![
-            ObservedDataPoint::new(0, "A_cat0".to_string(), 100.0),
-            ObservedDataPoint::new(0, "A_cat1".to_string(), 400.0),
+            ObservedDataPoint::new(0.0, "A_cat0".to_string(), 100.0),
+            ObservedDataPoint::new(0.0, "A_cat1".to_string(), 400.0),
         ],
         vec![CalibrationParameter::with_type_and_guess(
             "cat0".to_string(),
@@ -326,8 +326,8 @@ fn paired_category_initial_condition_infers_generic_category_names() {
     let problem = CalibrationProblem::new(
         TestEngine::with_alt_categories(),
         vec![
-            ObservedDataPoint::new(0, "A_seg0".to_string(), 400.0),
-            ObservedDataPoint::new(0, "A_seg1".to_string(), 100.0),
+            ObservedDataPoint::new(0.0, "A_seg0".to_string(), 400.0),
+            ObservedDataPoint::new(0.0, "A_seg1".to_string(), 100.0),
         ],
         vec![CalibrationParameter::with_type_and_guess(
             "seg0".to_string(),
@@ -349,7 +349,7 @@ fn paired_category_initial_condition_infers_generic_category_names() {
 fn exact_compartment_initial_conditions_are_still_accepted() {
     CalibrationProblem::new(
         TestEngine::new(),
-        vec![ObservedDataPoint::new(0, "A_cat0".to_string(), 300.0)],
+        vec![ObservedDataPoint::new(0.0, "A_cat0".to_string(), 300.0)],
         vec![CalibrationParameter::with_type_and_guess(
             "A_cat0".to_string(),
             CalibrationParameterType::InitialCondition,

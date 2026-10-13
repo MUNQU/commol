@@ -9,7 +9,9 @@
 //! ## Modules
 //!
 //! - `core`: Core data structures (Model, Population, etc.)
+//! - `model`: What a model expands into (compartments, flows, initial state)
 //! - `difference`: Discrete-time difference equation solver
+//! - `differential`: Continuous-time ordinary differential equation solver
 //! - `calibration`: Parameter calibration and optimization
 //!
 //! ## Example
@@ -35,6 +37,9 @@ use pyo3::prelude::*;
 mod calibration;
 mod core;
 mod difference;
+mod differential;
+mod engine;
+mod model;
 pub(crate) mod python_observer;
 
 /// High-performance compartment modelling library.
@@ -53,6 +58,17 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;
 
+    // Model module: expansion shared by every engine
+    let model_module = PyModule::new(py, "model")?;
+    model_module.add(
+        "__doc__",
+        "What a model expands into, whatever engine runs it.\n\n\
+         Provides the initial state, the expanded outputs, the transition\n\
+         flows and the name checks of a model.",
+    )?;
+    model::register(&model_module)?;
+    m.add_submodule(&model_module)?;
+
     // Difference module: discrete-time solver
     let difference_module = PyModule::new(py, "difference")?;
     difference_module.add(
@@ -63,6 +79,17 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     difference::register(&difference_module)?;
     m.add_submodule(&difference_module)?;
+
+    // Differential module: continuous-time solver
+    let differential_module = PyModule::new(py, "differential")?;
+    differential_module.add(
+        "__doc__",
+        "Continuous-time ordinary differential equation solver.\n\n\
+         Provides the DifferentialEquations class for simulating compartment\n\
+         models in continuous time with diffsol.",
+    )?;
+    differential::register(&differential_module)?;
+    m.add_submodule(&differential_module)?;
 
     // Calibration module: parameter optimization
     let calibration_module = PyModule::new(py, "calibration")?;

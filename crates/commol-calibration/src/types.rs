@@ -16,8 +16,9 @@ pub enum CalibrationParameterType {
 /// Represents an observed data point to fit against
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservedDataPoint {
-    /// Time step at which this observation was made
-    pub time_step: u32,
+    /// Position on the axis (step) of the observation. A
+    /// difference-equations model requires an integer.
+    pub time_step: f64,
 
     /// Name of the compartment being observed
     pub compartment: String,
@@ -41,12 +42,12 @@ pub struct ObservedDataPoint {
 
     /// Optional window size for cumulative-output observations.
     /// When set, the predicted value is output(time_step) - output(time_step - window_steps).
-    pub window_steps: Option<u32>,
+    pub window_steps: Option<f64>,
 }
 
 impl ObservedDataPoint {
     /// Create a new observed data point with default weight of 1.0
-    pub fn new(time_step: u32, compartment: String, value: f64) -> Self {
+    pub fn new(time_step: f64, compartment: String, value: f64) -> Self {
         Self {
             time_step,
             compartment,
@@ -59,7 +60,7 @@ impl ObservedDataPoint {
     }
 
     /// Create a new observed data point with a custom weight
-    pub fn with_weight(time_step: u32, compartment: String, value: f64, weight: f64) -> Self {
+    pub fn with_weight(time_step: f64, compartment: String, value: f64, weight: f64) -> Self {
         Self {
             time_step,
             compartment,
@@ -72,7 +73,7 @@ impl ObservedDataPoint {
     }
 
     /// Create a new observed data point with a scale parameter
-    pub fn with_scale(time_step: u32, compartment: String, value: f64, scale_id: String) -> Self {
+    pub fn with_scale(time_step: f64, compartment: String, value: f64, scale_id: String) -> Self {
         Self {
             time_step,
             compartment,
@@ -86,7 +87,7 @@ impl ObservedDataPoint {
 
     /// Create a new observed data point with both weight and scale
     pub fn with_weight_and_scale(
-        time_step: u32,
+        time_step: f64,
         compartment: String,
         value: f64,
         weight: f64,
@@ -104,7 +105,7 @@ impl ObservedDataPoint {
     }
 
     /// Create a windowed observation for a cumulative output.
-    pub fn with_window(time_step: u32, compartment: String, value: f64, window_steps: u32) -> Self {
+    pub fn with_window(time_step: f64, compartment: String, value: f64, window_steps: f64) -> Self {
         Self {
             time_step,
             compartment,
@@ -329,21 +330,21 @@ impl std::fmt::Display for LossConfig {
 ///     "max_infected".to_string(),
 ///     "500.0 - I".to_string(),
 /// )
-/// .with_time_steps(vec![10, 20, 30, 40])
+/// .with_time_steps(vec![10.0, 20.0, 30.0, 40.0])
 ///
 /// // Total population must stay <= 1000
 /// CalibrationConstraint::new(
 ///     "population_bound".to_string(),
 ///     "1000.0 - (S + I + R)".to_string(),
 /// )
-/// .with_time_steps(vec![0, 5, 10, 15, 20])
+/// .with_time_steps(vec![0.0, 5.0, 10.0, 15.0, 20.0])
 ///
 /// // Ratio of compartments with parameter reference
 /// CalibrationConstraint::new(
 ///     "ratio_bound".to_string(),
 ///     "threshold - I/S".to_string(),
 /// )
-/// .with_time_steps(vec![10, 20, 30])
+/// .with_time_steps(vec![10.0, 20.0, 30.0])
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationConstraint {
@@ -377,7 +378,7 @@ pub struct CalibrationConstraint {
     /// - If None: Constraint is evaluated once before simulation using parameter values only
     /// - If Some(vec): Constraint is evaluated at each specified time step during simulation,
     ///   and can reference both parameters and compartment values
-    pub time_steps: Option<Vec<u32>>,
+    pub time_steps: Option<Vec<f64>>,
 }
 
 impl CalibrationConstraint {
@@ -405,7 +406,7 @@ impl CalibrationConstraint {
     }
 
     /// Set the time steps
-    pub fn with_time_steps(mut self, time_steps: Vec<u32>) -> Self {
+    pub fn with_time_steps(mut self, time_steps: Vec<f64>) -> Self {
         self.time_steps = Some(time_steps);
         self
     }
