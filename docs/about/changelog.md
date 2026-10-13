@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Transition conditions: `Transition.condition`, the `condition` argument of
+  `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the
+  `Condition` and `Rule` types, and the `LogicOperators` and
+  `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated
+  them, so a condition that was never true still moved population. Write the
+  condition in the rate (`"if(step > 30, k, 0)"`), or use a `TimePattern` or a
+  stratified rate. A model file with a `condition` key still loads; the key is
+  ignored.
 - The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`,
   which uses the weights.
 

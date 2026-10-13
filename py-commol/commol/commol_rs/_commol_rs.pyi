@@ -1,15 +1,6 @@
 from typing import ClassVar, Protocol
 
-from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
-
-class RuleProtocol(Protocol):
-    variable: str
-    operator: LogicOperators
-    value: str | int | float | bool
-
-class ConditionProtocol(Protocol):
-    logic: LogicOperators
-    rules: list[RuleProtocol]
+from commol.constants import ModelTypes
 
 class BinProtocol(Protocol):
     id: str
@@ -33,7 +24,6 @@ class TransitionProtocol(Protocol):
     target: list[str]
     rate: RateMathExpressionProtocol | None
     stratified_rates: list[StratifiedRateProtocol] | None
-    condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
     id: str
@@ -532,11 +522,7 @@ class CoreModule(Protocol):
     InitialConditions: type[InitialConditionsProtocol]
     StratificationFraction: type[StratificationFractionProtocol]
     StratificationFractions: type[StratificationFractionsProtocol]
-    Condition: type[ConditionProtocol]
-    Rule: type[RuleProtocol]
-    LogicOperator: type[LogicOperators]
     ModelTypes: type[ModelTypes]
-    VariablePrefixes: type[VariablePrefixes]
     Dynamics: type[DynamicsProtocol]
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]

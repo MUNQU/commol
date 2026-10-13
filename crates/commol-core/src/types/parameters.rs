@@ -1,16 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Prefixes of a `Rule` variable.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum VariablePrefixes {
-    /// `state:<bin>`.
-    #[serde(rename = "state")]
-    State,
-    /// `strat:<stratification>`.
-    #[serde(rename = "strat")]
-    Strat,
-}
-
 /// How a [`ParameterValue::TimeSeries`] is interpolated between listed steps.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SeriesMode {

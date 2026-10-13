@@ -220,7 +220,6 @@ mod tests {
                 rate: "1.0".to_string(),
                 absolute: None,
             }]),
-            condition: None,
             per_compartment: None,
         };
 

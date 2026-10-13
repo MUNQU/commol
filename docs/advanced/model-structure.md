@@ -24,10 +24,8 @@ Model                      name, description, version
 └── dynamics: Dynamics
     ├── typology: "DifferenceEquations"
     └── transitions: [Transition]
-        ├── stratified_rates: [StratifiedRate]
-        │   └── conditions: [StratificationCondition]
-        └── condition: Condition           (stored, not evaluated)
-            └── rules: [Rule]
+        └── stratified_rates: [StratifiedRate]
+            └── conditions: [StratificationCondition]
 ```
 
 `Model` itself is documented in [Model API](../api/model.md).
@@ -59,10 +57,6 @@ Model                      name, description, version
 ::: commol.context.dynamics.Transition
 
 ::: commol.context.dynamics.StratifiedRate
-
-::: commol.context.dynamics.Condition
-
-::: commol.context.dynamics.Rule
 
 ## Initial conditions
 

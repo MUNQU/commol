@@ -1456,7 +1456,6 @@ mod tests {
             accumulators: vec![],
             rate: Some(RateMathExpression::from_string(rate.to_string())),
             stratified_rates: None,
-            condition: None,
             per_compartment: None,
         }];
         model

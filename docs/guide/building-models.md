@@ -77,7 +77,6 @@ methods:
 | `clone()` | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model. |
 | `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
 | `get_summary()` | `dict` | The name, description, version and the ids added so far. |
-| `create_condition(logic, rules)` | `Condition` | Builds a transition condition; see [Transitions](transitions.md#conditions-are-not-evaluated). |
 
 ```python
 variant = builder.clone()

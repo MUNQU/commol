@@ -687,7 +687,6 @@ mod tests {
                         "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
                     )),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
                 }],
             },
@@ -739,7 +738,6 @@ mod tests {
                     accumulators: vec![],
                     rate: Some(RateMathExpression::from_string("missing * A".to_string())),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
                 }],
             },
@@ -1011,7 +1009,6 @@ mod tests {
                             "k1 * A * B / N".to_string(),
                         )),
                         stratified_rates: None,
-                        condition: None,
                         per_compartment: None,
                     },
                     Transition {
@@ -1021,7 +1018,6 @@ mod tests {
                         accumulators: vec![],
                         rate: Some(RateMathExpression::from_string("k2".to_string())),
                         stratified_rates: None,
-                        condition: None,
                         per_compartment: None,
                     },
                 ],
@@ -1072,7 +1068,6 @@ mod tests {
             accumulators: vec![],
             rate: Some(RateMathExpression::from_string(rate.to_string())),
             stratified_rates: None,
-            condition: None,
             per_compartment: None,
         }];
         model
