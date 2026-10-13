@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With
   every weight at 1 nothing changes. The ensemble central loss follows the same
   rule.
+- `Simulation.run` starts from the initial state at every call, so two calls
+  give the same result. Before, a second `run` continued the first one. To
+  continue a run, call `simulation.engine.step()`.
 
 ### Removed
 
@@ -28,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `Simulation` follows its model: `run` and `engine` rebuild the engine when
+  the model changed after the `Simulation` was created, for example with
+  `update_parameters` or `apply_calibration_parameters`. Before, it used the
+  old values, or failed with "Parameter index … not found" for a parameter
+  that was `None`.
 - `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before,
   outside a function argument, the simulation failed with "Variable 'pi' not
   found".

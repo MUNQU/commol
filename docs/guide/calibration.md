@@ -78,17 +78,15 @@ result = Calibrator(Simulation(model), problem).run()
 print({name: round(value, 3) for name, value in sorted(result.best_parameters.items())})
 # {'k1': 0.4, 'k2': 0.1}
 
-# 4. Write the values back, and simulate with a new Simulation
+# 4. Write the values back, and simulate
 model.apply_calibration_parameters(result, problem)
 calibrated = Simulation(model).run(num_steps=100)
 ```
 
-!!! warning "A `Simulation` copies the model"
-    `Simulation(model)` builds its engine from the model as it is at that
-    moment. After you change the model (`apply_calibration_parameters`,
-    `update_parameters`, …), create a **new** `Simulation`. An old one keeps the
-    old values, and one created while a parameter was `None` fails with
-    "Parameter index … not found".
+A `Simulation` follows its model: after `apply_calibration_parameters` or
+`update_parameters`, its next `run` (and its `engine`) uses the new values,
+also when it was created while a parameter was `None`. See
+[Simulations](simulations.md#simulation).
 
 ## The problem
 

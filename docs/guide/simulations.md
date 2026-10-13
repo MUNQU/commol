@@ -46,29 +46,38 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Member | Returns | What it does |
 |---|---|---|
 | `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
-| `run(num_steps, output_format="dict_of_lists")` | results | Runs `num_steps` steps from the engine's current state; see below. Raises `ValueError` if a parameter is still `None`. |
+| `run(num_steps, output_format="dict_of_lists")` | results | Runs `num_steps` steps from the initial state, with the model as it is now; see below. Raises `ValueError` if a parameter is still `None`. |
 | `simulation_outputs` | `list[str]` | The output names, in engine order: compartments first, then accumulators. |
 | `outputs_for(id)` | `list[str]` | The outputs of one bin or accumulator. |
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
 | `total_series(results, ids)` | `list[float]` | The sum of all outputs of the given ids, at each step. |
 | `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]` | What the given accumulators gained in each window. |
-| `engine` | engine | The underlying Rust engine. `engine.reset()` returns it to the initial state. |
+| `engine` | engine | The underlying Rust engine, for the model as it is now. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
-!!! warning "A second `run` continues the first one"
-    The engine keeps its state between calls: a second `run` starts where the
-    first one stopped, and its step 0 is the previous last step. To start
-    again from the initial state, call `simulation.engine.reset()` or create a
-    new `Simulation`.
+Every `run` starts again from the initial state, so two calls with the same
+model give the same result (`Simulation.run` resets the engine first). To
+continue a run step by step, use the engine:
 
 ```python
-simulation.engine.reset()
 first = simulation.run(num_steps=10)
-continued = simulation.run(num_steps=10)
-print(continued["A"][0] == first["A"][-1])  # True: it continued
-
-simulation.engine.reset()
 again = simulation.run(num_steps=10)
 print(again["A"] == first["A"])  # True: it started again
+
+simulation.engine.step()  # step 11, from where the last run stopped
+print(simulation.engine.population[0] < first["A"][-1])  # True: A keeps falling
+```
+
+The engine follows the model. When the model changed after the
+`Simulation` was created, for example with `update_parameters` or
+`apply_calibration_parameters`, `run` and `engine` rebuild the engine from the
+model as it is now (`Simulation._sync_engine` compares `model_dump_json()`
+with the JSON the engine was built from):
+
+```python
+model.update_parameters({"k1": 0.0})
+frozen = simulation.run(num_steps=10)
+print(frozen["A"][10] == frozen["A"][0])  # True: k1 = 0 stops A → B
+model.update_parameters({"k1": 0.3})
 ```
 
 ## Output formats
@@ -81,7 +90,6 @@ print(again["A"] == first["A"])  # True: it started again
 Both contain `num_steps + 1` values per output: step 0 is the initial state.
 
 ```python
-simulation.engine.reset()
 rows = simulation.run(num_steps=100, output_format="list_of_lists")
 
 print(len(rows))         # 101
