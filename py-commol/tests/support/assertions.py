@@ -4,6 +4,8 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 
 Series = Mapping[str, Sequence[float]]
+Values = Mapping[str, float]
+"""One value per output, such as the state at one position."""
 
 ENGINE_REL = 1e-9
 """
@@ -11,10 +13,16 @@ Relative tolerance between the engine and a hand computation of the same
 arithmetic. The two only differ in the order of floating-point operations.
 """
 
+ODE_REL = 1e-6
+"""
+Relative tolerance between a differential model, solved with the ``TIGHT``
+settings, and a stated result: a closed form, a final size or an equilibrium.
+"""
+
 
 def assert_close(
-    actual: float | Sequence[float] | Series,
-    expected: float | Sequence[float] | Series,
+    actual: float | Sequence[float] | Series | Values,
+    expected: float | Sequence[float] | Series | Values,
     *,
     rel: float = 0.0,
     abs: float = 0.0,
@@ -24,8 +32,8 @@ def assert_close(
 
     Parameters
     ----------
-    actual, expected : float | Sequence[float] | Series
-        Both of the same shape. Series must have the same keys.
+    actual, expected : float | Sequence[float] | Series | Values
+        Both of the same shape. Series and values must have the same keys.
     rel, abs : float
         The relative and the absolute tolerance, as in ``math.isclose``. At
         least one must be given, so every comparison states its tolerance.
@@ -45,7 +53,13 @@ def assert_close(
             f"series differ: {sorted(actual)} != {sorted(expected)}"
         )
         for name in expected:
-            _assert_sequence_close(actual[name], expected[name], rel, abs, name)
+            got, want = actual[name], expected[name]
+            if isinstance(want, Sequence):
+                _assert_sequence_close(got, want, rel, abs, name)
+            else:
+                assert math.isclose(got, want, rel_tol=rel, abs_tol=abs), (
+                    f"{name}: {got!r} != {want!r} (rel={rel}, abs={abs})"
+                )
         return
     if isinstance(expected, Sequence):
         assert isinstance(actual, Sequence), f"expected a sequence, got {actual!r}"

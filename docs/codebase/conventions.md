@@ -157,7 +157,9 @@ The tests live in `py-commol/tests/`.
 A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
-`api/probabilistic/`) goes in the package of its feature.
+`api/probabilistic/`) goes in the package of its feature. The one exception is
+`reference_models/`: it checks published models across features (see
+[Reference models](#reference-models)).
 
 | Package | Tests of | Guide page |
 |---|---|---|
@@ -173,6 +175,7 @@ of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
 | `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
+| `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
@@ -204,6 +207,7 @@ A test compares a result with an oracle:
 | A value computed by hand in the test | `reference_run` (`tests/support/reference.py`) evaluates the flows in plain Python, as the engine does: every flow from the state at the start of the step, no clamping. `tests/rates/test_formulas.py` compares whole trajectories with it. |
 | An analytic value | A death rate `d` on every bin gives `N(t) = N(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
 | An invariant | Conservation of the population (`assert_population_conserved`); two paths that must agree, such as a bin id and the explicit sum of its compartments. |
+| What a stated result predicts about a run | `tests/support/oracles.py`: `final_size` solves the final size relation, `assert_threshold` checks that an infection grows at a reproduction number of `1.05` and dies out at `0.95`, `settled` reads a limit once doubling the horizon no longer moves it. |
 
 "It runs" is not a result. A test whose only check is that no exception
 occurs is allowed only when the exception is its subject, such as a validator
@@ -216,10 +220,44 @@ that accepts a valid input.
   difference.
 - `ENGINE_REL = 1e-9` compares the engine with a hand computation of the same
   arithmetic: only the order of the floating-point operations differs.
+- `ODE_REL = 1e-6` compares a differential model with a closed form, a final
+  size or an equilibrium. `flow_model` solves with `FINE` (`TIGHT` with
+  `atol = 1e-12`), so the error of a value near zero stays below its own size.
 - `pytest.approx` with its default (relative `1e-6`) suits a single value
   computed by hand.
 - An optimizer result states the tolerance its convergence allows, for example
   `abs=1e-5` for Nelder-Mead on noise-free data.
+
+### Reference models
+
+`tests/reference_models/` shows that commol can state published models and
+computes their stated results. A module holds one model family and is named
+after its epidemiology (`test_pulse_vaccination.py`); a test checks one stated
+result (`test_the_fixed_point_starts_the_periodic_orbit`).
+
+- **Attribution.** The module docstring has a `References` section in the NumPy
+  format with the original papers of the model and of its parameter values
+  (authors, year, title, journal, DOI). A value or a result taken from a paper
+  cites it in a comment next to the value. A model with no primary source is
+  not added.
+- **Independent oracle.** The expected value comes from the stated result,
+  computed with `math` or `numpy`: a closed form, a root of the final size
+  relation, a spectral radius. A test never compares commol with commol. A
+  quantity that commol does not output, such as a reproduction number, is
+  checked through what it predicts about a run (`tests/support/oracles.py`).
+- **Equations.** To check that a model has the stated equations, `increments`
+  reads its right-hand side at one state: a difference-equation step adds the
+  flows of the state it starts from, and both engines compile the same flows.
+- **Tolerances.** `ENGINE_REL` for a discrete model, `ODE_REL` for a
+  differential one; an asymptotic result is read with `settled`, and the test
+  states its horizon.
+- **Gaps.** A model that commol cannot state, or computes wrong, gets a test
+  marked `xfail(strict=True, reason="F<n>: …")` that names a finding of the
+  task that added it, so a fix makes the test pass and forces the marker out.
+
+To add a test, write the model with `Flow` and `flow_model` (`tests/support/flows.py`)
+from the initial value of each bin, compute the stated result in the test,
+and cite the papers.
 
 ## Commits
 
