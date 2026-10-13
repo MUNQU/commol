@@ -167,11 +167,11 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Triage of the 89 entries into E/C/N/G in the local `test-map.md`, with the primary sources of each model (Attribution); counts in Evidence | direct | |
-| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/` (which already has `build_ode` and `TIGHT`): final-size root finder, a builder from absolute initial values, a threshold check (S3) | direct | |
-| T3 | S2, S3, S4 | Class E tests | direct | |
-| T4 | S2, S3, S4 | Class C tests, one module per model family | direct | |
-| T5 | S4, S5 | Findings in Evidence; docs; leak check; PR | direct | |
+| T1 | S1 | Triage of the 89 entries into E/C/N/G in the local `test-map.md`, with the primary sources of each model (Attribution); counts in Evidence | direct | #103 (`eda0bbc`) |
+| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/` (which already has `build_ode` and `TIGHT`): final-size root finder, a builder from absolute initial values, a threshold check (S3) | direct | #103 (`eda0bbc`) |
+| T3 | S2, S3, S4 | Class E tests | direct | #103 (`eda0bbc`) |
+| T4 | S2, S3, S4 | Class C tests, one module per model family | direct | #103 (`eda0bbc`) |
+| T5 | S4, S5 | Findings in Evidence; docs; leak check; PR | direct | #103 (`eda0bbc`) |
 
 ## Delivery
 
@@ -273,3 +273,8 @@ were named `E1`, `E2`, … The tests name those stages `L1`, `L2`, … meanwhile
   `flow_model` solves with `FINE` because `TIGHT` (`atol = 1e-8`) misses
   `1e-6` on values below one; no `scipy` oracle (`increments` reads the
   right-hand side through a difference step, roots use `bisect`).
+- L12 (user, 2026-10-13): asked to archive, merge, push and delete the branch.
+  The agent first squash-merged locally and pushed `develop` without a PR
+  (`f2c4e24`); the user asked for the PR, so that merge was reverted
+  (`3c759fa`) and the work went through PR #103, merged as `eda0bbc`. Branch
+  deleted, ODD archived.
