@@ -2,7 +2,7 @@
 
 import pytest
 
-from commol import ObservedDataPoint, Simulation
+from commol import ObservedDataPoint, Simulation, window_index
 from commol.api.reporting import observed_report, simulation_report
 from tests.support import a_to_b_builder, build, build_ode
 
@@ -21,8 +21,8 @@ class TestObservedReport:
     def test_a_non_integer_step_lands_on_the_window_that_holds_it(self) -> None:
         # Window w holds the steps (5 w, 5 (w + 1)].
         observed = [
-            ObservedDataPoint(step=3.5, compartment="events", value=1.0),
-            ObservedDataPoint(step=5.5, compartment="events", value=2.0),
+            ObservedDataPoint(at=3.5, output="events", value=1.0),
+            ObservedDataPoint(at=5.5, output="events", value=2.0),
         ]
 
         report = observed_report(observed, WINDOW, WINDOWS)
@@ -44,8 +44,8 @@ class TestObservedReport:
 
     def test_values_land_on_their_window(self) -> None:
         observed = [
-            ObservedDataPoint(step=5, compartment="events", value=1.0),
-            ObservedDataPoint(step=15, compartment="events", value=3.0),
+            ObservedDataPoint(at=5, output="events", value=1.0),
+            ObservedDataPoint(at=15, output="events", value=3.0),
         ]
 
         report = observed_report(observed, WINDOW, WINDOWS)
@@ -62,34 +62,32 @@ class TestObservedReport:
         ]
 
     def test_uniform_weights_are_omitted(self) -> None:
-        observed = [ObservedDataPoint(step=5, compartment="events", value=1.0)]
+        observed = [ObservedDataPoint(at=5, output="events", value=1.0)]
 
         assert "weights" not in observed_report(observed, WINDOW, WINDOWS)["events"]
 
     def test_non_uniform_weights_are_kept(self) -> None:
-        observed = [
-            ObservedDataPoint(step=5, compartment="events", value=1.0, weight=2.0)
-        ]
+        observed = [ObservedDataPoint(at=5, output="events", value=1.0, weight=2.0)]
 
         assert observed_report(observed, WINDOW, WINDOWS)["events"]["weights"][0] == 2.0
 
     def test_aggregate_series_records_its_components_and_scale(self) -> None:
         observed = [
             ObservedDataPoint(
-                step=5,
-                compartment="events",
+                at=5,
+                label="events",
                 value=1.0,
-                compartments=["events"],
-                scale_id="reporting_rate",
+                outputs=["events"],
+                factor_id="reporting_rate",
             )
         ]
 
         entry = observed_report(observed, WINDOW, WINDOWS)["events"]
-        assert entry["compartments"] == ["events"]
-        assert entry["scale_id"] == "reporting_rate"
+        assert entry["outputs"] == ["events"]
+        assert entry["factor_id"] == "reporting_rate"
 
     def test_observations_beyond_the_axis_are_dropped(self) -> None:
-        observed = [ObservedDataPoint(step=500, compartment="events", value=1.0)]
+        observed = [ObservedDataPoint(at=500, output="events", value=1.0)]
 
         assert (
             observed_report(observed, WINDOW, WINDOWS)["events"]["values"]
@@ -194,3 +192,57 @@ class TestRunReport:
         assert list(plain["accumulators"]["events"]) == list(
             ensemble["accumulators"]["events"]
         )
+
+
+class TestNonIntegerPositions:
+    """A differential model reports on a window of 2.5, read at its positions."""
+
+    WINDOW = 2.5
+    ENDS = [2.5 * (w + 1) for w in range(4)]
+
+    def _simulation(self) -> Simulation:
+        builder = a_to_b_builder(
+            parameters={"k1": 0.05}, rate="k1", accumulator="events"
+        )
+        return Simulation(build_ode(builder))
+
+    def test_series_and_windows_match_run_at(self) -> None:
+        simulation = self._simulation()
+        results = simulation.run_at([0.0, *self.ENDS])
+
+        report = simulation_report(
+            simulation, results, self.ENDS, self.WINDOW, 4, accumulators=["events"]
+        )
+
+        at = simulation.run_at(self.ENDS)
+        assert report["series"]["A"] == pytest.approx(at["A"], rel=1e-9)
+        windowed = report["accumulators"]["events"]["windowed"]["total"]
+        assert windowed == pytest.approx(
+            [b - a for a, b in zip([0.0, *at["events"]], at["events"])], rel=1e-9
+        )
+
+    def test_a_position_the_results_do_not_hold_is_an_error(self) -> None:
+        simulation = self._simulation()
+        results = simulation.run(10)
+
+        with pytest.raises(ValueError, match="no value at 2.5"):
+            simulation_report(simulation, results, self.ENDS, self.WINDOW, 4)
+
+
+@pytest.mark.parametrize("window", [5, 2.5, 0.1])
+def test_observed_report_places_each_observation_by_window_index(
+    window: float,
+) -> None:
+    positions = [0, 0.05, 0.1, 1, 2.5, 3.3, 5, 7.5, 9.99]
+    observed = [
+        ObservedDataPoint(at=at, output="events", value=float(i))
+        for i, at in enumerate(positions)
+    ]
+    windows = window_index(max(positions), window) + 1
+
+    report = observed_report(observed, window, windows)
+
+    expected: list[float | None] = [None] * windows
+    for i, at in enumerate(positions):
+        expected[window_index(at, window)] = float(i)
+    assert report["events"]["values"] == expected

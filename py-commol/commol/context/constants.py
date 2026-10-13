@@ -14,13 +14,13 @@ class CalibrationParameterType(StrEnum):
         Model parameter
     INITIAL_CONDITION
         Initial population in a compartment
-    SCALE
-        Scaling factor for observed data
+    FACTOR
+        Factor that multiplies the model output of an observation
     """
 
     PARAMETER = "parameter"
     INITIAL_CONDITION = "initial_condition"
-    SCALE = "scale"
+    FACTOR = "factor"
 
 
 @unique

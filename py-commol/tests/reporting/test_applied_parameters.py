@@ -44,9 +44,9 @@ def _model(*, conditional: bool = False, s_fraction: float | None = 0.9) -> Mode
 def _problem(scale: bool = False) -> CalibrationProblem:
     parameters = [bounded("k1")]
     if scale:
-        parameters.append(bounded("reporting_rate", 0.01, 1.0, kind="scale"))
+        parameters.append(bounded("reporting_rate", 0.01, 1.0, kind="factor"))
     return CalibrationProblem(
-        observed_data=[ObservedDataPoint(step=1, compartment="A_group1", value=1.0)],
+        observed_data=[ObservedDataPoint(at=1, output="A_group1", value=1.0)],
         parameters=parameters,
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1),

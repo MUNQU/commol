@@ -1,10 +1,13 @@
 //! Integration of a compiled model with `diffsol`.
 //!
 //! The right-hand side is [`CompiledModel::derivatives`]. The engine splits the
-//! integration at breakpoints: the impulse positions and, when a rate reads
-//! `step` or a time series, every integer. Each piece is integrated on its own,
-//! so a discontinuity of the right-hand side is always the end of a piece, and
-//! the solver restarts from the state after the jumps.
+//! integration at breakpoints: the impulse positions, the values a rate
+//! compares `t` with, the points of a series read at `t` and, when a rate
+//! reads `step` or a pulse series, every integer. Each piece is integrated on
+//! its own, so a discontinuity of the right-hand side is always the end of a
+//! piece, and the solver restarts from the state after the jumps. On a piece
+//! `[start, end)` the right-hand side sees `t` below `end`, so a value that
+//! jumps at `end` acts only from the next piece on.
 
 use std::cell::{Cell, RefCell};
 
@@ -38,6 +41,10 @@ struct RightHandSide<'m> {
     model: RefCell<&'m mut CompiledModel>,
     /// Value of `step` for the piece being integrated.
     step: Cell<f64>,
+    /// Largest `t` the right-hand side sees on the piece being integrated:
+    /// just below its end, so a value that jumps at the end acts only on the
+    /// next piece.
+    last_t: Cell<f64>,
     /// First evaluation error; the closures cannot return it.
     error: RefCell<Option<String>>,
     /// Last `(t, x, f(t, x))`, reused by the finite-difference `J·v`.
@@ -46,6 +53,7 @@ struct RightHandSide<'m> {
 
 impl RightHandSide<'_> {
     fn eval(&self, x: &[f64], t: f64, y: &mut [f64]) {
+        let t = t.min(self.last_t.get());
         let result = self
             .model
             .borrow_mut()
@@ -131,6 +139,7 @@ pub(crate) fn integrate_with(
     let rhs = RightHandSide {
         model: RefCell::new(model),
         step: Cell::new(t0.floor()),
+        last_t: Cell::new(f64::INFINITY),
         error: RefCell::new(None),
         cache: RefCell::new((f64::NAN, Vec::new(), Vec::new())),
     };
@@ -199,8 +208,8 @@ struct Plan<'p> {
 }
 
 /// Ends of the pieces of an integration from `t0` to `end`: the impulse
-/// positions, the values a rate compares `t` with and, when the right-hand
-/// side reads `step`, the integers.
+/// positions, the values a rate compares `t` with, the points of the series
+/// read at `t` and, when the right-hand side reads `step`, the integers.
 fn breakpoints(model: &mut CompiledModel, t0: f64, end: f64) -> Result<Vec<f64>, String> {
     let mut points: Vec<f64> = model
         .impulse_positions(t0, end)
@@ -208,6 +217,7 @@ fn breakpoints(model: &mut CompiledModel, t0: f64, end: f64) -> Result<Vec<f64>,
         .filter(|&position| position > t0)
         .collect();
     points.extend(model.time_thresholds(t0, end)?);
+    points.extend(model.series_points(t0, end));
     if model.depends_on_step() {
         let mut n = t0.floor() + 1.0;
         while n < end {
@@ -245,6 +255,9 @@ where
     for &end in plan.breakpoints {
         // `step` is constant on the piece: the step that holds its start.
         rhs.step.set(start.floor());
+        rhs.last_t.set(end.next_down());
+        // A cached `f(t, x)` of the previous piece saw another `t` at its end.
+        rhs.cache.borrow_mut().0 = f64::NAN;
         rhs.eval(&y, start, &mut dy);
         if let Some(error) = rhs.take_error() {
             return Err(error);

@@ -5,7 +5,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder, OdeSolver, Simulation, TimePattern
+from commol import ModelBuilder, OdeSolver, Simulation, AxisPattern
 from commol.context.model import Model
 from tests.support import (
     a_to_b_builder,
@@ -69,9 +69,11 @@ class TestRunAt:
         expected = 1000 * (math.exp(-K * 0.5) - math.exp(-K * 3.5))
         assert_close(results["moved"][1] - results["moved"][0], expected, rel=1e-7)
 
-    def test_list_of_lists_gives_one_row_per_position(self) -> None:
-        rows = Simulation(_decay()).run_at([1, 2], output_format="list_of_lists")
+    def test_results_hold_the_requested_positions(self) -> None:
+        results = Simulation(_decay()).run_at([1, 2.5])
 
+        assert results.positions == [1.0, 2.5]
+        rows = results.rows()
         assert len(rows) == 2 and len(rows[0]) == 3
 
     def test_a_difference_model_rejects_a_non_integer_step(self) -> None:
@@ -95,7 +97,7 @@ class TestRunAt:
 
 class TestTimeInsideAStep:
     def test_a_pulse_is_a_constant_rate_on_its_unit_interval(self) -> None:
-        pulse = TimePattern.pulse(at=2, amount=0.2)
+        pulse = AxisPattern.pulse(at=2, amount=0.2)
         ode = Simulation(build_ode(a_to_b_builder(rate=pulse))).run(4)
         difference = Simulation(build(a_to_b_builder(rate=pulse))).run(4)
 

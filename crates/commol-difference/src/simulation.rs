@@ -52,14 +52,20 @@ impl DifferenceEquations {
     ///
     /// # Errors
     ///
-    /// Returns a message that names the impulse transition when one of its
-    /// positions is not an integer, because the engine only steps at
-    /// integers.
+    /// Returns a message that names the impulse transition or the series
+    /// parameter when one of its positions is not an integer, because the
+    /// engine only steps at integers.
     pub fn from_compiled(model: CompiledModel) -> Result<Self, String> {
         if let Some((transition, position)) = model.first_non_integer_impulse() {
             return Err(format!(
                 "Impulse transition '{transition}' acts at {position}, which is not an \
                  integer step; a difference-equations model steps only at integers"
+            ));
+        }
+        if let Some((parameter, position)) = model.first_non_integer_series_point() {
+            return Err(format!(
+                "Series parameter '{parameter}' has a point at {position}, which is not \
+                 an integer step; a difference-equations model steps only at integers"
             ));
         }
         let state = model.initial_state().to_vec();
@@ -110,10 +116,6 @@ impl DifferenceEquations {
         self.state.len()
     }
 
-    fn output_row(&self) -> Vec<f64> {
-        self.state.clone()
-    }
-
     fn copy_output_row(&self, row: &mut Vec<f64>) {
         let output_len = self.output_len();
         if row.len() != output_len {
@@ -144,137 +146,66 @@ impl DifferenceEquations {
         Ok(())
     }
 
-    /// Run the simulation for a specified number of steps.
+    /// Step through the largest of `steps`, recording the outputs at each of
+    /// them into `buffer`.
     ///
-    /// # Arguments
-    ///
-    /// * `num_steps` - Number of time steps to simulate
-    ///
-    /// # Returns
-    ///
-    /// A vector of population states, where the first element is the initial state (t=0)
-    /// and subsequent elements are states at t=1, t=2, ..., t=num_steps.
-    pub fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        // Pre-allocate memory for efficiency
-        let mut steps = Vec::with_capacity(num_steps as usize + 1);
-
-        // Store initial state (t=0)
-        self.settle()?;
-        steps.push(self.output_row());
-
-        for _ in 0..num_steps {
-            self.step()?;
-            self.settle()?;
-            steps.push(self.output_row());
-        }
-
-        Ok(steps)
-    }
-
-    /// Optimized version that writes simulation results into a pre-allocated buffer.
-    ///
-    /// This method is more memory-efficient than `run()` when the caller can
-    /// provide a reusable buffer.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_steps` - Number of time steps to simulate
-    /// * `buffer` - Pre-allocated buffer to store results
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` on success, or an error message if simulation fails.
-    pub fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let total_steps = (num_steps + 1) as usize;
+    /// `steps` are sorted, unique and not before the current step; the
+    /// caller checks them ([`commol_core::check_positions`]).
+    fn record_steps(&mut self, steps: &[u32], buffer: &mut Vec<Vec<f64>>) -> Result<(), String> {
         let output_len = self.output_len();
 
         // Keep existing row allocations alive across repeated calls. This is
         // especially important for calibration, where the same buffer is reused
         // for hundreds or thousands of full simulations.
-        if buffer.len() < total_steps {
-            buffer.reserve(total_steps - buffer.len());
-            while buffer.len() < total_steps {
-                buffer.push(vec![0.0; output_len]);
-            }
-        } else if buffer.len() > total_steps {
-            buffer.truncate(total_steps);
-        }
-
+        buffer.resize_with(steps.len(), Vec::new);
         for row in buffer.iter_mut() {
             if row.len() != output_len {
                 row.resize(output_len, 0.0);
             }
         }
 
-        // Store initial state (t=0)
         self.settle()?;
-        self.copy_output_row(&mut buffer[0]);
-
-        for row in buffer.iter_mut().take(total_steps).skip(1) {
+        let mut next = 0;
+        loop {
+            while next < steps.len() && f64::from(steps[next]) == self.current_step {
+                self.copy_output_row(&mut buffer[next]);
+                next += 1;
+            }
+            if next == steps.len() {
+                return Ok(());
+            }
             self.step()?;
             self.settle()?;
-            self.copy_output_row(row);
         }
-
-        Ok(())
     }
+}
 
-    /// Run through the largest requested step while recording only selected
-    /// steps. `time_steps` must be sorted and deduplicated by the caller.
-    pub fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let output_len = self.output_len();
-
-        if buffer.len() < time_steps.len() {
-            buffer.reserve(time_steps.len() - buffer.len());
-            while buffer.len() < time_steps.len() {
-                buffer.push(vec![0.0; output_len]);
-            }
-        } else if buffer.len() > time_steps.len() {
-            buffer.truncate(time_steps.len());
-        }
-
-        for row in buffer.iter_mut() {
-            if row.len() != output_len {
-                row.resize(output_len, 0.0);
-            }
-        }
-
-        let mut next_record_idx = 0;
-        self.settle()?;
-        while next_record_idx < time_steps.len() && time_steps[next_record_idx] == 0 {
-            self.copy_output_row(&mut buffer[next_record_idx]);
-            next_record_idx += 1;
-        }
-
-        let Some(&max_step) = time_steps.last() else {
-            return Ok(());
-        };
-
-        for step in 1..=max_step {
-            self.step()?;
-            self.settle()?;
-            while next_record_idx < time_steps.len() && time_steps[next_record_idx] == step {
-                self.copy_output_row(&mut buffer[next_record_idx]);
-                next_record_idx += 1;
-            }
-        }
-
+/// Why a difference engine does not report at `position`, if it does not.
+fn check_step(position: f64) -> Result<(), String> {
+    if position >= 0.0 && position.fract() == 0.0 && position <= f64::from(u32::MAX) {
         Ok(())
+    } else {
+        Err(format!(
+            "a difference-equations model reports only at integer steps; {position} is not one"
+        ))
     }
 }
 
 /// Implementation of the SimulationEngine trait.
 impl commol_core::SimulationEngine for DifferenceEquations {
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        DifferenceEquations::run(self, num_steps)
+    fn check_position(&self, position: f64) -> Result<(), String> {
+        check_step(position)
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        commol_core::check_positions(positions, self.current_step, check_step)?;
+        // `check_step` accepts only integers that fit in a `u32`.
+        let steps: Vec<u32> = positions.iter().map(|&position| position as u32).collect();
+        self.record_steps(&steps, buffer)
     }
 
     fn step(&mut self) -> Result<(), String> {
@@ -312,24 +243,8 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         self.model.parameters()
     }
 
-    fn current_step(&self) -> f64 {
+    fn current_position(&self) -> f64 {
         self.current_step
-    }
-
-    fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        DifferenceEquations::run_into_buffer(self, num_steps, buffer)
-    }
-
-    fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        DifferenceEquations::run_at_steps_into_buffer(self, time_steps, buffer)
     }
 
     fn set_initial_condition(
@@ -354,7 +269,7 @@ mod tests {
     use super::*;
     use commol_core::{
         Bin, BinFraction, Dynamics, InitialConditions, Model, ModelTypes, Population,
-        RateMathExpression, Transition,
+        RateMathExpression, SimulationEngine, Transition,
     };
 
     /// One difference step is exactly `state + derivatives(n, state)`.
@@ -498,7 +413,7 @@ mod tests {
         // correctly end-to-end through the DifferenceEquations engine.
         let model = make_periodic_ab_model();
         let mut engine = DifferenceEquations::from_model(&model);
-        let results = engine.run(14).unwrap();
+        let results = engine.run(14).unwrap().rows;
 
         // results[k] = state after k step() calls; step counter k-1 was used for k>=1.
         // Compartment order: A=index 0, B=index 1.
@@ -646,7 +561,6 @@ mod tests {
 
     #[test]
     fn get_parameters_exposes_n_after_step_without_compartment_context() {
-        use commol_core::SimulationEngine;
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
 
@@ -665,7 +579,7 @@ mod tests {
     fn three_bin_model_conserves_population_through_fast_path() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
-        let results = engine.run(50).unwrap();
+        let results = engine.run(50).unwrap().rows;
 
         for (k, state) in results.iter().enumerate() {
             let total: f64 = state.iter().sum();
@@ -708,7 +622,8 @@ mod tests {
             let mut engine = DifferenceEquations::from_model(&model);
             let results = engine
                 .run(1)
-                .unwrap_or_else(|error| panic!("{rate}: {error}"));
+                .unwrap_or_else(|error| panic!("{rate}: {error}"))
+                .rows;
             let expected = 990.0 - constant * 0.1 * 990.0;
             assert!(
                 (results[1][0] - expected).abs() < 1e-9,
@@ -722,8 +637,61 @@ mod tests {
     fn pi_alone_is_a_per_capita_constant_rate() {
         let model = ab_model_with_rate("pi / 10");
         let mut engine = DifferenceEquations::from_model(&model);
-        let results = engine.run(1).unwrap();
+        let results = engine.run(1).unwrap().rows;
         let expected = 990.0 - std::f64::consts::PI / 10.0 * 990.0;
         assert!((results[1][0] - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_run_reports_at_its_grid() {
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let trajectory = engine.run(3).unwrap();
+        assert_eq!(trajectory.positions, vec![0.0, 1.0, 2.0, 3.0]);
+
+        let mut fresh = DifferenceEquations::from_model(&make_three_bin_model());
+        let rows = fresh.run_at(&[1.0, 3.0]).unwrap();
+        assert_eq!(
+            rows,
+            vec![trajectory.rows[1].clone(), trajectory.rows[3].clone()]
+        );
+    }
+
+    #[test]
+    fn a_run_continues_from_the_current_step() {
+        let mut whole = DifferenceEquations::from_model(&make_three_bin_model());
+        let expected = whole.run(5).unwrap();
+
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        engine.run(2).unwrap();
+        let rest = engine.run(3).unwrap();
+        assert_eq!(rest.positions, vec![2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(rest.rows, expected.rows[2..].to_vec());
+    }
+
+    #[test]
+    fn integer_positions_are_accepted_and_others_rejected() {
+        let engine = DifferenceEquations::from_model(&make_three_bin_model());
+        assert_eq!(engine.check_position(0.0), Ok(()));
+        assert_eq!(engine.check_position(12.0), Ok(()));
+        for position in [2.5, -1.0, f64::NAN, f64::INFINITY] {
+            let error = engine.check_position(position).unwrap_err();
+            assert!(
+                error.contains("only at integer steps") && error.contains(&position.to_string()),
+                "{position}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn unsorted_or_past_positions_are_rejected() {
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let error = engine.run_at(&[3.0, 1.0]).unwrap_err();
+        assert!(error.contains("sorted and unique"), "{error}");
+        let error = engine.run_at(&[2.5]).unwrap_err();
+        assert!(error.contains("2.5 is not one"), "{error}");
+
+        engine.run(4).unwrap();
+        let error = engine.run_at(&[2.0]).unwrap_err();
+        assert!(error.contains("before the current position 4"), "{error}");
     }
 }

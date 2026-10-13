@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context._model import engine_state
 from commol.context.calibration import (
     PSOChaoticInertia,
     PSOConstantAcceleration,
@@ -118,18 +119,7 @@ class CalibrationRunner:
 
     def build_rust_observed_data(self):
         """Convert observed data to Rust types."""
-        return [
-            commol_rs.calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        return engine_state.rust_observed_data(self.problem.observed_data)
 
     def build_rust_parameters(self):
         """Convert calibration parameters to Rust types."""
@@ -146,16 +136,7 @@ class CalibrationRunner:
 
     def build_rust_constraints(self):
         """Convert calibration constraints to Rust types."""
-        return [
-            commol_rs.calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        return engine_state.rust_constraints(self.problem.constraints)
 
     def build_loss_config(self) -> "LossConfigProtocol":
         """Convert the configured Python loss function to Rust."""
@@ -173,8 +154,8 @@ class CalibrationRunner:
             return commol_rs.calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return commol_rs.calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
-            return commol_rs.calibration.CalibrationParameterType.Scale
+        elif param_type == CalibrationParameterType.FACTOR:
+            return commol_rs.calibration.CalibrationParameterType.Factor
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -207,7 +188,7 @@ class CalibrationRunner:
             nm_config = commol_rs.calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                initial_step=opt_config.initial_step,
+                initial_simplex_size=opt_config.initial_simplex_size,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,

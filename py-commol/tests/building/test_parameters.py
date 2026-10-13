@@ -1,10 +1,19 @@
-"""Parameters: numbers, formulas, and values left for calibration."""
+"""Parameters: numbers, formulas, series, and values left for calibration."""
+
+import math
 
 import pytest
 
 from commol import Simulation
 from commol.context.parameter import Parameter
-from tests.support import ENGINE_REL, assert_close, build, sir_builder
+from tests.support import (
+    ENGINE_REL,
+    a_to_b_builder,
+    assert_close,
+    build,
+    build_ode,
+    sir_builder,
+)
 
 
 class TestFormulaParameters:
@@ -90,3 +99,41 @@ class TestUncalibratedParameters:
             model.update_parameters({"invalid_param": 0.1})
 
         assert "not found" in str(error.value).lower()
+
+
+class TestSeriesParameters:
+    def test_a_difference_model_reads_a_linear_series_at_each_step(self) -> None:
+        # k(n) = n / 10, so one step moves k(n) A(n).
+        builder = a_to_b_builder(parameters={}, rate="k")
+        builder.add_parameter("k", [(0, 0.0), (10, 1.0)], mode="linear")
+
+        a = Simulation(build(builder)).run(4)["A"]
+
+        expected = [1000.0]
+        for n in range(4):
+            expected.append(expected[-1] * (1 - n / 10))
+        assert_close(a, expected, rel=ENGINE_REL)
+
+    def test_a_difference_engine_names_a_point_between_steps(self) -> None:
+        builder = a_to_b_builder(parameters={}, rate="k")
+        builder.add_parameter("k", [(2.5, 0.1)], mode="step_function")
+
+        with pytest.raises(RuntimeError, match="'k' has a point at 2.5"):
+            Simulation(build(builder))
+
+    def test_a_linear_series_is_a_ramp_in_a_differential_model(self) -> None:
+        # k(t) = t / 10 on [0, 10]: A(10) = 1000 exp(-5), not the staircase
+        # 1000 exp(-4.5) of a series read at the step.
+        builder = a_to_b_builder(parameters={}, rate="k")
+        builder.add_parameter("k", [(0, 0.0), (10, 1.0)], mode="linear")
+
+        a = Simulation(build_ode(builder)).run(10)["A"]
+
+        assert_close(a[10], 1000 * math.exp(-5), rel=1e-7)
+
+    def test_a_pulse_between_steps_names_its_parameter(self) -> None:
+        builder = a_to_b_builder(parameters={}, rate="k")
+        builder.add_parameter("k", [(1.5, 0.1)], mode="pulse")
+
+        with pytest.raises(RuntimeError, match="'k' is a pulse at 1.5"):
+            Simulation(build_ode(builder))

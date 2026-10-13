@@ -215,6 +215,7 @@ dependencies = [
  "argmin-observer-slog",
  "commol-core",
  "commol-difference",
+ "commol-differential",
  "rand 0.10.3",
  "rayon",
  "serde",

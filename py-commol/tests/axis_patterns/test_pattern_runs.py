@@ -1,10 +1,10 @@
-"""Time patterns drive the flow of a run at the steps they name."""
+"""Axis patterns drive the flow of a run at the steps they name."""
 
 import math
 
 import pytest
 
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 from commol.context.model import Model
 from tests.support import a_to_b_builder, assert_close, build, build_ode, run
 
@@ -17,7 +17,7 @@ def _run_ab(rate: str, *, steps: int = 20, pop: int = 1000) -> dict[str, list[fl
 class TestPulseIntegration:
     def test_pulse_fires_at_correct_step(self):
         # run(15) returns 16 entries; flow at step N shows as a[N] - a[N+1]
-        result = _run_ab(str(TimePattern.pulse(at=10, amount=0.5)), steps=15)
+        result = _run_ab(str(AxisPattern.pulse(at=10, amount=0.5)), steps=15)
         a = result["A"]
         # Before pulse (steps 0-9): no change
         for t in range(10):
@@ -29,7 +29,7 @@ class TestPulseIntegration:
             assert a[t] - a[t + 1] == pytest.approx(0.0, abs=1e-6)
 
     def test_pulse_conserves_population(self):
-        result = _run_ab(str(TimePattern.pulse(at=5, amount=0.3)), steps=10, pop=1000)
+        result = _run_ab(str(AxisPattern.pulse(at=5, amount=0.3)), steps=10, pop=1000)
         for t in range(11):
             assert result["A"][t] + result["B"][t] == pytest.approx(1000.0, abs=1e-4)
 
@@ -38,7 +38,7 @@ class TestPeriodicIntegration:
     def test_periodic_fires_at_correct_steps(self):
         # run(71) gives 72 entries (indices 0..71); flow at step N: a[N] - a[N+1]
         # multiples of 7 in range 0..70: 0, 7, 14, ..., 70
-        result = _run_ab(str(TimePattern.periodic(period=7, amount=0.1)), steps=71)
+        result = _run_ab(str(AxisPattern.periodic(period=7, amount=0.1)), steps=71)
         a = result["A"]
         fire_steps = set(range(0, 71, 7))  # {0, 7, 14, ..., 70}
         nonzero = {t for t in range(71) if a[t] - a[t + 1] > 1e-6}
@@ -46,7 +46,7 @@ class TestPeriodicIntegration:
 
     def test_periodic_offset_shifts_first_fire(self):
         result = _run_ab(
-            str(TimePattern.periodic(period=7, amount=0.1, offset=3)), steps=30
+            str(AxisPattern.periodic(period=7, amount=0.1, offset=3)), steps=30
         )
         a = result["A"]
         # Step 0 does not fire (offset=3)
@@ -55,16 +55,18 @@ class TestPeriodicIntegration:
         assert a[3] - a[4] > 1e-6
 
     def test_period_one_fires_every_step(self):
-        result = _run_ab(str(TimePattern.periodic(period=1, amount=0.1)), steps=10)
+        result = _run_ab(str(AxisPattern.periodic(period=1, amount=0.1)), steps=10)
         a = result["A"]
         for t in range(10):
             assert a[t] - a[t + 1] > 1e-6
 
 
-class TestWindowIntegration:
-    def test_window_boundaries(self):
+class TestIntervalIntegration:
+    def test_interval_boundaries(self):
         # flow at step N shows as a[N] - a[N+1]
-        result = _run_ab(str(TimePattern.window(start=5, end=10, amount=0.2)), steps=15)
+        result = _run_ab(
+            str(AxisPattern.interval(start=5, end=10, amount=0.2)), steps=15
+        )
         a = result["A"]
         # Before window (steps 0-4): no change
         for t in range(5):
@@ -81,18 +83,33 @@ class TestDifferentialIntegration:
     """A pattern holds for one time unit: `amount` acts as a constant rate."""
 
     @staticmethod
-    def _run_ode(pattern: TimePattern, steps: int) -> list[float]:
+    def _run_ode(pattern: AxisPattern, steps: int) -> list[float]:
         builder = a_to_b_builder(rate=str(pattern), parameters={})
         return Simulation(build_ode(builder)).run(steps)["A"]
 
-    def test_window_acts_on_its_unit_intervals(self):
-        a = self._run_ode(TimePattern.window(start=2, end=4, amount=0.5), steps=6)
+    def test_interval_acts_on_its_unit_intervals(self):
+        a = self._run_ode(AxisPattern.interval(start=2, end=4, amount=0.5), steps=6)
         assert_close(a[2], 1000.0, rel=1e-12)
         assert_close(a[4], 1000.0 * math.exp(-1.0), rel=1e-7)
         assert_close(a[6], a[4], rel=1e-12)
 
+    def test_an_interval_opens_between_steps(self):
+        # The rate 0.5 acts on [2.5, 4): A keeps exp(-1.5 * 0.5) of its start.
+        a = self._run_ode(AxisPattern.interval(start=2.5, end=4, amount=0.5), steps=6)
+        assert_close(a[2], 1000.0, rel=1e-12)
+        assert_close(a[4], 1000.0 * math.exp(-0.75), rel=1e-7)
+        assert_close(a[6], a[4], rel=1e-12)
+
+    def test_a_ramp_matches_its_integral(self):
+        # r(t) = 0.01 t on [0, 10), so A(t) = 1000 exp(-0.005 t^2) there.
+        ramp = AxisPattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1)
+        a = self._run_ode(ramp, steps=12)
+        for t in (3, 5, 10):
+            assert_close(a[t], 1000.0 * math.exp(-0.005 * t * t), rel=1e-7)
+        assert_close(a[12], a[10], rel=1e-12)
+
     def test_periodic_acts_on_each_period_start(self):
-        a = self._run_ode(TimePattern.periodic(period=5, amount=0.5), steps=20)
+        a = self._run_ode(AxisPattern.periodic(period=5, amount=0.5), steps=20)
         # [0, 1), [5, 6), [10, 11) and [15, 16): four time units.
         assert_close(a[20], 1000.0 * math.exp(-2.0), rel=1e-7)
 
@@ -102,7 +119,7 @@ class TestSeasonalIntegration:
         """Average flow over many full periods should approximate baseline × source."""
         # Use a small rate so A does not deplete to zero quickly
         result = _run_ab(
-            str(TimePattern.seasonal(amplitude=0.001, period=10, baseline=0.005)),
+            str(AxisPattern.seasonal(amplitude=0.001, period=10, baseline=0.005)),
             steps=200,
             pop=10_000,
         )
@@ -121,10 +138,10 @@ class TestCombineIntegration:
         # period=2 fires at steps 0,2,4,...; period=5 fires at steps 0,5,10,...
         # step 0: both fire → flow = (0.1 + 0.2) * a[0]
         # step 2: only period-2 fires → flow = 0.1 * a[2]
-        p = TimePattern.combine(
-            TimePattern.periodic(period=2, amount=0.1),
-            TimePattern.periodic(period=5, amount=0.2),
-            mode=TimePattern.SUM,
+        p = AxisPattern.combine(
+            AxisPattern.periodic(period=2, amount=0.1),
+            AxisPattern.periodic(period=5, amount=0.2),
+            mode=AxisPattern.SUM,
         )
         result = _run_ab(str(p), steps=15)
         a = result["A"]
@@ -135,10 +152,10 @@ class TestCombineIntegration:
 
     def test_max_gives_higher_value(self):
         """MAX combine: at the pulse step, the larger pulse dominates."""
-        p = TimePattern.combine(
-            TimePattern.pulse(at=5, amount=0.5),
-            TimePattern.pulse(at=5, amount=0.3),
-            mode=TimePattern.MAX,
+        p = AxisPattern.combine(
+            AxisPattern.pulse(at=5, amount=0.5),
+            AxisPattern.pulse(at=5, amount=0.3),
+            mode=AxisPattern.MAX,
         )
         result = _run_ab(str(p), steps=10)
         a = result["A"]
@@ -151,7 +168,7 @@ class TestGaussianPulseIntegration:
         """Flow at the center step should exceed all other steps."""
         center = 20
         # Small peak so depletion is negligible (< 5% total over all steps)
-        p = TimePattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
+        p = AxisPattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
         result = _run_ab(str(p), steps=40, pop=100_000)
         a = result["A"]
         flows = [a[t] - a[t + 1] for t in range(40)]
@@ -160,7 +177,7 @@ class TestGaussianPulseIntegration:
     def test_symmetry_around_center(self):
         """Flows are approximately symmetric around the center."""
         center = 20
-        p = TimePattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
+        p = AxisPattern.gaussian_pulse(center=float(center), width=3.0, peak=0.001)
         result = _run_ab(str(p), steps=40, pop=100_000)
         a = result["A"]
         # flow 3 steps left of center vs 3 steps right of center
@@ -172,7 +189,7 @@ class TestGaussianPulseIntegration:
 class TestLinearRampIntegration:
     def test_ramp_inside_window(self):
         """Linear ramp produces increasing flow within the window."""
-        p = TimePattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1)
+        p = AxisPattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1)
         result = _run_ab(str(p), steps=12)
         a = result["A"]
         # Per-capita rate increases from 0 at step 0 to ~0.09 at step 9.
@@ -184,7 +201,7 @@ class TestLinearRampIntegration:
 
     def test_ramp_outside_window_is_zero(self):
         """Outside [start, end), flow is exactly zero."""
-        p = TimePattern.linear_ramp(start=5, end=10, start_value=1.0, end_value=0.0)
+        p = AxisPattern.linear_ramp(start=5, end=10, start_value=1.0, end_value=0.0)
         result = _run_ab(str(p), steps=15)
         a = result["A"]
         for t in range(5):
@@ -195,14 +212,14 @@ class TestLinearRampIntegration:
 
 class TestPulsesIntegration:
     def test_pulses_fire_at_each_listed_step(self):
-        p = TimePattern.pulses(at=[3, 7, 10], amount=0.1)
+        p = AxisPattern.pulses(at=[3, 7, 10], amount=0.1)
         result = _run_ab(str(p), steps=15)
         a = result["A"]
         nonzero = {t for t in range(15) if a[t] - a[t + 1] > 1e-6}
         assert nonzero == {3, 7, 10}
 
     def test_per_step_amounts_fire_with_distinct_magnitudes(self):
-        p = TimePattern.pulses(at=[2, 6, 11], amount=[0.1, 0.2, 0.4])
+        p = AxisPattern.pulses(at=[2, 6, 11], amount=[0.1, 0.2, 0.4])
         result = _run_ab(str(p), steps=15)
         a = result["A"]
         # only the three listed steps trigger a flow
@@ -217,12 +234,12 @@ class TestPulsesIntegration:
 
 
 class TestPerCompartmentInteraction:
-    """Verify TimePattern formulas work correctly with per_compartment=True."""
+    """Verify AxisPattern formulas work correctly with per_compartment=True."""
 
     def test_per_compartment_with_pattern_substitutes_correctly(self):
         """With per_compartment=True the rate uses each stratified compartment."""
         # rate references base bin name `A`; per_compartment expands it per flow.
-        p_str = f"{TimePattern.pulse(at=5, amount=0.1)} * A"
+        p_str = f"{AxisPattern.pulse(at=5, amount=0.1)} * A"
         model = build(
             a_to_b_builder(
                 rate=p_str,
@@ -241,15 +258,15 @@ class TestPerCompartmentInteraction:
         assert flow_cat2 == pytest.approx(100.0, rel=1e-3)
 
 
-class TestAddTransitionAcceptsTimePattern:
-    """ModelBuilder.add_transition reads a TimePattern directly via `rate=`."""
+class TestAddTransitionAcceptsAxisPattern:
+    """ModelBuilder.add_transition reads a AxisPattern directly via `rate=`."""
 
-    def _build_ab(self, rate: str | float | TimePattern | None) -> Model:
+    def _build_ab(self, rate: str | float | AxisPattern | None) -> Model:
         return build(a_to_b_builder(rate=rate, parameters={}))
 
     def test_plain_pattern_via_rate(self):
-        """A single TimePattern can be passed as rate= without conversion."""
-        model_dict = run(self._build_ab(rate=TimePattern.pulse(at=5, amount=0.1)), 10)
+        """A single AxisPattern can be passed as rate= without conversion."""
+        model_dict = run(self._build_ab(rate=AxisPattern.pulse(at=5, amount=0.1)), 10)
         a = model_dict["A"]
         # Nonzero per-capita flow only at step 5; zero elsewhere.
         for t in range(10):
@@ -269,7 +286,7 @@ class TestAddTransitionAcceptsTimePattern:
                     "flow",
                     ["A"],
                     ["B"],
-                    rate=TimePattern.pulse(at=5, amount=0.1),
+                    rate=AxisPattern.pulse(at=5, amount=0.1),
                     stratified_rates=[{"conditions": [], "rate": "0.0"}],
                 )
             )
@@ -280,11 +297,11 @@ class TestAddTransitionAcceptsTimePattern:
                 ModelBuilder("AB")
                 .add_bin("A", "Source")
                 .add_bin("B", "Sink")
-                .add_parameter("_ts_0", 1.0)
+                .add_parameter("_series_0", 1.0)
                 .add_transition(
                     "flow",
                     ["A"],
                     ["B"],
-                    rate=TimePattern.pulse(at=5, amount=0.1),
+                    rate=AxisPattern.pulse(at=5, amount=0.1),
                 )
             )

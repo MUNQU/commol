@@ -25,7 +25,6 @@ from commol.api.simulation import Simulation
 from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationProblem,
-    check_steps_for_typology,
     CalibrationResult,
     NelderMeadConfig,
     ParticleSwarmConfig,
@@ -80,7 +79,7 @@ class Calibrator:
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
         self._validate_observed_data()
-        self._warn_constraint_time_steps_beyond_observations()
+        self._warn_constraint_positions_beyond_observations()
 
     def run(self) -> CalibrationResult:
         """
@@ -115,34 +114,12 @@ class Calibrator:
             )
         )
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
         rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
@@ -210,34 +187,12 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
         rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
@@ -276,8 +231,8 @@ class Calibrator:
             return rust_calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
-            return rust_calibration.CalibrationParameterType.Scale
+        elif param_type == CalibrationParameterType.FACTOR:
+            return rust_calibration.CalibrationParameterType.Factor
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -305,7 +260,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                initial_step=opt_config.initial_step,
+                initial_simplex_size=opt_config.initial_simplex_size,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -448,10 +403,10 @@ class Calibrator:
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
                 # The engine resolves initial-condition ids below.
                 pass
-            elif param.parameter_type == CalibrationParameterType.SCALE:
+            elif param.parameter_type == CalibrationParameterType.FACTOR:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
-                        f"Scale parameter '{param.id}' must have positive bounds "
+                        f"Factor parameter '{param.id}' must have positive bounds "
                         f"(got min={param.min_bound}, max={param.max_bound})"
                     )
             else:
@@ -508,7 +463,7 @@ class Calibrator:
         simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            observed_outputs = obs.compartments or [obs.compartment]
+            observed_outputs = obs.observed_outputs
             missing_outputs = [
                 output
                 for output in observed_outputs
@@ -517,36 +472,27 @@ class Calibrator:
             if missing_outputs:
                 raise ValueError(
                     f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"'{obs.label}' not found in model simulation outputs. "
                     f"Available outputs: {sorted(simulation_output_names)}"
                 )
 
-        if self.problem.observed_data:
-            min_step = min(obs.step for obs in self.problem.observed_data)
-            if min_step < 0:
-                raise ValueError(
-                    f"Observed data contains negative time step: {min_step}. "
-                    "Time steps must be non-negative."
-                )
-        check_steps_for_typology(
-            self.simulation.model_definition.dynamics.typology,
-            self.problem.observed_data,
-            self.problem.constraints,
+        engine_state.check_positions(
+            self._engine, self.problem.observed_data, self.problem.constraints
         )
 
-    def _warn_constraint_time_steps_beyond_observations(self) -> None:
+    def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when time-dependent constraints extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
-        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
-            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+            if constraint.at and max(constraint.at) > max_observed_position:
                 logger.warning(
-                    "Constraint '%s' has time_steps beyond the maximum observed "
-                    "step (%s); simulation will be extended to evaluate them.",
+                    "Constraint '%s' has positions beyond the maximum observed "
+                    "position (%s); simulation will be extended to evaluate them.",
                     constraint.id,
-                    max_observed_step,
+                    max_observed_position,
                 )
 
     def run_probabilistic(self):

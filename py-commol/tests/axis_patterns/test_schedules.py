@@ -1,23 +1,23 @@
-"""Schedules give each stratification category its own time pattern."""
+"""Schedules give each stratification category its own axis pattern."""
 
 from typing import cast
 
 import pytest
 
-from commol import ModelBuilder, TimePattern
-from commol.api.time_patterns import ConditionDict
+from commol import ModelBuilder, AxisPattern
+from commol.api.patterns import ConditionDict
 from tests.support import a_to_b_builder, run
-from tests.time_patterns.conditions import condition, rate_string, stratified_rates
+from tests.axis_patterns.conditions import condition, rate_string, stratified_rates
 
 
 def _make_schedule_ab(
-    rate: TimePattern,
+    rate: AxisPattern,
     *,
     categories: list[str] | None = None,
     steps: int = 20,
     pop: int = 1000,
 ) -> dict[str, list[float]]:
-    """Run A → B split by ``group``, with a TimePattern rate."""
+    """Run A → B split by ``group``, with a AxisPattern rate."""
     categories = categories or ["cat1", "cat2"]
     builder = a_to_b_builder(
         rate=rate,
@@ -32,28 +32,28 @@ def _make_schedule_ab(
 
 class TestScheduleUnit:
     def test_add_group_classlevel_creates_schedule(self):
-        """TimePattern.add_group as classmethod returns a TimePattern instance."""
-        rate = TimePattern.add_group(
+        """AxisPattern.add_group as classmethod returns a AxisPattern instance."""
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, amount=0.1),
         )
-        assert isinstance(rate, TimePattern)
+        assert isinstance(rate, AxisPattern)
         # Builder hook returns one stratified rate, no default.
         assert rate._builder_stratified_rates() == [
             {
                 "conditions": [condition("group", "cat1")],
-                "rate": str(TimePattern.pulse(at=5, amount=0.1)),
+                "rate": str(AxisPattern.pulse(at=5, amount=0.1)),
             }
         ]
         assert rate._builder_rate() is None
 
     def test_add_group_chained_appends(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, amount=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=TimePattern.pulse(at=10, amount=0.2),
+            schedule=AxisPattern.pulse(at=10, amount=0.2),
         )
         srs = stratified_rates(rate)
         assert len(srs) == 2
@@ -61,128 +61,128 @@ class TestScheduleUnit:
         assert srs[1]["conditions"] == [condition("group", "cat2")]
 
     def test_set_default_attaches_fallback(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=0.1),
-        ).set_default(TimePattern.from_formula("0.01"))
+            schedule=AxisPattern.pulse(at=5, amount=0.1),
+        ).set_default(AxisPattern.from_formula("0.01"))
         assert rate._builder_rate() is not None
         builder_rate = rate._builder_rate()
         assert isinstance(builder_rate, str)
         assert "0.01" in builder_rate
 
     def test_add_group_on_single_pattern_raises(self):
-        """Single TimePatterns reject instance-level add_group (use the class)."""
-        p = TimePattern.pulse(at=5, amount=0.1)
+        """Single AxisPatterns reject instance-level add_group (use the class)."""
+        p = AxisPattern.pulse(at=5, amount=0.1)
         with pytest.raises(TypeError, match="class-level"):
             p.add_group(conditions=[condition("group", "cat1")], schedule=p)
 
     def test_set_default_on_single_pattern_raises(self):
-        p = TimePattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, amount=0.1)
         with pytest.raises(TypeError, match="schedule"):
-            p.set_default(TimePattern.from_formula("0.01"))
+            p.set_default(AxisPattern.from_formula("0.01"))
 
     def test_add_group_empty_conditions_raises(self):
         with pytest.raises(ValueError, match="non-empty"):
-            TimePattern.add_group(
-                conditions=[], schedule=TimePattern.from_formula("0.1")
+            AxisPattern.add_group(
+                conditions=[], schedule=AxisPattern.from_formula("0.1")
             )
 
     def test_add_group_duplicate_raises(self):
         with pytest.raises(ValueError, match="already been registered"):
             (
-                TimePattern.add_group(
+                AxisPattern.add_group(
                     conditions=[condition("group", "cat1")],
-                    schedule=TimePattern.from_formula("0.1"),
+                    schedule=AxisPattern.from_formula("0.1"),
                 ).add_group(
                     conditions=[condition("group", "cat1")],
-                    schedule=TimePattern.from_formula("0.2"),
+                    schedule=AxisPattern.from_formula("0.2"),
                 )
             )
 
     def test_set_default_twice_raises(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.1"),
-        ).set_default(TimePattern.from_formula("0.05"))
+            schedule=AxisPattern.from_formula("0.1"),
+        ).set_default(AxisPattern.from_formula("0.05"))
         with pytest.raises(ValueError, match="already been registered"):
-            rate.set_default(TimePattern.from_formula("0.02"))
+            rate.set_default(AxisPattern.from_formula("0.02"))
 
     def test_set_default_rejects_conditions(self):
         with pytest.raises(ValueError, match="conditions"):
-            TimePattern.add_group(
+            AxisPattern.add_group(
                 conditions=[condition("group", "cat1")],
-                schedule=TimePattern.from_formula("0.1"),
+                schedule=AxisPattern.from_formula("0.1"),
             ).set_default(
-                TimePattern.from_formula("0.05").for_group([condition("group", "cat2")])
+                AxisPattern.from_formula("0.05").for_group([condition("group", "cat2")])
             )
 
     def test_set_default_rejects_source_compartment(self):
-        default_with_comp = TimePattern.from_formula("0.1").model_copy(
+        default_with_comp = AxisPattern.from_formula("0.1").model_copy(
             update={"source_compartment": "A_cat1"}
         )
         with pytest.raises(ValueError, match="source_compartment"):
-            TimePattern.add_group(
+            AxisPattern.add_group(
                 conditions=[condition("group", "cat1")],
-                schedule=TimePattern.from_formula("0.1"),
+                schedule=AxisPattern.from_formula("0.1"),
             ).set_default(default_with_comp)
 
     def test_malformed_condition_missing_keys_raises(self):
         with pytest.raises(ValueError, match="missing required key"):
             bad_condition: dict[str, str] = {"strat": "g", "cat": "c1"}
-            TimePattern.add_group(
+            AxisPattern.add_group(
                 conditions=cast(list[ConditionDict], [bad_condition]),
-                schedule=TimePattern.from_formula("0.1"),
+                schedule=AxisPattern.from_formula("0.1"),
             )
 
     def test_schedule_has_no_single_formula(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.1"),
+            schedule=AxisPattern.from_formula("0.1"),
         )
         with pytest.raises(TypeError, match="no single formula"):
             _ = rate.formula
 
     def test_chaining_returns_same_object(self):
-        rate1 = TimePattern.add_group(
+        rate1 = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.1"),
+            schedule=AxisPattern.from_formula("0.1"),
         )
         rate2 = rate1.add_group(
             conditions=[condition("group", "cat2")],
-            schedule=TimePattern.from_formula("0.2"),
+            schedule=AxisPattern.from_formula("0.2"),
         )
         assert rate1 is rate2
 
     def test_source_compartment_passes_through(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.1"),
+            schedule=AxisPattern.from_formula("0.1"),
             source_compartment="A_cat1",
         )
         srs = stratified_rates(rate)
         assert "A_cat1" in rate_string(srs[0])
 
     def test_default_absolute_is_inferred(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.001 * N"),
+            schedule=AxisPattern.from_formula("0.001 * N"),
         )
         srs = stratified_rates(rate)
         assert "absolute" not in srs[0]
 
     def test_explicit_absolute_false_is_preserved(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.from_formula("0.001 * N"),
+            schedule=AxisPattern.from_formula("0.001 * N"),
             absolute=False,
         )
         srs = stratified_rates(rate)
         assert srs[0]["absolute"] is False
 
     def test_absolute_true_is_preserved(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=1.0),
+            schedule=AxisPattern.pulse(at=5, amount=1.0),
             absolute=True,
         )
         srs = stratified_rates(rate)
@@ -190,23 +190,23 @@ class TestScheduleUnit:
 
 
 class TestScheduleIntegration:
-    """The simulation engine consumes a TimePattern via add_transition(rate=...)."""
+    """The simulation engine consumes a AxisPattern via add_transition(rate=...)."""
 
     def test_conditional_exclusion_cat2_unchanged(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, amount=0.1),
         )
         result = _make_schedule_ab(rate, steps=30)
         assert all(v == pytest.approx(0.0, abs=1e-8) for v in result["B_cat2"])
 
     def test_differential_schedules(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, amount=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=TimePattern.periodic(period=30, amount=0.1),
+            schedule=AxisPattern.periodic(period=30, amount=0.1),
         )
         result = _make_schedule_ab(rate, steps=61)
         b1_events = sum(
@@ -219,10 +219,10 @@ class TestScheduleIntegration:
         assert (b1_events, b2_events) == (9, 3)
 
     def test_default_covers_unmatched_groups(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=0.5),
-        ).set_default(TimePattern.pulse(at=5, amount=0.2))
+            schedule=AxisPattern.pulse(at=5, amount=0.5),
+        ).set_default(AxisPattern.pulse(at=5, amount=0.2))
         result = _make_schedule_ab(rate, steps=10)
         # Both cat1 and cat2 fire at step 5 — flow appears between index 5 and 6.
         # Each group holds 500; cat1 moves half at step 5, cat2 the default 0.2.
@@ -231,9 +231,9 @@ class TestScheduleIntegration:
 
     def test_cross_category_routing(self):
         """`to:` condition routes flow between categories of the same bin."""
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("status", "s0", to="s1")],
-            schedule=TimePattern.pulse(at=5, amount=0.5),
+            schedule=AxisPattern.pulse(at=5, amount=0.5),
         )
 
         model = (
@@ -308,12 +308,12 @@ class TestScheduleIntegration:
         assert result["B_g2"][1] == pytest.approx(1000.0)
 
     def test_population_conservation(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, amount=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=TimePattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, amount=0.1),
         )
         result = _make_schedule_ab(rate, steps=30, pop=1000)
         for t in range(31):
@@ -326,13 +326,13 @@ class TestScheduleIntegration:
             assert total == pytest.approx(1000.0, abs=1e-4)
 
     def test_mixed_absolute_and_relative_groups(self):
-        rate = TimePattern.add_group(
+        rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=TimePattern.pulse(at=5, amount=10.0),
+            schedule=AxisPattern.pulse(at=5, amount=10.0),
             absolute=True,
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=TimePattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, amount=0.1),
             absolute=False,
         )
 

@@ -75,7 +75,7 @@ impl JITFunction {
         for (i, name) in self.variable_names.iter().enumerate() {
             // Preferred order: precomputed parameter (includes N, N_*, base bin
             // totals, and partial bin-strat sums that the engine updates once
-            // per step), then compartment values, then the special step alias,
+            // per step), then compartment values, then the special variables `step` and `t`,
             // and only then the expensive on-demand recomputation fallback.
             //
             // The recomputation paths are kept so that callers using the JIT

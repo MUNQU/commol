@@ -101,7 +101,7 @@ fn decay_model(solver: &str) -> Model {
 #[test]
 fn exponential_decay_matches_the_closed_form_with_both_methods() {
     for solver in [TIGHT, TIGHT_BDF] {
-        let rows = engine(&decay_model(solver)).run(10).unwrap();
+        let rows = engine(&decay_model(solver)).run(10).unwrap().rows;
         for (t, row) in rows.iter().enumerate() {
             let expected = 1000.0 * (-0.3 * t as f64).exp();
             assert_close(row[0], expected, 1e-7, &format!("A({t}) {solver}"));
@@ -112,7 +112,7 @@ fn exponential_decay_matches_the_closed_form_with_both_methods() {
 
 #[test]
 fn an_accumulator_is_the_integral_of_its_flows() {
-    let rows = engine(&decay_model(TIGHT)).run(10).unwrap();
+    let rows = engine(&decay_model(TIGHT)).run(10).unwrap().rows;
     for (t, row) in rows.iter().enumerate() {
         let expected = 1000.0 * (1.0 - (-0.3 * t as f64).exp());
         assert_close(row[2], expected, 1e-7, &format!("moved({t})"));
@@ -138,9 +138,11 @@ fn positions_must_be_sorted_and_not_in_the_past() {
     let mut engine = engine(&decay_model(TIGHT));
     let error = engine.run_at(&[1.0, 0.5]).unwrap_err();
     assert!(error.contains("sorted"), "{error}");
+    let error = engine.run_at(&[-1.0]).unwrap_err();
+    assert!(error.contains("-1 is not one"), "{error}");
     engine.run_at(&[2.0]).unwrap();
     let error = engine.run_at(&[1.0]).unwrap_err();
-    assert!(error.contains("before the current time"), "{error}");
+    assert!(error.contains("before the current position"), "{error}");
 }
 
 #[test]
@@ -153,7 +155,7 @@ fn logistic_growth_matches_the_closed_form() {
         &[transition("growth", &[], &["X"], "r * X * (1 - X / K)", "")],
         TIGHT,
     );
-    let rows = engine(&model).run(20).unwrap();
+    let rows = engine(&model).run(20).unwrap().rows;
     for (t, row) in rows.iter().enumerate() {
         let expected = 1000.0 / (1.0 + 99.0 * (-0.5 * t as f64).exp());
         assert_close(row[0], expected, 1e-7, &format!("X({t})"));
@@ -173,7 +175,7 @@ fn a_linear_two_by_two_system_matches_the_closed_form() {
         ],
         TIGHT,
     );
-    let rows = engine(&model).run(15).unwrap();
+    let rows = engine(&model).run(15).unwrap().rows;
     let equilibrium = 1000.0 * 0.1 / 0.5;
     for (t, row) in rows.iter().enumerate() {
         let expected = equilibrium + (800.0 - equilibrium) * (-0.5 * t as f64).exp();
@@ -198,7 +200,7 @@ fn sir_model(solver: &str) -> Model {
 #[test]
 fn sir_keeps_the_final_size_relation() {
     // ln(S(t) / S(0)) = -(beta / gamma) R(t) / N holds at every t.
-    let rows = engine(&sir_model(TIGHT)).run(300).unwrap();
+    let rows = engine(&sir_model(TIGHT)).run(300).unwrap().rows;
     for row in rows.iter().step_by(25) {
         let residual = (row[0] / 990.0).ln() + 3.0 * row[2] / 1000.0;
         assert!(residual.abs() < 1e-7, "final-size residual {residual}");
@@ -220,7 +222,7 @@ fn sis_reaches_its_endemic_equilibrium() {
         ],
         TIGHT,
     );
-    let rows = engine(&model).run(400).unwrap();
+    let rows = engine(&model).run(400).unwrap().rows;
     assert_close(rows[400][1], 1000.0 * (1.0 - 0.1 / 0.4), 1e-7, "I*");
 }
 
@@ -243,7 +245,7 @@ fn stiff_model(solver: &str) -> Model {
 fn bdf_solves_a_stiff_model_within_the_tolerance() {
     let model = stiff_model(r#","solver":{"method":"bdf","rtol":1e-8,"atol":1e-8}"#);
     let started = Instant::now();
-    let rows = engine(&model).run(100).unwrap();
+    let rows = engine(&model).run(100).unwrap().rows;
     let elapsed = started.elapsed();
     let (k1, k2) = (1000.0_f64, 0.01_f64);
     for (t, row) in rows.iter().enumerate().skip(1) {
@@ -254,7 +256,7 @@ fn bdf_solves_a_stiff_model_within_the_tolerance() {
     eprintln!("stiff bdf, 100 time units: {elapsed:?}");
 }
 
-/// A per-capita rate `p` on step 2 only, as a time-series pulse.
+/// A per-capita rate `p` on step 2 only, as a pulse series.
 fn pulse_model(typology: &str) -> Model {
     model(
         typology,
@@ -274,7 +276,8 @@ fn pulse_model(typology: &str) -> Model {
 fn a_pulse_rate_is_a_constant_rate_on_its_unit_interval() {
     let rows = engine(&pulse_model("DifferentialEquations"))
         .run(4)
-        .unwrap();
+        .unwrap()
+        .rows;
     assert_close(rows[2][0], 1000.0, 1e-12, "A before the pulse");
     let moved = rows[2][0] - rows[3][0];
     assert_close(moved, 1000.0 * (1.0 - (-0.2_f64).exp()), 1e-8, "ODE pulse");
@@ -283,7 +286,7 @@ fn a_pulse_rate_is_a_constant_rate_on_its_unit_interval() {
     // The difference engine moves `p` times the source in one step.
     let mut difference = DifferenceEquations::try_from_model(&pulse_model("DifferenceEquations"))
         .expect("the model compiles");
-    let rows = difference.run(4).unwrap();
+    let rows = difference.run(4).unwrap().rows;
     assert_close(rows[2][0] - rows[3][0], 200.0, 1e-12, "difference pulse");
 }
 
@@ -299,10 +302,79 @@ fn rate_model(rate: &str) -> Model {
     )
 }
 
+/// A → B at the per-capita rate `k`, a series parameter.
+fn series_model(typology: &str, series: &str) -> Model {
+    model(
+        typology,
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", series)],
+        &[],
+        &[transition("move", &["A"], &["B"], "k", "")],
+        if typology == "DifferentialEquations" {
+            TIGHT
+        } else {
+            ""
+        },
+    )
+}
+
+#[test]
+fn a_linear_series_matches_the_integral_of_its_interpolant() {
+    // k(t) = t / 10 on [0, 10], so A(t) = 1000 exp(−t² / 20) there.
+    let linear = r#"{"data":[[0.0,0.0],[10.0,1.0]],"mode":"linear"}"#;
+    let positions = [0.0, 2.5, 5.0, 7.25, 10.0];
+    let rows = engine(&series_model("DifferentialEquations", linear))
+        .run_at(&positions)
+        .unwrap();
+    for (t, row) in positions.iter().zip(&rows) {
+        let expected = 1000.0 * (-t * t / 20.0).exp();
+        assert_close(row[0], expected, 1e-7, &format!("A({t})"));
+    }
+}
+
+#[test]
+fn a_step_function_series_holds_from_a_position_between_steps() {
+    // k = 0.5 on [2.5, 4) only: A keeps exp(−0.75) of its start.
+    let held = r#"{"data":[[2.5,0.5],[4.0,0.0]],"mode":"step_function"}"#;
+    let rows = engine(&series_model("DifferentialEquations", held))
+        .run_at(&[2.5, 4.0, 10.0])
+        .unwrap();
+    assert_close(rows[0][0], 1000.0, 1e-12, "A before the window");
+    let after = 1000.0 * (-0.75_f64).exp();
+    assert_close(rows[1][0], after, 1e-7, "A at the end of the window");
+    assert_close(rows[2][0], after, 1e-7, "A after the window");
+}
+
+#[test]
+fn a_difference_engine_names_a_series_point_between_steps() {
+    let held = r#"{"data":[[2.5,0.5]],"mode":"step_function"}"#;
+    let error = DifferenceEquations::try_from_model(&series_model("DifferenceEquations", held))
+        .err()
+        .expect("2.5 is rejected");
+    assert!(
+        error.contains("Series parameter 'k' has a point at 2.5"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_difference_engine_reads_a_linear_series_at_its_steps() {
+    // k(n) = n / 10, so one step moves k(n) A(n).
+    let linear = r#"{"data":[[0.0,0.0],[10.0,1.0]],"mode":"linear"}"#;
+    let mut difference =
+        DifferenceEquations::try_from_model(&series_model("DifferenceEquations", linear)).unwrap();
+    let rows = difference.run(4).unwrap().rows;
+    let mut a = 1000.0;
+    for (n, row) in rows.iter().enumerate() {
+        assert_close(row[0], a, 1e-12, &format!("A({n})"));
+        a -= n as f64 / 10.0 * a;
+    }
+}
+
 #[test]
 fn a_rate_reads_the_step_of_its_unit_interval() {
     // On [n, n + 1) the rate is k (n + 1), so A(n) = 1000 exp(−k n (n + 1) / 2).
-    let rows = engine(&rate_model("k * (step + 1)")).run(5).unwrap();
+    let rows = engine(&rate_model("k * (step + 1)")).run(5).unwrap().rows;
     for (n, row) in rows.iter().enumerate() {
         let n = n as f64;
         let expected = 1000.0 * (-0.1 * n * (n + 1.0) / 2.0).exp();
@@ -314,7 +386,8 @@ fn a_rate_reads_the_step_of_its_unit_interval() {
 fn a_rate_that_switches_on_the_step_acts_only_on_its_window() {
     let rows = engine(&rate_model("if(step >= 2, if(step < 4, 0.5, 0), 0)"))
         .run(6)
-        .unwrap();
+        .unwrap()
+        .rows;
     assert_close(rows[2][0], 1000.0, 1e-12, "A before the window");
     assert_close(
         rows[4][0],
@@ -335,7 +408,7 @@ fn a_formula_parameter_that_reads_the_step_restarts_the_integration() {
         &[transition("move", &["A"], &["B"], "r", "")],
         TIGHT,
     );
-    let rows = engine(&model).run(3).unwrap();
+    let rows = engine(&model).run(3).unwrap().rows;
     assert_close(rows[3][0], 1000.0 * (-0.6_f64).exp(), 1e-7, "A(3)");
 }
 
@@ -346,7 +419,8 @@ fn a_rate_that_switches_on_t_acts_only_on_its_window() {
     // solver grows its step and can step over the window.
     let rows = engine(&rate_model("if(t >= 12.5, if(t < 14, 0.5, 0), 0)"))
         .run(40)
-        .unwrap();
+        .unwrap()
+        .rows;
     assert_close(rows[12][0], 1000.0, 1e-12, "A before the window");
     let after = 1000.0 * (-0.75_f64).exp();
     assert_close(rows[14][0], after, 1e-7, "A at the end of the window");
@@ -371,7 +445,7 @@ fn a_time_threshold_reads_the_current_parameter_values() {
     );
     let mut engine = engine(&model);
     engine.set_parameter("t_on", 15.5).unwrap();
-    let rows = engine.run(40).unwrap();
+    let rows = engine.run(40).unwrap().rows;
     assert_close(rows[15][0], 1000.0, 1e-12, "A before t_on");
     assert_close(rows[40][0], 1000.0 * (-0.15_f64).exp(), 1e-7, "A(40)");
 }
@@ -402,11 +476,12 @@ fn an_impulse_moves_its_fraction_at_once_in_both_engines() {
     let impulse = r#","impulse_at":[1.0, 3.0]"#;
     let ode = engine(&impulse_model("DifferentialEquations", impulse))
         .run(4)
-        .unwrap();
+        .unwrap()
+        .rows;
     let mut difference =
         DifferenceEquations::try_from_model(&impulse_model("DifferenceEquations", impulse))
             .unwrap();
-    let diff = difference.run(4).unwrap();
+    let diff = difference.run(4).unwrap().rows;
     let expected_a = [1000.0, 750.0, 750.0, 562.5, 562.5];
     for rows in [&ode, &diff] {
         for (t, &a) in expected_a.iter().enumerate() {
@@ -501,10 +576,10 @@ fn a_missing_parameter_is_an_error_not_a_nan() {
 #[test]
 fn reset_and_calibration_parameters_rerun_the_model() {
     let mut engine = engine(&decay_model(TIGHT));
-    let first = engine.run(5).unwrap();
+    let first = engine.run(5).unwrap().rows;
     engine.reset();
     engine.set_parameter("k", 0.6).unwrap();
-    let second = engine.run(5).unwrap();
+    let second = engine.run(5).unwrap().rows;
     assert_close(
         second[5][0],
         1000.0 * (-3.0_f64).exp(),
@@ -538,7 +613,7 @@ fn a_large_stiff_model_uses_the_sparse_path() {
         &transitions,
         r#","solver":{"method":"bdf","rtol":1e-6,"atol":1e-6}"#,
     );
-    let rows = engine(&model).run(5).unwrap();
+    let rows = engine(&model).run(5).unwrap().rows;
     let total: f64 = rows[5].iter().sum();
     assert_close(total, 1000.0, 1e-8, "conservation");
     assert_close(rows[5][0], 1000.0 * (-500.0_f64).exp(), 1e-6, "X0(5)");
@@ -675,6 +750,38 @@ fn benchmark_dense_against_sparse_bdf() {
             }),
             best_ms(5, || {
                 bdf.clone().run(100).unwrap();
+            }),
+        );
+    }
+}
+
+/// `run(n)` against `run_at` on the same full grid, and `run_at` on every
+/// 50th position, for a difference model of 150 states: `run(n)` builds its
+/// grid in Rust and runs at positions, so the two full-grid runs cost the same
+/// (axis-positions D2). Run with `cargo test --release -p commol-differential
+/// -- --ignored --nocapture benchmark_run_against_run_at`.
+#[test]
+#[ignore = "benchmark: run on demand in release mode"]
+fn benchmark_run_against_run_at() {
+    let mut model = coupled_groups(50, "bdf");
+    model.dynamics.typology = commol_core::ModelTypes::DifferenceEquations;
+    model.dynamics.solver = None;
+    let difference = DifferenceEquations::try_from_model(&model).unwrap();
+    println!("| steps | run(n) (ms) | run_at, full grid (ms) | run_at, every 50 (ms) |");
+    println!("|---|---|---|---|");
+    for n in [100_u32, 2000] {
+        let grid: Vec<f64> = (0..=n).map(f64::from).collect();
+        let sparse: Vec<f64> = (0..=n).step_by(50).map(f64::from).collect();
+        println!(
+            "| {n} | {:.3} | {:.3} | {:.3} |",
+            best_ms(40, || {
+                difference.clone().run(n).unwrap();
+            }),
+            best_ms(40, || {
+                difference.clone().run_at(&grid).unwrap();
+            }),
+            best_ms(40, || {
+                difference.clone().run_at(&sparse).unwrap();
             }),
         );
     }

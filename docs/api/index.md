@@ -9,9 +9,9 @@ explain how to use them; these pages list every argument, attribute and error.
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder` |
 | [Model](model.md) | `Model`, `InitialCompartment`, `UnitConsistencyError` |
-| [Simulation](simulation.md) | `Simulation`, `OdeSolver`, `window_end_steps`, `windowed_totals` |
+| [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `OdeSolver`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals` |
 | [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
-| [TimePattern](time-patterns.md) | `TimePattern` |
+| [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [TimeScale](time-scale.md) | `TimeScale` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `LossFunction`, `OptimizationAlgorithm` |
 | [Probabilistic Calibration](probabilistic-calibrator.md) | `ProbabilisticCalibrationConfig`, `ProbEvaluationFilterConfig`, `ProbClusteringConfig`, `ProbRepresentativeConfig`, `ProbNsga2Config`, `ProbGreedyLocalSearchConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics`, `CalibrationEvaluation`, `ci_percentiles`, `member_statistics` |

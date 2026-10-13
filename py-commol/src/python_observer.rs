@@ -148,13 +148,13 @@ pub fn optimize_with_python_observer<E: SimulationEngine>(
              Initial values: {:?}\n\
              Max iterations: {}\n\
              SD tolerance: {}\n\
-             Initial step: {}\n\
+             Initial simplex size: {}\n\
              ===============================================\n",
             parameter_names,
             initial_params,
             nm_config.max_iterations,
             nm_config.sd_tolerance,
-            nm_config.initial_step
+            nm_config.initial_simplex_size
         ),
         OptimizationConfig::ParticleSwarm(ps_config) => {
             let mut header = format!(

@@ -16,7 +16,7 @@ formula to machine code, and fits unknown values to your data.
 | Fluent model building | `ModelBuilder` with validation of every input |
 | Stratifications | Subgroups with their own rates, including conditional stratifications and per-compartment initial conditions |
 | Rate formulas | Parameters, compartments, totals, `step`, math functions and `if`, compiled with Cranelift |
-| Time patterns | Pulses, windows, ramps, seasons and schedules per subgroup |
+| Axis patterns | Pulses, windows, ramps, seasons and schedules per subgroup |
 | Unit checking | Dimensional analysis of every rate |
 | Calibration | Nelder-Mead and particle swarm, with initial conditions, scale factors, windows and constraints |
 | Probabilistic calibration | Ensembles, prediction intervals and parameter spreads |
@@ -67,7 +67,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 |---|---|
 | **[Quick Start](https://munqu.github.io/commol/latest/getting-started/quickstart/)** | Build, run, check and calibrate a first model. Start here. |
 | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/) | Bins, stratifications, transitions, rates and initial conditions |
-| [Building Models](https://munqu.github.io/commol/latest/guide/building-models/) | Every builder option, transitions, expressions, time patterns and units |
+| [Building Models](https://munqu.github.io/commol/latest/guide/building-models/) | Every builder option, transitions, expressions, axis patterns and units |
 | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/) | Outputs, totals, windows and plots |
 | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/) | Fitting parameters and initial conditions, and probabilistic calibration |
 | [API Reference](https://munqu.github.io/commol/latest/api/) | Every public class and function |

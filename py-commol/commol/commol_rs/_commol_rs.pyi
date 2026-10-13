@@ -75,13 +75,14 @@ class EngineProtocol(Protocol):
     """A DifferenceEquations or a DifferentialEquations engine."""
 
     def __init__(self, model: RustModelProtocol) -> None: ...
-    def run(self, num_steps: int) -> list[list[float]]: ...
+    def run(self, num_steps: int) -> tuple[list[float], list[list[float]]]: ...
     def run_at(self, positions: list[float]) -> list[list[float]]: ...
+    def check_position(self, position: float) -> None: ...
     def step(self) -> None: ...
     def reset(self) -> None: ...
     def set_parameter(self, parameter_id: str, value: float) -> None: ...
     def get_parameters(self) -> dict[str, float]: ...
-    def current_step(self) -> float: ...
+    def current_position(self) -> float: ...
     def set_initial_condition(self, compartment_index: int, value: float) -> None: ...
     @property
     def population(self) -> list[float]: ...
@@ -114,27 +115,21 @@ class ModelModule(Protocol):
 class ObservedDataPointProtocol(Protocol):
     def __init__(
         self,
-        step: float,
-        compartment: str,
+        at: float,
+        label: str,
+        outputs: list[str],
         value: float,
         weight: float | None = None,
-        scale_id: str | None = None,
-        window_steps: float | None = None,
-        compartments: list[str] | None = None,
+        factor_id: str | None = None,
+        window: float | None = None,
     ) -> None: ...
     @property
-    def time_step(self) -> float: ...
-    @property
-    def compartment(self) -> str: ...
-    @property
-    def value(self) -> float: ...
-    @property
-    def scale_id(self) -> str | None: ...
+    def at(self) -> float: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: ClassVar["CalibrationParameterTypeProtocol"]
     InitialCondition: ClassVar["CalibrationParameterTypeProtocol"]
-    Scale: ClassVar["CalibrationParameterTypeProtocol"]
+    Factor: ClassVar["CalibrationParameterTypeProtocol"]
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
@@ -161,7 +156,7 @@ class CalibrationConstraintProtocol(Protocol):
         expression: str,
         description: str | None = None,
         weight: float = 1.0,
-        time_steps: list[float] | None = None,
+        at: list[float] | None = None,
     ) -> None: ...
     @property
     def id(self) -> str: ...
@@ -172,7 +167,7 @@ class CalibrationConstraintProtocol(Protocol):
     @property
     def weight(self) -> float: ...
     @property
-    def time_steps(self) -> list[float] | None: ...
+    def at(self) -> list[float] | None: ...
 
 class LossConfigProtocol(Protocol):
     @staticmethod
@@ -191,7 +186,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
-        initial_step: float = 0.1,
+        initial_simplex_size: float = 0.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
@@ -386,6 +381,12 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
+    def check_positions(
+        self,
+        engine: EngineProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+    ) -> None: ...
     def check_initial_conditions(
         self,
         engine: EngineProtocol,
@@ -436,7 +437,7 @@ class CalibrationModule(Protocol):
         engine: EngineProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
-        time_steps: int,
+        positions: list[float],
     ) -> list[list[list[float]]]: ...
     def generate_calibrated_predictions_parallel(
         self,
@@ -447,7 +448,7 @@ class CalibrationModule(Protocol):
         loss_config: LossConfigProtocol,
         initial_population_size: int,
         parameter_sets: list[list[float]],
-        time_steps: int,
+        positions: list[float],
         initial_condition_remainder: str | None = None,
     ) -> list[list[list[float]]]: ...
     def generate_predictions_at_points_parallel(

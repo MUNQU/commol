@@ -42,7 +42,7 @@ def _scatter(ax) -> np.ndarray:
 
 def _observed_infected(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
     return [
-        ObservedDataPoint(step=step, compartment="I", value=results["I"][step])
+        ObservedDataPoint(at=step, output="I", value=results["I"][step])
         for step in range(0, 100, 10)
     ]
 
@@ -56,7 +56,7 @@ class TestSimulationPlotter:
         assert plotter.simulation == sir_simulation
         assert plotter.results == results
         assert len(plotter.bins) == 3
-        assert plotter.num_steps == 100
+        assert plotter.results.positions == [float(step) for step in range(101)]
 
     def test_plot_series_draws_every_bin(self, plotter: SimulationPlotter) -> None:
         fig = plotter.plot_series()
@@ -80,7 +80,7 @@ class TestSimulationPlotter:
         fig = plotter.plot_series(observed_data=observed)
 
         markers = _scatter(_visible(fig)[1])
-        np.testing.assert_allclose(markers[:, 0], [p.step for p in observed])
+        np.testing.assert_allclose(markers[:, 0], [p.at for p in observed])
         np.testing.assert_allclose(markers[:, 1], [p.value for p in observed])
 
     def test_plot_series_with_calibration_result(
@@ -90,10 +90,10 @@ class TestSimulationPlotter:
         scale_factor = 0.5
         observed = [
             ObservedDataPoint(
-                step=i,
-                compartment="I",
+                at=i,
+                output="I",
                 value=results["I"][i] * scale_factor,
-                scale_id="detection_rate",
+                factor_id="detection_rate",
             )
             for i in range(0, 100, 10)
         ]
@@ -184,14 +184,14 @@ class TestSimulationPlotter:
 
     def test_group_observed_data(self, plotter: SimulationPlotter) -> None:
         observed = [
-            ObservedDataPoint(step=10, compartment="I", value=50.0),
-            ObservedDataPoint(step=20, compartment="I", value=60.0),
-            ObservedDataPoint(step=10, compartment="R", value=10.0),
+            ObservedDataPoint(at=10, output="I", value=50.0),
+            ObservedDataPoint(at=20, output="I", value=60.0),
+            ObservedDataPoint(at=10, output="R", value=10.0),
         ]
 
         grouped = plotter._group_observed_data(observed)
 
-        assert {name: [p.step for p in points] for name, points in grouped.items()} == {
+        assert {name: [p.at for p in points] for name, points in grouped.items()} == {
             "I": [10, 20],
             "R": [10],
         }
@@ -205,8 +205,8 @@ class TestSimulationPlotter:
         # A windowed series: plotted steps are window ends, starting at the
         # window width rather than at 0.
         window = 7
-        time_steps = list(range(window, 8 * window + 1, window))
-        plotter._apply_x_labels(ax, time_steps, str, tick_every=2 * window)
+        positions = list(range(window, 8 * window + 1, window))
+        plotter._apply_x_labels(ax, positions, str, tick_every=2 * window)
 
         ticks = list(ax.get_xticks())
         assert ticks == [window, 3 * window, 5 * window, 7 * window]
@@ -295,10 +295,10 @@ class TestWindowedProbabilisticSeries:
         steps = [10, 25, 40]
         observed = [
             ObservedDataPoint(
-                step=step,
-                compartment="events",
+                at=step,
+                output="events",
                 value=results["events"][step] - results["events"][step - window],
-                window_steps=window,
+                window=window,
             )
             for step in steps
         ]
@@ -310,10 +310,11 @@ class TestWindowedProbabilisticSeries:
             selected_indices=[0],
             ensemble_parameters=[{"k1": 0.05}],
             parameter_statistics={},
+            prediction_positions=results.positions,
             prediction_median={k: list(v) for k, v in results.items()},
             prediction_ci_lower={k: list(v) for k, v in results.items()},
             prediction_ci_upper={k: list(v) for k, v in results.items()},
-            windowed_prediction_steps={"events": steps},
+            windowed_prediction_positions={"events": steps},
             windowed_prediction_median={"events": windowed},
             windowed_prediction_ci_lower={"events": windowed},
             windowed_prediction_ci_upper={"events": windowed},
@@ -398,7 +399,7 @@ class TestDifferentialModel:
         steps = [0.5, 10.25, 40.75]
         at = simulation.run_at(steps)
         observed = [
-            ObservedDataPoint(step=step, compartment="I", value=value)
+            ObservedDataPoint(at=step, output="I", value=value)
             for step, value in zip(steps, at["I"], strict=True)
         ]
 
@@ -408,17 +409,35 @@ class TestDifferentialModel:
 
         np.testing.assert_allclose(_scatter(fig.axes[0])[:, 0], steps)
 
-    def test_a_window_of_non_whole_steps_has_no_windowed_line(self) -> None:
-        simulation = Simulation(
+    def _events(self) -> Simulation:
+        return Simulation(
             build_ode(
                 a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
             )
         )
-        observed = [
-            ObservedDataPoint(step=5, compartment="events", value=1.0, window_steps=2.5)
-        ]
 
-        with pytest.raises(ValueError, match="whole steps"):
+    def test_a_window_of_non_whole_steps_draws_its_increments(self) -> None:
+        simulation = self._events()
+        observed = [ObservedDataPoint(at=5, output="events", value=1.0, window=2.5)]
+        results = simulation.run_at([2.5 * j for j in range(9)])
+
+        fig = SimulationPlotter(simulation, results).plot_series(
+            observed_data=observed, series=["events"]
+        )
+
+        line = fig.axes[0].lines[0]
+        ends = [2.5 * j for j in range(1, 9)]
+        np.testing.assert_allclose(line.get_xdata(), ends)
+        np.testing.assert_allclose(
+            line.get_ydata(),
+            simulation.windowed_totals(results, ["events"], 2.5, ends),
+        )
+
+    def test_a_window_the_results_do_not_hold_is_an_error(self) -> None:
+        simulation = self._events()
+        observed = [ObservedDataPoint(at=5, output="events", value=1.0, window=2.5)]
+
+        with pytest.raises(ValueError, match="no value at 2.5"):
             SimulationPlotter(simulation, simulation.run(20)).plot_series(
                 observed_data=observed
             )

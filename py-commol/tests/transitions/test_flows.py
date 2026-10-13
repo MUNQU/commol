@@ -3,8 +3,9 @@
 import json
 
 import pytest
+from pydantic import ValidationError
 
-from commol import ModelBuilder, Simulation
+from commol import ModelBuilder
 from commol.context._model.engine_state import transition_flows
 from commol.context.model import Model
 from tests.support import a_to_b_builder, assert_population_conserved, build, run
@@ -110,7 +111,7 @@ class TestNoTransitionConditions:
     def test_the_builder_has_no_create_condition(self) -> None:
         assert not hasattr(ModelBuilder, "create_condition")
 
-    def test_a_model_file_with_a_condition_key_still_loads(self, tmp_path) -> None:
+    def test_a_model_file_with_a_condition_key_names_it(self, tmp_path) -> None:
         model = _age_model()
         data = model.model_dump(mode="json")
         data["dynamics"]["transitions"][0]["condition"] = {
@@ -120,6 +121,5 @@ class TestNoTransitionConditions:
         path = tmp_path / "model.json"
         path.write_text(json.dumps(data))
 
-        loaded = Model.from_json(path)
-
-        assert Simulation(loaded).run(1) == Simulation(model).run(1)
+        with pytest.raises(ValidationError, match="condition"):
+            Model.from_json(path)

@@ -57,15 +57,15 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     observed_output_indices: Vec<Vec<usize>>,
 
     /// Sorted, deduplicated observation time steps for sparse loss evaluation
-    observed_time_steps: Vec<f64>,
+    observed_positions: Vec<f64>,
 
-    /// Row index in `observed_time_steps` for each observed data point
+    /// Row index in `observed_positions` for each observed data point
     observed_time_indices: Vec<usize>,
 
     /// Optional previous row index for windowed cumulative-output observations.
     observed_previous_time_indices: Vec<Option<usize>>,
 
-    /// Row indices in `observed_time_steps` for each time-dependent constraint.
+    /// Row indices in `observed_positions` for each time-dependent constraint.
     constraint_time_indices: Vec<Option<Vec<usize>>>,
 
     /// Parameters to calibrate with their bounds
@@ -74,9 +74,9 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Resolved initial-condition targets and remainder of the parameters.
     initial_conditions: InitialConditionPlan,
 
-    /// Scale parameter indices for observed data points (parallel to observed_data vec)
-    /// None if no scale is applied, Some(param_idx) if a scale parameter should be applied
-    observed_scale_indices: Vec<Option<usize>>,
+    /// Factor parameter indices for observed data points (parallel to observed_data vec)
+    /// None if no factor is applied, Some(param_idx) if a factor parameter should be applied
+    observed_factor_indices: Vec<Option<usize>>,
 
     /// Per-series normalization factors (parallel to observed_data vec).
     ///
@@ -106,10 +106,10 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Evaluation history tracker (wrapped in RwLock for thread-safe interior mutability)
     evaluations: RwLock<Vec<CalibrationEvaluation>>,
 
-    /// Indices of parameter-only constraints (no time_steps, evaluated once before simulation)
+    /// Indices of parameter-only constraints (no positions, evaluated once before simulation)
     parameter_constraint_indices: Vec<usize>,
 
-    /// Indices of time-dependent constraints (with time_steps, evaluated at specified times during simulation)
+    /// Indices of constraints at positions (evaluated at those positions during simulation)
     time_dependent_constraint_indices: Vec<usize>,
 
     /// Pre-computed prefix → compartment-index mappings for constraint evaluation.
@@ -134,20 +134,20 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
     fn clone(&self) -> Self {
         // Pre-allocate result buffer for the clone
-        let buffer_capacity = self.observed_time_steps.len();
+        let buffer_capacity = self.observed_positions.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
         Self {
             base_engine: self.base_engine.clone(),
             observed_data: self.observed_data.clone(),
             observed_output_indices: self.observed_output_indices.clone(),
-            observed_time_steps: self.observed_time_steps.clone(),
+            observed_positions: self.observed_positions.clone(),
             observed_time_indices: self.observed_time_indices.clone(),
             observed_previous_time_indices: self.observed_previous_time_indices.clone(),
             constraint_time_indices: self.constraint_time_indices.clone(),
             parameters: self.parameters.clone(),
             initial_conditions: self.initial_conditions.clone(),
-            observed_scale_indices: self.observed_scale_indices.clone(),
+            observed_factor_indices: self.observed_factor_indices.clone(),
             observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
             result_buffer: RwLock::new(result_buffer),
@@ -211,7 +211,7 @@ fn compute_observation_normalization(
         std::collections::HashMap::new();
     for obs in observed_data {
         let entry = series_sum_squares
-            .entry(obs.compartment.as_str())
+            .entry(obs.label.as_str())
             .or_insert((0.0, 0));
         entry.0 += obs.value * obs.value;
         entry.1 += 1;
@@ -220,7 +220,7 @@ fn compute_observation_normalization(
     observed_data
         .iter()
         .map(|obs| {
-            let (sum_squares, count) = series_sum_squares[obs.compartment.as_str()];
+            let (sum_squares, count) = series_sum_squares[obs.label.as_str()];
             let rms = if count > 0 {
                 (sum_squares / count as f64).sqrt()
             } else {
@@ -253,7 +253,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// - No observed data provided
     /// - No calibration parameters provided
     /// - Constraint expressions are invalid or reference unknown variables
-    /// - Compartments are referenced in constraints without time_steps specified
+    /// - Outputs are referenced in constraints without positions (`at`)
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
@@ -266,6 +266,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         if observed_data.is_empty() {
             return Err("No observed data provided".to_string());
         }
+        check_positions(&base_engine, &observed_data, &constraints)?;
 
         if parameters.is_empty() {
             return Err("No calibration parameters provided".to_string());
@@ -293,29 +294,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Validate observed output names and convert to indices.
         let mut observed_output_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
-            if !(obs.time_step.is_finite() && obs.time_step >= 0.0) {
-                return Err(format!(
-                    "Observation '{}' is at step {}; a step must be finite and not negative",
-                    obs.compartment, obs.time_step
-                ));
-            }
-            if let Some(window_steps) = obs.window_steps {
-                if window_steps > obs.time_step {
-                    return Err(format!(
-                        "Observation '{}' at step {} has window_steps={} before simulation start",
-                        obs.compartment, obs.time_step, window_steps
-                    ));
-                }
-            }
-
-            let observed_outputs: Vec<&str> = obs.compartments.as_ref().map_or_else(
-                || vec![obs.compartment.as_str()],
-                |compartments| compartments.iter().map(String::as_str).collect(),
-            );
+            let observed_outputs: Vec<&str> = obs.outputs.iter().map(String::as_str).collect();
             if observed_outputs.is_empty() {
                 return Err(format!(
-                    "Observation '{}' at step {} has an empty compartments list",
-                    obs.compartment, obs.time_step
+                    "Observation '{}' at {} has an empty list of outputs",
+                    obs.label, obs.at
                 ));
             }
 
@@ -328,7 +311,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                             "Invalid observed output name '{}' for observation '{}' \
                             (available: {})",
                             output_name,
-                            obs.compartment,
+                            obs.label,
                             output_names.join(", ")
                         ));
                     }
@@ -341,37 +324,38 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let compartments = base_engine.compartments();
         let initial_conditions = InitialConditionPlan::new(&base_engine, &parameters)?;
 
-        // Build parameter ID to index mapping for scale lookups
+        // Build parameter ID to index mapping for factor lookups
         let param_id_map: std::collections::HashMap<&str, usize> = parameters
             .iter()
             .enumerate()
             .map(|(idx, param)| (param.id.as_str(), idx))
             .collect();
 
-        // Build scale parameter indices for observed data
-        let mut observed_scale_indices = Vec::with_capacity(observed_data.len());
+        // Build factor parameter indices for observed data
+        let mut observed_factor_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
-            if let Some(ref scale_id) = obs.scale_id {
-                match param_id_map.get(scale_id.as_str()) {
+            if let Some(ref factor_id) = obs.factor_id {
+                match param_id_map.get(factor_id.as_str()) {
                     Some(&param_idx) => {
-                        // Verify this parameter is actually a Scale type
-                        if parameters[param_idx].parameter_type != CalibrationParameterType::Scale {
+                        // Verify this parameter is actually a Factor type
+                        if parameters[param_idx].parameter_type != CalibrationParameterType::Factor
+                        {
                             return Err(format!(
-                                "Parameter '{}' referenced as scale_id but is not a Scale parameter",
-                                scale_id
+                                "Parameter '{}' referenced as factor_id but is not a Factor parameter",
+                                factor_id
                             ));
                         }
-                        observed_scale_indices.push(Some(param_idx));
+                        observed_factor_indices.push(Some(param_idx));
                     }
                     None => {
                         return Err(format!(
-                            "Invalid scale_id '{}' referenced in observed data (not found in parameters)",
-                            scale_id
+                            "Invalid factor_id '{}' referenced in observed data (not found in parameters)",
+                            factor_id
                         ));
                     }
                 }
             } else {
-                observed_scale_indices.push(None);
+                observed_factor_indices.push(None);
             }
         }
 
@@ -395,14 +379,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         let mut parameter_constraint_indices = Vec::new();
         let mut time_dependent_constraint_indices = Vec::new();
-        let mut simulation_time_steps: Vec<f64> = observed_data
+        let mut simulation_positions: Vec<f64> = observed_data
             .iter()
-            .flat_map(|obs| {
-                std::iter::once(obs.time_step).chain(
-                    obs.window_steps
-                        .map(|window_steps| obs.time_step - window_steps),
-                )
-            })
+            .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
             .collect();
 
         for (idx, constraint) in constraints.iter().enumerate() {
@@ -440,49 +419,41 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
 
                 // Compartments can only be used in time-dependent constraints
-                if is_compartment && constraint.time_steps.is_none() {
+                if is_compartment && constraint.at.is_none() {
                     return Err(format!(
-                        "Constraint '{}' references compartment '{}' but has no time_steps specified",
+                        "Constraint '{}' references output '{}' but has no positions (`at`)",
                         constraint.id, var
                     ));
                 }
             }
 
             // Add sparse constraint time steps to the simulation schedule.
-            if let Some(ref time_steps) = constraint.time_steps {
-                simulation_time_steps.extend(time_steps.iter().copied());
+            if let Some(ref positions) = constraint.at {
+                simulation_positions.extend(positions.iter().copied());
                 time_dependent_constraint_indices.push(idx);
             } else {
                 parameter_constraint_indices.push(idx);
             }
         }
 
-        if let Some(bad) = simulation_time_steps
-            .iter()
-            .find(|step| !(step.is_finite() && **step >= 0.0))
-        {
-            return Err(format!(
-                "Constraint step {bad} is not valid; a step must be finite and not negative"
-            ));
-        }
-        simulation_time_steps.sort_by(f64::total_cmp);
-        simulation_time_steps.dedup();
+        simulation_positions.sort_by(f64::total_cmp);
+        simulation_positions.dedup();
         let position_index = |position: f64| {
-            simulation_time_steps
+            simulation_positions
                 .binary_search_by(|step| step.total_cmp(&position))
                 .ok()
         };
 
         let observed_time_indices: Vec<usize> = observed_data
             .iter()
-            .map(|obs| position_index(obs.time_step).expect("observed time step must be present"))
+            .map(|obs| position_index(obs.at).expect("observed time step must be present"))
             .collect();
 
         let observed_previous_time_indices: Vec<Option<usize>> = observed_data
             .iter()
             .map(|obs| {
-                obs.window_steps.map(|window_steps| {
-                    position_index(obs.time_step - window_steps)
+                obs.window.map(|window| {
+                    position_index(obs.at - window)
                         .expect("window previous time step must be present")
                 })
             })
@@ -491,8 +462,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let constraint_time_indices: Vec<Option<Vec<usize>>> = constraints
             .iter()
             .map(|constraint| {
-                constraint.time_steps.as_ref().map(|time_steps| {
-                    time_steps
+                constraint.at.as_ref().map(|positions| {
+                    positions
                         .iter()
                         .map(|time_step| {
                             position_index(*time_step)
@@ -504,7 +475,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .collect();
 
         // Pre-allocate result buffer for performance
-        let buffer_capacity = simulation_time_steps.len();
+        let buffer_capacity = simulation_positions.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
         let bin_aggregates = output_aggregates;
@@ -521,13 +492,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             base_engine,
             observed_data,
             observed_output_indices,
-            observed_time_steps: simulation_time_steps,
+            observed_positions: simulation_positions,
             observed_time_indices,
             observed_previous_time_indices,
             constraint_time_indices,
             parameters,
             initial_conditions,
-            observed_scale_indices,
+            observed_factor_indices,
             observed_normalization,
             loss_config,
             result_buffer: RwLock::new(result_buffer),
@@ -633,19 +604,19 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 
     /// Calculate loss from a sparse result matrix whose rows are aligned with
-    /// `self.observed_time_steps`.
+    /// `self.observed_positions`.
     fn calculate_sparse_loss(&self, observed_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
         let observation_iter = || {
             self.observed_data
                 .iter()
                 .zip(&self.observed_output_indices)
-                .zip(&self.observed_scale_indices)
+                .zip(&self.observed_factor_indices)
                 .zip(&self.observed_time_indices)
                 .zip(&self.observed_previous_time_indices)
                 .zip(&self.observed_normalization)
                 .filter_map(
                     |(
-                        ((((obs, output_indices), &scale_idx), &time_idx), &previous_time_idx),
+                        ((((obs, output_indices), &factor_idx), &time_idx), &previous_time_idx),
                         &normalization,
                     )| {
                         observed_results.get(time_idx).map(|step_data| {
@@ -666,7 +637,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                             } else {
                                 current
                             };
-                            let scaled_predicted = if let Some(param_idx) = scale_idx {
+                            let scaled_predicted = if let Some(param_idx) = factor_idx {
                                 predicted * param_values[param_idx]
                             } else {
                                 predicted
@@ -735,7 +706,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         (max_observed * max_observed * num_obs * 1000.0).max(1e10)
     }
 
-    /// Evaluate parameter-only constraints (no time_steps specified)
+    /// Evaluate parameter-only constraints (no positions)
     ///
     /// These constraints can only reference calibration parameters, not compartment values.
     /// Evaluated once before simulation starts.
@@ -783,7 +754,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         Ok(total_penalty)
     }
 
-    /// Evaluate time-dependent constraints (with time_steps specified)
+    /// Evaluate constraints at positions (with `at`)
     ///
     /// These constraints can reference both calibration parameters and compartment values.
     /// Evaluated at each specified time step after simulation completes.
@@ -818,15 +789,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             let constraint = &self.constraints[constraint_idx];
             let expr = &self.compiled_constraints[constraint_idx];
 
-            let time_steps = constraint
-                .time_steps
+            let positions = constraint
+                .at
                 .as_ref()
-                .expect("Time-dependent constraint must have time_steps");
+                .expect("a constraint at positions has positions");
             let time_indices = self.constraint_time_indices[constraint_idx]
                 .as_ref()
                 .expect("Time-dependent constraint must have row indices");
 
-            for (&time_step, &time_idx) in time_steps.iter().zip(time_indices) {
+            for (&time_step, &time_idx) in positions.iter().zip(time_indices) {
                 // Get compartment values at this time step
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
@@ -932,7 +903,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .expect("Failed to acquire write lock on result_buffer");
 
         engine
-            .run_at_positions_into_buffer(&self.observed_time_steps, &mut buffer)
+            .run_at_positions_into_buffer(&self.observed_positions, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
 
         // Check for numerical instability (NaN or infinity values)
@@ -982,6 +953,55 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
 
         Ok(loss)
     }
+}
+
+/// Check every position of a calibration problem with the engine.
+///
+/// The engine decides which positions its model type accepts
+/// ([`SimulationEngine::check_position`]); this function names the object
+/// that holds the first one it rejects: the observation (at its position or
+/// at the start of its window) or the constraint.
+///
+/// # Errors
+///
+/// Returns a message that names the observation or constraint and gives the
+/// engine's reason, or that names an observation whose window is not a
+/// finite, positive length.
+pub fn check_positions<E: SimulationEngine>(
+    engine: &E,
+    observed_data: &[ObservedDataPoint],
+    constraints: &[CalibrationConstraint],
+) -> Result<(), String> {
+    for obs in observed_data {
+        engine
+            .check_position(obs.at)
+            .map_err(|reason| format!("Observation '{}': {reason}", obs.label))?;
+        if let Some(window) = obs.window {
+            if !(window.is_finite() && window > 0.0) {
+                return Err(format!(
+                    "Observation '{}' at {} has the window {window}; a window \
+                     must be finite and positive",
+                    obs.label, obs.at
+                ));
+            }
+            let start = obs.at - window;
+            engine.check_position(start).map_err(|reason| {
+                format!(
+                    "Observation '{}' at {} with the window {window} starts its \
+                     window at {start}: {reason}",
+                    obs.label, obs.at
+                )
+            })?;
+        }
+    }
+    for constraint in constraints {
+        for &position in constraint.at.iter().flatten() {
+            engine
+                .check_position(position)
+                .map_err(|reason| format!("Constraint '{}': {reason}", constraint.id))?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

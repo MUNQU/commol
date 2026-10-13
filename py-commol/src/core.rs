@@ -416,8 +416,8 @@ impl PyParameter {
         let value_str = match &self.inner.value {
             Some(commol_core::ParameterValue::Constant(v)) => format!("{}", v),
             Some(commol_core::ParameterValue::Formula(f)) => format!("'{}'", f),
-            Some(commol_core::ParameterValue::TimeSeries { data, mode }) => {
-                format!("TimeSeries(len={}, mode={:?})", data.len(), mode)
+            Some(commol_core::ParameterValue::Series { data, mode }) => {
+                format!("Series(len={}, mode={:?})", data.len(), mode)
             }
             None => "None".to_string(),
         };

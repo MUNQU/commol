@@ -29,15 +29,15 @@ def series_normalization_factors(
     When ``enabled`` is ``False`` every factor is ``1.0``, so callers can multiply
     unconditionally and leave the loss unchanged.
     """
-    series = {observation.compartment for observation in observed_data}
+    series = {observation.label for observation in observed_data}
     if not enabled:
         return {name: 1.0 for name in series}
 
     sum_squares: dict[str, float] = {name: 0.0 for name in series}
     counts: dict[str, int] = {name: 0 for name in series}
     for observation in observed_data:
-        sum_squares[observation.compartment] += observation.value**2
-        counts[observation.compartment] += 1
+        sum_squares[observation.label] += observation.value**2
+        counts[observation.label] += 1
 
     factors: dict[str, float] = {}
     for name in series:

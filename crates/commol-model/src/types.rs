@@ -16,7 +16,7 @@ pub(crate) enum VarSlot {
     /// Direct index into `MathExpressionContext`'s parameter value storage.
     ParameterIndex(usize),
     /// Look up by name in `MathExpressionContext.parameters` (covers user
-    /// parameters, formula parameters, time-series, subpopulation totals,
+    /// parameters, formula parameters, series, subpopulation totals,
     /// base bin sums, and partial bin-strat sums).
     Parameter(String),
     /// The step that holds the current time (`step`).
@@ -158,65 +158,113 @@ pub(crate) struct ImpulseFlow {
     pub(crate) schedule: ImpulseSchedule,
 }
 
-/// Pre-computed time-series parameter for O(log N) step lookup.
+/// Pre-computed series parameter for O(log N) lookup.
 #[derive(Clone)]
-pub(crate) struct TimeSeriesParameter {
+pub(crate) struct SeriesParameter {
     pub(crate) parameter_name: String,
     pub(crate) parameter_index: usize,
-    /// Sorted by step for binary search.
-    data: Vec<(u64, f64)>,
+    /// Sorted by position for binary search.
+    data: Vec<(f64, f64)>,
     mode: SeriesMode,
 }
 
-impl TimeSeriesParameter {
+impl SeriesParameter {
+    /// Compile a series, sorted by position.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the parameter when a position is not
+    /// finite and non-negative, two positions are the same, or a `"pulse"`
+    /// series has a position that is not an integer: a pulse is a rate on
+    /// one unit step.
     pub(crate) fn new(
         parameter_name: String,
         parameter_index: usize,
-        mut data: Vec<(u64, f64)>,
+        mut data: Vec<(f64, f64)>,
         mode: SeriesMode,
-    ) -> Self {
-        data.sort_unstable_by_key(|(step, _)| *step);
-        Self {
+    ) -> Result<Self, String> {
+        if let Some(&(position, _)) = data.iter().find(|(p, _)| !(p.is_finite() && *p >= 0.0)) {
+            return Err(format!(
+                "Series parameter '{parameter_name}' has a point at {position}; a \
+                 position must be finite and not negative"
+            ));
+        }
+        if mode == SeriesMode::Pulse
+            && let Some(&(position, _)) = data.iter().find(|(p, _)| p.fract() != 0.0)
+        {
+            return Err(format!(
+                "Series parameter '{parameter_name}' is a pulse at {position}, which is \
+                 not an integer step; a pulse acts on one whole step"
+            ));
+        }
+        data.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some(pair) = data.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+            return Err(format!(
+                "Series parameter '{parameter_name}' has two points at {}",
+                pair[0].0
+            ));
+        }
+        Ok(Self {
             parameter_name,
             parameter_index,
             data,
             mode,
-        }
+        })
     }
 
-    pub(crate) fn evaluate(&self, step: u64) -> f64 {
+    /// Whether the series is read at `step` rather than at `t`.
+    pub(crate) fn reads_step(&self) -> bool {
+        self.mode == SeriesMode::Pulse
+    }
+
+    /// The first position that is not an integer, if any.
+    pub(crate) fn first_non_integer(&self) -> Option<f64> {
+        self.data
+            .iter()
+            .map(|&(position, _)| position)
+            .find(|position| position.fract() != 0.0)
+    }
+
+    /// Positions in `(from, to)` where the series jumps or bends, for a
+    /// series read at `t`.
+    pub(crate) fn points_in(&self, from: f64, to: f64) -> impl Iterator<Item = f64> + '_ {
+        self.data
+            .iter()
+            .map(|&(position, _)| position)
+            .filter(move |&position| position > from && position < to)
+    }
+
+    /// The value of the series at `step` (pulse) or at `t` (step function,
+    /// linear).
+    pub(crate) fn evaluate(&self, step: f64, t: f64) -> f64 {
         if self.data.is_empty() {
             return 0.0;
         }
         match self.mode {
-            SeriesMode::Pulse => match self.data.binary_search_by_key(&step, |(s, _)| *s) {
+            SeriesMode::Pulse => match self
+                .data
+                .binary_search_by(|(position, _)| position.total_cmp(&step))
+            {
                 Ok(idx) => self.data[idx].1,
                 Err(_) => 0.0,
             },
             SeriesMode::StepFunction => {
-                let pos = self.data.partition_point(|(s, _)| *s <= step);
+                let pos = self.data.partition_point(|(position, _)| *position <= t);
                 if pos == 0 { 0.0 } else { self.data[pos - 1].1 }
             }
             SeriesMode::Linear => {
-                let first_step = self.data[0].0;
-                let last_step = self.data[self.data.len() - 1].0;
-                if step < first_step || step > last_step {
+                let first = self.data[0].0;
+                let last = self.data[self.data.len() - 1].0;
+                if t < first || t > last {
                     return 0.0;
                 }
-                let pos = self.data.partition_point(|(s, _)| *s <= step);
-                if pos == 0 {
-                    return self.data[0].1;
-                }
+                let pos = self.data.partition_point(|(position, _)| *position <= t);
                 if pos >= self.data.len() {
                     return self.data[self.data.len() - 1].1;
                 }
-                let (s0, v0) = self.data[pos - 1];
-                let (s1, v1) = self.data[pos];
-                if s0 == s1 {
-                    return v0;
-                }
-                let t = (step - s0) as f64 / (s1 - s0) as f64;
-                v0 + t * (v1 - v0)
+                let (p0, v0) = self.data[pos - 1];
+                let (p1, v1) = self.data[pos];
+                v0 + (t - p0) / (p1 - p0) * (v1 - v0)
             }
         }
     }
@@ -276,7 +324,7 @@ pub struct CompiledModel {
     /// Impulse transitions: they move their rate at once at their positions
     /// and are not part of the right-hand side.
     pub(crate) impulse_flows: Vec<ImpulseFlow>,
-    /// Whether a rate or a formula parameter reads `step` or a time series,
+    /// Whether a rate or a formula parameter reads `step` or a pulse series,
     /// so the right-hand side jumps at integer positions.
     pub(crate) depends_on_step: bool,
     /// Values that a rate or a formula parameter compares `t` with, such as
@@ -286,8 +334,9 @@ pub struct CompiledModel {
     pub(crate) subpopulation_mappings: Vec<SubpopulationMapping>,
     /// Parameters defined as formulas that need to be evaluated each step
     pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
-    /// Parameters defined as empirical time series; evaluated via binary search each step
-    pub(crate) series_parameters: Vec<TimeSeriesParameter>,
+    /// Parameters defined as empirical series; evaluated via binary search
+    /// each time the right-hand side is evaluated
+    pub(crate) series_parameters: Vec<SeriesParameter>,
     pub(crate) n_parameter_index: usize,
     pub(crate) t_parameter_index: usize,
     /// Whether any per-step expression still needs compartment values in the
@@ -300,49 +349,65 @@ pub struct CompiledModel {
 mod tests {
     use super::*;
 
+    fn series(data: Vec<(f64, f64)>, mode: SeriesMode) -> SeriesParameter {
+        SeriesParameter::new("x".to_string(), 0, data, mode).unwrap()
+    }
+
     #[test]
     fn pulse_series_only_fires_on_listed_steps() {
-        let series = TimeSeriesParameter::new(
-            "x".to_string(),
-            0,
-            vec![(5, 2.0), (1, 1.0)],
-            SeriesMode::Pulse,
-        );
+        let series = series(vec![(5.0, 2.0), (1.0, 1.0)], SeriesMode::Pulse);
 
-        assert_eq!(series.evaluate(0), 0.0);
-        assert_eq!(series.evaluate(1), 1.0);
-        assert_eq!(series.evaluate(2), 0.0);
-        assert_eq!(series.evaluate(5), 2.0);
+        assert_eq!(series.evaluate(0.0, 0.0), 0.0);
+        assert_eq!(series.evaluate(1.0, 1.5), 1.0);
+        assert_eq!(series.evaluate(2.0, 2.0), 0.0);
+        assert_eq!(series.evaluate(5.0, 5.0), 2.0);
     }
 
     #[test]
     fn step_function_series_holds_last_value() {
-        let series = TimeSeriesParameter::new(
-            "x".to_string(),
-            0,
-            vec![(10, 3.0), (3, 1.5)],
-            SeriesMode::StepFunction,
-        );
+        let series = series(vec![(10.0, 3.0), (3.0, 1.5)], SeriesMode::StepFunction);
 
-        assert_eq!(series.evaluate(2), 0.0);
-        assert_eq!(series.evaluate(3), 1.5);
-        assert_eq!(series.evaluate(9), 1.5);
-        assert_eq!(series.evaluate(10), 3.0);
-        assert_eq!(series.evaluate(20), 3.0);
+        assert_eq!(series.evaluate(2.0, 2.0), 0.0);
+        assert_eq!(series.evaluate(3.0, 3.0), 1.5);
+        assert_eq!(series.evaluate(9.0, 9.0), 1.5);
+        assert_eq!(series.evaluate(10.0, 10.0), 3.0);
+        assert_eq!(series.evaluate(20.0, 20.0), 3.0);
     }
 
     #[test]
-    fn linear_series_interpolates_between_points() {
-        let series = TimeSeriesParameter::new(
-            "x".to_string(),
-            0,
-            vec![(10, 10.0), (0, 0.0)],
-            SeriesMode::Linear,
-        );
+    fn step_function_series_holds_from_any_position() {
+        let series = series(vec![(2.5, 1.0)], SeriesMode::StepFunction);
 
-        assert_eq!(series.evaluate(0), 0.0);
-        assert_eq!(series.evaluate(5), 5.0);
-        assert_eq!(series.evaluate(10), 10.0);
-        assert_eq!(series.evaluate(11), 0.0);
+        assert_eq!(series.evaluate(2.0, 2.4), 0.0);
+        assert_eq!(series.evaluate(2.0, 2.5), 1.0);
+    }
+
+    #[test]
+    fn linear_series_interpolates_in_t() {
+        let series = series(vec![(10.0, 10.0), (0.0, 0.0)], SeriesMode::Linear);
+
+        assert_eq!(series.evaluate(0.0, 0.0), 0.0);
+        assert_eq!(series.evaluate(5.0, 5.0), 5.0);
+        assert_eq!(series.evaluate(2.0, 2.5), 2.5);
+        assert_eq!(series.evaluate(10.0, 10.0), 10.0);
+        assert_eq!(series.evaluate(11.0, 11.0), 0.0);
+    }
+
+    #[test]
+    fn a_pulse_between_steps_names_its_parameter() {
+        let error = SeriesParameter::new("x".to_string(), 0, vec![(1.5, 1.0)], SeriesMode::Pulse)
+            .err()
+            .unwrap();
+        assert!(error.contains("'x' is a pulse at 1.5"), "{error}");
+    }
+
+    #[test]
+    fn a_negative_or_repeated_position_names_its_parameter() {
+        for data in [vec![(-1.0, 1.0)], vec![(2.0, 1.0), (2.0, 3.0)]] {
+            let error = SeriesParameter::new("x".to_string(), 0, data, SeriesMode::Linear)
+                .err()
+                .unwrap();
+            assert!(error.contains("Series parameter 'x'"), "{error}");
+        }
     }
 }

@@ -21,8 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`t >= t_on`), so the solver cannot step over a jump.
 - `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the
   model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
-- `Simulation.run_at(steps)`: the outputs at the given sorted steps. A
-  differential model takes any step, such as `0.5`.
+- `Simulation.run_at(at)`: the outputs at the given sorted positions. A
+  differential model takes any position, such as `0.5`.
+- `SimulationResults`: what `Simulation.run` and `run_at` return. A `dict`
+  from output name to values, as before, with the positions in `positions`
+  and the rows in `rows()`.
+- The window grid as module functions: `window_start`, `window_end`,
+  `window_index` and `window_ends`, beside `windowed_totals`.
+- A public Pydantic class rejects an unknown field and names it
+  (`extra="forbid"` on every class of `commol.__all__`), so a misspelt or an
+  old name is an error instead of being dropped.
 - Impulses: `add_transition(..., impulse_at=[...])` or
   `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at
   once at those steps, in both engines, before the flows of the step.
@@ -34,18 +42,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `ObservedDataPoint.step` and `window_steps`, and
-  `CalibrationConstraint.time_steps`, accept a float for a differential model.
-  A whole number is stored as an `int`. A difference model still requires
-  integers, and `Calibrator` names the observation or constraint that is not.
+- A position on the axis is a `float` everywhere, and the engine alone decides
+  which positions its model type accepts: a difference model integer steps, a
+  differential model any non-negative position. Its error names the
+  observation, constraint, impulse transition or series parameter that holds
+  a rejected position. The engine trait runs only at positions
+  (`run_at_positions_into_buffer`); `run(n)` returns the grid it ran on.
+- Names of positions, lengths and counts, and names with more than one
+  meaning. No old name is kept; an old keyword raises an error that names it.
+
+  | Before | Now |
+  |---|---|
+  | `ObservedDataPoint(step=…)` | `ObservedDataPoint(at=…)` |
+  | `ObservedDataPoint(window_steps=…)` | `ObservedDataPoint(window=…)` |
+  | `ObservedDataPoint(compartment="B")` | `ObservedDataPoint(output="B")` |
+  | `ObservedDataPoint(compartment="label", compartments=[…])` | `ObservedDataPoint(label="label", outputs=[…])` |
+  | `ObservedDataPoint(scale_id=…)` | `ObservedDataPoint(factor_id=…)` |
+  | `CalibrationParameter(parameter_type="scale")`, `CalibrationParameterType.SCALE` | `"factor"`, `CalibrationParameterType.FACTOR` |
+  | `CalibrationConstraint(time_steps=…)` | `CalibrationConstraint(at=…)` |
+  | `NelderMeadConfig(initial_step=…)` | `NelderMeadConfig(initial_simplex_size=…)` |
+  | `Simulation.run_at(steps)` | `Simulation.run_at(at)` |
+  | `Simulation.windowed_totals(results, source_ids, window_steps, at_steps)` | `Simulation.windowed_totals(results, ids, window, at)` |
+  | `Simulation.total_series(results, source_ids)`, `group_outputs(source_ids)`, `outputs_for(source_id)` | `ids`, `id` |
+  | `windowed_totals(series, window_steps, at_steps)` | `windowed_totals(series, positions, window, at)` |
+  | `window_end_steps(window_steps, num_steps)` | `window_ends(window, end)` |
+  | `TimeScale.window_start`, `window_end`, `window_index` | `commol.window_start`, `window_end`, `window_index` |
+  | `simulation_report(…, steps, window_steps, …)`, `series_report`, `accumulators_report`, `observed_report` | `at`, `window` |
+  | `SimulationPlotter.plot_series(step_to_label=…)` | `position_label=…`, which takes a `float` |
+  | `TimePattern` (`commol.api.time_patterns`) | `AxisPattern` (`commol.api.patterns`) |
+  | `TimePattern.window(start, end, amount)` | `AxisPattern.interval(start, end, amount)` |
+  | `TimeSeriesValue`, "time-series parameter" | `SeriesValue`, "series parameter" |
+  | `EnsembleSolution.windowed_prediction_steps` | `windowed_prediction_positions` |
+  | `engine.current_step()` | `engine.current_position()` |
+  | `simulation.run(n, output_format="list_of_lists")` | `simulation.run(n).rows()` |
+
+- Reports, windows, plots and ensemble statistics read a value at a position
+  of the results, not at a list index, so a differential model windows and
+  reports at non-integer positions once its results hold them. The report key
+  `scale_id` is `factor_id`, and `compartments` is `outputs`.
+- `EnsembleSolution` has `prediction_positions`; its prediction series hold the
+  unit grid and every observation position and window start.
+- Series parameters take `(position, value)` points with `float` positions.
+  `"linear"` interpolates in `t` and `"step_function"` holds from any
+  position; a differential engine restarts its integration at their points,
+  so a `"linear"` series is a ramp, not a staircase. `"pulse"` keeps integer
+  positions. A difference model gives the same results and rejects a point
+  between integers.
+- `AxisPattern.interval` and `linear_ramp` read `t` and take `float` bounds. A
+  difference model gives the same results; in a differential model an
+  interval opens at any position and a ramp is continuous.
+- A pattern parameter that the builder generates is named `_series_<n>`
+  (was `_ts_<n>`).
 - The model compiler moved from `commol-difference` to the new crate
   `commol-model`, which both engines use; `commol_rs.difference` no longer has
   `initial_state`, `expanded_outputs`, `transition_flows` and `check_names`,
   which are in `commol_rs.model`. No public Python name changes.
-- `SimulationPlotter` raises `ValueError` for a windowed observation whose
-  `window_steps` is not a whole number, because the plotted series holds
-  integer steps only.
-
 - `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead
   of `bins`. An entry is an output name or a bin or accumulator id; an id plots
   the sum of its outputs, so a bin of a stratified model can be plotted. There
@@ -67,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nelder-Mead searches inside the bounds: it optimizes an unbounded
   coordinate and scores `x = lo + (hi − lo)·(sin u + 1)/2`. Its first simplex
-  is set by `NelderMeadConfig.initial_step` (a fraction of each bound width,
+  is set by `NelderMeadConfig.initial_simplex_size` (a fraction of each bound width,
   default 0.1), which replaces `simplex_perturbation`; there is no alias. Every
   Nelder-Mead result can change.
 
@@ -78,13 +129,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Condition` and `Rule` types, and the `LogicOperators` and
   `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated
   them, so a condition that was never true still moved population. Write the
-  condition in the rate (`"if(step > 30, k, 0)"`), or use a `TimePattern` or a
-  stratified rate. A model file with a `condition` key still loads; the key is
-  ignored.
+  condition in the rate (`"if(step > 30, k, 0)"`), or use an `AxisPattern` or
+  a stratified rate. A model file with a `condition` key raises an error that
+  names it.
+- `Simulation.run(..., output_format=...)` and `run_at(..., output_format=...)`:
+  both return `SimulationResults`; use `rows()` for one row per position.
+- `commol_core::integer_steps`, `SimulationEngine::run_into_buffer` and
+  `run_at_steps_into_buffer`; the Python checks that repeated the engine's
+  rules on positions (`check_steps_for_typology`, the impulse check of
+  `Dynamics`, the order check of `Simulation.run_at`).
 - The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`,
   which uses the weights.
 
 ### Fixed
+
+- A differential model: on a piece of integration that ends where a rate
+  jumps (a value `t` is compared with, a series point), the right-hand side
+  sees `t` below the end. Before, the last solver step of the piece already
+  saw the rate after the jump, so a rate of 0.5 that starts at 2.5 moved
+  `3·10⁻⁸` of the state before 2.5.
 
 - `CalibrationResult.converged` is `True` only when the optimizer met its
   convergence test or `target_cost`. Before, every finished run reported

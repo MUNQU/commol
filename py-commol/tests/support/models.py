@@ -33,7 +33,7 @@ from commol.api.model_builder import (
     CompartmentFractionDict,
     StratificationFractionsDict,
 )
-from commol.api.time_patterns import TimePattern
+from commol.api.patterns import AxisPattern
 from commol.constants import ModelTypes
 from commol.context.model import Model
 
@@ -43,7 +43,7 @@ TIGHT = OdeSolver(rtol=1e-10, atol=1e-8)
 """Tolerances tight enough for closed-form checks."""
 
 Parameters = Mapping[str, float | str | None]
-Rate = str | float | TimePattern | None
+Rate = str | float | AxisPattern | None
 Stratifications = Mapping[str, Mapping[str, float]]
 """Stratification id to its categories and their fractions, in declaration order."""
 Conditions = Mapping[str, Mapping[str, str]]

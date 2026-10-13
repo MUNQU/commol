@@ -129,12 +129,10 @@ class EnsembleSelector:
         ]
         weights = [observation.weight for observation in self.problem.observed_data]
         normalization_factors = [
-            normalization[observation.compartment]
+            normalization[observation.label]
             for observation in self.problem.observed_data
         ]
-        series_ids = [
-            observation.compartment for observation in self.problem.observed_data
-        ]
+        series_ids = [observation.label for observation in self.problem.observed_data]
         rust_candidates = [
             commol_rs.calibration.CalibrationEvaluation(
                 candidate.parameters,
@@ -223,12 +221,12 @@ class EnsembleSelector:
         """Build compact metric points for observed outputs only."""
         metric_points = []
         for obs in self.problem.observed_data:
-            output_ids = obs.compartments or [obs.compartment]
+            output_ids = obs.observed_outputs
             for output_id in output_ids:
                 output_idx = self._simulation_output_to_idx[output_id]
-                metric_points.append((obs.step, output_idx))
-                if obs.window_steps is not None:
-                    metric_points.append((obs.step - obs.window_steps, output_idx))
+                metric_points.append((obs.at, output_idx))
+                if obs.window is not None:
+                    metric_points.append((obs.at - obs.window, output_idx))
         return metric_points
 
     @staticmethod
@@ -251,18 +249,18 @@ class EnsembleSelector:
         """Build aggregate/window/scale transforms for each observation."""
         observation_specs: list[ObservationSpec] = []
         for obs in self.problem.observed_data:
-            output_ids = obs.compartments or [obs.compartment]
+            output_ids = obs.observed_outputs
             observation_components = []
             for output_id in output_ids:
                 output_idx = self._simulation_output_to_idx[output_id]
-                current_point_idx = point_to_compact_idx[(obs.step, output_idx)]
+                current_point_idx = point_to_compact_idx[(obs.at, output_idx)]
                 previous_point_idx = (
-                    point_to_compact_idx[(obs.step - obs.window_steps, output_idx)]
-                    if obs.window_steps is not None
+                    point_to_compact_idx[(obs.at - obs.window, output_idx)]
+                    if obs.window is not None
                     else None
                 )
                 observation_components.append((current_point_idx, previous_point_idx))
-            observation_specs.append((observation_components, obs.scale_id))
+            observation_specs.append((observation_components, obs.factor_id))
         return observation_specs
 
     def _generate_compact_predictions(
@@ -300,7 +298,7 @@ class EnsembleSelector:
             }
             compact_rows = [
                 [
-                    self._scale_observation_value(
+                    self._apply_factor(
                         sum(
                             predictions[current_idx]
                             - (
@@ -310,12 +308,12 @@ class EnsembleSelector:
                             )
                             for current_idx, previous_idx in observation_components
                         ),
-                        scale_id,
+                        factor_id,
                         rep.parameters,
                         parameter_indices,
                     )
                 ]
-                for observation_components, scale_id in observation_specs
+                for observation_components, factor_id in observation_specs
             ]
             result.append(
                 CalibrationEvaluation(
@@ -329,19 +327,19 @@ class EnsembleSelector:
         return result
 
     @staticmethod
-    def _scale_observation_value(
+    def _apply_factor(
         value: float,
-        scale_id: str | None,
+        factor_id: str | None,
         parameters: list[float],
         parameter_indices: dict[str, int],
     ) -> float:
-        if scale_id is None:
+        if factor_id is None:
             return value
         try:
-            scale_idx = parameter_indices[scale_id]
+            factor_idx = parameter_indices[factor_id]
         except KeyError as exc:
             raise ValueError(
-                f"Scale parameter '{scale_id}' is not present in calibration "
+                f"Factor parameter '{factor_id}' is not present in calibration "
                 "evaluation parameter names."
             ) from exc
-        return value * parameters[scale_idx]
+        return value * parameters[factor_idx]

@@ -140,13 +140,13 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Engine trait on positions (D2); each engine checks its positions; remove C1–C3; a benchmark test of `run(n)` against `run_at` on the full grid | direct | |
-| T2 | S2 | Results with positions (D1), in `Simulation` and the ensemble predictions | direct | |
-| T3 | S3 | Windows, reports, plots and ensemble statistics by position; window grid into `windows.py` | direct | |
-| T4 | S4 | Time-series parameters at `float` positions (D4); restarts at their points | direct | |
-| T5 | S5 | `window` and `linear_ramp` on `t` with `float` bounds | direct | |
-| T6 | S6 | Names (D3, L7, L8); `extra="forbid"` on every public Pydantic class, with a test over `commol.__all__`; docs, API pages, design decisions, changelog | direct | |
-| T7 | all | Final audit: every runner | direct | |
+| T1 | S1 | Engine trait on positions (D2); each engine checks its positions; remove C1–C3; a benchmark test of `run(n)` against `run_at` on the full grid | direct | done (`729894c`) |
+| T2 | S2 | Results with positions (D1), in `Simulation` and the ensemble predictions | direct | done (`729894c`) |
+| T3 | S3 | Windows, reports, plots and ensemble statistics by position; window grid into `windows.py` | direct | done (`729894c`) |
+| T4 | S4 | Time-series parameters at `float` positions (D4); restarts at their points | direct | done (`729894c`) |
+| T5 | S5 | `window` and `linear_ramp` on `t` with `float` bounds | direct | done (`729894c`) |
+| T6 | S6 | Names (D3, L7, L8); `extra="forbid"` on every public Pydantic class, with a test over `commol.__all__`; docs, API pages, design decisions, changelog | direct | done (`729894c`) |
+| T7 | all | Final audit: every runner | direct | done (`729894c`) |
 
 ## Delivery
 
@@ -159,7 +159,18 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Branch `refactor/axis-positions` from `develop` at `a001e2a`, 2026-10-13.
+
+| Spec | Evidence |
+|---|---|
+| S1 | Trait: `check_position`, `run_at_positions_into_buffer` (required), `run_at`, `grid`, `run(n) -> Trajectory`, `current_position`; `run_into_buffer`, `run_at_steps_into_buffer` and `integer_steps` gone (`crates/commol-core/src/simulation_engine.rs`). The difference engine keeps its integer loop as `record_steps`. Names in messages: `crates/commol-calibration/tests/test_positions.rs` (6 tests: observation, window start, constraint, negative position), `commol-difference` `integer_positions_are_accepted_and_others_rejected`, `unsorted_or_past_positions_are_rejected`. C1–C3 removed: `check_steps_for_typology`, the impulse loop of `Dynamics`, the checks of `Simulation.run_at`; `Calibrator` calls `engine_state.check_positions` (binding `calibration.check_positions`). Python tests expect the engine's messages (`tests/calibration/test_observations.py::TestPositionsAndTypology`, `tests/transitions/test_impulses.py`). |
+| S1 benchmark | `crates/commol-differential/src/tests.rs::benchmark_run_against_run_at` (difference model, 150 states, best of 40): `run(2000)` 3.90–4.71 ms, `run_at` on the full grid 4.51–4.66 ms; `develop` at `a001e2a`, same benchmark: `run(2000)` 3.94–4.61 ms, full grid 3.82–4.51 ms. The spread between runs (±10 %) is larger than any difference. |
+| S2 | `SimulationResults` (`py-commol/commol/api/results.py`); `tests/simulation/test_runs.py::TestResults` (positions `0…n`, `rows()`, `json`), `tests/simulation/test_differential.py::TestRunAt::test_results_hold_the_requested_positions`; every existing read of `results["A"]` passes. Ensembles: `generate_*predictions_parallel` take positions; `EnsembleSolution.prediction_positions`. |
+| S3 | `api/windows.py` (`window_start/end/index/ends`, `windowed_totals(series, positions, window, at)`); `TimeScale` window methods gone; `isinstance(step, int)` and `_as_step` gone. `tests/reporting/test_simulation_report.py::TestNonIntegerPositions` (a window of 2.5 matches `run_at`), `test_observed_report_places_each_observation_by_window_index`, `tests/plotting/test_plotter.py::TestDifferentialModel::test_a_window_of_non_whole_steps_draws_its_increments`, `tests/simulation/test_windows.py::TestWindowGrid`. Difference models: every existing report, window and plot test passes unchanged in its values. |
+| S4 | `SeriesParameter` (`crates/commol-model/src/types.rs`), `CompiledModel::series_points`, `first_non_integer_series_point`. `a_linear_series_matches_the_integral_of_its_interpolant` (A(t) = 1000 e^(−t²/20), rel 1e-7), `a_step_function_series_holds_from_a_position_between_steps`, `a_difference_engine_names_a_series_point_between_steps`, `a_difference_engine_reads_a_linear_series_at_its_steps`; Python `tests/building/test_parameters.py::TestSeriesParameters` (A(10) = 1000 e^−5 = 6.738, the L5 case). The `building-models.md` example prints the same three difference series as before. |
+| S5 | `tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration::test_an_interval_opens_between_steps` (1000 e^(−0.75)), `test_a_ramp_matches_its_integral` (1000 e^(−0.005 t²)); every existing pattern run test passes unchanged. |
+| S6 | Renames of D3, L7, L8 in code, tests and docs; the search for the old names finds them only in the changelog, `odd/` and the tests that check the error naming them. `tests/building/test_unknown_fields.py` (every Pydantic class of `commol.__all__` forbids unknown fields; `window_steps=7` and `time_steps=` are named). |
+| T7 | `cargo test` (5 crates): 227 passed. `cargo clippy --workspace --all-targets -D warnings`, `cargo fmt --check`, `RUSTDOCFLAGS="-D warnings" cargo doc`: clean. `pytest`: 944 passed (incl. docs), 4 xfailed. `pytest -m docs`: 60 passed. `ruff check`, `ruff format --check`, `ty check commol`, `vulture`: clean. `mkdocs build --strict`: built. |
 
 ## Log
 
@@ -201,3 +212,21 @@ Each row says why the recommendation beats each alternative.
   fields silently (`ObservedDataPoint(…, window=7)` drops `window` today);
   only the six probabilistic configs set `extra="forbid"`. Approved
   `extra="forbid"` on every public Pydantic class, which also catches typos.
+- L11 (agent, 2026-10-13, T4): a step-function series at 2.5 moved
+  `3·10⁻⁸` of the state before 2.5 in a differential model: a Runge–Kutta
+  step evaluates the right-hand side at the end of its interval, where the
+  series had already jumped. The same held for the thresholds of PR #102. Fix:
+  on a piece `[start, end)` the right-hand side sees `t ≤ end.next_down()`
+  (`RightHandSide::last_t`), and the Jacobian cache is cleared per piece.
+- L12 (agent, 2026-10-13, T6): reading of L7 for observations: `output` (one
+  output) or `outputs` (a sum, which needs a `label`); `label` names the series
+  everywhere and defaults to `output`. Rust `ObservedDataPoint` holds `label`
+  and `outputs` (always a list). The Rust constraint field is `at`,
+  `with_positions` its builder.
+- L13 (agent, 2026-10-13, T6): consequences of `extra="forbid"`: a model file
+  with the removed `condition` key now fails and names it (the test that
+  loaded it now expects the error); a test passed `seed=` to
+  `ParticleSwarmConfig`, which dropped it with no error; the test now relies on
+  the problem's seed.
+- L14 (user, 2026-10-13): approved the implementation; committed as
+  `729894c`, PR #104 to `develop`, and the ODD archived in the same PR.

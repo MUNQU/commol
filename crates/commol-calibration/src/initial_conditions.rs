@@ -190,7 +190,7 @@ impl InitialConditionPlan {
     /// Parameters are set by id. Initial conditions are written layer by layer
     /// (bins, category splits, exact compartments) and then the remainder
     /// takes the difference to the population size, keeping its own split.
-    /// Scale values are skipped because they apply to observations.
+    /// Factor values are skipped because they apply to observations.
     ///
     /// # Returns
     ///

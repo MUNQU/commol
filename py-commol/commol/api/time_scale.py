@@ -36,7 +36,7 @@ class TimeScale(BaseModel):
         Duration represented by one simulation step, in seconds.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     step_seconds: float = Field(
         gt=0.0, description="Duration of one simulation step, in seconds."
@@ -206,92 +206,3 @@ class TimeScale(BaseModel):
         if period_steps <= 0:
             raise ValueError(f"period_steps must be positive, got {period_steps}.")
         return 1.0 - (1.0 - probability) ** (1.0 / period_steps)
-
-    def window_start(self, index: int, period_steps: int) -> int:
-        """
-        First step of a window.
-
-        Parameters
-        ----------
-        index : int
-            Zero-based window index.
-        period_steps : int
-            Length of one window, in steps.
-
-        Returns
-        -------
-        int
-            Step at which the window opens.
-
-        Raises
-        ------
-        ValueError
-            If `period_steps` is not positive or `index` is negative.
-        """
-        self._validate_window(index, period_steps)
-        return index * period_steps
-
-    def window_end(self, index: int, period_steps: int) -> int:
-        """
-        Step closing a window.
-
-        The window covers ``(window_start(index), window_end(index)]``, so a
-        quantity observed over it is the change between those two steps.
-
-        Parameters
-        ----------
-        index : int
-            Zero-based window index.
-        period_steps : int
-            Length of one window, in steps.
-
-        Returns
-        -------
-        int
-            Step at which the window closes, equal to the start of the next.
-
-        Raises
-        ------
-        ValueError
-            If `period_steps` is not positive or `index` is negative.
-        """
-        self._validate_window(index, period_steps)
-        return (index + 1) * period_steps
-
-    def window_index(self, step: int, period_steps: int) -> int:
-        """
-        Window a step belongs to.
-
-        The exact inverse of :meth:`window_end`, and the containing window for
-        any step in between. Step 0 belongs to window 0.
-
-        Parameters
-        ----------
-        step : int
-            Simulation step.
-        period_steps : int
-            Length of one window, in steps.
-
-        Returns
-        -------
-        int
-            Zero-based window index.
-
-        Raises
-        ------
-        ValueError
-            If `period_steps` is not positive or `step` is negative.
-        """
-        if step < 0:
-            raise ValueError(f"step must not be negative, got {step}.")
-        if period_steps <= 0:
-            raise ValueError(f"period_steps must be positive, got {period_steps}.")
-        return max(step - 1, 0) // period_steps
-
-    @staticmethod
-    def _validate_window(index: int, period_steps: int) -> None:
-        """Reject a negative window index or a non-positive period."""
-        if index < 0:
-            raise ValueError(f"index must not be negative, got {index}.")
-        if period_steps <= 0:
-            raise ValueError(f"period_steps must be positive, got {period_steps}.")

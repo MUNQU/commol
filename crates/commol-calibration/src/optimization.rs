@@ -62,7 +62,7 @@ pub struct NelderMeadConfig {
     /// width. Each vertex moves one parameter by this fraction from the start
     /// value (towards the farther bound when the step would leave the bounds).
     /// Must be in (0, 1]; defaults to 0.1.
-    pub initial_step: f64,
+    pub initial_simplex_size: f64,
 
     /// Reflection parameter (alpha)
     /// Must be > 0, defaults to 1.0
@@ -89,7 +89,7 @@ impl Default for NelderMeadConfig {
         Self {
             max_iterations: 1000,
             sd_tolerance: 1e-6,
-            initial_step: 0.1,
+            initial_simplex_size: 0.1,
             alpha: None, // Use argmin's default: 1.0
             gamma: None, // Use argmin's default: 2.0
             rho: None,   // Use argmin's default: 0.5
@@ -118,8 +118,8 @@ impl NelderMeadConfig {
     }
 
     /// Set the size of the initial simplex, as a fraction of the bound width
-    pub fn with_initial_step(mut self, initial_step: f64) -> Self {
-        self.initial_step = initial_step;
+    pub fn with_initial_simplex_size(mut self, initial_simplex_size: f64) -> Self {
+        self.initial_simplex_size = initial_simplex_size;
         self
     }
 
@@ -703,13 +703,13 @@ fn build_nelder_mead_solver(
     initial_params: &[f64],
     config: &NelderMeadConfig,
 ) -> Result<NelderMead<Vec<f64>, f64>, String> {
-    if !(config.initial_step > 0.0 && config.initial_step <= 1.0) {
+    if !(config.initial_simplex_size > 0.0 && config.initial_simplex_size <= 1.0) {
         return Err(format!(
-            "initial_step must be in (0, 1], got {}",
-            config.initial_step
+            "initial_simplex_size must be in (0, 1], got {}",
+            config.initial_simplex_size
         ));
     }
-    let vertices = transform.initial_simplex(initial_params, config.initial_step);
+    let vertices = transform.initial_simplex(initial_params, config.initial_simplex_size);
 
     // Build solver with configuration
     let mut solver = NelderMead::new(vertices)

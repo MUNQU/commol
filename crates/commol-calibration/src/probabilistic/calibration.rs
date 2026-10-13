@@ -169,10 +169,11 @@ enum PredictionError {
 /// * `base_engine` - Base simulation engine (will be cloned for each parameter set)
 /// * `parameter_sets` - Vector of parameter values for each parameter set
 /// * `parameter_names` - Names of parameters (must match engine parameter names)
-/// * `time_steps` - Number of time steps to simulate
+/// * `positions` - Sorted, unique positions on the axis to report at
 ///
 /// # Returns
-/// Vector of predictions, where each prediction is a 2D array `[time_step][compartment_idx]`
+/// Vector of predictions, where each prediction is a 2D array
+/// `[position_idx][output_idx]`, aligned with `positions`
 ///
 /// # Errors
 /// - `CalibrationError::ParameterSetFailed` if setting a parameter fails
@@ -181,7 +182,7 @@ pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
     base_engine: &E,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
-    time_steps: u32,
+    positions: Vec<f64>,
 ) -> CalibrationResult<Vec<Vec<Vec<f64>>>> {
     // Run simulations in parallel using Rayon
     let predictions: Vec<Result<Vec<Vec<f64>>, PredictionError>> = parameter_sets
@@ -203,9 +204,9 @@ pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
                 })?;
             }
 
-            // Run simulation - this returns [time_step][compartment]
+            // Run simulation - this returns [position][output]
             engine
-                .run(time_steps)
+                .run_at(&positions)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))
         })
         .collect();
@@ -229,10 +230,12 @@ pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
 
 /// Generate predictions for calibration parameter sets, applying both model
 /// parameters and calibrated initial conditions.
+///
+/// Each prediction holds one row per position, aligned with `positions`.
 pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Sync>(
     base_problem: &CalibrationProblem<E>,
     parameter_sets: Vec<Vec<f64>>,
-    time_steps: u32,
+    positions: Vec<f64>,
 ) -> CalibrationResult<Vec<Vec<Vec<f64>>>> {
     let predictions: Vec<Result<Vec<Vec<f64>>, PredictionError>> = parameter_sets
         .par_iter()
@@ -245,7 +248,7 @@ pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Syn
             })?;
 
             engine
-                .run(time_steps)
+                .run_at(&positions)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))
         })
         .collect();
@@ -262,15 +265,18 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
     parameter_names: Vec<String>,
     metric_points: Vec<(f64, usize)>,
 ) -> CalibrationResult<Vec<Vec<f64>>> {
-    let mut time_steps: Vec<f64> = metric_points.iter().map(|&(step, _)| step).collect();
-    time_steps.sort_by(f64::total_cmp);
-    time_steps.dedup();
+    let mut positions: Vec<f64> = metric_points
+        .iter()
+        .map(|&(position, _)| position)
+        .collect();
+    positions.sort_by(f64::total_cmp);
+    positions.dedup();
 
     let point_time_indices: Vec<usize> = metric_points
         .iter()
-        .map(|&(step, _)| {
-            time_steps
-                .binary_search_by(|candidate| candidate.total_cmp(&step))
+        .map(|&(position, _)| {
+            positions
+                .binary_search_by(|candidate| candidate.total_cmp(&position))
                 .expect("metric point time step must be present")
         })
         .collect();
@@ -290,9 +296,9 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
                 })?;
             }
 
-            let mut sparse_results = Vec::with_capacity(time_steps.len());
+            let mut sparse_results = Vec::with_capacity(positions.len());
             engine
-                .run_at_positions_into_buffer(&time_steps, &mut sparse_results)
+                .run_at_positions_into_buffer(&positions, &mut sparse_results)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
 
             metric_points
@@ -337,15 +343,18 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
     parameter_sets: Vec<Vec<f64>>,
     metric_points: Vec<(f64, usize)>,
 ) -> CalibrationResult<Vec<Vec<f64>>> {
-    let mut time_steps: Vec<f64> = metric_points.iter().map(|&(step, _)| step).collect();
-    time_steps.sort_by(f64::total_cmp);
-    time_steps.dedup();
+    let mut positions: Vec<f64> = metric_points
+        .iter()
+        .map(|&(position, _)| position)
+        .collect();
+    positions.sort_by(f64::total_cmp);
+    positions.dedup();
 
     let point_time_indices: Vec<usize> = metric_points
         .iter()
-        .map(|&(step, _)| {
-            time_steps
-                .binary_search_by(|candidate| candidate.total_cmp(&step))
+        .map(|&(position, _)| {
+            positions
+                .binary_search_by(|candidate| candidate.total_cmp(&position))
                 .expect("metric point time step must be present")
         })
         .collect();
@@ -360,9 +369,9 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
                 }
             })?;
 
-            let mut sparse_results = Vec::with_capacity(time_steps.len());
+            let mut sparse_results = Vec::with_capacity(positions.len());
             engine
-                .run_at_positions_into_buffer(&time_steps, &mut sparse_results)
+                .run_at_positions_into_buffer(&positions, &mut sparse_results)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
 
             metric_points

@@ -13,8 +13,9 @@
 //!
 //! The following variables are automatically available in all expressions:
 //! - `N` - Total population (sum of all compartments)
-//! - `step` - Current simulation step number
-//! - `t` - Alias for `step` (for convenience in time-dependent formulas)
+//! - `step` - The step that holds the current position, `floor(t)`
+//! - `t` - The current position on the axis; equal to `step` in a difference
+//!   engine, continuous in a differential engine
 //! - `pi` - Mathematical constant π (≈ 3.14159)
 //! - `e` - Mathematical constant e (≈ 2.71828)
 //!

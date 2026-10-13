@@ -1,5 +1,7 @@
 """A Simulation runs from the initial state of the model as it is now."""
 
+import json
+
 import pytest
 
 from commol import (
@@ -49,22 +51,33 @@ I = 10 + 99 - 0.5 = 108.5 and R = 0.5.
 """
 
 
-class TestOutputFormats:
-    def test_dict_of_lists_is_the_default(self) -> None:
+class TestResults:
+    def test_results_map_each_output_to_its_values(self) -> None:
         result = Simulation(_per_capita_sir()).run(10)
 
+        assert isinstance(result, dict)
         assert list(result) == ["S", "I", "R"]
         assert_close(result, PER_CAPITA_SIR, rel=ENGINE_REL)
         assert result["I"][1] == pytest.approx(108.5)
         assert_population_conserved(result, 1000.0)
 
-    def test_list_of_lists_has_one_row_per_step(self) -> None:
-        rows = Simulation(_per_capita_sir()).run(10, output_format="list_of_lists")
+    def test_a_run_holds_the_positions_of_its_grid(self) -> None:
+        result = Simulation(_per_capita_sir()).run(10)
+
+        assert result.positions == [float(step) for step in range(11)]
+
+    def test_rows_give_every_output_at_each_position(self) -> None:
+        rows = Simulation(_per_capita_sir()).run(10).rows()
 
         assert len(rows) == 11
         for step, row in enumerate(rows):
             expected = [PER_CAPITA_SIR[name][step] for name in ("S", "I", "R")]
             assert_close(row, expected, rel=ENGINE_REL)
+
+    def test_results_serialize_as_a_mapping(self) -> None:
+        result = Simulation(_per_capita_sir()).run(2)
+
+        assert json.loads(json.dumps(result)) == dict(result)
 
     def test_a_run_with_an_uncalibrated_parameter_is_rejected(self) -> None:
         simulation = Simulation(
@@ -94,7 +107,7 @@ class TestRepeatableRuns:
         result = simulation.run(5)
 
         assert result["A"][0] == 1000.0
-        assert simulation.engine.current_step() == 5
+        assert simulation.engine.current_position() == 5
 
     def test_the_engine_continues_a_run(self) -> None:
         simulation = Simulation(_model())
@@ -144,7 +157,7 @@ class TestModelChanges:
         model.update_parameters({"k": None})
         problem = CalibrationProblem(
             observed_data=[
-                ObservedDataPoint(step=step, compartment="A", value=truth["A"][step])
+                ObservedDataPoint(at=step, output="A", value=truth["A"][step])
                 for step in range(1, 11)
             ],
             parameters=[

@@ -348,8 +348,8 @@ class TestCompositeStateCalibration:
         problem = CalibrationProblem(
             observed_data=[
                 ObservedDataPoint(
-                    step=step,
-                    compartment="IH_oe60_hosp",
+                    at=step,
+                    output="IH_oe60_hosp",
                     value=observed["IH_oe60_hosp"][step],
                 )
                 for step in range(1, 10)
@@ -400,7 +400,7 @@ def _split_problem() -> CalibrationProblem:
     observed_series = Simulation(truth).run(20)
     return CalibrationProblem(
         observed_data=[
-            ObservedDataPoint(step=step, compartment=output, value=values[step])
+            ObservedDataPoint(at=step, output=output, value=values[step])
             for output, values in observed_series.items()
             for step in range(1, 20)
         ],
@@ -441,7 +441,7 @@ class TestApplyCalibrationParameters:
 
         replayed = Simulation(model).run(20)
         recomputed_loss = sum(
-            (replayed[point.compartment][point.step] - point.value) ** 2
+            (replayed[point.label][int(point.at)] - point.value) ** 2
             for point in problem.observed_data
         )
 
@@ -482,7 +482,7 @@ class TestApplyCalibrationParameters:
         problem.parameters.append(
             CalibrationParameter(
                 id="reporting_rate",
-                parameter_type="scale",
+                parameter_type="factor",
                 min_bound=0.01,
                 max_bound=1.0,
             )

@@ -967,7 +967,7 @@ mod jit_tests {
 
     #[test]
     fn test_jit_floor_of_negative_value() {
-        // _PeriodicTimePattern with offset>0 substitutes `step - O`, which is
+        // _PeriodicAxisPattern with offset>0 substitutes `step - O`, which is
         // negative for any `step < O`. The floor of a negative quotient must
         // return the next-lower integer (e.g. floor(-3.0 / 7.0) == -1).
         let compiler = JITCompiler::new().unwrap();

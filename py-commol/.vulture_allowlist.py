@@ -8,6 +8,8 @@ EngineProtocol
 RustModelProtocol
 CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
+CalibrationConstraintProtocol
+ObservedDataPointProtocol
 CalibrationResultWithHistoryProtocol
 LossConfigProtocol
 OptimizationConfigProtocol

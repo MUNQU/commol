@@ -10,17 +10,17 @@ fn test_constraint_creation() {
     assert_eq!(constraint.expression, "5.0 - beta/gamma");
     assert_eq!(constraint.weight, 1.0);
     assert!(constraint.is_parameter_only());
-    assert!(!constraint.is_time_dependent());
+    assert!(!constraint.has_positions());
 }
 
 #[test]
-fn test_constraint_with_time_steps() {
+fn test_constraint_with_positions() {
     let constraint = CalibrationConstraint::new("time_test".to_string(), "500.0 - I".to_string())
-        .with_time_steps(vec![10.0, 20.0, 30.0]);
+        .with_positions(vec![10.0, 20.0, 30.0]);
 
-    assert!(constraint.is_time_dependent());
+    assert!(constraint.has_positions());
     assert!(!constraint.is_parameter_only());
-    assert_eq!(constraint.time_steps, Some(vec![10.0, 20.0, 30.0]));
+    assert_eq!(constraint.at, Some(vec![10.0, 20.0, 30.0]));
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_constraint_with_special_variables() {
     // Constraints can reference special variables like N, step, t, pi, e
     let constraint =
         CalibrationConstraint::new("time_dependent".to_string(), "N - 1000.0".to_string())
-            .with_time_steps(vec![10.0]);
+            .with_positions(vec![10.0]);
 
     let expr = MathExpression::new(constraint.expression.clone());
     assert!(expr.validate().is_ok());
@@ -114,7 +114,7 @@ fn test_constraint_builder_pattern() {
         CalibrationConstraint::new("complex".to_string(), "5.0 - beta/gamma".to_string())
             .with_description("R0 must be less than 5".to_string())
             .with_weight(2.5)
-            .with_time_steps(vec![10.0, 20.0, 30.0]);
+            .with_positions(vec![10.0, 20.0, 30.0]);
 
     assert_eq!(constraint.id, "complex");
     assert_eq!(constraint.expression, "5.0 - beta/gamma");
@@ -123,6 +123,6 @@ fn test_constraint_builder_pattern() {
         Some("R0 must be less than 5".to_string())
     );
     assert_eq!(constraint.weight, 2.5);
-    assert_eq!(constraint.time_steps, Some(vec![10.0, 20.0, 30.0]));
-    assert!(constraint.is_time_dependent());
+    assert_eq!(constraint.at, Some(vec![10.0, 20.0, 30.0]));
+    assert!(constraint.has_positions());
 }

@@ -121,7 +121,7 @@ class TestConverged:
     def test_a_particle_swarm_that_hits_max_iterations_did_not_converge(
         self,
     ) -> None:
-        config = ParticleSwarmConfig(num_particles=5, max_iterations=3, seed=1)
+        config = ParticleSwarmConfig(num_particles=5, max_iterations=3)
 
         result = _calibrate(_k_problem(config))
 
@@ -151,6 +151,6 @@ class TestNelderMeadInsideBounds:
         assert 0.5 <= result.best_parameters["k"] <= 0.9
         assert result.best_parameters["k"] == pytest.approx(0.5, abs=1e-3)
 
-    def test_initial_step_must_be_a_fraction_of_the_width(self) -> None:
-        with pytest.raises(ValueError, match="initial_step"):
-            NelderMeadConfig(initial_step=1.5)
+    def test_initial_simplex_size_must_be_a_fraction_of_the_width(self) -> None:
+        with pytest.raises(ValueError, match="initial_simplex_size"):
+            NelderMeadConfig(initial_simplex_size=1.5)

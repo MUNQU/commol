@@ -33,8 +33,16 @@ macro_rules! dispatch {
 }
 
 impl SimulationEngine for Engine {
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        dispatch!(self, engine => SimulationEngine::run(engine, num_steps))
+    fn check_position(&self, position: f64) -> Result<(), String> {
+        dispatch!(self, engine => engine.check_position(position))
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        dispatch!(self, engine => engine.run_at_positions_into_buffer(positions, buffer))
     }
 
     fn step(&mut self) -> Result<(), String> {
@@ -69,32 +77,8 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.get_parameters())
     }
 
-    fn current_step(&self) -> f64 {
-        dispatch!(self, engine => engine.current_step())
-    }
-
-    fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        dispatch!(self, engine => engine.run_into_buffer(num_steps, buffer))
-    }
-
-    fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        dispatch!(self, engine => engine.run_at_steps_into_buffer(time_steps, buffer))
-    }
-
-    fn run_at_positions_into_buffer(
-        &mut self,
-        positions: &[f64],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        dispatch!(self, engine => engine.run_at_positions_into_buffer(positions, buffer))
+    fn current_position(&self) -> f64 {
+        dispatch!(self, engine => engine.current_position())
     }
 
     fn set_initial_condition(
@@ -156,38 +140,56 @@ macro_rules! engine_class {
                 })
             }
 
-            /// Run the simulation for a given number of steps
+            /// Run on the default grid of a number of steps
             ///
             /// Args:
             ///     num_steps: Number of steps to simulate
             ///
             /// Returns:
-            ///     One output row per step, from the current one (included)
-            fn run(&mut self, num_steps: u32) -> PyResult<Vec<Vec<f64>>> {
-                commol_core::SimulationEngine::run(&mut self.inner, num_steps)
-                    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+            ///     The positions of the grid, from the current one (included)
+            ///     one unit apart, and one output row per position
+            fn run(&mut self, num_steps: u32) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
+                let trajectory = commol_core::SimulationEngine::run(&mut self.inner, num_steps)
+                    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+                Ok((trajectory.positions, trajectory.rows))
             }
 
             /// Run through the last of the given positions on the axis
             ///
             /// Args:
-            ///     positions: Sorted, unique positions to report at
+            ///     positions: Sorted, unique positions to report at, not before
+            ///         the current one
             ///
             /// Returns:
             ///     One output row per position
             ///
             /// Raises:
-            ///     RuntimeError: If a position is not valid for the engine (a
-            ///         difference engine reports only at integer steps)
+            ///     ValueError: If a position is not valid for the engine (a
+            ///         difference engine reports only at integer steps), or the
+            ///         positions are not sorted and unique
+            ///     RuntimeError: If the simulation fails
             fn run_at(&mut self, positions: Vec<f64>) -> PyResult<Vec<Vec<f64>>> {
-                let mut buffer = Vec::with_capacity(positions.len());
-                commol_core::SimulationEngine::run_at_positions_into_buffer(
-                    &mut self.inner,
+                let engine = &mut self.inner;
+                commol_core::check_positions(
                     &positions,
-                    &mut buffer,
+                    commol_core::SimulationEngine::current_position(engine),
+                    |position| commol_core::SimulationEngine::check_position(engine, position),
                 )
-                .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
-                Ok(buffer)
+                .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+                commol_core::SimulationEngine::run_at(engine, &positions)
+                    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+            }
+
+            /// Check that the engine can report at a position on the axis
+            ///
+            /// Args:
+            ///     position: A position on the axis
+            ///
+            /// Raises:
+            ///     ValueError: If the engine's model type does not report there
+            fn check_position(&self, position: f64) -> PyResult<()> {
+                commol_core::SimulationEngine::check_position(&self.inner, position)
+                    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
             }
 
             /// Advance one step
@@ -235,8 +237,8 @@ macro_rules! engine_class {
             }
 
             /// Current position on the axis
-            fn current_step(&self) -> f64 {
-                commol_core::SimulationEngine::current_step(&self.inner)
+            fn current_position(&self) -> f64 {
+                commol_core::SimulationEngine::current_position(&self.inner)
             }
 
             /// Set the initial condition for a specific compartment
@@ -262,10 +264,10 @@ macro_rules! engine_class {
 
             fn __repr__(&self) -> String {
                 format!(
-                    "{}(compartments={}, step={})",
+                    "{}(compartments={}, position={})",
                     $name,
                     commol_core::SimulationEngine::compartments(&self.inner).len(),
-                    commol_core::SimulationEngine::current_step(&self.inner)
+                    commol_core::SimulationEngine::current_position(&self.inner)
                 )
             }
         }

@@ -5,7 +5,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 from commol.context.model import Model
 from tests.support import TIGHT, assert_close, build, build_ode
 
@@ -109,9 +109,11 @@ class TestDefinition:
         assert transition.impulse_every == (7.5, 0.5)
         assert transition.is_impulse
 
-    def test_a_difference_impulse_needs_integer_positions(self) -> None:
-        with pytest.raises(ValidationError, match="'jump'.*0.5"):
-            _impulse_model(ode=False, impulse_at=[0.5])
+    def test_a_difference_engine_names_an_impulse_between_steps(self) -> None:
+        model = _impulse_model(ode=False, impulse_at=[0.5])
+
+        with pytest.raises(RuntimeError, match="'jump' acts at 0.5"):
+            Simulation(model)
 
     def test_impulse_at_and_impulse_every_exclude_each_other(self) -> None:
         with pytest.raises(ValidationError, match="not both"):
@@ -128,12 +130,12 @@ class TestDefinition:
         builder = ModelBuilder(name="m")
         builder.add_bin("A", "A").add_bin("B", "B")
 
-        with pytest.raises(ValueError, match="not a TimePattern"):
+        with pytest.raises(ValueError, match="not a AxisPattern"):
             builder.add_transition(
                 "t",
                 ["A"],
                 ["B"],
-                rate=TimePattern.pulse(at=1, amount=0.1),
+                rate=AxisPattern.pulse(at=1, amount=0.1),
                 impulse_at=[1],
             )
 

@@ -54,7 +54,7 @@ def model(k1: float | None, k2: float | None):
 
 truth = Simulation(model(0.4, 0.1)).run(num_steps=50)
 observed_data = [
-    ObservedDataPoint(step=step, compartment="B", value=truth["B"][step])
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step])
     for step in range(5, 51, 5)
 ]
 
@@ -81,7 +81,7 @@ print(calibrate(ParticleSwarmConfig(num_particles=30, max_iterations=300)))  # {
 nelder_mead = NelderMeadConfig(
     max_iterations=1000,
     sd_tolerance=1e-6,
-    initial_step=0.1,
+    initial_simplex_size=0.1,
     alpha=1.0,
     gamma=2.0,
     rho=0.5,
@@ -96,7 +96,7 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 |---|---|---|
 | `max_iterations` | `1000` | The iteration limit. |
 | `sd_tolerance` | `1e-6` | Stops when the spread of the simplex values falls below it. |
-| `initial_step` | `0.1` | The size of the first simplex: each vertex moves one unknown by this fraction of its bound width, towards the farther bound. In (0, 1]. |
+| `initial_simplex_size` | `0.1` | The size of the first simplex: each vertex moves one unknown by this fraction of its bound width, towards the farther bound. In (0, 1]. |
 | `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients. |
 | `verbose` | `False` | Prints a progress table. |
 | `header_interval` | `100` | With `verbose`, repeats the table header every this many iterations. |
