@@ -71,9 +71,12 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
 - Fix: `diffsol` (pinned minor version, default features) solves the system;
   commol keeps no numerical method of its own. The right-hand side of S1 is the
   `rhs` closure. Methods: `tsit45` (explicit, the default) and `bdf` (stiff).
-  The engine integrates each unit interval `[n, n + 1]` on its own, so every
-  output time and every discontinuity of a time-series parameter or a time
-  pattern is a step boundary.
+  The engine integrates in pieces and restarts the solver at the start of each
+  one (D12): a piece ends at every impulse step and at the last output, and
+  also at every integer when a rate or a formula parameter reads `step` or a
+  time series (`CompiledModel::depends_on_step`). So every discontinuity of the
+  right-hand side is the start of a piece. Outputs inside a piece come from
+  the dense output of `diffsol`.
 - Facts (probe on diffsol 0.17.1, 2026-10-13): it builds with `maturin`'s
   toolchain and needs no system library; `tsit45` and `bdf` agree on an SIR
   run to 8 digits (final-size residual 6.7e-8). `rhs_implicit` also takes a
@@ -215,6 +218,7 @@ Each row says why the recommendation beats each alternative.
 | D9 | S9 | In step `n`, does the jump come before or after the flows? | Before: at time `n` the state jumps, then the step `[n, n + 1)` runs from the new state, in both engines. | After: matches "the flows of step n see the old state", but then the ODE output at `n` would show the state before the jump while the difference output shows it after, so the two engines disagree at the output times. | approved (L10) |
 | D10 | S7 | How does an observation give a non-integer position on the axis? | `ObservedDataPoint.step` stays and accepts a float for an ODE model; a difference model requires an integer, and the error names the observation. `run_at(steps=[…])`. | The axis is the independent variable, not only time: `design-decisions.md` ("Physical time is not in the model") measures it in steps, so `step` is already neutral. `time`: false when the axis is not time. `at`: neutral too, but a rename with a deprecated alias for no gain. | approved (L12): `step: float`, no rename (replaces L11) |
 | D11 | S10 | How does the check know the axis unit? | Declared: `ModelBuilder(..., step_unit="meter")`, stored in the model, any single dimension; when absent, the current inference (`[time]` or `step`) applies, so existing models do not change. | Infer it from any dimension: ambiguous, because a parameter in `1/(person·meter)` may be a density, not a rate along the axis, and the check would guess. Always declare it: clear, but breaks every model with units today. | approved (L14): optional `step_unit` on `ModelBuilder`, inferred when absent |
+| D12 | S3 | Where does the engine restart the solver? | At impulse steps and the last output always, and at every integer only when the right-hand side reads `step` or a time series (`CompiledModel::depends_on_step`). | At every integer always (the first draft of S3): simpler to state, but a model whose rates never jump at integers pays a restart per unit, and `bdf` falls back to order 1 each time; results are the same within the tolerance. | approved (L18) |
 
 ## Tasks
 
@@ -259,12 +263,11 @@ Verified 2026-10-13 on `feat/ode-engine` (not committed), Apple M-series,
 - S3: closed forms (decay with both methods, logistic, linear 2×2, SIR final
   size residual < 1e-7, SIS equilibrium) within tolerance; stiff ratio 1e5
   over 100 time units with `bdf`: 1.2 ms, error < 1e-6 relative.
-- Deviation from S3, for review: the engine ends a piece of integration at
-  every integer only when a rate reads `step` or a time series
+- Piece rule (D12, approved in L18): the engine ends a piece of integration
+  at every integer only when a rate reads `step` or a time series
   (`CompiledModel::depends_on_step`), and always at impulse steps and at the
-  last output. Outputs between pieces come from the dense output. Results are
-  the same within the tolerance; a model without `step` restarts `bdf` once,
-  not once per unit.
+  last output. Results are the same within the tolerance; a model without
+  `step` restarts `bdf` once, not once per unit.
 - D7 benchmark (`benchmark_dense_against_sparse_bdf`, 50 time units, best of 3):
 
 | model | states | dense bdf (ms) | sparse bdf (ms) |
@@ -327,3 +330,7 @@ Verified 2026-10-13 on `feat/ode-engine` (not committed), Apple M-series,
 - L17 (user, 2026-10-13): `TimeScale` rate methods are discrete-time; this PR
   only warns (docstrings, `core-concepts.md`, `simulations.md`). The refactor
   is `odd/tasks/axis-scale-refactor.md`.
+- L18 (user, 2026-10-13): accepted the piece rule of the implementation (D12):
+  restart at every integer only when a rate reads `step` or a time series.
+  S3 rewritten. D7 (size threshold 128) stays as approved; a density-based
+  matrix rule is not part of this PR.
