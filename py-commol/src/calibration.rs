@@ -289,7 +289,7 @@ impl PyNelderMeadConfig {
     /// Args:
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     sd_tolerance: Convergence tolerance (default: 1e-6)
-    ///     simplex_perturbation: Multiplier for initial simplex vertices (default: 1.1 = 10% perturbation)
+    ///     initial_step: Size of the initial simplex, as a fraction of each bound width (default: 0.1)
     ///     alpha: Reflection coefficient (default: None, uses argmin's default)
     ///     gamma: Expansion coefficient (default: None, uses argmin's default)
     ///     rho: Contraction coefficient (default: None, uses argmin's default)
@@ -297,12 +297,12 @@ impl PyNelderMeadConfig {
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, simplex_perturbation=1.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
+    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_step=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
-        simplex_perturbation: f64,
+        initial_step: f64,
         alpha: Option<f64>,
         gamma: Option<f64>,
         rho: Option<f64>,
@@ -314,7 +314,7 @@ impl PyNelderMeadConfig {
             inner: commol_calibration::NelderMeadConfig {
                 max_iterations,
                 sd_tolerance,
-                simplex_perturbation,
+                initial_step,
                 alpha,
                 gamma,
                 rho,

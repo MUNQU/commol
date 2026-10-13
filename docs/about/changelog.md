@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error that names each parameter, because the engine converts nothing. Before,
   the check accepted any convertible unit and defaulted to `day`.
 
+- Nelder-Mead searches inside the bounds: it optimizes an unbounded
+  coordinate and scores `x = lo + (hi − lo)·(sin u + 1)/2`. Its first simplex
+  is set by `NelderMeadConfig.initial_step` (a fraction of each bound width,
+  default 0.1), which replaces `simplex_perturbation`; there is no alias. Every
+  Nelder-Mead result can change.
+
 ### Removed
 
 - Transition conditions: `Transition.condition`, the `condition` argument of
@@ -44,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which uses the weights.
 
 ### Fixed
+
+- `CalibrationResult.converged` is `True` only when the optimizer met its
+  convergence test or `target_cost`. Before, every finished run reported
+  `True`, also one that stopped at `max_iterations`.
+- Nelder-Mead from a start value of 0 builds a real simplex, and no longer
+  stops at a bound where the clamped loss is flat. Before, the simplex was
+  degenerate at 0, and could collapse on a bound and report `converged=True`.
+- The verbose Nelder-Mead run uses the configured simplex. Before, it always
+  used a 10% perturbation.
 
 - `Model.check_unit_consistency` names every bin without a unit. Before, it
   failed with "'None' is not defined in the unit registry".

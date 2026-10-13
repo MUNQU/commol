@@ -277,9 +277,11 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
-    simplex_perturbation : float
-        Multiplier for creating initial simplex vertices by perturbing each
-        parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1)
+    initial_step : float
+        Size of the initial simplex, as a fraction of each parameter's bound
+        width, in (0, 1] (default: 0.1). Nelder-Mead searches an unbounded
+        coordinate ``u`` and scores ``x = lo + (hi - lo)(sin u + 1)/2``, so
+        every point it tries is inside the bounds.
     alpha : float | None
         Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
@@ -301,12 +303,12 @@ class NelderMeadConfig(BaseModel):
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
     )
-    simplex_perturbation: float = Field(
-        default=1.1,
-        gt=1.0,
+    initial_step: float = Field(
+        default=0.1,
+        gt=0.0,
+        le=1.0,
         description=(
-            "Multiplier for creating initial simplex vertices (e.g., 1.1 = 10% "
-            "perturbation)"
+            "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(

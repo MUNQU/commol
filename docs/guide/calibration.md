@@ -158,7 +158,7 @@ of the observations of its series (its output, or its aggregate label).
 | `best_parameters` | `dict[str, float]`: the best value of every unknown |
 | `final_loss` | The loss at `best_parameters` |
 | `iterations` | The optimizer iterations performed |
-| `converged` | Whether the optimizer met its convergence test |
+| `converged` | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
 
 ```python

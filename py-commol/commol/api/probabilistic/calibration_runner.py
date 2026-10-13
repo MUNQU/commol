@@ -207,6 +207,7 @@ class CalibrationRunner:
             nm_config = commol_rs.calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
+                initial_step=opt_config.initial_step,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,

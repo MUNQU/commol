@@ -179,7 +179,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
-        simplex_perturbation: float = 1.1,
+        initial_step: float = 0.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
