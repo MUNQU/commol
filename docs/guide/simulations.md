@@ -225,7 +225,7 @@ plotter.plot_cumulative(output_file="cumulative.png")
 plotter.plot_series(
     output_file="custom.png",
     config=PlotConfig(figsize=(16, 10), dpi=150, style="whitegrid", palette="Set2", context="talk"),
-    bins=["B", "C"],
+    series=["B", "C"],
     x_label="Week",
     tick_every=10,
     step_to_label=lambda step: f"w{step // 7}",
@@ -237,7 +237,7 @@ plotter.plot_series(
 | Argument | Default | Meaning |
 |---|---|---|
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
-| `bins` | `None` (all) | The **output names** to plot. With stratifications, name the expanded outputs (`B_g1`), not the bin (`B`). |
+| `series` | `None` (every output) | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
 | `observed_data` | `None` | `ObservedDataPoint`s to draw on the matching subplots. |
 | `calibration_result` | `None` | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations. |
 | `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |

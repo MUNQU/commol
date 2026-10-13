@@ -71,7 +71,7 @@ class SimulationPlotter:
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
-        bins: list[str] | None = None,
+        series: list[str] | None = None,
         show_legend: bool = True,
         step_to_label: Callable[[int], str] | None = None,
         tick_every: int | None = None,
@@ -79,10 +79,11 @@ class SimulationPlotter:
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
-        Plot simulation results as time series with one subplot per bin.
+        Plot simulation results as time series with one subplot per series.
 
         Creates a figure with subplots arranged in a grid, where each subplot shows
-        the evolution of one bin over time. Optionally overlays observed data points.
+        the evolution of one series over time. Optionally overlays observed data
+        points.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
         Parameters
@@ -103,8 +104,11 @@ class SimulationPlotter:
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
-        bins : list[str] | None
-            List of bin IDs to plot. If None, plots all bins.
+        series : list[str] | None
+            What to plot, one subplot each. An entry is an output name (an
+            expanded compartment or accumulator, such as ``A_g1``) or a bin or
+            accumulator id, which plots the sum of its outputs. An exact output
+            name wins over an id. If None, plots every output.
         show_legend : bool
             Whether to show the legend on each subplot. Default True.
         step_to_label : Callable[[int], str] | None
@@ -123,11 +127,17 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
+
+        Raises
+        ------
+        ValueError
+            If an entry of ``series`` is neither an output name nor a bin or
+            accumulator id.
         """
         logger.info("Starting plot_series")
 
         config = config or PlotConfig()
-        bins_to_plot = bins if bins is not None else self.bins
+        bins_to_plot = self._series_to_plot(series)
 
         self._apply_seaborn_style(config)
         scale_values = self._extract_scale_values(calibration_result)
@@ -159,13 +169,13 @@ class SimulationPlotter:
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
-        bins: list[str] | None = None,
+        series: list[str] | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
-        Plot cumulative (accumulated) simulation results with one subplot per bin.
+        Plot cumulative (accumulated) simulation results with one subplot per series.
 
-        Creates a figure showing the running sum of each bin's values over time.
+        Creates a figure showing the running sum of each series over time.
         Useful for tracking totals, losses, or other accumulated quantities.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -186,8 +196,10 @@ class SimulationPlotter:
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
-        bins : list[str] | None
-            List of bin IDs to plot. If None, plots all bins.
+        series : list[str] | None
+            What to plot, one subplot each: an output name or a bin or
+            accumulator id, as in :meth:`plot_series`. If None, plots every
+            output.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -196,11 +208,17 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
+
+        Raises
+        ------
+        ValueError
+            If an entry of ``series`` is neither an output name nor a bin or
+            accumulator id.
         """
         logger.info("Starting plot_cumulative")
 
         config = config or PlotConfig()
-        bins_to_plot = bins if bins is not None else self.bins
+        bins_to_plot = self._series_to_plot(series)
 
         self._apply_seaborn_style(config)
         scale_values = self._extract_scale_values(calibration_result)
@@ -317,6 +335,27 @@ class SimulationPlotter:
 
         return dict(grouped)
 
+    def _series_to_plot(self, series: list[str] | None) -> list[str]:
+        """The series to plot, each checked to resolve to outputs."""
+        if series is None:
+            return list(self.bins)
+        for series_id in series:
+            self._series_components(series_id)
+        return list(series)
+
+    def _series_components(self, series_id: str) -> list[str]:
+        """Output names whose sum is the series: itself, or a bin's outputs."""
+        if series_id in self.results:
+            return [series_id]
+        try:
+            return self.simulation.outputs_for(series_id)
+        except KeyError:
+            sources = sorted(self.simulation.model_definition.get_outputs_by_source())
+            raise ValueError(
+                f"'{series_id}' is neither an output nor a bin or accumulator id. "
+                f"Outputs: {self.bins}. Bins and accumulators: {sources}"
+            ) from None
+
     def _observed_component_ids(
         self,
         bin_id: str,
@@ -325,7 +364,7 @@ class SimulationPlotter:
         for point in observed:
             if point.compartments:
                 return point.compartments
-        return [bin_id]
+        return self._series_components(bin_id)
 
     @staticmethod
     def _sum_series(
@@ -799,16 +838,24 @@ class SimulationPlotter:
         """
         Plot cumulative data for a single bin with probabilistic confidence intervals.
         """
-        if bin_id not in prob_result.selected_ensemble.prediction_median:
+        component_ids = self._series_components(bin_id)
+        ensemble = prob_result.selected_ensemble
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in ensemble.prediction_median
+        ]
+        if missing:
             logger.warning(
-                f"Bin '{bin_id}' not found in probabilistic result predictions"
+                f"Series '{bin_id}' components not found in probabilistic result "
+                f"predictions: {missing}"
             )
             return
 
         # Calculate cumulative values from the probabilistic predictions
-        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
-        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
-        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+        median_values = self._sum_series(ensemble.prediction_median, component_ids)
+        ci_lower = self._sum_series(ensemble.prediction_ci_lower, component_ids)
+        ci_upper = self._sum_series(ensemble.prediction_ci_upper, component_ids)
 
         # Calculate cumulative sums
         cumulative_median = np.cumsum(median_values).tolist()
@@ -878,7 +925,7 @@ class SimulationPlotter:
         cumulative: dict[str, list[float]] = {}
 
         for bin_id in bins_to_plot:
-            values = self.results[bin_id]
+            values = self._sum_series(self.results, self._series_components(bin_id))
             cumsum = []
             running_total = 0.0
 

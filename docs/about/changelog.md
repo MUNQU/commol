@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead
+  of `bins`. An entry is an output name or a bin or accumulator id; an id plots
+  the sum of its outputs, so a bin of a stratified model can be plotted. There
+  is no `bins` alias: rename the argument.
+
 ### Fixed
 
 - `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before,
