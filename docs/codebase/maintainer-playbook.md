@@ -46,7 +46,7 @@ Use this page before you make or review a change. It turns the
 
 - [ ] Plan the flows in `flows.rs`; reject what cannot be simulated.
 - [ ] Check the [rate semantics](design-decisions.md#absolute-and-per-capita-rates).
-- [ ] Add a case to `test_transition_flows.py`, and check `print_equations`.
+- [ ] Add a case to `tests/transitions/test_flows.py`, and check `print_equations`.
 - [ ] Update [Building models](../guide/building-models.md).
 
 ### Expressions (functions, variables)
@@ -71,7 +71,7 @@ Use this page before you make or review a change. It turns the
 - [ ] Keep the loss and the constraints in `calibration_problem.rs`.
 - [ ] Convert new options in `api/calibrator.py` and
       `api/probabilistic/calibration_runner.py`.
-- [ ] Check that `test_windows.py::TestAgreementWithTheCalibrationLoss` still
+- [ ] Check that `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` still
       passes if the loss changes.
 - [ ] Update [Calibration](../guide/calibration.md) and, for ensembles,
       [Probabilistic calibration](../guide/probabilistic-calibration.md).
@@ -86,7 +86,7 @@ Use this page before you make or review a change. It turns the
 
 - [ ] Keep the key order of existing entries.
 - [ ] Use `member_statistics` and `ci_percentiles` for ensemble values.
-- [ ] Update `test_reporting.py`.
+- [ ] Update `tests/reporting/`.
 
 ### Dependencies
 
