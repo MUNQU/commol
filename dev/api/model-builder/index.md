@@ -324,7 +324,6 @@ class ModelBuilder:
         target: list[str],
         rate: "str | float | TimePattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
-        condition: Condition | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
     ) -> Self:
@@ -395,10 +394,6 @@ class ModelBuilder:
             - "conditions": List of dicts with "stratification" and "category" keys
             - "rate": Rate expression string
 
-        condition : Condition | None, default=None
-            A condition stored with the transition. The engine does not evaluate
-            it: the transition runs at every step.
-
         per_compartment : bool | None, default=None
             When True, base compartment names in the rate
             expression are automatically replaced with the specific stratified
@@ -466,7 +461,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates, condition
+                id, source, target, rate, stratified_rates
             )
             return self
 
@@ -494,7 +489,6 @@ class ModelBuilder:
                 accumulators=accumulators or [],
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
-                condition=condition,
                 per_compartment=per_compartment,
             )
         )
@@ -569,7 +563,6 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
-        condition: Condition | None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -588,8 +581,6 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
-        condition : Condition | None
-            Transition condition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -663,7 +654,6 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
-                    condition=condition,
                 )
             )
 
@@ -682,57 +672,6 @@ class ModelBuilder:
 
         logging.info(
             f"Successfully expanded transition '{id}' into {len(source)} transitions"
-        )
-
-    def create_condition(
-        self,
-        logic: Literal["and", "or"],
-        rules: list[RuleDict],
-    ) -> Condition:
-        """
-        Create a condition object for use in transitions.
-
-        Parameters
-        ----------
-        logic : Literal["and", "or"]
-            How to combine the rules.
-        rules : List[RuleDict]
-            List of rule dictionaries with 'variable', 'operator', and 'value' keys.
-            Each dictionary must have:
-            - 'variable': str (format '<prefix>:<variable_id>')
-            - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"]
-            - 'value': str | int | float | bool
-
-        Returns
-        -------
-        Condition
-            The created condition object.
-
-        Examples
-        --------
-        >>> condition = builder.create_condition(
-        ...     "and",
-        ...     [
-        ...         {"variable": "states:I", "operator": "gt", "value": 0},
-        ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-        ...     ],
-        ... )
-        """
-        rule_objects: list[Rule] = []
-        for rule_dict in rules:
-            rule_objects.append(
-                Rule(
-                    variable=rule_dict["variable"],
-                    operator=rule_dict["operator"],
-                    value=rule_dict["value"],
-                )
-            )
-
-        return Condition(
-            logic=cast(
-                Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
-            ),
-            rules=rule_objects,
         )
 
     def set_initial_conditions(
@@ -886,22 +825,19 @@ class ModelBuilder:
         Returns
         -------
         ModelBuilder
-            A new ModelBuilder instance with the same configuration.
+            A new ModelBuilder instance with the same configuration: every
+            bin, accumulator, stratification, transition, parameter and the
+            initial conditions. Changes to one builder do not affect the other.
         """
-
-        new_builder = type(self)(self._name, self._description, self._version)
-
-        new_builder._bins = copy.deepcopy(self._bins)
-        new_builder._stratifications = copy.deepcopy(self._stratifications)
-        new_builder._transitions = copy.deepcopy(self._transitions)
-        new_builder._parameters = copy.deepcopy(self._parameters)
-        new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-        return new_builder
+        return copy.deepcopy(self)
 
     def reset(self) -> Self:
         """
-        Reset the builder to empty state while keeping name, description, and version.
+        Reset the builder to empty state.
+
+        The name, description, version and ``bin_unit`` are kept. Every bin,
+        accumulator, stratification, transition, parameter and the initial
+        conditions are removed.
 
         Returns
         -------
@@ -909,10 +845,12 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._bins.clear()
+        self._accumulators.clear()
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._initial_conditions = None
+        self._ts_counter = 0
         return self
 
     def _validate_typology(self, typology: str) -> ModelTypes:
@@ -1345,7 +1283,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, condition: Condition | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -1379,7 +1317,6 @@ Parameters:
 | `target`           | `list[str]`  | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
 | `rate`             | \`str        | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
 | `stratified_rates` | \`list[dict] | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
-| `condition`        | \`Condition  | None\`                                                                                                                                                                                       | A condition stored with the transition. The engine does not evaluate it: the transition runs at every step.                                                                                                                                                                                          |
 | `per_compartment`  | \`bool       | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
 | `accumulators`     | \`list[str]  | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
 
@@ -1405,7 +1342,6 @@ def add_transition(
     target: list[str],
     rate: "str | float | TimePattern | None" = None,
     stratified_rates: list[StratifiedRateDict] | None = None,
-    condition: Condition | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
 ) -> Self:
@@ -1476,10 +1412,6 @@ def add_transition(
         - "conditions": List of dicts with "stratification" and "category" keys
         - "rate": Rate expression string
 
-    condition : Condition | None, default=None
-        A condition stored with the transition. The engine does not evaluate
-        it: the transition runs at every step.
-
     per_compartment : bool | None, default=None
         When True, base compartment names in the rate
         expression are automatically replaced with the specific stratified
@@ -1547,7 +1479,7 @@ def add_transition(
     if rate and "$compartment" in rate:
         self._validate_compartment_placeholder(id, source, target)
         self._expand_compartment_transition(
-            id, source, target, rate, stratified_rates, condition
+            id, source, target, rate, stratified_rates
         )
         return self
 
@@ -1575,7 +1507,6 @@ def add_transition(
             accumulators=accumulators or [],
             rate=rate,
             stratified_rates=stratified_rates_objects,
-            condition=condition,
             per_compartment=per_compartment,
         )
     )
@@ -1588,94 +1519,6 @@ def add_transition(
         )
     )
     return self
-```
-
-#### create_condition
-
-```python
-create_condition(logic: Literal['and', 'or'], rules: list[RuleDict]) -> Condition
-```
-
-Create a condition object for use in transitions.
-
-Parameters:
-
-| Name    | Type                   | Description                                                                                                                                                                                                    | Default    |
-| ------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `logic` | `Literal['and', 'or']` | How to combine the rules.                                                                                                                                                                                      | *required* |
-| `rules` | `List[RuleDict]`       | List of rule dictionaries with 'variable', 'operator', and 'value' keys. Each dictionary must have: - 'variable': str (format ':') - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"] - 'value': str | int        |
-
-Returns:
-
-| Type        | Description                   |
-| ----------- | ----------------------------- |
-| `Condition` | The created condition object. |
-
-Examples:
-
-```pycon
->>> condition = builder.create_condition(
-...     "and",
-...     [
-...         {"variable": "states:I", "operator": "gt", "value": 0},
-...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-...     ],
-... )
-```
-
-Source code in `commol/api/model_builder.py`
-
-```python
-def create_condition(
-    self,
-    logic: Literal["and", "or"],
-    rules: list[RuleDict],
-) -> Condition:
-    """
-    Create a condition object for use in transitions.
-
-    Parameters
-    ----------
-    logic : Literal["and", "or"]
-        How to combine the rules.
-    rules : List[RuleDict]
-        List of rule dictionaries with 'variable', 'operator', and 'value' keys.
-        Each dictionary must have:
-        - 'variable': str (format '<prefix>:<variable_id>')
-        - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"]
-        - 'value': str | int | float | bool
-
-    Returns
-    -------
-    Condition
-        The created condition object.
-
-    Examples
-    --------
-    >>> condition = builder.create_condition(
-    ...     "and",
-    ...     [
-    ...         {"variable": "states:I", "operator": "gt", "value": 0},
-    ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-    ...     ],
-    ... )
-    """
-    rule_objects: list[Rule] = []
-    for rule_dict in rules:
-        rule_objects.append(
-            Rule(
-                variable=rule_dict["variable"],
-                operator=rule_dict["operator"],
-                value=rule_dict["value"],
-            )
-        )
-
-    return Condition(
-        logic=cast(
-            Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
-        ),
-        rules=rule_objects,
-    )
 ```
 
 #### set_initial_conditions
@@ -1883,9 +1726,9 @@ Create a deep copy of this ModelBuilder.
 
 Returns:
 
-| Type           | Description                                              |
-| -------------- | -------------------------------------------------------- |
-| `ModelBuilder` | A new ModelBuilder instance with the same configuration. |
+| Type           | Description                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, transition, parameter and the initial conditions. Changes to one builder do not affect the other. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1897,18 +1740,11 @@ def clone(self) -> Self:
     Returns
     -------
     ModelBuilder
-        A new ModelBuilder instance with the same configuration.
+        A new ModelBuilder instance with the same configuration: every
+        bin, accumulator, stratification, transition, parameter and the
+        initial conditions. Changes to one builder do not affect the other.
     """
-
-    new_builder = type(self)(self._name, self._description, self._version)
-
-    new_builder._bins = copy.deepcopy(self._bins)
-    new_builder._stratifications = copy.deepcopy(self._stratifications)
-    new_builder._transitions = copy.deepcopy(self._transitions)
-    new_builder._parameters = copy.deepcopy(self._parameters)
-    new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-    return new_builder
+    return copy.deepcopy(self)
 ```
 
 #### reset
@@ -1917,7 +1753,9 @@ def clone(self) -> Self:
 reset() -> Self
 ```
 
-Reset the builder to empty state while keeping name, description, and version.
+Reset the builder to empty state.
+
+The name, description, version and `bin_unit` are kept. Every bin, accumulator, stratification, transition, parameter and the initial conditions are removed.
 
 Returns:
 
@@ -1930,7 +1768,11 @@ Source code in `commol/api/model_builder.py`
 ```python
 def reset(self) -> Self:
     """
-    Reset the builder to empty state while keeping name, description, and version.
+    Reset the builder to empty state.
+
+    The name, description, version and ``bin_unit`` are kept. Every bin,
+    accumulator, stratification, transition, parameter and the initial
+    conditions are removed.
 
     Returns
     -------
@@ -1938,10 +1780,12 @@ def reset(self) -> Self:
         Self for method chaining.
     """
     self._bins.clear()
+    self._accumulators.clear()
     self._stratifications.clear()
     self._transitions.clear()
     self._parameters.clear()
     self._initial_conditions = None
+    self._ts_counter = 0
     return self
 ```
 

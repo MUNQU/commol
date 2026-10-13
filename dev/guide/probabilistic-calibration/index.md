@@ -101,7 +101,7 @@ flowchart LR
 1. **Selection.** NSGA-II (default) or a fit-gated greedy search picks the final members, balancing narrow intervals and coverage of the observations (`ensemble_selection`).
 1. **Intervals.** Each member's predictions are computed with the observation's aggregates, windows and scale factors, and then reduced across members.
 
-Every loss works (`"sse"`, `"weighted_sse"`, `"rmse"`, `"mae"`): the ensemble is scored with the same loss as the runs. Use `normalize_observations=True` when series differ in size.
+Every loss works (`"sse"`, `"rmse"`, `"mae"`): the ensemble is scored with the same loss as the runs. Use `normalize_observations=True` when series differ in size.
 
 ## Configuration
 

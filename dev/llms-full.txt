@@ -813,13 +813,12 @@ builder = ModelBuilder(
 
 Every `add_*` and `set_*` method returns the builder, so calls chain. The other methods:
 
-| Method                           | Returns        | What it does                                                                                                                                   |
-| -------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build(typology)`                | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                    |
-| `clone()`                        | `ModelBuilder` | A deep copy, to build variants of one model.                                                                                                   |
-| `reset()`                        | `ModelBuilder` | Removes bins, stratifications, transitions, parameters and initial conditions; keeps the name, description and version. Accumulators are kept. |
-| `get_summary()`                  | `dict`         | The name, description, version and the ids added so far.                                                                                       |
-| `create_condition(logic, rules)` | `Condition`    | Builds a transition condition; see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#conditions-are-not-evaluated).       |
+| Method            | Returns        | What it does                                                                                                                                      |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build(typology)` | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                       |
+| `clone()`         | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                 |
+| `reset()`         | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
+| `get_summary()`   | `dict`         | The name, description, version and the ids added so far.                                                                                          |
 
 ```python
 variant = builder.clone()
@@ -859,7 +858,7 @@ builder = (
 
 | Argument      | Type                                                | Default  | Meaning                                                                                                        |
 | ------------- | --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                                               | required | The identifier. It must be unique and must not be a bin id.                                                    |
+| `id`          | `str`                                               | required | The identifier. It must be unique and must not be a [name the engine sets](#names-the-engine-sets).            |
 | `value`       | `float`, `str`, `list[tuple[int, float]]` or `None` | required | See the table below.                                                                                           |
 | `description` | `str \| None`                                       | `None`   | A free-text description.                                                                                       |
 | `unit`        | `str \| None`                                       | `None`   | The unit, for [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
@@ -872,9 +871,18 @@ builder = (
 | `[(step, value), …]` | Time series  | A value per step, read with `mode` (below).                                                                                                                                                                  |
 | `None`               | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                            |
 
-Names the engine sets
+### Names the engine sets
 
-`N`, `N_<category>…`, `step`, `t`, `pi`, `e` and expanded compartment names such as `A_g1` are variables that the engine sets. Commol only rejects bin ids, so do not give a parameter any of these names.
+The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-difference/src/builder.rs`):
+
+| Name                        | Example                                   |
+| --------------------------- | ----------------------------------------- |
+| `N`, `step`, `t`, `pi`, `e` | `N`                                       |
+| A bin id                    | `A`                                       |
+| An expanded compartment     | `A_g1`                                    |
+| A subpopulation total       | `N_g1`, `A_t1` (with two stratifications) |
+
+An id that starts with `N_` but names no subpopulation, such as `N_max`, is accepted.
 
 ### Time-series parameters
 
@@ -1046,14 +1054,15 @@ print([c.name for c in stratified_model.initial_state()])
 
 `build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid:
 
-| Check                                           | Example of a rejected definition                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Initial conditions are set                      | `build` called before `set_initial_conditions`                                                   |
-| At least one bin and one transition             | A model with no transition                                                                       |
-| Initial conditions follow the rules above       | Bin fractions that sum to 0.9                                                                    |
-| Parameter ids are unique and are not bin ids    | A parameter named `A`                                                                            |
-| Every rate expression passes the security check | A formula with `__import__`                                                                      |
-| Every transition can be planned by the engine   | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
+| Check                                                                                | Example of a rejected definition                                                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Initial conditions are set                                                           | `build` called before `set_initial_conditions`                                                   |
+| At least one bin and one transition                                                  | A model with no transition                                                                       |
+| Initial conditions follow the rules above                                            | Bin fractions that sum to 0.9                                                                    |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `N` or `A_g1`                                                             |
+| Every `N_…` variable names a subpopulation                                           | `N_t1_g1` when `group` is declared before `type`                                                 |
+| Every rate expression passes the security check                                      | A formula with `__import__`                                                                      |
+| Every transition can be planned by the engine                                        | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
 
 ## Save and load
 
@@ -1122,7 +1131,6 @@ model.print_equations()  # shows every flow as the engine computes it
 | `stratified_rates` | `list[dict] \| None`                    | `None`   | Rates for some categories; see [Stratified rates](#stratified-rates).                                                                               |
 | `per_compartment`  | `bool \| None`                          | `None`   | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment).                                           |
 | `accumulators`     | `list[str] \| None`                     | `None`   | Accumulators that count the flow; see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#accumulators).                 |
-| `condition`        | `Condition \| None`                     | `None`   | Stored, but **not evaluated**; see [Conditions](#conditions-are-not-evaluated).                                                                     |
 
 ## Rates
 
@@ -1425,16 +1433,9 @@ redirect.print_equations()
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
-## Conditions are not evaluated
+## Limiting when a transition runs
 
-`add_transition(condition=...)` and `ModelBuilder.create_condition(logic, rules)` store a condition with the model, and the model file keeps it. **The engine does not evaluate it: the transition runs at every step.** To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md) or a [time-series parameter](https://munqu.github.io/commol/latest/guide/building-models/#time-series-parameters). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
-
-| `create_condition` argument | Values                                              |
-| --------------------------- | --------------------------------------------------- |
-| `logic`                     | `"and"`, `"or"`                                     |
-| `rules[].variable`          | `"state:<bin id>"` or `"strat:<stratification id>"` |
-| `rules[].operator`          | `"eq"`, `"neq"`, `"gt"`, `"get"`, `"lt"`, `"let"`   |
-| `rules[].value`             | a string, number or boolean                         |
+A transition runs at every step. To limit a flow, write the condition in the rate with `if`, as in `"if(step > 30, k, 0)"`, or use a [`TimePattern`](https://munqu.github.io/commol/latest/guide/time-patterns/index.md), a [time-series parameter](https://munqu.github.io/commol/latest/guide/building-models/#time-series-parameters) or a [stratified rate](#stratified-rates). A comparison alone is a boolean, so `"k * (step > 30)"` is rejected.
 
 ## What building checks
 
@@ -1497,16 +1498,17 @@ Whether a rate is the flow itself or a rate per member of the source depends on 
 
 ## Operators
 
-| Operator                         | Meaning                         | Example                     | Value |
-| -------------------------------- | ------------------------------- | --------------------------- | ----- |
-| `+`, `-`                         | Addition, subtraction, negation | `"k1 - k2"`, `"-k1"`        |       |
-| `*`, `/`                         | Multiplication, division        | `"k1 * B / N"`              |       |
-| `**` or `^`                      | Power                           | `"2 * 3 ** 4"`              | 162   |
-| `( )`                            | Grouping                        | `"(2 + 3) * 4"`             | 20    |
-| `>`, `<`, `>=`, `<=`, `==`, `!=` | Comparison, only inside `if`    | `"if(step > 30, k1, 0)"`    |       |
-| `!`                              | Not, only inside `if`           | `"if(!(step > 30), k1, 0)"` |       |
+| Operator                         | Meaning                         | Example                     | Value  |
+| -------------------------------- | ------------------------------- | --------------------------- | ------ |
+| `+`, `-`                         | Addition, subtraction, negation | `"k1 - k2"`, `"-k1"`        |        |
+| `*`, `/`                         | Multiplication, division        | `"k1 * B / N"`              |        |
+| `%`                              | Remainder                       | `"step % 7"`                | 0 to 6 |
+| `**` or `^`                      | Power                           | `"2 * 3 ** 4"`              | 162    |
+| `( )`                            | Grouping                        | `"(2 + 3) * 4"`             | 20     |
+| `>`, `<`, `>=`, `<=`, `==`, `!=` | Comparison, only inside `if`    | `"if(step > 30, k1, 0)"`    |        |
+| `!`                              | Not, only inside `if`           | `"if(!(step > 30), k1, 0)"` |        |
 
-Precedence, from high to low: parentheses, power, multiplication and division, addition and subtraction. So `"2 ** 3 * 4"` is 32 and `"2 + 3 * 4"` is 14.
+Precedence, from high to low: parentheses, power, multiplication, division and remainder, addition and subtraction. So `"2 ** 3 * 4"` is 32 and `"2 + 3 * 4"` is 14.
 
 A comparison gives a boolean, not a number, so it cannot be multiplied: `"k1 * (step > 30)"` is rejected. Write `"if(step > 30, k1, 0)"`. Rates do not accept `&&` or `||`; nest `if` calls instead:
 
@@ -1525,11 +1527,7 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 | A bin id, with stratifications     | The total of all its compartments  |
 | `N`                                | The total population               |
 | `step`, `t`                        | The current step: 0, 1, 2, …       |
-| `pi`, `e`                          | π and e; see the warning below     |
-
-Known issue: `pi` and `e` in rates
-
-In a transition rate, `pi` and `e` only work inside a function argument, such as `sin(2 * pi * step / 365)`. Elsewhere (`"k1 * pi"`) the simulation fails with "Variable 'pi' not found". Formula parameters accept them everywhere, so define `two_pi = "2 * pi"` as a parameter, or write the number.
+| `pi`, `e`                          | π and e                            |
 
 ### Subpopulation variables
 
@@ -1588,11 +1586,11 @@ print(value_of("A_g1 + 0"))     # 150.0  = 600 x 0.25
 print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 ```
 
-| Pitfall                                                       | Result                                 |
-| ------------------------------------------------------------- | -------------------------------------- |
-| Suffixes out of declaration order, as in `A_t1_g1`            | Error: the variable is not found       |
-| `N_…` out of order, as in `N_t1_g1`                           | **0, with no error.** Check the order. |
-| A combination that a conditional stratification never creates | `N_…` is 0; `<bin>_…` is not found     |
+| Pitfall                                                       | Result                                          |
+| ------------------------------------------------------------- | ----------------------------------------------- |
+| Suffixes out of declaration order, as in `A_t1_g1`            | Error: the variable is not found                |
+| `N_…` out of order, as in `N_t1_g1`                           | `build` fails and lists the valid `N_…` names   |
+| A combination that a conditional stratification never creates | `build` fails for `N_…`; `<bin>_…` is not found |
 
 ## Functions
 
@@ -1953,29 +1951,37 @@ model.print_equations()
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<time unit>`, and that every function receives a plain number. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, and that every function receives a plain number. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
-| Item                   | How it gets a unit                                                       |
-| ---------------------- | ------------------------------------------------------------------------ |
-| Bins                   | `ModelBuilder(bin_unit=...)`, or `add_bin(unit=...)` for one bin         |
-| `N`, `N_<category>…`   | The bin unit, automatically                                              |
-| Constant parameters    | `add_parameter(unit=...)`. Required: the check raises if one is missing. |
-| Formula parameters     | Inferred from the formula; a unit is optional                            |
-| `step`, `t`, `pi`, `e` | Dimensionless, automatically                                             |
+| Item                   | How it gets a unit                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Bins                   | `ModelBuilder(bin_unit=...)`, or `add_bin(unit=...)` for one bin. Required: the check names every bin without one. |
+| `N`, `N_<category>…`   | The bin unit, automatically                                                                                        |
+| Constant parameters    | `add_parameter(unit=...)`. Required: the check raises if one is missing.                                           |
+| Formula parameters     | Inferred from the formula; a unit is optional                                                                      |
+| `step`, `t`, `pi`, `e` | Dimensionless, automatically                                                                                       |
 
 | Unit                              | Use for                                           |
 | --------------------------------- | ------------------------------------------------- |
-| `"1/day"`, `"1/week"`, `"1/hour"` | Rates                                             |
+| `"1/day"`, `"1/week"`, `"1/step"` | Rates                                             |
 | `"dimensionless"`                 | Ratios, fractions, amplitudes, function arguments |
 | Any word, such as `"item"`        | A custom unit for bins; Commol registers it       |
 
-The time unit of the flows comes from the parameters: the first parameter whose unit has a known time unit (`second`, `minute`, `hour`, `day`, `week`, `month`, `year`, …) sets it, and `day` is the default.
+### The step unit
 
-Per-step units
+The engine applies every flow once per step and converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`):
 
-`step` is not a time unit for the check: a model whose rates are in `"1/step"` fails with "expected `<bin unit>/day`". Give rates a physical time unit, such as `"1/day"`.
+| Parameter units                                        | Step unit | Result                                       |
+| ------------------------------------------------------ | --------- | -------------------------------------------- |
+| All in one unit of time, such as `"1/day"` and `"day"` | `day`     | Flows must be `<bin unit>/day`               |
+| All in `"1/week"`                                      | `week`    | Accepted: one step is one week               |
+| All in `"1/step"`                                      | `step`    | Accepted                                     |
+| No unit of time                                        | `step`    | Flows must be `<bin unit>/step`              |
+| `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"`  | —         | Error that names each parameter and its unit |
+
+A unit of time is any unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `person/week` does not match `person/day`, because the engine would apply a weekly rate every day.
 
 ### What the check catches
 
@@ -2003,12 +2009,14 @@ except UnitConsistencyError as error:
     print(error)
 ```
 
-| Error                                                                       | Cause                                                                    |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'` | A rate with the wrong unit                                               |
-| `Cannot convert from 'item' to 'dimensionless'`                             | A function such as `sin`, `exp` or `log` received a quantity with a unit |
-| `The following constant parameters are missing units: …`                    | A constant parameter has no unit                                         |
-| `Variable '…' … has no defined unit`                                        | A bin has no unit (set `bin_unit`)                                       |
+| Error                                                                               | Cause                                                                    |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'`         | A rate with the wrong unit                                               |
+| `Cannot convert from 'item' to 'dimensionless'`                                     | A function such as `sin`, `exp` or `log` received a quantity with a unit |
+| `The following constant parameters are missing units: …`                            | A constant parameter has no unit                                         |
+| `The following bins have no unit: …`                                                | A bin has no unit (set `bin_unit`)                                       |
+| `the parameters use more than one unit of time ('k1' in '1/day', 'k2' in '1/week')` | Rates in two units of time; see [The step unit](#the-step-unit)          |
+| `Variable '…' … has no defined unit`                                                | A variable of a rate has no unit                                         |
 
 To pass a quantity to a function, make it dimensionless first, for example `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in `"dimensionless"`.
 
@@ -2100,30 +2108,35 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## `Simulation`
 
-| Member                                                       | Returns                | What it does                                                                                                           |
-| ------------------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `Simulation(model)`                                          | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                       |
-| `run(num_steps, output_format="dict_of_lists")`              | results                | Runs `num_steps` steps from the engine's current state; see below. Raises `ValueError` if a parameter is still `None`. |
-| `simulation_outputs`                                         | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                              |
-| `outputs_for(id)`                                            | `list[str]`            | The outputs of one bin or accumulator.                                                                                 |
-| `group_outputs(ids)`                                         | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                              |
-| `total_series(results, ids)`                                 | `list[float]`          | The sum of all outputs of the given ids, at each step.                                                                 |
-| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                     |
-| `engine`                                                     | engine                 | The underlying Rust engine. `engine.reset()` returns it to the initial state.                                          |
+| Member                                                       | Returns                | What it does                                                                                                                                    |
+| ------------------------------------------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Simulation(model)`                                          | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                |
+| `run(num_steps, output_format="dict_of_lists")`              | results                | Runs `num_steps` steps from the initial state, with the model as it is now; see below. Raises `ValueError` if a parameter is still `None`.      |
+| `simulation_outputs`                                         | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                       |
+| `outputs_for(id)`                                            | `list[str]`            | The outputs of one bin or accumulator.                                                                                                          |
+| `group_outputs(ids)`                                         | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                       |
+| `total_series(results, ids)`                                 | `list[float]`          | The sum of all outputs of the given ids, at each step.                                                                                          |
+| `windowed_totals(results, ids, window_steps, at_steps=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                              |
+| `engine`                                                     | engine                 | The underlying Rust engine, for the model as it is now. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
-A second `run` continues the first one
-
-The engine keeps its state between calls: a second `run` starts where the first one stopped, and its step 0 is the previous last step. To start again from the initial state, call `simulation.engine.reset()` or create a new `Simulation`.
+Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
 
 ```python
-simulation.engine.reset()
 first = simulation.run(num_steps=10)
-continued = simulation.run(num_steps=10)
-print(continued["A"][0] == first["A"][-1])  # True: it continued
-
-simulation.engine.reset()
 again = simulation.run(num_steps=10)
 print(again["A"] == first["A"])  # True: it started again
+
+simulation.engine.step()  # step 11, from where the last run stopped
+print(simulation.engine.population[0] < first["A"][-1])  # True: A keeps falling
+```
+
+The engine follows the model. When the model changed after the `Simulation` was created, for example with `update_parameters` or `apply_calibration_parameters`, `run` and `engine` rebuild the engine from the model as it is now (`Simulation._sync_engine` compares `model_dump_json()` with the JSON the engine was built from):
+
+```python
+model.update_parameters({"k1": 0.0})
+frozen = simulation.run(num_steps=10)
+print(frozen["A"][10] == frozen["A"][0])  # True: k1 = 0 stops A → B
+model.update_parameters({"k1": 0.3})
 ```
 
 ## Output formats
@@ -2136,7 +2149,6 @@ print(again["A"] == first["A"])  # True: it started again
 Both contain `num_steps + 1` values per output: step 0 is the initial state.
 
 ```python
-simulation.engine.reset()
 rows = simulation.run(num_steps=100, output_format="list_of_lists")
 
 print(len(rows))         # 101
@@ -2271,7 +2283,7 @@ plotter.plot_cumulative(output_file="cumulative.png")
 plotter.plot_series(
     output_file="custom.png",
     config=PlotConfig(figsize=(16, 10), dpi=150, style="whitegrid", palette="Set2", context="talk"),
-    bins=["B", "C"],
+    series=["B", "C"],
     x_label="Week",
     tick_every=10,
     step_to_label=lambda step: f"w{step // 7}",
@@ -2280,16 +2292,16 @@ plotter.plot_series(
 )
 ```
 
-| Argument                                 | Default                        | Meaning                                                                                                                  |
-| ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `output_file`                            | `None`                         | Where to save the figure. `None` only returns it.                                                                        |
-| `bins`                                   | `None` (all)                   | The **output names** to plot. With stratifications, name the expanded outputs (`B_g1`), not the bin (`B`).               |
-| `observed_data`                          | `None`                         | `ObservedDataPoint`s to draw on the matching subplots.                                                                   |
-| `calibration_result`                     | `None`                         | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations. |
-| `config`                                 | `PlotConfig()`                 | Figure size, dpi, layout and seaborn style.                                                                              |
-| `show_legend`                            | `True`                         | `plot_series` only.                                                                                                      |
-| `x_label`, `tick_every`, `step_to_label` | `"Step"`, every step, the step | `plot_series` only. Label the x axis, for example in weeks.                                                              |
-| other keyword arguments                  | —                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                            |
+| Argument                                 | Default                        | Meaning                                                                                                                                                                                                                   |
+| ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                            | `None`                         | Where to save the figure. `None` only returns it.                                                                                                                                                                         |
+| `series`                                 | `None` (every output)          | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
+| `observed_data`                          | `None`                         | `ObservedDataPoint`s to draw on the matching subplots.                                                                                                                                                                    |
+| `calibration_result`                     | `None`                         | With a probabilistic result, draws the median and the confidence band; scale parameters are applied to the observations.                                                                                                  |
+| `config`                                 | `PlotConfig()`                 | Figure size, dpi, layout and seaborn style.                                                                                                                                                                               |
+| `show_legend`                            | `True`                         | `plot_series` only.                                                                                                                                                                                                       |
+| `x_label`, `tick_every`, `step_to_label` | `"Step"`, every step, the step | `plot_series` only. Label the x axis, for example in weeks.                                                                                                                                                               |
+| other keyword arguments                  | —                              | Passed to `seaborn.lineplot`, such as `linewidth` or `alpha`.                                                                                                                                                             |
 
 | `PlotConfig` field | Default            | Values                                                      |
 | ------------------ | ------------------ | ----------------------------------------------------------- |
@@ -2397,14 +2409,12 @@ result = Calibrator(Simulation(model), problem).run()
 print({name: round(value, 3) for name, value in sorted(result.best_parameters.items())})
 # {'k1': 0.4, 'k2': 0.1}
 
-# 4. Write the values back, and simulate with a new Simulation
+# 4. Write the values back, and simulate
 model.apply_calibration_parameters(result, problem)
 calibrated = Simulation(model).run(num_steps=100)
 ```
 
-A `Simulation` copies the model
-
-`Simulation(model)` builds its engine from the model as it is at that moment. After you change the model (`apply_calibration_parameters`, `update_parameters`, …), create a **new** `Simulation`. An old one keeps the old values, and one created while a parameter was `None` fails with "Parameter index … not found".
+A `Simulation` follows its model: after `apply_calibration_parameters` or `update_parameters`, its next `run` (and its `engine`) uses the new values, also when it was created while a parameter was `None`. See [Simulations](https://munqu.github.io/commol/latest/guide/simulations/#simulation).
 
 ## The problem
 
@@ -2427,7 +2437,7 @@ A `Simulation` copies the model
 | `step`                    | `int`               | required | The step of the observation.                                                                                    |
 | `compartment`             | `str`               | required | The output it observes: a compartment or accumulator name, such as `B` or `B_g1`. With `compartments`, a label. |
 | `value`                   | `float`             | required | The observed value.                                                                                             |
-| `weight`                  | `float`             | `1.0`    | Multiplies its residual in `"sse"` and `"weighted_sse"`; see [Losses](#losses).                                 |
+| `weight`                  | `float`             | `1.0`    | How much the observation counts in every loss; see [Losses](#losses).                                           |
 | `compartments`            | `list[str] \| None` | `None`   | Outputs to sum before the comparison.                                                                           |
 | `scale_id`                | `str \| None`       | `None`   | A `scale` parameter that multiplies the prediction.                                                             |
 | `window_steps`            | `int \| None`       | `None`   | Compares with the gain over the last `window_steps` steps instead of the value.                                 |
@@ -2449,16 +2459,15 @@ A `Simulation` copies the model
 
 ## Losses
 
-| `loss_function`   | Formula (residual `r = observed − predicted`) | Use when                                                   |
-| ----------------- | --------------------------------------------- | ---------------------------------------------------------- |
-| `"sse"` (default) | `Σ (weight × r)²`                             | The usual choice                                           |
-| `"weighted_sse"`  | `Σ (weight × r)²`, the same as `"sse"`        | Kept as an explicit name when you set weights              |
-| `"rmse"`          | `√(Σ r² / n)`                                 | You want the error in the data's unit; weights are ignored |
-| `"mae"`           | \`Σ                                           | r                                                          |
+| `loss_function`   | Formula (residual `r = observed − predicted`, weight `w`) | Use when                              |
+| ----------------- | --------------------------------------------------------- | ------------------------------------- |
+| `"sse"` (default) | `Σ w·r²`                                                  | The usual choice                      |
+| `"rmse"`          | `√(Σ w·r² / Σ w)`                                         | You want the error in the data's unit |
+| `"mae"`           | \`Σ w·                                                    | r                                     |
 
 How weights count
 
-A weight multiplies the residual **before** it is squared, so `weight=2.0` makes an observation count four times as much. With every weight at its default of 1.0, `"sse"` is the plain sum of squared residuals.
+Every loss uses a weight the same way: `weight=2.0` makes an observation count twice as much as one with weight 1.0. With every weight at its default of 1.0, the losses are the plain sum of squares, root mean square and mean absolute error. `LossConfig` in `crates/commol-calibration/src/types.rs` computes them, for the optimizer and for the ensemble central loss.
 
 With `normalize_observations=True`, each residual is first divided by the RMS of the observations of its series (its output, or its aggregate label).
 
@@ -2466,13 +2475,13 @@ With `normalize_observations=True`, each residual is first divided by the RMS of
 
 `Calibrator(simulation, problem)` checks the problem against the model, and `run()` returns a `CalibrationResult`:
 
-| `CalibrationResult` field | Meaning                                             |
-| ------------------------- | --------------------------------------------------- |
-| `best_parameters`         | `dict[str, float]`: the best value of every unknown |
-| `final_loss`              | The loss at `best_parameters`                       |
-| `iterations`              | The optimizer iterations performed                  |
-| `converged`               | Whether the optimizer met its convergence test      |
-| `termination_reason`      | Why it stopped                                      |
+| `CalibrationResult` field | Meaning                                                                                                                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `best_parameters`         | `dict[str, float]`: the best value of every unknown                                                                                                                                                                                                |
+| `final_loss`              | The loss at `best_parameters`                                                                                                                                                                                                                      |
+| `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                 |
+| `converged`               | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
+| `termination_reason`      | Why it stopped                                                                                                                                                                                                                                     |
 
 ```python
 print(result.converged, result.termination_reason)
@@ -2594,6 +2603,14 @@ Here `B` is calibrated, and `A`, the remainder, takes what is left of the popula
 | A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                       |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
+
+The engine resolves every id when you create the `Calibrator` or the `ProbabilisticCalibrator` (`check_initial_conditions` in `crates/commol-calibration/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
+
+| `id`                                                                                             | Error                                                              |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Names nothing in the model                                                                       | `Invalid bin, compartment or category 'X'`, with the compartments  |
+| A category of a stratification with three or more categories, such as `"y"` of `age = [y, m, o]` | `Initial condition category 'age:y' needs a binary stratification` |
+| A category name that two stratifications declare                                                 | `… is ambiguous`, with the qualified names                         |
 
 ## The remainder
 
@@ -2798,10 +2815,10 @@ print(calibrate_k1(b_and_c))  # 0.4
 
 ## Weights and normalization
 
-| Option                        | Where                | Effect                                                                                                                                              |
-| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weight=2.0`                  | `ObservedDataPoint`  | Multiplies the residual by 2 before squaring, so the observation counts 4 times, with `"sse"` or `"weighted_sse"`. Ignored by `"rmse"` and `"mae"`. |
-| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                           |
+| Option                        | Where                | Effect                                                                                                                                                                                    |
+| ----------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. See [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses). |
+| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                                                                 |
 
 ```python
 weighted = [
@@ -2809,7 +2826,7 @@ weighted = [
     ObservedDataPoint(step=30, compartment="B", value=truth["B"][30], weight=1.0),
     ObservedDataPoint(step=30, compartment="cum_ab", value=truth["cum_ab"][30], weight=1.0),
 ]
-print(calibrate_k1(weighted, loss_function="weighted_sse", normalize_observations=True))  # 0.4
+print(calibrate_k1(weighted, loss_function="sse", normalize_observations=True))  # 0.4
 ```
 
 ## Partial observations: scale factors
@@ -2878,7 +2895,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with `compartments
 ## Checklist
 
 - [ ] Every `compartment` (and every entry of `compartments`) is an output name.
-- [ ] Weights are used with `"sse"` or `"weighted_sse"`, and you know they count squared.
+- [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `scale_id` has a `CalibrationParameter` with `parameter_type="scale"`.
 - [ ] Windowed observations use a cumulative output and `window_steps <= step`.
 
@@ -2968,7 +2985,7 @@ print(calibrate(ParticleSwarmConfig(num_particles=30, max_iterations=300)))  # {
 nelder_mead = NelderMeadConfig(
     max_iterations=1000,
     sd_tolerance=1e-6,
-    simplex_perturbation=1.1,
+    initial_step=0.1,
     alpha=1.0,
     gamma=2.0,
     rho=0.5,
@@ -2979,16 +2996,27 @@ nelder_mead = NelderMeadConfig(
 print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
-| Field                            | Default                  | Meaning                                                                                         |
-| -------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `max_iterations`                 | `1000`                   | The iteration limit.                                                                            |
-| `sd_tolerance`                   | `1e-6`                   | Stops when the spread of the simplex values falls below it.                                     |
-| `simplex_perturbation`           | `1.1`                    | Builds the first simplex by multiplying each coordinate of the start by this factor (10% here). |
-| `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients.                                     |
-| `verbose`                        | `False`                  | Prints a progress table.                                                                        |
-| `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                            |
+| Field                            | Default                  | Meaning                                                                                                                                  |
+| -------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_iterations`                 | `1000`                   | The iteration limit.                                                                                                                     |
+| `sd_tolerance`                   | `1e-6`                   | Stops when the spread of the simplex values falls below it.                                                                              |
+| `initial_step`                   | `0.1`                    | The size of the first simplex: each vertex moves one unknown by this fraction of its bound width, towards the farther bound. In (0, 1\]. |
+| `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients.                                                                              |
+| `verbose`                        | `False`                  | Prints a progress table.                                                                                                                 |
+| `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
-The search starts at `initial_guess`, or at the midpoint of the bounds. From a poor start, Nelder-Mead may stop at a bound and still report `converged=True`: check that results are not at a bound, and give a better `initial_guess`.
+The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` in `crates/commol-calibration/src/optimization.rs`). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations.
+
+## `converged` and `termination_reason`
+
+| `termination_reason`            | `converged` | Meaning                                                                 |
+| ------------------------------- | ----------- | ----------------------------------------------------------------------- |
+| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance` |
+| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                          |
+| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                       |
+| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                   |
+
+`converged` comes from `converged` in `optimization.rs`. A particle swarm without `target_cost` always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
 
 ## Particle swarm
 
@@ -3031,13 +3059,13 @@ Set `CalibrationProblem(seed=...)`: particle swarm, the initialization and the p
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                    |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm |
-| `converged=False`                  | More `max_iterations`; check `termination_reason`                      |
-| Different results on each run      | Set `seed`; use more particles or iterations                           |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start    |
+| Symptom                            | Try                                                                        |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
+| Different results on each run      | Set `seed`; use more particles or iterations                               |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
 
 ## Next steps
 
@@ -3282,7 +3310,7 @@ flowchart LR
 1. **Selection.** NSGA-II (default) or a fit-gated greedy search picks the final members, balancing narrow intervals and coverage of the observations (`ensemble_selection`).
 1. **Intervals.** Each member's predictions are computed with the observation's aggregates, windows and scale factors, and then reduced across members.
 
-Every loss works (`"sse"`, `"weighted_sse"`, `"rmse"`, `"mae"`): the ensemble is scored with the same loss as the runs. Use `normalize_observations=True` when series differ in size.
+Every loss works (`"sse"`, `"rmse"`, `"mae"`): the ensemble is scored with the same loss as the runs. Use `normalize_observations=True` when series differ in size.
 
 ## Configuration
 
@@ -4378,16 +4406,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -4482,16 +4501,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -4557,8 +4567,6 @@ class Calibrator:
             loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = rust_calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 
@@ -4573,7 +4581,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                simplex_perturbation=opt_config.simplex_perturbation,
+                initial_step=opt_config.initial_step,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -4680,6 +4688,19 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
+    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
+        """Calibration parameters as engine types, in problem order."""
+        return [
+            rust_calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
     def _validate_calibration_parameters(self) -> None:
         """
         Validate that all calibration parameters exist in the model.
@@ -4691,14 +4712,6 @@ class Calibrator:
         """
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
-        model_bin_ids = {b.id for b in model.population.bins}
-        model_binary_stratification_categories = {
-            category
-            for stratification in model.population.stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -4709,20 +4722,8 @@ class Calibrator:
                         f"{sorted(model_param_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins, stratification categories, or expanded "
-                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: "
-                        f"{sorted(engine_compartment_ids)}"
-                    )
+                # The engine resolves initial-condition ids below.
+                pass
             elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
@@ -4733,6 +4734,12 @@ class Calibrator:
                 raise ValueError(
                     f"Unknown calibration parameter type: {param.parameter_type}"
                 )
+
+        engine_state.check_initial_conditions(
+            self._engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
+        )
 
     def _get_compartment_index(self, bin_id: str) -> int:
         """
@@ -4998,16 +5005,7 @@ def run(self) -> CalibrationResult:
     ]
 
     # Convert parameters to Rust types
-    rust_parameters = [
-        rust_calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=self._to_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in self.problem.parameters
-    ]
+    rust_parameters = self._rust_parameters()
 
     # Convert constraints to Rust types
     rust_constraints = [
@@ -5130,16 +5128,7 @@ def run_with_history(self) -> "CalibrationResultWithHistoryProtocol":
     ]
 
     # Convert parameters to Rust types
-    rust_parameters = [
-        rust_calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=self._to_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in self.problem.parameters
-    ]
+    rust_parameters = self._rust_parameters()
 
     # Convert constraints to Rust types
     rust_constraints = [
@@ -5248,17 +5237,17 @@ This class encapsulates all the information needed to calibrate model parameters
 
 Attributes:
 
-| Name                          | Type                             | Description                                                                                                            |
-| ----------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`        | List of observed data points to fit against                                                                            |
-| `parameters`                  | `list[CalibrationParameter]`     | List of parameters to calibrate with their bounds                                                                      |
-| `constraints`                 | `list[CalibrationConstraint]`    | List of constraints on calibration parameters (optional, default: empty list)                                          |
-| `loss_function`               | `str`                            | Loss function to use for measuring fit quality (default: "sse")                                                        |
-| `normalize_observations`      | `bool`                           | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). |
-| `optimization_config`         | `OptimizationConfig`             | Configuration for the optimization algorithm                                                                           |
-| `initial_condition_remainder` | \`str                            | None\`                                                                                                                 |
-| `probabilistic_config`        | \`ProbabilisticCalibrationConfig | None\`                                                                                                                 |
-| `seed`                        | \`int                            | None\`                                                                                                                 |
+| Name                          | Type                             | Description                                                                                                                |
+| ----------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data`               | `list[ObservedDataPoint]`        | List of observed data points to fit against                                                                                |
+| `parameters`                  | `list[CalibrationParameter]`     | List of parameters to calibrate with their bounds                                                                          |
+| `constraints`                 | `list[CalibrationConstraint]`    | List of constraints on calibration parameters (optional, default: empty list)                                              |
+| `loss_function`               | `str`                            | Loss function to use for measuring fit quality: "sse" (default), "rmse" or "mae". Every loss uses the observation weights. |
+| `normalize_observations`      | `bool`                           | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False).     |
+| `optimization_config`         | `OptimizationConfig`             | Configuration for the optimization algorithm                                                                               |
+| `initial_condition_remainder` | \`str                            | None\`                                                                                                                     |
+| `probabilistic_config`        | \`ProbabilisticCalibrationConfig | None\`                                                                                                                     |
+| `seed`                        | \`int                            | None\`                                                                                                                     |
 
 Source code in `commol/context/calibration.py`
 
@@ -5280,7 +5269,8 @@ class CalibrationProblem(BaseModel):
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
-        Loss function to use for measuring fit quality (default: "sse")
+        Loss function to use for measuring fit quality: "sse" (default),
+        "rmse" or "mae". Every loss uses the observation weights.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False).
@@ -5403,14 +5393,14 @@ Represents a single observed data point for calibration.
 
 Attributes:
 
-| Name           | Type        | Description                                                                                                   |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `step`         | `int`       | Time step of the observation                                                                                  |
-| `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set |
-| `compartments` | \`list[str] | None\`                                                                                                        |
-| `value`        | `float`     | Observed value                                                                                                |
-| `weight`       | `float`     | Weight for this observation in the loss function (default: 1.0)                                               |
-| `scale_id`     | \`str       | None\`                                                                                                        |
+| Name           | Type        | Description                                                                                                                                                                    |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `step`         | `int`       | Time step of the observation                                                                                                                                                   |
+| `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set                                                                  |
+| `compartments` | \`list[str] | None\`                                                                                                                                                                         |
+| `value`        | `float`     | Observed value                                                                                                                                                                 |
+| `weight`       | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w· |
+| `scale_id`     | \`str       | None\`                                                                                                                                                                         |
 
 Source code in `commol/context/calibration.py`
 
@@ -5431,7 +5421,10 @@ class ObservedDataPoint(BaseModel):
     value : float
         Observed value
     weight : float
-        Weight for this observation in the loss function (default: 1.0)
+        How much this observation counts in the loss (default: 1.0). Every
+        loss multiplies the squared or absolute residual by it: ``sse`` is
+        ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
+        ``Σ w·|r| / Σ w``.
     scale_id : str | None
         Optional scale parameter ID to apply to model output before comparison
     """
@@ -5829,17 +5822,17 @@ The Nelder-Mead method is a simplex-based derivative-free optimization algorithm
 
 Attributes:
 
-| Name                   | Type    | Description                                                                                                                                    |
-| ---------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_iterations`       | `int`   | Maximum number of iterations (default: 1000)                                                                                                   |
-| `sd_tolerance`         | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                   |
-| `simplex_perturbation` | `float` | Multiplier for creating initial simplex vertices by perturbing each parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1) |
-| `alpha`                | \`float | None\`                                                                                                                                         |
-| `gamma`                | \`float | None\`                                                                                                                                         |
-| `rho`                  | \`float | None\`                                                                                                                                         |
-| `sigma`                | \`float | None\`                                                                                                                                         |
-| `verbose`              | `bool`  | Enable verbose output during optimization (default: False)                                                                                     |
-| `header_interval`      | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                             |
+| Name              | Type    | Description                                                                                                                                                                                                                                     |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_iterations`  | `int`   | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
+| `sd_tolerance`    | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
+| `initial_step`    | `float` | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
+| `alpha`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `gamma`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `rho`             | \`float | None\`                                                                                                                                                                                                                                          |
+| `sigma`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `verbose`         | `bool`  | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
+| `header_interval` | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
 Source code in `commol/context/calibration.py`
 
@@ -5857,9 +5850,11 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
-    simplex_perturbation : float
-        Multiplier for creating initial simplex vertices by perturbing each
-        parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1)
+    initial_step : float
+        Size of the initial simplex, as a fraction of each parameter's bound
+        width, in (0, 1] (default: 0.1). Nelder-Mead searches an unbounded
+        coordinate ``u`` and scores ``x = lo + (hi - lo)(sin u + 1)/2``, so
+        every point it tries is inside the bounds.
     alpha : float | None
         Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
@@ -5881,12 +5876,12 @@ class NelderMeadConfig(BaseModel):
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
     )
-    simplex_perturbation: float = Field(
-        default=1.1,
-        gt=1.0,
+    initial_step: float = Field(
+        default=0.1,
+        gt=0.0,
+        le=1.0,
         description=(
-            "Multiplier for creating initial simplex vertices (e.g., 1.1 = 10% "
-            "perturbation)"
+            "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
@@ -6696,7 +6691,7 @@ Available loss functions for calibration.
 
 Values
 
-SSE Sum of Squared Errors RMSE Root Mean Squared Error MAE Mean Absolute Error WEIGHTED_SSE Weighted Sum of Squared Errors
+SSE Sum of Squared Errors RMSE Root Mean Squared Error MAE Mean Absolute Error
 
 Source code in `commol/context/constants.py`
 
@@ -6714,14 +6709,11 @@ class LossFunction(StrEnum):
         Root Mean Squared Error
     MAE
         Mean Absolute Error
-    WEIGHTED_SSE
-        Weighted Sum of Squared Errors
     """
 
     SSE = "sse"
     RMSE = "rmse"
     MAE = "mae"
-    WEIGHTED_SSE = "weighted_sse"
 ```
 
 ## OptimizationAlgorithm
@@ -7080,7 +7072,6 @@ class ModelBuilder:
         target: list[str],
         rate: "str | float | TimePattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
-        condition: Condition | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
     ) -> Self:
@@ -7151,10 +7142,6 @@ class ModelBuilder:
             - "conditions": List of dicts with "stratification" and "category" keys
             - "rate": Rate expression string
 
-        condition : Condition | None, default=None
-            A condition stored with the transition. The engine does not evaluate
-            it: the transition runs at every step.
-
         per_compartment : bool | None, default=None
             When True, base compartment names in the rate
             expression are automatically replaced with the specific stratified
@@ -7222,7 +7209,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates, condition
+                id, source, target, rate, stratified_rates
             )
             return self
 
@@ -7250,7 +7237,6 @@ class ModelBuilder:
                 accumulators=accumulators or [],
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
-                condition=condition,
                 per_compartment=per_compartment,
             )
         )
@@ -7325,7 +7311,6 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
-        condition: Condition | None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -7344,8 +7329,6 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
-        condition : Condition | None
-            Transition condition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -7419,7 +7402,6 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
-                    condition=condition,
                 )
             )
 
@@ -7438,57 +7420,6 @@ class ModelBuilder:
 
         logging.info(
             f"Successfully expanded transition '{id}' into {len(source)} transitions"
-        )
-
-    def create_condition(
-        self,
-        logic: Literal["and", "or"],
-        rules: list[RuleDict],
-    ) -> Condition:
-        """
-        Create a condition object for use in transitions.
-
-        Parameters
-        ----------
-        logic : Literal["and", "or"]
-            How to combine the rules.
-        rules : List[RuleDict]
-            List of rule dictionaries with 'variable', 'operator', and 'value' keys.
-            Each dictionary must have:
-            - 'variable': str (format '<prefix>:<variable_id>')
-            - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"]
-            - 'value': str | int | float | bool
-
-        Returns
-        -------
-        Condition
-            The created condition object.
-
-        Examples
-        --------
-        >>> condition = builder.create_condition(
-        ...     "and",
-        ...     [
-        ...         {"variable": "states:I", "operator": "gt", "value": 0},
-        ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-        ...     ],
-        ... )
-        """
-        rule_objects: list[Rule] = []
-        for rule_dict in rules:
-            rule_objects.append(
-                Rule(
-                    variable=rule_dict["variable"],
-                    operator=rule_dict["operator"],
-                    value=rule_dict["value"],
-                )
-            )
-
-        return Condition(
-            logic=cast(
-                Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
-            ),
-            rules=rule_objects,
         )
 
     def set_initial_conditions(
@@ -7642,22 +7573,19 @@ class ModelBuilder:
         Returns
         -------
         ModelBuilder
-            A new ModelBuilder instance with the same configuration.
+            A new ModelBuilder instance with the same configuration: every
+            bin, accumulator, stratification, transition, parameter and the
+            initial conditions. Changes to one builder do not affect the other.
         """
-
-        new_builder = type(self)(self._name, self._description, self._version)
-
-        new_builder._bins = copy.deepcopy(self._bins)
-        new_builder._stratifications = copy.deepcopy(self._stratifications)
-        new_builder._transitions = copy.deepcopy(self._transitions)
-        new_builder._parameters = copy.deepcopy(self._parameters)
-        new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-        return new_builder
+        return copy.deepcopy(self)
 
     def reset(self) -> Self:
         """
-        Reset the builder to empty state while keeping name, description, and version.
+        Reset the builder to empty state.
+
+        The name, description, version and ``bin_unit`` are kept. Every bin,
+        accumulator, stratification, transition, parameter and the initial
+        conditions are removed.
 
         Returns
         -------
@@ -7665,10 +7593,12 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._bins.clear()
+        self._accumulators.clear()
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._initial_conditions = None
+        self._ts_counter = 0
         return self
 
     def _validate_typology(self, typology: str) -> ModelTypes:
@@ -8101,7 +8031,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, condition: Condition | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | TimePattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -8135,7 +8065,6 @@ Parameters:
 | `target`           | `list[str]`  | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                           |
 | `rate`             | \`str        | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                               |
 | `stratified_rates` | \`list[dict] | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                              |
-| `condition`        | \`Condition  | None\`                                                                                                                                                                                       | A condition stored with the transition. The engine does not evaluate it: the transition runs at every step.                                                                                                                                                                                          |
 | `per_compartment`  | \`bool       | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subpopulation transitions based on its own compartment value rather than the total across all subpopulations. |
 | `accumulators`     | \`list[str]  | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                         |
 
@@ -8161,7 +8090,6 @@ def add_transition(
     target: list[str],
     rate: "str | float | TimePattern | None" = None,
     stratified_rates: list[StratifiedRateDict] | None = None,
-    condition: Condition | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
 ) -> Self:
@@ -8232,10 +8160,6 @@ def add_transition(
         - "conditions": List of dicts with "stratification" and "category" keys
         - "rate": Rate expression string
 
-    condition : Condition | None, default=None
-        A condition stored with the transition. The engine does not evaluate
-        it: the transition runs at every step.
-
     per_compartment : bool | None, default=None
         When True, base compartment names in the rate
         expression are automatically replaced with the specific stratified
@@ -8303,7 +8227,7 @@ def add_transition(
     if rate and "$compartment" in rate:
         self._validate_compartment_placeholder(id, source, target)
         self._expand_compartment_transition(
-            id, source, target, rate, stratified_rates, condition
+            id, source, target, rate, stratified_rates
         )
         return self
 
@@ -8331,7 +8255,6 @@ def add_transition(
             accumulators=accumulators or [],
             rate=rate,
             stratified_rates=stratified_rates_objects,
-            condition=condition,
             per_compartment=per_compartment,
         )
     )
@@ -8344,94 +8267,6 @@ def add_transition(
         )
     )
     return self
-```
-
-#### create_condition
-
-```python
-create_condition(logic: Literal['and', 'or'], rules: list[RuleDict]) -> Condition
-```
-
-Create a condition object for use in transitions.
-
-Parameters:
-
-| Name    | Type                   | Description                                                                                                                                                                                                    | Default    |
-| ------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `logic` | `Literal['and', 'or']` | How to combine the rules.                                                                                                                                                                                      | *required* |
-| `rules` | `List[RuleDict]`       | List of rule dictionaries with 'variable', 'operator', and 'value' keys. Each dictionary must have: - 'variable': str (format ':') - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"] - 'value': str | int        |
-
-Returns:
-
-| Type        | Description                   |
-| ----------- | ----------------------------- |
-| `Condition` | The created condition object. |
-
-Examples:
-
-```pycon
->>> condition = builder.create_condition(
-...     "and",
-...     [
-...         {"variable": "states:I", "operator": "gt", "value": 0},
-...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-...     ],
-... )
-```
-
-Source code in `commol/api/model_builder.py`
-
-```python
-def create_condition(
-    self,
-    logic: Literal["and", "or"],
-    rules: list[RuleDict],
-) -> Condition:
-    """
-    Create a condition object for use in transitions.
-
-    Parameters
-    ----------
-    logic : Literal["and", "or"]
-        How to combine the rules.
-    rules : List[RuleDict]
-        List of rule dictionaries with 'variable', 'operator', and 'value' keys.
-        Each dictionary must have:
-        - 'variable': str (format '<prefix>:<variable_id>')
-        - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"]
-        - 'value': str | int | float | bool
-
-    Returns
-    -------
-    Condition
-        The created condition object.
-
-    Examples
-    --------
-    >>> condition = builder.create_condition(
-    ...     "and",
-    ...     [
-    ...         {"variable": "states:I", "operator": "gt", "value": 0},
-    ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-    ...     ],
-    ... )
-    """
-    rule_objects: list[Rule] = []
-    for rule_dict in rules:
-        rule_objects.append(
-            Rule(
-                variable=rule_dict["variable"],
-                operator=rule_dict["operator"],
-                value=rule_dict["value"],
-            )
-        )
-
-    return Condition(
-        logic=cast(
-            Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
-        ),
-        rules=rule_objects,
-    )
 ```
 
 #### set_initial_conditions
@@ -8639,9 +8474,9 @@ Create a deep copy of this ModelBuilder.
 
 Returns:
 
-| Type           | Description                                              |
-| -------------- | -------------------------------------------------------- |
-| `ModelBuilder` | A new ModelBuilder instance with the same configuration. |
+| Type           | Description                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, transition, parameter and the initial conditions. Changes to one builder do not affect the other. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -8653,18 +8488,11 @@ def clone(self) -> Self:
     Returns
     -------
     ModelBuilder
-        A new ModelBuilder instance with the same configuration.
+        A new ModelBuilder instance with the same configuration: every
+        bin, accumulator, stratification, transition, parameter and the
+        initial conditions. Changes to one builder do not affect the other.
     """
-
-    new_builder = type(self)(self._name, self._description, self._version)
-
-    new_builder._bins = copy.deepcopy(self._bins)
-    new_builder._stratifications = copy.deepcopy(self._stratifications)
-    new_builder._transitions = copy.deepcopy(self._transitions)
-    new_builder._parameters = copy.deepcopy(self._parameters)
-    new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-    return new_builder
+    return copy.deepcopy(self)
 ```
 
 #### reset
@@ -8673,7 +8501,9 @@ def clone(self) -> Self:
 reset() -> Self
 ```
 
-Reset the builder to empty state while keeping name, description, and version.
+Reset the builder to empty state.
+
+The name, description, version and `bin_unit` are kept. Every bin, accumulator, stratification, transition, parameter and the initial conditions are removed.
 
 Returns:
 
@@ -8686,7 +8516,11 @@ Source code in `commol/api/model_builder.py`
 ```python
 def reset(self) -> Self:
     """
-    Reset the builder to empty state while keeping name, description, and version.
+    Reset the builder to empty state.
+
+    The name, description, version and ``bin_unit`` are kept. Every bin,
+    accumulator, stratification, transition, parameter and the initial
+    conditions are removed.
 
     Returns
     -------
@@ -8694,10 +8528,12 @@ def reset(self) -> Self:
         Self for method chaining.
     """
     self._bins.clear()
+    self._accumulators.clear()
     self._stratifications.clear()
     self._transitions.clear()
     self._parameters.clear()
     self._initial_conditions = None
+    self._ts_counter = 0
     return self
 ```
 
@@ -8915,15 +8751,21 @@ class Model(BaseModel):
         """
         Validates that parameter IDs do not conflict with reserved variable names.
 
-        Bin IDs are reserved variables that cannot be used as parameter names.
-        When stratifications are present, base compartment names represent the
-        sum of all stratified versions (e.g., S = S_young + S_old).
-
-        Parameters cannot use these reserved names to avoid conflicts during
-        rate expression evaluation.
+        ``N``, ``step``, ``t``, ``pi`` and ``e`` are engine variables, and bin
+        IDs are the population of each bin. Expanded compartment names and
+        subpopulation totals are checked by the engine
+        (``validate_names_with_engine``).
         """
         bin_ids = {bin_item.id for bin_item in self.population.bins}
         parameter_ids = {p.id for p in self.parameters}
+
+        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
+        if special:
+            raise ValueError(
+                f"Parameter IDs conflict with engine variables: {special}. "
+                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
+                f"Please rename the conflicting parameters."
+            )
 
         conflicting_names = bin_ids & parameter_ids
         if conflicting_names:
@@ -9141,6 +8983,17 @@ class Model(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_names_with_engine(self) -> Self:
+        """
+        Validate parameter ids and subpopulation variables with the engine.
+
+        A parameter id cannot be an expanded compartment or a subpopulation
+        total, and every ``N_…`` variable must name a subpopulation.
+        """
+        engine_state.check_names(self)
+        return self
+
+    @model_validator(mode="after")
     def validate_compartment_fractions(self) -> Self:
         """Validate per-compartment overrides against the engine expansion."""
         if self.population.initial_conditions.compartment_fractions:
@@ -9162,7 +9015,7 @@ class Model(BaseModel):
 
     def _get_valid_identifiers(self) -> set[str]:
         """Gathers all valid identifiers for use in rate expressions."""
-        special_vars = {"N", "step", "pi", "e", "t"}
+        special_vars = set(RESERVED_VARIABLE_NAMES)
         param_ids = {param.id for param in self.parameters}
         bin_ids = {bin_item.id for bin_item in self.population.bins}
 
@@ -9392,16 +9245,22 @@ class Model(BaseModel):
         if undefined_vars:
             param_ids = {param.id for param in self.parameters}
             bin_ids = {bin_item.id for bin_item in self.population.bins}
-            raise ValueError(
-                (
-                    f"Undefined variables in transition '{transition_id}' "
-                    f"{context} '{rate}': {', '.join(undefined_vars)}. "
-                    f"Available parameters: "
-                    f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
-                    f"Available bins: "
-                    f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
-                )
+            message = (
+                f"Undefined variables in transition '{transition_id}' "
+                f"{context} '{rate}': {', '.join(undefined_vars)}. "
+                f"Available parameters: "
+                f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
+                f"Available bins: "
+                f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
             )
+            if any(var.startswith("N_") for var in undefined_vars):
+                n_vars = sorted(self._get_subpopulation_n_vars())
+                message += (
+                    " Subpopulation names follow the declaration order of the "
+                    "stratifications. Available subpopulations: "
+                    f"{', '.join(n_vars) if n_vars else 'none'}."
+                )
+            raise ValueError(message)
 
     @model_validator(mode="after")
     def validate_transition_ids(self) -> Self:
@@ -9522,13 +9381,11 @@ class Model(BaseModel):
         """
         Check unit consistency of all equations in the model.
 
-        This method validates that all transition rates have consistent units.
-        It only performs the check if ALL parameters have units specified.
-        If any parameter lacks a unit, the check is skipped.
-
-        For difference equation models, all rates should have units that result in
-        population change rates (e.g., "person/day" or "1/day" when multiplied by
-        population).
+        The engine applies every flow once per step and converts no value
+        between units. So the check infers one step unit from the parameter
+        units: the one unit of time (``day``, ``week``, ``step``, …) that they
+        use, or ``step`` when they use none. Every flow must then be exactly
+        ``<bin unit>/<step unit>``, such as ``person/day``.
 
         Parameters
         ----------
@@ -9538,14 +9395,15 @@ class Model(BaseModel):
         Raises
         ------
         UnitConsistencyError
-            If unit inconsistencies are found in any equation.
+            If a constant parameter or a bin has no unit, if the parameters use
+            more than one unit of time (``1/day`` and ``1/week``), or if a flow
+            does not have the unit ``<bin unit>/<step unit>``.
         ValueError
             If the model type doesn't support unit checking.
 
         Notes
         -----
-        - Bin variables are assumed to have units of "person"
-        - Predefined variables (N, N_young, etc.) have units of "person"
+        - Predefined variables (N, N_young, etc.) have the bin unit
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
@@ -9697,9 +9555,7 @@ validate_parameter_names_not_reserved() -> Self
 
 Validates that parameter IDs do not conflict with reserved variable names.
 
-Bin IDs are reserved variables that cannot be used as parameter names. When stratifications are present, base compartment names represent the sum of all stratified versions (e.g., S = S_young + S_old).
-
-Parameters cannot use these reserved names to avoid conflicts during rate expression evaluation.
+`N`, `step`, `t`, `pi` and `e` are engine variables, and bin IDs are the population of each bin. Expanded compartment names and subpopulation totals are checked by the engine (`validate_names_with_engine`).
 
 Source code in `commol/context/model.py`
 
@@ -9709,15 +9565,21 @@ def validate_parameter_names_not_reserved(self) -> Self:
     """
     Validates that parameter IDs do not conflict with reserved variable names.
 
-    Bin IDs are reserved variables that cannot be used as parameter names.
-    When stratifications are present, base compartment names represent the
-    sum of all stratified versions (e.g., S = S_young + S_old).
-
-    Parameters cannot use these reserved names to avoid conflicts during
-    rate expression evaluation.
+    ``N``, ``step``, ``t``, ``pi`` and ``e`` are engine variables, and bin
+    IDs are the population of each bin. Expanded compartment names and
+    subpopulation totals are checked by the engine
+    (``validate_names_with_engine``).
     """
     bin_ids = {bin_item.id for bin_item in self.population.bins}
     parameter_ids = {p.id for p in self.parameters}
+
+    special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
+    if special:
+        raise ValueError(
+            f"Parameter IDs conflict with engine variables: {special}. "
+            f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
+            f"Please rename the conflicting parameters."
+        )
 
     conflicting_names = bin_ids & parameter_ids
     if conflicting_names:
@@ -10137,6 +9999,31 @@ def validate_transitions_with_engine(self) -> Self:
     of the compartments the transition starts from.
     """
     engine_state.transition_flows(self)
+    return self
+```
+
+#### validate_names_with_engine
+
+```python
+validate_names_with_engine() -> Self
+```
+
+Validate parameter ids and subpopulation variables with the engine.
+
+A parameter id cannot be an expanded compartment or a subpopulation total, and every `N_…` variable must name a subpopulation.
+
+Source code in `commol/context/model.py`
+
+```python
+@model_validator(mode="after")
+def validate_names_with_engine(self) -> Self:
+    """
+    Validate parameter ids and subpopulation variables with the engine.
+
+    A parameter id cannot be an expanded compartment or a subpopulation
+    total, and every ``N_…`` variable must name a subpopulation.
+    """
+    engine_state.check_names(self)
     return self
 ```
 
@@ -10566,9 +10453,7 @@ check_unit_consistency(verbose: bool = False) -> None
 
 Check unit consistency of all equations in the model.
 
-This method validates that all transition rates have consistent units. It only performs the check if ALL parameters have units specified. If any parameter lacks a unit, the check is skipped.
-
-For difference equation models, all rates should have units that result in population change rates (e.g., "person/day" or "1/day" when multiplied by population).
+The engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `person/day`.
 
 Parameters:
 
@@ -10578,15 +10463,14 @@ Parameters:
 
 Raises:
 
-| Type                   | Description                                        |
-| ---------------------- | -------------------------------------------------- |
-| `UnitConsistencyError` | If unit inconsistencies are found in any equation. |
-| `ValueError`           | If the model type doesn't support unit checking.   |
+| Type                   | Description                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UnitConsistencyError` | If a constant parameter or a bin has no unit, if the parameters use more than one unit of time (1/day and 1/week), or if a flow does not have the unit <bin unit>/<step unit>. |
+| `ValueError`           | If the model type doesn't support unit checking.                                                                                                                               |
 
 Notes
 
-- Bin variables are assumed to have units of "person"
-- Predefined variables (N, N_young, etc.) have units of "person"
+- Predefined variables (N, N_young, etc.) have the bin unit
 - Time step variables (t, step) are dimensionless
 - Mathematical constants (pi, e) are dimensionless
 
@@ -10597,13 +10481,11 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     """
     Check unit consistency of all equations in the model.
 
-    This method validates that all transition rates have consistent units.
-    It only performs the check if ALL parameters have units specified.
-    If any parameter lacks a unit, the check is skipped.
-
-    For difference equation models, all rates should have units that result in
-    population change rates (e.g., "person/day" or "1/day" when multiplied by
-    population).
+    The engine applies every flow once per step and converts no value
+    between units. So the check infers one step unit from the parameter
+    units: the one unit of time (``day``, ``week``, ``step``, …) that they
+    use, or ``step`` when they use none. Every flow must then be exactly
+    ``<bin unit>/<step unit>``, such as ``person/day``.
 
     Parameters
     ----------
@@ -10613,14 +10495,15 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     Raises
     ------
     UnitConsistencyError
-        If unit inconsistencies are found in any equation.
+        If a constant parameter or a bin has no unit, if the parameters use
+        more than one unit of time (``1/day`` and ``1/week``), or if a flow
+        does not have the unit ``<bin unit>/<step unit>``.
     ValueError
         If the model type doesn't support unit checking.
 
     Notes
     -----
-    - Bin variables are assumed to have units of "person"
-    - Predefined variables (N, N_young, etc.) have units of "person"
+    - Predefined variables (N, N_young, etc.) have the bin unit
     - Time step variables (t, step) are dimensionless
     - Mathematical constants (pi, e) are dimensionless
     """
@@ -10757,7 +10640,7 @@ class SimulationPlotter:
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
-        bins: list[str] | None = None,
+        series: list[str] | None = None,
         show_legend: bool = True,
         step_to_label: Callable[[int], str] | None = None,
         tick_every: int | None = None,
@@ -10765,10 +10648,11 @@ class SimulationPlotter:
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
-        Plot simulation results as time series with one subplot per bin.
+        Plot simulation results as time series with one subplot per series.
 
         Creates a figure with subplots arranged in a grid, where each subplot shows
-        the evolution of one bin over time. Optionally overlays observed data points.
+        the evolution of one series over time. Optionally overlays observed data
+        points.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
         Parameters
@@ -10789,8 +10673,11 @@ class SimulationPlotter:
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
-        bins : list[str] | None
-            List of bin IDs to plot. If None, plots all bins.
+        series : list[str] | None
+            What to plot, one subplot each. An entry is an output name (an
+            expanded compartment or accumulator, such as ``A_g1``) or a bin or
+            accumulator id, which plots the sum of its outputs. An exact output
+            name wins over an id. If None, plots every output.
         show_legend : bool
             Whether to show the legend on each subplot. Default True.
         step_to_label : Callable[[int], str] | None
@@ -10809,11 +10696,17 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
+
+        Raises
+        ------
+        ValueError
+            If an entry of ``series`` is neither an output name nor a bin or
+            accumulator id.
         """
         logger.info("Starting plot_series")
 
         config = config or PlotConfig()
-        bins_to_plot = bins if bins is not None else self.bins
+        bins_to_plot = self._series_to_plot(series)
 
         self._apply_seaborn_style(config)
         scale_values = self._extract_scale_values(calibration_result)
@@ -10845,13 +10738,13 @@ class SimulationPlotter:
         | ProbabilisticCalibrationResult
         | None = None,
         config: PlotConfig | None = None,
-        bins: list[str] | None = None,
+        series: list[str] | None = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
         """
-        Plot cumulative (accumulated) simulation results with one subplot per bin.
+        Plot cumulative (accumulated) simulation results with one subplot per series.
 
-        Creates a figure showing the running sum of each bin's values over time.
+        Creates a figure showing the running sum of each series over time.
         Useful for tracking totals, losses, or other accumulated quantities.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -10872,8 +10765,10 @@ class SimulationPlotter:
         config : PlotConfig | None
             Configuration for plot layout and styling (figsize, dpi, layout,
             style, palette, context). If None, uses defaults.
-        bins : list[str] | None
-            List of bin IDs to plot. If None, plots all bins.
+        series : list[str] | None
+            What to plot, one subplot each: an output name or a bin or
+            accumulator id, as in :meth:`plot_series`. If None, plots every
+            output.
         **kwargs : str | int | float | bool | None
             Additional keyword arguments passed to seaborn.lineplot().
             Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -10882,11 +10777,17 @@ class SimulationPlotter:
         -------
         Figure
             The matplotlib Figure object.
+
+        Raises
+        ------
+        ValueError
+            If an entry of ``series`` is neither an output name nor a bin or
+            accumulator id.
         """
         logger.info("Starting plot_cumulative")
 
         config = config or PlotConfig()
-        bins_to_plot = bins if bins is not None else self.bins
+        bins_to_plot = self._series_to_plot(series)
 
         self._apply_seaborn_style(config)
         scale_values = self._extract_scale_values(calibration_result)
@@ -11003,6 +10904,27 @@ class SimulationPlotter:
 
         return dict(grouped)
 
+    def _series_to_plot(self, series: list[str] | None) -> list[str]:
+        """The series to plot, each checked to resolve to outputs."""
+        if series is None:
+            return list(self.bins)
+        for series_id in series:
+            self._series_components(series_id)
+        return list(series)
+
+    def _series_components(self, series_id: str) -> list[str]:
+        """Output names whose sum is the series: itself, or a bin's outputs."""
+        if series_id in self.results:
+            return [series_id]
+        try:
+            return self.simulation.outputs_for(series_id)
+        except KeyError:
+            sources = sorted(self.simulation.model_definition.get_outputs_by_source())
+            raise ValueError(
+                f"'{series_id}' is neither an output nor a bin or accumulator id. "
+                f"Outputs: {self.bins}. Bins and accumulators: {sources}"
+            ) from None
+
     def _observed_component_ids(
         self,
         bin_id: str,
@@ -11011,7 +10933,7 @@ class SimulationPlotter:
         for point in observed:
             if point.compartments:
                 return point.compartments
-        return [bin_id]
+        return self._series_components(bin_id)
 
     @staticmethod
     def _sum_series(
@@ -11485,16 +11407,24 @@ class SimulationPlotter:
         """
         Plot cumulative data for a single bin with probabilistic confidence intervals.
         """
-        if bin_id not in prob_result.selected_ensemble.prediction_median:
+        component_ids = self._series_components(bin_id)
+        ensemble = prob_result.selected_ensemble
+        missing = [
+            component_id
+            for component_id in component_ids
+            if component_id not in ensemble.prediction_median
+        ]
+        if missing:
             logger.warning(
-                f"Bin '{bin_id}' not found in probabilistic result predictions"
+                f"Series '{bin_id}' components not found in probabilistic result "
+                f"predictions: {missing}"
             )
             return
 
         # Calculate cumulative values from the probabilistic predictions
-        median_values = prob_result.selected_ensemble.prediction_median[bin_id]
-        ci_lower = prob_result.selected_ensemble.prediction_ci_lower[bin_id]
-        ci_upper = prob_result.selected_ensemble.prediction_ci_upper[bin_id]
+        median_values = self._sum_series(ensemble.prediction_median, component_ids)
+        ci_lower = self._sum_series(ensemble.prediction_ci_lower, component_ids)
+        ci_upper = self._sum_series(ensemble.prediction_ci_upper, component_ids)
 
         # Calculate cumulative sums
         cumulative_median = np.cumsum(median_values).tolist()
@@ -11564,7 +11494,7 @@ class SimulationPlotter:
         cumulative: dict[str, list[float]] = {}
 
         for bin_id in bins_to_plot:
-            values = self.results[bin_id]
+            values = self._sum_series(self.results, self._series_components(bin_id))
             cumsum = []
             running_total = 0.0
 
@@ -11714,33 +11644,39 @@ def __init__(
 #### plot_series
 
 ```python
-plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, bins: list[str] | None = None, show_legend: bool = True, step_to_label: Callable[[int], str] | None = None, tick_every: int | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
+plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, step_to_label: Callable[[int], str] | None = None, tick_every: int | None = None, x_label: str = 'Step', **kwargs: str | int | float | bool | None) -> Figure
 ```
 
-Plot simulation results as time series with one subplot per bin.
+Plot simulation results as time series with one subplot per series.
 
-Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one bin over time. Optionally overlays observed data points. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one series over time. Optionally overlays observed data points. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
 Parameters:
 
-| Name                 | Type                      | Description                                               | Default                                                                                                                                                                                                                                  |
-| -------------------- | ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                     | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                   |
-| `observed_data`      | \`list[ObservedDataPoint] | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a scale_id will be scaled for plotting using scale values from the calibration_result, so observed values remain in their original units. |
-| `calibration_result` | \`CalibrationResult       | ProbabilisticCalibrationResult                            | None\`                                                                                                                                                                                                                                   |
-| `config`             | \`PlotConfig              | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                       |
-| `bins`               | \`list[str]               | None\`                                                    | List of bin IDs to plot. If None, plots all bins.                                                                                                                                                                                        |
-| `show_legend`        | `bool`                    | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                   |
-| `step_to_label`      | \`Callable\[[int], str\]  | None\`                                                    | Turns a step into an x-axis tick label, such as a date. If None, the ticks show the step.                                                                                                                                                |
-| `tick_every`         | \`int                     | None\`                                                    | Labels every tick_every plotted steps, counted from the first plotted step. If None, labels every plotted step.                                                                                                                          |
-| `x_label`            | `str`                     | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                 |
-| `**kwargs`           | \`str                     | int                                                       | float                                                                                                                                                                                                                                    |
+| Name                 | Type                      | Description                                               | Default                                                                                                                                                                                                                                              |
+| -------------------- | ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`                                                    | Path to save the figure. If None, figure is not saved (only returned).                                                                                                                                                                               |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`                                                    | Optional observed data points to overlay on corresponding bin subplots. Model predictions with a scale_id will be scaled for plotting using scale values from the calibration_result, so observed values remain in their original units.             |
+| `calibration_result` | \`CalibrationResult       | ProbabilisticCalibrationResult                            | None\`                                                                                                                                                                                                                                               |
+| `config`             | \`PlotConfig              | None\`                                                    | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                                                                                   |
+| `series`             | \`list[str]               | None\`                                                    | What to plot, one subplot each. An entry is an output name (an expanded compartment or accumulator, such as A_g1) or a bin or accumulator id, which plots the sum of its outputs. An exact output name wins over an id. If None, plots every output. |
+| `show_legend`        | `bool`                    | Whether to show the legend on each subplot. Default True. | `True`                                                                                                                                                                                                                                               |
+| `step_to_label`      | \`Callable\[[int], str\]  | None\`                                                    | Turns a step into an x-axis tick label, such as a date. If None, the ticks show the step.                                                                                                                                                            |
+| `tick_every`         | \`int                     | None\`                                                    | Labels every tick_every plotted steps, counted from the first plotted step. If None, labels every plotted step.                                                                                                                                      |
+| `x_label`            | `str`                     | The x-axis label. Default "Step".                         | `'Step'`                                                                                                                                                                                                                                             |
+| `**kwargs`           | \`str                     | int                                                       | float                                                                                                                                                                                                                                                |
 
 Returns:
 
 | Type     | Description                   |
 | -------- | ----------------------------- |
 | `Figure` | The matplotlib Figure object. |
+
+Raises:
+
+| Type         | Description                                                                  |
+| ------------ | ---------------------------------------------------------------------------- |
+| `ValueError` | If an entry of series is neither an output name nor a bin or accumulator id. |
 
 Source code in `commol/api/plotter.py`
 
@@ -11753,7 +11689,7 @@ def plot_series(
     | ProbabilisticCalibrationResult
     | None = None,
     config: PlotConfig | None = None,
-    bins: list[str] | None = None,
+    series: list[str] | None = None,
     show_legend: bool = True,
     step_to_label: Callable[[int], str] | None = None,
     tick_every: int | None = None,
@@ -11761,10 +11697,11 @@ def plot_series(
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
     """
-    Plot simulation results as time series with one subplot per bin.
+    Plot simulation results as time series with one subplot per series.
 
     Creates a figure with subplots arranged in a grid, where each subplot shows
-    the evolution of one bin over time. Optionally overlays observed data points.
+    the evolution of one series over time. Optionally overlays observed data
+    points.
     If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
     Parameters
@@ -11785,8 +11722,11 @@ def plot_series(
     config : PlotConfig | None
         Configuration for plot layout and styling (figsize, dpi, layout,
         style, palette, context). If None, uses defaults.
-    bins : list[str] | None
-        List of bin IDs to plot. If None, plots all bins.
+    series : list[str] | None
+        What to plot, one subplot each. An entry is an output name (an
+        expanded compartment or accumulator, such as ``A_g1``) or a bin or
+        accumulator id, which plots the sum of its outputs. An exact output
+        name wins over an id. If None, plots every output.
     show_legend : bool
         Whether to show the legend on each subplot. Default True.
     step_to_label : Callable[[int], str] | None
@@ -11805,11 +11745,17 @@ def plot_series(
     -------
     Figure
         The matplotlib Figure object.
+
+    Raises
+    ------
+    ValueError
+        If an entry of ``series`` is neither an output name nor a bin or
+        accumulator id.
     """
     logger.info("Starting plot_series")
 
     config = config or PlotConfig()
-    bins_to_plot = bins if bins is not None else self.bins
+    bins_to_plot = self._series_to_plot(series)
 
     self._apply_seaborn_style(config)
     scale_values = self._extract_scale_values(calibration_result)
@@ -11837,12 +11783,12 @@ def plot_series(
 #### plot_cumulative
 
 ```python
-plot_cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, bins: list[str] | None = None, **kwargs: str | int | float | bool | None) -> Figure
+plot_cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | ProbabilisticCalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
-Plot cumulative (accumulated) simulation results with one subplot per bin.
+Plot cumulative (accumulated) simulation results with one subplot per series.
 
-Creates a figure showing the running sum of each bin's values over time. Useful for tracking totals, losses, or other accumulated quantities. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure showing the running sum of each series over time. Useful for tracking totals, losses, or other accumulated quantities. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
 Parameters:
 
@@ -11852,7 +11798,7 @@ Parameters:
 | `observed_data`      | \`list[ObservedDataPoint] | None\`                         | Optional observed data points to overlay (also shown as cumulative). Observed data points with a scale_id will be unscaled for plotting using scale values from the calibration_result. |
 | `calibration_result` | \`CalibrationResult       | ProbabilisticCalibrationResult | None\`                                                                                                                                                                                  |
 | `config`             | \`PlotConfig              | None\`                         | Configuration for plot layout and styling (figsize, dpi, layout, style, palette, context). If None, uses defaults.                                                                      |
-| `bins`               | \`list[str]               | None\`                         | List of bin IDs to plot. If None, plots all bins.                                                                                                                                       |
+| `series`             | \`list[str]               | None\`                         | What to plot, one subplot each: an output name or a bin or accumulator id, as in :meth:plot_series. If None, plots every output.                                                        |
 | `**kwargs`           | \`str                     | int                            | float                                                                                                                                                                                   |
 
 Returns:
@@ -11860,6 +11806,12 @@ Returns:
 | Type     | Description                   |
 | -------- | ----------------------------- |
 | `Figure` | The matplotlib Figure object. |
+
+Raises:
+
+| Type         | Description                                                                  |
+| ------------ | ---------------------------------------------------------------------------- |
+| `ValueError` | If an entry of series is neither an output name nor a bin or accumulator id. |
 
 Source code in `commol/api/plotter.py`
 
@@ -11872,13 +11824,13 @@ def plot_cumulative(
     | ProbabilisticCalibrationResult
     | None = None,
     config: PlotConfig | None = None,
-    bins: list[str] | None = None,
+    series: list[str] | None = None,
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
     """
-    Plot cumulative (accumulated) simulation results with one subplot per bin.
+    Plot cumulative (accumulated) simulation results with one subplot per series.
 
-    Creates a figure showing the running sum of each bin's values over time.
+    Creates a figure showing the running sum of each series over time.
     Useful for tracking totals, losses, or other accumulated quantities.
     If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -11899,8 +11851,10 @@ def plot_cumulative(
     config : PlotConfig | None
         Configuration for plot layout and styling (figsize, dpi, layout,
         style, palette, context). If None, uses defaults.
-    bins : list[str] | None
-        List of bin IDs to plot. If None, plots all bins.
+    series : list[str] | None
+        What to plot, one subplot each: an output name or a bin or
+        accumulator id, as in :meth:`plot_series`. If None, plots every
+        output.
     **kwargs : str | int | float | bool | None
         Additional keyword arguments passed to seaborn.lineplot().
         Common parameters: linewidth, alpha, linestyle, marker, etc.
@@ -11909,11 +11863,17 @@ def plot_cumulative(
     -------
     Figure
         The matplotlib Figure object.
+
+    Raises
+    ------
+    ValueError
+        If an entry of ``series`` is neither an output name nor a bin or
+        accumulator id.
     """
     logger.info("Starting plot_cumulative")
 
     config = config or PlotConfig()
-    bins_to_plot = bins if bins is not None else self.bins
+    bins_to_plot = self._series_to_plot(series)
 
     self._apply_seaborn_style(config)
     scale_values = self._extract_scale_values(calibration_result)
@@ -13622,12 +13582,18 @@ Runs a model and reads its outputs. Guide: [Running Simulations](https://munqu.g
 
 A Facade for running a simulation from a defined Model.
 
+The engine follows the model: `run` and `engine` rebuild it when `model_definition` no longer serializes to the JSON the engine was built from, for example after `Model.update_parameters`.
+
 Source code in `commol/api/simulation.py`
 
 ```python
 class Simulation:
     """
     A Facade for running a simulation from a defined Model.
+
+    The engine follows the model: ``run`` and ``engine`` rebuild it when
+    ``model_definition`` no longer serializes to the JSON the engine was built
+    from, for example after ``Model.update_parameters``.
     """
 
     def __init__(self, model: Model):
@@ -13643,18 +13609,26 @@ class Simulation:
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
+        self._build_engine(model.model_dump_json())
 
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
-
-        self._compartments: list[str] = self._engine.compartments
-        self._simulation_outputs: list[str] = getattr(
-            self._engine,
-            "output_names",
-            self._compartments,
+    def _build_engine(self, model_json: str) -> None:
+        """Build the engine and its output names from a model JSON."""
+        self._model_json: str = model_json
+        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine(
+            model_json
         )
+        self._compartments: list[str] = self._engine.compartments
+        self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
+
+    def _sync_engine(self) -> None:
+        """Rebuild the engine when the model changed since it was built."""
+        model_json = self.model_definition.model_dump_json()
+        if model_json != self._model_json:
+            logging.info("Model changed since the engine was built; rebuilding it.")
+            self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
         """
@@ -13691,11 +13665,8 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def _initialize_engine(self) -> "DifferenceEquationsProtocol":
+    def _initialize_engine(self, model_json: str) -> "DifferenceEquationsProtocol":
         """Internal method to set up the Rust backend."""
-        logging.info("Preparing model definition for Rust serialization...")
-        model_json = self.model_definition.model_dump_json()
-
         rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
         logging.info("Rust model instance created from JSON.")
 
@@ -13739,7 +13710,11 @@ class Simulation:
         output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
     ) -> dict[str, list[float]] | list[list[float]]:
         """
-        Runs the simulation and returns the output in the specified format.
+        Runs the simulation from the initial state.
+
+        Every call starts at step 0 with the current ``model_definition``, so
+        two calls with the same model give the same result. To continue a run
+        step by step, call ``simulation.engine.step()``.
 
         Parameters
         ----------
@@ -13755,8 +13730,15 @@ class Simulation:
         -------
         dict[str, list[float]] | list[list[float]]
             The simulation results in the specified format.
+
+        Raises
+        ------
+        ValueError
+            If a parameter or initial condition has no value.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
+        self._sync_engine()
+        self._engine.reset()
         raw_results = self._run_raw(num_steps)
         if output_format == "list_of_lists":
             logging.info("Returning results in 'list_of_lists' format.")
@@ -13777,12 +13759,20 @@ class Simulation:
 
     @property
     def engine(self) -> "DifferenceEquationsProtocol":
-        """Get the underlying simulation engine."""
+        """
+        The engine for the current ``model_definition``.
+
+        It is rebuilt, at step 0, when the model changed since it was built.
+        Otherwise it is the same object, in the state the last ``run`` or
+        ``step`` left it.
+        """
+        self._sync_engine()
         return self._engine
 
     @property
     def simulation_outputs(self) -> list[str]:
         """Names of the columns returned by simulation runs."""
+        self._sync_engine()
         return self._simulation_outputs
 
     def outputs_for(self, source_id: str) -> list[str]:
@@ -13924,7 +13914,9 @@ class Simulation:
 engine: DifferenceEquationsProtocol
 ```
 
-Get the underlying simulation engine.
+The engine for the current `model_definition`.
+
+It is rebuilt, at step 0, when the model changed since it was built. Otherwise it is the same object, in the state the last `run` or `step` left it.
 
 #### simulation_outputs
 
@@ -13966,18 +13958,7 @@ def __init__(self, model: Model):
     """
     logging.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
-
-    self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
-
-    self._compartments: list[str] = self._engine.compartments
-    self._simulation_outputs: list[str] = getattr(
-        self._engine,
-        "output_names",
-        self._compartments,
-    )
-    logging.info(
-        f"Simulation engine ready. Total compartments: {len(self._compartments)}"
-    )
+    self._build_engine(model.model_dump_json())
 ```
 
 #### run
@@ -13998,7 +13979,9 @@ run(num_steps: int) -> dict[str, list[float]]
 run(num_steps: int, output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
 ```
 
-Runs the simulation and returns the output in the specified format.
+Runs the simulation from the initial state.
+
+Every call starts at step 0 with the current `model_definition`, so two calls with the same model give the same result. To continue a run step by step, call `simulation.engine.step()`.
 
 Parameters:
 
@@ -14013,6 +13996,12 @@ Returns:
 | -------------------------- | --------------------- |
 | \`dict\[str, list[float]\] | list\[list[float]\]\` |
 
+Raises:
+
+| Type         | Description                                       |
+| ------------ | ------------------------------------------------- |
+| `ValueError` | If a parameter or initial condition has no value. |
+
 Source code in `commol/api/simulation.py`
 
 ```python
@@ -14022,7 +14011,11 @@ def run(
     output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
 ) -> dict[str, list[float]] | list[list[float]]:
     """
-    Runs the simulation and returns the output in the specified format.
+    Runs the simulation from the initial state.
+
+    Every call starts at step 0 with the current ``model_definition``, so
+    two calls with the same model give the same result. To continue a run
+    step by step, call ``simulation.engine.step()``.
 
     Parameters
     ----------
@@ -14038,8 +14031,15 @@ def run(
     -------
     dict[str, list[float]] | list[list[float]]
         The simulation results in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If a parameter or initial condition has no value.
     """
     self._validate_all_parameters_calibrated(self.model_definition)
+    self._sync_engine()
+    self._engine.reset()
     raw_results = self._run_raw(num_steps)
     if output_format == "list_of_lists":
         logging.info("Returning results in 'list_of_lists' format.")
@@ -15877,10 +15877,8 @@ Model                      name, description, version
 └── dynamics: Dynamics
     ├── typology: "DifferenceEquations"
     └── transitions: [Transition]
-        ├── stratified_rates: [StratifiedRate]
-        │   └── conditions: [StratificationCondition]
-        └── condition: Condition           (stored, not evaluated)
-            └── rules: [Rule]
+        └── stratified_rates: [StratifiedRate]
+            └── conditions: [StratificationCondition]
 ```
 
 `Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
@@ -17004,7 +17002,6 @@ Attributes:
 | `target`           | `list[str]`            | The destination compartments. |
 | `rate`             | \`str                  | None\`                        |
 | `stratified_rates` | \`list[StratifiedRate] | None\`                        |
-| `condition`        | \`Condition            | None\`                        |
 
 Source code in `commol/context/dynamics.py`
 
@@ -17041,8 +17038,6 @@ class Transition(BaseModel):
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
         all specified stratification conditions.
-    condition : Condition | None
-        Logical restrictions for the transition.
     """
 
     id: str = Field(default=..., description="Id of the transition.")
@@ -17065,10 +17060,6 @@ class Transition(BaseModel):
 
     stratified_rates: list[StratifiedRate] | None = Field(
         default=None, description="List of stratification-specific rates"
-    )
-
-    condition: Condition | None = Field(
-        default=None, description="Logical restrictions for the transition."
     )
 
     per_compartment: bool | None = Field(
@@ -17279,173 +17270,6 @@ def validate_rate(cls, value: str) -> str:
     except ValueError as e:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
-```
-
-## Condition
-
-Bases: `BaseModel`
-
-Defines a set of logical restrictions for a transition.
-
-Attributes:
-
-| Name    | Type                   | Description                                 |
-| ------- | ---------------------- | ------------------------------------------- |
-| `logic` | `Literal['and', 'or']` | How to combine the rules.                   |
-| `rules` | `List[Rule]`           | A list of rules that make up the condition. |
-
-Source code in `commol/context/dynamics.py`
-
-```python
-class Condition(BaseModel):
-    """
-    Defines a set of logical restrictions for a transition.
-
-    Attributes
-    ----------
-    logic : Literal["and", "or"]
-        How to combine the rules.
-    rules : List[Rule]
-        A list of rules that make up the condition.
-    """
-
-    logic: Literal[LogicOperators.AND, LogicOperators.OR] = Field(
-        default=...,
-        description="How to combine the rules. Allowed operators: ['and', 'or']",
-    )
-    rules: list[Rule]
-```
-
-## Rule
-
-Bases: `BaseModel`
-
-A simple logical rule that compares a variable with a value.
-
-Attributes:
-
-| Name       | Type                                             | Description                                                                                           |
-| ---------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `variable` | `str`                                            | The variable to evaluate. Must follow the format ':'. The allowed prefixes are: ['states', 'strati']. |
-| `operator` | `Literal['eq', 'neq', 'gt', 'get', 'lt', 'let']` | The comparison operator.                                                                              |
-| `value`    | `Union[str, int, float, bool]`                   | The value to which the variable is compared.                                                          |
-
-Source code in `commol/context/dynamics.py`
-
-```python
-class Rule(BaseModel):
-    """
-    A simple logical rule that compares a variable with a value.
-
-    Attributes
-    ----------
-    variable : str
-        The variable to evaluate. Must follow the format '<prefix>:<variable_id>'. The
-        allowed prefixes are: ['states', 'strati'].
-    operator : Literal["eq", "neq", "gt", "get", "lt", "let"]
-        The comparison operator.
-    value : Union[str, int, float, bool]
-        The value to which the variable is compared.
-    """
-
-    variable: str = Field(
-        default=...,
-        description=(
-            "Variable to evaluate. Must follow the format '<prefix>:<variable_id>'. "
-            "The allowed prefixes are: ['states', 'strati']."
-        ),
-    )
-    operator: Literal[
-        LogicOperators.EQ,
-        LogicOperators.NEQ,
-        LogicOperators.GT,
-        LogicOperators.GET,
-        LogicOperators.LT,
-        LogicOperators.LET,
-    ] = Field(default=..., description="Comparison operator.")
-    value: str | int | float | bool = Field(
-        default=..., description="Value to which the variable is compared."
-    )
-
-    @model_validator(mode="after")
-    def validate_variable_predecessor(self) -> Self:
-        """
-        Enforces that the 'variable' field is correctly formatted as
-        '<prefix>:<id>' and uses an allowed prefix.
-        """
-        parts = self.variable.split(PREFIX_SEPARATOR, 1)
-
-        if len(parts) != 2:
-            raise ValueError(
-                (
-                    f"Variable '{self.variable}' must contain exactly one "
-                    f"'{PREFIX_SEPARATOR}' to separate the predecessor and the id."
-                )
-            )
-
-        predecessor, var_id = parts
-
-        if predecessor not in VALID_PREFIXES:
-            raise ValueError(
-                (
-                    f"Variable predecessor must be one of {VALID_PREFIXES}. "
-                    f"Found '{predecessor}' in variable '{self.variable}'."
-                )
-            )
-
-        if not var_id:
-            raise ValueError(
-                f"Variable id must not be empty. Found empty id in '{self.variable}'."
-            )
-
-        return self
-```
-
-### Methods:
-
-#### validate_variable_predecessor
-
-```python
-validate_variable_predecessor() -> Self
-```
-
-Enforces that the 'variable' field is correctly formatted as ':' and uses an allowed prefix.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@model_validator(mode="after")
-def validate_variable_predecessor(self) -> Self:
-    """
-    Enforces that the 'variable' field is correctly formatted as
-    '<prefix>:<id>' and uses an allowed prefix.
-    """
-    parts = self.variable.split(PREFIX_SEPARATOR, 1)
-
-    if len(parts) != 2:
-        raise ValueError(
-            (
-                f"Variable '{self.variable}' must contain exactly one "
-                f"'{PREFIX_SEPARATOR}' to separate the predecessor and the id."
-            )
-        )
-
-    predecessor, var_id = parts
-
-    if predecessor not in VALID_PREFIXES:
-        raise ValueError(
-            (
-                f"Variable predecessor must be one of {VALID_PREFIXES}. "
-                f"Found '{predecessor}' in variable '{self.variable}'."
-            )
-        )
-
-    if not var_id:
-        raise ValueError(
-            f"Variable id must not be empty. Found empty id in '{self.variable}'."
-        )
-
-    return self
 ```
 
 ## Initial conditions
@@ -18706,9 +18530,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead of `bins`. An entry is an output name or a bin or accumulator id; an id plots the sum of its outputs, so a bin of a stratified model can be plotted. There is no `bins` alias: rename the argument.
+- Every loss uses the observation weights the same way: `"sse"` is `Σ w·r²`, `"rmse"` is `√(Σ w·r² / Σ w)` and `"mae"` is `Σ w·|r| / Σ w`. Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With every weight at 1 nothing changes. The ensemble central loss follows the same rule.
+- `Simulation.run` starts from the initial state at every call, so two calls give the same result. Before, a second `run` continued the first one. To continue a run, call `simulation.engine.step()`.
+- `Model.check_unit_consistency` infers one step unit from the parameter units (`day`, `week`, `step`, …; `step` when there is none) and requires every flow to be exactly `<bin unit>/<step unit>`. A model in `"1/step"` now passes. Rates in two units of time, such as `"1/day"` and `"1/week"`, are an error that names each parameter, because the engine converts nothing. Before, the check accepted any convertible unit and defaulted to `day`.
+- Nelder-Mead searches inside the bounds: it optimizes an unbounded coordinate and scores `x = lo + (hi − lo)·(sin u + 1)/2`. Its first simplex is set by `NelderMeadConfig.initial_step` (a fraction of each bound width, default 0.1), which replaces `simplex_perturbation`; there is no alias. Every Nelder-Mead result can change.
+
+### Removed
+
+- Transition conditions: `Transition.condition`, the `condition` argument of `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the `Condition` and `Rule` types, and the `LogicOperators` and `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated them, so a condition that was never true still moved population. Write the condition in the rate (`"if(step > 30, k, 0)"`), or use a `TimePattern` or a stratified rate. A model file with a `condition` key still loads; the key is ignored.
+- The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`, which uses the weights.
+
+### Fixed
+
+- `CalibrationResult.converged` is `True` only when the optimizer met its convergence test or `target_cost`. Before, every finished run reported `True`, also one that stopped at `max_iterations`.
+- Nelder-Mead from a start value of 0 builds a real simplex, and no longer stops at a bound where the clamped loss is flat. Before, the simplex was degenerate at 0, and could collapse on a bound and report `converged=True`.
+- The verbose Nelder-Mead run uses the configured simplex. Before, it always used a 10% perturbation.
+- `Model.check_unit_consistency` names every bin without a unit. Before, it failed with "'None' is not defined in the unit registry".
+- A `Simulation` follows its model: `run` and `engine` rebuild the engine when the model changed after the `Simulation` was created, for example with `update_parameters` or `apply_calibration_parameters`. Before, it used the old values, or failed with "Parameter index … not found" for a parameter that was `None`.
+- `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before, outside a function argument, the simulation failed with "Variable 'pi' not found".
+- `%` (remainder) works as the only operator of a rate, as in `"step % 7"`. Before, the rate was read as a parameter name.
+- An `N_…` variable that names no subpopulation, such as `N_t1_g1` when `group` is declared before `type`, is a build error that lists the valid names. Before, a formula parameter or the engine gave it the value 0.
+- A parameter id cannot be `N`, `step`, `t`, `pi`, `e`, an expanded compartment or a subpopulation total. Before, only bin ids were rejected, and the parameter and the engine variable shared one value.
+- `ModelBuilder.reset` removes the accumulators, and `ModelBuilder.clone` copies them and the `bin_unit`. Before, `reset` kept the accumulators and a clone lost them.
+- An `initial_condition` id is resolved by the engine when the `Calibrator` or the `ProbabilisticCalibrator` is created. A category of a non-binary stratification now gives "needs a binary stratification" instead of "not found", and bin prefixes (`"B_g1"`) and qualified categories (`"group:g1"`) are accepted, as documented. Before, both were rejected as "not found".
+
 ### Documentation
 
-- The guide is rewritten and split into pages with one job each (building models, transitions, expressions, time patterns, units, simulations, and six calibration pages). Every example runs in CI, and every claim was checked against the engine. Behaviors that were described wrongly are now documented as they are, among them: transition `condition`s are not evaluated, a second `Simulation.run` continues the first one, a `Simulation` keeps the model it was created with, `"sse"` uses observation weights (squared), and a violated constraint replaces the loss with a penalty.
+- The guide is rewritten and split into pages with one job each (building models, transitions, expressions, time patterns, units, simulations, and six calibration pages). Every example runs in CI, and every claim was checked against the engine. Behaviors that were described wrongly are now documented as they are, among them: a violated constraint replaces the loss with a penalty.
 - The API reference documents every public name, and `Model`, plotting and reports have their own pages.
 - The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks the pages of the `dev` version.
 - `README.md` is a short landing page with links to the documentation.

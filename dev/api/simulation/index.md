@@ -8,12 +8,18 @@ Runs a model and reads its outputs. Guide: [Running Simulations](https://munqu.g
 
 A Facade for running a simulation from a defined Model.
 
+The engine follows the model: `run` and `engine` rebuild it when `model_definition` no longer serializes to the JSON the engine was built from, for example after `Model.update_parameters`.
+
 Source code in `commol/api/simulation.py`
 
 ```python
 class Simulation:
     """
     A Facade for running a simulation from a defined Model.
+
+    The engine follows the model: ``run`` and ``engine`` rebuild it when
+    ``model_definition`` no longer serializes to the JSON the engine was built
+    from, for example after ``Model.update_parameters``.
     """
 
     def __init__(self, model: Model):
@@ -29,18 +35,26 @@ class Simulation:
         """
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
+        self._build_engine(model.model_dump_json())
 
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
-
-        self._compartments: list[str] = self._engine.compartments
-        self._simulation_outputs: list[str] = getattr(
-            self._engine,
-            "output_names",
-            self._compartments,
+    def _build_engine(self, model_json: str) -> None:
+        """Build the engine and its output names from a model JSON."""
+        self._model_json: str = model_json
+        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine(
+            model_json
         )
+        self._compartments: list[str] = self._engine.compartments
+        self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
             f"Simulation engine ready. Total compartments: {len(self._compartments)}"
         )
+
+    def _sync_engine(self) -> None:
+        """Rebuild the engine when the model changed since it was built."""
+        model_json = self.model_definition.model_dump_json()
+        if model_json != self._model_json:
+            logging.info("Model changed since the engine was built; rebuilding it.")
+            self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
         """
@@ -77,11 +91,8 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def _initialize_engine(self) -> "DifferenceEquationsProtocol":
+    def _initialize_engine(self, model_json: str) -> "DifferenceEquationsProtocol":
         """Internal method to set up the Rust backend."""
-        logging.info("Preparing model definition for Rust serialization...")
-        model_json = self.model_definition.model_dump_json()
-
         rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
         logging.info("Rust model instance created from JSON.")
 
@@ -125,7 +136,11 @@ class Simulation:
         output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
     ) -> dict[str, list[float]] | list[list[float]]:
         """
-        Runs the simulation and returns the output in the specified format.
+        Runs the simulation from the initial state.
+
+        Every call starts at step 0 with the current ``model_definition``, so
+        two calls with the same model give the same result. To continue a run
+        step by step, call ``simulation.engine.step()``.
 
         Parameters
         ----------
@@ -141,8 +156,15 @@ class Simulation:
         -------
         dict[str, list[float]] | list[list[float]]
             The simulation results in the specified format.
+
+        Raises
+        ------
+        ValueError
+            If a parameter or initial condition has no value.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
+        self._sync_engine()
+        self._engine.reset()
         raw_results = self._run_raw(num_steps)
         if output_format == "list_of_lists":
             logging.info("Returning results in 'list_of_lists' format.")
@@ -163,12 +185,20 @@ class Simulation:
 
     @property
     def engine(self) -> "DifferenceEquationsProtocol":
-        """Get the underlying simulation engine."""
+        """
+        The engine for the current ``model_definition``.
+
+        It is rebuilt, at step 0, when the model changed since it was built.
+        Otherwise it is the same object, in the state the last ``run`` or
+        ``step`` left it.
+        """
+        self._sync_engine()
         return self._engine
 
     @property
     def simulation_outputs(self) -> list[str]:
         """Names of the columns returned by simulation runs."""
+        self._sync_engine()
         return self._simulation_outputs
 
     def outputs_for(self, source_id: str) -> list[str]:
@@ -310,7 +340,9 @@ class Simulation:
 engine: DifferenceEquationsProtocol
 ```
 
-Get the underlying simulation engine.
+The engine for the current `model_definition`.
+
+It is rebuilt, at step 0, when the model changed since it was built. Otherwise it is the same object, in the state the last `run` or `step` left it.
 
 #### simulation_outputs
 
@@ -352,18 +384,7 @@ def __init__(self, model: Model):
     """
     logging.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
-
-    self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
-
-    self._compartments: list[str] = self._engine.compartments
-    self._simulation_outputs: list[str] = getattr(
-        self._engine,
-        "output_names",
-        self._compartments,
-    )
-    logging.info(
-        f"Simulation engine ready. Total compartments: {len(self._compartments)}"
-    )
+    self._build_engine(model.model_dump_json())
 ```
 
 #### run
@@ -384,7 +405,9 @@ run(num_steps: int) -> dict[str, list[float]]
 run(num_steps: int, output_format: Literal['dict_of_lists', 'list_of_lists'] = 'dict_of_lists') -> dict[str, list[float]] | list[list[float]]
 ```
 
-Runs the simulation and returns the output in the specified format.
+Runs the simulation from the initial state.
+
+Every call starts at step 0 with the current `model_definition`, so two calls with the same model give the same result. To continue a run step by step, call `simulation.engine.step()`.
 
 Parameters:
 
@@ -399,6 +422,12 @@ Returns:
 | -------------------------- | --------------------- |
 | \`dict\[str, list[float]\] | list\[list[float]\]\` |
 
+Raises:
+
+| Type         | Description                                       |
+| ------------ | ------------------------------------------------- |
+| `ValueError` | If a parameter or initial condition has no value. |
+
 Source code in `commol/api/simulation.py`
 
 ```python
@@ -408,7 +437,11 @@ def run(
     output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
 ) -> dict[str, list[float]] | list[list[float]]:
     """
-    Runs the simulation and returns the output in the specified format.
+    Runs the simulation from the initial state.
+
+    Every call starts at step 0 with the current ``model_definition``, so
+    two calls with the same model give the same result. To continue a run
+    step by step, call ``simulation.engine.step()``.
 
     Parameters
     ----------
@@ -424,8 +457,15 @@ def run(
     -------
     dict[str, list[float]] | list[list[float]]
         The simulation results in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If a parameter or initial condition has no value.
     """
     self._validate_all_parameters_calibrated(self.model_definition)
+    self._sync_engine()
+    self._engine.reset()
     raw_results = self._run_raw(num_steps)
     if output_format == "list_of_lists":
         logging.info("Returning results in 'list_of_lists' format.")

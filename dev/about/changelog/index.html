@@ -2083,6 +2083,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2122,7 +2155,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2133,7 +2166,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -2292,6 +2325,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2331,7 +2397,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -2342,7 +2408,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -2472,16 +2538,94 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>SimulationPlotter.plot_series</code> and <code>plot_cumulative</code> take <code>series</code> instead
+  of <code>bins</code>. An entry is an output name or a bin or accumulator id; an id plots
+  the sum of its outputs, so a bin of a stratified model can be plotted. There
+  is no <code>bins</code> alias: rename the argument.</li>
+<li>Every loss uses the observation weights the same way: <code>"sse"</code> is
+  <code>Σ w·r²</code>, <code>"rmse"</code> is <code>√(Σ w·r² / Σ w)</code> and <code>"mae"</code> is <code>Σ w·|r| / Σ w</code>.
+  Before, <code>"sse"</code> squared the weight and <code>"rmse"</code> and <code>"mae"</code> ignored it. With
+  every weight at 1 nothing changes. The ensemble central loss follows the same
+  rule.</li>
+<li><code>Simulation.run</code> starts from the initial state at every call, so two calls
+  give the same result. Before, a second <code>run</code> continued the first one. To
+  continue a run, call <code>simulation.engine.step()</code>.</li>
+<li>
+<p><code>Model.check_unit_consistency</code> infers one step unit from the parameter
+  units (<code>day</code>, <code>week</code>, <code>step</code>, …; <code>step</code> when there is none) and requires
+  every flow to be exactly <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>. A model in <code>"1/step"</code> now
+  passes. Rates in two units of time, such as <code>"1/day"</code> and <code>"1/week"</code>, are an
+  error that names each parameter, because the engine converts nothing. Before,
+  the check accepted any convertible unit and defaulted to <code>day</code>.</p>
+</li>
+<li>
+<p>Nelder-Mead searches inside the bounds: it optimizes an unbounded
+  coordinate and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>. Its first simplex
+  is set by <code>NelderMeadConfig.initial_step</code> (a fraction of each bound width,
+  default 0.1), which replaces <code>simplex_perturbation</code>; there is no alias. Every
+  Nelder-Mead result can change.</p>
+</li>
+</ul>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Transition conditions: <code>Transition.condition</code>, the <code>condition</code> argument of
+  <code>ModelBuilder.add_transition</code>, <code>ModelBuilder.create_condition</code>, the
+  <code>Condition</code> and <code>Rule</code> types, and the <code>LogicOperators</code> and
+  <code>VariablePrefixes</code> enums, in Python and in Rust. The engine never evaluated
+  them, so a condition that was never true still moved population. Write the
+  condition in the rate (<code>"if(step &gt; 30, k, 0)"</code>), or use a <code>TimePattern</code> or a
+  stratified rate. A model file with a <code>condition</code> key still loads; the key is
+  ignored.</li>
+<li>The <code>"weighted_sse"</code> loss and <code>LossConfig.weighted_sse()</code>. Use <code>"sse"</code>,
+  which uses the weights.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>CalibrationResult.converged</code> is <code>True</code> only when the optimizer met its
+  convergence test or <code>target_cost</code>. Before, every finished run reported
+  <code>True</code>, also one that stopped at <code>max_iterations</code>.</li>
+<li>Nelder-Mead from a start value of 0 builds a real simplex, and no longer
+  stops at a bound where the clamped loss is flat. Before, the simplex was
+  degenerate at 0, and could collapse on a bound and report <code>converged=True</code>.</li>
+<li>The verbose Nelder-Mead run uses the configured simplex. Before, it always
+  used a 10% perturbation.</li>
+<li><code>Model.check_unit_consistency</code> names every bin without a unit. Before, it
+  failed with "'None' is not defined in the unit registry".</li>
+<li>A <code>Simulation</code> follows its model: <code>run</code> and <code>engine</code> rebuild the engine when
+  the model changed after the <code>Simulation</code> was created, for example with
+  <code>update_parameters</code> or <code>apply_calibration_parameters</code>. Before, it used the
+  old values, or failed with "Parameter index … not found" for a parameter
+  that was <code>None</code>.</li>
+<li><code>pi</code> and <code>e</code> work in every transition rate, such as <code>"pi * k * A"</code>. Before,
+  outside a function argument, the simulation failed with "Variable 'pi' not
+  found".</li>
+<li><code>%</code> (remainder) works as the only operator of a rate, as in <code>"step % 7"</code>.
+  Before, the rate was read as a parameter name.</li>
+<li>An <code>N_…</code> variable that names no subpopulation, such as <code>N_t1_g1</code> when
+  <code>group</code> is declared before <code>type</code>, is a build error that lists the valid
+  names. Before, a formula parameter or the engine gave it the value 0.</li>
+<li>A parameter id cannot be <code>N</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>, an expanded
+  compartment or a subpopulation total. Before, only bin ids were rejected, and
+  the parameter and the engine variable shared one value.</li>
+<li><code>ModelBuilder.reset</code> removes the accumulators, and <code>ModelBuilder.clone</code>
+  copies them and the <code>bin_unit</code>. Before, <code>reset</code> kept the accumulators and a
+  clone lost them.</li>
+<li>An <code>initial_condition</code> id is resolved by the engine when the <code>Calibrator</code>
+  or the <code>ProbabilisticCalibrator</code> is created. A category of a non-binary
+  stratification now gives "needs a binary stratification" instead of "not
+  found", and bin prefixes (<code>"B_g1"</code>) and qualified categories (<code>"group:g1"</code>)
+  are accepted, as documented. Before, both were rejected as "not found".</li>
+</ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The guide is rewritten and split into pages with one job each (building
   models, transitions, expressions, time patterns, units, simulations, and six
   calibration pages). Every example runs in CI, and every claim was checked
   against the engine. Behaviors that were described wrongly are now documented
-  as they are, among them: transition <code>condition</code>s are not evaluated, a second
-  <code>Simulation.run</code> continues the first one, a <code>Simulation</code> keeps the model it
-  was created with, <code>"sse"</code> uses observation weights (squared), and a violated
-  constraint replaces the loss with a penalty.</li>
+  as they are, among them: a violated constraint replaces the loss with a
+  penalty.</li>
 <li>The API reference documents every public name, and <code>Model</code>, plotting and
   reports have their own pages.</li>
 <li>The site publishes <code>llms.txt</code> and <code>llms-full.txt</code> for AI agents, and marks
@@ -2505,7 +2649,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   calibration objective, the calibrated predictions and the model write-back
   share one implementation of how calibration values reach the engine.</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Breaking:</strong> calibrated initial conditions no longer auto-calculate the
   last population-fraction value as the remainder of the population. The new
@@ -2563,7 +2707,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   built from output labels, so a bin <code>A</code> no longer sums the outputs of a bin
   <code>A_x</code>.</li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A transition between bins no longer moves bins whose id starts with the
   source bin id: <code>A -&gt; B</code> moved <code>AB -&gt; BB</code> as well.</li>

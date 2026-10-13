@@ -21,10 +21,8 @@ Model                      name, description, version
 └── dynamics: Dynamics
     ├── typology: "DifferenceEquations"
     └── transitions: [Transition]
-        ├── stratified_rates: [StratifiedRate]
-        │   └── conditions: [StratificationCondition]
-        └── condition: Condition           (stored, not evaluated)
-            └── rules: [Rule]
+        └── stratified_rates: [StratifiedRate]
+            └── conditions: [StratificationCondition]
 ```
 
 `Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
@@ -1148,7 +1146,6 @@ Attributes:
 | `target`           | `list[str]`            | The destination compartments. |
 | `rate`             | \`str                  | None\`                        |
 | `stratified_rates` | \`list[StratifiedRate] | None\`                        |
-| `condition`        | \`Condition            | None\`                        |
 
 Source code in `commol/context/dynamics.py`
 
@@ -1185,8 +1182,6 @@ class Transition(BaseModel):
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
         all specified stratification conditions.
-    condition : Condition | None
-        Logical restrictions for the transition.
     """
 
     id: str = Field(default=..., description="Id of the transition.")
@@ -1209,10 +1204,6 @@ class Transition(BaseModel):
 
     stratified_rates: list[StratifiedRate] | None = Field(
         default=None, description="List of stratification-specific rates"
-    )
-
-    condition: Condition | None = Field(
-        default=None, description="Logical restrictions for the transition."
     )
 
     per_compartment: bool | None = Field(
@@ -1423,173 +1414,6 @@ def validate_rate(cls, value: str) -> str:
     except ValueError as e:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
-```
-
-## Condition
-
-Bases: `BaseModel`
-
-Defines a set of logical restrictions for a transition.
-
-Attributes:
-
-| Name    | Type                   | Description                                 |
-| ------- | ---------------------- | ------------------------------------------- |
-| `logic` | `Literal['and', 'or']` | How to combine the rules.                   |
-| `rules` | `List[Rule]`           | A list of rules that make up the condition. |
-
-Source code in `commol/context/dynamics.py`
-
-```python
-class Condition(BaseModel):
-    """
-    Defines a set of logical restrictions for a transition.
-
-    Attributes
-    ----------
-    logic : Literal["and", "or"]
-        How to combine the rules.
-    rules : List[Rule]
-        A list of rules that make up the condition.
-    """
-
-    logic: Literal[LogicOperators.AND, LogicOperators.OR] = Field(
-        default=...,
-        description="How to combine the rules. Allowed operators: ['and', 'or']",
-    )
-    rules: list[Rule]
-```
-
-## Rule
-
-Bases: `BaseModel`
-
-A simple logical rule that compares a variable with a value.
-
-Attributes:
-
-| Name       | Type                                             | Description                                                                                           |
-| ---------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `variable` | `str`                                            | The variable to evaluate. Must follow the format ':'. The allowed prefixes are: ['states', 'strati']. |
-| `operator` | `Literal['eq', 'neq', 'gt', 'get', 'lt', 'let']` | The comparison operator.                                                                              |
-| `value`    | `Union[str, int, float, bool]`                   | The value to which the variable is compared.                                                          |
-
-Source code in `commol/context/dynamics.py`
-
-```python
-class Rule(BaseModel):
-    """
-    A simple logical rule that compares a variable with a value.
-
-    Attributes
-    ----------
-    variable : str
-        The variable to evaluate. Must follow the format '<prefix>:<variable_id>'. The
-        allowed prefixes are: ['states', 'strati'].
-    operator : Literal["eq", "neq", "gt", "get", "lt", "let"]
-        The comparison operator.
-    value : Union[str, int, float, bool]
-        The value to which the variable is compared.
-    """
-
-    variable: str = Field(
-        default=...,
-        description=(
-            "Variable to evaluate. Must follow the format '<prefix>:<variable_id>'. "
-            "The allowed prefixes are: ['states', 'strati']."
-        ),
-    )
-    operator: Literal[
-        LogicOperators.EQ,
-        LogicOperators.NEQ,
-        LogicOperators.GT,
-        LogicOperators.GET,
-        LogicOperators.LT,
-        LogicOperators.LET,
-    ] = Field(default=..., description="Comparison operator.")
-    value: str | int | float | bool = Field(
-        default=..., description="Value to which the variable is compared."
-    )
-
-    @model_validator(mode="after")
-    def validate_variable_predecessor(self) -> Self:
-        """
-        Enforces that the 'variable' field is correctly formatted as
-        '<prefix>:<id>' and uses an allowed prefix.
-        """
-        parts = self.variable.split(PREFIX_SEPARATOR, 1)
-
-        if len(parts) != 2:
-            raise ValueError(
-                (
-                    f"Variable '{self.variable}' must contain exactly one "
-                    f"'{PREFIX_SEPARATOR}' to separate the predecessor and the id."
-                )
-            )
-
-        predecessor, var_id = parts
-
-        if predecessor not in VALID_PREFIXES:
-            raise ValueError(
-                (
-                    f"Variable predecessor must be one of {VALID_PREFIXES}. "
-                    f"Found '{predecessor}' in variable '{self.variable}'."
-                )
-            )
-
-        if not var_id:
-            raise ValueError(
-                f"Variable id must not be empty. Found empty id in '{self.variable}'."
-            )
-
-        return self
-```
-
-### Methods:
-
-#### validate_variable_predecessor
-
-```python
-validate_variable_predecessor() -> Self
-```
-
-Enforces that the 'variable' field is correctly formatted as ':' and uses an allowed prefix.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@model_validator(mode="after")
-def validate_variable_predecessor(self) -> Self:
-    """
-    Enforces that the 'variable' field is correctly formatted as
-    '<prefix>:<id>' and uses an allowed prefix.
-    """
-    parts = self.variable.split(PREFIX_SEPARATOR, 1)
-
-    if len(parts) != 2:
-        raise ValueError(
-            (
-                f"Variable '{self.variable}' must contain exactly one "
-                f"'{PREFIX_SEPARATOR}' to separate the predecessor and the id."
-            )
-        )
-
-    predecessor, var_id = parts
-
-    if predecessor not in VALID_PREFIXES:
-        raise ValueError(
-            (
-                f"Variable predecessor must be one of {VALID_PREFIXES}. "
-                f"Found '{predecessor}' in variable '{self.variable}'."
-            )
-        )
-
-    if not var_id:
-        raise ValueError(
-            f"Variable id must not be empty. Found empty id in '{self.variable}'."
-        )
-
-    return self
 ```
 
 ## Initial conditions

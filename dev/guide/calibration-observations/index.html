@@ -2414,7 +2414,7 @@ reports:</p>
 <tr>
 <td><code>weight=2.0</code></td>
 <td><code>ObservedDataPoint</code></td>
-<td>Multiplies the residual by 2 before squaring, so the observation counts 4 times, with <code>"sse"</code> or <code>"weighted_sse"</code>. Ignored by <code>"rmse"</code> and <code>"mae"</code>.</td>
+<td>The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. See <a href="../calibration/#losses">Losses</a>.</td>
 </tr>
 <tr>
 <td><code>normalize_observations=True</code></td>
@@ -2428,7 +2428,7 @@ reports:</p>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">compartment</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">][</span><span class="mi">30</span><span class="p">],</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">]</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">weighted</span><span class="p">,</span> <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;weighted_sse&quot;</span><span class="p">,</span> <span class="n">normalize_observations</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>  <span class="c1"># 0.4</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">weighted</span><span class="p">,</span> <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span> <span class="n">normalize_observations</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
 <h2 id="partial-observations-scale-factors">Partial observations: scale factors<a class="headerlink" href="#partial-observations-scale-factors" title="Permanent link">&para;</a></h2>
 <p>When the data sees only part of an output, for example a fixed share of it, a
@@ -2528,7 +2528,7 @@ compared. See <a href="../simulations/#windowed-totals">Windowed totals</a>.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Every <code>compartment</code> (and every entry of <code>compartments</code>) is an output name.</li>
-<li>[ ] Weights are used with <code>"sse"</code> or <code>"weighted_sse"</code>, and you know they count squared.</li>
+<li>[ ] Weights say how much each observation counts, in every loss.</li>
 <li>[ ] Every <code>scale_id</code> has a <code>CalibrationParameter</code> with <code>parameter_type="scale"</code>.</li>
 <li>[ ] Windowed observations use a cumulative output and <code>window_steps &lt;= step</code>.</li>
 </ul>

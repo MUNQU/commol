@@ -77,7 +77,7 @@ print(calibrate(ParticleSwarmConfig(num_particles=30, max_iterations=300)))  # {
 nelder_mead = NelderMeadConfig(
     max_iterations=1000,
     sd_tolerance=1e-6,
-    simplex_perturbation=1.1,
+    initial_step=0.1,
     alpha=1.0,
     gamma=2.0,
     rho=0.5,
@@ -88,16 +88,27 @@ nelder_mead = NelderMeadConfig(
 print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
-| Field                            | Default                  | Meaning                                                                                         |
-| -------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `max_iterations`                 | `1000`                   | The iteration limit.                                                                            |
-| `sd_tolerance`                   | `1e-6`                   | Stops when the spread of the simplex values falls below it.                                     |
-| `simplex_perturbation`           | `1.1`                    | Builds the first simplex by multiplying each coordinate of the start by this factor (10% here). |
-| `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients.                                     |
-| `verbose`                        | `False`                  | Prints a progress table.                                                                        |
-| `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                            |
+| Field                            | Default                  | Meaning                                                                                                                                  |
+| -------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_iterations`                 | `1000`                   | The iteration limit.                                                                                                                     |
+| `sd_tolerance`                   | `1e-6`                   | Stops when the spread of the simplex values falls below it.                                                                              |
+| `initial_step`                   | `0.1`                    | The size of the first simplex: each vertex moves one unknown by this fraction of its bound width, towards the farther bound. In (0, 1\]. |
+| `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients.                                                                              |
+| `verbose`                        | `False`                  | Prints a progress table.                                                                                                                 |
+| `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
-The search starts at `initial_guess`, or at the midpoint of the bounds. From a poor start, Nelder-Mead may stop at a bound and still report `converged=True`: check that results are not at a bound, and give a better `initial_guess`.
+The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` in `crates/commol-calibration/src/optimization.rs`). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations.
+
+## `converged` and `termination_reason`
+
+| `termination_reason`            | `converged` | Meaning                                                                 |
+| ------------------------------- | ----------- | ----------------------------------------------------------------------- |
+| `Terminated(SolverConverged)`   | `True`      | Nelder-Mead: the spread of the simplex values fell below `sd_tolerance` |
+| `Terminated(TargetCostReached)` | `True`      | Particle swarm: the loss reached `target_cost`                          |
+| `Terminated(MaxItersReached)`   | `False`     | The run used all `max_iterations`                                       |
+| Any other reason                | `False`     | The run stopped for another reason, such as a timeout                   |
+
+`converged` comes from `converged` in `optimization.rs`. A particle swarm without `target_cost` always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
 
 ## Particle swarm
 
@@ -140,13 +151,13 @@ Set `CalibrationProblem(seed=...)`: particle swarm, the initialization and the p
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                    |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm |
-| `converged=False`                  | More `max_iterations`; check `termination_reason`                      |
-| Different results on each run      | Set `seed`; use more particles or iterations                           |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start    |
+| Symptom                            | Try                                                                        |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
+| Different results on each run      | Set `seed`; use more particles or iterations                               |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
 
 ## Next steps
 

@@ -68,13 +68,12 @@ builder = ModelBuilder(
 
 Every `add_*` and `set_*` method returns the builder, so calls chain. The other methods:
 
-| Method                           | Returns        | What it does                                                                                                                                   |
-| -------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build(typology)`                | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                    |
-| `clone()`                        | `ModelBuilder` | A deep copy, to build variants of one model.                                                                                                   |
-| `reset()`                        | `ModelBuilder` | Removes bins, stratifications, transitions, parameters and initial conditions; keeps the name, description and version. Accumulators are kept. |
-| `get_summary()`                  | `dict`         | The name, description, version and the ids added so far.                                                                                       |
-| `create_condition(logic, rules)` | `Condition`    | Builds a transition condition; see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#conditions-are-not-evaluated).       |
+| Method            | Returns        | What it does                                                                                                                                      |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build(typology)` | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                       |
+| `clone()`         | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                 |
+| `reset()`         | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
+| `get_summary()`   | `dict`         | The name, description, version and the ids added so far.                                                                                          |
 
 ```python
 variant = builder.clone()
@@ -114,7 +113,7 @@ builder = (
 
 | Argument      | Type                                                | Default  | Meaning                                                                                                        |
 | ------------- | --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                                               | required | The identifier. It must be unique and must not be a bin id.                                                    |
+| `id`          | `str`                                               | required | The identifier. It must be unique and must not be a [name the engine sets](#names-the-engine-sets).            |
 | `value`       | `float`, `str`, `list[tuple[int, float]]` or `None` | required | See the table below.                                                                                           |
 | `description` | `str \| None`                                       | `None`   | A free-text description.                                                                                       |
 | `unit`        | `str \| None`                                       | `None`   | The unit, for [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
@@ -127,9 +126,18 @@ builder = (
 | `[(step, value), …]` | Time series  | A value per step, read with `mode` (below).                                                                                                                                                                  |
 | `None`               | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                            |
 
-Names the engine sets
+### Names the engine sets
 
-`N`, `N_<category>…`, `step`, `t`, `pi`, `e` and expanded compartment names such as `A_g1` are variables that the engine sets. Commol only rejects bin ids, so do not give a parameter any of these names.
+The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-difference/src/builder.rs`):
+
+| Name                        | Example                                   |
+| --------------------------- | ----------------------------------------- |
+| `N`, `step`, `t`, `pi`, `e` | `N`                                       |
+| A bin id                    | `A`                                       |
+| An expanded compartment     | `A_g1`                                    |
+| A subpopulation total       | `N_g1`, `A_t1` (with two stratifications) |
+
+An id that starts with `N_` but names no subpopulation, such as `N_max`, is accepted.
 
 ### Time-series parameters
 
@@ -301,14 +309,15 @@ print([c.name for c in stratified_model.initial_state()])
 
 `build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid:
 
-| Check                                           | Example of a rejected definition                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Initial conditions are set                      | `build` called before `set_initial_conditions`                                                   |
-| At least one bin and one transition             | A model with no transition                                                                       |
-| Initial conditions follow the rules above       | Bin fractions that sum to 0.9                                                                    |
-| Parameter ids are unique and are not bin ids    | A parameter named `A`                                                                            |
-| Every rate expression passes the security check | A formula with `__import__`                                                                      |
-| Every transition can be planned by the engine   | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
+| Check                                                                                | Example of a rejected definition                                                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Initial conditions are set                                                           | `build` called before `set_initial_conditions`                                                   |
+| At least one bin and one transition                                                  | A model with no transition                                                                       |
+| Initial conditions follow the rules above                                            | Bin fractions that sum to 0.9                                                                    |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `N` or `A_g1`                                                             |
+| Every `N_…` variable names a subpopulation                                           | `N_t1_g1` when `group` is declared before `type`                                                 |
+| Every rate expression passes the security check                                      | A formula with `__import__`                                                                      |
+| Every transition can be planned by the engine                                        | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
 
 ## Save and load
 

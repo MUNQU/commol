@@ -1833,6 +1833,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-engine-owns-the-variable-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine owns the variable names
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1962,10 +1973,71 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#one-step-unit-in-the-unit-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One step unit in the unit check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#windowed-observations" class="md-nav__link">
     <span class="md-ellipsis">
       
         Windowed observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-meaning-of-an-observation-weight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One meaning of an observation weight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nelder-Mead searches inside the bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-simulation-follows-its-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Simulation follows its model
       
     </span>
   </a>
@@ -2444,6 +2516,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-engine-owns-the-variable-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine owns the variable names
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2573,10 +2656,71 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#one-step-unit-in-the-unit-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One step unit in the unit check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#windowed-observations" class="md-nav__link">
     <span class="md-ellipsis">
       
         Windowed observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-meaning-of-an-observation-weight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One meaning of an observation weight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nelder-mead-searches-inside-the-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nelder-Mead searches inside the bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-simulation-follows-its-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Simulation follows its model
       
     </span>
   </a>
@@ -2712,7 +2856,7 @@ test that guards it. Read the ones of your area before you change it.</p>
 <tbody>
 <tr>
 <td>Model structure</td>
-<td><a href="#compartments-are-labels-with-a-name">Compartments</a>, <a href="#stratification-order-is-part-of-the-model">stratification order</a>, <a href="#outputs-are-resolved-by-label">outputs</a></td>
+<td><a href="#compartments-are-labels-with-a-name">Compartments</a>, <a href="#stratification-order-is-part-of-the-model">stratification order</a>, <a href="#outputs-are-resolved-by-label">outputs</a>, <a href="#the-engine-owns-the-variable-names">variable names</a></td>
 </tr>
 <tr>
 <td>Dynamics</td>
@@ -2724,7 +2868,11 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 <tr>
 <td>Time</td>
-<td><a href="#physical-time-is-not-in-the-model">Physical time</a>, <a href="#windowed-observations">windowed observations</a></td>
+<td><a href="#physical-time-is-not-in-the-model">Physical time</a>, <a href="#one-step-unit-in-the-unit-check">step unit</a>, <a href="#windowed-observations">windowed observations</a></td>
+</tr>
+<tr>
+<td>Calibration</td>
+<td><a href="#one-meaning-of-an-observation-weight">Weights</a>, <a href="#nelder-mead-searches-inside-the-bounds">Nelder-Mead bounds</a>, <a href="#a-simulation-follows-its-model">simulations</a></td>
 </tr>
 <tr>
 <td>Results</td>
@@ -2765,6 +2913,18 @@ label, not by name.</p>
 <p><strong>Guards:</strong> <code>test_simulation_outputs.py::test_expansion_matches_the_engine_output_names</code>
 (order) and <code>TestSourceIdSharingAPrefix</code> (a bin and an accumulator that share
 a prefix).</p>
+<h3 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h3>
+<p>The engine sets one variable per expanded compartment and per subpopulation
+total (<code>N_&lt;categories&gt;</code>, bin totals and partial bin totals).
+<code>check_names</code> in <code>crates/commol-difference/src/builder.rs</code> rejects a parameter
+id that is one of those names, and an <code>N_…</code> variable in a rate or a formula
+parameter that names no subpopulation. <code>Model.validate_names_with_engine</code>
+calls it at <code>build</code>, and <code>DifferenceEquations::try_from_model</code> calls it again.</p>
+<p><strong>Rule:</strong> never list these names in Python. Ask the engine.</p>
+<p><strong>Guards:</strong> <code>builder.rs</code> tests
+<code>parameter_id_cannot_be_a_compartment_or_a_subpopulation</code> and
+<code>subpopulation_variable_out_of_declaration_order_is_a_build_error</code>;
+<code>test_reserved_names.py</code>.</p>
 <h2 id="dynamics">Dynamics<a class="headerlink" href="#dynamics" title="Permanent link">&para;</a></h2>
 <h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
 <p>The flow planner (<code>plan_transition_flows</code> in
@@ -2850,6 +3010,16 @@ durations, probabilities and window grids. Conversions <strong>raise</strong> wh
 is not a whole number of steps, instead of rounding. Months and years are absent
 on purpose, because they have no fixed length in steps.</p>
 <p><strong>Guard:</strong> <code>test_time_scale.py::TestWindowGrid</code>.</p>
+<h3 id="one-step-unit-in-the-unit-check">One step unit in the unit check<a class="headerlink" href="#one-step-unit-in-the-unit-check" title="Permanent link">&para;</a></h3>
+<p>The engine applies every flow once per step and converts no value between
+units. So <code>UnitChecker._step_unit</code> (<code>context/_model/units.py</code>) takes the one
+unit of time that the parameter units use (<code>step</code> when there is none), and
+<code>check_equation_units</code> requires every flow to be <strong>equal</strong> to
+<code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, not only convertible to it (<code>utils/equations.py</code>,
+<code>same_unit</code>).</p>
+<p><strong>Rule:</strong> never accept a convertible unit as equal. <code>1/week</code> and <code>1/day</code> in one
+model would apply a weekly rate every day.</p>
+<p><strong>Guard:</strong> <code>test_units.py::TestStepUnit</code>.</p>
 <h3 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h3>
 <p>An observation with <code>window_steps = W</code> is compared with
 <code>series[step] - series[step - W]</code>, anchored at its own step. The Rust loss and
@@ -2858,6 +3028,36 @@ statistics also use <code>windowed_totals</code>.</p>
 <p><strong>Guards:</strong> <code>test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
 the generating parameters is zero) and
 <code>test_probabilistic_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps</code>.</p>
+<h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
+<h3 id="one-meaning-of-an-observation-weight">One meaning of an observation weight<a class="headerlink" href="#one-meaning-of-an-observation-weight" title="Permanent link">&para;</a></h3>
+<p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
+<code>crates/commol-calibration/src/types.rs</code> compute every loss: <code>sse</code> is
+<code>Σ w·r²</code>, <code>rmse</code> is <code>√(Σ w·r² / Σ w)</code>, <code>mae</code> is <code>Σ w·|r| / Σ w</code>. The optimizer
+(<code>calibration_problem.rs</code>), the ensemble central loss
+(<code>probabilistic/ensemble/mod.rs</code>) and Python (<code>central_fit_loss</code>, through
+<code>LossConfig.aggregate</code>) all call them.</p>
+<p><strong>Rule:</strong> never write a loss formula elsewhere. The central-fit gate compares
+the ensemble loss with the optimizer loss, so both must measure the same way.</p>
+<p><strong>Guards:</strong> <code>types.rs</code> <code>loss_tests</code>;
+<code>ensemble::tests::central_loss_uses_observation_weights_in_every_metric</code>;
+<code>test_probabilistic_performance.py::test_central_fit_loss_uses_weights_in_every_metric</code>.</p>
+<h3 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h3>
+<p>The objective clamps values to their bounds, so the loss is flat outside them,
+and a simplex that crosses a bound collapses there. Nelder-Mead therefore
+searches an unbounded <code>u</code> and scores <code>x = lo + (hi − lo)·(sin u + 1)/2</code>
+(<code>SineTransform</code> and <code>BoundedProblem</code> in <code>optimization.rs</code>). Its evaluations
+and its result are recorded in <code>x</code>. <code>converged</code> is true only for
+<code>SolverConverged</code> and <code>TargetCostReached</code> (<code>optimization::converged</code>).</p>
+<p><strong>Rule:</strong> report and record values in <code>x</code>, never in <code>u</code>. Every optimizer run,
+the verbose one included, goes through <code>optimize_observed</code>.</p>
+<p><strong>Guards:</strong> <code>optimization::tests</code>; <code>test_optimizer_convergence.py</code>.</p>
+<h3 id="a-simulation-follows-its-model">A <code>Simulation</code> follows its model<a class="headerlink" href="#a-simulation-follows-its-model" title="Permanent link">&para;</a></h3>
+<p><code>Simulation</code> keeps the JSON its engine was built from. <code>run</code>, <code>engine</code> and
+<code>simulation_outputs</code> compare it with <code>model_dump_json()</code> and rebuild the engine
+when it differs (<code>Simulation._sync_engine</code>), and <code>run</code> resets the engine first.
+<code>Calibrator</code> takes <code>simulation.engine</code> when it is created, so the check is in
+the property, not only in <code>run</code>.</p>
+<p><strong>Guard:</strong> <code>test_simulation_runs.py</code>.</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <h3 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h3>
 <p><code>ci_percentiles</code> (<code>api/probabilistic/intervals.py</code>) is the only place that turns

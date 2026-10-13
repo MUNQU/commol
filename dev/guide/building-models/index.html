@@ -810,6 +810,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#names-the-engine-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Names the engine sets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#time-series-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2295,6 +2306,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#names-the-engine-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Names the engine sets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#time-series-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2525,22 +2547,17 @@ methods:</p>
 <tr>
 <td><code>clone()</code></td>
 <td><code>ModelBuilder</code></td>
-<td>A deep copy, to build variants of one model.</td>
+<td>A deep copy of everything, accumulators included, to build variants of one model.</td>
 </tr>
 <tr>
 <td><code>reset()</code></td>
 <td><code>ModelBuilder</code></td>
-<td>Removes bins, stratifications, transitions, parameters and initial conditions; keeps the name, description and version. Accumulators are kept.</td>
+<td>Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and <code>bin_unit</code>.</td>
 </tr>
 <tr>
 <td><code>get_summary()</code></td>
 <td><code>dict</code></td>
 <td>The name, description, version and the ids added so far.</td>
-</tr>
-<tr>
-<td><code>create_condition(logic, rules)</code></td>
-<td><code>Condition</code></td>
-<td>Builds a transition condition; see <a href="../transitions/#conditions-are-not-evaluated">Transitions</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -2609,7 +2626,7 @@ in a rate means the total of all its expanded compartments.</p>
 <td><code>id</code></td>
 <td><code>str</code></td>
 <td>required</td>
-<td>The identifier. It must be unique and must not be a bin id.</td>
+<td>The identifier. It must be unique and must not be a <a href="#names-the-engine-sets">name the engine sets</a>.</td>
 </tr>
 <tr>
 <td><code>value</code></td>
@@ -2668,12 +2685,38 @@ in a rate means the total of all its expanded compartments.</p>
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Names the engine sets</p>
-<p><code>N</code>, <code>N_&lt;category&gt;…</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code> and expanded compartment names
-such as <code>A_g1</code> are variables that the engine sets. Commol only rejects bin
-ids, so do not give a parameter any of these names.</p>
-</div>
+<h3 id="names-the-engine-sets">Names the engine sets<a class="headerlink" href="#names-the-engine-sets" title="Permanent link">&para;</a></h3>
+<p>The engine sets these variables, so <code>build</code> rejects a parameter with one of
+these ids (<code>Model.validate_parameter_names_not_reserved</code> and
+<code>check_names</code> in <code>crates/commol-difference/src/builder.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>N</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code></td>
+<td><code>N</code></td>
+</tr>
+<tr>
+<td>A bin id</td>
+<td><code>A</code></td>
+</tr>
+<tr>
+<td>An expanded compartment</td>
+<td><code>A_g1</code></td>
+</tr>
+<tr>
+<td>A subpopulation total</td>
+<td><code>N_g1</code>, <code>A_t1</code> (with two stratifications)</td>
+</tr>
+</tbody>
+</table>
+<p>An id that starts with <code>N_</code> but names no subpopulation, such as <code>N_max</code>, is
+accepted.</p>
 <h3 id="time-series-parameters">Time-series parameters<a class="headerlink" href="#time-series-parameters" title="Permanent link">&para;</a></h3>
 <p>A time series gives a parameter its value from <code>(step, value)</code> pairs. <code>mode</code>
 says how the steps between the pairs are read:</p>
@@ -3001,8 +3044,12 @@ the definition is not valid:</p>
 <td>Bin fractions that sum to 0.9</td>
 </tr>
 <tr>
-<td>Parameter ids are unique and are not bin ids</td>
-<td>A parameter named <code>A</code></td>
+<td>Parameter ids are unique and are not <a href="#names-the-engine-sets">names the engine sets</a></td>
+<td>A parameter named <code>A</code>, <code>N</code> or <code>A_g1</code></td>
+</tr>
+<tr>
+<td>Every <code>N_…</code> variable names a subpopulation</td>
+<td><code>N_t1_g1</code> when <code>group</code> is declared before <code>type</code></td>
 </tr>
 <tr>
 <td>Every rate expression passes the security check</td>

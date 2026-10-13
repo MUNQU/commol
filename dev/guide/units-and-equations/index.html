@@ -911,6 +911,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-step-unit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The step unit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-the-check-catches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2229,6 +2240,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-step-unit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The step unit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-the-check-catches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2319,7 +2341,7 @@ equations that the engine simulates, as text or LaTeX. Both work on a built
 </span></code></pre></div>
 <h2 id="unit-checking">Unit checking<a class="headerlink" href="#unit-checking" title="Permanent link">&para;</a></h2>
 <p><code>Model.check_unit_consistency(verbose=False)</code> checks that every flow has the
-unit <code>&lt;bin unit&gt;/&lt;time unit&gt;</code>, and that every function receives a plain number.
+unit <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, and that every function receives a plain number.
 It raises <code>UnitConsistencyError</code> (from <code>commol.utils.equations</code>) and lists every
 transition that fails.</p>
 <h3 id="what-needs-a-unit">What needs a unit<a class="headerlink" href="#what-needs-a-unit" title="Permanent link">&para;</a></h3>
@@ -2333,7 +2355,7 @@ transition that fails.</p>
 <tbody>
 <tr>
 <td>Bins</td>
-<td><code>ModelBuilder(bin_unit=...)</code>, or <code>add_bin(unit=...)</code> for one bin</td>
+<td><code>ModelBuilder(bin_unit=...)</code>, or <code>add_bin(unit=...)</code> for one bin. Required: the check names every bin without one.</td>
 </tr>
 <tr>
 <td><code>N</code>, <code>N_&lt;category&gt;…</code></td>
@@ -2362,7 +2384,7 @@ transition that fails.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>"1/day"</code>, <code>"1/week"</code>, <code>"1/hour"</code></td>
+<td><code>"1/day"</code>, <code>"1/week"</code>, <code>"1/step"</code></td>
 <td>Rates</td>
 </tr>
 <tr>
@@ -2375,15 +2397,51 @@ transition that fails.</p>
 </tr>
 </tbody>
 </table>
-<p>The time unit of the flows comes from the parameters: the first parameter whose
-unit has a known time unit (<code>second</code>, <code>minute</code>, <code>hour</code>, <code>day</code>, <code>week</code>, <code>month</code>,
-<code>year</code>, …) sets it, and <code>day</code> is the default.</p>
-<div class="admonition warning">
-<p class="admonition-title">Per-step units</p>
-<p><code>step</code> is not a time unit for the check: a model whose rates are in
-<code>"1/step"</code> fails with "expected <code>&lt;bin unit&gt;/day</code>". Give rates a physical
-time unit, such as <code>"1/day"</code>.</p>
-</div>
+<h3 id="the-step-unit">The step unit<a class="headerlink" href="#the-step-unit" title="Permanent link">&para;</a></h3>
+<p>The engine applies every flow once per step and converts no value between
+units. So one step has one unit, and every rate must use it
+(<code>UnitChecker._step_unit</code> in <code>py-commol/commol/context/_model/units.py</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Parameter units</th>
+<th>Step unit</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All in one unit of time, such as <code>"1/day"</code> and <code>"day"</code></td>
+<td><code>day</code></td>
+<td>Flows must be <code>&lt;bin unit&gt;/day</code></td>
+</tr>
+<tr>
+<td>All in <code>"1/week"</code></td>
+<td><code>week</code></td>
+<td>Accepted: one step is one week</td>
+</tr>
+<tr>
+<td>All in <code>"1/step"</code></td>
+<td><code>step</code></td>
+<td>Accepted</td>
+</tr>
+<tr>
+<td>No unit of time</td>
+<td><code>step</code></td>
+<td>Flows must be <code>&lt;bin unit&gt;/step</code></td>
+</tr>
+<tr>
+<td><code>"1/day"</code> and <code>"1/week"</code>, or <code>"1/day"</code> and <code>"1/step"</code></td>
+<td>—</td>
+<td>Error that names each parameter and its unit</td>
+</tr>
+</tbody>
+</table>
+<p>A unit of time is any unit of dimension <code>[time]</code> (<code>second</code>, <code>hour</code>, <code>day</code>,
+<code>week</code>, <code>month</code>, <code>year</code>, …) or <code>step</code>. Two names of one unit, such as <code>d</code> and
+<code>day</code>, are one unit. A flow must have exactly the expected unit: <code>person/week</code>
+does not match <code>person/day</code>, because the engine would apply a weekly rate
+every day.</p>
 <h3 id="what-the-check-catches">What the check catches<a class="headerlink" href="#what-the-check-catches" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.utils.equations</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitConsistencyError</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -2428,8 +2486,16 @@ time unit, such as <code>"1/day"</code>.</p>
 <td>A constant parameter has no unit</td>
 </tr>
 <tr>
-<td><code>Variable '…' … has no defined unit</code></td>
+<td><code>The following bins have no unit: …</code></td>
 <td>A bin has no unit (set <code>bin_unit</code>)</td>
+</tr>
+<tr>
+<td><code>the parameters use more than one unit of time ('k1' in '1/day', 'k2' in '1/week')</code></td>
+<td>Rates in two units of time; see <a href="#the-step-unit">The step unit</a></td>
+</tr>
+<tr>
+<td><code>Variable '…' … has no defined unit</code></td>
+<td>A variable of a rate has no unit</td>
 </tr>
 </tbody>
 </table>

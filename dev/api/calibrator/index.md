@@ -98,16 +98,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -202,16 +193,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -277,8 +259,6 @@ class Calibrator:
             loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = rust_calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 
@@ -293,7 +273,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                simplex_perturbation=opt_config.simplex_perturbation,
+                initial_step=opt_config.initial_step,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -400,6 +380,19 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
+    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
+        """Calibration parameters as engine types, in problem order."""
+        return [
+            rust_calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
     def _validate_calibration_parameters(self) -> None:
         """
         Validate that all calibration parameters exist in the model.
@@ -411,14 +404,6 @@ class Calibrator:
         """
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
-        model_bin_ids = {b.id for b in model.population.bins}
-        model_binary_stratification_categories = {
-            category
-            for stratification in model.population.stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -429,20 +414,8 @@ class Calibrator:
                         f"{sorted(model_param_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins, stratification categories, or expanded "
-                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: "
-                        f"{sorted(engine_compartment_ids)}"
-                    )
+                # The engine resolves initial-condition ids below.
+                pass
             elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
@@ -453,6 +426,12 @@ class Calibrator:
                 raise ValueError(
                     f"Unknown calibration parameter type: {param.parameter_type}"
                 )
+
+        engine_state.check_initial_conditions(
+            self._engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
+        )
 
     def _get_compartment_index(self, bin_id: str) -> int:
         """
@@ -718,16 +697,7 @@ def run(self) -> CalibrationResult:
     ]
 
     # Convert parameters to Rust types
-    rust_parameters = [
-        rust_calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=self._to_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in self.problem.parameters
-    ]
+    rust_parameters = self._rust_parameters()
 
     # Convert constraints to Rust types
     rust_constraints = [
@@ -850,16 +820,7 @@ def run_with_history(self) -> "CalibrationResultWithHistoryProtocol":
     ]
 
     # Convert parameters to Rust types
-    rust_parameters = [
-        rust_calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=self._to_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in self.problem.parameters
-    ]
+    rust_parameters = self._rust_parameters()
 
     # Convert constraints to Rust types
     rust_constraints = [
@@ -968,17 +929,17 @@ This class encapsulates all the information needed to calibrate model parameters
 
 Attributes:
 
-| Name                          | Type                             | Description                                                                                                            |
-| ----------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`        | List of observed data points to fit against                                                                            |
-| `parameters`                  | `list[CalibrationParameter]`     | List of parameters to calibrate with their bounds                                                                      |
-| `constraints`                 | `list[CalibrationConstraint]`    | List of constraints on calibration parameters (optional, default: empty list)                                          |
-| `loss_function`               | `str`                            | Loss function to use for measuring fit quality (default: "sse")                                                        |
-| `normalize_observations`      | `bool`                           | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). |
-| `optimization_config`         | `OptimizationConfig`             | Configuration for the optimization algorithm                                                                           |
-| `initial_condition_remainder` | \`str                            | None\`                                                                                                                 |
-| `probabilistic_config`        | \`ProbabilisticCalibrationConfig | None\`                                                                                                                 |
-| `seed`                        | \`int                            | None\`                                                                                                                 |
+| Name                          | Type                             | Description                                                                                                                |
+| ----------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data`               | `list[ObservedDataPoint]`        | List of observed data points to fit against                                                                                |
+| `parameters`                  | `list[CalibrationParameter]`     | List of parameters to calibrate with their bounds                                                                          |
+| `constraints`                 | `list[CalibrationConstraint]`    | List of constraints on calibration parameters (optional, default: empty list)                                              |
+| `loss_function`               | `str`                            | Loss function to use for measuring fit quality: "sse" (default), "rmse" or "mae". Every loss uses the observation weights. |
+| `normalize_observations`      | `bool`                           | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False).     |
+| `optimization_config`         | `OptimizationConfig`             | Configuration for the optimization algorithm                                                                               |
+| `initial_condition_remainder` | \`str                            | None\`                                                                                                                     |
+| `probabilistic_config`        | \`ProbabilisticCalibrationConfig | None\`                                                                                                                     |
+| `seed`                        | \`int                            | None\`                                                                                                                     |
 
 Source code in `commol/context/calibration.py`
 
@@ -1000,7 +961,8 @@ class CalibrationProblem(BaseModel):
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
-        Loss function to use for measuring fit quality (default: "sse")
+        Loss function to use for measuring fit quality: "sse" (default),
+        "rmse" or "mae". Every loss uses the observation weights.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False).
@@ -1123,14 +1085,14 @@ Represents a single observed data point for calibration.
 
 Attributes:
 
-| Name           | Type        | Description                                                                                                   |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `step`         | `int`       | Time step of the observation                                                                                  |
-| `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set |
-| `compartments` | \`list[str] | None\`                                                                                                        |
-| `value`        | `float`     | Observed value                                                                                                |
-| `weight`       | `float`     | Weight for this observation in the loss function (default: 1.0)                                               |
-| `scale_id`     | \`str       | None\`                                                                                                        |
+| Name           | Type        | Description                                                                                                                                                                    |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `step`         | `int`       | Time step of the observation                                                                                                                                                   |
+| `compartment`  | `str`       | Name of the compartment being observed, or a display name for aggregate observations when compartments is set                                                                  |
+| `compartments` | \`list[str] | None\`                                                                                                                                                                         |
+| `value`        | `float`     | Observed value                                                                                                                                                                 |
+| `weight`       | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w· |
+| `scale_id`     | \`str       | None\`                                                                                                                                                                         |
 
 Source code in `commol/context/calibration.py`
 
@@ -1151,7 +1113,10 @@ class ObservedDataPoint(BaseModel):
     value : float
         Observed value
     weight : float
-        Weight for this observation in the loss function (default: 1.0)
+        How much this observation counts in the loss (default: 1.0). Every
+        loss multiplies the squared or absolute residual by it: ``sse`` is
+        ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
+        ``Σ w·|r| / Σ w``.
     scale_id : str | None
         Optional scale parameter ID to apply to model output before comparison
     """
@@ -1549,17 +1514,17 @@ The Nelder-Mead method is a simplex-based derivative-free optimization algorithm
 
 Attributes:
 
-| Name                   | Type    | Description                                                                                                                                    |
-| ---------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_iterations`       | `int`   | Maximum number of iterations (default: 1000)                                                                                                   |
-| `sd_tolerance`         | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                   |
-| `simplex_perturbation` | `float` | Multiplier for creating initial simplex vertices by perturbing each parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1) |
-| `alpha`                | \`float | None\`                                                                                                                                         |
-| `gamma`                | \`float | None\`                                                                                                                                         |
-| `rho`                  | \`float | None\`                                                                                                                                         |
-| `sigma`                | \`float | None\`                                                                                                                                         |
-| `verbose`              | `bool`  | Enable verbose output during optimization (default: False)                                                                                     |
-| `header_interval`      | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                             |
+| Name              | Type    | Description                                                                                                                                                                                                                                     |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_iterations`  | `int`   | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
+| `sd_tolerance`    | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
+| `initial_step`    | `float` | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
+| `alpha`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `gamma`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `rho`             | \`float | None\`                                                                                                                                                                                                                                          |
+| `sigma`           | \`float | None\`                                                                                                                                                                                                                                          |
+| `verbose`         | `bool`  | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
+| `header_interval` | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
 Source code in `commol/context/calibration.py`
 
@@ -1577,9 +1542,11 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
-    simplex_perturbation : float
-        Multiplier for creating initial simplex vertices by perturbing each
-        parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1)
+    initial_step : float
+        Size of the initial simplex, as a fraction of each parameter's bound
+        width, in (0, 1] (default: 0.1). Nelder-Mead searches an unbounded
+        coordinate ``u`` and scores ``x = lo + (hi - lo)(sin u + 1)/2``, so
+        every point it tries is inside the bounds.
     alpha : float | None
         Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
@@ -1601,12 +1568,12 @@ class NelderMeadConfig(BaseModel):
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
     )
-    simplex_perturbation: float = Field(
-        default=1.1,
-        gt=1.0,
+    initial_step: float = Field(
+        default=0.1,
+        gt=0.0,
+        le=1.0,
         description=(
-            "Multiplier for creating initial simplex vertices (e.g., 1.1 = 10% "
-            "perturbation)"
+            "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
@@ -2416,7 +2383,7 @@ Available loss functions for calibration.
 
 Values
 
-SSE Sum of Squared Errors RMSE Root Mean Squared Error MAE Mean Absolute Error WEIGHTED_SSE Weighted Sum of Squared Errors
+SSE Sum of Squared Errors RMSE Root Mean Squared Error MAE Mean Absolute Error
 
 Source code in `commol/context/constants.py`
 
@@ -2434,14 +2401,11 @@ class LossFunction(StrEnum):
         Root Mean Squared Error
     MAE
         Mean Absolute Error
-    WEIGHTED_SSE
-        Weighted Sum of Squared Errors
     """
 
     SSE = "sse"
     RMSE = "rmse"
     MAE = "mae"
-    WEIGHTED_SSE = "weighted_sse"
 ```
 
 ## OptimizationAlgorithm

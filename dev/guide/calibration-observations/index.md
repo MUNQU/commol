@@ -87,10 +87,10 @@ print(calibrate_k1(b_and_c))  # 0.4
 
 ## Weights and normalization
 
-| Option                        | Where                | Effect                                                                                                                                              |
-| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weight=2.0`                  | `ObservedDataPoint`  | Multiplies the residual by 2 before squaring, so the observation counts 4 times, with `"sse"` or `"weighted_sse"`. Ignored by `"rmse"` and `"mae"`. |
-| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                           |
+| Option                        | Where                | Effect                                                                                                                                                                                    |
+| ----------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weight=2.0`                  | `ObservedDataPoint`  | The observation counts twice as much in every loss: its squared (or absolute) residual is multiplied by 2. See [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses). |
+| `normalize_observations=True` | `CalibrationProblem` | Divides each residual by the RMS of its series, so a series of thousands does not drown a series of tens.                                                                                 |
 
 ```python
 weighted = [
@@ -98,7 +98,7 @@ weighted = [
     ObservedDataPoint(step=30, compartment="B", value=truth["B"][30], weight=1.0),
     ObservedDataPoint(step=30, compartment="cum_ab", value=truth["cum_ab"][30], weight=1.0),
 ]
-print(calibrate_k1(weighted, loss_function="weighted_sse", normalize_observations=True))  # 0.4
+print(calibrate_k1(weighted, loss_function="sse", normalize_observations=True))  # 0.4
 ```
 
 ## Partial observations: scale factors
@@ -167,7 +167,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with `compartments
 ## Checklist
 
 - [ ] Every `compartment` (and every entry of `compartments`) is an output name.
-- [ ] Weights are used with `"sse"` or `"weighted_sse"`, and you know they count squared.
+- [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `scale_id` has a `CalibrationParameter` with `parameter_type="scale"`.
 - [ ] Windowed observations use a cumulative output and `window_steps <= step`.
 

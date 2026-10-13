@@ -2455,18 +2455,14 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 </span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">())})</span>
 </span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
 </span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="c1"># 4. Write the values back, and simulate with a new Simulation</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="c1"># 4. Write the values back, and simulate</span>
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="n">model</span><span class="o">.</span><span class="n">apply_calibration_parameters</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">problem</span><span class="p">)</span>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="n">calibrated</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </span></code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">A <code>Simulation</code> copies the model</p>
-<p><code>Simulation(model)</code> builds its engine from the model as it is at that
-moment. After you change the model (<code>apply_calibration_parameters</code>,
-<code>update_parameters</code>, …), create a <strong>new</strong> <code>Simulation</code>. An old one keeps the
-old values, and one created while a parameter was <code>None</code> fails with
-"Parameter index … not found".</p>
-</div>
+<p>A <code>Simulation</code> follows its model: after <code>apply_calibration_parameters</code> or
+<code>update_parameters</code>, its next <code>run</code> (and its <code>engine</code>) uses the new values,
+also when it was created while a parameter was <code>None</code>. See
+<a href="../simulations/#simulation">Simulations</a>.</p>
 <h2 id="the-problem">The problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2567,7 +2563,7 @@ old values, and one created while a parameter was <code>None</code> fails with
 <td><code>weight</code></td>
 <td><code>float</code></td>
 <td><code>1.0</code></td>
-<td>Multiplies its residual in <code>"sse"</code> and <code>"weighted_sse"</code>; see <a href="#losses">Losses</a>.</td>
+<td>How much the observation counts in every loss; see <a href="#losses">Losses</a>.</td>
 </tr>
 <tr>
 <td><code>compartments</code></td>
@@ -2657,39 +2653,36 @@ old values, and one created while a parameter was <code>None</code> fails with
 <thead>
 <tr>
 <th><code>loss_function</code></th>
-<th>Formula (residual <code>r = observed − predicted</code>)</th>
+<th>Formula (residual <code>r = observed − predicted</code>, weight <code>w</code>)</th>
 <th>Use when</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>"sse"</code> (default)</td>
-<td><code>Σ (weight × r)²</code></td>
+<td><code>Σ w·r²</code></td>
 <td>The usual choice</td>
 </tr>
 <tr>
-<td><code>"weighted_sse"</code></td>
-<td><code>Σ (weight × r)²</code>, the same as <code>"sse"</code></td>
-<td>Kept as an explicit name when you set weights</td>
-</tr>
-<tr>
 <td><code>"rmse"</code></td>
-<td><code>√(Σ r² / n)</code></td>
-<td>You want the error in the data's unit; weights are ignored</td>
+<td><code>√(Σ w·r² / Σ w)</code></td>
+<td>You want the error in the data's unit</td>
 </tr>
 <tr>
 <td><code>"mae"</code></td>
-<td><code>Σ |r| / n</code></td>
-<td>The data has outliers; weights are ignored</td>
+<td><code>Σ w·|r| / Σ w</code></td>
+<td>The data has outliers</td>
 </tr>
 </tbody>
 </table>
 <div class="admonition note">
 <p class="admonition-title">How weights count</p>
-<p>A weight multiplies the residual <strong>before</strong> it is squared, so
-<code>weight=2.0</code> makes an observation count four times as much. With every
-weight at its default of 1.0, <code>"sse"</code> is the plain sum of squared
-residuals.</p>
+<p>Every loss uses a weight the same way: <code>weight=2.0</code> makes an observation
+count twice as much as one with weight 1.0. With every weight at its
+default of 1.0, the losses are the plain sum of squares, root mean square
+and mean absolute error. <code>LossConfig</code> in
+<code>crates/commol-calibration/src/types.rs</code> computes them, for the optimizer
+and for the ensemble central loss.</p>
 </div>
 <p>With <code>normalize_observations=True</code>, each residual is first divided by the RMS
 of the observations of its series (its output, or its aggregate label).</p>
@@ -2718,7 +2711,7 @@ of the observations of its series (its output, or its aggregate label).</p>
 </tr>
 <tr>
 <td><code>converged</code></td>
-<td>Whether the optimizer met its convergence test</td>
+<td><code>True</code> only when the optimizer met its convergence test or <code>target_cost</code>; a run that used all <code>max_iterations</code> is <code>False</code>. See <a href="../calibration-optimizers/#converged-and-termination_reason">Optimizers</a>.</td>
 </tr>
 <tr>
 <td><code>termination_reason</code></td>

@@ -932,10 +932,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conditions-are-not-evaluated" class="md-nav__link">
+  <a href="#limiting-when-a-transition-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Conditions are not evaluated
+        Limiting when a transition runs
       
     </span>
   </a>
@@ -2434,10 +2434,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conditions-are-not-evaluated" class="md-nav__link">
+  <a href="#limiting-when-a-transition-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Conditions are not evaluated
+        Limiting when a transition runs
       
     </span>
   </a>
@@ -2569,12 +2569,6 @@ between categories, stratified rates, and what <code>build</code> checks.</p>
 <td><code>list[str] \| None</code></td>
 <td><code>None</code></td>
 <td>Accumulators that count the flow; see <a href="../building-models/#accumulators">Building Models</a>.</td>
-</tr>
-<tr>
-<td><code>condition</code></td>
-<td><code>Condition \| None</code></td>
-<td><code>None</code></td>
-<td>Stored, but <strong>not evaluated</strong>; see <a href="#conditions-are-not-evaluated">Conditions</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3001,40 +2995,13 @@ it can send the flow into a stratification that the source does not have:</p>
 </span><span id="__span-7-40"><a id="__codelineno-7-40" name="__codelineno-7-40" href="#__codelineno-7-40"></a><span class="n">redirect</span><span class="o">.</span><span class="n">print_equations</span><span class="p">()</span>
 </span><span id="__span-7-41"><a id="__codelineno-7-41" name="__codelineno-7-41" href="#__codelineno-7-41"></a><span class="c1"># A_g1 -&gt; A_g2_s1: k * A_g1   and   B_g1 -&gt; B_g2_s1: k * B_g1</span>
 </span></code></pre></div>
-<h2 id="conditions-are-not-evaluated">Conditions are not evaluated<a class="headerlink" href="#conditions-are-not-evaluated" title="Permanent link">&para;</a></h2>
-<p><code>add_transition(condition=...)</code> and <code>ModelBuilder.create_condition(logic,
-rules)</code> store a condition with the model, and the model file keeps it. <strong>The
-engine does not evaluate it: the transition runs at every step.</strong> To limit a
-flow, write the condition in the rate with <code>if</code>, as in
-<code>"if(step &gt; 30, k, 0)"</code>, or use a <a href="../time-patterns/"><code>TimePattern</code></a> or a
-<a href="../building-models/#time-series-parameters">time-series parameter</a>. A comparison
-alone is a boolean, so <code>"k * (step &gt; 30)"</code> is rejected.</p>
-<table>
-<thead>
-<tr>
-<th><code>create_condition</code> argument</th>
-<th>Values</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>logic</code></td>
-<td><code>"and"</code>, <code>"or"</code></td>
-</tr>
-<tr>
-<td><code>rules[].variable</code></td>
-<td><code>"state:&lt;bin id&gt;"</code> or <code>"strat:&lt;stratification id&gt;"</code></td>
-</tr>
-<tr>
-<td><code>rules[].operator</code></td>
-<td><code>"eq"</code>, <code>"neq"</code>, <code>"gt"</code>, <code>"get"</code>, <code>"lt"</code>, <code>"let"</code></td>
-</tr>
-<tr>
-<td><code>rules[].value</code></td>
-<td>a string, number or boolean</td>
-</tr>
-</tbody>
-</table>
+<h2 id="limiting-when-a-transition-runs">Limiting when a transition runs<a class="headerlink" href="#limiting-when-a-transition-runs" title="Permanent link">&para;</a></h2>
+<p>A transition runs at every step. To limit a flow, write the condition in the
+rate with <code>if</code>, as in <code>"if(step &gt; 30, k, 0)"</code>, or use a
+<a href="../time-patterns/"><code>TimePattern</code></a>, a
+<a href="../building-models/#time-series-parameters">time-series parameter</a> or a
+<a href="#stratified-rates">stratified rate</a>. A comparison alone is a boolean, so
+<code>"k * (step &gt; 30)"</code> is rejected.</p>
 <h2 id="what-building-checks">What building checks<a class="headerlink" href="#what-building-checks" title="Permanent link">&para;</a></h2>
 <p><code>build</code> plans every flow in the engine and rejects a transition it cannot
 simulate as written:</p>

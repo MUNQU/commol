@@ -2414,6 +2414,12 @@ the variables it names; see
 <td></td>
 </tr>
 <tr>
+<td><code>%</code></td>
+<td>Remainder</td>
+<td><code>"step % 7"</code></td>
+<td>0 to 6</td>
+</tr>
+<tr>
 <td><code>**</code> or <code>^</code></td>
 <td>Power</td>
 <td><code>"2 * 3 ** 4"</code></td>
@@ -2439,7 +2445,7 @@ the variables it names; see
 </tr>
 </tbody>
 </table>
-<p>Precedence, from high to low: parentheses, power, multiplication and division,
+<p>Precedence, from high to low: parentheses, power, multiplication, division and remainder,
 addition and subtraction. So <code>"2 ** 3 * 4"</code> is 32 and <code>"2 + 3 * 4"</code> is 14.</p>
 <p>A comparison gives a boolean, not a number, so it cannot be multiplied:
 <code>"k1 * (step &gt; 30)"</code> is rejected. Write <code>"if(step &gt; 30, k1, 0)"</code>. Rates do not
@@ -2482,18 +2488,10 @@ accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls in
 </tr>
 <tr>
 <td><code>pi</code>, <code>e</code></td>
-<td>π and e; see the warning below</td>
+<td>π and e</td>
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Known issue: <code>pi</code> and <code>e</code> in rates</p>
-<p>In a transition rate, <code>pi</code> and <code>e</code> only work inside a function argument,
-such as <code>sin(2 * pi * step / 365)</code>. Elsewhere (<code>"k1 * pi"</code>) the simulation
-fails with "Variable 'pi' not found". Formula parameters accept them
-everywhere, so define <code>two_pi = "2 * pi"</code> as a parameter, or write the
-number.</p>
-</div>
 <h3 id="subpopulation-variables">Subpopulation variables<a class="headerlink" href="#subpopulation-variables" title="Permanent link">&para;</a></h3>
 <p>With stratifications, the engine also provides sums of compartments. Category
 suffixes must follow the order in which the stratifications were declared.</p>
@@ -2582,11 +2580,11 @@ suffixes must follow the order in which the stratifications were declared.</p>
 </tr>
 <tr>
 <td><code>N_…</code> out of order, as in <code>N_t1_g1</code></td>
-<td><strong>0, with no error.</strong> Check the order.</td>
+<td><code>build</code> fails and lists the valid <code>N_…</code> names</td>
 </tr>
 <tr>
 <td>A combination that a conditional stratification never creates</td>
-<td><code>N_…</code> is 0; <code>&lt;bin&gt;_…</code> is not found</td>
+<td><code>build</code> fails for <code>N_…</code>; <code>&lt;bin&gt;_…</code> is not found</td>
 </tr>
 </tbody>
 </table>
