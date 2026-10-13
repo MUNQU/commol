@@ -287,6 +287,58 @@ fn a_pulse_rate_is_a_constant_rate_on_its_unit_interval() {
     assert_close(rows[2][0] - rows[3][0], 200.0, 1e-12, "difference pulse");
 }
 
+/// One per-capita transition A → B with `rate`.
+fn rate_model(rate: &str) -> Model {
+    model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.1")],
+        &[],
+        &[transition("move", &["A"], &["B"], rate, "")],
+        TIGHT,
+    )
+}
+
+#[test]
+fn a_rate_reads_the_step_of_its_unit_interval() {
+    // On [n, n + 1) the rate is k (n + 1), so A(n) = 1000 exp(−k n (n + 1) / 2).
+    let rows = engine(&rate_model("k * (step + 1)")).run(5).unwrap();
+    for (n, row) in rows.iter().enumerate() {
+        let n = n as f64;
+        let expected = 1000.0 * (-0.1 * n * (n + 1.0) / 2.0).exp();
+        assert_close(row[0], expected, 1e-7, &format!("A({n})"));
+    }
+}
+
+#[test]
+fn a_rate_that_switches_on_the_step_acts_only_on_its_window() {
+    let rows = engine(&rate_model("if(step >= 2, if(step < 4, 0.5, 0), 0)"))
+        .run(6)
+        .unwrap();
+    assert_close(rows[2][0], 1000.0, 1e-12, "A before the window");
+    assert_close(
+        rows[4][0],
+        1000.0 * (-1.0_f64).exp(),
+        1e-7,
+        "A after two units",
+    );
+    assert_close(rows[6][0], rows[4][0], 1e-12, "A after the window");
+}
+
+#[test]
+fn a_formula_parameter_that_reads_the_step_restarts_the_integration() {
+    let model = model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.1"), ("r", r#""k * (step + 1)""#)],
+        &[],
+        &[transition("move", &["A"], &["B"], "r", "")],
+        TIGHT,
+    );
+    let rows = engine(&model).run(3).unwrap();
+    assert_close(rows[3][0], 1000.0 * (-0.6_f64).exp(), 1e-7, "A(3)");
+}
+
 fn impulse_model(typology: &str, extra: &str) -> Model {
     model(
         typology,

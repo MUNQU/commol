@@ -10,7 +10,9 @@ use crate::types::{
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
-use commol_core::math_expression::preprocessing::{SPECIAL_VAR_E, SPECIAL_VAR_PI};
+use commol_core::math_expression::preprocessing::{
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP,
+};
 use commol_core::{MathExpressionContext, Model, OutputLabels, RateMathExpression};
 use std::collections::{HashMap, HashSet};
 
@@ -221,8 +223,13 @@ impl CompiledModel {
                 .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
             &formula_parameters,
         );
-        let depends_on_step =
-            !series_parameters.is_empty() || used_context_variables.contains("step");
+        let depends_on_step = !series_parameters.is_empty()
+            || reads_step(
+                transition_flows
+                    .iter()
+                    .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
+                &formula_parameters,
+            );
         subpopulation_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
@@ -801,6 +808,18 @@ pub fn check_names(model: &Model) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join(", ")
     ))
+}
+
+/// Whether a rate or a formula parameter reads `step`.
+fn reads_step<'a>(
+    transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
+    formula_parameters: &[(String, RateMathExpression)],
+) -> bool {
+    transition_flows
+        .into_iter()
+        .map(|flow| &flow.rate_expression)
+        .chain(formula_parameters.iter().map(|(_, expression)| expression))
+        .any(|expression| expression.reads_variable(SPECIAL_VAR_STEP))
 }
 
 fn collect_used_context_variables<'a>(

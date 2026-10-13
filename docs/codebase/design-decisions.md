@@ -189,13 +189,18 @@ interval. When the right-hand side reads one of them
 every integer, so each jump of the rate is the start of a piece
 (`breakpoints` in `crates/commol-differential/src/solve.rs`).
 
+Whether an expression reads `step` comes from `reads_variable`, not from
+`get_variables`: `get_variables` leaves out the special variables, because it
+lists the variables a model must define.
+
 **Consequence:** a per-capita pulse `p` moves `p` of its source in a difference
 model and `1 − e^(−p)` in a differential model. An impulse moves `p` in both.
 The alternative, `step = t`, makes a pulse `step == n` true on a set of zero
 length, so it would never act.
 
 **Guards:** `tests/simulation/test_differential.py::TestTimeInsideAStep`,
-`crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`.
+`crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`,
+`a_rate_reads_the_step_of_its_unit_interval`.
 
 ### Impulses come before the flows of their step
 

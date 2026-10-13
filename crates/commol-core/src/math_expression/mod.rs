@@ -88,7 +88,7 @@ pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
 pub use jit::{JITCompiler, JITFunction};
 
-use preprocessing::{get_variables, preprocess_formula};
+use preprocessing::{get_variables, preprocess_formula, reads_variable};
 
 /// Global cache for JIT-compiled functions.
 ///
@@ -298,6 +298,12 @@ impl MathExpression {
         get_variables(&self.preprocessed)
     }
 
+    /// Whether the expression reads the variable `name`, special variables
+    /// such as `step` included.
+    pub fn reads_variable(&self, name: &str) -> bool {
+        reads_variable(&self.preprocessed, name)
+    }
+
     /// Get the preprocessed formula string (Python operators normalised,
     /// transcendental functions prefixed).
     pub fn preprocessed(&self) -> &str {
@@ -398,6 +404,16 @@ impl RateMathExpression {
             Self::Parameter(param_name) => vec![param_name.clone()],
             Self::Formula(expr) => expr.get_variables(),
             Self::Constant(_) => vec![],
+        }
+    }
+
+    /// Whether this rate expression reads the variable `name`, special
+    /// variables such as `step` included.
+    pub fn reads_variable(&self, name: &str) -> bool {
+        match self {
+            Self::Parameter(param_name) => param_name == name,
+            Self::Formula(expr) => expr.reads_variable(name),
+            Self::Constant(_) => false,
         }
     }
 }

@@ -123,6 +123,15 @@ pub fn get_variables(preprocessed: &str) -> Vec<String> {
     variables.into_iter().collect()
 }
 
+/// Whether an expression reads the variable `name`, special variables such as
+/// `step` included.
+///
+/// Returns `false` if the expression is syntactically invalid.
+pub fn reads_variable(preprocessed: &str, name: &str) -> bool {
+    build_operator_tree(preprocessed)
+        .is_ok_and(|node: Node| node.iter_variable_identifiers().any(|ident| ident == name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +157,13 @@ mod tests {
         let vars = get_variables("beta * N + pi");
         assert_eq!(vars.len(), 1);
         assert!(vars.contains(&"beta".to_string()));
+    }
+
+    #[test]
+    fn reads_variable_sees_special_variables() {
+        assert!(reads_variable("k * (step + 1)", "step"));
+        assert!(reads_variable("if(t >= 2, k, 0)", "t"));
+        assert!(!reads_variable("k * steps", "step"));
+        assert!(!reads_variable("k * (", "k"));
     }
 }
