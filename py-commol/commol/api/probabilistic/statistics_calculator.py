@@ -12,7 +12,6 @@ import numpy as np
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.api.probabilistic.calibration_runner import CalibrationRunner
 from commol.api.probabilistic.intervals import ci_percentiles
-from commol.api.windows import windowed_totals
 from commol.api.probabilistic.normalization import (
     central_fit_loss,
     series_normalization_factors,
@@ -30,21 +29,11 @@ from commol.context.probabilistic_calibration import (
 logger = logging.getLogger(__name__)
 
 
-def _values_at_windows(
-    trajectory: list[float], windows: list[tuple[int, int]]
-) -> list[float]:
-    """Windowed value at each (step, window_steps) pair, in the order given."""
-    steps_by_window: dict[int, list[int]] = {}
-    for step, window_steps in windows:
-        steps_by_window.setdefault(window_steps, []).append(step)
-
-    values: dict[tuple[int, int], float] = {}
-    for window_steps, steps in steps_by_window.items():
-        for step, value in zip(
-            steps, windowed_totals(trajectory, window_steps, steps), strict=True
-        ):
-            values[(step, window_steps)] = value
-    return [values[window] for window in windows]
+def _as_step(position: int | float) -> int | float:
+    """A whole-number position as an int, so it indexes a trajectory."""
+    if isinstance(position, float) and position.is_integer():
+        return int(position)
+    return position
 
 
 class StatisticsCalculator:
@@ -76,6 +65,88 @@ class StatisticsCalculator:
         self.problem = problem
         self.confidence_level = confidence_level
         self._calibration_runner = CalibrationRunner(simulation, problem, seed=0)
+        self._point_values_cache: (
+            tuple[tuple[int, ...], dict[tuple[str, float], list[float]]] | None
+        ) = None
+
+    def _non_integer_points(self) -> list[tuple[str, float]]:
+        """``(output, step)`` of every observation read at a non-integer step."""
+        output_ids = set(self.simulation.simulation_outputs)
+        points: list[tuple[str, float]] = []
+        for obs in self.problem.observed_data:
+            positions = [obs.step]
+            if obs.window_steps is not None:
+                positions.append(obs.step - obs.window_steps)
+            for position in positions:
+                if float(position).is_integer():
+                    continue
+                for output in obs.compartments or [obs.compartment]:
+                    if output in output_ids and (output, position) not in points:
+                        points.append((output, position))
+        return points
+
+    def _point_values(
+        self,
+        ensemble_params: list[CalibrationEvaluation],
+    ) -> dict[tuple[str, float], list[float]]:
+        """
+        Exact value of each output at each non-integer step the problem uses.
+
+        Ensemble trajectories hold integer steps only. A DifferentialEquations
+        model may observe between them, so the engine reports those positions
+        directly, once per ensemble. Keys are ``(output, step)``; each value
+        has one entry per ensemble member.
+        """
+        cache_key = tuple(id(params) for params in ensemble_params)
+        if self._point_values_cache is not None:
+            cached_key, cached_values = self._point_values_cache
+            if cached_key == cache_key:
+                return cached_values
+
+        points = self._non_integer_points()
+        values: dict[tuple[str, float], list[float]] = {point: [] for point in points}
+        if points:
+            output_index = {
+                name: idx for idx, name in enumerate(self.simulation.simulation_outputs)
+            }
+            runner = self._calibration_runner
+            generate = (
+                commol_rs.calibration.generate_calibrated_predictions_at_points_parallel
+            )
+            predictions = generate(
+                self.simulation.engine,
+                runner.build_rust_observed_data(),
+                runner.build_rust_parameters(),
+                runner.build_rust_constraints(),
+                runner.build_loss_config(),
+                runner.initial_population_size(),
+                [params.parameters for params in ensemble_params],
+                [(float(step), output_index[output]) for output, step in points],
+                initial_condition_remainder=runner.problem.initial_condition_remainder,
+            )
+            for member in predictions:
+                for point, value in zip(points, member, strict=True):
+                    values[point].append(value)
+        self._point_values_cache = (cache_key, values)
+        return values
+
+    def _member_value(
+        self,
+        all_predictions: dict[str, list[list[float]]],
+        ensemble_params: list[CalibrationEvaluation],
+        output: str,
+        member_idx: int,
+        step: int | float,
+    ) -> float | None:
+        """
+        Value of one output for one ensemble member at a step, or None when
+        the trajectory does not reach that step.
+        """
+        if isinstance(step, int):
+            trajectory = all_predictions[output][member_idx]
+            return trajectory[step] if step < len(trajectory) else None
+        values = self._point_values(ensemble_params).get((output, step))
+        return values[member_idx] if values else None
 
     def calculate_parameter_statistics(
         self,
@@ -239,7 +310,7 @@ class StatisticsCalculator:
         dict[str, list[float]],
         dict[str, list[float]],
         dict[str, list[float]],
-        dict[str, list[int]],
+        dict[str, list[int | float]],
     ]:
         """Calculate median and CI from windowed (per-period) trajectories.
 
@@ -258,7 +329,8 @@ class StatisticsCalculator:
         Returns empty dicts if no observed data has window_steps set.
         """
         windowed_observations: dict[
-            str, tuple[list[str], str | None, list[tuple[int, int]]]
+            str,
+            tuple[list[str], str | None, list[tuple[int | float, int | float]]],
         ] = {}
         for obs in self.problem.observed_data:
             if obs.window_steps is None:
@@ -272,7 +344,7 @@ class StatisticsCalculator:
         prediction_median: dict[str, list[float]] = {}
         prediction_ci_lower: dict[str, list[float]] = {}
         prediction_ci_upper: dict[str, list[float]] = {}
-        prediction_steps: dict[str, list[int]] = {}
+        prediction_steps: dict[str, list[int | float]] = {}
 
         ci_lower_percentile, ci_upper_percentile = ci_percentiles(self.confidence_level)
 
@@ -285,26 +357,32 @@ class StatisticsCalculator:
                 component_id not in all_predictions for component_id in component_ids
             ):
                 continue
-            trajectories = self._component_trajectories(
-                all_predictions, ensemble_params, component_ids, scale_id
-            )
-            if not trajectories:
+            windows = sorted(set(observation_windows))
+            windowed_rows: list[list[float]] = []
+            kept: list[tuple[int | float, int | float]] = []
+            for step, window_steps in windows:
+                row = [
+                    self._member_window_value(
+                        all_predictions,
+                        ensemble_params,
+                        component_ids,
+                        scale_id,
+                        member_idx,
+                        step,
+                        window_steps,
+                    )
+                    for member_idx in range(len(ensemble_params))
+                ]
+                values = [value for value in row if value is not None]
+                if step - window_steps < 0 or len(values) != len(row):
+                    continue
+                kept.append((step, window_steps))
+                windowed_rows.append(values)
+            if not kept:
                 continue
+            windows = kept
+            windowed = np.array(windowed_rows).T
 
-            series_length = len(trajectories[0])
-            windows = sorted(
-                {
-                    (step, window_steps)
-                    for step, window_steps in observation_windows
-                    if step < series_length and step - window_steps >= 0
-                }
-            )
-            if not windows:
-                continue
-
-            windowed = np.array(
-                [_values_at_windows(trajectory, windows) for trajectory in trajectories]
-            )
             prediction_steps[output_id] = [step for step, _ in windows]
             prediction_median[output_id] = np.median(windowed, axis=0).tolist()
             prediction_ci_lower[output_id] = np.percentile(
@@ -321,32 +399,35 @@ class StatisticsCalculator:
             prediction_steps,
         )
 
-    def _component_trajectories(
+    def _member_window_value(
         self,
         all_predictions: dict[str, list[list[float]]],
         ensemble_params: list[CalibrationEvaluation],
         component_ids: list[str],
         scale_id: str | None,
-    ) -> list[list[float]]:
-        """Summed, optionally scaled trajectory of each ensemble member."""
-        first_component = all_predictions[component_ids[0]]
-        trajectories: list[list[float]] = []
-        for run_idx in range(len(first_component)):
-            trajectory = [
-                sum(
-                    all_predictions[component_id][run_idx][step_idx]
-                    for component_id in component_ids
-                )
-                for step_idx in range(len(first_component[run_idx]))
-            ]
-            if scale_id is not None:
-                scale_idx = ensemble_params[run_idx].parameter_names.index(scale_id)
-                trajectory = [
-                    value * ensemble_params[run_idx].parameters[scale_idx]
-                    for value in trajectory
-                ]
-            trajectories.append(trajectory)
-        return trajectories
+        member_idx: int,
+        step: int | float,
+        window_steps: int | float,
+    ) -> float | None:
+        """Summed, optionally scaled windowed value of one ensemble member."""
+        total = 0.0
+        for component_id in component_ids:
+            end = self._member_value(
+                all_predictions, ensemble_params, component_id, member_idx, step
+            )
+            start = self._member_value(
+                all_predictions,
+                ensemble_params,
+                component_id,
+                member_idx,
+                _as_step(step - window_steps),
+            )
+            if end is None or start is None:
+                return None
+            total += end - start
+        return self._scale_observation_value(
+            total, scale_id, ensemble_params[member_idx]
+        )
 
     def calculate_central_loss(
         self,
@@ -460,6 +541,12 @@ class StatisticsCalculator:
             component_ids = obs.compartments or [comp_id]
             step = obs.step
             observed_value = obs.value
+            previous_step = (
+                _as_step(step - obs.window_steps) if obs.window_steps is not None else 0
+            )
+            # The intervals hold integer steps only.
+            if not isinstance(step, int) or not isinstance(previous_step, int):
+                continue
 
             if all(
                 component_id in prediction_ci_lower
@@ -476,7 +563,6 @@ class StatisticsCalculator:
                         for component_id in component_ids
                     )
                 else:
-                    previous_step = step - obs.window_steps
                     ci_lower = sum(
                         prediction_ci_lower[component_id][step]
                         - prediction_ci_upper[component_id][previous_step]
@@ -551,19 +637,29 @@ class StatisticsCalculator:
 
         values = []
         previous_step = (
-            obs.step - obs.window_steps if obs.window_steps is not None else None
+            _as_step(obs.step - obs.window_steps)
+            if obs.window_steps is not None
+            else None
         )
         for member_idx, params in enumerate(ensemble_params):
             value = 0.0
             for component_id in component_ids:
-                trajectory = all_predictions[component_id][member_idx]
-                if obs.step >= len(trajectory):
+                component_value = self._member_value(
+                    all_predictions, ensemble_params, component_id, member_idx, obs.step
+                )
+                if component_value is None:
                     return []
-                component_value = trajectory[obs.step]
                 if previous_step is not None:
-                    if previous_step >= len(trajectory):
+                    previous_value = self._member_value(
+                        all_predictions,
+                        ensemble_params,
+                        component_id,
+                        member_idx,
+                        previous_step,
+                    )
+                    if previous_value is None:
                         return []
-                    component_value -= trajectory[previous_step]
+                    component_value -= previous_value
                 value += component_value
             values.append(self._scale_observation_value(value, obs.scale_id, params))
         return values

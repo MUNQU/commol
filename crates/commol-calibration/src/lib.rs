@@ -30,9 +30,9 @@
 //!
 //! // Define observed data
 //! let observed_data = vec![
-//!     ObservedDataPoint::new(10, 1, 501.0),  // time=10, compartment I, value=501
-//!     ObservedDataPoint::new(20, 1, 823.0),
-//!     ObservedDataPoint::new(30, 1, 654.0),
+//!     ObservedDataPoint::new(10.0, 1, 501.0),  // time=10, compartment I, value=501
+//!     ObservedDataPoint::new(20.0, 1, 823.0),
+//!     ObservedDataPoint::new(30.0, 1, 654.0),
 //! ];
 //!
 //! // Define parameters to calibrate

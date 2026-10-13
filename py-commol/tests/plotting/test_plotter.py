@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from commol import ObservedDataPoint, PlotConfig, Simulation
 from commol.api.plotter import SimulationPlotter
 from commol.context.calibration import CalibrationResult
-from tests.support import a_to_b_builder, build
+from tests.support import a_to_b_builder, build, build_ode, sir_builder
 
 BINS = ["S", "I", "R"]
 TITLES = {"S": "Susceptible", "I": "Infected", "R": "Recovered"}
@@ -388,3 +388,37 @@ class TestSeriesSelection:
 
         with pytest.raises(ValueError, match="'X' is neither an output"):
             getattr(plotter, method)(series=["X"])
+
+
+class TestDifferentialModel:
+    def test_observations_at_non_integer_steps_are_drawn_where_they_are(
+        self,
+    ) -> None:
+        simulation = Simulation(build_ode(sir_builder()))
+        steps = [0.5, 10.25, 40.75]
+        at = simulation.run_at(steps)
+        observed = [
+            ObservedDataPoint(step=step, compartment="I", value=value)
+            for step, value in zip(steps, at["I"], strict=True)
+        ]
+
+        fig = SimulationPlotter(simulation, simulation.run(50)).plot_series(
+            observed_data=observed, series=["I"]
+        )
+
+        np.testing.assert_allclose(_scatter(fig.axes[0])[:, 0], steps)
+
+    def test_a_window_of_non_whole_steps_has_no_windowed_line(self) -> None:
+        simulation = Simulation(
+            build_ode(
+                a_to_b_builder(parameters={"k1": 0.05}, rate="k1", accumulator="events")
+            )
+        )
+        observed = [
+            ObservedDataPoint(step=5, compartment="events", value=1.0, window_steps=2.5)
+        ]
+
+        with pytest.raises(ValueError, match="whole steps"):
+            SimulationPlotter(simulation, simulation.run(20)).plot_series(
+                observed_data=observed
+            )

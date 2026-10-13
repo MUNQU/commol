@@ -322,6 +322,7 @@ impl PyDynamics {
             inner: commol_core::Dynamics {
                 typology,
                 transitions: transitions.into_iter().map(|t| t.inner).collect(),
+                solver: None,
             },
         })
     }
@@ -378,6 +379,8 @@ impl PyTransition {
                 rate,
                 stratified_rates,
                 per_compartment,
+                impulse_at: None,
+                impulse_every: None,
             },
         }
     }

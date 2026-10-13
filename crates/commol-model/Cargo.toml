@@ -1,0 +1,19 @@
+[package]
+name = "commol-model"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Compilation of compartment models into the right-hand side every engine integrates"
+
+[lib]
+name = "commol_model"
+crate-type = ["rlib"]
+
+[dependencies]
+commol-core = { path = "../commol-core" }
+
+[dev-dependencies]
+serde_json = "1.0"

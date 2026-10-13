@@ -5,7 +5,7 @@
 A transition moves population at every step: from its `source` compartments to
 its `target` compartments, at the rate you give. This page documents
 `ModelBuilder.add_transition` completely: rates, several sources, transitions
-between categories, stratified rates, and what `build` checks.
+between categories, stratified rates, impulses, and what `build` checks.
 
 ## Quick path
 
@@ -46,6 +46,8 @@ model.print_equations()  # shows every flow as the engine computes it
 | `stratified_rates` | `list[dict] \| None` | `None` | Rates for some categories; see [Stratified rates](#stratified-rates). |
 | `per_compartment` | `bool \| None` | `None` | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment). |
 | `accumulators` | `list[str] \| None` | `None` | Accumulators that count the flow; see [Building Models](building-models.md#accumulators). |
+| `impulse_at` | `list[float] \| None` | `None` | Makes the transition an impulse at these steps; see [Impulses](#impulses). |
+| `impulse_every` | `tuple[float, float] \| None` | `None` | `(period, offset)`: an impulse at `offset`, `offset + period`, …; see [Impulses](#impulses). |
 
 ## Rates
 
@@ -381,6 +383,50 @@ rate with `if`, as in `"if(step > 30, k, 0)"`, or use a
 [stratified rate](#stratified-rates). A comparison alone is a boolean, so
 `"k * (step > 30)"` is rejected.
 
+## Impulses
+
+An impulse moves its amount at once, at given steps, and nothing between them.
+Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The
+rate is then a fraction of the source (per-capita) or an amount (absolute),
+with the same [rules](#absolute-and-per-capita-rates), sources, targets,
+stratified rates and accumulators as any transition.
+
+```python
+impulse_model = (
+    ModelBuilder(name="Impulses")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_accumulator(id="moved", name="Moved by the impulse")
+    .add_parameter(id="p", value=0.25)
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="jump", source=["A"], target=["B"], rate="p", impulse_at=[1], accumulators=["moved"])
+    .add_transition(id="flow", source=["A"], target=["B"], rate="k")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(typology="DifferenceEquations")
+)
+
+jumped = Simulation(impulse_model).run(num_steps=2)
+print([round(a, 1) for a in jumped["A"]])  # [1000.0, 675.0, 607.5]
+print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
+```
+
+| Rule | In both engines |
+|---|---|
+| Order | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`). |
+| Several impulses at one step | Every jump is computed from the state before any of them. |
+| Steps | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
+| Units | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](units-and-equations.md#impulses)). |
+| `print_equations` | Lists impulses apart from the equations, with their steps. |
+
+An impulse is not a pulse rate. A [`TimePattern.pulse`](time-patterns.md) is a
+rate: a difference model applies it for one step with the other flows, and a
+differential model applies it as a constant rate for one time unit, so it
+moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in
+both engines.
+
 ## What building checks
 
 `build` plans every flow in the engine and rejects a transition it cannot
@@ -394,6 +440,8 @@ simulate as written:
 | Several sources with a per-capita rate | The transition; use an absolute rate or `$compartment` |
 | A stratified rate whose `category` conditions match no source compartment | The categories; use `to` to reach another stratification |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
+| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition |
+| A non-integer impulse step in a `DifferenceEquations` model | The transition and the step |
 
 ## Next steps
 

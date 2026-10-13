@@ -38,7 +38,10 @@ model.print_equations()
 ## Unit checking
 
 `Model.check_unit_consistency(verbose=False)` checks that every flow has the
-unit `<bin unit>/<step unit>`, and that every function receives a plain number.
+unit `<bin unit>/<step unit>`, every [impulse](transitions.md#impulses) the
+unit `<bin unit>`, and that every function receives a plain number. It checks
+`DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate
+is per unit of the axis.
 It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every
 transition that fails.
 
@@ -62,7 +65,15 @@ transition that fails.
 
 The engine applies every flow once per step and converts no value between
 units. So one step has one unit, and every rate must use it
-(`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`):
+(`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`).
+
+The axis of a model is its independent variable: the quantity the model steps
+along or differentiates over. Time is one case; a length, a dose or any other
+quantity is another. So the step unit may have any single dimension. Declare it
+with `ModelBuilder(..., step_unit="meter")`
+(`Model.step_unit`); `check_step_unit` accepts one unit of one dimension with
+exponent 1, such as `day` or `meter`, and rejects `1/day` or `meter**2`. When
+it is not declared, the check infers it from the parameters:
 
 | Parameter units | Step unit | Result |
 |---|---|---|
@@ -72,11 +83,38 @@ units. So one step has one unit, and every rate must use it
 | No unit of time | `step` | Flows must be `<bin unit>/step` |
 | `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"` | — | Error that names each parameter and its unit |
 
-A unit of time is any unit of dimension `[time]` (`second`, `hour`, `day`,
-`week`, `month`, `year`, …) or `step`. Two names of one unit, such as `d` and
+Inference looks only at units of time: a unit of dimension `[time]`
+(`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in
+`1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the
+flow fails. Two names of one unit, such as `d` and
 `day`, are one unit. A flow must have exactly the expected unit: `person/week`
 does not match `person/day`, because the engine would apply a weekly rate
 every day.
+
+```python
+along_a_line = (
+    ModelBuilder(name="Along a line", bin_unit="item", step_unit="meter")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k1", value=0.01, unit="1/meter")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
+    .set_initial_conditions(
+        population_size=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(typology="DifferentialEquations")
+)
+along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
+```
+
+`TimeScale.from_step_unit(unit)` gives the time scale of a step unit of time,
+and raises `ValueError` for a unit of another dimension, such as `meter`.
+
+### Impulses
+
+An impulse moves an amount at once, so its rate must have the bin unit:
+`p * A` with `p` in `"dimensionless"` is an amount of `<bin unit>`; `k * A`
+with `k` in `"1/day"` is a flow and fails with `expected '<bin unit>'`.
 
 ### What the check catches
 

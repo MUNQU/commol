@@ -1,15 +1,8 @@
 //! Difference equations simulation engine for compartment models.
 //!
 //! This crate provides a discrete-time simulation engine for compartment models
-//! using difference equations. It is designed for efficient simulation of compartmental
-//! models with support for stratifications and complex rate expressions.
-//!
-//! ## Module Organization
-//!
-//! - `types` - Core data structures and types
-//! - `builder` - Model compilation and construction
-//! - `helpers` - Utility functions for stratification and rate resolution
-//! - `simulation` - Simulation execution methods
+//! using difference equations. The model is compiled by `commol-model`; this
+//! crate only steps it: `X(n + 1) = X(n) + derivatives(n, X(n))`.
 //!
 //! ## Example Usage
 //!
@@ -33,16 +26,6 @@
 
 #![warn(missing_docs)]
 
-mod builder;
-mod flows;
-mod helpers;
-mod layout;
 mod simulation;
-mod types;
 
-pub use builder::{
-    ExpandedOutput, InitialCompartment, check_names, expand_accumulators, expand_compartments,
-    initial_state,
-};
-pub use flows::{FlowDescription, describe_flows};
-pub use types::DifferenceEquations;
+pub use simulation::DifferenceEquations;

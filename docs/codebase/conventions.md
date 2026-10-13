@@ -11,7 +11,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 |---|---|---|
 | Python style | Ruff, line length 88 | `ruff check`, `ruff format` (pre-commit, CI) |
 | Python types | Annotations on every signature; never `Any` | `ty check` (pre-commit, CI) |
-| Python dead code | No unused code | `vulture` (CI) |
+| Python dead code | No unused code; a name used only in a string annotation goes in `py-commol/.vulture_allowlist.py` | `vulture` (pre-commit, CI) |
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
 | Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
 | Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |
@@ -162,11 +162,11 @@ of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
 | Package | Tests of | Guide page |
 |---|---|---|
 | `building/` | The builder, parameters, stratifications, reserved names, save and load | [Building Models](../guide/building-models.md) |
-| `transitions/` | Flows, `$compartment`, stratified rates | [Transitions](../guide/transitions.md) |
+| `transitions/` | Flows, `$compartment`, stratified rates, impulses | [Transitions](../guide/transitions.md) |
 | `rates/` | Formulas, functions, variables, expression security | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | `time_patterns/` | `TimePattern` formulas, runs and schedules | [Time Patterns](../guide/time-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#initial-conditions) |
-| `simulation/` | Runs, outputs, windowed totals, `TimeScale` | [Running Simulations](../guide/simulations.md) |
+| `simulation/` | Runs, `run_at`, differential models, outputs, windowed totals, `TimeScale` | [Running Simulations](../guide/simulations.md) |
 | `units/` | Unit checks and `print_equations` | [Units and Equations](../guide/units-and-equations.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |
@@ -185,7 +185,8 @@ topic inside its package.
   `override_builder`, `shared_category_builder` and
   `conditional_pathway_builder`. A keyword overrides one part of the default
   model, so a test names only what it changes. `build` builds for difference
-  equations; `run` builds and simulates.
+  equations; `build_ode` builds for differential equations, with the tight
+  solver settings `TIGHT` by default; `run` builds and simulates.
 - Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to `support/`.
 - Fixtures: `sir_model` and `sir_simulation` (`tests/conftest.py`); `truth`

@@ -221,6 +221,8 @@ mod tests {
                 absolute: None,
             }]),
             per_compartment: None,
+            impulse_at: None,
+            impulse_every: None,
         };
 
         let stratification_values = HashMap::from([("group".to_string(), "g1".to_string())]);

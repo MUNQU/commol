@@ -4,7 +4,7 @@ import pytest
 
 from commol import ObservedDataPoint, Simulation
 from commol.api.reporting import observed_report, simulation_report
-from tests.support import a_to_b_builder, build
+from tests.support import a_to_b_builder, build, build_ode
 
 
 def _accumulator_model() -> Simulation:
@@ -18,6 +18,30 @@ STEPS = [(w + 1) * WINDOW for w in range(WINDOWS)]
 
 
 class TestObservedReport:
+    def test_a_non_integer_step_lands_on_the_window_that_holds_it(self) -> None:
+        # Window w holds the steps (5 w, 5 (w + 1)].
+        observed = [
+            ObservedDataPoint(step=3.5, compartment="events", value=1.0),
+            ObservedDataPoint(step=5.5, compartment="events", value=2.0),
+        ]
+
+        report = observed_report(observed, WINDOW, WINDOWS)
+
+        assert report["events"]["values"][:3] == [1.0, 2.0, None]
+
+    def test_a_differential_model_is_reported(self) -> None:
+        builder = a_to_b_builder(
+            parameters={"k1": 0.05}, rate="k1", accumulator="events"
+        )
+        simulation = Simulation(build_ode(builder))
+        results = simulation.run(WINDOW * WINDOWS)
+
+        report = simulation_report(
+            simulation, results, STEPS, WINDOW, WINDOWS, accumulators=["events"]
+        )
+
+        assert set(report) >= {"observed", "series", "accumulators"}
+
     def test_values_land_on_their_window(self) -> None:
         observed = [
             ObservedDataPoint(step=5, compartment="events", value=1.0),

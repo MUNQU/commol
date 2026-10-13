@@ -1,7 +1,8 @@
 """Calibration problems, observations, unknowns, constraints, optimizers and results."""
 
-from collections.abc import Mapping
-from typing import Self, overload, override
+import math
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Self, overload, override
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
@@ -21,6 +22,57 @@ from commol.context.probabilistic_calibration import (
 )
 from commol.utils.security import validate_expression_security
 
+if TYPE_CHECKING:
+    from commol.constants import ModelTypes
+
+
+def _whole_as_int(value: int | float) -> int | float:
+    """A step that is a whole number, as an `int`; any other step as is."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def check_steps_for_typology(
+    typology: "ModelTypes",
+    observed_data: Sequence["ObservedDataPoint"],
+    constraints: Sequence["CalibrationConstraint"] = (),
+) -> None:
+    """
+    Check that the steps of a calibration fit the engine of a model.
+
+    A DifferentialEquations model reports at any position on the axis. A
+    DifferenceEquations model reports only at integer steps, so every
+    observation step, window and constraint step must be an integer.
+
+    Raises
+    ------
+    ValueError
+        Naming the first observation or constraint with a non-integer step in
+        a DifferenceEquations model.
+    """
+    from commol.constants import ModelTypes
+
+    if typology != ModelTypes.DIFFERENCE_EQUATIONS:
+        return
+    for point in observed_data:
+        for name, value in (("step", point.step), ("window_steps", point.window_steps)):
+            if isinstance(value, float):
+                raise ValueError(
+                    f"Observation '{point.compartment}' has {name}={value}, which is "
+                    f"not an integer; a DifferenceEquations model reports only at "
+                    f"integer steps."
+                )
+    for constraint in constraints:
+        for value in constraint.time_steps or []:
+            if isinstance(value, float):
+                raise ValueError(
+                    f"Constraint '{constraint.id}' has the time step {value}, which "
+                    f"is not an integer; a DifferenceEquations model reports only "
+                    f"at integer steps."
+                )
+
+
 # Re-export for documentation
 __all__ = ["OptimizationAlgorithm", "calibrated_values"]
 
@@ -31,8 +83,10 @@ class ObservedDataPoint(BaseModel):
 
     Attributes
     ----------
-    step : int
-        Time step of the observation
+    step : int | float
+        Position of the observation on the axis. A DifferentialEquations model
+        accepts any non-negative position; a DifferenceEquations model only an
+        integer step. A whole number is stored as an ``int``.
     compartment : str
         Name of the compartment being observed, or a display name for aggregate
         observations when compartments is set
@@ -49,7 +103,9 @@ class ObservedDataPoint(BaseModel):
         Optional scale parameter ID to apply to model output before comparison
     """
 
-    step: int = Field(default=..., ge=0, description="Time step of the observation")
+    step: int | float = Field(
+        default=..., ge=0, description="Position (step) of the observation"
+    )
     compartment: str = Field(
         default=..., min_length=1, description="Name of the compartment being observed"
     )
@@ -67,7 +123,7 @@ class ObservedDataPoint(BaseModel):
         default=None,
         description="Optional scale parameter ID to apply to model output",
     )
-    window_steps: int | None = Field(
+    window_steps: int | float | None = Field(
         default=None,
         gt=0,
         description=(
@@ -75,6 +131,16 @@ class ObservedDataPoint(BaseModel):
             "When set, prediction is value(step) - value(step - window_steps)."
         ),
     )
+
+    @field_validator("step", "window_steps")
+    @classmethod
+    def validate_finite_step(cls, value: int | float | None) -> int | float | None:
+        """Reject infinite or NaN steps; store a whole number as an int."""
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError(f"steps must be finite, got {value}")
+        return _whole_as_int(value)
 
     @model_validator(mode="after")
     def validate_window_steps(self) -> Self:
@@ -176,8 +242,9 @@ class CalibrationConstraint(BaseModel):
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
         more important relative to others. The penalty for violating this constraint
         is: weight * violation^2
-    time_steps : list[int] | None
-        Optional time steps at which to evaluate this constraint. If None, constraint
+    time_steps : list[int | float] | None
+        Optional time steps at which to evaluate this constraint. Non-integer
+        steps need a DifferentialEquations model. If None, constraint
         is evaluated once before simulation using parameter values only. If specified,
         constraint is evaluated at each time step and can reference compartment values.
 
@@ -229,10 +296,11 @@ class CalibrationConstraint(BaseModel):
         gt=0.0,
         description="Penalty weight multiplier for violations",
     )
-    time_steps: list[int] | None = Field(
+    time_steps: list[int | float] | None = Field(
         default=None,
         description=(
-            "Optional time steps at which to evaluate (for time-dependent constraints)"
+            "Optional time steps at which to evaluate (for time-dependent "
+            "constraints). Non-integer steps need a DifferentialEquations model."
         ),
     )
 
@@ -257,10 +325,12 @@ class CalibrationConstraint(BaseModel):
                     f"time_steps for constraint '{self.id}' must not be empty if "
                     "specified"
                 )
-            if any(ts < 0 for ts in self.time_steps):
+            if any(ts < 0 or not math.isfinite(ts) for ts in self.time_steps):
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must all be non-negative"
+                    f"time_steps for constraint '{self.id}' must all be finite "
+                    "and non-negative"
                 )
+            self.time_steps = [_whole_as_int(ts) for ts in self.time_steps]
         return self
 
 

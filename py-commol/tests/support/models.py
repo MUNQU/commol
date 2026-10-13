@@ -27,7 +27,7 @@ what it changes. The factories share these keywords:
 
 from collections.abc import Mapping
 
-from commol import ModelBuilder
+from commol import ModelBuilder, OdeSolver
 from commol.api.model_builder import (
     BinFractionDict,
     CompartmentFractionDict,
@@ -38,6 +38,9 @@ from commol.constants import ModelTypes
 from commol.context.model import Model
 
 DIFFERENCE_EQUATIONS = ModelTypes.DIFFERENCE_EQUATIONS.value
+DIFFERENTIAL_EQUATIONS = ModelTypes.DIFFERENTIAL_EQUATIONS.value
+TIGHT = OdeSolver(rtol=1e-10, atol=1e-8)
+"""Tolerances tight enough for closed-form checks."""
 
 Parameters = Mapping[str, float | str | None]
 Rate = str | float | TimePattern | None
@@ -50,6 +53,13 @@ Conditions = Mapping[str, Mapping[str, str]]
 def build(builder: ModelBuilder) -> Model:
     """Build a difference-equation model."""
     return builder.build(typology=DIFFERENCE_EQUATIONS)
+
+
+def build_ode(builder: ModelBuilder, solver: OdeSolver | None = TIGHT) -> Model:
+    """Build a differential-equation model with `solver` settings."""
+    model = builder.build(typology=DIFFERENTIAL_EQUATIONS)
+    dynamics = model.dynamics.model_copy(update={"solver": solver})
+    return model.model_copy(update={"dynamics": dynamics})
 
 
 def stratify(

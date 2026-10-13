@@ -8,7 +8,7 @@ writes it, and the Rust engine reads the same structure from JSON
 read this page to understand model files or to work on Commol.
 
 ```text
-Model                      name, description, version
+Model                      name, description, version, step_unit
 ├── population: Population
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]
@@ -22,8 +22,9 @@ Model                      name, description, version
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a TimeSeriesValue)
 └── dynamics: Dynamics
-    ├── typology: "DifferenceEquations"
-    └── transitions: [Transition]
+    ├── typology: "DifferenceEquations" or "DifferentialEquations"
+    ├── solver: OdeSolver | None            (differential models only)
+    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
         └── stratified_rates: [StratifiedRate]
             └── conditions: [StratificationCondition]
 ```
@@ -55,6 +56,8 @@ Model                      name, description, version
 ::: commol.context.dynamics.Dynamics
 
 ::: commol.context.dynamics.Transition
+
+`OdeSolver` is documented in [Simulation API](../api/simulation.md).
 
 ::: commol.context.dynamics.StratifiedRate
 

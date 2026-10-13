@@ -9,7 +9,7 @@ explain how to use them; these pages list every argument, attribute and error.
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder` |
 | [Model](model.md) | `Model`, `InitialCompartment`, `UnitConsistencyError` |
-| [Simulation](simulation.md) | `Simulation`, `window_end_steps`, `windowed_totals` |
+| [Simulation](simulation.md) | `Simulation`, `OdeSolver`, `window_end_steps`, `windowed_totals` |
 | [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
 | [TimePattern](time-patterns.md) | `TimePattern` |
 | [TimeScale](time-scale.md) | `TimeScale` |

@@ -36,6 +36,28 @@ impl OutputLabels {
     }
 }
 
+/// Convert positions on the axis to integer steps.
+///
+/// # Errors
+///
+/// Returns a message that names the first position that is not a
+/// non-negative integer, because a difference engine only reports at steps.
+pub fn integer_steps(positions: &[f64]) -> Result<Vec<u32>, String> {
+    positions
+        .iter()
+        .map(|&position| {
+            if position >= 0.0 && position.fract() == 0.0 && position <= u32::MAX as f64 {
+                Ok(position as u32)
+            } else {
+                Err(format!(
+                    "A difference-equations model reports only at integer steps; \
+                     {position} is not one"
+                ))
+            }
+        })
+        .collect()
+}
+
 /// Common interface that all model engines must implement
 /// to be compatible with calibration and other analysis tools.
 ///
@@ -229,6 +251,28 @@ pub trait SimulationEngine: Clone {
             buffer.push(row.clone());
         }
         Ok(())
+    }
+
+    /// Run the simulation through the largest requested position on the axis,
+    /// recording only those positions into a reusable buffer.
+    ///
+    /// `positions` must be sorted in ascending order and contain unique,
+    /// non-negative values. The output rows are aligned with `positions`. An
+    /// engine that steps in continuous time reports at any position; the
+    /// default implementation accepts only integer positions and delegates to
+    /// [`Self::run_at_steps_into_buffer`].
+    ///
+    /// # Errors
+    ///
+    /// The default implementation returns a message that names the first
+    /// position that is not an integer.
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), String> {
+        let steps = integer_steps(positions)?;
+        self.run_at_steps_into_buffer(&steps, buffer)
     }
 
     /// Set the initial condition for a specific compartment.

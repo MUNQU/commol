@@ -71,9 +71,12 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
 - Fix: `diffsol` (pinned minor version, default features) solves the system;
   commol keeps no numerical method of its own. The right-hand side of S1 is the
   `rhs` closure. Methods: `tsit45` (explicit, the default) and `bdf` (stiff).
-  The engine integrates each unit interval `[n, n + 1]` on its own, so every
-  output time and every discontinuity of a time-series parameter or a time
-  pattern is a step boundary.
+  The engine integrates in pieces and restarts the solver at the start of each
+  one (D12): a piece ends at every impulse step and at the last output, and
+  also at every integer when a rate or a formula parameter reads `step` or a
+  time series (`CompiledModel::depends_on_step`). So every discontinuity of the
+  right-hand side is the start of a piece. Outputs inside a piece come from
+  the dense output of `diffsol`.
 - Facts (probe on diffsol 0.17.1, 2026-10-13): it builds with `maturin`'s
   toolchain and needs no system library; `tsit45` and `bdf` agree on an SIR
   run to 8 digits (final-size residual 6.7e-8). `rhs_implicit` also takes a
@@ -130,7 +133,7 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
 - Fix (D5): the ODE engine reports at any list of times, from the dense output
   of `diffsol`. `Simulation.run(num_steps)` keeps its meaning (times 0…n);
   a new `Simulation.run_at(steps)` returns the outputs at the given sorted
-  positions on the axis (time or space). The engine trait gains `run_at_positions_into_buffer(&[f64])`; the
+  positions on the axis (the independent variable, whatever it is). The engine trait gains `run_at_positions_into_buffer(&[f64])`; the
   difference engine accepts only integer steps there and names the first
   non-integer one in its error. Observations, windows, reports and plots
   take non-integer steps for an ODE model (D10).
@@ -170,7 +173,7 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
 
 - Cause: `context/_model/units.py` (`TIME_DIMENSIONS = ("[time]", "[step]")`,
   `UnitChecker._step_unit`) takes the step unit only from parameter units of
-  dimension `[time]` or `[step]`. A model whose axis is space, with rates in
+  dimension `[time]` or `[step]`. A model whose axis is a length, with rates in
   `1/meter`, gets the default `step` and every flow `<bin>/meter` fails
   against the expected `<bin>/step`. The engines do not care which dimension
   the axis has (D10).
@@ -189,7 +192,7 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
   solver settings, the time rule of S4) with a runnable example.
 - `docs/guide/units-and-equations.md` and `design-decisions.md` ("Physical time
   is not in the model", "One step unit in the unit check"): the axis may be
-  time or space (S10).
+  any independent variable, not only time (S10).
 - `docs/guide/transitions.md` (or a new page): impulses, in both engines, and
   how they differ from a pulse rate.
 - `docs/codebase/mental-model.md`: the "An ODE solver" row of "What Commol is
@@ -213,22 +216,23 @@ Each row says why the recommendation beats each alternative.
 | D7 | S3 | Which matrix type does the engine use? | Dense `nalgebra` (`NalgebraMat`, `NalgebraLU`); sparse `faer` only if a measured stiff model with many compartments needs it. | Sparse `faer` from the start: wins for large stiff systems, but needs the Jacobian sparsity pattern, which the closure interface must be shown to give (not verified). Both behind a generic engine: two code paths to test now for a need not yet measured. Explicit `tsit45` uses no matrix solve, so the choice affects only `bdf`. | approved (L8): by size — dense `nalgebra` below a measured threshold, sparse `faer` above it |
 | D8 | S9 | What is the API of an impulse? | A transition option: `add_transition(..., impulse_at=[...] or impulse_every=(period, offset), rate=<fraction or amount>)`, serialized in `Transition`. It reuses source, target, stratified rates, accumulators and per-capita/absolute rules. | A separate `add_impulse` and `Impulse` type: clearer name, but it duplicates source/target/stratification/accumulator handling. Read pulse formulas as impulses: no new API, but only numeric pulses are detectable, and a pulse inside `combine` or `from_formula` would silently behave differently in the two engines. | approved (L9): `impulse_at` / `impulse_every=(period, offset)` on `add_transition` |
 | D9 | S9 | In step `n`, does the jump come before or after the flows? | Before: at time `n` the state jumps, then the step `[n, n + 1)` runs from the new state, in both engines. | After: matches "the flows of step n see the old state", but then the ODE output at `n` would show the state before the jump while the difference output shows it after, so the two engines disagree at the output times. | approved (L10) |
-| D10 | S7 | How does an observation give a non-integer position on the axis? | `ObservedDataPoint.step` stays and accepts a float for an ODE model; a difference model requires an integer, and the error names the observation. `run_at(steps=[…])`. | The axis may be time or space: `design-decisions.md` ("Physical time is not in the model") measures it in steps, so `step` is already neutral. `time`: false when the axis is space. `at`: neutral too, but a rename with a deprecated alias for no gain. | approved (L12): `step: float`, no rename (replaces L11) |
+| D10 | S7 | How does an observation give a non-integer position on the axis? | `ObservedDataPoint.step` stays and accepts a float for an ODE model; a difference model requires an integer, and the error names the observation. `run_at(steps=[…])`. | The axis is the independent variable, not only time: `design-decisions.md` ("Physical time is not in the model") measures it in steps, so `step` is already neutral. `time`: false when the axis is not time. `at`: neutral too, but a rename with a deprecated alias for no gain. | approved (L12): `step: float`, no rename (replaces L11) |
 | D11 | S10 | How does the check know the axis unit? | Declared: `ModelBuilder(..., step_unit="meter")`, stored in the model, any single dimension; when absent, the current inference (`[time]` or `step`) applies, so existing models do not change. | Infer it from any dimension: ambiguous, because a parameter in `1/(person·meter)` may be a density, not a rate along the axis, and the check would guess. Always declare it: clear, but breaks every model with units today. | approved (L14): optional `step_unit` on `ModelBuilder`, inferred when absent |
+| D12 | S3 | Where does the engine restart the solver? | At impulse steps and the last output always, and at every integer only when the right-hand side reads `step` or a time series (`CompiledModel::depends_on_step`). | At every integer always (the first draft of S3): simpler to state, but a model whose rates never jump at integers pays a restart per unit, and `bdf` falls back to order 1 each time; results are the same within the tolerance. | approved (L18) |
 
 ## Tasks
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | Extract `derivatives` from `step`; equality tests | direct | |
-| T2 | S2 | New compilation crate (D2); move expansion, flows and Python helpers; suites unchanged | direct | |
-| T3 | S3, S5 | Probe of the sparse path (pattern with closures, D7); then `commol-differential` on `diffsol` (`tsit45`, `bdf` with finite-difference `J·v`), unit intervals, accumulators as state; closed-form tests | direct | |
-| T4 | S4, S7 | Time rule, units, `run_at` and non-integer-step observations, windows, reports and plots (D5, D10); tests | direct | |
-| T4b | S9 | Impulses (D8, D9): model type, builder, serialization, both engines; tests incl. pulse-vaccination orbit | direct | |
-| T4c | S10 | Axis unit of any dimension (D11) in `units.py`, builder, model, `TimeScale` guard; tests | direct | |
-| T5 | S6 | Bindings (engine enum), `Simulation`, protocols, solver settings (D4), `.pyi`; workflow tests | direct | |
-| T6 | S8 | Documentation and changelog | direct | |
-| T7 | all | Final audit: every runner, `pytest -m docs`, cost table in Evidence, dense–sparse threshold benchmark (D7) | direct | |
+| T1 | S1 | Extract `derivatives` from `step`; equality tests | direct | done (uncommitted) |
+| T2 | S2 | New compilation crate (D2); move expansion, flows and Python helpers; suites unchanged | direct | done (uncommitted) |
+| T3 | S3, S5 | Probe of the sparse path (pattern with closures, D7); then `commol-differential` on `diffsol` (`tsit45`, `bdf` with finite-difference `J·v`), unit intervals, accumulators as state; closed-form tests | direct | done (uncommitted) |
+| T4 | S4, S7 | Time rule, units, `run_at` and non-integer-step observations, windows, reports and plots (D5, D10); tests | direct | done (uncommitted) |
+| T4b | S9 | Impulses (D8, D9): model type, builder, serialization, both engines; tests incl. pulse-vaccination orbit | direct | done (uncommitted) |
+| T4c | S10 | Axis unit of any dimension (D11) in `units.py`, builder, model, `TimeScale` guard; tests | direct | done (uncommitted) |
+| T5 | S6 | Bindings (engine enum), `Simulation`, protocols, solver settings (D4), `.pyi`; workflow tests | direct | done (uncommitted) |
+| T6 | S8 | Documentation and changelog | direct | done (uncommitted) |
+| T7 | all | Final audit: every runner, `pytest -m docs`, cost table in Evidence, dense–sparse threshold benchmark (D7) | direct | done (uncommitted) |
 
 ## Delivery
 
@@ -243,7 +247,58 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Verified 2026-10-13 on `feat/ode-engine` (not committed), Apple M-series,
+`--release`.
+
+- Runners: `cargo fmt --check`, `cargo clippy --workspace --all-targets
+  --all-features -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc` (5
+  crates), `cargo test` of the 5 crates (202 passed, 2 benchmarks ignored),
+  `pytest` (803 passed), `pytest -m docs` (56 passed), `ruff check`, `ruff
+  format --check`, `ty check commol`, `mkdocs build --strict`: all clean.
+- Probe (T3, D7): `FaerSparseMat` with closure `J·v` by finite differences
+  finds the exact pattern by its NaN probe (bidiagonal chain of 50 states: 99
+  non-zeros). The NaN arrives in `v`, so the finite-difference step must not
+  depend on `‖v‖` when it is NaN (`RightHandSide::jac_mul`).
+- S1: `one_step_adds_the_derivatives_exactly` (4 models) passes with `assert_eq`.
+- S3: closed forms (decay with both methods, logistic, linear 2×2, SIR final
+  size residual < 1e-7, SIS equilibrium) within tolerance; stiff ratio 1e5
+  over 100 time units with `bdf`: 1.2 ms, error < 1e-6 relative.
+- Piece rule (D12, approved in L18): the engine ends a piece of integration
+  at every integer only when a rate reads `step` or a time series
+  (`CompiledModel::depends_on_step`), and always at impulse steps and at the
+  last output. Results are the same within the tolerance; a model without
+  `step` restarts `bdf` once, not once per unit.
+- D7 benchmark (`benchmark_dense_against_sparse_bdf`, 50 time units, best of 3):
+
+| model | states | dense bdf (ms) | sparse bdf (ms) |
+|---|---|---|---|
+| stiff chain | 16 | 0.31 | 0.32 |
+| stiff chain | 32 | 0.64 | 0.50 |
+| stiff chain | 64 | 1.94 | 1.07 |
+| stiff chain | 128 | 9.78 | 2.01 |
+| stiff chain | 256 | 81.92 | 4.79 |
+| stiff chain | 512 | 652.67 | 12.81 |
+| coupled groups | 24 | 0.30 | 0.79 |
+| coupled groups | 48 | 0.75 | 2.94 |
+| coupled groups | 96 | 2.79 | 17.58 |
+| coupled groups | 192 | 20.00 | 60.08 |
+| coupled groups | 384 | 142.86 | 423.82 |
+
+  Size alone does not decide: sparse wins on a sparse pattern (17× at 256) and
+  loses about 3× from 192 states when every row reads a total. `SPARSE_THRESHOLD
+  = 128` bounds the loss of either choice to about 5×. A rule on the density of
+  the pattern would remove both losses (open question for the user).
+- Cost next to the difference engine (100 steps, best of 5):
+
+| model | states | difference (ms) | tsit45 (ms) | bdf (ms) |
+|---|---|---|---|---|
+| coupled groups, 100 steps | 3 | 0.025 | 0.079 | 0.103 |
+| coupled groups, 100 steps | 30 | 0.083 | 0.185 | 0.556 |
+| coupled groups, 100 steps | 300 | 0.700 | 1.387 | 224.721 |
+
+  `bdf` on a non-stiff model of 300 states pays a dense Jacobian of 300
+  right-hand-side calls per factorization; `tsit45` (the default) costs about
+  twice the difference engine.
 
 ## Log
 
@@ -263,3 +318,19 @@ Each row says why the recommendation beats each alternative.
 - L12 (user, 2026-10-13): D10 revised — the axis of a compartment model may be space, not time, so `time` is incoherent. → "step: float"; `run_at(steps=…)`. L11 is replaced.
 - L13 (user, 2026-10-13): add the unit check for a non-time axis to this ODD (S10, D11, T4c). Found while revising D10: `TIME_DIMENSIONS` only accepts `[time]` and `[step]`.
 - L14 (user, 2026-10-13): D11 → "Declarada, inferida si falta".
+- L15 (agent, 2026-10-13): implementation of T1–T7 on `feat/ode-engine`, not
+  committed. Two points for the user: the piece rule of S3 (Evidence,
+  "Deviation from S3") and the D7 finding that size alone does not choose the
+  matrix well (Evidence, D7 benchmark). Plots raise for a non-whole
+  `window_steps` (the plotted series holds integer steps); ensemble statistics
+  read non-integer observation steps from the engine, not by interpolation.
+- L16 (user, 2026-10-13): the axis is not "time or space": space was only an
+  example of an axis that is not time. The axis is whatever independent
+  variable the model differentiates over. Docs and docstrings say so.
+- L17 (user, 2026-10-13): `TimeScale` rate methods are discrete-time; this PR
+  only warns (docstrings, `core-concepts.md`, `simulations.md`). The refactor
+  is `odd/tasks/axis-scale-refactor.md`.
+- L18 (user, 2026-10-13): accepted the piece rule of the implementation (D12):
+  restart at every integer only when a rate reads `step` or a time series.
+  S3 rewritten. D7 (size threshold 128) stays as approved; a density-based
+  matrix rule is not part of this PR.

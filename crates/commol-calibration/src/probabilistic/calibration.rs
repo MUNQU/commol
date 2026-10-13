@@ -253,22 +253,24 @@ pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Syn
     collect_prediction_results(predictions)
 }
 
-/// Generate compact predictions for selected `(time_step, compartment_idx)` points.
+/// Generate compact predictions for selected `(step, compartment_idx)` points.
+///
+/// A step may be non-integer for an engine in continuous time.
 pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync>(
     base_engine: &E,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
-    metric_points: Vec<(u32, usize)>,
+    metric_points: Vec<(f64, usize)>,
 ) -> CalibrationResult<Vec<Vec<f64>>> {
-    let mut time_steps: Vec<u32> = metric_points.iter().map(|&(step, _)| step).collect();
-    time_steps.sort_unstable();
+    let mut time_steps: Vec<f64> = metric_points.iter().map(|&(step, _)| step).collect();
+    time_steps.sort_by(f64::total_cmp);
     time_steps.dedup();
 
     let point_time_indices: Vec<usize> = metric_points
         .iter()
         .map(|&(step, _)| {
             time_steps
-                .binary_search(&step)
+                .binary_search_by(|candidate| candidate.total_cmp(&step))
                 .expect("metric point time step must be present")
         })
         .collect();
@@ -290,7 +292,7 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
 
             let mut sparse_results = Vec::with_capacity(time_steps.len());
             engine
-                .run_at_steps_into_buffer(&time_steps, &mut sparse_results)
+                .run_at_positions_into_buffer(&time_steps, &mut sparse_results)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
 
             metric_points
@@ -333,17 +335,17 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
 pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + Send + Sync>(
     base_problem: &CalibrationProblem<E>,
     parameter_sets: Vec<Vec<f64>>,
-    metric_points: Vec<(u32, usize)>,
+    metric_points: Vec<(f64, usize)>,
 ) -> CalibrationResult<Vec<Vec<f64>>> {
-    let mut time_steps: Vec<u32> = metric_points.iter().map(|&(step, _)| step).collect();
-    time_steps.sort_unstable();
+    let mut time_steps: Vec<f64> = metric_points.iter().map(|&(step, _)| step).collect();
+    time_steps.sort_by(f64::total_cmp);
     time_steps.dedup();
 
     let point_time_indices: Vec<usize> = metric_points
         .iter()
         .map(|&(step, _)| {
             time_steps
-                .binary_search(&step)
+                .binary_search_by(|candidate| candidate.total_cmp(&step))
                 .expect("metric point time step must be present")
         })
         .collect();
@@ -360,7 +362,7 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
 
             let mut sparse_results = Vec::with_capacity(time_steps.len());
             engine
-                .run_at_steps_into_buffer(&time_steps, &mut sparse_results)
+                .run_at_positions_into_buffer(&time_steps, &mut sparse_results)
                 .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
 
             metric_points

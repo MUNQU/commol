@@ -84,8 +84,10 @@ impl JITFunction {
                 v
             } else if let Some(v) = context.compartments.get(name).copied() {
                 v
-            } else if name == "step" || name == "t" {
+            } else if name == "step" {
                 context.step
+            } else if name == "t" {
+                context.time
             } else if name == "N" {
                 // Fallback: sum all compartments in sorted order for
                 // deterministic floating-point results.

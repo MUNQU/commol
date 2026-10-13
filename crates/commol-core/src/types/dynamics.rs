@@ -8,9 +8,61 @@ pub enum ModelTypes {
     /// Discrete time: each step applies every flow once.
     #[serde(rename = "DifferenceEquations")]
     DifferenceEquations,
-    /// Defined for model definitions; no engine solves it yet.
+    /// Continuous time: the engine integrates `dX/dt = Σ flows` with an ODE
+    /// solver (`commol-differential`).
     #[serde(rename = "DifferentialEquations")]
     DifferentialEquations,
+}
+
+/// Integration method of a differential-equations model.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OdeMethod {
+    /// Explicit Tsitouras 5(4) Runge–Kutta method, for non-stiff models.
+    #[default]
+    #[serde(rename = "tsit45")]
+    Tsit45,
+    /// Backward differentiation formulas, for stiff models.
+    #[serde(rename = "bdf")]
+    Bdf,
+}
+
+/// Solver settings of a differential-equations model.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OdeSolver {
+    /// Integration method.
+    #[serde(default)]
+    pub method: OdeMethod,
+    /// Relative tolerance of each state component.
+    #[serde(default = "OdeSolver::default_rtol")]
+    pub rtol: f64,
+    /// Absolute tolerance of each state component.
+    #[serde(default = "OdeSolver::default_atol")]
+    pub atol: f64,
+}
+
+impl OdeSolver {
+    /// Default relative tolerance.
+    pub const DEFAULT_RTOL: f64 = 1e-6;
+    /// Default absolute tolerance.
+    pub const DEFAULT_ATOL: f64 = 1e-6;
+
+    fn default_rtol() -> f64 {
+        Self::DEFAULT_RTOL
+    }
+
+    fn default_atol() -> f64 {
+        Self::DEFAULT_ATOL
+    }
+}
+
+impl Default for OdeSolver {
+    fn default() -> Self {
+        Self {
+            method: OdeMethod::default(),
+            rtol: Self::DEFAULT_RTOL,
+            atol: Self::DEFAULT_ATOL,
+        }
+    }
 }
 
 /// Condition that specifies a stratification category for rate matching.
@@ -67,6 +119,22 @@ pub struct Transition {
     /// When true, base compartment names in the rate expression are replaced
     /// with the specific stratified compartment name for each expanded flow.
     pub per_compartment: Option<bool>,
+    /// Positions on the axis where the transition is an impulse: at each one,
+    /// the rate is a fraction (per-capita) or an amount (absolute) moved at
+    /// once, and the transition moves nothing between them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impulse_at: Option<Vec<f64>>,
+    /// `(period, offset)`: the transition is an impulse at `offset`,
+    /// `offset + period`, `offset + 2 * period`, …
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impulse_every: Option<(f64, f64)>,
+}
+
+impl Transition {
+    /// Whether the transition is an impulse rather than a continuous flow.
+    pub fn is_impulse(&self) -> bool {
+        self.impulse_at.is_some() || self.impulse_every.is_some()
+    }
 }
 
 /// Model dynamics specification including type and transitions
@@ -76,4 +144,8 @@ pub struct Dynamics {
     pub typology: ModelTypes,
     /// The transitions the engine plans and simulates.
     pub transitions: Vec<Transition>,
+    /// Solver settings of a differential-equations model; `None` uses the
+    /// defaults. A difference-equations model has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solver: Option<OdeSolver>,
 }

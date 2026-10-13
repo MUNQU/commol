@@ -11,11 +11,16 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-core/src/types/` | The model data types shared by all crates and serialized from Python (`Model`, `Population`, `Transition`, `InitialConditions`, …). | Engine behavior. |
 | `crates/commol-core/src/math_expression/` | Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (`jit/`). | Model-specific variables. |
 | `crates/commol-core/src/simulation_engine.rs` | The `SimulationEngine` trait and `OutputLabels`: what calibration needs from any engine. | Code for one engine. |
-| `crates/commol-difference/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), and engine construction. | Flow planning. |
-| `crates/commol-difference/src/layout.rs` | `CompartmentLayout`: compartments in engine order with their labels, and lookups by bin and categories. | Name parsing. |
-| `crates/commol-difference/src/flows.rs` | Transition flow planning (`plan_transition_flows`) and its description for Python (`describe_flows`). | Rate evaluation at run time. |
-| `crates/commol-difference/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
-| `crates/commol-difference/src/simulation.rs` | The simulation step and the `SimulationEngine` implementation. | Model validation. |
+| `crates/commol-model/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), name checks (`check_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
+| `crates/commol-model/src/layout.rs` | `CompartmentLayout`: compartments in engine order with their labels, and lookups by bin and categories. | Name parsing. |
+| `crates/commol-model/src/flows.rs` | Transition flow planning (`plan_transition_flows`) and its description for Python (`describe_flows`). | Rate evaluation at run time. |
+| `crates/commol-model/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
+| `crates/commol-model/src/rates.rs` | Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback. | Flow logic. |
+| `crates/commol-model/src/system.rs` | The right-hand side `CompiledModel::derivatives`, impulses (`apply_impulses`, `impulse_positions`) and the accessors both engines use. | Time stepping. |
+| `crates/commol-model/src/types.rs` | `CompiledModel`, compiled flows, impulse schedules, time-series lookup. | Python types. |
+| `crates/commol-difference/src/simulation.rs` | `DifferenceEquations`: the discrete step (`state += derivatives`), impulses at integer steps, and its `SimulationEngine` implementation. | Model compilation. |
+| `crates/commol-differential/src/lib.rs` | `DifferentialEquations`: state, output positions, impulses, and its `SimulationEngine` implementation. | Numerical methods. |
+| `crates/commol-differential/src/solve.rs` | The integration with `diffsol`: pieces between breakpoints, the finite-difference `J·v`, dense or sparse matrices (`SPARSE_THRESHOLD`). | Model compilation. |
 | `crates/commol-calibration/src/calibration_problem.rs` | Loss, constraints and the objective function. | Optimizer setup. |
 | `crates/commol-calibration/src/initial_conditions.rs` | How calibrated initial-condition values reach the engine (`InitialConditionPlan`, `calibrated_initial_population`). | Parameter values. |
 | `crates/commol-calibration/src/optimization.rs` | Nelder-Mead and particle swarm setup on the argmin fork. | Loss definitions. |
@@ -26,8 +31,10 @@ Use this page when you know what to change but not where it belongs.
 | Path | Owns | Do not put here |
 |---|---|---|
 | `py-commol/src/core.rs` | Bindings of the model types. | Logic. |
-| `py-commol/src/difference.rs` | `DifferenceEquations` and the engine queries `initial_state`, `expanded_outputs`, `transition_flows`. | Logic beyond type conversion. |
-| `py-commol/src/calibration.rs` | Calibration types and functions. | Logic beyond type conversion. |
+| `py-commol/src/model.rs` | The model queries of `commol_rs.model`: `initial_state`, `expanded_outputs`, `transition_flows`, `check_names`. | Logic beyond type conversion. |
+| `py-commol/src/engine.rs` | `Engine` (either engine, for calibration), `EngineArg` (either Python engine object) and `engine_class!`, which defines the methods both Python engine classes share. | Engine logic. |
+| `py-commol/src/difference.rs`, `py-commol/src/differential.rs` | The Python classes `DifferenceEquations` and `DifferentialEquations`. | Logic beyond type conversion. |
+| `py-commol/src/calibration.rs` | Calibration types and functions; each takes either engine (`EngineArg`). | Logic beyond type conversion. |
 | `py-commol/commol/commol_rs/_commol_rs.pyi` | The type stub of the extension. Update it with every binding change. | — |
 
 ## Python package (`py-commol/commol/`)
@@ -35,14 +42,14 @@ Use this page when you know what to change but not where it belongs.
 | Path | Owns | Do not put here |
 |---|---|---|
 | `api/model_builder.py` | The fluent `ModelBuilder`. | Validation rules that belong to the model. |
-| `api/simulation.py` | `Simulation`: engine construction, runs, output grouping. | Expansion rules. |
+| `api/simulation.py` | `Simulation`: runs (`run`, `run_at`), output grouping. | Expansion rules. |
 | `api/calibrator.py`, `api/probabilistic_calibrator.py` | Calibration entry points and conversion to Rust types. | Loss or optimizer logic. |
 | `api/probabilistic/` | Ensemble statistics, normalization and confidence intervals (`intervals.py`). | New interval conventions outside `ci_percentiles`. |
 | `api/reporting.py` | `simulation_report` and `applied_parameters_report`. | Domain vocabulary. |
 | `api/time_patterns.py`, `api/time_scale.py`, `api/windows.py` | Time-varying rates, step/physical-time conversion, windowed totals. | Physical time inside the model. |
 | `api/plotter.py` | Plots of results. | Computation of results. |
 | `context/` | The Pydantic model: fields, validation, JSON I/O, update methods. | Engine rules. |
-| `context/_model/engine_state.py` | The only Python access to the engine queries. | Python re-implementations of them. |
+| `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the typology names. | Python re-implementations of them. |
 | `context/_model/` (other files) | Internals of `Model`: equation printer, unit checker, calibration write-back, JSON rendering. | Public API. |
 | `utils/security.py` | Validation of every user expression (`SecurityConfig` limits). | Expression evaluation. |
 | `utils/equations.py` | Dimensional analysis with `pint`. | — |
@@ -61,9 +68,11 @@ Use this page when you know what to change but not where it belongs.
 
 | Task | Start with | Then check |
 |---|---|---|
-| Change how a model expands | `builder.rs` (`expand`) | `layout.rs`, `engine_state.py`, `tests/building/`, `tests/simulation/test_outputs.py` |
-| Change how transitions become flows | `flows.rs` | `helpers.rs`, `context/_model/equations.py`, `tests/transitions/` |
-| Change the simulation step | `simulation.rs` | `simulation_engine.rs` |
+| Change how a model expands | `commol-model/src/builder.rs` (`expand`) | `layout.rs`, `engine_state.py`, `tests/building/`, `tests/simulation/test_outputs.py` |
+| Change how transitions become flows | `commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`derivatives`), `context/_model/equations.py`, `tests/transitions/` |
+| Change the difference step | `commol-difference/src/simulation.rs` | `simulation_engine.rs` |
+| Change the ODE integration or the solver settings | `commol-differential/src/solve.rs` | `commol-differential/src/lib.rs`, `commol-core/src/types/dynamics.rs` (`OdeSolver`), `context/dynamics.py` |
+| Change impulses | `commol-model/src/system.rs` (`apply_impulses`) | `types.rs` (`ImpulseSchedule`), both engines, `context/dynamics.py`, `tests/transitions/test_impulses.py` |
 | Add an expression function or variable | `math_expression/` | `utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `tests/initial_conditions/` |
 | Change calibration | `calibration_problem.rs` | `initial_conditions.rs`, `api/calibrator.py`, `tests/calibration/` |

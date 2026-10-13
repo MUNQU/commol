@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NotRequired, TypedDict
 
+import math
 import numpy as np
 
 from commol.api.probabilistic.intervals import member_statistics
@@ -507,7 +508,8 @@ def observed_report(
                 "weights": [None] * num_windows,
             },
         )
-        window = max(point.step - 1, 0) // window_steps
+        # Window w covers steps (w * window_steps, (w + 1) * window_steps].
+        window = max(math.ceil(point.step / window_steps) - 1, 0)
         if not 0 <= window < num_windows:
             continue
         entry["values"][window] = point.value

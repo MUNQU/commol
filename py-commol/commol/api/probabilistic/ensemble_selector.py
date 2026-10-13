@@ -21,7 +21,7 @@ from commol.context.probabilistic_calibration import (
 
 logger = logging.getLogger(__name__)
 
-MetricPoint = tuple[int, int]
+MetricPoint = tuple[float, int]
 ObservationComponent = tuple[int, int | None]
 ObservationSpec = tuple[list[ObservationComponent], str | None]
 EnsembleAlgorithmName = Literal["nsga2", "greedy_local_search"]

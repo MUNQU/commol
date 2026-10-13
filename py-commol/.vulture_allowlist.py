@@ -4,7 +4,7 @@
 # Type annotations and Protocol imports used in string form
 Axes
 Figure
-DifferenceEquationsProtocol
+EngineProtocol
 RustModelProtocol
 CalibrationParameterProtocol
 CalibrationParameterTypeProtocol

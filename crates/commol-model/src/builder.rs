@@ -1,12 +1,12 @@
-//! Model builder for constructing DifferenceEquations from a compartment model.
+//! Expansion of a model and its compilation into a [`CompiledModel`].
 
 use crate::flows::{PlannedFlow, plan_transition_flows};
 use crate::helpers::rate_to_string;
 use crate::layout::CompartmentLayout;
 use crate::types::{
-    AccumulatorOutputRef, DifferenceEquations, FastRateExpression, FastRateOp,
-    GeneratedAccumulatorOutput, SubpopulationLayout, SubpopulationMapping, TimeSeriesParameter,
-    TransitionFlow, VarSlot,
+    AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp,
+    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SubpopulationLayout,
+    SubpopulationMapping, TimeSeriesParameter, TransitionFlow, VarSlot,
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
@@ -23,8 +23,8 @@ struct TimeSeriesPayload {
     mode: commol_core::SeriesMode,
 }
 
-impl DifferenceEquations {
-    /// Create a new DifferenceEquations instance from a model.
+impl CompiledModel {
+    /// Compile a model, whatever its typology.
     ///
     /// This constructor performs several pre-computation steps for efficiency:
     /// 1. Generates all stratified compartment combinations
@@ -32,34 +32,12 @@ impl DifferenceEquations {
     /// 3. Pre-computes transition flows with parsed rate expressions
     /// 4. Pre-computes subpopulation mappings for stratifications
     ///
-    /// # Arguments
-    ///
-    /// * `model` - The compartment model to compile
-    ///
-    /// # Returns
-    ///
-    /// A new `DifferenceEquations` instance ready for simulation.
-    pub fn from_model(model: &Model) -> Self {
-        Self::try_from_model(model)
-            .unwrap_or_else(|error| panic!("Failed to build population: {error}"))
-    }
-
-    /// Fallible counterpart of [`Self::from_model`].
-    ///
-    /// Returns the population initialization error instead of panicking, so a
-    /// caller can surface it as its own error type.
-    ///
     /// # Errors
     ///
-    /// Returns a message when the model is not a difference-equations model,
+    /// Returns a message when a name of the model conflicts with a name the
+    /// engine provides ([`check_names`]), when a transition cannot be planned,
     /// or when an initial-condition override is not valid for the expansion.
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
-        if model.dynamics.typology != commol_core::ModelTypes::DifferenceEquations {
-            return Err(format!(
-                "The DifferenceEquations engine cannot solve a {:?} model",
-                model.dynamics.typology
-            ));
-        }
         check_names(model)?;
 
         // Generate all compartment and accumulator output combinations
@@ -149,9 +127,6 @@ impl DifferenceEquations {
         expression_context.set_parameters(constant_parameters);
         expression_context.init_compartments(compartments.clone());
 
-        // Store initial population for reset functionality
-        let initial_population = population.clone();
-
         // Pre-compute subpopulation mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subpopulation variable names)
@@ -211,11 +186,43 @@ impl DifferenceEquations {
         // Plan the transition flows and compile them
         let planned_flows =
             plan_transition_flows(model, &layout, &accumulator_map, &subpopulation_param_names)?;
+        let schedules = impulse_schedules(model)?;
+        let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
+            .into_iter()
+            .partition(|flow| schedules.contains_key(&flow.transition_id));
+        let impulse_schedules: Vec<(String, ImpulseSchedule)> = impulse_plans
+            .iter()
+            .map(|plan| {
+                (
+                    plan.transition_id.clone(),
+                    schedules[&plan.transition_id].clone(),
+                )
+            })
+            .collect();
+        let impulse_flows: Vec<ImpulseFlow> = impulse_schedules
+            .into_iter()
+            .zip(compile_transition_flows(
+                impulse_plans,
+                &compartment_map,
+                &expression_context,
+            ))
+            .map(|((transition_id, schedule), flow)| ImpulseFlow {
+                transition_id,
+                flow,
+                schedule,
+            })
+            .collect();
         let transition_flows =
-            compile_transition_flows(planned_flows, &compartment_map, &expression_context);
+            compile_transition_flows(flow_plans, &compartment_map, &expression_context);
 
-        let used_context_variables =
-            collect_used_context_variables(&transition_flows, &formula_parameters);
+        let used_context_variables = collect_used_context_variables(
+            transition_flows
+                .iter()
+                .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
+            &formula_parameters,
+        );
+        let depends_on_step =
+            !series_parameters.is_empty() || used_context_variables.contains("step");
         subpopulation_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
@@ -225,28 +232,29 @@ impl DifferenceEquations {
         // read compartment values directly from `population`, so they do
         // not require the HashMap to be kept up to date.
         let requires_compartment_context = !formula_parameters.is_empty()
-            || transition_flows.iter().any(|flow| {
-                matches!(flow.rate_expression, RateMathExpression::Formula(_))
-                    && flow.resolved_slots.is_none()
-                    && flow.fast_rate_expression.is_none()
-            });
+            || transition_flows
+                .iter()
+                .chain(impulse_flows.iter().map(|impulse| &impulse.flow))
+                .any(|flow| {
+                    matches!(flow.rate_expression, RateMathExpression::Formula(_))
+                        && flow.resolved_slots.is_none()
+                        && flow.fast_rate_expression.is_none()
+                });
 
-        // Initialize compartment flows buffer
-        let num_compartments = compartments.len();
-        let compartment_flows = vec![0.0; num_compartments];
+        let initial_state: Vec<f64> = population
+            .into_iter()
+            .chain(std::iter::repeat_n(0.0, accumulator_map.len()))
+            .collect();
 
         Ok(Self {
             compartments,
             output_labels,
             output_names,
-            population,
-            accumulators: vec![0.0; accumulator_map.len()],
+            initial_state,
             expression_context,
-            current_step: 0.0,
-            initial_population,
-            initial_accumulators: vec![0.0; accumulator_map.len()],
             transition_flows,
-            compartment_flows,
+            impulse_flows,
+            depends_on_step,
             subpopulation_mappings,
             formula_parameters,
             series_parameters,
@@ -255,6 +263,60 @@ impl DifferenceEquations {
             requires_compartment_context,
         })
     }
+}
+
+/// The impulse schedule of each impulse transition, by transition id.
+///
+/// # Errors
+///
+/// Returns a message that names the transition when it sets both
+/// `impulse_at` and `impulse_every`, when a position is not finite or is
+/// negative, or when the period is not positive.
+fn impulse_schedules(model: &Model) -> Result<HashMap<String, ImpulseSchedule>, String> {
+    let mut schedules = HashMap::new();
+    for transition in &model.dynamics.transitions {
+        let schedule = match (&transition.impulse_at, transition.impulse_every) {
+            (None, None) => continue,
+            (Some(_), Some(_)) => {
+                return Err(format!(
+                    "Transition '{}' sets both impulse_at and impulse_every; set one",
+                    transition.id
+                ));
+            }
+            (Some(positions), None) => {
+                if let Some(bad) = positions.iter().find(|p| !p.is_finite() || **p < 0.0) {
+                    return Err(format!(
+                        "Transition '{}' has the impulse position {bad}; positions must \
+                         be finite and not negative",
+                        transition.id
+                    ));
+                }
+                let mut positions = positions.clone();
+                positions.sort_by(f64::total_cmp);
+                positions.dedup();
+                ImpulseSchedule::At(positions)
+            }
+            (None, Some((period, offset))) => {
+                if !(period.is_finite() && period > 0.0) {
+                    return Err(format!(
+                        "Transition '{}' has the impulse period {period}; it must be \
+                         positive",
+                        transition.id
+                    ));
+                }
+                if !(offset.is_finite() && offset >= 0.0) {
+                    return Err(format!(
+                        "Transition '{}' has the impulse offset {offset}; it must be \
+                         finite and not negative",
+                        transition.id
+                    ));
+                }
+                ImpulseSchedule::Every { period, offset }
+            }
+        };
+        schedules.insert(transition.id.clone(), schedule);
+    }
+    Ok(schedules)
 }
 
 /// Check whether a stratification's conditions are all satisfied by the
@@ -741,8 +803,8 @@ pub fn check_names(model: &Model) -> Result<(), String> {
     ))
 }
 
-fn collect_used_context_variables(
-    transition_flows: &[TransitionFlow],
+fn collect_used_context_variables<'a>(
+    transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
     formula_parameters: &[(String, RateMathExpression)],
 ) -> HashSet<String> {
     let mut variables = HashSet::new();
@@ -1080,8 +1142,10 @@ fn resolve_var_slot(
 ) -> VarSlot {
     if let Some(&idx) = compartment_map.get(name) {
         VarSlot::Compartment(idx)
-    } else if name == "step" || name == "t" {
+    } else if name == "step" {
         VarSlot::Step
+    } else if name == "t" {
+        VarSlot::Time
     } else if name == SPECIAL_VAR_PI {
         VarSlot::Constant(std::f64::consts::PI)
     } else if name == SPECIAL_VAR_E {
@@ -1214,6 +1278,7 @@ mod tests {
             dynamics: Dynamics {
                 typology: ModelTypes::DifferenceEquations,
                 transitions: vec![],
+                solver: None,
             },
         }
     }
@@ -1457,13 +1522,15 @@ mod tests {
             rate: Some(RateMathExpression::from_string(rate.to_string())),
             stratified_rates: None,
             per_compartment: None,
+            impulse_at: None,
+            impulse_every: None,
         }];
         model
     }
 
     #[test]
     fn subpopulation_variable_out_of_declaration_order_is_a_build_error() {
-        let error = DifferenceEquations::try_from_model(&model_with_rate("k * N_s1_g1 / N"))
+        let error = CompiledModel::try_from_model(&model_with_rate("k * N_s1_g1 / N"))
             .err()
             .expect("N_s1_g1 names no subpopulation");
         assert!(error.contains("'N_s1_g1'"), "{error}");
@@ -1472,7 +1539,7 @@ mod tests {
 
     #[test]
     fn unknown_subpopulation_variable_is_a_build_error() {
-        let error = DifferenceEquations::try_from_model(&model_with_rate("k * N_x"))
+        let error = CompiledModel::try_from_model(&model_with_rate("k * N_x"))
             .err()
             .expect("N_x names no subpopulation");
         assert!(error.contains("'N_x'"), "{error}");
@@ -1480,17 +1547,20 @@ mod tests {
 
     #[test]
     fn subpopulation_variable_in_declaration_order_builds() {
-        assert!(DifferenceEquations::try_from_model(&model_with_rate("k * N_g1_s1 / N")).is_ok());
+        assert!(CompiledModel::try_from_model(&model_with_rate("k * N_g1_s1 / N")).is_ok());
     }
 
     #[test]
     fn modulo_is_an_operator_in_a_rate() {
         // `step % 2` is 0 at even steps and 1 at odd steps (per-capita rate).
-        let mut engine = DifferenceEquations::try_from_model(&model_with_rate("step % 2")).unwrap();
-        let results = engine.run(2).unwrap();
+        let mut model = CompiledModel::try_from_model(&model_with_rate("step % 2")).unwrap();
+        let state = model.initial_state().to_vec();
+        let mut rates = vec![0.0; state.len()];
         // Compartment 0 is A_g1_s1 with 250 people.
-        assert_eq!(results[1][0], 250.0);
-        assert_eq!(results[2][0], 0.0);
+        model.derivatives(0.0, 0.0, &state, &mut rates).unwrap();
+        assert_eq!(rates[0], 0.0);
+        model.derivatives(1.0, 1.0, &state, &mut rates).unwrap();
+        assert_eq!(rates[0], -250.0);
     }
 
     fn model_with_parameter(id: &str) -> Model {

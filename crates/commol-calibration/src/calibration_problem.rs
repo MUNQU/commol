@@ -30,8 +30,8 @@ use crate::types::{
 ///
 /// let engine = DifferenceEquations::from_model(&model);
 /// let observed_data = vec![
-///     ObservedDataPoint::new(10, "I".to_string(), 501.0),  // time=10, compartment I, value=501
-///     ObservedDataPoint::new(20, "I".to_string(), 823.0),
+///     ObservedDataPoint::new(10.0, "I".to_string(), 501.0),  // time=10, compartment I, value=501
+///     ObservedDataPoint::new(20.0, "I".to_string(), 823.0),
 /// ];
 /// let params = vec![
 ///     CalibrationParameter::new("beta".to_string(), 0.0, 1.0),
@@ -57,7 +57,7 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     observed_output_indices: Vec<Vec<usize>>,
 
     /// Sorted, deduplicated observation time steps for sparse loss evaluation
-    observed_time_steps: Vec<u32>,
+    observed_time_steps: Vec<f64>,
 
     /// Row index in `observed_time_steps` for each observed data point
     observed_time_indices: Vec<usize>,
@@ -293,6 +293,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Validate observed output names and convert to indices.
         let mut observed_output_indices = Vec::with_capacity(observed_data.len());
         for obs in &observed_data {
+            if !(obs.time_step.is_finite() && obs.time_step >= 0.0) {
+                return Err(format!(
+                    "Observation '{}' is at step {}; a step must be finite and not negative",
+                    obs.compartment, obs.time_step
+                ));
+            }
             if let Some(window_steps) = obs.window_steps {
                 if window_steps > obs.time_step {
                     return Err(format!(
@@ -389,7 +395,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         let mut parameter_constraint_indices = Vec::new();
         let mut time_dependent_constraint_indices = Vec::new();
-        let mut simulation_time_steps: Vec<u32> = observed_data
+        let mut simulation_time_steps: Vec<f64> = observed_data
             .iter()
             .flat_map(|obs| {
                 std::iter::once(obs.time_step).chain(
@@ -451,24 +457,32 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
 
-        simulation_time_steps.sort_unstable();
+        if let Some(bad) = simulation_time_steps
+            .iter()
+            .find(|step| !(step.is_finite() && **step >= 0.0))
+        {
+            return Err(format!(
+                "Constraint step {bad} is not valid; a step must be finite and not negative"
+            ));
+        }
+        simulation_time_steps.sort_by(f64::total_cmp);
         simulation_time_steps.dedup();
+        let position_index = |position: f64| {
+            simulation_time_steps
+                .binary_search_by(|step| step.total_cmp(&position))
+                .ok()
+        };
 
         let observed_time_indices: Vec<usize> = observed_data
             .iter()
-            .map(|obs| {
-                simulation_time_steps
-                    .binary_search(&obs.time_step)
-                    .expect("observed time step must be present")
-            })
+            .map(|obs| position_index(obs.time_step).expect("observed time step must be present"))
             .collect();
 
         let observed_previous_time_indices: Vec<Option<usize>> = observed_data
             .iter()
             .map(|obs| {
                 obs.window_steps.map(|window_steps| {
-                    simulation_time_steps
-                        .binary_search(&(obs.time_step - window_steps))
+                    position_index(obs.time_step - window_steps)
                         .expect("window previous time step must be present")
                 })
             })
@@ -481,8 +495,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                     time_steps
                         .iter()
                         .map(|time_step| {
-                            simulation_time_steps
-                                .binary_search(time_step)
+                            position_index(*time_step)
                                 .expect("constraint time step must be present")
                         })
                         .collect()
@@ -829,7 +842,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                         let total: f64 = indices.iter().map(|&i| step_data[i]).sum();
                         context.set_parameter_str(bin_name, total);
                     }
-                    context.set_step(time_step as f64);
+                    context.set_step(time_step);
 
                     match expr.evaluate(&mut context) {
                         Ok(value) => {
@@ -919,7 +932,7 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .expect("Failed to acquire write lock on result_buffer");
 
         engine
-            .run_at_steps_into_buffer(&self.observed_time_steps, &mut buffer)
+            .run_at_positions_into_buffer(&self.observed_time_steps, &mut buffer)
             .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
 
         // Check for numerical instability (NaN or infinity values)

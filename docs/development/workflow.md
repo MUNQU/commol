@@ -184,12 +184,13 @@ already tests the result of merging it into `main`.
 
 ```bash
 # Python, from py-commol/ with the virtual environment active
-ruff check . && ruff format --check . && ty check commol && pytest
+ruff check . && ruff format --check . && ty check commol
+vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 
 # Rust, from the repository root
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-difference -p commol-calibration
+cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration
 
 # Documentation, from the repository root
 mkdocs build --strict

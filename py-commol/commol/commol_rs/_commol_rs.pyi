@@ -71,11 +71,18 @@ class RustModelProtocol(Protocol):
     @staticmethod
     def from_json(json_string: str) -> RustModelProtocol: ...
 
-class DifferenceEquationsProtocol(Protocol):
+class EngineProtocol(Protocol):
+    """A DifferenceEquations or a DifferentialEquations engine."""
+
     def __init__(self, model: RustModelProtocol) -> None: ...
     def run(self, num_steps: int) -> list[list[float]]: ...
+    def run_at(self, positions: list[float]) -> list[list[float]]: ...
     def step(self) -> None: ...
     def reset(self) -> None: ...
+    def set_parameter(self, parameter_id: str, value: float) -> None: ...
+    def get_parameters(self) -> dict[str, float]: ...
+    def current_step(self) -> float: ...
+    def set_initial_condition(self, compartment_index: int, value: float) -> None: ...
     @property
     def population(self) -> list[float]: ...
     @property
@@ -84,7 +91,12 @@ class DifferenceEquationsProtocol(Protocol):
     def output_names(self) -> list[str]: ...
 
 class DifferenceModule(Protocol):
-    DifferenceEquations: type[DifferenceEquationsProtocol]
+    DifferenceEquations: type[EngineProtocol]
+
+class DifferentialModule(Protocol):
+    DifferentialEquations: type[EngineProtocol]
+
+class ModelModule(Protocol):
     def initial_state(
         self, model: RustModelProtocol
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
@@ -102,16 +114,16 @@ class DifferenceModule(Protocol):
 class ObservedDataPointProtocol(Protocol):
     def __init__(
         self,
-        step: int,
+        step: float,
         compartment: str,
         value: float,
         weight: float | None = None,
         scale_id: str | None = None,
-        window_steps: int | None = None,
+        window_steps: float | None = None,
         compartments: list[str] | None = None,
     ) -> None: ...
     @property
-    def time_step(self) -> int: ...
+    def time_step(self) -> float: ...
     @property
     def compartment(self) -> str: ...
     @property
@@ -149,7 +161,7 @@ class CalibrationConstraintProtocol(Protocol):
         expression: str,
         description: str | None = None,
         weight: float = 1.0,
-        time_steps: list[int] | None = None,
+        time_steps: list[float] | None = None,
     ) -> None: ...
     @property
     def id(self) -> str: ...
@@ -160,7 +172,7 @@ class CalibrationConstraintProtocol(Protocol):
     @property
     def weight(self) -> float: ...
     @property
-    def time_steps(self) -> list[int] | None: ...
+    def time_steps(self) -> list[float] | None: ...
 
 class LossConfigProtocol(Protocol):
     @staticmethod
@@ -365,7 +377,7 @@ class CalibrationModule(Protocol):
     EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
     def calibrate(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
@@ -376,13 +388,13 @@ class CalibrationModule(Protocol):
     ) -> CalibrationResultProtocol: ...
     def check_initial_conditions(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],
         initial_condition_remainder: str | None = None,
     ) -> None: ...
     def calibrated_initial_population(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],
         values: list[float],
         initial_population_size: int,
@@ -390,7 +402,7 @@ class CalibrationModule(Protocol):
     ) -> tuple[list[float], list[float], list[int]]: ...
     def calibrate_with_history(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
@@ -401,7 +413,7 @@ class CalibrationModule(Protocol):
     ) -> CalibrationResultWithHistoryProtocol: ...
     def run_multiple_calibrations(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
@@ -421,14 +433,14 @@ class CalibrationModule(Protocol):
     ) -> list[CalibrationEvaluationProtocol]: ...
     def generate_predictions_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
         time_steps: int,
     ) -> list[list[list[float]]]: ...
     def generate_calibrated_predictions_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
@@ -440,21 +452,21 @@ class CalibrationModule(Protocol):
     ) -> list[list[list[float]]]: ...
     def generate_predictions_at_points_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
-        metric_points: list[tuple[int, int]],
+        metric_points: list[tuple[float, int]],
     ) -> list[list[float]]: ...
     def generate_calibrated_predictions_at_points_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         initial_population_size: int,
         parameter_sets: list[list[float]],
-        metric_points: list[tuple[int, int]],
+        metric_points: list[tuple[float, int]],
         initial_condition_remainder: str | None = None,
     ) -> list[list[float]]: ...
     def select_compact_ensemble(
@@ -529,10 +541,14 @@ class CoreModule(Protocol):
 
 class RustCommolModule(Protocol):
     core: CoreModule
+    model: ModelModule
     difference: DifferenceModule
+    differential: DifferentialModule
     calibration: CalibrationModule
 
 core: CoreModule
+model: ModelModule
 difference: DifferenceModule
+differential: DifferentialModule
 calibration: CalibrationModule
 rust_commol: RustCommolModule

@@ -1,4 +1,4 @@
-//! Core data types for the difference equations engine.
+//! Data types of a compiled model.
 
 use commol_core::{MathExpressionContext, RateMathExpression, SeriesMode};
 
@@ -19,8 +19,10 @@ pub(crate) enum VarSlot {
     /// parameters, formula parameters, time-series, subpopulation totals,
     /// base bin sums, and partial bin-strat sums).
     Parameter(String),
-    /// The simulation's current step counter (also exposed as `t`).
+    /// The step that holds the current time (`step`).
     Step,
+    /// The current time (`t`). Equal to `step` in a difference model.
+    Time,
     /// A mathematical constant (`pi` or `e`).
     Constant(f64),
 }
@@ -80,6 +82,80 @@ pub(crate) struct TransitionFlow {
     /// JIT-compiled formula whose variables we could resolve at build time;
     /// `None` for `Parameter` / `Constant` rates and for `evalexpr` fallbacks.
     pub(crate) resolved_slots: Option<Vec<VarSlot>>,
+}
+
+/// Positions on the axis where an impulse transition acts.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ImpulseSchedule {
+    /// The listed positions, sorted and without duplicates.
+    At(Vec<f64>),
+    /// `offset`, `offset + period`, `offset + 2 * period`, …
+    Every { period: f64, offset: f64 },
+}
+
+/// Relative tolerance with which a position matches an impulse position.
+const POSITION_TOLERANCE: f64 = 1e-9;
+
+fn same_position(a: f64, b: f64) -> bool {
+    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
+}
+
+impl ImpulseSchedule {
+    /// Whether the impulse acts at `position`.
+    pub(crate) fn fires_at(&self, position: f64) -> bool {
+        match self {
+            Self::At(positions) => positions.iter().any(|&p| same_position(p, position)),
+            Self::Every { period, offset } => {
+                let k = ((position - offset) / period).round();
+                k >= 0.0 && same_position(offset + k * period, position)
+            }
+        }
+    }
+
+    /// Positions in `[from, to]` where the impulse acts, in ascending order.
+    pub(crate) fn positions_in(&self, from: f64, to: f64) -> Vec<f64> {
+        match self {
+            Self::At(positions) => positions
+                .iter()
+                .copied()
+                .filter(|&p| p >= from && p <= to)
+                .collect(),
+            Self::Every { period, offset } => {
+                let first = ((from - offset) / period).ceil().max(0.0);
+                let mut positions = Vec::new();
+                let mut k = first;
+                loop {
+                    let position = offset + k * period;
+                    if position > to {
+                        break;
+                    }
+                    positions.push(position);
+                    k += 1.0;
+                }
+                positions
+            }
+        }
+    }
+
+    /// The first position that is not an integer, if any.
+    pub(crate) fn first_non_integer(&self) -> Option<f64> {
+        match self {
+            Self::At(positions) => positions.iter().copied().find(|p| p.fract() != 0.0),
+            Self::Every { period, offset } => [*offset, *period]
+                .into_iter()
+                .find(|value| value.fract() != 0.0),
+        }
+    }
+}
+
+/// A transition that moves its rate at once at the positions of a schedule.
+#[derive(Clone)]
+pub(crate) struct ImpulseFlow {
+    /// Id of the impulse transition.
+    pub(crate) transition_id: String,
+    /// Pieces, rate and accumulators, compiled as for any transition.
+    pub(crate) flow: TransitionFlow,
+    pub(crate) schedule: ImpulseSchedule,
 }
 
 /// Pre-computed time-series parameter for O(log N) step lookup.
@@ -178,28 +254,31 @@ pub(crate) struct GeneratedAccumulatorOutput {
     pub(crate) output_ref: AccumulatorOutputRef,
 }
 
-/// Difference equations simulation engine.
+/// A model compiled into the right-hand side that every engine integrates.
 ///
-/// This struct represents a compiled compartment model using difference equations
-/// for discrete-time simulation. It pre-computes transition flows and stratification
-/// mappings for efficient simulation.
+/// It holds the expanded compartments and accumulators, the planned flows with
+/// their compiled rates, and the initial state. The state of a model is one
+/// vector: the compartments, in engine order, then the accumulators.
+/// [`CompiledModel::derivatives`] is the right-hand side `dX/dt = Σ flows`; a
+/// difference engine adds it once per step, a differential engine integrates
+/// it.
 #[derive(Clone)]
-pub struct DifferenceEquations {
+pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
     /// Source and applied categories of each output, parallel to `output_names`
     pub(crate) output_labels: Vec<commol_core::OutputLabels>,
     pub(crate) output_names: Vec<String>,
-    pub(crate) population: Vec<f64>,
-    pub(crate) accumulators: Vec<f64>,
+    /// Initial state: compartments, then accumulators (which start at zero).
+    pub(crate) initial_state: Vec<f64>,
     pub(crate) expression_context: MathExpressionContext,
-    pub(crate) current_step: f64,
-    /// Store initial state for reset functionality
-    pub(crate) initial_population: Vec<f64>,
-    pub(crate) initial_accumulators: Vec<f64>,
     /// Pre-computed transition flows for performance
     pub(crate) transition_flows: Vec<TransitionFlow>,
-    /// Reusable buffer for compartment flows to avoid allocations
-    pub(crate) compartment_flows: Vec<f64>,
+    /// Impulse transitions: they move their rate at once at their positions
+    /// and are not part of the right-hand side.
+    pub(crate) impulse_flows: Vec<ImpulseFlow>,
+    /// Whether a rate or a formula parameter reads `step` or a time series,
+    /// so the right-hand side jumps at integer positions.
+    pub(crate) depends_on_step: bool,
     /// Pre-computed subpopulation mappings for stratifications
     pub(crate) subpopulation_mappings: Vec<SubpopulationMapping>,
     /// Parameters defined as formulas that need to be evaluated each step
@@ -210,7 +289,7 @@ pub struct DifferenceEquations {
     pub(crate) t_parameter_index: usize,
     /// Whether any per-step expression still needs compartment values in the
     /// expression context. JIT-resolved transition formulas read compartments
-    /// directly from `population` and do not need this HashMap update.
+    /// directly from the state and do not need this HashMap update.
     pub(crate) requires_compartment_context: bool,
 }
 
