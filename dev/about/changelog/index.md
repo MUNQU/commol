@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- An ODE engine: a model built with `typology="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol_rs.differential.DifferentialEquations`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`.
+- An ODE engine: a model built with `typology="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol_rs.differential.DifferentialEquations`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`. The engine restarts its integration at each integer when a rate reads `step`, and where `t` reaches a value a rate compares it with (`t >= t_on`), so the solver cannot step over a jump.
 - `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
 - `Simulation.run_at(steps)`: the outputs at the given sorted steps. A differential model takes any step, such as `0.5`.
 - Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.

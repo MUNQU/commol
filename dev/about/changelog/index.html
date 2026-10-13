@@ -2567,7 +2567,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   (<code>commol_rs.differential.DifferentialEquations</code>). It has the same flows,
   outputs, accumulators, calibration, ensembles, reports and plots as a
   difference model. On <code>[n, n + 1)</code> a rate sees <code>step = n</code> and the continuous
-  <code>t</code>.</li>
+  <code>t</code>. The engine restarts its integration at each integer when a rate reads
+  <code>step</code>, and where <code>t</code> reaches a value a rate compares it with
+  (<code>t &gt;= t_on</code>), so the solver cannot step over a jump.</li>
 <li><code>OdeSolver</code> (<code>method</code> <code>"tsit45"</code> or <code>"bdf"</code>, <code>rtol</code>, <code>atol</code>), stored in the
   model as <code>Dynamics.solver</code> and set with <code>ModelBuilder(..., solver=...)</code>.</li>
 <li><code>Simulation.run_at(steps)</code>: the outputs at the given sorted steps. A

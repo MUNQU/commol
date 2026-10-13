@@ -3163,12 +3163,26 @@ interval. When the right-hand side reads one of them
 (<code>CompiledModel::depends_on_step</code>), the engine ends a piece of integration at
 every integer, so each jump of the rate is the start of a piece
 (<code>breakpoints</code> in <code>crates/commol-differential/src/solve.rs</code>).</p>
+<p>A rate can also jump where <code>t</code> reaches a value it compares <code>t</code> with
+(<code>t &gt;= t_on</code>). The compiler collects those values when they read only numbers,
+<code>pi</code>, <code>e</code> and parameters that do not change during a run
+(<code>time_thresholds</code> in <code>crates/commol-model/src/builder.rs</code>), and the engine
+evaluates them with the current parameters and ends a piece there. Without
+that, an adaptive solver whose rate is 0 before a short window grows its step
+and steps over the window. A comparison with the state is a state event, which
+the engine does not detect.</p>
+<p>Whether an expression reads <code>step</code> comes from <code>reads_variable</code>, not from
+<code>get_variables</code>: <code>get_variables</code> leaves out the special variables, because it
+lists the variables a model must define.</p>
 <p><strong>Consequence:</strong> a per-capita pulse <code>p</code> moves <code>p</code> of its source in a difference
 model and <code>1 − e^(−p)</code> in a differential model. An impulse moves <code>p</code> in both.
 The alternative, <code>step = t</code>, makes a pulse <code>step == n</code> true on a set of zero
 length, so it would never act.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_differential.py::TestTimeInsideAStep</code>,
-<code>crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval</code>.</p>
+<code>crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval</code>,
+<code>a_rate_reads_the_step_of_its_unit_interval</code>,
+<code>a_rate_that_switches_on_t_acts_only_on_its_window</code>,
+<code>crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold</code>.</p>
 <h3 id="impulses-come-before-the-flows-of-their-step">Impulses come before the flows of their step<a class="headerlink" href="#impulses-come-before-the-flows-of-their-step" title="Permanent link">&para;</a></h3>
 <p>At step <code>n</code> the state jumps first, then the flows of the step run from the new
 state, in both engines (<code>CompiledModel::apply_impulses</code>). Every jump of one

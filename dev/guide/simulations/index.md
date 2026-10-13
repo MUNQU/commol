@@ -248,6 +248,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 On `[n, n + 1)` a rate sees `step = n` and the continuous time `t`. So a rate that reads `step`, a time series or a time pattern is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A per-capita pulse `p` on step `n` acts as the constant rate `p` for one time unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).
 
+A rate can also jump where `t` reaches a value that it compares `t` with, such as `if(t >= t_on, beta, 0)`. The engine restarts the integration there too, so the solver cannot step over a short window. This works when the value reads only numbers, `pi`, `e` and parameters with a constant or calibrated value, and `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump that depends on the state, such as `if(t >= A, ...)`, is not found.
+
 `TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step probabilities for difference models. A differential model needs the continuous rate; see [Steps and physical time](https://munqu.github.io/commol/latest/guide/core-concepts/#steps-and-physical-time).
 
 ```python

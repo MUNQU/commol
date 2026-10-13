@@ -2803,6 +2803,12 @@ rate can jump. A per-capita pulse <code>p</code> on step <code>n</code> acts as 
 <code>p</code> for one time unit: it moves <code>1 − e^(−p)</code> of its source, not <code>p</code> as in a
 difference model. To move a fraction at once, use an
 <a href="../transitions/#impulses">impulse</a>.</p>
+<p>A rate can also jump where <code>t</code> reaches a value that it compares <code>t</code> with, such
+as <code>if(t &gt;= t_on, beta, 0)</code>. The engine restarts the integration there too, so
+the solver cannot step over a short window. This works when the value reads
+only numbers, <code>pi</code>, <code>e</code> and parameters with a constant or calibrated value, and
+<code>t</code> is one side of the comparison: write <code>t &gt;= 10</code>, not <code>t - 10 &gt;= 0</code>. A jump
+that depends on the state, such as <code>if(t &gt;= A, ...)</code>, is not found.</p>
 <p><code>TimeScale.rate_from_mean_duration</code> and <code>rate_from_probability</code> give per-step
 probabilities for difference models. A differential model needs the
 continuous rate; see <a href="../core-concepts/#steps-and-physical-time">Steps and physical time</a>.</p>
