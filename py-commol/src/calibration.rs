@@ -236,15 +236,6 @@ impl PyLossConfig {
         }
     }
 
-    /// Weighted sum of squared errors
-    #[staticmethod]
-    fn weighted_sse() -> Self {
-        Self {
-            inner: commol_calibration::LossConfig::WeightedSSE,
-            normalize_observations: false,
-        }
-    }
-
     /// Return a copy with per-series observation normalization enabled or disabled.
     ///
     /// Normalization is orthogonal to the metric: each residual is divided by the
@@ -263,6 +254,24 @@ impl PyLossConfig {
     fn normalize_observations(&self) -> bool {
         self.normalize_observations
     }
+
+    /// Loss of residuals with their observation weights
+    ///
+    /// The residuals are used as given: scale them by their normalization
+    /// factor first when normalization applies.
+    ///
+    /// Raises:
+    ///     ValueError: If `residuals` and `weights` differ in length
+    fn aggregate(&self, residuals: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
+        if residuals.len() != weights.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "{} residuals but {} weights",
+                residuals.len(),
+                weights.len()
+            )));
+        }
+        Ok(self.inner.aggregate(residuals.into_iter().zip(weights)))
+    }
 }
 
 /// Nelder-Mead optimization configuration
@@ -280,7 +289,7 @@ impl PyNelderMeadConfig {
     /// Args:
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     sd_tolerance: Convergence tolerance (default: 1e-6)
-    ///     simplex_perturbation: Multiplier for initial simplex vertices (default: 1.1 = 10% perturbation)
+    ///     initial_step: Size of the initial simplex, as a fraction of each bound width (default: 0.1)
     ///     alpha: Reflection coefficient (default: None, uses argmin's default)
     ///     gamma: Expansion coefficient (default: None, uses argmin's default)
     ///     rho: Contraction coefficient (default: None, uses argmin's default)
@@ -288,12 +297,12 @@ impl PyNelderMeadConfig {
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, simplex_perturbation=1.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
+    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_step=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
-        simplex_perturbation: f64,
+        initial_step: f64,
         alpha: Option<f64>,
         gamma: Option<f64>,
         rho: Option<f64>,
@@ -305,7 +314,7 @@ impl PyNelderMeadConfig {
             inner: commol_calibration::NelderMeadConfig {
                 max_iterations,
                 sd_tolerance,
-                simplex_perturbation,
+                initial_step,
                 alpha,
                 gamma,
                 rho,
@@ -1423,6 +1432,34 @@ fn calibrated_initial_population(
     Ok((state.values, state.population, state.covered))
 }
 
+/// Check that every initial-condition id and the remainder resolve
+///
+/// Args:
+///     engine: The difference equations engine
+///     parameters: Calibration parameters, in problem order
+///     initial_condition_remainder: Compartment or bin that absorbs the
+///         difference to the population size, if any
+///
+/// Raises:
+///     ValueError: If an initial-condition id or the remainder cannot be
+///         resolved, for example a category of a stratification that is not
+///         binary
+#[pyfunction]
+#[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
+fn check_initial_conditions(
+    engine: &PyDifferenceEquations,
+    parameters: Vec<PyCalibrationParameter>,
+    initial_condition_remainder: Option<String>,
+) -> PyResult<()> {
+    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    commol_calibration::check_initial_conditions(
+        engine.inner(),
+        &parameters,
+        initial_condition_remainder.as_deref(),
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
 /// Generate compact predictions for selected metric points.
 #[pyfunction]
 fn generate_predictions_at_points_parallel(
@@ -1485,7 +1522,7 @@ fn generate_calibrated_predictions_at_points_parallel(
 
 /// Select an ensemble from compact observation-space predictions.
 #[pyfunction]
-#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="weighted_sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
+#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
 #[allow(clippy::too_many_arguments)]
 fn select_compact_ensemble(
     candidates: Vec<PyCalibrationEvaluation>,
@@ -1524,13 +1561,12 @@ fn select_compact_ensemble(
     // Keep the gate's central loss coherent with the optimizer's member loss:
     // the same loss family is used on both sides of the fit gate.
     let central_loss_metric = match central_loss_metric {
-        "sse" | "weighted_sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
+        "sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
         "rmse" => commol_calibration::CentralLossMetric::RootMeanSquared,
         "mae" => commol_calibration::CentralLossMetric::MeanAbsolute,
         _ => {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid central_loss_metric: '{}'. Must be 'sse', 'weighted_sse', \
-                 'rmse', or 'mae'",
+                "Invalid central_loss_metric: '{}'. Must be 'sse', 'rmse', or 'mae'",
                 central_loss_metric
             )));
         }
@@ -1686,6 +1722,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEnsembleSelectionResult>()?;
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
     m.add_function(wrap_pyfunction!(calibrated_initial_population, m)?)?;
+    m.add_function(wrap_pyfunction!(check_initial_conditions, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;

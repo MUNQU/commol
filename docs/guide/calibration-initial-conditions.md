@@ -83,6 +83,17 @@ population.
 A category name that two stratifications declare must be qualified with its
 stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
 
+The engine resolves every id when you create the `Calibrator` or the
+`ProbabilisticCalibrator` (`check_initial_conditions` in
+`crates/commol-calibration/src/initial_conditions.rs`), so a wrong id fails
+before the optimization starts:
+
+| `id` | Error |
+|---|---|
+| Names nothing in the model | `Invalid bin, compartment or category 'X'`, with the compartments |
+| A category of a stratification with three or more categories, such as `"y"` of `age = [y, m, o]` | `Initial condition category 'age:y' needs a binary stratification` |
+| A category name that two stratifications declare | `… is ambiguous`, with the qualified names |
+
 ## The remainder
 
 Without help, calibrated values change the total population. Name a

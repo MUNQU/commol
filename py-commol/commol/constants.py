@@ -1,20 +1,9 @@
-"""Enumerations shared across the package."""
+"""Enumerations and constants shared across the package."""
 
 from enum import StrEnum, unique
 
-
-@unique
-class LogicOperators(StrEnum):
-    """Logic and comparison operators of a transition `Condition`."""
-
-    AND = "and"
-    OR = "or"
-    EQ = "eq"
-    NEQ = "neq"
-    GT = "gt"
-    GET = "get"
-    LT = "lt"
-    LET = "let"
+RESERVED_VARIABLE_NAMES: tuple[str, ...] = ("N", "step", "t", "pi", "e")
+"""Variables the engine provides in every expression."""
 
 
 @unique
@@ -23,14 +12,6 @@ class ModelTypes(StrEnum):
 
     DIFFERENCE_EQUATIONS = "DifferenceEquations"
     DIFFERENTIAL_EQUATIONS = "DifferentialEquations"
-
-
-@unique
-class VariablePrefixes(StrEnum):
-    """Prefixes of a `Rule` variable: `state:<bin>` or `strat:<stratification>`."""
-
-    STATE = "state"
-    STRAT = "strat"
 
 
 @unique

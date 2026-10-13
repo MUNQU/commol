@@ -1,15 +1,6 @@
 from typing import ClassVar, Protocol
 
-from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
-
-class RuleProtocol(Protocol):
-    variable: str
-    operator: LogicOperators
-    value: str | int | float | bool
-
-class ConditionProtocol(Protocol):
-    logic: LogicOperators
-    rules: list[RuleProtocol]
+from commol.constants import ModelTypes
 
 class BinProtocol(Protocol):
     id: str
@@ -33,7 +24,6 @@ class TransitionProtocol(Protocol):
     target: list[str]
     rate: RateMathExpressionProtocol | None
     stratified_rates: list[StratifiedRateProtocol] | None
-    condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
     id: str
@@ -85,6 +75,7 @@ class DifferenceEquationsProtocol(Protocol):
     def __init__(self, model: RustModelProtocol) -> None: ...
     def run(self, num_steps: int) -> list[list[float]]: ...
     def step(self) -> None: ...
+    def reset(self) -> None: ...
     @property
     def population(self) -> list[float]: ...
     @property
@@ -100,6 +91,7 @@ class DifferenceModule(Protocol):
     def transition_flows(
         self, model: RustModelProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
+    def check_names(self, model: RustModelProtocol) -> None: ...
     def expanded_outputs(
         self, model: RustModelProtocol
     ) -> tuple[
@@ -177,9 +169,8 @@ class LossConfigProtocol(Protocol):
     def rmse() -> LossConfigProtocol: ...
     @staticmethod
     def mae() -> LossConfigProtocol: ...
-    @staticmethod
-    def weighted_sse() -> LossConfigProtocol: ...
     def normalized(self, enabled: bool = True) -> LossConfigProtocol: ...
+    def aggregate(self, residuals: list[float], weights: list[float]) -> float: ...
     @property
     def normalize_observations(self) -> bool: ...
 
@@ -188,7 +179,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
-        simplex_perturbation: float = 1.1,
+        initial_step: float = 0.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
@@ -383,6 +374,12 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
+    def check_initial_conditions(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        initial_condition_remainder: str | None = None,
+    ) -> None: ...
     def calibrated_initial_population(
         self,
         engine: DifferenceEquationsProtocol,
@@ -469,7 +466,7 @@ class CalibrationModule(Protocol):
         series_ids: list[str],
         confidence_level: float,
         seed: int,
-        central_loss_metric: str = "weighted_sse",
+        central_loss_metric: str = "sse",
         ensemble_algorithm: str = "nsga2",
         ensemble_size_mode: str = "automatic",
         ensemble_size: int | None = None,
@@ -525,11 +522,7 @@ class CoreModule(Protocol):
     InitialConditions: type[InitialConditionsProtocol]
     StratificationFraction: type[StratificationFractionProtocol]
     StratificationFractions: type[StratificationFractionsProtocol]
-    Condition: type[ConditionProtocol]
-    Rule: type[RuleProtocol]
-    LogicOperator: type[LogicOperators]
     ModelTypes: type[ModelTypes]
-    VariablePrefixes: type[VariablePrefixes]
     Dynamics: type[DynamicsProtocol]
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]

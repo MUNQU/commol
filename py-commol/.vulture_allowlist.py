@@ -6,6 +6,7 @@ Axes
 Figure
 DifferenceEquationsProtocol
 RustModelProtocol
+CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
 CalibrationResultWithHistoryProtocol
 LossConfigProtocol

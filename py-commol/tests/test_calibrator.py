@@ -214,7 +214,7 @@ class TestCalibrator:
         assert math.isclose(result.best_parameters["beta"], 0.1, abs_tol=1e-5)
         assert math.isclose(result.best_parameters["gamma"], 0.05, abs_tol=1e-5)
 
-    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae", "weighted_sse"])
+    @pytest.mark.parametrize("loss_function", ["sse", "rmse", "mae"])
     @pytest.mark.parametrize("normalize", [False, True])
     def test_loss_config_carries_normalization_flag(
         self, model: Model, loss_function: str, normalize: bool
@@ -840,7 +840,7 @@ class TestCalibrator:
         simulation = Simulation(model)
 
         # Should raise ValueError during calibrator initialization
-        with pytest.raises(ValueError, match="not found in model bins"):
+        with pytest.raises(ValueError, match="Invalid bin, compartment or category .X"):
             _ = Calibrator(simulation, problem)
 
     def test_particle_swarm_with_advanced_features(self, model: Model):

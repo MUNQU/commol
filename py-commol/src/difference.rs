@@ -257,11 +257,27 @@ fn transition_flows(
         .collect())
 }
 
+/// Check the names a model uses against the names the engine provides
+///
+/// Args:
+///     model: The compartment model
+///
+/// Raises:
+///     ValueError: If a parameter id is an expanded compartment or a
+///         subpopulation total, or a rate uses an `N_…` name that is not a
+///         subpopulation of the model
+#[pyfunction]
+fn check_names(model: &PyModel) -> PyResult<()> {
+    commol_difference::check_names(&model.inner)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
 /// Register difference equation solver with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDifferenceEquations>()?;
     m.add_function(wrap_pyfunction!(initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(expanded_outputs, m)?)?;
     m.add_function(wrap_pyfunction!(transition_flows, m)?)?;
+    m.add_function(wrap_pyfunction!(check_names, m)?)?;
     Ok(())
 }

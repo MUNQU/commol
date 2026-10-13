@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use super::conditions::Condition;
 use crate::math_expression::RateMathExpression;
 
 /// Model typologies.
@@ -65,9 +64,6 @@ pub struct Transition {
     pub rate: Option<RateMathExpression>,
     /// Rates for compartments with some categories.
     pub stratified_rates: Option<Vec<StratifiedRate>>,
-    /// A condition stored with the transition. The engine does not evaluate it.
-    #[allow(dead_code)]
-    pub condition: Option<Condition>,
     /// When true, base compartment names in the rate expression are replaced
     /// with the specific stratified compartment name for each expanded flow.
     pub per_compartment: Option<bool>,

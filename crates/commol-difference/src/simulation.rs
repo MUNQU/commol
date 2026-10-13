@@ -407,6 +407,7 @@ fn resolve_slot(
     match slot {
         VarSlot::Compartment(idx) => Ok(population[*idx]),
         VarSlot::Step => Ok(current_step),
+        VarSlot::Constant(value) => Ok(*value),
         VarSlot::ParameterIndex(idx) => ctx
             .get_parameter_by_index(*idx)
             .ok_or_else(|| format!("Parameter index '{}' not found", idx)),
@@ -686,7 +687,6 @@ mod tests {
                         "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
                     )),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
                 }],
             },
@@ -738,7 +738,6 @@ mod tests {
                     accumulators: vec![],
                     rate: Some(RateMathExpression::from_string("missing * A".to_string())),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
                 }],
             },
@@ -1010,7 +1009,6 @@ mod tests {
                             "k1 * A * B / N".to_string(),
                         )),
                         stratified_rates: None,
-                        condition: None,
                         per_compartment: None,
                     },
                     Transition {
@@ -1020,7 +1018,6 @@ mod tests {
                         accumulators: vec![],
                         rate: Some(RateMathExpression::from_string("k2".to_string())),
                         stratified_rates: None,
-                        condition: None,
                         per_compartment: None,
                     },
                 ],
@@ -1060,5 +1057,52 @@ mod tests {
                 total
             );
         }
+    }
+
+    fn ab_model_with_rate(rate: &str) -> Model {
+        let mut model = make_three_bin_model();
+        model.dynamics.transitions = vec![Transition {
+            id: "a_to_b".to_string(),
+            source: vec!["A".to_string()],
+            target: vec!["B".to_string()],
+            accumulators: vec![],
+            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            stratified_rates: None,
+            per_compartment: None,
+        }];
+        model
+    }
+
+    #[test]
+    fn pi_and_e_are_constants_in_every_rate_path() {
+        // k2 = 0.1, A starts at 990: one step moves `constant * 0.1 * 990`.
+        let cases = [
+            ("pi * k2 * A", std::f64::consts::PI),
+            ("e * k2 * A", std::f64::consts::E),
+            ("k2 * pi * A + 0 * B", std::f64::consts::PI),
+            ("if(step >= 0, e * k2 * A, 0)", std::f64::consts::E),
+        ];
+        for (rate, constant) in cases {
+            let model = ab_model_with_rate(rate);
+            let mut engine = DifferenceEquations::from_model(&model);
+            let results = engine
+                .run(1)
+                .unwrap_or_else(|error| panic!("{rate}: {error}"));
+            let expected = 990.0 - constant * 0.1 * 990.0;
+            assert!(
+                (results[1][0] - expected).abs() < 1e-9,
+                "{rate}: expected A = {expected}, got {}",
+                results[1][0]
+            );
+        }
+    }
+
+    #[test]
+    fn pi_alone_is_a_per_capita_constant_rate() {
+        let model = ab_model_with_rate("pi / 10");
+        let mut engine = DifferenceEquations::from_model(&model);
+        let results = engine.run(1).unwrap();
+        let expected = 990.0 - std::f64::consts::PI / 10.0 * 990.0;
+        assert!((results[1][0] - expected).abs() < 1e-9);
     }
 }

@@ -7,7 +7,7 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from commol.constants import PrintEquationsOutputFormat
+from commol.constants import RESERVED_VARIABLE_NAMES, PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.context._model.calibration_write_back import (
     calibrated_initial_conditions,
@@ -129,15 +129,21 @@ class Model(BaseModel):
         """
         Validates that parameter IDs do not conflict with reserved variable names.
 
-        Bin IDs are reserved variables that cannot be used as parameter names.
-        When stratifications are present, base compartment names represent the
-        sum of all stratified versions (e.g., S = S_young + S_old).
-
-        Parameters cannot use these reserved names to avoid conflicts during
-        rate expression evaluation.
+        ``N``, ``step``, ``t``, ``pi`` and ``e`` are engine variables, and bin
+        IDs are the population of each bin. Expanded compartment names and
+        subpopulation totals are checked by the engine
+        (``validate_names_with_engine``).
         """
         bin_ids = {bin_item.id for bin_item in self.population.bins}
         parameter_ids = {p.id for p in self.parameters}
+
+        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
+        if special:
+            raise ValueError(
+                f"Parameter IDs conflict with engine variables: {special}. "
+                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
+                f"Please rename the conflicting parameters."
+            )
 
         conflicting_names = bin_ids & parameter_ids
         if conflicting_names:
@@ -355,6 +361,17 @@ class Model(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_names_with_engine(self) -> Self:
+        """
+        Validate parameter ids and subpopulation variables with the engine.
+
+        A parameter id cannot be an expanded compartment or a subpopulation
+        total, and every ``N_…`` variable must name a subpopulation.
+        """
+        engine_state.check_names(self)
+        return self
+
+    @model_validator(mode="after")
     def validate_compartment_fractions(self) -> Self:
         """Validate per-compartment overrides against the engine expansion."""
         if self.population.initial_conditions.compartment_fractions:
@@ -376,7 +393,7 @@ class Model(BaseModel):
 
     def _get_valid_identifiers(self) -> set[str]:
         """Gathers all valid identifiers for use in rate expressions."""
-        special_vars = {"N", "step", "pi", "e", "t"}
+        special_vars = set(RESERVED_VARIABLE_NAMES)
         param_ids = {param.id for param in self.parameters}
         bin_ids = {bin_item.id for bin_item in self.population.bins}
 
@@ -606,16 +623,22 @@ class Model(BaseModel):
         if undefined_vars:
             param_ids = {param.id for param in self.parameters}
             bin_ids = {bin_item.id for bin_item in self.population.bins}
-            raise ValueError(
-                (
-                    f"Undefined variables in transition '{transition_id}' "
-                    f"{context} '{rate}': {', '.join(undefined_vars)}. "
-                    f"Available parameters: "
-                    f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
-                    f"Available bins: "
-                    f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
-                )
+            message = (
+                f"Undefined variables in transition '{transition_id}' "
+                f"{context} '{rate}': {', '.join(undefined_vars)}. "
+                f"Available parameters: "
+                f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
+                f"Available bins: "
+                f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
             )
+            if any(var.startswith("N_") for var in undefined_vars):
+                n_vars = sorted(self._get_subpopulation_n_vars())
+                message += (
+                    " Subpopulation names follow the declaration order of the "
+                    "stratifications. Available subpopulations: "
+                    f"{', '.join(n_vars) if n_vars else 'none'}."
+                )
+            raise ValueError(message)
 
     @model_validator(mode="after")
     def validate_transition_ids(self) -> Self:
@@ -736,13 +759,11 @@ class Model(BaseModel):
         """
         Check unit consistency of all equations in the model.
 
-        This method validates that all transition rates have consistent units.
-        It only performs the check if ALL parameters have units specified.
-        If any parameter lacks a unit, the check is skipped.
-
-        For difference equation models, all rates should have units that result in
-        population change rates (e.g., "person/day" or "1/day" when multiplied by
-        population).
+        The engine applies every flow once per step and converts no value
+        between units. So the check infers one step unit from the parameter
+        units: the one unit of time (``day``, ``week``, ``step``, …) that they
+        use, or ``step`` when they use none. Every flow must then be exactly
+        ``<bin unit>/<step unit>``, such as ``person/day``.
 
         Parameters
         ----------
@@ -752,14 +773,15 @@ class Model(BaseModel):
         Raises
         ------
         UnitConsistencyError
-            If unit inconsistencies are found in any equation.
+            If a constant parameter or a bin has no unit, if the parameters use
+            more than one unit of time (``1/day`` and ``1/week``), or if a flow
+            does not have the unit ``<bin unit>/<step unit>``.
         ValueError
             If the model type doesn't support unit checking.
 
         Notes
         -----
-        - Bin variables are assumed to have units of "person"
-        - Predefined variables (N, N_young, etc.) have units of "person"
+        - Predefined variables (N, N_young, etc.) have the bin unit
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """

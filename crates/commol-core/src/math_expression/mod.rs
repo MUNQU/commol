@@ -359,6 +359,7 @@ impl RateMathExpression {
             || s.contains('*')
             || s.contains('/')
             || s.contains('^')
+            || s.contains('%')
             || s.contains('(')
             || s.contains(')');
 

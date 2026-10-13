@@ -10,6 +10,7 @@ from commol.context.parameter import Parameter
 from commol.context.stratification import Stratification
 
 ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
+ureg.define("step = [step]")
 
 
 class UnitConsistencyError(Exception):
@@ -42,15 +43,18 @@ def check_equation_units(
         A tuple of (is_consistent, error_message).
         If consistent, returns (True, None).
         If inconsistent, returns (False, error_message).
+
+    Notes
+    -----
+    The unit must be equal to ``expected_unit``, not only convertible to it:
+    ``person/week`` does not match ``person/day``, because the engine never
+    converts values between units.
     """
     try:
         # Parse the equation to build a pint Quantity
         equation_unit = parse_equation_unit(equation, variable_units)
 
-        # Check if result matches expected unit
-        expected_quantity = ureg(expected_unit)
-
-        if not equation_unit.is_compatible_with(expected_quantity):
+        if not same_unit(str(equation_unit.units), expected_unit):
             return (
                 False,
                 (
@@ -65,6 +69,28 @@ def check_equation_units(
         return (False, f"Unit error in equation '{equation}': {str(e)}")
     except Exception as e:
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
+
+
+def same_unit(unit: str, other: str) -> bool:
+    """
+    Whether two units are equal: convertible, with a conversion factor of 1.
+
+    Parameters
+    ----------
+    unit, other : str
+        Unit expressions, such as ``"1/day"`` and ``"1/d"``.
+
+    Returns
+    -------
+    bool
+        True for ``"1/day"`` and ``"1/d"``; False for ``"1/day"`` and
+        ``"1/week"``, which are convertible but not equal.
+    """
+    quantity = ureg.Quantity(1.0, ureg.parse_units(unit))
+    target = ureg.parse_units(other)
+    if not quantity.is_compatible_with(target):
+        return False
+    return math.isclose(float(quantity.to(target).magnitude), 1.0, rel_tol=1e-9)
 
 
 def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:

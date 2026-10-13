@@ -72,11 +72,14 @@ pub mod types;
 
 // Re-export commonly used items
 pub use calibration_problem::CalibrationProblem;
-pub use initial_conditions::{calibrated_initial_population, CalibratedInitialPopulation};
+pub use initial_conditions::{
+    calibrated_initial_population, check_initial_conditions, CalibratedInitialPopulation,
+};
 pub use optimization::{
-    optimize, optimize_with_history, AccelerationStrategy, InertiaWeightStrategy,
-    InitializationStrategy, MutationApplication, MutationStrategy, NelderMeadConfig,
-    OptimizationAlgorithm, OptimizationConfig, ParticleSwarmConfig,
+    converged, optimize, optimize_with_history, optimize_with_observer, AccelerationStrategy,
+    InertiaWeightStrategy, InitializationStrategy, MutationApplication, MutationStrategy,
+    NelderMeadConfig, NelderMeadState, NoObserver, OptimizationAlgorithm, OptimizationConfig,
+    ParticleSwarmConfig, ParticleSwarmState,
 };
 pub use probabilistic::{
     deduplicate_evaluations, generate_calibrated_predictions_at_points_parallel,

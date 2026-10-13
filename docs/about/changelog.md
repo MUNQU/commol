@@ -9,16 +9,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `SimulationPlotter.plot_series` and `plot_cumulative` take `series` instead
+  of `bins`. An entry is an output name or a bin or accumulator id; an id plots
+  the sum of its outputs, so a bin of a stratified model can be plotted. There
+  is no `bins` alias: rename the argument.
+- Every loss uses the observation weights the same way: `"sse"` is
+  `Σ w·r²`, `"rmse"` is `√(Σ w·r² / Σ w)` and `"mae"` is `Σ w·|r| / Σ w`.
+  Before, `"sse"` squared the weight and `"rmse"` and `"mae"` ignored it. With
+  every weight at 1 nothing changes. The ensemble central loss follows the same
+  rule.
+- `Simulation.run` starts from the initial state at every call, so two calls
+  give the same result. Before, a second `run` continued the first one. To
+  continue a run, call `simulation.engine.step()`.
+- `Model.check_unit_consistency` infers one step unit from the parameter
+  units (`day`, `week`, `step`, …; `step` when there is none) and requires
+  every flow to be exactly `<bin unit>/<step unit>`. A model in `"1/step"` now
+  passes. Rates in two units of time, such as `"1/day"` and `"1/week"`, are an
+  error that names each parameter, because the engine converts nothing. Before,
+  the check accepted any convertible unit and defaulted to `day`.
+
+- Nelder-Mead searches inside the bounds: it optimizes an unbounded
+  coordinate and scores `x = lo + (hi − lo)·(sin u + 1)/2`. Its first simplex
+  is set by `NelderMeadConfig.initial_step` (a fraction of each bound width,
+  default 0.1), which replaces `simplex_perturbation`; there is no alias. Every
+  Nelder-Mead result can change.
+
+### Removed
+
+- Transition conditions: `Transition.condition`, the `condition` argument of
+  `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the
+  `Condition` and `Rule` types, and the `LogicOperators` and
+  `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated
+  them, so a condition that was never true still moved population. Write the
+  condition in the rate (`"if(step > 30, k, 0)"`), or use a `TimePattern` or a
+  stratified rate. A model file with a `condition` key still loads; the key is
+  ignored.
+- The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`,
+  which uses the weights.
+
+### Fixed
+
+- `CalibrationResult.converged` is `True` only when the optimizer met its
+  convergence test or `target_cost`. Before, every finished run reported
+  `True`, also one that stopped at `max_iterations`.
+- Nelder-Mead from a start value of 0 builds a real simplex, and no longer
+  stops at a bound where the clamped loss is flat. Before, the simplex was
+  degenerate at 0, and could collapse on a bound and report `converged=True`.
+- The verbose Nelder-Mead run uses the configured simplex. Before, it always
+  used a 10% perturbation.
+- `Model.check_unit_consistency` names every bin without a unit. Before, it
+  failed with "'None' is not defined in the unit registry".
+- A `Simulation` follows its model: `run` and `engine` rebuild the engine when
+  the model changed after the `Simulation` was created, for example with
+  `update_parameters` or `apply_calibration_parameters`. Before, it used the
+  old values, or failed with "Parameter index … not found" for a parameter
+  that was `None`.
+- `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before,
+  outside a function argument, the simulation failed with "Variable 'pi' not
+  found".
+- `%` (remainder) works as the only operator of a rate, as in `"step % 7"`.
+  Before, the rate was read as a parameter name.
+- An `N_…` variable that names no subpopulation, such as `N_t1_g1` when
+  `group` is declared before `type`, is a build error that lists the valid
+  names. Before, a formula parameter or the engine gave it the value 0.
+- A parameter id cannot be `N`, `step`, `t`, `pi`, `e`, an expanded
+  compartment or a subpopulation total. Before, only bin ids were rejected, and
+  the parameter and the engine variable shared one value.
+- `ModelBuilder.reset` removes the accumulators, and `ModelBuilder.clone`
+  copies them and the `bin_unit`. Before, `reset` kept the accumulators and a
+  clone lost them.
+- An `initial_condition` id is resolved by the engine when the `Calibrator`
+  or the `ProbabilisticCalibrator` is created. A category of a non-binary
+  stratification now gives "needs a binary stratification" instead of "not
+  found", and bin prefixes (`"B_g1"`) and qualified categories (`"group:g1"`)
+  are accepted, as documented. Before, both were rejected as "not found".
+
 ### Documentation
 
 - The guide is rewritten and split into pages with one job each (building
   models, transitions, expressions, time patterns, units, simulations, and six
   calibration pages). Every example runs in CI, and every claim was checked
   against the engine. Behaviors that were described wrongly are now documented
-  as they are, among them: transition `condition`s are not evaluated, a second
-  `Simulation.run` continues the first one, a `Simulation` keeps the model it
-  was created with, `"sse"` uses observation weights (squared), and a violated
-  constraint replaces the loss with a penalty.
+  as they are, among them: a violated constraint replaces the loss with a
+  penalty.
 - The API reference documents every public name, and `Model`, plotting and
   reports have their own pages.
 - The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks

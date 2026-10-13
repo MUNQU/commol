@@ -483,6 +483,28 @@ pub struct CalibratedInitialPopulation {
     pub covered: Vec<usize>,
 }
 
+/// Check that every initial-condition id and the remainder resolve.
+///
+/// The ids are resolved as the calibration objective resolves them, so the
+/// first check that sees an id gives the engine's message, for example that a
+/// category needs a binary stratification.
+///
+/// # Errors
+///
+/// Returns a message when an initial-condition id or the remainder cannot be
+/// resolved.
+pub fn check_initial_conditions<E: SimulationEngine>(
+    engine: &E,
+    parameters: &[CalibrationParameter],
+    remainder: Option<&str>,
+) -> Result<(), String> {
+    let plan = InitialConditionPlan::new(engine, parameters)?;
+    if let Some(remainder) = remainder {
+        plan.with_remainder(engine, parameters, remainder)?;
+    }
+    Ok(())
+}
+
 /// Initial population an engine starts from once calibration values are
 /// applied, exactly as the calibration objective scores them.
 ///

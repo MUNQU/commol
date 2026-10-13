@@ -377,7 +377,6 @@ impl PyTransition {
                 accumulators: accumulators.unwrap_or_default(),
                 rate,
                 stratified_rates,
-                condition: None,
                 per_compartment,
             },
         }

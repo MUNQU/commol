@@ -26,6 +26,7 @@ from commol.api.probabilistic.ensemble_selector import (
 )
 from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
+from commol.context._model import engine_state
 from commol.context.constants import CalibrationParameterType
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
@@ -132,61 +133,28 @@ class ProbabilisticCalibrator:
             If validation fails due to incompatible inputs.
         """
         model_param_ids = {p.id for p in self.simulation.model_definition.parameters}
-        model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
-        stratifications = self.simulation.model_definition.population.stratifications
-        model_binary_stratification_categories = {
-            category
-            for stratification in stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self.simulation.engine.compartments)
         simulation_output_ids = set(self.simulation.simulation_outputs)
 
-        self._validate_calibration_parameters(
-            model_param_ids,
-            model_bin_ids,
-            model_binary_stratification_categories,
-            engine_compartment_ids,
-        )
+        self._validate_calibration_parameters(model_param_ids)
         self._validate_observed_data(simulation_output_ids)
         self._warn_constraint_time_steps_beyond_observations()
 
         logger.debug("Input validation passed")
 
-    def _validate_calibration_parameters(
-        self,
-        model_param_ids: set[str],
-        model_bin_ids: set[str],
-        model_binary_stratification_categories: set[str],
-        engine_compartment_ids: set[str],
-    ) -> None:
+    def _validate_calibration_parameters(self, model_param_ids: set[str]) -> None:
         """Validate that calibration parameters exist in the model."""
         for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.SCALE:
-                continue
-
             if param.parameter_type == CalibrationParameterType.PARAMETER:
                 if param.id not in model_param_ids:
                     raise ValueError(
                         f"Calibration parameter '{param.id}' not found in model. "
                         f"Available parameters: {sorted(model_param_ids)}"
                     )
-
-            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Initial condition parameter '{param.id}' not found in model "
-                        f"bins, stratification categories, or expanded compartments. "
-                        f"Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: {sorted(engine_compartment_ids)}"
-                    )
+        engine_state.check_initial_conditions(
+            self.simulation.engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
+        )
 
     def _validate_observed_data(self, simulation_output_ids: set[str]) -> None:
         """Validate that observed data targets exist and have valid steps."""

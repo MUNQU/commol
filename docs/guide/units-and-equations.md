@@ -38,7 +38,7 @@ model.print_equations()
 ## Unit checking
 
 `Model.check_unit_consistency(verbose=False)` checks that every flow has the
-unit `<bin unit>/<time unit>`, and that every function receives a plain number.
+unit `<bin unit>/<step unit>`, and that every function receives a plain number.
 It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every
 transition that fails.
 
@@ -46,7 +46,7 @@ transition that fails.
 
 | Item | How it gets a unit |
 |---|---|
-| Bins | `ModelBuilder(bin_unit=...)`, or `add_bin(unit=...)` for one bin |
+| Bins | `ModelBuilder(bin_unit=...)`, or `add_bin(unit=...)` for one bin. Required: the check names every bin without one. |
 | `N`, `N_<category>…` | The bin unit, automatically |
 | Constant parameters | `add_parameter(unit=...)`. Required: the check raises if one is missing. |
 | Formula parameters | Inferred from the formula; a unit is optional |
@@ -54,18 +54,29 @@ transition that fails.
 
 | Unit | Use for |
 |---|---|
-| `"1/day"`, `"1/week"`, `"1/hour"` | Rates |
+| `"1/day"`, `"1/week"`, `"1/step"` | Rates |
 | `"dimensionless"` | Ratios, fractions, amplitudes, function arguments |
 | Any word, such as `"item"` | A custom unit for bins; Commol registers it |
 
-The time unit of the flows comes from the parameters: the first parameter whose
-unit has a known time unit (`second`, `minute`, `hour`, `day`, `week`, `month`,
-`year`, …) sets it, and `day` is the default.
+### The step unit
 
-!!! warning "Per-step units"
-    `step` is not a time unit for the check: a model whose rates are in
-    `"1/step"` fails with "expected `<bin unit>/day`". Give rates a physical
-    time unit, such as `"1/day"`.
+The engine applies every flow once per step and converts no value between
+units. So one step has one unit, and every rate must use it
+(`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`):
+
+| Parameter units | Step unit | Result |
+|---|---|---|
+| All in one unit of time, such as `"1/day"` and `"day"` | `day` | Flows must be `<bin unit>/day` |
+| All in `"1/week"` | `week` | Accepted: one step is one week |
+| All in `"1/step"` | `step` | Accepted |
+| No unit of time | `step` | Flows must be `<bin unit>/step` |
+| `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"` | — | Error that names each parameter and its unit |
+
+A unit of time is any unit of dimension `[time]` (`second`, `hour`, `day`,
+`week`, `month`, `year`, …) or `step`. Two names of one unit, such as `d` and
+`day`, are one unit. A flow must have exactly the expected unit: `person/week`
+does not match `person/day`, because the engine would apply a weekly rate
+every day.
 
 ### What the check catches
 
@@ -98,7 +109,9 @@ except UnitConsistencyError as error:
 | `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'` | A rate with the wrong unit |
 | `Cannot convert from 'item' to 'dimensionless'` | A function such as `sin`, `exp` or `log` received a quantity with a unit |
 | `The following constant parameters are missing units: …` | A constant parameter has no unit |
-| `Variable '…' … has no defined unit` | A bin has no unit (set `bin_unit`) |
+| `The following bins have no unit: …` | A bin has no unit (set `bin_unit`) |
+| `the parameters use more than one unit of time ('k1' in '1/day', 'k2' in '1/week')` | Rates in two units of time; see [The step unit](#the-step-unit) |
+| `Variable '…' … has no defined unit` | A variable of a rate has no unit |
 
 To pass a quantity to a function, make it dimensionless first, for example
 `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in

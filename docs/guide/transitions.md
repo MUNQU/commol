@@ -46,7 +46,6 @@ model.print_equations()  # shows every flow as the engine computes it
 | `stratified_rates` | `list[dict] \| None` | `None` | Rates for some categories; see [Stratified rates](#stratified-rates). |
 | `per_compartment` | `bool \| None` | `None` | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment). |
 | `accumulators` | `list[str] \| None` | `None` | Accumulators that count the flow; see [Building Models](building-models.md#accumulators). |
-| `condition` | `Condition \| None` | `None` | Stored, but **not evaluated**; see [Conditions](#conditions-are-not-evaluated). |
 
 ## Rates
 
@@ -373,22 +372,14 @@ redirect.print_equations()
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
-## Conditions are not evaluated
+## Limiting when a transition runs
 
-`add_transition(condition=...)` and `ModelBuilder.create_condition(logic,
-rules)` store a condition with the model, and the model file keeps it. **The
-engine does not evaluate it: the transition runs at every step.** To limit a
-flow, write the condition in the rate with `if`, as in
-`"if(step > 30, k, 0)"`, or use a [`TimePattern`](time-patterns.md) or a
-[time-series parameter](building-models.md#time-series-parameters). A comparison
-alone is a boolean, so `"k * (step > 30)"` is rejected.
-
-| `create_condition` argument | Values |
-|---|---|
-| `logic` | `"and"`, `"or"` |
-| `rules[].variable` | `"state:<bin id>"` or `"strat:<stratification id>"` |
-| `rules[].operator` | `"eq"`, `"neq"`, `"gt"`, `"get"`, `"lt"`, `"let"` |
-| `rules[].value` | a string, number or boolean |
+A transition runs at every step. To limit a flow, write the condition in the
+rate with `if`, as in `"if(step > 30, k, 0)"`, or use a
+[`TimePattern`](time-patterns.md), a
+[time-series parameter](building-models.md#time-series-parameters) or a
+[stratified rate](#stratified-rates). A comparison alone is a boolean, so
+`"k * (step > 30)"` is rejected.
 
 ## What building checks
 

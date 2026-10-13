@@ -134,7 +134,7 @@ class TestSimulationPlotter:
         fig = plotter.plot_series(
             observed_data=observed_data,
             calibration_result=calibration_result,
-            bins=["I"],
+            series=["I"],
         )
 
         ax = fig.axes[0]
@@ -155,7 +155,7 @@ class TestSimulationPlotter:
         simulation, results = simulation_results
         plotter = SimulationPlotter(simulation, results)
 
-        fig = plotter.plot_series(bins=["I", "R"])
+        fig = plotter.plot_series(series=["I", "R"])
 
         assert fig is not None
         plt.close(fig)
@@ -461,7 +461,7 @@ class TestWindowedProbabilisticSeries:
 
         plotter = SimulationPlotter(simulation, results)
         figure = plotter.plot_series(
-            observed_data=observed, calibration_result=result, bins=["events"]
+            observed_data=observed, calibration_result=result, series=["events"]
         )
 
         line = figure.axes[0].lines[0]
@@ -470,3 +470,72 @@ class TestWindowedProbabilisticSeries:
             windowed
         )
         plt.close(figure)
+
+
+class TestSeriesSelection:
+    @pytest.fixture
+    def stratified(self) -> tuple[Simulation, dict[str, list[float]]]:
+        model = (
+            ModelBuilder(name="Stratified")
+            .add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_parameter(id="k", value=0.1)
+            .add_stratification(id="group", categories=["g1", "g2"])
+            .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+            .set_initial_conditions(
+                population_size=1000,
+                bin_fractions=[
+                    {"bin": "A", "fraction": 1.0},
+                    {"bin": "B", "fraction": 0.0},
+                ],
+                stratification_fractions=[
+                    {
+                        "stratification": "group",
+                        "fractions": [
+                            {"category": "g1", "fraction": 0.3},
+                            {"category": "g2", "fraction": 0.7},
+                        ],
+                    }
+                ],
+            )
+            .build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+        )
+        simulation = Simulation(model)
+        return simulation, simulation.run(10)
+
+    def test_a_bin_id_plots_the_sum_of_its_outputs(self, stratified) -> None:
+        simulation, results = stratified
+
+        fig = SimulationPlotter(simulation, results).plot_series(series=["B"])
+
+        plotted = np.asarray(fig.axes[0].lines[0].get_ydata(), dtype=float)
+        expected = np.add(results["B_g1"], results["B_g2"])
+        np.testing.assert_allclose(plotted, expected)
+        plt.close(fig)
+
+    def test_an_output_name_plots_that_output(self, stratified) -> None:
+        simulation, results = stratified
+
+        fig = SimulationPlotter(simulation, results).plot_series(series=["B_g1"])
+
+        plotted = np.asarray(fig.axes[0].lines[0].get_ydata(), dtype=float)
+        np.testing.assert_allclose(plotted, results["B_g1"])
+        plt.close(fig)
+
+    def test_a_bin_id_in_a_cumulative_plot(self, stratified) -> None:
+        simulation, results = stratified
+
+        fig = SimulationPlotter(simulation, results).plot_cumulative(series=["B"])
+
+        plotted = np.asarray(fig.axes[0].lines[0].get_ydata(), dtype=float)
+        expected = np.cumsum(np.add(results["B_g1"], results["B_g2"]))
+        np.testing.assert_allclose(plotted, expected)
+        plt.close(fig)
+
+    @pytest.mark.parametrize("method", ["plot_series", "plot_cumulative"])
+    def test_an_unknown_id_is_a_clear_error(self, stratified, method: str) -> None:
+        simulation, results = stratified
+        plotter = SimulationPlotter(simulation, results)
+
+        with pytest.raises(ValueError, match="'X' is neither an output"):
+            getattr(plotter, method)(series=["X"])

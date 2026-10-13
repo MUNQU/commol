@@ -21,6 +21,8 @@ pub(crate) enum VarSlot {
     Parameter(String),
     /// The simulation's current step counter (also exposed as `t`).
     Step,
+    /// A mathematical constant (`pi` or `e`).
+    Constant(f64),
 }
 
 #[derive(Clone)]

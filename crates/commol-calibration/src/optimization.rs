@@ -1,11 +1,14 @@
 //! Optimization solver setup and execution
 
-use argmin::core::Executor;
+use argmin::core::observers::{Observe, ObserverMode};
+use argmin::core::{
+    CostFunction, Error, Executor, IterState, PopulationState, TerminationReason, TerminationStatus,
+};
 use argmin::solver::neldermead::NelderMead;
 use argmin::solver::particleswarm::{
     InitializationStrategy as ArgminInitializationStrategy,
     MutationApplication as ArgminMutationApplication, MutationStrategy as ArgminMutationStrategy,
-    ParticleSwarm,
+    Particle, ParticleSwarm,
 };
 use commol_core::SimulationEngine;
 use rand::rngs::SmallRng;
@@ -55,10 +58,11 @@ pub struct NelderMeadConfig {
     /// Must be non-negative, defaults to EPSILON
     pub sd_tolerance: f64,
 
-    /// Simplex perturbation multiplier for creating initial vertices
-    /// Each vertex is created by multiplying one parameter dimension by this factor.
-    /// A value of 1.1 means 10% perturbation. Must be > 1.0.
-    pub simplex_perturbation: f64,
+    /// Size of the initial simplex, as a fraction of each parameter's bound
+    /// width. Each vertex moves one parameter by this fraction from the start
+    /// value (towards the farther bound when the step would leave the bounds).
+    /// Must be in (0, 1]; defaults to 0.1.
+    pub initial_step: f64,
 
     /// Reflection parameter (alpha)
     /// Must be > 0, defaults to 1.0
@@ -85,11 +89,11 @@ impl Default for NelderMeadConfig {
         Self {
             max_iterations: 1000,
             sd_tolerance: 1e-6,
-            simplex_perturbation: 1.1, // 10% perturbation
-            alpha: None,               // Use argmin's default: 1.0
-            gamma: None,               // Use argmin's default: 2.0
-            rho: None,                 // Use argmin's default: 0.5
-            sigma: None,               // Use argmin's default: 0.5
+            initial_step: 0.1,
+            alpha: None, // Use argmin's default: 1.0
+            gamma: None, // Use argmin's default: 2.0
+            rho: None,   // Use argmin's default: 0.5
+            sigma: None, // Use argmin's default: 0.5
             verbose: false,
         }
     }
@@ -113,11 +117,9 @@ impl NelderMeadConfig {
         self
     }
 
-    /// Set simplex perturbation multiplier
-    /// Each simplex vertex is created by multiplying one parameter dimension by this factor.
-    /// A value of 1.1 means 10% perturbation. Must be > 1.0.
-    pub fn with_simplex_perturbation(mut self, perturbation: f64) -> Self {
-        self.simplex_perturbation = perturbation;
+    /// Set the size of the initial simplex, as a fraction of the bound width
+    pub fn with_initial_step(mut self, initial_step: f64) -> Self {
+        self.initial_step = initial_step;
         self
     }
 
@@ -528,33 +530,186 @@ pub fn optimize<E: SimulationEngine>(
     problem: CalibrationProblem<E>,
     config: OptimizationConfig,
 ) -> Result<CalibrationResult, String> {
+    let (result, _) = optimize_observed(problem, config, false, None::<NoObserver>)?;
+    Ok(result)
+}
+
+/// Run optimization with an observer that sees every iteration.
+///
+/// The observer replaces the verbose log of the configuration.
+///
+/// # Errors
+///
+/// Returns a message when the configuration is not valid or the run fails.
+pub fn optimize_with_observer<E, O>(
+    problem: CalibrationProblem<E>,
+    config: OptimizationConfig,
+    observer: O,
+) -> Result<CalibrationResult, String>
+where
+    E: SimulationEngine,
+    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
+{
+    let (result, _) = optimize_observed(problem, config, false, Some(observer))?;
+    Ok(result)
+}
+
+fn optimize_observed<E, O>(
+    problem: CalibrationProblem<E>,
+    config: OptimizationConfig,
+    with_history: bool,
+    observer: Option<O>,
+) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+where
+    E: SimulationEngine,
+    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
+{
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
 
     match config {
-        OptimizationConfig::NelderMead(nm_config) => {
-            optimize_nelder_mead(problem, initial_params, parameter_names, nm_config)
-        }
-        OptimizationConfig::ParticleSwarm(ps_config) => {
-            optimize_particle_swarm(problem, initial_params, parameter_names, ps_config)
-        }
+        OptimizationConfig::NelderMead(nm_config) => optimize_nelder_mead_internal(
+            problem,
+            initial_params,
+            parameter_names,
+            nm_config,
+            with_history,
+            observer,
+        ),
+        OptimizationConfig::ParticleSwarm(ps_config) => optimize_particle_swarm_internal(
+            problem,
+            initial_params,
+            parameter_names,
+            ps_config,
+            with_history,
+            observer,
+        ),
     }
 }
 
-/// Build Nelder-Mead solver from configuration
+/// State of a Nelder-Mead run.
+pub type NelderMeadState = IterState<Vec<f64>, (), (), (), (), f64>;
+
+/// State of a Particle Swarm run.
+pub type ParticleSwarmState = PopulationState<Particle<Vec<f64>, f64>, f64>;
+
+/// An observer that observes nothing, for runs without one.
+pub struct NoObserver;
+
+impl<I> Observe<I> for NoObserver {}
+
+/// Whether a run converged: the solver met its convergence criterion or the
+/// target cost. A run that stops at `max_iterations` did not converge.
+pub fn converged(status: &TerminationStatus) -> bool {
+    matches!(
+        status,
+        TerminationStatus::Terminated(
+            TerminationReason::SolverConverged | TerminationReason::TargetCostReached
+        )
+    )
+}
+
+/// Maps an unbounded coordinate `u` to a value `x` inside its bounds:
+/// `x = lo + (hi − lo)·(sin u + 1)/2` (the MINUIT and lmfit transform).
+///
+/// Nelder-Mead searches `u`, so every point it tries is inside the bounds and
+/// the simplex never collapses on a bound where the clamped loss is flat.
+#[derive(Debug, Clone)]
+pub(crate) struct SineTransform {
+    bounds: Vec<(f64, f64)>,
+}
+
+impl SineTransform {
+    pub(crate) fn new(bounds: Vec<(f64, f64)>) -> Self {
+        Self { bounds }
+    }
+
+    /// Bounded values of the unbounded coordinates `u`.
+    pub(crate) fn to_x(&self, u: &[f64]) -> Vec<f64> {
+        u.iter()
+            .zip(&self.bounds)
+            .map(|(u, (lo, hi))| lo + (hi - lo) * (u.sin() + 1.0) / 2.0)
+            .collect()
+    }
+
+    /// Unbounded coordinates of the values `x`, clamped to the bounds first.
+    pub(crate) fn to_u(&self, x: &[f64]) -> Vec<f64> {
+        x.iter()
+            .zip(&self.bounds)
+            .map(|(x, (lo, hi))| {
+                if hi > lo {
+                    (2.0 * (x.clamp(*lo, *hi) - lo) / (hi - lo) - 1.0).asin()
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    }
+
+    /// Initial simplex in `u`: the start, and one vertex per parameter that
+    /// moves it by `step × (hi − lo)` in `x`, towards the farther bound.
+    pub(crate) fn initial_simplex(&self, x0: &[f64], step: f64) -> Vec<Vec<f64>> {
+        let x0: Vec<f64> = x0
+            .iter()
+            .zip(&self.bounds)
+            .map(|(x, (lo, hi))| x.clamp(*lo, *hi))
+            .collect();
+        let u0 = self.to_u(&x0);
+        let mut vertices = vec![u0.clone()];
+        for (i, (lo, hi)) in self.bounds.iter().enumerate() {
+            let mut vertex = u0.clone();
+            if hi > lo {
+                let delta = step * (hi - lo);
+                let moved = if hi - x0[i] >= x0[i] - lo {
+                    x0[i] + delta
+                } else {
+                    x0[i] - delta
+                };
+                vertex[i] = self.to_u(&with_value(&x0, i, moved))[i];
+            } else {
+                vertex[i] += 1.0;
+            }
+            vertices.push(vertex);
+        }
+        vertices
+    }
+}
+
+fn with_value(values: &[f64], index: usize, value: f64) -> Vec<f64> {
+    let mut values = values.to_vec();
+    values[index] = value;
+    values
+}
+
+/// The calibration problem seen through a [`SineTransform`]: the optimizer
+/// proposes `u`, the problem scores `x`.
+pub(crate) struct BoundedProblem<E: SimulationEngine> {
+    pub(crate) problem: CalibrationProblem<E>,
+    transform: SineTransform,
+}
+
+impl<E: SimulationEngine> CostFunction for BoundedProblem<E> {
+    type Param = Vec<f64>;
+    type Output = f64;
+
+    fn cost(&self, u: &Self::Param) -> Result<Self::Output, Error> {
+        self.problem.cost(&self.transform.to_x(u))
+    }
+}
+
+/// Build Nelder-Mead solver from configuration, with its simplex in `u`
 fn build_nelder_mead_solver(
+    transform: &SineTransform,
     initial_params: &[f64],
     config: &NelderMeadConfig,
 ) -> Result<NelderMead<Vec<f64>, f64>, String> {
-    // Create simplex vertices (n+1 vertices for n parameters)
-    let mut vertices = vec![initial_params.to_vec()];
-
-    // Create n additional vertices by perturbing each parameter
-    for i in 0..initial_params.len() {
-        let mut vertex = initial_params.to_vec();
-        vertex[i] *= config.simplex_perturbation;
-        vertices.push(vertex);
+    if !(config.initial_step > 0.0 && config.initial_step <= 1.0) {
+        return Err(format!(
+            "initial_step must be in (0, 1], got {}",
+            config.initial_step
+        ));
     }
+    let vertices = transform.initial_simplex(initial_params, config.initial_step);
 
     // Build solver with configuration
     let mut solver = NelderMead::new(vertices)
@@ -590,18 +745,33 @@ fn build_nelder_mead_solver(
 }
 
 /// Internal optimization function for Nelder-Mead that optionally returns evaluations
-fn optimize_nelder_mead_internal<E: SimulationEngine>(
+fn optimize_nelder_mead_internal<E, O>(
     problem: CalibrationProblem<E>,
     initial_params: Vec<f64>,
     parameter_names: Vec<String>,
     config: NelderMeadConfig,
     with_history: bool,
-) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String> {
-    let solver = build_nelder_mead_solver(&initial_params, &config)?;
-    let executor =
-        Executor::new(problem, solver).configure(|state| state.max_iters(config.max_iterations));
+    observer: Option<O>,
+) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+where
+    E: SimulationEngine,
+    O: Observe<NelderMeadState> + 'static,
+{
+    let transform = SineTransform::new(problem.parameter_bounds());
+    let solver = build_nelder_mead_solver(&transform, &initial_params, &config)?;
+    let bounded = BoundedProblem {
+        problem,
+        transform: transform.clone(),
+    };
+    let mut executor = Executor::new(bounded, solver)
+        .configure(|state| state.max_iters(config.max_iterations).counting(true))
+        .timer(true);
+    let log = config.verbose && observer.is_none();
+    if let Some(observer) = observer {
+        executor = executor.add_observer(observer, ObserverMode::Always);
+    }
 
-    let result = if config.verbose {
+    let result = if log {
         print_optimization_header(
             "Nelder-Mead",
             &parameter_names,
@@ -620,60 +790,48 @@ fn optimize_nelder_mead_internal<E: SimulationEngine>(
 
     // Extract evaluations if requested before consuming result
     let evaluations = if with_history {
-        // Access the problem directly from the Problem wrapper
         result
             .problem()
             .problem
             .as_ref()
-            .map(|p| p.get_evaluations())
+            .map(|bounded| bounded.problem.get_evaluations())
     } else {
         None
     };
 
     let state = result.state();
-    let best_params = state.best_param.clone().unwrap_or(initial_params.clone());
-
-    // Report the values the objective scored (clamped to their bounds)
-    let corrected_params = result
-        .problem()
-        .problem
+    let best_params = state
+        .best_param
         .as_ref()
-        .map(|p| p.applied_parameter_values(&best_params))
-        .unwrap_or(best_params);
+        .map(|u| transform.to_x(u))
+        .unwrap_or(initial_params);
 
     Ok((
         CalibrationResult {
-            best_parameters: corrected_params,
+            best_parameters: best_params,
             parameter_names,
             final_loss: state.best_cost,
             iterations: state.iter as usize,
-            converged: state.termination_status.terminated(),
+            converged: converged(&state.termination_status),
             termination_reason: format!("{:?}", state.termination_status),
         },
         evaluations,
     ))
 }
 
-/// Optimize using Nelder-Mead algorithm
-fn optimize_nelder_mead<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    initial_params: Vec<f64>,
-    parameter_names: Vec<String>,
-    config: NelderMeadConfig,
-) -> Result<CalibrationResult, String> {
-    let (result, _) =
-        optimize_nelder_mead_internal(problem, initial_params, parameter_names, config, false)?;
-    Ok(result)
-}
-
 /// Internal optimization function for Particle Swarm that optionally returns evaluations
-fn optimize_particle_swarm_internal<E: SimulationEngine>(
+fn optimize_particle_swarm_internal<E, O>(
     problem: CalibrationProblem<E>,
     initial_params: Vec<f64>,
     parameter_names: Vec<String>,
     config: ParticleSwarmConfig,
     with_history: bool,
-) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String> {
+    observer: Option<O>,
+) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+where
+    E: SimulationEngine,
+    O: Observe<ParticleSwarmState> + 'static,
+{
     // Get bounds from CalibrationParameter definitions
     let bounds = problem.parameter_bounds();
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
@@ -775,15 +933,21 @@ fn optimize_particle_swarm_internal<E: SimulationEngine>(
             .map_err(|e| format!("Failed to set mutation: {}", e))?;
     }
 
-    let executor = Executor::new(problem, solver).configure(|state| {
-        let mut state = state.max_iters(config.max_iterations);
-        if let Some(target) = config.target_cost {
-            state = state.target_cost(target);
-        }
-        state
-    });
+    let mut executor = Executor::new(problem, solver)
+        .configure(|state| {
+            let mut state = state.max_iters(config.max_iterations).counting(true);
+            if let Some(target) = config.target_cost {
+                state = state.target_cost(target);
+            }
+            state
+        })
+        .timer(true);
+    let log = config.verbose && observer.is_none();
+    if let Some(observer) = observer {
+        executor = executor.add_observer(observer, ObserverMode::Always);
+    }
 
-    let result = if config.verbose {
+    let result = if log {
         print_optimization_header(
             "Particle Swarm",
             &parameter_names,
@@ -860,23 +1024,11 @@ fn optimize_particle_swarm_internal<E: SimulationEngine>(
             parameter_names,
             final_loss: best_cost,
             iterations: state.iter as usize,
-            converged: state.termination_status.terminated(),
+            converged: converged(&state.termination_status),
             termination_reason: format!("{:?}", state.termination_status),
         },
         evaluations,
     ))
-}
-
-/// Optimize using Particle Swarm algorithm
-fn optimize_particle_swarm<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    initial_params: Vec<f64>,
-    parameter_names: Vec<String>,
-    config: ParticleSwarmConfig,
-) -> Result<CalibrationResult, String> {
-    let (result, _) =
-        optimize_particle_swarm_internal(problem, initial_params, parameter_names, config, false)?;
-    Ok(result)
 }
 
 /// Optimize calibration problem with evaluation history tracking
@@ -894,25 +1046,7 @@ pub fn optimize_with_history<E: SimulationEngine>(
     problem: CalibrationProblem<E>,
     config: OptimizationConfig,
 ) -> Result<crate::types::CalibrationResultWithHistory, String> {
-    let initial_params = problem.initial_parameters();
-    let parameter_names = problem.parameter_names();
-
-    let (result, evaluations) = match config {
-        OptimizationConfig::NelderMead(nm_config) => optimize_nelder_mead_internal(
-            problem,
-            initial_params,
-            parameter_names,
-            nm_config,
-            true,
-        )?,
-        OptimizationConfig::ParticleSwarm(ps_config) => optimize_particle_swarm_internal(
-            problem,
-            initial_params,
-            parameter_names,
-            ps_config,
-            true,
-        )?,
-    };
+    let (result, evaluations) = optimize_observed(problem, config, true, None::<NoObserver>)?;
 
     Ok(crate::types::CalibrationResultWithHistory {
         best_parameters: result.best_parameters,
@@ -923,4 +1057,52 @@ pub fn optimize_with_history<E: SimulationEngine>(
         termination_reason: result.termination_reason,
         evaluations: evaluations.unwrap_or_default(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_convergence_and_target_cost_count_as_converged() {
+        let status = TerminationStatus::Terminated;
+        assert!(converged(&status(TerminationReason::SolverConverged)));
+        assert!(converged(&status(TerminationReason::TargetCostReached)));
+        assert!(!converged(&status(TerminationReason::MaxItersReached)));
+        assert!(!converged(&status(TerminationReason::Timeout)));
+        assert!(!converged(&TerminationStatus::NotTerminated));
+    }
+
+    #[test]
+    fn the_transform_keeps_every_value_inside_its_bounds() {
+        let transform = SineTransform::new(vec![(0.0, 1.0), (-2.0, 3.0)]);
+        for u in [-10.0, -1.6, 0.0, 0.7, 1.6, 25.0] {
+            let x = transform.to_x(&[u, u]);
+            assert!((0.0..=1.0).contains(&x[0]));
+            assert!((-2.0..=3.0).contains(&x[1]));
+        }
+    }
+
+    #[test]
+    fn the_transform_round_trips_inside_the_bounds() {
+        let transform = SineTransform::new(vec![(0.0, 1.0), (-2.0, 3.0)]);
+        let x = [0.25, 1.5];
+        let back = transform.to_x(&transform.to_u(&x));
+        assert!((back[0] - 0.25).abs() < 1e-12);
+        assert!((back[1] - 1.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_initial_simplex_moves_each_value_by_the_step_of_its_width() {
+        let transform = SineTransform::new(vec![(0.0, 1.0), (0.0, 10.0)]);
+        // A start at the lower bound (0) is not degenerate.
+        let simplex = transform.initial_simplex(&[0.0, 9.5], 0.1);
+        let x: Vec<Vec<f64>> = simplex.iter().map(|u| transform.to_x(u)).collect();
+
+        assert_eq!(x.len(), 3);
+        assert!((x[0][0] - 0.0).abs() < 1e-12 && (x[0][1] - 9.5).abs() < 1e-12);
+        assert!((x[1][0] - 0.1).abs() < 1e-12, "{:?}", x[1]);
+        // 9.5 + 1.0 leaves the bounds, so the vertex moves down.
+        assert!((x[2][1] - 8.5).abs() < 1e-12, "{:?}", x[2]);
+    }
 }

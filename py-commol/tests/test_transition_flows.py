@@ -1,5 +1,7 @@
 """Transition flows: what the engine simulates is what is printed."""
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -167,3 +169,30 @@ class TestStratifiedRateValidation:
 
         with pytest.raises(ValidationError, match="use 'to'"):
             builder.build(typology=ModelTypes.DIFFERENCE_EQUATIONS.value)
+
+
+class TestNoTransitionConditions:
+    def test_add_transition_has_no_condition_argument(self) -> None:
+        builder = ModelBuilder(name="No condition").add_bin(id="A", name="A")
+
+        with pytest.raises(TypeError, match="condition"):
+            builder.add_transition(  # type: ignore[call-arg]
+                id="t", source=["A"], target=[], rate="0.1", condition=None
+            )
+
+    def test_the_builder_has_no_create_condition(self) -> None:
+        assert not hasattr(ModelBuilder, "create_condition")
+
+    def test_a_model_file_with_a_condition_key_still_loads(self, tmp_path) -> None:
+        model = _age_model()
+        data = model.model_dump(mode="json")
+        data["dynamics"]["transitions"][0]["condition"] = {
+            "logic": "and",
+            "rules": [{"variable": "state:S", "operator": "gt", "value": 0}],
+        }
+        path = tmp_path / "model.json"
+        path.write_text(json.dumps(data))
+
+        loaded = Model.from_json(path)
+
+        assert Simulation(loaded).run(1) == Simulation(model).run(1)

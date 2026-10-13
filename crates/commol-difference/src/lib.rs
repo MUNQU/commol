@@ -41,7 +41,8 @@ mod simulation;
 mod types;
 
 pub use builder::{
-    ExpandedOutput, InitialCompartment, expand_accumulators, expand_compartments, initial_state,
+    ExpandedOutput, InitialCompartment, check_names, expand_accumulators, expand_compartments,
+    initial_state,
 };
 pub use flows::{FlowDescription, describe_flows};
 pub use types::DifferenceEquations;

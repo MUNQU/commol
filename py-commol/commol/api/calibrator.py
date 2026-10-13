@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
+        CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
         CalibrationResultWithHistoryProtocol,
         DifferenceEquationsProtocol,
@@ -22,6 +23,7 @@ except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
 from commol.api.simulation import Simulation
+from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -128,16 +130,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -232,16 +225,7 @@ class Calibrator:
         ]
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
         # Convert constraints to Rust types
         rust_constraints = [
@@ -307,8 +291,6 @@ class Calibrator:
             loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = rust_calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 
@@ -323,7 +305,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                simplex_perturbation=opt_config.simplex_perturbation,
+                initial_step=opt_config.initial_step,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -430,6 +412,19 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
+    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
+        """Calibration parameters as engine types, in problem order."""
+        return [
+            rust_calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
     def _validate_calibration_parameters(self) -> None:
         """
         Validate that all calibration parameters exist in the model.
@@ -441,14 +436,6 @@ class Calibrator:
         """
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
-        model_bin_ids = {b.id for b in model.population.bins}
-        model_binary_stratification_categories = {
-            category
-            for stratification in model.population.stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -459,20 +446,8 @@ class Calibrator:
                         f"{sorted(model_param_ids)}"
                     )
             elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins, stratification categories, or expanded "
-                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: "
-                        f"{sorted(engine_compartment_ids)}"
-                    )
+                # The engine resolves initial-condition ids below.
+                pass
             elif param.parameter_type == CalibrationParameterType.SCALE:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
@@ -483,6 +458,12 @@ class Calibrator:
                 raise ValueError(
                     f"Unknown calibration parameter type: {param.parameter_type}"
                 )
+
+        engine_state.check_initial_conditions(
+            self._engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
+        )
 
     def _get_compartment_index(self, bin_id: str) -> int:
         """

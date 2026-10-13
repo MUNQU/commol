@@ -3,13 +3,27 @@ from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
     UnitConsistencyError,
     check_equation_units,
+    same_unit,
     ureg,
 )
 from commol.utils.security import get_expression_variables
 
 
+DEFAULT_STEP_UNIT = "step"
+"""Step unit of a model whose parameters name no unit of time."""
+
+TIME_DIMENSIONS = ("[time]", "[step]")
+"""Dimensions of a unit that can be the length of one step."""
+
+
 class UnitChecker:
-    """Validates unit consistency of model equations."""
+    """
+    Validates unit consistency of model equations.
+
+    The engine applies every flow once per step and never converts values
+    between units. So the check infers one step unit from the parameters and
+    requires every flow to be exactly ``<bin unit>/<step unit>``.
+    """
 
     def __init__(self, model) -> None:
         self._model = model
@@ -18,6 +32,7 @@ class UnitChecker:
     def check_unit_consistency(self, verbose: bool = False) -> None:
         """Check unit consistency of all equations in the model."""
         self._validate_unit_check_preconditions()
+        self._step_unit()
 
         variable_units = self._helper.build_variable_units()
 
@@ -48,6 +63,14 @@ class UnitChecker:
                 f"parameters are missing units: {param_names}. "
                 f"Please specify units for all parameters, or use formulas "
                 f"to allow automatic unit inference."
+            )
+
+        bins_without_unit = [b.id for b in self._model.population.bins if not b.unit]
+        if bins_without_unit:
+            raise UnitConsistencyError(
+                f"Cannot perform unit consistency check. The following bins have "
+                f"no unit: {', '.join(bins_without_unit)}. Set bin_unit in "
+                f"ModelBuilder, or unit in add_bin."
             )
 
         if self._model.dynamics.typology != ModelTypes.DIFFERENCE_EQUATIONS:
@@ -82,47 +105,41 @@ class UnitChecker:
 
         return errors
 
-    def _infer_time_unit(self) -> str | None:
-        """Infer the time unit used in the model from parameter units."""
+    def _step_unit(self) -> str:
+        """
+        The step unit: the one unit of time that the parameter units use.
+
+        A unit of time is a unit of dimension ``[time]`` (such as ``day``) or
+        ``[step]`` (``step``), with any exponent: ``1/day`` and ``day`` both use
+        ``day``. Units are equal when they convert with a factor of 1, so
+        ``d`` and ``day`` are one unit.
+
+        Raises
+        ------
+        UnitConsistencyError
+            If the parameters use more than one unit of time.
+        """
+        uses: list[tuple[str, str, str]] = []
         for param in self._model.parameters:
             if param.unit is None:
                 continue
+            for name in ureg.parse_units(param.unit)._units:
+                dimensionality = str(ureg.parse_units(name).dimensionality)
+                if dimensionality in TIME_DIMENSIONS:
+                    uses.append((param.id, param.unit, name))
 
-            try:
-                unit_obj = ureg(param.unit)
+        if not uses:
+            return DEFAULT_STEP_UNIT
+        step_unit = uses[0][2]
+        if all(same_unit(name, step_unit) for _, _, name in uses):
+            return step_unit
 
-                if "[time]" in str(unit_obj.dimensionality):
-                    time_dimension = unit_obj.dimensionality.get("[time]", 0)
-                    if isinstance(time_dimension, (int, float)) and time_dimension < 0:
-                        unit_str = str(unit_obj.units)
-
-                        time_units = [
-                            "second",
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "fortnight",
-                            "month",
-                            "year",
-                            "semester",
-                            "wk",
-                            "mon",
-                            "yr",
-                            "s",
-                            "min",
-                            "h",
-                            "d",
-                        ]
-
-                        for time_unit in time_units:
-                            if time_unit in unit_str:
-                                return time_unit
-
-            except Exception:
-                continue
-
-        return None
+        listed = ", ".join(f"'{param_id}' in '{unit}'" for param_id, unit, _ in uses)
+        raise UnitConsistencyError(
+            f"Unit consistency check failed: the parameters use more than one "
+            f"unit of time ({listed}). The engine applies every rate once per "
+            f"step and converts nothing, so all rates must use one step unit."
+        )
 
     def _check_transition_rate_units(
         self,
@@ -148,15 +165,9 @@ class UnitChecker:
 
         bin_unit = self._get_transition_bin_unit(transition_id)
         if not bin_unit:
-            bin_unit = (
-                self._model.population.bins[0].unit
-                if self._model.population.bins
-                else "person"
-            )
+            bin_unit = self._model.population.bins[0].unit
 
-        time_unit = self._infer_time_unit() or "day"
-
-        expected_unit = f"{bin_unit}/{time_unit}"
+        expected_unit = f"{bin_unit}/{self._step_unit()}"
 
         is_consistent, error_msg = check_equation_units(
             rate, rate_variable_units, expected_unit

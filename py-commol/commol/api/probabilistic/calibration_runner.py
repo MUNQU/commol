@@ -188,8 +188,6 @@ class CalibrationRunner:
             loss_config = commol_rs.calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = commol_rs.calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = commol_rs.calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}")
 
@@ -209,6 +207,7 @@ class CalibrationRunner:
             nm_config = commol_rs.calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
+                initial_step=opt_config.initial_step,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,

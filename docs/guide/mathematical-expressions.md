@@ -47,12 +47,13 @@ the variables it names; see
 |---|---|---|---|
 | `+`, `-` | Addition, subtraction, negation | `"k1 - k2"`, `"-k1"` | |
 | `*`, `/` | Multiplication, division | `"k1 * B / N"` | |
+| `%` | Remainder | `"step % 7"` | 0 to 6 |
 | `**` or `^` | Power | `"2 * 3 ** 4"` | 162 |
 | `( )` | Grouping | `"(2 + 3) * 4"` | 20 |
 | `>`, `<`, `>=`, `<=`, `==`, `!=` | Comparison, only inside `if` | `"if(step > 30, k1, 0)"` | |
 | `!` | Not, only inside `if` | `"if(!(step > 30), k1, 0)"` | |
 
-Precedence, from high to low: parentheses, power, multiplication and division,
+Precedence, from high to low: parentheses, power, multiplication, division and remainder,
 addition and subtraction. So `"2 ** 3 * 4"` is 32 and `"2 + 3 * 4"` is 14.
 
 A comparison gives a boolean, not a number, so it cannot be multiplied:
@@ -74,14 +75,7 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 | A bin id, with stratifications | The total of all its compartments |
 | `N` | The total population |
 | `step`, `t` | The current step: 0, 1, 2, … |
-| `pi`, `e` | π and e; see the warning below |
-
-!!! warning "Known issue: `pi` and `e` in rates"
-    In a transition rate, `pi` and `e` only work inside a function argument,
-    such as `sin(2 * pi * step / 365)`. Elsewhere (`"k1 * pi"`) the simulation
-    fails with "Variable 'pi' not found". Formula parameters accept them
-    everywhere, so define `two_pi = "2 * pi"` as a parameter, or write the
-    number.
+| `pi`, `e` | π and e |
 
 ### Subpopulation variables
 
@@ -144,8 +138,8 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Pitfall | Result |
 |---|---|
 | Suffixes out of declaration order, as in `A_t1_g1` | Error: the variable is not found |
-| `N_…` out of order, as in `N_t1_g1` | **0, with no error.** Check the order. |
-| A combination that a conditional stratification never creates | `N_…` is 0; `<bin>_…` is not found |
+| `N_…` out of order, as in `N_t1_g1` | `build` fails and lists the valid `N_…` names |
+| A combination that a conditional stratification never creates | `build` fails for `N_…`; `<bin>_…` is not found |
 
 ## Functions
 

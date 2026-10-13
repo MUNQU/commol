@@ -665,46 +665,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         };
 
         // `normalization` is the per-series factor (1.0 unless observation
-        // normalization is enabled). It is applied to every metric so that
-        // series of very different magnitudes contribute comparably to any error
-        // measurement, not just to a single dedicated loss variant.
-        match self.loss_config {
-            LossConfig::SumSquaredError | LossConfig::WeightedSSE => observation_iter()
-                .map(|(obs, predicted, normalization)| {
-                    let error = (obs.value - predicted) * obs.weight * normalization;
-                    error * error
-                })
-                .sum(),
-
-            LossConfig::RootMeanSquaredError => {
-                let (sum_squared_error, count) = observation_iter()
-                    .map(|(obs, predicted, normalization)| {
-                        let error = (obs.value - predicted) * normalization;
-                        error * error
-                    })
-                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
-
-                if count > 0 {
-                    (sum_squared_error / count as f64).sqrt()
-                } else {
-                    0.0
-                }
-            }
-
-            LossConfig::MeanAbsoluteError => {
-                let (total_error, count) = observation_iter()
-                    .map(|(obs, predicted, normalization)| {
-                        ((obs.value - predicted) * normalization).abs()
-                    })
-                    .fold((0.0, 0), |(sum, count), error| (sum + error, count + 1));
-
-                if count > 0 {
-                    total_error / count as f64
-                } else {
-                    0.0
-                }
-            }
-        }
+        // normalization is enabled). It scales every residual, so series of very
+        // different magnitudes contribute comparably to any loss. The weight is
+        // applied by `LossConfig::term`.
+        self.loss_config
+            .aggregate(observation_iter().map(|(obs, predicted, normalization)| {
+                ((obs.value - predicted) * normalization, obs.weight)
+            }))
     }
 
     /// Clamp parameter values to their defined bounds
