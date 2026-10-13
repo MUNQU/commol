@@ -840,7 +840,7 @@ class TestCalibrator:
         simulation = Simulation(model)
 
         # Should raise ValueError during calibrator initialization
-        with pytest.raises(ValueError, match="not found in model bins"):
+        with pytest.raises(ValueError, match="Invalid bin, compartment or category .X"):
             _ = Calibrator(simulation, problem)
 
     def test_particle_swarm_with_advanced_features(self, model: Model):

@@ -1423,6 +1423,34 @@ fn calibrated_initial_population(
     Ok((state.values, state.population, state.covered))
 }
 
+/// Check that every initial-condition id and the remainder resolve
+///
+/// Args:
+///     engine: The difference equations engine
+///     parameters: Calibration parameters, in problem order
+///     initial_condition_remainder: Compartment or bin that absorbs the
+///         difference to the population size, if any
+///
+/// Raises:
+///     ValueError: If an initial-condition id or the remainder cannot be
+///         resolved, for example a category of a stratification that is not
+///         binary
+#[pyfunction]
+#[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
+fn check_initial_conditions(
+    engine: &PyDifferenceEquations,
+    parameters: Vec<PyCalibrationParameter>,
+    initial_condition_remainder: Option<String>,
+) -> PyResult<()> {
+    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    commol_calibration::check_initial_conditions(
+        engine.inner(),
+        &parameters,
+        initial_condition_remainder.as_deref(),
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
 /// Generate compact predictions for selected metric points.
 #[pyfunction]
 fn generate_predictions_at_points_parallel(
@@ -1686,6 +1714,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEnsembleSelectionResult>()?;
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
     m.add_function(wrap_pyfunction!(calibrated_initial_population, m)?)?;
+    m.add_function(wrap_pyfunction!(check_initial_conditions, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;

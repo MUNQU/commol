@@ -384,6 +384,12 @@ class CalibrationModule(Protocol):
         initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
+    def check_initial_conditions(
+        self,
+        engine: DifferenceEquationsProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        initial_condition_remainder: str | None = None,
+    ) -> None: ...
     def calibrated_initial_population(
         self,
         engine: DifferenceEquationsProtocol,

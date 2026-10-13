@@ -18,7 +18,9 @@ from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
+        CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
+        DifferenceEquationsProtocol,
         RustModelProtocol,
     )
     from commol.context.calibration import CalibrationParameter
@@ -203,6 +205,57 @@ def _rust_parameter_type(parameter_type: str) -> "CalibrationParameterTypeProtoc
     raise ValueError(f"Unknown parameter type: {parameter_type}")
 
 
+def _rust_parameters(
+    parameters: Sequence["CalibrationParameter"],
+) -> list["CalibrationParameterProtocol"]:
+    return [
+        commol_rs.calibration.CalibrationParameter(
+            id=param.id,
+            parameter_type=_rust_parameter_type(param.parameter_type),
+            min_bound=param.min_bound,
+            max_bound=param.max_bound,
+            initial_guess=param.initial_guess,
+        )
+        for param in parameters
+    ]
+
+
+def check_initial_conditions(
+    engine: "DifferenceEquationsProtocol",
+    parameters: Sequence["CalibrationParameter"],
+    remainder: str | None = None,
+) -> None:
+    """
+    Check that every initial-condition id and the remainder resolve.
+
+    The engine resolves the ids as the calibration objective does, so its
+    message names the problem: an unknown id, an ambiguous category, or a
+    category of a stratification that is not binary.
+
+    Parameters
+    ----------
+    engine : DifferenceEquationsProtocol
+        The engine the calibration runs on.
+    parameters : Sequence[CalibrationParameter]
+        Calibration parameters, in problem order.
+    remainder : str | None
+        Compartment or bin that absorbs the difference to the population size.
+
+    Raises
+    ------
+    ValueError
+        If an initial-condition id or the remainder cannot be resolved.
+    """
+    try:
+        commol_rs.calibration.check_initial_conditions(
+            engine,
+            _rust_parameters(parameters),
+            initial_condition_remainder=remainder,
+        )
+    except ValueError as error:
+        raise ValueError(f"Calibration initial condition: {error}") from error
+
+
 class CalibratedInitialPopulation(NamedTuple):
     """
     Initial state the engine scores for a set of calibration values.
@@ -260,19 +313,9 @@ def calibrated_initial_population(
         initial population exceeds the population size.
     """
     engine = commol_rs.difference.DifferenceEquations(_rust_model(model))
-    rust_parameters = [
-        commol_rs.calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in parameters
-    ]
     applied, population, covered = commol_rs.calibration.calibrated_initial_population(
         engine,
-        rust_parameters,
+        _rust_parameters(parameters),
         list(values),
         model.population.initial_conditions.population_size,
         initial_condition_remainder=remainder,

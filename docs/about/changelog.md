@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ModelBuilder.reset` removes the accumulators, and `ModelBuilder.clone`
   copies them and the `bin_unit`. Before, `reset` kept the accumulators and a
   clone lost them.
+- An `initial_condition` id is resolved by the engine when the `Calibrator`
+  or the `ProbabilisticCalibrator` is created. A category of a non-binary
+  stratification now gives "needs a binary stratification" instead of "not
+  found", and bin prefixes (`"B_g1"`) and qualified categories (`"group:g1"`)
+  are accepted, as documented. Before, both were rejected as "not found".
 
 ### Documentation
 
