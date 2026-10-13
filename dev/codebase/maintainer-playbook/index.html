@@ -2505,7 +2505,7 @@
 <ul>
 <li>[ ] Plan the flows in <code>flows.rs</code>; reject what cannot be simulated.</li>
 <li>[ ] Check the <a href="../design-decisions/#absolute-and-per-capita-rates">rate semantics</a>.</li>
-<li>[ ] Add a case to <code>test_transition_flows.py</code>, and check <code>print_equations</code>.</li>
+<li>[ ] Add a case to <code>tests/transitions/test_flows.py</code>, and check <code>print_equations</code>.</li>
 <li>[ ] Update <a href="../../guide/building-models/">Building models</a>.</li>
 </ul>
 <h3 id="expressions-functions-variables">Expressions (functions, variables)<a class="headerlink" href="#expressions-functions-variables" title="Permanent link">&para;</a></h3>
@@ -2530,7 +2530,7 @@
 <li>[ ] Keep the loss and the constraints in <code>calibration_problem.rs</code>.</li>
 <li>[ ] Convert new options in <code>api/calibrator.py</code> and
       <code>api/probabilistic/calibration_runner.py</code>.</li>
-<li>[ ] Check that <code>test_windows.py::TestAgreementWithTheCalibrationLoss</code> still
+<li>[ ] Check that <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> still
       passes if the loss changes.</li>
 <li>[ ] Update <a href="../../guide/calibration/">Calibration</a> and, for ensembles,
       <a href="../../guide/probabilistic-calibration/">Probabilistic calibration</a>.</li>
@@ -2545,7 +2545,7 @@
 <ul>
 <li>[ ] Keep the key order of existing entries.</li>
 <li>[ ] Use <code>member_statistics</code> and <code>ci_percentiles</code> for ensemble values.</li>
-<li>[ ] Update <code>test_reporting.py</code>.</li>
+<li>[ ] Update <code>tests/reporting/</code>.</li>
 </ul>
 <h3 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>
 <ul>

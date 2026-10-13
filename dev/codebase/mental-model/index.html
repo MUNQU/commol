@@ -2332,7 +2332,7 @@ owns every rule about how a model becomes numbers.</p>
 </tr>
 <tr>
 <td>A rule engine for transitions</td>
-<td><code>Transition.condition</code> is stored and serialized, but the engine does not evaluate it.</td>
+<td>A transition has no condition. A rate expresses a gate, such as <code>if(A &gt; 0, k, 0)</code> (see <a href="../../guide/mathematical-expressions/">Mathematical expressions</a>), and <a href="../../guide/transitions/#stratified-rates">stratified rates</a> set a rate per category.</td>
 </tr>
 </tbody>
 </table>

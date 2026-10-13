@@ -2485,7 +2485,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests, including end-to-end model tests in <code>test_models_execution/</code> and <code>test_transition_rate/</code>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>time_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>), and <code>support/</code> with the shared model factories, the reference solver and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -2518,12 +2518,12 @@
 <tr>
 <td>Change how a model expands</td>
 <td><code>builder.rs</code> (<code>expand</code>)</td>
-<td><code>layout.rs</code>, <code>engine_state.py</code>, <code>test_simulation_outputs.py</code></td>
+<td><code>layout.rs</code>, <code>engine_state.py</code>, <code>tests/building/</code>, <code>tests/simulation/test_outputs.py</code></td>
 </tr>
 <tr>
 <td>Change how transitions become flows</td>
 <td><code>flows.rs</code></td>
-<td><code>helpers.rs</code>, <code>context/_model/equations.py</code>, <code>test_transition_flows.py</code></td>
+<td><code>helpers.rs</code>, <code>context/_model/equations.py</code>, <code>tests/transitions/</code></td>
 </tr>
 <tr>
 <td>Change the simulation step</td>
@@ -2538,12 +2538,12 @@
 <tr>
 <td>Change initial conditions</td>
 <td><code>context/initial_conditions.py</code></td>
-<td><code>builder.rs</code> (<code>initial_state</code>), <code>test_compartment_initial_conditions.py</code></td>
+<td><code>builder.rs</code> (<code>initial_state</code>), <code>tests/initial_conditions/</code></td>
 </tr>
 <tr>
 <td>Change calibration</td>
 <td><code>calibration_problem.rs</code></td>
-<td><code>initial_conditions.rs</code>, <code>api/calibrator.py</code>, <code>test_calibrator.py</code></td>
+<td><code>initial_conditions.rs</code>, <code>api/calibrator.py</code>, <code>tests/calibration/</code></td>
 </tr>
 <tr>
 <td>Change ensembles</td>
@@ -2558,7 +2558,7 @@
 <tr>
 <td>Change a report</td>
 <td><code>api/reporting.py</code></td>
-<td><a href="../design-decisions/#reports">Design decisions</a>, <code>test_reporting.py</code></td>
+<td><a href="../design-decisions/#reports">Design decisions</a>, <code>tests/reporting/</code></td>
 </tr>
 </tbody>
 </table>

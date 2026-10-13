@@ -1922,6 +1922,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layout-one-package-per-guide-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout: one package per guide page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#models-use-the-factories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models: use the factories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-test-checks-a-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every test checks a result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tolerances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tolerances
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2354,6 +2415,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layout-one-package-per-guide-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout: one package per guide page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#models-use-the-factories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models: use the factories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-test-checks-a-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every test checks a result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tolerances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tolerances
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2453,6 +2575,11 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <td>Doc examples</td>
 <td>Abstract names; every block runs</td>
 <td><code>pytest -m docs</code> (CI) and review</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>One package per guide page; shared factories; every test checks a result</td>
+<td>Review; pytest 10 deprecations fail the run (<code>filterwarnings</code>)</td>
 </tr>
 <tr>
 <td>Commits</td>
@@ -2590,7 +2717,7 @@ every match.</p>
   parameters <code>k1</code>, <code>alpha</code>. No names from epidemiology, chemistry or any other
   field.</li>
 <li>Every Python block runs, top to bottom within its page, in one namespace and
-  from a temporary directory (<code>py-commol/tests/test_docs_examples.py</code>). Define
+  from a temporary directory (<code>py-commol/tests/docs/test_examples.py</code>). Define
   what a block needs in an earlier block of the same page.</li>
 <li>
 <p>A block that cannot run alone (a signature, a fragment) is marked on the line
@@ -2636,7 +2763,7 @@ every match.</p>
 </tr>
 <tr>
 <td>Every name in <code>commol.__all__</code> has an API entry (<code>…</code> under <code>docs/api/</code>)</td>
-<td><code>pytest -m docs</code> (<code>tests/test_docs_reference.py</code>)</td>
+<td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
 <td>CI (Code Quality)</td>
 </tr>
 <tr>
@@ -2669,6 +2796,147 @@ asks for it before approving.</p>
 <li>keep each page self-contained, with its links;</li>
 <li>name files and functions exactly, in code format;</li>
 <li>put the rule before the explanation.</li>
+</ul>
+<h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h2>
+<p>Where a Python test goes, how it builds its model, and what it must check.
+The tests live in <code>py-commol/tests/</code>.</p>
+<h3 id="layout-one-package-per-guide-page">Layout: one package per guide page<a class="headerlink" href="#layout-one-package-per-guide-page" title="Permanent link">&para;</a></h3>
+<p>A test goes in the package of the guide page that documents the behavior it
+checks, so "where is the test of X" has the same answer as "where is the guide
+of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scale.py</code>,
+<code>api/probabilistic/</code>) goes in the package of its feature.</p>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Tests of</th>
+<th>Guide page</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>building/</code></td>
+<td>The builder, parameters, stratifications, reserved names, save and load</td>
+<td><a href="../../guide/building-models/">Building Models</a></td>
+</tr>
+<tr>
+<td><code>transitions/</code></td>
+<td>Flows, <code>$compartment</code>, stratified rates</td>
+<td><a href="../../guide/transitions/">Transitions</a></td>
+</tr>
+<tr>
+<td><code>rates/</code></td>
+<td>Formulas, functions, variables, expression security</td>
+<td><a href="../../guide/mathematical-expressions/">Mathematical Expressions</a></td>
+</tr>
+<tr>
+<td><code>time_patterns/</code></td>
+<td><code>TimePattern</code> formulas, runs and schedules</td>
+<td><a href="../../guide/time-patterns/">Time Patterns</a></td>
+</tr>
+<tr>
+<td><code>initial_conditions/</code></td>
+<td>Bin, stratification and compartment fractions; the initial state</td>
+<td><a href="../../guide/building-models/#initial-conditions">Building Models</a></td>
+</tr>
+<tr>
+<td><code>simulation/</code></td>
+<td>Runs, outputs, windowed totals, <code>TimeScale</code></td>
+<td><a href="../../guide/simulations/">Running Simulations</a></td>
+</tr>
+<tr>
+<td><code>units/</code></td>
+<td>Unit checks and <code>print_equations</code></td>
+<td><a href="../../guide/units-and-equations/">Units and Equations</a></td>
+</tr>
+<tr>
+<td><code>calibration/</code></td>
+<td>One file per calibration page: <code>test_problem.py</code>, <code>test_optimizers.py</code>, <code>test_constraints.py</code>, <code>test_observations.py</code>, <code>test_initial_conditions.py</code>, <code>test_write_back.py</code></td>
+<td><a href="../../guide/calibration/">Model Calibration</a> and its sub-pages</td>
+</tr>
+<tr>
+<td><code>probabilistic/</code></td>
+<td>Ensembles, their selection and intervals</td>
+<td><a href="../../guide/probabilistic-calibration/">Probabilistic Calibration</a></td>
+</tr>
+<tr>
+<td><code>reporting/</code></td>
+<td>Reports</td>
+<td><a href="../../guide/reports/">Reports</a></td>
+</tr>
+<tr>
+<td><code>plotting/</code></td>
+<td><code>SimulationPlotter</code></td>
+<td><a href="../../guide/simulations/#plotting">Running Simulations</a></td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>The documentation examples and the API coverage (marker <code>docs</code>)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>support/</code></td>
+<td>No tests: the code the tests share</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Keep a test module under about 600 lines. When it grows past that, split it by
+topic inside its package.</p>
+<h3 id="models-use-the-factories">Models: use the factories<a class="headerlink" href="#models-use-the-factories" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Build models with the factories of <code>tests/support/models.py</code>:
+  <code>sir_builder</code>, <code>seir_builder</code> and <code>a_to_b_builder</code>, and the special models
+  <code>override_builder</code>, <code>shared_category_builder</code> and
+  <code>conditional_pathway_builder</code>. A keyword overrides one part of the default
+  model, so a test names only what it changes. <code>build</code> builds for difference
+  equations; <code>run</code> builds and simulates.</li>
+<li>Build a model by hand only when one test needs it and no factory keyword
+  expresses it. A model that a second file needs goes to <code>support/</code>.</li>
+<li>Fixtures: <code>sir_model</code> and <code>sir_simulation</code> (<code>tests/conftest.py</code>); <code>truth</code>
+  and <code>truth_run</code> (<code>tests/calibration/conftest.py</code>). A fixture is
+  function-scoped unless its cost is measured; a wider scope never holds an
+  object a test can change. A class-scoped fixture is never an instance
+  method (removed in pytest 10).</li>
+</ul>
+<h3 id="every-test-checks-a-result">Every test checks a result<a class="headerlink" href="#every-test-checks-a-result" title="Permanent link">&para;</a></h3>
+<p>A test compares a result with an oracle:</p>
+<table>
+<thead>
+<tr>
+<th>Oracle</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A value computed by hand in the test</td>
+<td><code>reference_run</code> (<code>tests/support/reference.py</code>) evaluates the flows in plain Python, as the engine does: every flow from the state at the start of the step, no clamping. <code>tests/rates/test_formulas.py</code> compares whole trajectories with it.</td>
+</tr>
+<tr>
+<td>An analytic value</td>
+<td>A death rate <code>d</code> on every bin gives <code>N(t) = N(0) (1 - d)^t</code> (<code>tests/transitions/test_compartment_placeholder.py</code>).</td>
+</tr>
+<tr>
+<td>An invariant</td>
+<td>Conservation of the population (<code>assert_population_conserved</code>); two paths that must agree, such as a bin id and the explicit sum of its compartments.</td>
+</tr>
+</tbody>
+</table>
+<p>"It runs" is not a result. A test whose only check is that no exception
+occurs is allowed only when the exception is its subject, such as a validator
+that accepts a valid input.</p>
+<h3 id="tolerances">Tolerances<a class="headerlink" href="#tolerances" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>assert_close(actual, expected, rel=…, abs=…)</code> (<code>tests/support/assertions.py</code>)
+  needs a stated tolerance, and reports the key and the index of the first
+  difference.</li>
+<li><code>ENGINE_REL = 1e-9</code> compares the engine with a hand computation of the same
+  arithmetic: only the order of the floating-point operations differs.</li>
+<li><code>pytest.approx</code> with its default (relative <code>1e-6</code>) suits a single value
+  computed by hand.</li>
+<li>An optimizer result states the tolerance its convergence allows, for example
+  <code>abs=1e-5</code> for Nelder-Mead on noise-free data.</li>
 </ul>
 <h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
 <p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a>:

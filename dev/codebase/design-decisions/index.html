@@ -2910,7 +2910,7 @@ compartments exist and what they are named.</p>
 names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so
 <code>Simulation.outputs_for</code>, <code>group_outputs</code> and <code>total_series</code> group outputs by
 label, not by name.</p>
-<p><strong>Guards:</strong> <code>test_simulation_outputs.py::test_expansion_matches_the_engine_output_names</code>
+<p><strong>Guards:</strong> <code>tests/simulation/test_outputs.py::TestOutputsBySource::test_expansion_matches_the_engine_output_names</code>
 (order) and <code>TestSourceIdSharingAPrefix</code> (a bin and an accumulator that share
 a prefix).</p>
 <h3 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h3>
@@ -2924,7 +2924,7 @@ calls it at <code>build</code>, and <code>DifferenceEquations::try_from_model</c
 <p><strong>Guards:</strong> <code>builder.rs</code> tests
 <code>parameter_id_cannot_be_a_compartment_or_a_subpopulation</code> and
 <code>subpopulation_variable_out_of_declaration_order_is_a_build_error</code>;
-<code>test_reserved_names.py</code>.</p>
+<code>tests/building/test_reserved_names.py</code>.</p>
 <h2 id="dynamics">Dynamics<a class="headerlink" href="#dynamics" title="Permanent link">&para;</a></h2>
 <h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
 <p>The flow planner (<code>plan_transition_flows</code> in
@@ -2964,7 +2964,7 @@ is absolute or per-capita:</p>
 <p>A transition with several sources and a per-capita rate is rejected, because
 it has no single source to multiply. <code>print_equations</code> shows the planned flows,
 so a per-capita rate prints as <code>k1 * A</code>.</p>
-<p><strong>Guard:</strong> <code>test_transition_flows.py</code>.</p>
+<p><strong>Guard:</strong> <code>tests/transitions/test_flows.py</code>.</p>
 <h3 id="the-most-specific-stratified-rate-wins">The most specific stratified rate wins<a class="headerlink" href="#the-most-specific-stratified-rate-wins" title="Permanent link">&para;</a></h3>
 <p>For each compartment, the stratified rate whose conditions match it with the
 largest number of conditions wins (<code>helpers.rs</code>). On a tie, the first one in
@@ -2987,7 +2987,7 @@ its conditions select, not to the whole population. Head counts therefore
 multiply along the chain: <code>N × fraction(group1) × fraction(cat1)</code>.
 <code>InitialConditions.subgroup_population</code> owns this; <code>Model.subgroup_population</code>
 and <code>Model.get_conditioning_categories</code> delegate to it.</p>
-<p><strong>Guard:</strong> <code>test_simulation_outputs.py::TestSubgroupPopulation</code> compares the
+<p><strong>Guard:</strong> <code>tests/simulation/test_outputs.py::TestSubgroupPopulation</code> compares the
 result with the population the engine starts from.</p>
 <h3 id="calibrated-initial-conditions-are-applied-in-layers">Calibrated initial conditions are applied in layers<a class="headerlink" href="#calibrated-initial-conditions-are-applied-in-layers" title="Permanent link">&para;</a></h3>
 <p><code>InitialConditionPlan</code> in <code>crates/commol-calibration/src/initial_conditions.rs</code>
@@ -3000,7 +3000,7 @@ construction. <code>Model.apply_calibration_parameters</code>
 fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.</p>
 <p><strong>Guard:</strong>
-<code>test_calibrator.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>.
+<code>tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>.
 See also <a href="../../development/design-per-compartment-initial-conditions/">Per-compartment initial conditions</a>.</p>
 <h2 id="time">Time<a class="headerlink" href="#time" title="Permanent link">&para;</a></h2>
 <h3 id="physical-time-is-not-in-the-model">Physical time is not in the model<a class="headerlink" href="#physical-time-is-not-in-the-model" title="Permanent link">&para;</a></h3>
@@ -3009,7 +3009,7 @@ counts. <code>TimeScale</code> (<code>api/time_scale.py</code>) holds the step l
 durations, probabilities and window grids. Conversions <strong>raise</strong> when a period
 is not a whole number of steps, instead of rounding. Months and years are absent
 on purpose, because they have no fixed length in steps.</p>
-<p><strong>Guard:</strong> <code>test_time_scale.py::TestWindowGrid</code>.</p>
+<p><strong>Guard:</strong> <code>tests/simulation/test_time_scale.py::TestWindowGrid</code>.</p>
 <h3 id="one-step-unit-in-the-unit-check">One step unit in the unit check<a class="headerlink" href="#one-step-unit-in-the-unit-check" title="Permanent link">&para;</a></h3>
 <p>The engine applies every flow once per step and converts no value between
 units. So <code>UnitChecker._step_unit</code> (<code>context/_model/units.py</code>) takes the one
@@ -3019,15 +3019,15 @@ unit of time that the parameter units use (<code>step</code> when there is none)
 <code>same_unit</code>).</p>
 <p><strong>Rule:</strong> never accept a convertible unit as equal. <code>1/week</code> and <code>1/day</code> in one
 model would apply a weekly rate every day.</p>
-<p><strong>Guard:</strong> <code>test_units.py::TestStepUnit</code>.</p>
+<p><strong>Guard:</strong> <code>tests/units/test_model_units.py::TestStepUnit</code>.</p>
 <h3 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h3>
 <p>An observation with <code>window_steps = W</code> is compared with
 <code>series[step] - series[step - W]</code>, anchored at its own step. The Rust loss and
 <code>windowed_totals</code> (<code>api/windows.py</code>) must give the same number; the ensemble
 statistics also use <code>windowed_totals</code>.</p>
-<p><strong>Guards:</strong> <code>test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
+<p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
 the generating parameters is zero) and
-<code>test_probabilistic_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps</code>.</p>
+<code>tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_steps</code>.</p>
 <h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
 <h3 id="one-meaning-of-an-observation-weight">One meaning of an observation weight<a class="headerlink" href="#one-meaning-of-an-observation-weight" title="Permanent link">&para;</a></h3>
 <p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
@@ -3040,7 +3040,7 @@ the generating parameters is zero) and
 the ensemble loss with the optimizer loss, so both must measure the same way.</p>
 <p><strong>Guards:</strong> <code>types.rs</code> <code>loss_tests</code>;
 <code>ensemble::tests::central_loss_uses_observation_weights_in_every_metric</code>;
-<code>test_probabilistic_performance.py::test_central_fit_loss_uses_weights_in_every_metric</code>.</p>
+<code>tests/probabilistic/test_selection.py::test_central_fit_loss_uses_weights_in_every_metric</code>.</p>
 <h3 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h3>
 <p>The objective clamps values to their bounds, so the loss is flat outside them,
 and a simplex that crosses a bound collapses there. Nelder-Mead therefore
@@ -3050,14 +3050,14 @@ and its result are recorded in <code>x</code>. <code>converged</code> is true on
 <code>SolverConverged</code> and <code>TargetCostReached</code> (<code>optimization::converged</code>).</p>
 <p><strong>Rule:</strong> report and record values in <code>x</code>, never in <code>u</code>. Every optimizer run,
 the verbose one included, goes through <code>optimize_observed</code>.</p>
-<p><strong>Guards:</strong> <code>optimization::tests</code>; <code>test_optimizer_convergence.py</code>.</p>
+<p><strong>Guards:</strong> <code>optimization::tests</code>; <code>tests/calibration/test_optimizers.py</code>.</p>
 <h3 id="a-simulation-follows-its-model">A <code>Simulation</code> follows its model<a class="headerlink" href="#a-simulation-follows-its-model" title="Permanent link">&para;</a></h3>
 <p><code>Simulation</code> keeps the JSON its engine was built from. <code>run</code>, <code>engine</code> and
 <code>simulation_outputs</code> compare it with <code>model_dump_json()</code> and rebuild the engine
 when it differs (<code>Simulation._sync_engine</code>), and <code>run</code> resets the engine first.
 <code>Calibrator</code> takes <code>simulation.engine</code> when it is created, so the check is in
 the property, not only in <code>run</code>.</p>
-<p><strong>Guard:</strong> <code>test_simulation_runs.py</code>.</p>
+<p><strong>Guard:</strong> <code>tests/simulation/test_runs.py</code>.</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <h3 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h3>
 <p><code>ci_percentiles</code> (<code>api/probabilistic/intervals.py</code>) is the only place that turns
@@ -3076,7 +3076,7 @@ members. Taking percentiles first gives a band that describes no member.</p>
 <li>Labels and summary figures belong to the caller, because they carry domain
   vocabulary.</li>
 </ul>
-<p><strong>Guard:</strong> <code>test_reporting.py</code>.</p>
+<p><strong>Guard:</strong> <code>tests/reporting/</code>.</p>
 <h3 id="model-files-are-written-in-full">Model files are written in full<a class="headerlink" href="#model-files-are-written-in-full" title="Permanent link">&para;</a></h3>
 <p><code>Model.to_json</code> writes every field, nulls included. Dropping nulls is not
 round-trip safe: an uncalibrated <code>Parameter.value</code> or <code>BinFraction.fraction</code>
