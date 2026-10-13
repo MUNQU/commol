@@ -4,12 +4,41 @@ Goal: add one test for each problem with a stated result in the local reference
 catalogue, to show that commol can express each model and that the engine
 computes it correctly. A problem that commol cannot express, or that it
 computes wrong, becomes a finding (F1, F2, …) for a later ODD.
-Branch: `test/reference-models` from `develop`, after `test-suite-refactor.md`
-and `ode-engine.md` merge (see Delivery).
+Branch: `test/reference-models` from `develop`. Both prerequisites are merged:
+the test refactor (PR #100, `c3cc346`) and the ODE engine (PR #101,
+`3c13102`).
 Engram mirror: topic `odd/reference-model-tests/tasks` (project `commol`).
 Runners: `maturin develop --release` then `pytest` and `pytest -m docs` (from
-`py-commol/`), `ruff check . && ruff format --check . && ty check commol`,
-`mkdocs build --strict` (from the root).
+`py-commol/`), `ruff check . && ruff format --check . && ty check commol &&
+vulture commol .vulture_allowlist.py --min-confidence 80`, `mkdocs build
+--strict` (from the root), and the leak check of Confidentiality.
+
+## Current state (verified 2026-10-13 on `develop` at `0672c1c`)
+
+- Confidentiality: the catalogue directory is in `.git/info/exclude` and
+  untracked; `.git/info/forbidden-terms` holds 8 terms. No tracked file, commit
+  message (all branches), branch name, or PR title or body (last 30 PRs)
+  contains one. `test-map.md` does not exist yet (T1).
+- Catalogue: 89 problems with a stated result: 33 solved examples of the
+  appendices (linear algebra, first-order ODEs, systems of ODEs) and 56 project
+  questions with a given result. 69 open project questions are out of scope.
+- Engine: `DifferentialEquations` models run with `diffsol` (`tsit45`, `bdf`);
+  outputs at any position (`Simulation.run_at`); impulses (`impulse_at`,
+  `impulse_every`); accumulators integrate their flows. Not supported: delays,
+  state-dependent events, stochastic models, rates that read an accumulator,
+  and partial or integral equations (continuous age).
+- `tests/support/` already has what class C needs: `build_ode` and `TIGHT`
+  (`rtol=1e-10`, `atol=1e-8`) in `models.py`, `assert_close` and `ENGINE_REL`
+  (`1e-9`) in `assertions.py`, `reference_run` (difference engine in plain
+  Python) in `reference.py`.
+- Initial conditions are fractions of an integer `population_size`
+  (`InitialConditions`, `u64` in Rust). A problem with a non-integer total and
+  a rate that is not homogeneous in the population (mass action without `/N`)
+  cannot be rescaled; it is a candidate gap (class G).
+- An impulse test with synthetic values exists
+  (`tests/transitions/test_impulses.py::TestJump::test_pulse_vaccination_reaches_the_periodic_orbit`).
+  A reference test uses the values and the stated result of its source, so it
+  checks a different claim and both stay.
 
 ## Confidentiality (hard rule)
 
@@ -62,7 +91,7 @@ recorded in the local `test-map.md` and counted (without names) in Evidence:
 | Class | Meaning | Test |
 |---|---|---|
 | E (exact) | A discrete-time model: commol runs the same equations | The stated result holds to a relative tolerance of 1e-9 |
-| C (continuous) | An ODE model: commol runs it with the ODE engine (D1) | The stated result holds within a tolerance derived from the solver tolerances |
+| C (continuous) | An ODE model: commol runs it with the ODE engine (D1) | The stated result holds to a relative tolerance of 1e-6 with `TIGHT` solver settings (S3) |
 | N (not a model) | Pure linear algebra with no model behind it | No test; counted only (D3) |
 | G (gap) | commol cannot express the model, or computes it wrong | `xfail(strict=True)` with the finding id (D2) |
 
@@ -73,8 +102,7 @@ Grouped by the commol feature they exercise, not by their place in the source:
 - Discrete-time SIR and staged-treatment models (rates as `1 - exp(...)`
   probabilities): final-size relation, limits of the sequences.
 - SIR with births and deaths: threshold, endemic equilibrium, herd-immunity
-  fraction; pulse vaccination (impulses of `ode-engine.md`) and its periodic
-  orbit.
+  fraction; pulse vaccination (`impulse_every`) and its periodic orbit.
 - Two competing strains: coexistence and exclusion conditions.
 - Logistic population growth with an epidemic.
 - Direct plus environmental (indirect) transmission; quarantine and isolation.
@@ -82,7 +110,9 @@ Grouped by the commol feature they exercise, not by their place in the source:
 - Vector–host models (different host and vector totals), one and two patches.
 - Latent-stage models with one and two strains; partial progression.
 - Sub-exponential growth and movement restrictions between patches.
-- Age classes (stratifications as age groups) and age of infection.
+- Age classes (stratifications as age groups). Continuous age of infection
+  is an integral equation: class G unless the source gives a staged
+  approximation.
 - Three-patch spatial model with movement.
 - Scalar ODE examples (exponential growth and decay, separable equations,
   stability of equilibria) and planar linear systems.
@@ -92,6 +122,17 @@ Grouped by the commol feature they exercise, not by their place in the source:
 - Fix: the expected value comes from the stated result, computed in the test
   with `math`/`numpy` (closed form, root of the final-size equation, eigenvalue
   sign), never from another commol call.
+- A stated quantity that commol does not output (a reproduction number, a
+  threshold) is checked through what it predicts about a run: the epidemic
+  invades just above the threshold and dies out just below it, the early
+  growth rate equals `(R0 − 1)·γ`, or the run reaches the equilibrium the
+  formula gives.
+- An asymptotic result (equilibrium, limit of a sequence, periodic orbit) is
+  read after a horizon long enough that the distance to the limit is below the
+  tolerance: the test states the horizon, and doubling it changes the value
+  by less than the tolerance.
+- A test is self-contained: it never reads the catalogue, which CI does not
+  have.
 - Check: review; no test compares commol with commol.
 
 ### S4 — Findings are recorded, not fixed here
@@ -105,10 +146,11 @@ Grouped by the commol feature they exercise, not by their place in the source:
 ### S5 — Documentation
 
 Follows the [documentation definition of done](../../docs/codebase/conventions.md#documentation-definition-of-done):
-the "Tests" section of `docs/codebase/conventions.md` (from
-`test-suite-refactor.md`) gains the reference-model tests, the attribution
-rule and how to add one; `docs/codebase/repository-map.md` lists
-`reference_models/`. No changelog entry: nothing visible to users changes.
+the "Tests" section of `docs/codebase/conventions.md` gains a row for
+`reference_models/` (the one package that does not follow a guide page: it
+checks stated results across features), the attribution rule and how to add a
+test; `docs/codebase/repository-map.md` lists `reference_models/`. No changelog
+entry: nothing visible to users changes.
 
 ## Decisions (the user's to make)
 
@@ -116,7 +158,7 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Spec | Question | Recommendation | Why, against each alternative | Status |
 |---|---|---|---|---|---|
-| D1 | S1 | How to compare an ODE result with a discrete engine? | (first draft) Scale every rate by a step `h` and check convergence when `h` halves. | The user chose a Rust ODE engine instead, delivered as its own ODD and PR before this one. The draft said an ODE solver goes against the golden rule; that was wrong: the rule forbids a Python re-implementation, not a new Rust engine. `ModelTypes::DifferentialEquations` already exists and the difference engine rejects it (`docs/codebase/mental-model.md` L24). | approved (L4): ODE engine, own ODD (`ode-engine.md`) |
+| D1 | S1 | How to compare an ODE result with a discrete engine? | (first draft) Scale every rate by a step `h` and check convergence when `h` halves. | The user chose a Rust ODE engine instead, delivered as its own ODD and PR before this one. The draft said an ODE solver goes against the golden rule; that was wrong: the rule forbids a Python re-implementation, not a new Rust engine. `ModelTypes::DifferentialEquations` already existed and the difference engine rejected it (`docs/codebase/mental-model.md` L24, before PR #101). | approved (L4): ODE engine, own ODD (`ode-engine.md`) |
 | D2 | S4 | What to do when a model fails? | `xfail(strict=True)` + finding; fixes go to a later ODD, as the documentation overhaul did for code findings. | Fix in the same PR: unbounded scope, and an engine change hides in a test PR. `skip`: a later fix goes unnoticed. Delete the test: the gap is lost. | approved (L5) |
 | D3 | S1 | Test the pure linear-algebra examples? | No: class N, counted only. | commol has no matrix API to test; such a test would check `numpy`, not commol. Where a matrix decides stability of a model, the model test (class C) already checks the stability by simulation. | approved (L6): class N, recorded in `test-map.md` and counted in Evidence |
 | D4 | S2 | Test names? | Describe the model and the checked result (`test_pulse_vaccination_reaches_periodic_orbit`); the local `test-map.md` links each test to its entry. | Opaque ids (`test_ref_017`): safe, but a failing test says nothing to the reader. Names with the source's numbering: break the confidentiality rule. | approved (L7): one module per model family, one test per checked result |
@@ -126,7 +168,7 @@ Each row says why the recommendation beats each alternative.
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
 | T1 | S1 | Triage of the 89 entries into E/C/N/G in the local `test-map.md`, with the primary sources of each model (Attribution); counts in Evidence | direct | |
-| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/`: ODE run with tolerances (D1), final-size root finder | direct | |
+| T2 | S2, S3 | `reference_models/` helpers on top of `tests/support/` (which already has `build_ode` and `TIGHT`): final-size root finder, a builder from absolute initial values, a threshold check (S3) | direct | |
 | T3 | S2, S3, S4 | Class E tests | direct | |
 | T4 | S2, S3, S4 | Class C tests, one module per model family | direct | |
 | T5 | S4, S5 | Findings in Evidence; docs; leak check; PR | direct | |
@@ -135,8 +177,7 @@ Each row says why the recommendation beats each alternative.
 
 - Strategy: one PR to `develop` from `test/reference-models`, squash-merged
   (`test(reference): …` commits).
-- Order: after `test-suite-refactor.md` and `ode-engine.md` merge; T1 → T5.
-  T1 (triage) can start earlier; class C tests wait for the ODE engine.
+- Order: T1 → T5. Both prerequisites are merged (PR #100, PR #101).
 - Version impact: none (tests and contributor docs only).
 - Leak check (Confidentiality) before every commit and before the PR.
 
@@ -169,3 +210,9 @@ Each row says why the recommendation beats each alternative.
 - L9 (user, 2026-10-13): split from the test-suite refactor into its own ODD;
   specs, decisions, tasks and log entries renumbered (old S6–S10 → S1–S5,
   D3–D6 → D1–D4, T6–T10 → T1–T5).
+- L10 (agent, 2026-10-13): reviewed after PR #101. Added "Current state";
+  class C tolerance fixed at 1e-6 with `TIGHT`; S3 gained the rules for
+  quantities commol does not output, for asymptotic results and for
+  self-contained tests; T2 reuses `build_ode` and `TIGHT`; the integer
+  `population_size` and continuous age of infection are named as candidate
+  gaps; Delivery no longer waits.
