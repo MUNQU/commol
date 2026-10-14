@@ -43,7 +43,7 @@ def model(k1: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 ends = [7, 14, 21, 28]

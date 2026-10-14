@@ -66,7 +66,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=100)
@@ -186,7 +186,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -209,7 +209,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `.add_transition(..., rate="k1 * A * B / N")` | Moves population from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
 | `.add_transition(..., rate="k2")`             | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`.                                               |
 | `.set_initial_conditions(...)`                | Sets the total population and the fraction that starts in each bin. The fractions must sum to 1.                           |
-| `.build(typology="DifferenceEquations")`      | Validates the definition and returns a `Model`.                                                                            |
+| `.build(engine="DifferenceEquations")`        | Validates the definition and returns a `Model`.                                                                            |
 | `Simulation(model).run(num_steps=100)`        | Runs the Rust engine and returns the results.                                                                              |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
@@ -236,7 +236,7 @@ model_with_units = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
@@ -274,7 +274,7 @@ calibration_model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
@@ -451,7 +451,7 @@ A fraction may be `None` when calibration will find it; see [Model Calibration](
 `build` validates the definition and returns a `Model`. `Simulation` runs it in the Rust engine:
 
 ```python
-model = builder.build(typology="DifferenceEquations")
+model = builder.build(engine="DifferenceEquations")
 
 results = Simulation(model).run(num_steps=50)
 
@@ -513,7 +513,7 @@ stratified = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 for compartment in stratified.initial_state():
@@ -577,7 +577,7 @@ conditional = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 print([c.name for c in conditional.initial_state()])
@@ -624,7 +624,7 @@ overridden = (
         ],
         compartment_fractions=[{"compartment": "B_g1", "fraction": 0.0}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 print({c.name: c.population for c in overridden.initial_state()})
@@ -673,7 +673,7 @@ reaction = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 # Each step: A loses k*A*B, B loses k*A*B, C gains 2*k*A*B
 ```
@@ -694,7 +694,7 @@ outflow = (
             {"bin": "B", "fraction": 0.5},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 print([t.id for t in outflow.dynamics.transitions])  # ['outflow__A', 'outflow__B']
 ```
@@ -795,7 +795,7 @@ model = (
             {"bin": "D", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=200)
@@ -826,12 +826,12 @@ builder = ModelBuilder(
 
 Every `add_*` and `set_*` method returns the builder, so calls chain. The other methods:
 
-| Method            | Returns        | What it does                                                                                                                                      |
-| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build(typology)` | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                       |
-| `clone()`         | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                 |
-| `reset()`         | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
-| `get_summary()`   | `dict`         | The name, description, version and the ids added so far.                                                                                          |
+| Method                         | Returns        | What it does                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build(engine, settings=None)` | `Model`        | Validates the definition and returns the model for an engine: `"DifferenceEquations"` (discrete time) or `"DifferentialEquations"` (continuous time). `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`); None uses its defaults. One builder can build the model for each engine. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
+| `clone()`                      | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                     |
+| `reset()`                      | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`.                                                                                                                                                                                                                                                                                     |
+| `get_summary()`                | `dict`         | The name, description, version and the ids added so far.                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```python
 variant = builder.clone()
@@ -926,7 +926,7 @@ def inflow_per_step(mode: str) -> list[float]:
         .set_initial_conditions(
             population_size=100, bin_fractions=[{"bin": "A", "fraction": 1.0}]
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=7)["A"]
     return np.diff(series).round(3).tolist()
@@ -998,7 +998,7 @@ counted = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(counted).run(num_steps=10)
@@ -1066,7 +1066,7 @@ builder = (
     .add_parameter(id="k_out", value=0.05)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k_out")
 )
-stratified_model = builder.build(typology="DifferenceEquations")
+stratified_model = builder.build(engine="DifferenceEquations")
 
 print([c.name for c in stratified_model.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
@@ -1134,7 +1134,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model.print_equations()  # shows every flow as the engine computes it
@@ -1198,7 +1198,7 @@ seasonal = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 ```
 
@@ -1224,7 +1224,7 @@ reaction = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 reaction.print_equations()
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
@@ -1255,7 +1255,7 @@ outflow = (
             {"bin": "C", "fraction": 0.3},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 for transition in outflow.dynamics.transitions:
@@ -1298,7 +1298,7 @@ moving = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 moving.print_equations()
 # move (g1 -> g2):  A_g1 -> A_g2: k * A_g1   and   B_g1 -> B_g2: k * B_g1
@@ -1336,7 +1336,7 @@ own_compartment = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 own_compartment.print_equations()
 # A_g1 -> B_g1: k * A_g1   and   A_g2 -> B_g2: k * A_g2
@@ -1381,7 +1381,7 @@ group_rates = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 group_rates.print_equations()
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
@@ -1449,7 +1449,7 @@ redirect = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 redirect.print_equations()
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
@@ -1477,7 +1477,7 @@ impulse_model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 jumped = Simulation(impulse_model).run(num_steps=2)
@@ -1541,7 +1541,7 @@ model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=60)
@@ -1633,7 +1633,7 @@ def value_of(expression: str) -> float:
                 },
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=1)
     inflow = sum(series[1] - series[0] for series in results.values())
@@ -1738,7 +1738,7 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
             population_size=100,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=num_steps)["B"]
     return [round(series[i + 1] - series[i], 4) for i in range(num_steps)]
@@ -1844,7 +1844,7 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
                 }
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=num_steps)
     return {
@@ -1952,7 +1952,7 @@ routing = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 routed = Simulation(routing).run(num_steps=2)
 print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
@@ -1980,7 +1980,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
             population_size=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferentialEquations")
+        .build(engine="DifferentialEquations")
     )
     return Simulation(model).run_at([at])["A"][0]
 
@@ -2038,7 +2038,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
@@ -2092,7 +2092,7 @@ along_a_line = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferentialEquations")
+    .build(engine="DifferentialEquations")
 )
 along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
 ```
@@ -2120,7 +2120,7 @@ wrong_units = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 try:
@@ -2146,7 +2146,7 @@ To pass a quantity to a function, make it dimensionless first, for example `sin(
 
 | Part              | Content                                                                                                                           |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Model information | Name, typology, and the number of bins, stratifications, parameters and transitions                                               |
+| Model information | Name, engine, and the number of bins, stratifications, parameters and transitions                                                 |
 | Compact form      | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit. |
 | Expanded form     | One difference equation per compartment: `[A(t+Dt) - A(t)] / Dt = …`                                                              |
 
@@ -2216,7 +2216,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -2238,7 +2238,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `group_outputs(ids)`                             | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                    |
 | `total_series(results, ids)`                     | `list[float]`          | The sum of all outputs of the given ids, at each position of the results.                                                                                                                                                                                                                                                                                                    |
 | `windowed_totals(results, ids, window, at=None)` | `list[float]`          | What the given accumulators gained in each window.                                                                                                                                                                                                                                                                                                                           |
-| `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: `DifferenceEquations` or `DifferentialEquations`, as the typology names. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                     |
+| `engine`                                         | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                 |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
 
@@ -2323,7 +2323,7 @@ stratified = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 stratified_simulation = Simulation(stratified)
@@ -2406,7 +2406,7 @@ A window need not be a whole number of steps: see [Reporting at any position](#r
 
 ## Differential equations
 
-A model built with `typology="DifferentialEquations"` runs in continuous time. The engine (`crates/commol-differential/`) integrates `dX/dt = Σ flows(t, X)` with the ODE solver [diffsol](https://github.com/martinjrobins/diffsol). The flows are the same as in a difference model: the same transitions, rates, accumulators, outputs, calibration, reports and plots. Only the way the engine advances changes.
+A model built with `engine="DifferentialEquations"` runs in continuous time. The engine (`crates/commol-differential/`) integrates `dX/dt = Σ flows(t, X)` with the ODE solver [diffsol](https://github.com/martinjrobins/diffsol). The flows are the same as in a difference model: the same transitions, rates, accumulators, outputs, calibration, reports and plots. Only the way the engine advances changes.
 
 ```python
 import math
@@ -2414,7 +2414,7 @@ import math
 from commol import OdeSolver
 
 ode_model = (
-    ModelBuilder(name="Decay", solver=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8))
+    ModelBuilder(name="Decay")
     .add_bin(id="A", name="A")
     .add_bin(id="B", name="B")
     .add_parameter(id="k1", value=0.1)
@@ -2424,7 +2424,10 @@ ode_model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferentialEquations")
+    .build(
+        engine="DifferentialEquations",
+        settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
+    )
 )
 
 ode = Simulation(ode_model)
@@ -2435,7 +2438,7 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Solver settings
 
-`OdeSolver` holds the settings. They are part of the model (`Dynamics.solver`), so a saved model reproduces its runs. Pass them to `ModelBuilder(..., solver=...)`; without them the defaults apply. A `DifferenceEquations` model has no solver settings (`ValidationError`).
+`OdeSolver` holds the settings of the `DifferentialEquations` engine. They are part of the model (`Model.engine.settings`), so a saved model reproduces its runs. Pass them where you choose the engine, `build(engine="DifferentialEquations", settings=...)`, so one builder can build the model for each engine with its own settings; without them the defaults apply. The `DifferenceEquations` engine takes no settings: the engine rejects settings of another engine with an error that names both (`ValidationError`).
 
 | Field    | Default    | Meaning                                                                                                                                                     |
 | -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2468,7 +2471,7 @@ pulse_model = (
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
 )
-ode_pulse = Simulation(pulse_model.build(typology="DifferentialEquations")).run(num_steps=3)
+ode_pulse = Simulation(pulse_model.build(engine="DifferentialEquations")).run(num_steps=3)
 print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^−0.2)
 ```
 
@@ -2595,7 +2598,7 @@ def basic_model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 # Observations generated from k1 = 0.4, k2 = 0.1
@@ -2779,7 +2782,7 @@ def model_with_b(b_fraction: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model_with_b(0.02)).run(num_steps=40)
@@ -2888,7 +2891,7 @@ def stratified(b_g1: float | None):
                 ]
             ),
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(stratified(0.01)).run(num_steps=20)
@@ -2983,7 +2986,7 @@ def model(k1: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model(0.4)).run(num_steps=70)
@@ -3134,7 +3137,7 @@ def ode_model(k1: float | None):
             population_size=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferentialEquations")
+        .build(engine="DifferentialEquations")
     )
 
 positions = [0.5, 1.75, 3.25, 6.5]
@@ -3215,7 +3218,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model(0.4, 0.1)).run(num_steps=50)
@@ -3374,7 +3377,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 # The data comes from k1 / k2 = 4
@@ -3510,7 +3513,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 # Noisy observations of a model with k1 = 0.4, k2 = 0.1
@@ -3802,7 +3805,7 @@ def model(k1: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 ends = [7, 14, 21, 28]
@@ -3962,7 +3965,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -3995,7 +3998,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4030,7 +4033,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4095,7 +4098,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4130,7 +4133,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4165,7 +4168,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4224,7 +4227,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4274,7 +4277,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -4349,7 +4352,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 # Generated compartments:
@@ -4407,7 +4410,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
@@ -7805,7 +7808,6 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
-        solver: OdeSolver | None = None,
         step_unit: str | None = None,
     ):
         """
@@ -7824,10 +7826,6 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
-        solver : OdeSolver | None, default=None
-            Solver settings of a DifferentialEquations model (method and
-            tolerances). None uses the defaults of `OdeSolver`. A
-            DifferenceEquations model takes none.
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
@@ -7838,7 +7836,6 @@ class ModelBuilder:
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
-        self._solver: OdeSolver | None = solver
         self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
@@ -8638,42 +8635,20 @@ class ModelBuilder:
         self._series_counter = 0
         return self
 
-    def _validate_typology(self, typology: str) -> ModelTypes:
-        """
-        Validate and convert typology string to ModelTypes enum.
-
-        Parameters
-        ----------
-        typology : str
-            The model typology as a string.
-
-        Returns
-        -------
-        ModelTypes
-            The validated ModelTypes enum value.
-
-        Raises
-        ------
-        ValueError
-            If the typology string is not a valid ModelTypes value.
-        """
-        try:
-            return ModelTypes(typology)
-        except ValueError:
-            valid_values = [t.value for t in ModelTypes]
-            raise ValueError(
-                f"Invalid typology: '{typology}'. Must be one of {valid_values}"
-            ) from None
-
-    def build(self, typology: str) -> Model:
+    def build(
+        self, engine: EngineType, settings: EngineSettings | None = None
+    ) -> Model:
         """
         Build and return the final Model instance.
 
         Parameters
         ----------
-        typology : str
-            Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations" or "DifferentialEquations".
+        engine : EngineType
+            The engine that runs the model: ``"DifferenceEquations"``
+            (discrete time) or ``"DifferentialEquations"`` (continuous time).
+        settings : EngineSettings | None, default=None
+            Settings of that engine; None uses its defaults. Only
+            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
         Returns
         -------
@@ -8683,16 +8658,13 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If validation fails, required components are missing,
-            typology is invalid, or a per-compartment override names an unknown
-            compartment or makes the initial population exceed
-            ``population_size``.
+            If validation fails, required components are missing, the engine
+            is unknown, the settings are not settings of that engine, or a
+            per-compartment override names an unknown compartment or makes
+            the initial population exceed ``population_size``.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
-
-        # Validate and convert typology string to enum
-        validated_typology = self._validate_typology(typology)
 
         population = Population(
             bins=self._bins,
@@ -8702,11 +8674,7 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(
-            typology=validated_typology,
-            transitions=self._transitions,
-            solver=self._solver,
-        )
+        dynamics = Dynamics(transitions=self._transitions)
 
         model = Model(
             name=self._name,
@@ -8715,11 +8683,12 @@ class ModelBuilder:
             population=population,
             parameters=self._parameters,
             dynamics=dynamics,
+            engine=ModelEngine(type=engine, settings=settings),
             step_unit=self._step_unit,
         )
 
         logging.info(
-            f"Model '{self._name}' successfully built with typology '{typology}'."
+            f"Model '{self._name}' successfully built for the {engine} engine."
         )
 
         return model
@@ -8730,21 +8699,20 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, solver: OdeSolver | None = None, step_unit: str | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None)
 ```
 
 Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type        | Description                                | Default                                                                                                                                                                                                            |
-| ------------- | ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str`       | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
-| `description` | \`str       | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
-| `version`     | \`str       | None\`                                     | The version number of the model.                                                                                                                                                                                   |
-| `bin_unit`    | \`str       | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
-| `solver`      | \`OdeSolver | None\`                                     | Solver settings of a DifferentialEquations model (method and tolerances). None uses the defaults of OdeSolver. A DifferenceEquations model takes none.                                                             |
-| `step_unit`   | \`str       | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
+| Name          | Type  | Description                                | Default                                                                                                                                                                                                            |
+| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
+| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
+| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                   |
+| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
+| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -8755,7 +8723,6 @@ def __init__(
     description: str | None = None,
     version: str | None = None,
     bin_unit: str | None = None,
-    solver: OdeSolver | None = None,
     step_unit: str | None = None,
 ):
     """
@@ -8774,10 +8741,6 @@ def __init__(
         Individual bins can override this with their own unit parameter.
         Units are optional but required for model.print_equations() and
         model.check_unit_consistency().
-    solver : OdeSolver | None, default=None
-        Solver settings of a DifferentialEquations model (method and
-        tolerances). None uses the defaults of `OdeSolver`. A
-        DifferenceEquations model takes none.
     step_unit : str | None, default=None
         Unit of one step on the axis, of any single dimension (for example
         ``"day"`` or ``"meter"``). The unit check requires every flow to be
@@ -8788,7 +8751,6 @@ def __init__(
     self._description: str | None = description
     self._version: str | None = version
     self._bin_unit: str | None = bin_unit
-    self._solver: OdeSolver | None = solver
     self._step_unit: str | None = step_unit
 
     self._bins: list[Bin] = []
@@ -9618,16 +9580,17 @@ def reset(self) -> Self:
 #### build
 
 ```python
-build(typology: str) -> Model
+build(engine: EngineType, settings: EngineSettings | None = None) -> Model
 ```
 
 Build and return the final Model instance.
 
 Parameters:
 
-| Name       | Type  | Description                                                                                                      | Default    |
-| ---------- | ----- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
-| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations" or "DifferentialEquations". | *required* |
+| Name       | Type             | Description                                                                                                         | Default                                                                                                   |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `engine`   | `EngineType`     | The engine that runs the model: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
+| `settings` | \`EngineSettings | None\`                                                                                                              | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
 
 Returns:
 
@@ -9637,22 +9600,27 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, required components are missing, typology is invalid, or a per-compartment override names an unknown compartment or makes the initial population exceed population_size. |
+| Type         | Description                                                                                                                                                                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, required components are missing, the engine is unknown, the settings are not settings of that engine, or a per-compartment override names an unknown compartment or makes the initial population exceed population_size. |
 
 Source code in `commol/api/model_builder.py`
 
 ```python
-def build(self, typology: str) -> Model:
+def build(
+    self, engine: EngineType, settings: EngineSettings | None = None
+) -> Model:
     """
     Build and return the final Model instance.
 
     Parameters
     ----------
-    typology : str
-        Type of the model. Must be one of the valid ModelTypes values:
-        "DifferenceEquations" or "DifferentialEquations".
+    engine : EngineType
+        The engine that runs the model: ``"DifferenceEquations"``
+        (discrete time) or ``"DifferentialEquations"`` (continuous time).
+    settings : EngineSettings | None, default=None
+        Settings of that engine; None uses its defaults. Only
+        ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
     Returns
     -------
@@ -9662,16 +9630,13 @@ def build(self, typology: str) -> Model:
     Raises
     ------
     ValueError
-        If validation fails, required components are missing,
-        typology is invalid, or a per-compartment override names an unknown
-        compartment or makes the initial population exceed
-        ``population_size``.
+        If validation fails, required components are missing, the engine
+        is unknown, the settings are not settings of that engine, or a
+        per-compartment override names an unknown compartment or makes
+        the initial population exceed ``population_size``.
     """
     if self._initial_conditions is None:
         raise ValueError("Initial conditions must be set")
-
-    # Validate and convert typology string to enum
-    validated_typology = self._validate_typology(typology)
 
     population = Population(
         bins=self._bins,
@@ -9681,11 +9646,7 @@ def build(self, typology: str) -> Model:
         initial_conditions=self._initial_conditions,
     )
 
-    dynamics = Dynamics(
-        typology=validated_typology,
-        transitions=self._transitions,
-        solver=self._solver,
-    )
+    dynamics = Dynamics(transitions=self._transitions)
 
     model = Model(
         name=self._name,
@@ -9694,11 +9655,12 @@ def build(self, typology: str) -> Model:
         population=population,
         parameters=self._parameters,
         dynamics=dynamics,
+        engine=ModelEngine(type=engine, settings=settings),
         step_unit=self._step_unit,
     )
 
     logging.info(
-        f"Model '{self._name}' successfully built with typology '{typology}'."
+        f"Model '{self._name}' successfully built for the {engine} engine."
     )
 
     return model
@@ -9726,6 +9688,7 @@ Attributes:
 | `population`  | `Population`      | Population details, subpopulations, stratifications and initial conditions. |
 | `parameters`  | `list[Parameter]` | A list of global model parameters.                                          |
 | `dynamics`    | `Dynamics`        | The rules that govern system evolution.                                     |
+| `engine`      | `ModelEngine`     | The engine that runs the model, and its settings.                           |
 | `step_unit`   | \`str             | None\`                                                                      |
 
 Source code in `commol/context/model.py`
@@ -9749,6 +9712,8 @@ class Model(BaseModel):
         A list of global model parameters.
     dynamics : Dynamics
         The rules that govern system evolution.
+    engine : ModelEngine
+        The engine that runs the model, and its settings.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check uses it; when None, the check infers it
@@ -9767,6 +9732,7 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+    engine: ModelEngine
     step_unit: str | None = Field(
         None,
         description=(
@@ -15734,7 +15700,7 @@ def __repr__(self) -> str:
 
 Bases: `BaseModel`
 
-Solver settings of a differential-equations model.
+Settings of the `DifferentialEquations` engine.
 
 Attributes:
 
@@ -15744,12 +15710,12 @@ Attributes:
 | `rtol`   | `float`                    | Relative tolerance of each state component.                                                                                      |
 | `atol`   | `float`                    | Absolute tolerance of each state component, in the unit of the bins.                                                             |
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/engine.py`
 
 ```python
 class OdeSolver(BaseModel):
     """
-    Solver settings of a differential-equations model.
+    Settings of the ``DifferentialEquations`` engine.
 
     Attributes
     ----------
@@ -16702,12 +16668,13 @@ Model                      name, description, version, step_unit
 │       │   └── fractions: [StratificationFraction]
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
-└── dynamics: Dynamics
-    ├── typology: "DifferenceEquations" or "DifferentialEquations"
-    ├── solver: OdeSolver | None            (differential models only)
-    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-        └── stratified_rates: [StratifiedRate]
-            └── conditions: [StratificationCondition]
+├── dynamics: Dynamics
+│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+│       └── stratified_rates: [StratifiedRate]
+│           └── conditions: [StratificationCondition]
+└── engine: ModelEngine
+    ├── type: "DifferenceEquations" or "DifferentialEquations"
+    └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
 ```
 
 `Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
@@ -17745,11 +17712,9 @@ Defines how the system evolves.
 
 Attributes:
 
-| Name          | Type                                                      | Description                        |
-| ------------- | --------------------------------------------------------- | ---------------------------------- |
-| `typology`    | `Literal['DifferenceEquations', 'DifferentialEquations']` | The type of model.                 |
-| `transitions` | `List[Transition]`                                        | A list of rules for state changes. |
-| `solver`      | \`OdeSolver                                               | None\`                             |
+| Name          | Type               | Description                        |
+| ------------- | ------------------ | ---------------------------------- |
+| `transitions` | `List[Transition]` | A list of rules for state changes. |
 
 Source code in `commol/context/dynamics.py`
 
@@ -17760,35 +17725,13 @@ class Dynamics(BaseModel):
 
     Attributes
     ----------
-    typology : Literal["DifferenceEquations", "DifferentialEquations"]
-        The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
-    solver : OdeSolver | None
-        Solver settings of a differential-equations model; None uses the
-        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    typology: Literal[
-        ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
-    ]
     transitions: list[Transition]
-    solver: OdeSolver | None = Field(
-        default=None,
-        description="Solver settings of a differential-equations model.",
-    )
-
-    @model_validator(mode="after")
-    def validate_typology_settings(self) -> Self:
-        """A solver needs a differential model."""
-        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
-            raise ValueError(
-                "Solver settings apply only to a DifferentialEquations model; "
-                "a DifferenceEquations model has no solver."
-            )
-        return self
 
     @field_validator("transitions")
     @classmethod
@@ -17813,28 +17756,6 @@ class Dynamics(BaseModel):
 ```
 
 ### Methods:
-
-#### validate_typology_settings
-
-```python
-validate_typology_settings() -> Self
-```
-
-A solver needs a differential model.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@model_validator(mode="after")
-def validate_typology_settings(self) -> Self:
-    """A solver needs a differential model."""
-    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
-        raise ValueError(
-            "Solver settings apply only to a DifferentialEquations model; "
-            "a DifferenceEquations model has no solver."
-        )
-    return self
-```
 
 #### validate_transitions_not_empty
 
@@ -18120,8 +18041,6 @@ def validate_rate(cls, value: str | None) -> str | None:
     return value
 ```
 
-`OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
-
 ## StratifiedRate
 
 Bases: `BaseModel`
@@ -18278,6 +18197,80 @@ def validate_rate(cls, value: str) -> str:
     except ValueError as e:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
+```
+
+## Engine
+
+The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
+
+## ModelEngine
+
+Bases: `BaseModel`
+
+The engine that runs a model, and its settings.
+
+Attributes:
+
+| Name       | Type             | Description                                                                                             |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `type`     | `EngineType`     | Name of the engine: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). |
+| `settings` | \`EngineSettings | None\`                                                                                                  |
+
+Source code in `commol/context/engine.py`
+
+```python
+class ModelEngine(BaseModel):
+    """
+    The engine that runs a model, and its settings.
+
+    Attributes
+    ----------
+    type : EngineType
+        Name of the engine: ``"DifferenceEquations"`` (discrete time) or
+        ``"DifferentialEquations"`` (continuous time).
+    settings : EngineSettings | None
+        Settings of that engine; None uses its defaults. Only
+        ``DifferentialEquations`` takes settings (`OdeSolver`).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: EngineType = Field(..., description="Name of the engine.")
+    settings: EngineSettings | None = Field(
+        default=None, description="Settings of the engine; None uses its defaults."
+    )
+
+    @model_validator(mode="after")
+    def check_settings(self) -> Self:
+        """Ask the engine whether the settings are its own."""
+        settings_json = (
+            None if self.settings is None else self.settings.model_dump_json()
+        )
+        commol_rs.engine.EngineType(self.type).check_settings(settings_json)
+        return self
+```
+
+### Methods:
+
+#### check_settings
+
+```python
+check_settings() -> Self
+```
+
+Ask the engine whether the settings are its own.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_settings(self) -> Self:
+    """Ask the engine whether the settings are its own."""
+    settings_json = (
+        None if self.settings is None else self.settings.model_dump_json()
+    )
+    commol_rs.engine.EngineType(self.type).check_settings(settings_json)
+    return self
 ```
 
 ## Initial conditions
@@ -19550,8 +19543,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- An ODE engine: a model built with `typology="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol_rs.differential.DifferentialEquations`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`. The engine restarts its integration at each integer when a rate reads `step`, and where `t` reaches a value a rate compares it with (`t >= t_on`), so the solver cannot step over a jump.
-- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
+- An ODE engine: a model built with `engine="DifferentialEquations"` runs in continuous time, `dX/dt = Σ flows`, integrated by `diffsol` (`commol-differential`). It has the same flows, outputs, accumulators, calibration, ensembles, reports and plots as a difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous `t`. The engine restarts its integration at each integer when a rate reads `step`, and where `t` reaches a value a rate compares it with (`t >= t_on`), so the solver cannot step over a jump.
+- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), the settings of the `DifferentialEquations` engine, stored in the model as `Model.engine.settings` and set with `build(engine="DifferentialEquations", settings=...)`.
+- One list of engines in the Rust engine (`EngineType`): each entry names the model kind it runs, validates its settings, and says the form of its equations and what a rate means (`per_step` or `continuous`). Python asks it through `commol_rs.engine.EngineType` instead of branching on engine names.
 - `Simulation.run_at(at)`: the outputs at the given sorted positions. A differential model takes any position, such as `0.5`.
 - `SimulationResults`: what `Simulation.run` and `run_at` return. A `dict` from output name to values, as before, with the positions in `positions` and the rows in `rows()`.
 - The window grid as module functions: `window_start`, `window_end`, `window_index` and `window_ends`, beside `windowed_totals`.
@@ -19563,7 +19557,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - A position on the axis is a `float` everywhere, and the engine alone decides which positions its model type accepts: a difference model integer steps, a differential model any non-negative position. Its error names the observation, constraint, impulse transition or series parameter that holds a rejected position. The engine trait runs only at positions (`run_at_positions_into_buffer`); `run(n)` returns the grid it ran on.
-- Names of positions, lengths and counts, and names with more than one meaning. No old name is kept; an old keyword raises an error that names it.
+- The engine of a model and its settings are one field, `Model.engine = {type, settings}` (`ModelEngine`), which replaces `Model.dynamics.typology`; `Dynamics` holds only the transitions. The builder takes the engine where it builds, so one builder builds the model for each engine with its own settings. Settings of one engine given to another raise an error from the engine that names both. A model file saved before has `dynamics.typology` and does not load: move it to `"engine": {"type": …, "settings": null}`.
+
+| Before                                                                                                   | Now                                                          |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `builder.build(typology="DifferenceEquations")`                                                          | `builder.build(engine="DifferenceEquations")`                |
+| `model.dynamics.typology`                                                                                | `model.engine.type`                                          |
+| `commol_rs.difference.DifferenceEquations(model)`, `commol_rs.differential.DifferentialEquations(model)` | `commol_rs.engine.Engine(model)`, the engine the model names |
+| - Names of positions, lengths and counts, and names with more than one                                   |                                                              |
+| meaning. No old name is kept; an old keyword raises an error that names it.                              |                                                              |
 
 | Before                                                                                                    | Now                                                    |
 | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -19608,6 +19610,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Simulation.run(..., output_format=...)` and `run_at(..., output_format=...)`: both return `SimulationResults`; use `rows()` for one row per position.
 - `commol_core::integer_steps`, `SimulationEngine::run_into_buffer` and `run_at_steps_into_buffer`; the Python checks that repeated the engine's rules on positions (`check_steps_for_typology`, the impulse check of `Dynamics`, the order check of `Simulation.run_at`).
 - The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`, which uses the weights.
+- `commol.constants.ModelTypes`. The engine names are the `Literal` `commol.context.engine.EngineType`.
 
 ### Fixed
 

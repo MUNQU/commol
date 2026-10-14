@@ -36,7 +36,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 # The data comes from k1 / k2 = 4

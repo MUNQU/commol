@@ -1934,6 +1934,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#model-type-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model type (engine)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pyo3-bindings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2371,6 +2382,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#model-type-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model type (engine)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pyo3-bindings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2534,6 +2556,28 @@
       passes if the loss changes.</li>
 <li>[ ] Update <a href="../../guide/calibration/">Calibration</a> and, for ensembles,
       <a href="../../guide/probabilistic-calibration/">Probabilistic calibration</a>.</li>
+</ul>
+<h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
+<p>To add an engine to the list:</p>
+<ul>
+<li>[ ] Add the entry to <code>EngineType</code> in <code>crates/commol-core/src/types/engine.rs</code>
+      and to <code>ALL</code>. The compiler then names every <code>match</code> to complete in that
+      file: its name, its model kind, its settings (<code>EngineSettings</code>, parsed
+      and validated with <code>deny_unknown_fields</code>), the left-hand side of its
+      equations and the meaning of a rate.</li>
+<li>[ ] Write the engine in its own crate and implement <code>SimulationEngine</code>;
+      <code>try_from_model</code> rejects a model of another engine.</li>
+<li>[ ] Add a variant to <code>Engine</code> in <code>py-commol/src/engine.rs</code>: its arm in
+      <code>build</code>, <code>engine_type</code> and <code>dispatch!</code>. Add the crate to
+      <code>py-commol/Cargo.toml</code>.</li>
+<li>[ ] Add the name to the <code>EngineType</code> <code>Literal</code> in <code>context/engine.py</code>; if the
+      engine has settings, add their Pydantic class to <code>EngineSettings</code>.</li>
+<li>[ ] Run the tests of <code>crates/commol-core/src/types/engine.rs</code>,
+      <code>py-commol/src/engine.rs</code> and <code>tests/building/test_engine.py</code>; they run
+      every entry of the list.</li>
+<li>[ ] Say what a rate means for it in the guides, and add it to
+      <a href="../../advanced/model-structure/">Model structure</a> and
+      <a href="../../guide/simulations/">Running simulations</a>.</li>
 </ul>
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>

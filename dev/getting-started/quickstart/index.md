@@ -30,7 +30,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -53,7 +53,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `.add_transition(..., rate="k1 * A * B / N")` | Moves population from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
 | `.add_transition(..., rate="k2")`             | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`.                                               |
 | `.set_initial_conditions(...)`                | Sets the total population and the fraction that starts in each bin. The fractions must sum to 1.                           |
-| `.build(typology="DifferenceEquations")`      | Validates the definition and returns a `Model`.                                                                            |
+| `.build(engine="DifferenceEquations")`        | Validates the definition and returns a `Model`.                                                                            |
 | `Simulation(model).run(num_steps=100)`        | Runs the Rust engine and returns the results.                                                                              |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
@@ -80,7 +80,7 @@ model_with_units = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
@@ -118,7 +118,7 @@ calibration_model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 observed_data = [

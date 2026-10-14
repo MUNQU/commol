@@ -18,12 +18,13 @@ Model                      name, description, version, step_unit
 │       │   └── fractions: [StratificationFraction]
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
-└── dynamics: Dynamics
-    ├── typology: "DifferenceEquations" or "DifferentialEquations"
-    ├── solver: OdeSolver | None            (differential models only)
-    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-        └── stratified_rates: [StratifiedRate]
-            └── conditions: [StratificationCondition]
+├── dynamics: Dynamics
+│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+│       └── stratified_rates: [StratifiedRate]
+│           └── conditions: [StratificationCondition]
+└── engine: ModelEngine
+    ├── type: "DifferenceEquations" or "DifferentialEquations"
+    └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
 ```
 
 `Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
@@ -1061,11 +1062,9 @@ Defines how the system evolves.
 
 Attributes:
 
-| Name          | Type                                                      | Description                        |
-| ------------- | --------------------------------------------------------- | ---------------------------------- |
-| `typology`    | `Literal['DifferenceEquations', 'DifferentialEquations']` | The type of model.                 |
-| `transitions` | `List[Transition]`                                        | A list of rules for state changes. |
-| `solver`      | \`OdeSolver                                               | None\`                             |
+| Name          | Type               | Description                        |
+| ------------- | ------------------ | ---------------------------------- |
+| `transitions` | `List[Transition]` | A list of rules for state changes. |
 
 Source code in `commol/context/dynamics.py`
 
@@ -1076,35 +1075,13 @@ class Dynamics(BaseModel):
 
     Attributes
     ----------
-    typology : Literal["DifferenceEquations", "DifferentialEquations"]
-        The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
-    solver : OdeSolver | None
-        Solver settings of a differential-equations model; None uses the
-        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    typology: Literal[
-        ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
-    ]
     transitions: list[Transition]
-    solver: OdeSolver | None = Field(
-        default=None,
-        description="Solver settings of a differential-equations model.",
-    )
-
-    @model_validator(mode="after")
-    def validate_typology_settings(self) -> Self:
-        """A solver needs a differential model."""
-        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
-            raise ValueError(
-                "Solver settings apply only to a DifferentialEquations model; "
-                "a DifferenceEquations model has no solver."
-            )
-        return self
 
     @field_validator("transitions")
     @classmethod
@@ -1129,28 +1106,6 @@ class Dynamics(BaseModel):
 ```
 
 ### Methods:
-
-#### validate_typology_settings
-
-```python
-validate_typology_settings() -> Self
-```
-
-A solver needs a differential model.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@model_validator(mode="after")
-def validate_typology_settings(self) -> Self:
-    """A solver needs a differential model."""
-    if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
-        raise ValueError(
-            "Solver settings apply only to a DifferentialEquations model; "
-            "a DifferenceEquations model has no solver."
-        )
-    return self
-```
 
 #### validate_transitions_not_empty
 
@@ -1436,8 +1391,6 @@ def validate_rate(cls, value: str | None) -> str | None:
     return value
 ```
 
-`OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
-
 ## StratifiedRate
 
 Bases: `BaseModel`
@@ -1594,6 +1547,80 @@ def validate_rate(cls, value: str) -> str:
     except ValueError as e:
         raise ValueError(f"Validation failed for rate '{value}': {e}")
     return value
+```
+
+## Engine
+
+The engine's list of engines (`crates/commol-core/src/types/engine.rs`) validates the settings: settings of another engine raise an error that names both. `OdeSolver` is documented in [Simulation API](https://munqu.github.io/commol/latest/api/simulation/index.md).
+
+## ModelEngine
+
+Bases: `BaseModel`
+
+The engine that runs a model, and its settings.
+
+Attributes:
+
+| Name       | Type             | Description                                                                                             |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `type`     | `EngineType`     | Name of the engine: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). |
+| `settings` | \`EngineSettings | None\`                                                                                                  |
+
+Source code in `commol/context/engine.py`
+
+```python
+class ModelEngine(BaseModel):
+    """
+    The engine that runs a model, and its settings.
+
+    Attributes
+    ----------
+    type : EngineType
+        Name of the engine: ``"DifferenceEquations"`` (discrete time) or
+        ``"DifferentialEquations"`` (continuous time).
+    settings : EngineSettings | None
+        Settings of that engine; None uses its defaults. Only
+        ``DifferentialEquations`` takes settings (`OdeSolver`).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: EngineType = Field(..., description="Name of the engine.")
+    settings: EngineSettings | None = Field(
+        default=None, description="Settings of the engine; None uses its defaults."
+    )
+
+    @model_validator(mode="after")
+    def check_settings(self) -> Self:
+        """Ask the engine whether the settings are its own."""
+        settings_json = (
+            None if self.settings is None else self.settings.model_dump_json()
+        )
+        commol_rs.engine.EngineType(self.type).check_settings(settings_json)
+        return self
+```
+
+### Methods:
+
+#### check_settings
+
+```python
+check_settings() -> Self
+```
+
+Ask the engine whether the settings are its own.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_settings(self) -> Self:
+    """Ask the engine whether the settings are its own."""
+    settings_json = (
+        None if self.settings is None else self.settings.model_dump_json()
+    )
+    commol_rs.engine.EngineType(self.type).check_settings(settings_json)
+    return self
 ```
 
 ## Initial conditions

@@ -37,7 +37,7 @@ model = (
             {"bin": "D", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=200)
@@ -68,12 +68,12 @@ builder = ModelBuilder(
 
 Every `add_*` and `set_*` method returns the builder, so calls chain. The other methods:
 
-| Method            | Returns        | What it does                                                                                                                                      |
-| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build(typology)` | `Model`        | Validates the definition and returns the model. `typology` must be `"DifferenceEquations"`.                                                       |
-| `clone()`         | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                 |
-| `reset()`         | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
-| `get_summary()`   | `dict`         | The name, description, version and the ids added so far.                                                                                          |
+| Method                         | Returns        | What it does                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build(engine, settings=None)` | `Model`        | Validates the definition and returns the model for an engine: `"DifferenceEquations"` (discrete time) or `"DifferentialEquations"` (continuous time). `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`); None uses its defaults. One builder can build the model for each engine. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
+| `clone()`                      | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                     |
+| `reset()`                      | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`.                                                                                                                                                                                                                                                                                     |
+| `get_summary()`                | `dict`         | The name, description, version and the ids added so far.                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```python
 variant = builder.clone()
@@ -168,7 +168,7 @@ def inflow_per_step(mode: str) -> list[float]:
         .set_initial_conditions(
             population_size=100, bin_fractions=[{"bin": "A", "fraction": 1.0}]
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=7)["A"]
     return np.diff(series).round(3).tolist()
@@ -240,7 +240,7 @@ counted = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(counted).run(num_steps=10)
@@ -308,7 +308,7 @@ builder = (
     .add_parameter(id="k_out", value=0.05)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k_out")
 )
-stratified_model = builder.build(typology="DifferenceEquations")
+stratified_model = builder.build(engine="DifferenceEquations")
 
 print([c.name for c in stratified_model.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']

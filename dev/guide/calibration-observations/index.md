@@ -38,7 +38,7 @@ def model(k1: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model(0.4)).run(num_steps=70)
@@ -189,7 +189,7 @@ def ode_model(k1: float | None):
             population_size=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferentialEquations")
+        .build(engine="DifferentialEquations")
     )
 
 positions = [0.5, 1.75, 3.25, 6.5]

@@ -36,7 +36,7 @@ def model_with_b(b_fraction: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model_with_b(0.02)).run(num_steps=40)
@@ -145,7 +145,7 @@ def stratified(b_g1: float | None):
                 ]
             ),
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(stratified(0.01)).run(num_steps=20)

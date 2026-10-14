@@ -2314,6 +2314,11 @@
 <td>Engine behavior.</td>
 </tr>
 <tr>
+<td><code>crates/commol-core/src/types/engine.rs</code></td>
+<td><code>EngineType</code>, the one list of engines (model types): per entry, the model kind it runs, its settings and their validation, the form of its equations and the meaning of a rate. <code>ModelEngine</code>, the engine and settings of a model.</td>
+<td>The engines themselves.</td>
+</tr>
+<tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
 <td>Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
@@ -2417,17 +2422,12 @@
 </tr>
 <tr>
 <td><code>py-commol/src/engine.rs</code></td>
-<td><code>Engine</code> (either engine, for calibration), <code>EngineArg</code> (either Python engine object) and <code>engine_class!</code>, which defines the methods both Python engine classes share.</td>
+<td><code>commol_rs.engine</code>: <code>Engine::build</code>, which builds the engine an <code>EngineType</code> entry names, and the Python classes <code>Engine</code> (any engine, built from a model) and <code>EngineType</code> (the list, for Python to ask).</td>
 <td>Engine logic.</td>
 </tr>
 <tr>
-<td><code>py-commol/src/difference.rs</code>, <code>py-commol/src/differential.rs</code></td>
-<td>The Python classes <code>DifferenceEquations</code> and <code>DifferentialEquations</code>.</td>
-<td>Logic beyond type conversion.</td>
-</tr>
-<tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>Calibration types and functions; each takes either engine (<code>EngineArg</code>).</td>
+<td>Calibration types and functions; each takes an <code>Engine</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -2493,8 +2493,13 @@
 <td>Engine rules.</td>
 </tr>
 <tr>
+<td><code>context/engine.py</code></td>
+<td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings), <code>OdeSolver</code>, and the <code>EngineType</code> names as a <code>Literal</code> for static typing.</td>
+<td>Settings validation or engine meanings: ask <code>commol_rs.engine.EngineType</code>.</td>
+</tr>
+<tr>
 <td><code>context/_model/engine_state.py</code></td>
-<td>The only Python access to the engine queries, and <code>build_engine</code>, which builds the engine the typology names.</td>
+<td>The only Python access to the engine queries, and <code>build_engine</code>, which builds the engine the model names.</td>
 <td>Python re-implementations of them.</td>
 </tr>
 <tr>
@@ -2573,7 +2578,12 @@
 <tr>
 <td>Change the ODE integration or the solver settings</td>
 <td><code>commol-differential/src/solve.rs</code></td>
-<td><code>commol-differential/src/lib.rs</code>, <code>commol-core/src/types/dynamics.rs</code> (<code>OdeSolver</code>), <code>context/dynamics.py</code></td>
+<td><code>commol-differential/src/lib.rs</code>, <code>commol-core/src/types/engine.rs</code> (<code>OdeSolver</code>), <code>context/engine.py</code></td>
+</tr>
+<tr>
+<td>Add a model type (engine)</td>
+<td><code>commol-core/src/types/engine.rs</code> (<code>EngineType</code>)</td>
+<td><code>py-commol/src/engine.rs</code> (<code>Engine</code>), <code>context/engine.py</code>, <a href="../maintainer-playbook/#model-type-engine">checklist</a></td>
 </tr>
 <tr>
 <td>Change impulses</td>

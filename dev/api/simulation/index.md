@@ -1013,7 +1013,7 @@ def __repr__(self) -> str:
 
 Bases: `BaseModel`
 
-Solver settings of a differential-equations model.
+Settings of the `DifferentialEquations` engine.
 
 Attributes:
 
@@ -1023,12 +1023,12 @@ Attributes:
 | `rtol`   | `float`                    | Relative tolerance of each state component.                                                                                      |
 | `atol`   | `float`                    | Absolute tolerance of each state component, in the unit of the bins.                                                             |
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/engine.py`
 
 ```python
 class OdeSolver(BaseModel):
     """
-    Solver settings of a differential-equations model.
+    Settings of the ``DifferentialEquations`` engine.
 
     Attributes
     ----------

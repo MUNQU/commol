@@ -43,7 +43,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -76,7 +76,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -111,7 +111,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -176,7 +176,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -211,7 +211,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -246,7 +246,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -305,7 +305,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -355,7 +355,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -430,7 +430,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 # Generated compartments:
@@ -488,7 +488,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 observed_data = [

@@ -61,7 +61,6 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
-        solver: OdeSolver | None = None,
         step_unit: str | None = None,
     ):
         """
@@ -80,10 +79,6 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
-        solver : OdeSolver | None, default=None
-            Solver settings of a DifferentialEquations model (method and
-            tolerances). None uses the defaults of `OdeSolver`. A
-            DifferenceEquations model takes none.
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
@@ -94,7 +89,6 @@ class ModelBuilder:
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
-        self._solver: OdeSolver | None = solver
         self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
@@ -894,42 +888,20 @@ class ModelBuilder:
         self._series_counter = 0
         return self
 
-    def _validate_typology(self, typology: str) -> ModelTypes:
-        """
-        Validate and convert typology string to ModelTypes enum.
-
-        Parameters
-        ----------
-        typology : str
-            The model typology as a string.
-
-        Returns
-        -------
-        ModelTypes
-            The validated ModelTypes enum value.
-
-        Raises
-        ------
-        ValueError
-            If the typology string is not a valid ModelTypes value.
-        """
-        try:
-            return ModelTypes(typology)
-        except ValueError:
-            valid_values = [t.value for t in ModelTypes]
-            raise ValueError(
-                f"Invalid typology: '{typology}'. Must be one of {valid_values}"
-            ) from None
-
-    def build(self, typology: str) -> Model:
+    def build(
+        self, engine: EngineType, settings: EngineSettings | None = None
+    ) -> Model:
         """
         Build and return the final Model instance.
 
         Parameters
         ----------
-        typology : str
-            Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations" or "DifferentialEquations".
+        engine : EngineType
+            The engine that runs the model: ``"DifferenceEquations"``
+            (discrete time) or ``"DifferentialEquations"`` (continuous time).
+        settings : EngineSettings | None, default=None
+            Settings of that engine; None uses its defaults. Only
+            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
         Returns
         -------
@@ -939,16 +911,13 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If validation fails, required components are missing,
-            typology is invalid, or a per-compartment override names an unknown
-            compartment or makes the initial population exceed
-            ``population_size``.
+            If validation fails, required components are missing, the engine
+            is unknown, the settings are not settings of that engine, or a
+            per-compartment override names an unknown compartment or makes
+            the initial population exceed ``population_size``.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
-
-        # Validate and convert typology string to enum
-        validated_typology = self._validate_typology(typology)
 
         population = Population(
             bins=self._bins,
@@ -958,11 +927,7 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(
-            typology=validated_typology,
-            transitions=self._transitions,
-            solver=self._solver,
-        )
+        dynamics = Dynamics(transitions=self._transitions)
 
         model = Model(
             name=self._name,
@@ -971,11 +936,12 @@ class ModelBuilder:
             population=population,
             parameters=self._parameters,
             dynamics=dynamics,
+            engine=ModelEngine(type=engine, settings=settings),
             step_unit=self._step_unit,
         )
 
         logging.info(
-            f"Model '{self._name}' successfully built with typology '{typology}'."
+            f"Model '{self._name}' successfully built for the {engine} engine."
         )
 
         return model
@@ -986,21 +952,20 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, solver: OdeSolver | None = None, step_unit: str | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None)
 ```
 
 Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type        | Description                                | Default                                                                                                                                                                                                            |
-| ------------- | ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str`       | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
-| `description` | \`str       | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
-| `version`     | \`str       | None\`                                     | The version number of the model.                                                                                                                                                                                   |
-| `bin_unit`    | \`str       | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
-| `solver`      | \`OdeSolver | None\`                                     | Solver settings of a DifferentialEquations model (method and tolerances). None uses the defaults of OdeSolver. A DifferenceEquations model takes none.                                                             |
-| `step_unit`   | \`str       | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
+| Name          | Type  | Description                                | Default                                                                                                                                                                                                            |
+| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
+| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
+| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                   |
+| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
+| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1011,7 +976,6 @@ def __init__(
     description: str | None = None,
     version: str | None = None,
     bin_unit: str | None = None,
-    solver: OdeSolver | None = None,
     step_unit: str | None = None,
 ):
     """
@@ -1030,10 +994,6 @@ def __init__(
         Individual bins can override this with their own unit parameter.
         Units are optional but required for model.print_equations() and
         model.check_unit_consistency().
-    solver : OdeSolver | None, default=None
-        Solver settings of a DifferentialEquations model (method and
-        tolerances). None uses the defaults of `OdeSolver`. A
-        DifferenceEquations model takes none.
     step_unit : str | None, default=None
         Unit of one step on the axis, of any single dimension (for example
         ``"day"`` or ``"meter"``). The unit check requires every flow to be
@@ -1044,7 +1004,6 @@ def __init__(
     self._description: str | None = description
     self._version: str | None = version
     self._bin_unit: str | None = bin_unit
-    self._solver: OdeSolver | None = solver
     self._step_unit: str | None = step_unit
 
     self._bins: list[Bin] = []
@@ -1874,16 +1833,17 @@ def reset(self) -> Self:
 #### build
 
 ```python
-build(typology: str) -> Model
+build(engine: EngineType, settings: EngineSettings | None = None) -> Model
 ```
 
 Build and return the final Model instance.
 
 Parameters:
 
-| Name       | Type  | Description                                                                                                      | Default    |
-| ---------- | ----- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
-| `typology` | `str` | Type of the model. Must be one of the valid ModelTypes values: "DifferenceEquations" or "DifferentialEquations". | *required* |
+| Name       | Type             | Description                                                                                                         | Default                                                                                                   |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `engine`   | `EngineType`     | The engine that runs the model: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
+| `settings` | \`EngineSettings | None\`                                                                                                              | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
 
 Returns:
 
@@ -1893,22 +1853,27 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, required components are missing, typology is invalid, or a per-compartment override names an unknown compartment or makes the initial population exceed population_size. |
+| Type         | Description                                                                                                                                                                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, required components are missing, the engine is unknown, the settings are not settings of that engine, or a per-compartment override names an unknown compartment or makes the initial population exceed population_size. |
 
 Source code in `commol/api/model_builder.py`
 
 ```python
-def build(self, typology: str) -> Model:
+def build(
+    self, engine: EngineType, settings: EngineSettings | None = None
+) -> Model:
     """
     Build and return the final Model instance.
 
     Parameters
     ----------
-    typology : str
-        Type of the model. Must be one of the valid ModelTypes values:
-        "DifferenceEquations" or "DifferentialEquations".
+    engine : EngineType
+        The engine that runs the model: ``"DifferenceEquations"``
+        (discrete time) or ``"DifferentialEquations"`` (continuous time).
+    settings : EngineSettings | None, default=None
+        Settings of that engine; None uses its defaults. Only
+        ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
     Returns
     -------
@@ -1918,16 +1883,13 @@ def build(self, typology: str) -> Model:
     Raises
     ------
     ValueError
-        If validation fails, required components are missing,
-        typology is invalid, or a per-compartment override names an unknown
-        compartment or makes the initial population exceed
-        ``population_size``.
+        If validation fails, required components are missing, the engine
+        is unknown, the settings are not settings of that engine, or a
+        per-compartment override names an unknown compartment or makes
+        the initial population exceed ``population_size``.
     """
     if self._initial_conditions is None:
         raise ValueError("Initial conditions must be set")
-
-    # Validate and convert typology string to enum
-    validated_typology = self._validate_typology(typology)
 
     population = Population(
         bins=self._bins,
@@ -1937,11 +1899,7 @@ def build(self, typology: str) -> Model:
         initial_conditions=self._initial_conditions,
     )
 
-    dynamics = Dynamics(
-        typology=validated_typology,
-        transitions=self._transitions,
-        solver=self._solver,
-    )
+    dynamics = Dynamics(transitions=self._transitions)
 
     model = Model(
         name=self._name,
@@ -1950,11 +1908,12 @@ def build(self, typology: str) -> Model:
         population=population,
         parameters=self._parameters,
         dynamics=dynamics,
+        engine=ModelEngine(type=engine, settings=settings),
         step_unit=self._step_unit,
     )
 
     logging.info(
-        f"Model '{self._name}' successfully built with typology '{typology}'."
+        f"Model '{self._name}' successfully built for the {engine} engine."
     )
 
     return model

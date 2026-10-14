@@ -39,7 +39,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 # Noisy observations of a model with k1 = 0.4, k2 = 0.1

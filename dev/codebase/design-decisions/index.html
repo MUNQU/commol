@@ -2056,6 +2056,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#one-list-of-engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One list of engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#one-right-hand-side-two-engines" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2833,6 +2844,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#one-list-of-engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One list of engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#one-right-hand-side-two-engines" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3320,6 +3342,31 @@ every observation position and window start.</p>
 <code>tests/plotting/test_plotter.py::TestDifferentialModel</code>,
 <code>tests/probabilistic/test_differential.py</code>.</p>
 <h2 id="engines">Engines<a class="headerlink" href="#engines" title="Permanent link">&para;</a></h2>
+<h3 id="one-list-of-engines">One list of engines<a class="headerlink" href="#one-list-of-engines" title="Permanent link">&para;</a></h3>
+<p><code>EngineType</code> (<code>crates/commol-core/src/types/engine.rs</code>) is the one list of
+model types. An entry is an engine, named by its type
+(<code>DifferenceEquations</code>, <code>DifferentialEquations</code>), and it names the model kind
+it runs (today only <code>compartmental</code>). Each entry validates its settings and
+says the form of its equations and the meaning of a rate (<code>per_step</code> or
+<code>continuous</code>). <code>Engine::build</code> (<code>py-commol/src/engine.rs</code>) builds the engine of
+an entry. A model holds its engine and the settings of that engine,
+<code>Model.engine = {type, settings}</code>, because the engine sets what a rate means,
+so a saved model reproduces its runs.</p>
+<p>Python asks the list (<code>commol_rs.engine.EngineType</code>): it builds the engine,
+prints the left-hand side of an equation and checks settings through it, and
+never branches on an engine name. It keeps the names only as the <code>Literal</code>
+<code>EngineType</code> (<code>context/engine.py</code>) for static typing and completion; a test
+checks that it equals the list. Generating the <code>Literal</code> from Rust would need
+a code-generation step for two names; the test catches the same drift. The
+entry names its model kind, so another kind (for example an agent network)
+adds entries, not a second meaning of the type.</p>
+<p>The builder takes the engine and its settings where it chooses the engine,
+<code>build(engine, settings=None)</code>, so one builder builds a model for each engine
+with its own settings. Settings of one engine given to another raise an error
+from the engine that names both.</p>
+<p><strong>Guards:</strong> <code>crates/commol-core/src/types/engine.rs</code> (tests),
+<code>py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs</code>,
+<code>tests/building/test_engine.py</code>.</p>
 <h3 id="one-right-hand-side-two-engines">One right-hand side, two engines<a class="headerlink" href="#one-right-hand-side-two-engines" title="Permanent link">&para;</a></h3>
 <p><code>CompiledModel::derivatives</code> (<code>crates/commol-model/src/system.rs</code>) computes
 every flow from one snapshot of the state: it is the right-hand side
@@ -3338,8 +3385,8 @@ differential engine integrates them.</p>
 symbolic derivative of every rate would be new numerical code. The matrix is
 dense (<code>nalgebra</code>) below <code>SPARSE_THRESHOLD</code> state components and sparse
 (<code>faer</code>) from there; <code>diffsol</code> finds the sparse pattern by passing NaN through
-<code>J·v</code>. Solver settings live in the model (<code>Dynamics.solver</code>), so a saved model
-reproduces a run.</p>
+<code>J·v</code>. Solver settings live in the model (<code>Model.engine.settings</code>), so a saved
+model reproduces a run.</p>
 <p><strong>Guards:</strong> <code>crates/commol-differential/src/tests.rs</code>
 (<code>bdf_solves_a_stiff_model_within_the_tolerance</code>,
 <code>a_large_stiff_model_uses_the_sparse_path</code>).</p>

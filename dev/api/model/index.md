@@ -20,6 +20,7 @@ Attributes:
 | `population`  | `Population`      | Population details, subpopulations, stratifications and initial conditions. |
 | `parameters`  | `list[Parameter]` | A list of global model parameters.                                          |
 | `dynamics`    | `Dynamics`        | The rules that govern system evolution.                                     |
+| `engine`      | `ModelEngine`     | The engine that runs the model, and its settings.                           |
 | `step_unit`   | \`str             | None\`                                                                      |
 
 Source code in `commol/context/model.py`
@@ -43,6 +44,8 @@ class Model(BaseModel):
         A list of global model parameters.
     dynamics : Dynamics
         The rules that govern system evolution.
+    engine : ModelEngine
+        The engine that runs the model, and its settings.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check uses it; when None, the check infers it
@@ -61,6 +64,7 @@ class Model(BaseModel):
     population: Population
     parameters: list[Parameter]
     dynamics: Dynamics
+    engine: ModelEngine
     step_unit: str | None = Field(
         None,
         description=(

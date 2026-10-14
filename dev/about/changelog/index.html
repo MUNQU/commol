@@ -2562,16 +2562,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li>An ODE engine: a model built with <code>typology="DifferentialEquations"</code> runs in
+<li>An ODE engine: a model built with <code>engine="DifferentialEquations"</code> runs in
   continuous time, <code>dX/dt = Σ flows</code>, integrated by <code>diffsol</code>
-  (<code>commol_rs.differential.DifferentialEquations</code>). It has the same flows,
+  (<code>commol-differential</code>). It has the same flows,
   outputs, accumulators, calibration, ensembles, reports and plots as a
   difference model. On <code>[n, n + 1)</code> a rate sees <code>step = n</code> and the continuous
   <code>t</code>. The engine restarts its integration at each integer when a rate reads
   <code>step</code>, and where <code>t</code> reaches a value a rate compares it with
   (<code>t &gt;= t_on</code>), so the solver cannot step over a jump.</li>
-<li><code>OdeSolver</code> (<code>method</code> <code>"tsit45"</code> or <code>"bdf"</code>, <code>rtol</code>, <code>atol</code>), stored in the
-  model as <code>Dynamics.solver</code> and set with <code>ModelBuilder(..., solver=...)</code>.</li>
+<li><code>OdeSolver</code> (<code>method</code> <code>"tsit45"</code> or <code>"bdf"</code>, <code>rtol</code>, <code>atol</code>), the settings
+  of the <code>DifferentialEquations</code> engine, stored in the model as
+  <code>Model.engine.settings</code> and set with
+  <code>build(engine="DifferentialEquations", settings=...)</code>.</li>
+<li>One list of engines in the Rust engine (<code>EngineType</code>): each entry names the
+  model kind it runs, validates its settings, and says the form of its
+  equations and what a rate means (<code>per_step</code> or <code>continuous</code>). Python asks it
+  through <code>commol_rs.engine.EngineType</code> instead of branching on engine names.</li>
 <li><code>Simulation.run_at(at)</code>: the outputs at the given sorted positions. A
   differential model takes any position, such as <code>0.5</code>.</li>
 <li><code>SimulationResults</code>: what <code>Simulation.run</code> and <code>run_at</code> return. A <code>dict</code>
@@ -2599,9 +2605,45 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   observation, constraint, impulse transition or series parameter that holds
   a rejected position. The engine trait runs only at positions
   (<code>run_at_positions_into_buffer</code>); <code>run(n)</code> returns the grid it ran on.</li>
-<li>Names of positions, lengths and counts, and names with more than one
-  meaning. No old name is kept; an old keyword raises an error that names it.</li>
+<li>The engine of a model and its settings are one field,
+  <code>Model.engine = {type, settings}</code> (<code>ModelEngine</code>), which replaces
+  <code>Model.dynamics.typology</code>; <code>Dynamics</code> holds only the transitions. The
+  builder takes the engine where it builds, so one builder builds the model
+  for each engine with its own settings. Settings of one engine given to
+  another raise an error from the engine that names both. A model file
+  saved before has <code>dynamics.typology</code> and does not load: move it to
+  <code>"engine": {"type": …, "settings": null}</code>.</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>builder.build(typology="DifferenceEquations")</code></td>
+<td><code>builder.build(engine="DifferenceEquations")</code></td>
+</tr>
+<tr>
+<td><code>model.dynamics.typology</code></td>
+<td><code>model.engine.type</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.difference.DifferenceEquations(model)</code>, <code>commol_rs.differential.DifferentialEquations(model)</code></td>
+<td><code>commol_rs.engine.Engine(model)</code>, the engine the model names</td>
+</tr>
+<tr>
+<td>- Names of positions, lengths and counts, and names with more than one</td>
+<td></td>
+</tr>
+<tr>
+<td>meaning. No old name is kept; an old keyword raises an error that names it.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -2768,6 +2810,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Dynamics</code>, the order check of <code>Simulation.run_at</code>).</li>
 <li>The <code>"weighted_sse"</code> loss and <code>LossConfig.weighted_sse()</code>. Use <code>"sse"</code>,
   which uses the weights.</li>
+<li><code>commol.constants.ModelTypes</code>. The engine names are the <code>Literal</code>
+  <code>commol.context.engine.EngineType</code>.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
