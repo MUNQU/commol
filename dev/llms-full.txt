@@ -20308,7 +20308,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The guide is rewritten and split into pages with one job each (building models, transitions, expressions, time patterns, units, simulations, and six calibration pages). Every example runs in CI, and every claim was checked against the engine. Behaviors that were described wrongly are now documented as they are, among them: a violated constraint replaces the loss with a penalty.
 - The API reference documents every public name, and `Model`, plotting and reports have their own pages.
 - The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks the pages of the `dev` version.
-- `README.md` is a short landing page with links to the documentation.
+- `README.md` presents Commol as a library for declarative dynamical modelling: the idea behind it, what it can model and its limits, an example that derives, calibrates and simulates a model, and links to the guides. The citation title is "Commol: High-Performance Declarative Dynamical Modelling in Python".
+- The package metadata on PyPI has the same description, and keywords and classifiers (Python versions, audience, topic, development status).
 
 ## [0.2.0] - 2026-10-12
 
