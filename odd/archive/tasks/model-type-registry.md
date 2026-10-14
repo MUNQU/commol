@@ -87,7 +87,7 @@ Each row says why the recommendation beats each alternative.
 
 ## Delivery
 
-- Strategy: one PR to `develop` from `refactor/model-type-registry`,
+- Strategy: one PR to `develop` from `refactor/model-type-registry` (PR #105),
   squash-merged (`refactor(engine): …`).
 - Order: T1 → T2 → T3 → T4.
 - Version impact: none for released names: `solver` and
@@ -97,7 +97,50 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Branch `refactor/model-type-registry` from `develop` at `e997d58`
+(2026-10-14).
+
+- T1 (S1, D1): `crates/commol-core/src/types/engine.rs` holds the list,
+  `EngineType` (`ALL`, `name`, `from_name`, `kind`, `rate_meaning`,
+  `equation_lhs`, `settings`), with `ModelKind` (`compartmental`),
+  `RateMeaning` (`per_step`, `continuous`), `EngineSettings` and
+  `OdeSolver` (moved from `dynamics.rs`, now `deny_unknown_fields` and
+  `validate`). An entry cannot build its engine in `commol-core`, which the
+  engine crates depend on, so `Engine::build` lives in the bindings
+  (`py-commol/src/engine.rs`); an exhaustive `match` makes the compiler name
+  every place a new entry needs. One Python class `commol_rs.engine.Engine`
+  replaces `DifferenceEquations`, `DifferentialEquations`, `EngineArg` and
+  `engine_class!`; `commol_rs.engine.EngineType` exposes the list.
+  `build_engine` and `print_equations` ask it: the two `if/else` of D-2 are
+  gone, and `commol.constants.ModelTypes` is removed.
+- Rust tests of S1: `engine.rs` (core) checks for every entry its name, kind,
+  rate meaning, equations, defaults and the rejection of wrong settings;
+  `py-commol/src/engine.rs` checks that every entry builds its engine and
+  runs, and that the engine takes the model's settings. The binding crate's
+  tests run with `cargo test -p commol` (added to the test commands; CI
+  already runs `cargo test --workspace`).
+- T2 (S2, D2 → `model-kind-interface` D1, D3): `Model.engine = {type,
+  settings}` (`ModelEngine`, Python `context/engine.py` and Rust); `Dynamics`
+  keeps only `transitions`. In Rust, `ModelEngine` reads its settings through
+  the entry, so a model with settings of another engine does not load. Python
+  `ModelEngine` asks `EngineType.check_settings`; the error names both
+  engines. `ModelBuilder(solver=…)` is gone; `build(engine, settings=None)`.
+  `engine` has no default (as `typology` had none).
+  `EngineSettings = OdeSolver`: the union has one member, since the
+  difference engine takes no settings; Rust finds the owner of foreign
+  settings by trying the other entries.
+- `print_equations` keeps its header `Model Type: <engine>`, so the
+  print-equation tests are unchanged except the `build` call.
+- T3 (S3): checklist "Model type (engine)" in
+  `docs/codebase/maintainer-playbook.md`; decision "One list of engines" in
+  `design-decisions.md`; `repository-map.md`, `mental-model.md`,
+  `AGENTS.md`, the guides, `advanced/model-structure.md` and the changelog
+  (`[Unreleased]`: Added, Changed with a mapping table, Removed).
+- T4: `cargo fmt --check`, `cargo clippy --workspace --all-targets -D
+  warnings`, the Rust tests (238 passed, `-p commol` included), rustdoc with
+  `-D warnings`, `maturin develop --release`, `pytest` (954 passed, 4
+  xfailed), `ruff check`, `ruff format --check`, `ty check commol`,
+  `vulture` and `mkdocs build --strict`: all pass.
 
 ## Log
 
@@ -122,3 +165,6 @@ Each row says why the recommendation beats each alternative.
 - L8 (user, 2026-10-13): while ordering the pending tasks, split the layout
   of `model-kind-interface` D1 between the two ODDs: this one makes
   `Model.engine` (T2), that one `Model.structure` (its T0).
+- L9 (agent, 2026-10-14): implemented T1–T4 (see Evidence). `Engine::build`
+  is in the bindings, not `commol-core`, because the core cannot depend on
+  the engine crates; its tests run with `cargo test -p commol`.
