@@ -87,7 +87,7 @@ def _assert_sequence_close(
         )
 
 
-def assert_population_conserved(
+def assert_total_conserved(
     results: Series,
     total: float,
     *,
@@ -102,7 +102,7 @@ def assert_population_conserved(
     results : Series
         A simulation result in the ``dict_of_lists`` format.
     total : float
-        The population every step must hold.
+        The total every step must hold.
     outputs : Iterable[str] | None
         The outputs to sum. Defaults to every output, so a model with
         accumulators must name its compartments.

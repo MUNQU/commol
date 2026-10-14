@@ -112,7 +112,7 @@ def test_the_assumptions_give_the_stated_map() -> None:
     ("recruitment", "demography"),
     [
         ("Lam", lambda _: LAMBDA),
-        ("r * N * (1 - N / k)", lambda t: 0.5 * t * (1 - t / 1000)),
+        ("r * total * (1 - total / k)", lambda t: 0.5 * t * (1 - t / 1000)),
     ],
 )
 def test_the_total_follows_the_demographic_equation(
@@ -146,7 +146,7 @@ def test_without_infection_only_the_demography_is_left() -> None:
     ("recruitment", "equilibrium"),
     [
         ("Lam", LAMBDA / (1 - math.exp(-MU))),
-        ("r * N * (1 - N / k)", 1000 * (0.5 + math.exp(-MU) - 1) / 0.5),
+        ("r * total * (1 - total / k)", 1000 * (0.5 + math.exp(-MU) - 1) / 0.5),
     ],
 )
 def test_the_total_tends_to_the_demographic_equilibrium(

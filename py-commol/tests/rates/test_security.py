@@ -23,14 +23,14 @@ class TestBasicValidation:
             # Basic arithmetic
             "beta * gamma",
             "S + I + R",
-            "N - S",
-            "beta * S * I / N",
+            "total - S",
+            "beta * S * I / total",
             "gamma * I",
             # Mathematical functions
             "sin(step)",
             "cos(2 * pi * step / 365)",
             "exp(-decay_rate * step)",
-            "log(population_size)",
+            "log(total_size)",
             "sqrt(variance)",
             "abs(difference)",
             "max(a, b)",
@@ -40,7 +40,7 @@ class TestBasicValidation:
             "ceil(fractional_value)",
             "round(precise_value)",
             # Complex expressions
-            "(S + I + R) / N",
+            "(S + I + R) / total",
             "beta * (1 - vaccination_rate)",
             "1 / (1 + exp(-steepness * (step - midpoint)))",
             "beta * (1 + 0.1 * sin(2 * pi * step / 365))",

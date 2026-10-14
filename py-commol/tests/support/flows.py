@@ -56,7 +56,7 @@ def flow_model(
     ----------
     values : Mapping[str, float]
         Bin id to its initial value, in declaration order. Their sum is the
-        population size, so it must be a positive integer.
+        total, so it must be finite and greater than 0.
     flows : Sequence[Flow]
         The transitions.
     parameters : Mapping[str, float | str] | None
@@ -91,11 +91,8 @@ def flow_model(
             accumulators=list(flow.accumulators) or None,
         )
     total = sum(values.values())
-    # A total that is not an integer goes through as it is, so the builder
-    # rejects it instead of this helper rounding it.
-    population = int(total) if float(total).is_integer() else total
     builder.set_initial_conditions(
-        population_size=population,
+        total=total,
         bin_fractions=[
             {"bin": bin_id, "fraction": value / total if total else 0.0}
             for bin_id, value in values.items()

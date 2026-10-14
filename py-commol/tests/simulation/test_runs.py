@@ -18,7 +18,7 @@ from tests.support import (
     SIR_START,
     a_to_b_builder,
     assert_close,
-    assert_population_conserved,
+    assert_total_conserved,
     build,
     reference_run,
     sir_builder,
@@ -59,7 +59,7 @@ class TestResults:
         assert list(result) == ["S", "I", "R"]
         assert_close(result, PER_CAPITA_SIR, rel=ENGINE_REL)
         assert result["I"][1] == pytest.approx(108.5)
-        assert_population_conserved(result, 1000.0)
+        assert_total_conserved(result, 1000.0)
 
     def test_a_run_holds_the_positions_of_its_grid(self) -> None:
         result = Simulation(_per_capita_sir()).run(10)
@@ -115,7 +115,7 @@ class TestRepeatableRuns:
 
         simulation.engine.step()
 
-        assert simulation.engine.population[0] == pytest.approx(result["A"][5] * 0.9)
+        assert simulation.engine.state[0] == pytest.approx(result["A"][5] * 0.9)
 
 
 class TestModelChanges:

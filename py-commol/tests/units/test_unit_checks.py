@@ -4,7 +4,6 @@ import pint
 import pytest
 
 from commol.context.parameter import Parameter
-from commol.context.stratification import Stratification
 from commol.utils.equations import (
     check_all_parameters_have_units,
     check_equation_units,
@@ -23,7 +22,7 @@ def common_units() -> None:
     These tests call ``check_equation_units`` without a model, so nothing
     registers the units they use.
     """
-    for name, definition in (("person", "[population]"), ("time", "[time_abstract]")):
+    for name, definition in (("person", "[person]"), ("time", "[time_abstract]")):
         try:
             ureg(name)
         except pint.UndefinedUnitError:
@@ -32,20 +31,20 @@ def common_units() -> None:
 
 CONSISTENT = [
     pytest.param(
-        "beta * S * I / N",
-        {"beta": "1/day", "S": "person", "I": "person", "N": "person"},
+        "beta * S * I / total",
+        {"beta": "1/day", "S": "person", "I": "person", "total": "person"},
         PERSON_RATE,
         id="mass-action",
     ),
     pytest.param(
-        "beta * exp(-decay * step) * S * I / N",
+        "beta * exp(-decay * step) * S * I / total",
         {
             "beta": "1/day",
             "decay": "dimensionless",
             "step": "dimensionless",
             "S": "person",
             "I": "person",
-            "N": "person",
+            "total": "person",
         },
         PERSON_RATE,
         id="exponential-decay",
@@ -54,13 +53,13 @@ CONSISTENT = [
         "rate * I", {"rate": "1/time", "I": "person"}, "person/time", id="abstract-time"
     ),
     pytest.param(
-        "beta * sin(I / N) * S",
-        {"beta": "1/day", "I": "person", "N": "person", "S": "person"},
+        "beta * sin(I / total) * S",
+        {"beta": "1/day", "I": "person", "total": "person", "S": "person"},
         PERSON_RATE,
         id="division-inside-a-function",
     ),
     pytest.param(
-        "beta * (1 + amplitude * sin(2 * pi * step / 365)) * S * I / N",
+        "beta * (1 + amplitude * sin(2 * pi * step / 365)) * S * I / total",
         {
             "beta": "1/day",
             "amplitude": "dimensionless",
@@ -68,13 +67,13 @@ CONSISTENT = [
             "step": "dimensionless",
             "S": "person",
             "I": "person",
-            "N": "person",
+            "total": "person",
         },
         PERSON_RATE,
         id="seasonal-sin",
     ),
     pytest.param(
-        "beta * (1 + amplitude * cos(2 * pi * step / 365)) * S * I / N",
+        "beta * (1 + amplitude * cos(2 * pi * step / 365)) * S * I / total",
         {
             "beta": "1/day",
             "amplitude": "dimensionless",
@@ -82,19 +81,19 @@ CONSISTENT = [
             "step": "dimensionless",
             "S": "person",
             "I": "person",
-            "N": "person",
+            "total": "person",
         },
         PERSON_RATE,
         id="seasonal-cos",
     ),
     pytest.param(
-        "base_rate * log(1 + I / scale) * S * I / N",
+        "base_rate * log(1 + I / scale) * S * I / total",
         {
             "base_rate": "1/day",
             "I": "person",
             "scale": "person",
             "S": "person",
-            "N": "person",
+            "total": "person",
         },
         PERSON_RATE,
         id="log",
@@ -134,7 +133,7 @@ CONSISTENT = [
     ),
     pytest.param(
         "base * exp(-decay * step) * (1 + amp1 * sin(2 * pi * step / 365) "
-        "+ amp2 * cos(4 * pi * step / 365)) * S * I / N",
+        "+ amp2 * cos(4 * pi * step / 365)) * S * I / total",
         {
             "base": "1/day",
             "amp1": "dimensionless",
@@ -144,7 +143,7 @@ CONSISTENT = [
             "pi": "dimensionless",
             "S": "person",
             "I": "person",
-            "N": "person",
+            "total": "person",
         },
         PERSON_RATE,
         id="combined-functions",
@@ -167,7 +166,7 @@ INCONSISTENT = [
         id="convertible-time-units-are-not-equal",
     ),
     pytest.param(
-        "beta * (1 + amp * sin(2 * pi * step / 365)) * S * I / N",
+        "beta * (1 + amp * sin(2 * pi * step / 365)) * S * I / total",
         {
             "beta": "1/day",
             "amp": "dimensionless",
@@ -175,7 +174,7 @@ INCONSISTENT = [
             "pi": "dimensionless",
             "S": "person",
             "I": "person",
-            "N": "person",
+            "total": "person",
         },
         "person",
         "Unit mismatch",
@@ -196,8 +195,14 @@ INCONSISTENT = [
         id="dimensional-log",
     ),
     pytest.param(
-        "beta * exp(time) * S * I / N",
-        {"beta": "1/day", "time": "day", "S": "person", "I": "person", "N": "person"},
+        "beta * exp(time) * S * I / total",
+        {
+            "beta": "1/day",
+            "time": "day",
+            "S": "person",
+            "I": "person",
+            "total": "person",
+        },
         PERSON_RATE,
         "Cannot convert|Error",
         id="dimensional-exp",
@@ -302,24 +307,18 @@ class TestHelpers:
             ]
         )
 
-    def test_population_totals_have_the_bin_unit(self) -> None:
+    def test_the_total_and_the_subgroup_totals_have_the_bin_unit(self) -> None:
         units = get_predefined_variable_units(
-            [Stratification(id="age", categories=["young", "old"])],
+            ["A", "A_young", "total_old", "total_young", "total_young_urban"],
             bin_unit="person",
         )
 
-        assert units["N"] == "person"
-        assert units["N_young"] == "person"
-        assert units["N_old"] == "person"
+        assert units == {
+            "total": "person",
+            "total_old": "person",
+            "total_young": "person",
+            "total_young_urban": "person",
+        }
 
-    def test_totals_of_category_combinations_have_the_bin_unit(self) -> None:
-        units = get_predefined_variable_units(
-            [
-                Stratification(id="age", categories=["young", "old"]),
-                Stratification(id="location", categories=["urban", "rural"]),
-            ],
-            bin_unit="person",
-        )
-
-        for name in ("N", "N_young", "N_urban", "N_young_urban", "N_old_rural"):
-            assert units[name] == "person"
+    def test_without_a_bin_unit_there_are_no_units(self) -> None:
+        assert get_predefined_variable_units(["total_young"], bin_unit=None) == {}

@@ -4,7 +4,7 @@ from .assertions import (
     ENGINE_REL,
     ODE_REL,
     assert_close,
-    assert_population_conserved,
+    assert_total_conserved,
 )
 from .flows import Flow, flow_model, increments
 from .models import (
@@ -29,7 +29,7 @@ from .oracles import (
 )
 from .problems import bounded, initial_condition_problem, observed
 from .reference import SIR_START, reference_run, sir_flows, total
-from .simulation import initial_population, run
+from .simulation import initial_state, run
 
 __all__ = [
     "ENGINE_REL",
@@ -38,7 +38,7 @@ __all__ = [
     "SIR_START",
     "a_to_b_builder",
     "assert_close",
-    "assert_population_conserved",
+    "assert_total_conserved",
     "assert_threshold",
     "bisect",
     "bounded",
@@ -51,7 +51,7 @@ __all__ = [
     "growth_ratio",
     "increments",
     "initial_condition_problem",
-    "initial_population",
+    "initial_state",
     "observed",
     "override_builder",
     "reference_run",

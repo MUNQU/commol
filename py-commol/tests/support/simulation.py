@@ -13,7 +13,7 @@ def run(model: Model | ModelBuilder, steps: int) -> dict[str, list[float]]:
     return Simulation(model).run(steps)
 
 
-def initial_population(model: Model[CompartmentalStructure]) -> dict[str, float]:
-    """The population of each compartment the engine starts from."""
+def initial_state(model: Model[CompartmentalStructure]) -> dict[str, float]:
+    """The amount of each compartment the engine starts from."""
     engine = Simulation(model).engine
-    return dict(zip(engine.compartments, engine.population, strict=True))
+    return dict(zip(engine.compartments, engine.state, strict=True))

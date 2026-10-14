@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from commol import ModelBuilder
 from commol.context._model.engine_state import transition_flows
 from commol.context.model import Model
-from tests.support import a_to_b_builder, assert_population_conserved, build, run
+from tests.support import a_to_b_builder, assert_total_conserved, build, run
 
 
 def _age_model() -> Model:
@@ -25,13 +25,13 @@ def _age_model() -> Model:
 
 
 class TestCategoryTransitions:
-    def test_the_engine_moves_population_between_categories(self) -> None:
+    def test_the_engine_moves_amounts_between_categories(self) -> None:
         result = run(_age_model(), 1)
 
         # rec moves 0.1 of each A compartment; aging moves 0.2 of A_young.
         assert result["A_young"][1] == pytest.approx(500 - 50 - 100)
         assert result["A_old"][1] == pytest.approx(500 - 50 + 100)
-        assert_population_conserved(result, 1000.0)
+        assert_total_conserved(result, 1000.0)
 
     def test_printed_flows_are_the_simulated_ones(self) -> None:
         flows = {
@@ -54,7 +54,7 @@ class TestBinsSharingAPrefix:
             .add_parameter(id="k", value=0.5)
             .add_transition(id="t", source=["A"], target=["B"], rate="k")
             .set_initial_conditions(
-                population_size=1000,
+                total=1000,
                 bin_fractions=[
                     {"bin": bin_id, "fraction": 0.25}
                     for bin_id in ("A", "AB", "B", "BB")
@@ -82,7 +82,7 @@ class TestStoichiometricTransitions:
                 id="forward", source=["A", "B"], target=["C", "C"], rate="k * A * B"
             )
             .set_initial_conditions(
-                population_size=100,
+                total=100,
                 bin_fractions=[
                     {"bin": "A", "fraction": 0.5},
                     {"bin": "B", "fraction": 0.5},

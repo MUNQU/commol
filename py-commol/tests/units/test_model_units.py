@@ -57,11 +57,11 @@ def _vaccination(rate: str, threshold_unit: str = "person") -> Model:
         .add_parameter(id="threshold", value=100, unit=threshold_unit)
         .add_transition(id="vaccination", source=["S"], target=["V"], rate=rate)
         .add_transition(
-            id="infection", source=["S"], target=["I"], rate="beta * S * I / N"
+            id="infection", source=["S"], target=["I"], rate="beta * S * I / total"
         )
         .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "S", "fraction": 0.98},
                 {"bin": "V", "fraction": 0.0},
@@ -76,16 +76,16 @@ class TestConsistentModels:
     def test_sir(self) -> None:
         _sir().check_unit_consistency()
 
-    def test_rates_divided_by_population_totals(self) -> None:
+    def test_rates_divided_by_subgroup_totals(self) -> None:
         _per_age_infection(
-            "beta * S * I / N_child", "beta * S * I / N_adult"
+            "beta * S * I / total_child", "beta * S * I / total_adult"
         ).check_unit_consistency()
 
     def test_a_dimensionless_parameter(self) -> None:
         _sir(
             parameters={"contact_reduction": 0.5, "beta": 0.5, "gamma": 0.1},
             units={**DAILY, "contact_reduction": "dimensionless"},
-            infection="beta * contact_reduction * S * I / N",
+            infection="beta * contact_reduction * S * I / total",
         ).check_unit_consistency()
 
     def test_a_custom_bin_unit_and_a_time_alias_are_registered(self) -> None:
@@ -107,7 +107,7 @@ class TestConsistentModels:
         _sir(
             parameters={"beta_0": 0.5, "decay_rate": 0.01, "gamma": 0.1},
             units={"beta_0": "1/day", "decay_rate": "dimensionless", "gamma": "1/day"},
-            infection="beta_0 * exp(-decay_rate * step) * S * I / N",
+            infection="beta_0 * exp(-decay_rate * step) * S * I / total",
         ).check_unit_consistency()
 
     def test_seasonal_forcing(self) -> None:
@@ -119,7 +119,8 @@ class TestConsistentModels:
                 "gamma": "1/day",
             },
             infection=(
-                "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365)) * S * I / N"
+                "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365))"
+                " * S * I / total"
             ),
         ).check_unit_consistency()
 
@@ -138,9 +139,13 @@ class TestConsistentModels:
             },
         ).check_unit_consistency()
 
-    def test_a_formula_of_population_totals_is_dimensionless(self) -> None:
+    def test_a_formula_of_subgroup_totals_is_dimensionless(self) -> None:
         _sir(
-            parameters={"young_fraction": "N_young / N", "beta": 0.3, "gamma": 0.1},
+            parameters={
+                "young_fraction": "total_young / total",
+                "beta": 0.3,
+                "gamma": 0.1,
+            },
             stratifications={"age": {"young": 0.3, "old": 0.7}},
         ).check_unit_consistency()
 
@@ -153,7 +158,7 @@ class TestConsistentModels:
                 "gamma": 0.1,
             },
             units={"base_rate": "1/day", "gamma": "1/day"},
-            infection="final_rate * S * I / N",
+            infection="final_rate * S * I / total",
         ).check_unit_consistency()
 
 
@@ -181,7 +186,7 @@ class TestMissingUnits:
                 "multiplier": "dimensionless",
                 "gamma": "1/day",
             },
-            infection="invalid_param * S * I / N",
+            infection="invalid_param * S * I / total",
         )
 
         with pytest.raises(UnitConsistencyError, match="no defined unit") as error:
@@ -202,19 +207,19 @@ class TestInconsistentModels:
     @pytest.mark.parametrize(
         ("infection", "extra"),
         [
-            pytest.param("beta * log(I) * S / N", {}, id="log-of-a-population"),
+            pytest.param("beta * log(I) * S / total", {}, id="log-of-an-amount"),
             pytest.param(
-                "beta * (1 + 0.1 * sin(time_scale)) * S * I / N",
+                "beta * (1 + 0.1 * sin(time_scale)) * S * I / total",
                 {"time_scale": (365, "day")},
                 id="sin-of-days",
             ),
             pytest.param(
-                "beta * (1 + 0.1 * atan2(I, threshold_time)) * S * I / N",
+                "beta * (1 + 0.1 * atan2(I, threshold_time)) * S * I / total",
                 {"threshold_time": (30, "day")},
                 id="atan2-of-persons-and-days",
             ),
             pytest.param(
-                "min(beta, capacity) * S * I / N",
+                "min(beta, capacity) * S * I / total",
                 {"capacity": (50, "person")},
                 id="min-of-a-rate-and-persons",
             ),
@@ -241,7 +246,7 @@ class TestInconsistentModels:
                 bin_unit="person",
                 parameters={"beta": 0.5, "sigma": 0.2, "gamma": 0.1, "decay_time": 10},
                 units={**DAILY, "sigma": "1/day", "decay_time": "day"},
-                exposure="beta * exp(decay_time) * S * I / N",
+                exposure="beta * exp(decay_time) * S * I / total",
             )
         )
 
@@ -270,7 +275,7 @@ class TestInconsistentModels:
                 },
                 exposure=(
                     "beta_avg * (1 + seasonal_amp * sin(2 * pi * step / period)) "
-                    "* S * I / N"
+                    "* S * I / total"
                 ),
             )
         )
@@ -280,9 +285,9 @@ class TestInconsistentModels:
 
         assert "sin(2 * pi * step / period)" in str(error.value)
 
-    def test_sqrt_of_a_population_in_a_stratified_rate_fails(self) -> None:
+    def test_sqrt_of_an_amount_in_a_stratified_rate_fails(self) -> None:
         model = _per_age_infection(
-            "beta * sqrt(I) * S / N_child", "beta * 0.5 * sqrt(I) * S / N_adult"
+            "beta * sqrt(I) * S / total_child", "beta * 0.5 * sqrt(I) * S / total_adult"
         )
 
         with pytest.raises(UnitConsistencyError, match=FAILED) as error:
@@ -290,11 +295,11 @@ class TestInconsistentModels:
 
         assert "sqrt(I)" in str(error.value)
 
-    def test_floor_of_a_population_in_a_stratified_rate_fails(self) -> None:
+    def test_floor_of_an_amount_in_a_stratified_rate_fails(self) -> None:
         model = _per_age_infection(
-            "beta * floor(S) * I / N_child",
-            "beta * S * I / N_adult",
-            "beta * 0.6 * S * I / N_senior",
+            "beta * floor(S) * I / total_child",
+            "beta * S * I / total_adult",
+            "beta * 0.6 * S * I / total_senior",
         )
 
         with pytest.raises(UnitConsistencyError, match=FAILED) as error:
@@ -317,10 +322,10 @@ class TestInconsistentModels:
             (
                 "young",
                 "urban",
-            ): "beta * exp(log(contact_scale)) * S * I / N_young_urban",
-            ("young", "rural"): "beta * 0.5 * S * I / N_young_rural",
-            ("old", "urban"): "beta * 0.7 * S * I / N_old_urban",
-            ("old", "rural"): "beta * 0.3 * S * I / N_old_rural",
+            ): "beta * exp(log(contact_scale)) * S * I / total_young_urban",
+            ("young", "rural"): "beta * 0.5 * S * I / total_young_rural",
+            ("old", "urban"): "beta * 0.7 * S * I / total_old_urban",
+            ("old", "rural"): "beta * 0.3 * S * I / total_old_rural",
         }
         model = build(
             builder.add_transition(
@@ -346,12 +351,12 @@ class TestInconsistentModels:
         assert "exp(log(contact_scale))" in str(error.value)
 
     def test_pow_with_an_exponent_in_persons_fails(self) -> None:
-        model = _vaccination("vax_rate * pow(I / N, threshold) * S")
+        model = _vaccination("vax_rate * pow(I / total, threshold) * S")
 
         with pytest.raises(UnitConsistencyError, match=FAILED) as error:
             model.check_unit_consistency()
 
-        assert "pow(I / N, threshold)" in str(error.value)
+        assert "pow(I / total, threshold)" in str(error.value)
 
 
 def _two_rates(
@@ -373,7 +378,7 @@ def _two_rates(
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "A", "fraction": 1.0},
                 {"bin": "B", "fraction": 0.0},
@@ -459,7 +464,7 @@ class TestAxisUnit:
                     id="t_ab", source=["A"], target=["B"], rate="p * A", impulse_at=[1]
                 )
                 .set_initial_conditions(
-                    population_size=1000,
+                    total=1000,
                     bin_fractions=[
                         {"bin": "A", "fraction": 1.0},
                         {"bin": "B", "fraction": 0.0},

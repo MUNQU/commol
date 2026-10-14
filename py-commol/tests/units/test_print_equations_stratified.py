@@ -42,7 +42,7 @@ def _per_compartment_sir(builder: ModelBuilder) -> ModelBuilder:
         id="infection",
         source=["S"],
         target=["I"],
-        rate="beta * S * I / N",
+        rate="beta * S * I / total",
         per_compartment=True,
     ).add_transition(
         id="recovery", source=["I"], target=["R"], rate="gamma", per_compartment=True
@@ -98,8 +98,8 @@ class TestText:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  S_young -> I_young: beta * S * I / N\n"
-            "  S_old -> I_old: beta * S * I / N\n"
+            "  S_young -> I_young: beta * S * I / total\n"
+            "  S_old -> I_old: beta * S * I / total\n"
             "\n"
             "recovery (I -> R):\n"
             "  I_young -> R_young: gamma * I\n"
@@ -116,13 +116,13 @@ class TestText:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_young(t+Dt) - S_young(t)] / Dt = - (beta * S * I / N) - "
+            "[S_young(t+Dt) - S_young(t)] / Dt = - (beta * S * I / total) - "
             "(aging_rate * S_young)\n"
-            "[S_old(t+Dt) - S_old(t)] / Dt = - (beta * S * I / N) + (aging_rate * "
+            "[S_old(t+Dt) - S_old(t)] / Dt = - (beta * S * I / total) + (aging_rate * "
             "S_young)\n"
-            "[I_young(t+Dt) - I_young(t)] / Dt = (beta * S * I / N) - (gamma * I) "
+            "[I_young(t+Dt) - I_young(t)] / Dt = (beta * S * I / total) - (gamma * I) "
             "- (aging_rate * I_young)\n"
-            "[I_old(t+Dt) - I_old(t)] / Dt = (beta * S * I / N) - (gamma * I) + "
+            "[I_old(t+Dt) - I_old(t)] / Dt = (beta * S * I / total) - (gamma * I) + "
             "(aging_rate * I_young)\n"
             "[R_young(t+Dt) - R_young(t)] / Dt = (gamma * I) - (aging_rate * "
             "R_young)\n"
@@ -132,7 +132,7 @@ class TestText:
 
     def test_print_equations_with_multiple_stratifications(self, capsys) -> None:
         """
-        Rates differ by category, use the totals ``N_young`` and ``N_old``, and
+        Rates differ by category, use the totals ``total_young`` and ``total_old``, and
         fall back to the transition rate for an unlisted category.
         """
         young, old = (
@@ -166,19 +166,19 @@ class TestText:
                 id="infection",
                 source=["S"],
                 target=["I"],
-                rate="0.3 * S * I / N",
+                rate="0.3 * S * I / total",
                 stratified_rates=[
                     {
                         "conditions": [young, urban],
-                        "rate": "beta_young_urban * S * I / N_young",
+                        "rate": "beta_young_urban * S * I / total_young",
                     },
                     {
                         "conditions": [young, rural],
-                        "rate": "beta_young_rural * S * I / N_young",
+                        "rate": "beta_young_rural * S * I / total_young",
                     },
                     {
                         "conditions": [old, urban],
-                        "rate": "beta_old_urban * S * I / N_old",
+                        "rate": "beta_old_urban * S * I / total_old",
                     },
                 ],
             )
@@ -227,10 +227,10 @@ class TestText:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  S_young_urban -> I_young_urban: beta_young_urban * S * I / N_young\n"
-            "  S_young_rural -> I_young_rural: beta_young_rural * S * I / N_young\n"
-            "  S_old_urban -> I_old_urban: beta_old_urban * S * I / N_old\n"
-            "  S_old_rural -> I_old_rural: 0.3 * S * I / N\n"
+            "  S_young_urban -> I_young_urban: beta_young_urban * S * I / total_young\n"
+            "  S_young_rural -> I_young_rural: beta_young_rural * S * I / total_young\n"
+            "  S_old_urban -> I_old_urban: beta_old_urban * S * I / total_old\n"
+            "  S_old_rural -> I_old_rural: 0.3 * S * I / total\n"
             "\n"
             "recovery (I -> R):\n"
             "  I_young_urban -> R_young_urban: gamma_young * I\n"
@@ -262,26 +262,26 @@ class TestText:
             "EXPANDED FORM\n"
             "========================================\n"
             "[S_young_urban(t+Dt) - S_young_urban(t)] / Dt = - (beta_young_urban * "
-            "S * I / N_young) - (aging_rate * S_young_urban) - "
+            "S * I / total_young) - (aging_rate * S_young_urban) - "
             "(migration_rate_young * S_young_urban)\n"
             "[S_young_rural(t+Dt) - S_young_rural(t)] / Dt = - (beta_young_rural * "
-            "S * I / N_young) - (aging_rate * S_young_rural) + "
+            "S * I / total_young) - (aging_rate * S_young_rural) + "
             "(migration_rate_young * S_young_urban)\n"
             "[S_old_urban(t+Dt) - S_old_urban(t)] / Dt = - (beta_old_urban * S * I "
-            "/ N_old) + (aging_rate * S_young_urban) - (migration_rate_old * "
+            "/ total_old) + (aging_rate * S_young_urban) - (migration_rate_old * "
             "S_old_urban)\n"
-            "[S_old_rural(t+Dt) - S_old_rural(t)] / Dt = - (0.3 * S * I / N) + "
+            "[S_old_rural(t+Dt) - S_old_rural(t)] / Dt = - (0.3 * S * I / total) + "
             "(aging_rate * S_young_rural) + (migration_rate_old * S_old_urban)\n"
             "[I_young_urban(t+Dt) - I_young_urban(t)] / Dt = (beta_young_urban * S "
-            "* I / N_young) - (gamma_young * I) - (aging_rate * I_young_urban) - "
+            "* I / total_young) - (gamma_young * I) - (aging_rate * I_young_urban) - "
             "(migration_rate_young * I_young_urban)\n"
             "[I_young_rural(t+Dt) - I_young_rural(t)] / Dt = (beta_young_rural * S "
-            "* I / N_young) - (gamma_young * I) - (aging_rate * I_young_rural) + "
+            "* I / total_young) - (gamma_young * I) - (aging_rate * I_young_rural) + "
             "(migration_rate_young * I_young_urban)\n"
             "[I_old_urban(t+Dt) - I_old_urban(t)] / Dt = (beta_old_urban * S * I / "
-            "N_old) - (0.1 * I) + (aging_rate * I_young_urban) - "
+            "total_old) - (0.1 * I) + (aging_rate * I_young_urban) - "
             "(migration_rate_old * I_old_urban)\n"
-            "[I_old_rural(t+Dt) - I_old_rural(t)] / Dt = (0.3 * S * I / N) - (0.1 "
+            "[I_old_rural(t+Dt) - I_old_rural(t)] / Dt = (0.3 * S * I / total) - (0.1 "
             "* I) + (aging_rate * I_young_rural) + (migration_rate_old * "
             "I_old_urban)\n"
             "[R_young_urban(t+Dt) - R_young_urban(t)] / Dt = (gamma_young * I) - "
@@ -323,9 +323,9 @@ class TestText:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  S_y -> I_y: beta * S_y * I_y / N\n"
-            "  S_o_nv -> I_o_nv: beta * S_o_nv * I_o_nv / N\n"
-            "  S_o_v -> I_o_v: beta * S_o_v * I_o_v / N\n"
+            "  S_y -> I_y: beta * S_y * I_y / total\n"
+            "  S_o_nv -> I_o_nv: beta * S_o_nv * I_o_nv / total\n"
+            "  S_o_v -> I_o_v: beta * S_o_v * I_o_v / total\n"
             "\n"
             "recovery (I -> R):\n"
             "  I_y -> R_y: gamma * I_y\n"
@@ -340,14 +340,14 @@ class TestText:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / N) - (aging * S_y)\n"
-            "[S_o_nv(t+Dt) - S_o_nv(t)] / Dt = - (beta * S_o_nv * I_o_nv / N) + "
+            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / total) - (aging * S_y)\n"
+            "[S_o_nv(t+Dt) - S_o_nv(t)] / Dt = - (beta * S_o_nv * I_o_nv / total) + "
             "(aging * S_y)\n"
-            "[S_o_v(t+Dt) - S_o_v(t)] / Dt = - (beta * S_o_v * I_o_v / N)\n"
-            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / N) - (gamma * I_y)\n"
-            "[I_o_nv(t+Dt) - I_o_nv(t)] / Dt = (beta * S_o_nv * I_o_nv / N) - "
+            "[S_o_v(t+Dt) - S_o_v(t)] / Dt = - (beta * S_o_v * I_o_v / total)\n"
+            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / total) - (gamma * I_y)\n"
+            "[I_o_nv(t+Dt) - I_o_nv(t)] / Dt = (beta * S_o_nv * I_o_nv / total) - "
             "(gamma * I_o_nv)\n"
-            "[I_o_v(t+Dt) - I_o_v(t)] / Dt = (beta * S_o_v * I_o_v / N) - (gamma * "
+            "[I_o_v(t+Dt) - I_o_v(t)] / Dt = (beta * S_o_v * I_o_v / total) - (gamma * "
             "I_o_v)\n"
             "[R_y(t+Dt) - R_y(t)] / Dt = (gamma * I_y)\n"
             "[R_o_nv(t+Dt) - R_o_nv(t)] / Dt = (gamma * I_o_nv)\n"
@@ -387,9 +387,9 @@ class TestText:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  S_y -> I_y: beta * S_y * I_y / N\n"
-            "  S_o_nc -> I_o_nc: beta * S_o_nc * I_o_nc / N\n"
-            "  S_o_c -> I_o_c: beta * S_o_c * I_o_c / N\n"
+            "  S_y -> I_y: beta * S_y * I_y / total\n"
+            "  S_o_nc -> I_o_nc: beta * S_o_nc * I_o_nc / total\n"
+            "  S_o_c -> I_o_c: beta * S_o_c * I_o_c / total\n"
             "\n"
             "recovery (I -> R):\n"
             "  I_y -> R_y: gamma * I_y\n"
@@ -407,15 +407,15 @@ class TestText:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / N) - (aging * S_y)\n"
-            "[S_o_nc(t+Dt) - S_o_nc(t)] / Dt = - (beta * S_o_nc * I_o_nc / N) + "
+            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / total) - (aging * S_y)\n"
+            "[S_o_nc(t+Dt) - S_o_nc(t)] / Dt = - (beta * S_o_nc * I_o_nc / total) + "
             "(aging * (1 - p_c) * S_y)\n"
-            "[S_o_c(t+Dt) - S_o_c(t)] / Dt = - (beta * S_o_c * I_o_c / N) + (aging "
+            "[S_o_c(t+Dt) - S_o_c(t)] / Dt = - (beta * S_o_c * I_o_c / total) + (aging "
             "* p_c * S_y)\n"
-            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / N) - (gamma * I_y)\n"
-            "[I_o_nc(t+Dt) - I_o_nc(t)] / Dt = (beta * S_o_nc * I_o_nc / N) - "
+            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / total) - (gamma * I_y)\n"
+            "[I_o_nc(t+Dt) - I_o_nc(t)] / Dt = (beta * S_o_nc * I_o_nc / total) - "
             "(gamma * I_o_nc)\n"
-            "[I_o_c(t+Dt) - I_o_c(t)] / Dt = (beta * S_o_c * I_o_c / N) - (gamma * "
+            "[I_o_c(t+Dt) - I_o_c(t)] / Dt = (beta * S_o_c * I_o_c / total) - (gamma * "
             "I_o_c)\n"
             "[R_y(t+Dt) - R_y(t)] / Dt = (gamma * I_y)\n"
             "[R_o_nc(t+Dt) - R_o_nc(t)] / Dt = (gamma * I_o_nc)\n"
@@ -450,8 +450,8 @@ class TestLatex:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  $S_{young} \\to I_{young}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
-            "  $S_{old} \\to I_{old}: \\frac{\\beta \\cdot S \\cdot I}{N}$\n"
+            "  $S_{young} \\to I_{young}: \\frac{\\beta \\cdot S \\cdot I}{total}$\n"
+            "  $S_{old} \\to I_{old}: \\frac{\\beta \\cdot S \\cdot I}{total}$\n"
             "\n"
             "recovery (I -> R):\n"
             "  $I_{young} \\to R_{young}: \\gamma \\cdot I$\n"
@@ -468,14 +468,14 @@ class TestLatex:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "\\[\\frac{dS_{young}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N}) - "
+            "\\[\\frac{dS_{young}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
             "(aging_{rate} \\cdot S_{young})\\]\n"
-            "\\[\\frac{dS_{old}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N}) + "
+            "\\[\\frac{dS_{old}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total}) + "
             "(aging_{rate} \\cdot S_{young})\\]\n"
-            "\\[\\frac{dI_{young}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) - "
+            "\\[\\frac{dI_{young}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
             "(\\gamma "
             "\\cdot I) - (aging_{rate} \\cdot I_{young})\\]\n"
-            "\\[\\frac{dI_{old}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) - "
+            "\\[\\frac{dI_{old}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
             "(\\gamma "
             "\\cdot I) + (aging_{rate} \\cdot I_{young})\\]\n"
             "\\[\\frac{dR_{young}}{dt} = (\\gamma \\cdot I) - (aging_{rate} \\cdot "
@@ -509,11 +509,11 @@ class TestLatex:
             "\n"
             "Bin Transitions:\n"
             "infection (S -> I):\n"
-            "  $S_{y} \\to I_{y}: \\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{N}$\n"
+            "  $S_{y} \\to I_{y}: \\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{total}$\n"
             "  $S_{o,nv} \\to I_{o,nv}: \\frac{\\beta \\cdot S_{o,nv} \\cdot "
-            "I_{o,nv}}{N}$\n"
+            "I_{o,nv}}{total}$\n"
             "  $S_{o,v} \\to I_{o,v}: \\frac{\\beta \\cdot S_{o,v} \\cdot "
-            "I_{o,v}}{N}$\n"
+            "I_{o,v}}{total}$\n"
             "\n"
             "recovery (I -> R):\n"
             "  $I_{y} \\to R_{y}: \\gamma \\cdot I_{y}$\n"
@@ -529,21 +529,21 @@ class TestLatex:
             "EXPANDED FORM\n"
             "========================================\n"
             "\\[\\frac{S_{y}(t+\\Delta t) - S_{y}(t)}{\\Delta t} = - (\\frac{\\beta "
-            "\\cdot S_{y} \\cdot I_{y}}{N}) - (aging \\cdot S_{y})\\]\n"
+            "\\cdot S_{y} \\cdot I_{y}}{total}) - (aging \\cdot S_{y})\\]\n"
             "\\[\\frac{S_{o,nv}(t+\\Delta t) - S_{o,nv}(t)}{\\Delta t} = - "
-            "(\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{N}) + (aging \\cdot "
+            "(\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{total}) + (aging \\cdot "
             "S_{y})\\]\n"
             "\\[\\frac{S_{o,v}(t+\\Delta t) - S_{o,v}(t)}{\\Delta t} = - "
             "(\\frac{\\beta "
-            "\\cdot S_{o,v} \\cdot I_{o,v}}{N})\\]\n"
+            "\\cdot S_{o,v} \\cdot I_{o,v}}{total})\\]\n"
             "\\[\\frac{I_{y}(t+\\Delta t) - I_{y}(t)}{\\Delta t} = "
             "(\\frac{\\beta \\cdot "
-            "S_{y} \\cdot I_{y}}{N}) - (\\gamma \\cdot I_{y})\\]\n"
+            "S_{y} \\cdot I_{y}}{total}) - (\\gamma \\cdot I_{y})\\]\n"
             "\\[\\frac{I_{o,nv}(t+\\Delta t) - I_{o,nv}(t)}{\\Delta t} = "
             "(\\frac{\\beta "
-            "\\cdot S_{o,nv} \\cdot I_{o,nv}}{N}) - (\\gamma \\cdot I_{o,nv})\\]\n"
+            "\\cdot S_{o,nv} \\cdot I_{o,nv}}{total}) - (\\gamma \\cdot I_{o,nv})\\]\n"
             "\\[\\frac{I_{o,v}(t+\\Delta t) - I_{o,v}(t)}{\\Delta t} = (\\frac{\\beta "
-            "\\cdot S_{o,v} \\cdot I_{o,v}}{N}) - (\\gamma \\cdot I_{o,v})\\]\n"
+            "\\cdot S_{o,v} \\cdot I_{o,v}}{total}) - (\\gamma \\cdot I_{o,v})\\]\n"
             "\\[\\frac{R_{y}(t+\\Delta t) - R_{y}(t)}{\\Delta t} = (\\gamma \\cdot "
             "I_{y})\\]\n"
             "\\[\\frac{R_{o,nv}(t+\\Delta t) - R_{o,nv}(t)}{\\Delta t} = "

@@ -24,7 +24,7 @@ N, GAMMA, ALPHA = 1e6, 0.2, 0.7
 
 def test_a_single_infective_grows_only_if_beta_exceeds_gamma() -> None:
     flows = [
-        Flow("infection", "S", "I", "beta * S / N * I ^ alpha"),
+        Flow("infection", "S", "I", "beta * S / total * I ^ alpha"),
         Flow("recovery", "I", "R", "gamma * I"),
     ]
 

@@ -11,9 +11,9 @@ what it changes. The factories share these keywords:
 - ``name``: the model name; ``print_equations`` prints it.
 - ``parameters``: id to value, in declaration order. ``None`` leaves a value
   for calibration; a string is a formula. It replaces every default parameter.
-- ``fractions``: bin id to its share of the population; ``None`` leaves a
+- ``fractions``: bin id to its share of the total; ``None`` leaves a
   share for calibration.
-- ``population``: the population size.
+- ``total``: the total of the initial conditions.
 - ``stratifications``: see ``Stratifications``; ``conditions``: see
   ``Conditions``.
 - ``compartment_fractions``: per-compartment overrides, as in
@@ -101,7 +101,7 @@ def _finish(
     *,
     parameters: Parameters,
     units: Mapping[str, str],
-    population: int,
+    total: float,
     fractions: Mapping[str, float | None],
     stratifications: Stratifications | None,
     conditions: Conditions | None,
@@ -115,7 +115,7 @@ def _finish(
         {"bin": bin_id, "fraction": fraction} for bin_id, fraction in fractions.items()
     ]
     return builder.set_initial_conditions(
-        population_size=population,
+        total=total,
         bin_fractions=bin_fractions,
         stratification_fractions=stratify(builder, stratifications or {}, conditions),
         compartment_fractions=compartment_fractions,
@@ -126,9 +126,9 @@ def sir_builder(
     *,
     name: str = "SIR",
     parameters: Parameters | None = None,
-    infection: Rate = "beta * S * I / N",
+    infection: Rate = "beta * S * I / total",
     recovery: Rate = "gamma * I",
-    population: int = 1000,
+    total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     stratifications: Stratifications | None = None,
     conditions: Conditions | None = None,
@@ -137,7 +137,7 @@ def sir_builder(
     accumulator: str | None = None,
 ) -> ModelBuilder:
     """
-    S → I → R: ``infection`` at ``beta * S * I / N``, ``recovery`` at ``gamma * I``.
+    S → I → R: ``infection`` at ``beta * S * I / total``, ``recovery`` at ``gamma * I``.
 
     The defaults are ``beta = 0.3``, ``gamma = 0.1``, 1000 people, 99 % S and
     1 % I. See the module docstring for the keywords.
@@ -162,7 +162,7 @@ def sir_builder(
         builder,
         parameters={"beta": 0.3, "gamma": 0.1} if parameters is None else parameters,
         units=units or {},
-        population=population,
+        total=total,
         fractions=fractions
         if fractions is not None
         else {"S": 0.99, "I": 0.01, "R": 0.0},
@@ -176,10 +176,10 @@ def seir_builder(
     *,
     name: str = "SEIR",
     parameters: Parameters | None = None,
-    exposure: Rate = "beta * S * I / N",
+    exposure: Rate = "beta * S * I / total",
     progression: Rate = "sigma * E",
     recovery: Rate = "gamma * I",
-    population: int = 1000,
+    total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     bin_unit: str | None = None,
     units: Mapping[str, str] | None = None,
@@ -215,7 +215,7 @@ def seir_builder(
             else parameters
         ),
         units=units or {},
-        population=population,
+        total=total,
         fractions=fractions
         if fractions is not None
         else {"S": 0.98, "E": 0.01, "I": 0.01, "R": 0.0},
@@ -232,7 +232,7 @@ def a_to_b_builder(
     rate: Rate = "k",
     transition_id: str = "t_ab",
     per_compartment: bool = False,
-    population: int = 1000,
+    total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     stratifications: Stratifications | None = None,
     conditions: Conditions | None = None,
@@ -265,7 +265,7 @@ def a_to_b_builder(
         builder,
         parameters={"k": 0.1} if parameters is None else parameters,
         units=units or {},
-        population=population,
+        total=total,
         fractions=fractions if fractions is not None else {"A": 1.0, "B": 0.0},
         stratifications=stratifications,
         conditions=conditions,
@@ -278,7 +278,7 @@ def override_builder(fraction: float = 0.3) -> ModelBuilder:
     ``a_to_b_builder`` split into halves ``g1`` and ``g2``, with ``A_g1`` set.
 
     Without the override every compartment of A holds 500. The override sets
-    ``A_g1`` to ``fraction`` of the population; ``A_g2`` keeps its 500.
+    ``A_g1`` to ``fraction`` of the total; ``A_g2`` keeps its 500.
     """
     return a_to_b_builder(
         rate="k * A",
@@ -308,7 +308,7 @@ def shared_category_builder(
         builder,
         parameters={"k": 0.1},
         units={},
-        population=1000,
+        total=1000,
         fractions={"A": 1.0},
         stratifications={
             "age": {"y": age[0], "o": age[1]},
@@ -324,7 +324,7 @@ def conditional_pathway_builder() -> ModelBuilder:
     Bins S and IH, where only the ``oe60`` stratum moves from S to IH.
 
     ``care`` splits only ``oe60``, and the override pins ``IH_y60`` to zero, so
-    the compartments and their initial populations are::
+    the compartments and their initial amounts are::
 
         S_y60 450, S_oe60_home 225, S_oe60_hosp 225,
         IH_y60 0,  IH_oe60_home 25, IH_oe60_hosp 25
@@ -348,7 +348,7 @@ def conditional_pathway_builder() -> ModelBuilder:
         builder,
         parameters={"beta": 0.01},
         units={},
-        population=1000,
+        total=1000,
         fractions={"S": 0.9, "IH": 0.1},
         stratifications={
             "age": {"y60": 0.5, "oe60": 0.5},

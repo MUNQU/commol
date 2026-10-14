@@ -14,83 +14,83 @@ from tests.axis_patterns.conditions import condition, rate_string
 
 class TestPulse:
     def test_formula_contains_step_and_amount(self):
-        p = AxisPattern.pulse(at=5, amount=1.0)
+        p = AxisPattern.pulse(at=5, value=1.0)
         assert "step == 5" in str(p)
         assert "1.0" in str(p)
 
     def test_formula_is_parenthesized(self):
-        p = AxisPattern.pulse(at=5, amount=1.0)
+        p = AxisPattern.pulse(at=5, value=1.0)
         formula = str(p)
         assert formula.startswith("(") and formula.endswith(")")
 
     def test_boundary_at_zero(self):
-        p = AxisPattern.pulse(at=0, amount=1.0)
+        p = AxisPattern.pulse(at=0, value=1.0)
         assert "step == 0" in str(p)
 
     def test_zero_amount_is_legal(self):
-        p = AxisPattern.pulse(at=0, amount=0.0)
+        p = AxisPattern.pulse(at=0, value=0.0)
         assert str(p) == "(if(step == 0, 0.0, 0))"
 
     def test_negative_at_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.pulse(at=-1, amount=1.0)
+            AxisPattern.pulse(at=-1, value=1.0)
 
     def test_string_amount(self):
-        p = AxisPattern.pulse(at=3, amount="alpha")
+        p = AxisPattern.pulse(at=3, value="alpha")
         assert "alpha" in str(p)
 
 
 class TestPulses:
     def test_formula_contains_all_steps(self):
-        p = AxisPattern.pulses(at=[3, 7, 10], amount=1.0)
+        p = AxisPattern.pulses(at=[3, 7, 10], value=1.0)
         formula = str(p)
         for s in (3, 7, 10):
             assert f"step == {s}" in formula
 
     def test_single_step_is_legal(self):
-        p = AxisPattern.pulses(at=[0], amount=0.5)
+        p = AxisPattern.pulses(at=[0], value=0.5)
         assert "step == 0" in str(p)
 
     def test_empty_list_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.pulses(at=[], amount=1.0)
+            AxisPattern.pulses(at=[], value=1.0)
 
     def test_negative_step_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.pulses(at=[-1, 5], amount=1.0)
+            AxisPattern.pulses(at=[-1, 5], value=1.0)
 
     def test_large_step_count_accepted(self):
-        p = AxisPattern.pulses(at=list(range(50)), amount=1.0)
+        p = AxisPattern.pulses(at=list(range(50)), value=1.0)
         assert str(p).count("step ==") == 50
 
     def test_duplicate_step_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.pulses(at=[3, 3, 7], amount=1.0)
+            AxisPattern.pulses(at=[3, 3, 7], value=1.0)
 
     def test_amount_with_comma_rejected(self):
         with pytest.raises(ValueError):
-            AxisPattern.pulses(at=[1, 2], amount="1, 0")
+            AxisPattern.pulses(at=[1, 2], value="1, 0")
 
     def test_per_step_amounts_formula(self):
-        p = AxisPattern.pulses(at=[2, 5, 9], amount=[0.1, 0.2, 0.3])
+        p = AxisPattern.pulses(at=[2, 5, 9], value=[0.1, 0.2, 0.3])
         formula = str(p)
         assert "step == 2, 0.1" in formula
         assert "step == 5, 0.2" in formula
         assert "step == 9, 0.3" in formula
 
     def test_per_step_amounts_string_values(self):
-        p = AxisPattern.pulses(at=[1, 4], amount=["alpha", "beta"])
+        p = AxisPattern.pulses(at=[1, 4], value=["alpha", "beta"])
         formula = str(p)
         assert "step == 1, alpha" in formula
         assert "step == 4, beta" in formula
 
     def test_per_step_amounts_length_mismatch_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.pulses(at=[1, 2, 3], amount=[0.1, 0.2])
+            AxisPattern.pulses(at=[1, 2, 3], value=[0.1, 0.2])
 
     def test_per_step_amounts_invalid_element_raises(self):
         with pytest.raises(ValueError):
-            AxisPattern.pulses(at=[1, 2], amount=[0.1, "1, 0"])
+            AxisPattern.pulses(at=[1, 2], value=[0.1, "1, 0"])
 
 
 class TestSeriesParameterValue:
@@ -113,54 +113,54 @@ class TestSeriesParameterValue:
 
 class TestPeriodic:
     def test_formula_contains_period(self):
-        p = AxisPattern.periodic(period=7, amount=0.1)
+        p = AxisPattern.periodic(period=7, value=0.1)
         assert "7" in str(p)
 
     def test_period_zero_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.periodic(period=0, amount=0.1)
+            AxisPattern.periodic(period=0, value=0.1)
 
     def test_negative_period_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.periodic(period=-1, amount=0.1)
+            AxisPattern.periodic(period=-1, value=0.1)
 
     def test_negative_offset_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.periodic(period=7, amount=0.1, offset=-1)
+            AxisPattern.periodic(period=7, value=0.1, offset=-1)
 
     def test_offset_equal_period_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.periodic(period=7, amount=0.1, offset=7)
+            AxisPattern.periodic(period=7, value=0.1, offset=7)
 
     def test_formula_uses_floor_based_modulo(self):
-        formula = str(AxisPattern.periodic(period=7, amount=0.1))
+        formula = str(AxisPattern.periodic(period=7, value=0.1))
         assert "floor" in formula
         assert "%" not in formula
 
     def test_offset_present_in_formula(self):
-        formula = str(AxisPattern.periodic(period=7, amount=0.1, offset=3))
+        formula = str(AxisPattern.periodic(period=7, value=0.1, offset=3))
         assert "3" in formula
 
 
 class TestInterval:
     def test_formula_reads_t_between_its_bounds(self):
-        p = AxisPattern.interval(start=5, end=10, amount=0.3)
+        p = AxisPattern.interval(start=5, end=10, value=0.3)
         assert str(p) == "(if(t >= 5, if(t < 10, 0.3, 0), 0))"
 
     def test_bounds_may_lie_between_steps(self):
-        p = AxisPattern.interval(start=2.5, end=4, amount=0.5)
+        p = AxisPattern.interval(start=2.5, end=4, value=0.5)
         assert str(p) == "(if(t >= 2.5, if(t < 4, 0.5, 0), 0))"
 
     def test_start_equals_end_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.interval(start=5, end=5, amount=0.3)
+            AxisPattern.interval(start=5, end=5, value=0.3)
 
     def test_start_greater_than_end_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.interval(start=10, end=5, amount=0.3)
+            AxisPattern.interval(start=10, end=5, value=0.3)
 
     def test_formula_is_parenthesized(self):
-        formula = str(AxisPattern.interval(start=0, end=1, amount=1.0))
+        formula = str(AxisPattern.interval(start=0, end=1, value=1.0))
         assert formula.startswith("(") and formula.endswith(")")
 
 
@@ -225,26 +225,26 @@ class TestLinearRamp:
 
 class TestCombine:
     def test_sum_contains_plus(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
         result = str(AxisPattern.combine(a, b, mode=AxisPattern.SUM))
         assert "+" in result
 
     def test_max_contains_max(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
         result = str(AxisPattern.combine(a, b, mode=AxisPattern.MAX))
         assert "max" in result
 
     def test_min_contains_min(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
         result = str(AxisPattern.combine(a, b, mode=AxisPattern.MIN))
         assert "min" in result
 
     def test_single_pattern_is_identity(self):
         """combine(p) returns p unchanged."""
-        a = AxisPattern.pulse(at=1, amount=0.1)
+        a = AxisPattern.pulse(at=1, value=0.1)
         assert AxisPattern.combine(a) is a
 
     def test_zero_patterns_raises(self):
@@ -252,49 +252,49 @@ class TestCombine:
             AxisPattern.combine()
 
     def test_result_is_parenthesized(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
         result = str(AxisPattern.combine(a, b))
         assert result.startswith("(") and result.endswith(")")
 
     def test_three_patterns_sum(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
-        c = AxisPattern.pulse(at=3, amount=0.3)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
+        c = AxisPattern.pulse(at=3, value=0.3)
         result = str(AxisPattern.combine(a, b, c, mode=AxisPattern.SUM))
         assert result.count("+") >= 2
 
     def test_combine_propagates_conditions(self):
         """combine of grouped patterns preserves the shared group binding."""
         conds = [condition("group", "cat1")]
-        a = AxisPattern.pulse(at=1, amount=0.1).for_group(conds)
-        b = AxisPattern.pulse(at=2, amount=0.2).for_group(conds)
+        a = AxisPattern.pulse(at=1, value=0.1).for_group(conds)
+        b = AxisPattern.pulse(at=2, value=0.2).for_group(conds)
         result = AxisPattern.combine(a, b)
         assert result.conditions == conds
 
     def test_combine_propagates_source_compartment(self):
         conds = [condition("group", "cat1")]
-        a = AxisPattern.pulse(at=1, amount=0.1).for_group(
+        a = AxisPattern.pulse(at=1, value=0.1).for_group(
             conds, source_compartment="A_cat1"
         )
-        b = AxisPattern.pulse(at=2, amount=0.2).for_group(
+        b = AxisPattern.pulse(at=2, value=0.2).for_group(
             conds, source_compartment="A_cat1"
         )
         result = AxisPattern.combine(a, b)
         assert result.source_compartment == "A_cat1"
 
     def test_combine_rejects_inconsistent_conditions(self):
-        a = AxisPattern.pulse(at=1, amount=0.1).for_group([condition("group", "cat1")])
-        b = AxisPattern.pulse(at=2, amount=0.2).for_group([condition("group", "cat2")])
+        a = AxisPattern.pulse(at=1, value=0.1).for_group([condition("group", "cat1")])
+        b = AxisPattern.pulse(at=2, value=0.2).for_group([condition("group", "cat2")])
         with pytest.raises(ValueError, match="conditions"):
             AxisPattern.combine(a, b)
 
     def test_combine_rejects_inconsistent_source_compartment(self):
         conds = [condition("group", "cat1")]
-        a = AxisPattern.pulse(at=1, amount=0.1).for_group(
+        a = AxisPattern.pulse(at=1, value=0.1).for_group(
             conds, source_compartment="A_cat1"
         )
-        b = AxisPattern.pulse(at=2, amount=0.2).for_group(
+        b = AxisPattern.pulse(at=2, value=0.2).for_group(
             conds, source_compartment="B_cat1"
         )
         with pytest.raises(ValueError, match="source_compartment"):
@@ -303,7 +303,7 @@ class TestCombine:
     def test_combine_security_cap_raises_clear_error(self):
         """Repeatedly combining hits the security-length cap with a clear error."""
         # Each periodic formula is ~47 chars; need enough to exceed the 10000-char cap.
-        periodics = [AxisPattern.periodic(period=7, amount=0.1) for _ in range(220)]
+        periodics = [AxisPattern.periodic(period=7, value=0.1) for _ in range(220)]
         with pytest.raises(ValueError, match="exceeds maximum"):
             AxisPattern.combine(*periodics)
 
@@ -347,17 +347,17 @@ class TestFromFormula:
 
 class TestForGroup:
     def test_conditions_are_attached(self):
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         grouped = p.for_group([{"stratification": "age", "category": "elderly"}])
         assert grouped.conditions == [{"stratification": "age", "category": "elderly"}]
 
     def test_original_is_unchanged(self):
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         p.for_group([{"stratification": "age", "category": "elderly"}])
         assert p.conditions is None
 
     def test_source_compartment_is_attached(self):
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         grouped = p.for_group(
             [{"stratification": "age", "category": "elderly"}],
             source_compartment="S_elderly",
@@ -367,13 +367,13 @@ class TestForGroup:
 
 class TestToStratifiedRate:
     def test_without_source_compartment(self):
-        p = AxisPattern.pulse(at=5, amount=0.1).for_group([condition("age", "elderly")])
+        p = AxisPattern.pulse(at=5, value=0.1).for_group([condition("age", "elderly")])
         sr = p.to_stratified_rate()
         assert sr["conditions"] == [condition("age", "elderly")]
         assert "S_" not in rate_string(sr)
 
     def test_with_source_compartment(self):
-        p = AxisPattern.pulse(at=5, amount=0.1).for_group(
+        p = AxisPattern.pulse(at=5, value=0.1).for_group(
             [condition("age", "elderly")],
             source_compartment="S_elderly",
         )
@@ -381,22 +381,22 @@ class TestToStratifiedRate:
         assert "S_elderly" in rate_string(sr)
 
     def test_no_conditions_gives_empty_list(self):
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         sr = p.to_stratified_rate()
         assert sr["conditions"] == []
 
 
 class TestCompositionSafety:
     def test_outer_multiplication_respects_parens(self):
-        formula = str(AxisPattern.pulse(at=5, amount=1.0))
+        formula = str(AxisPattern.pulse(at=5, value=1.0))
         outer = f"2 * {formula}"
         # The whole pulse expression is multiplied, not just the last token
         assert outer.startswith("2 * (")
 
     def test_nested_combine_is_parenthesized(self):
-        a = AxisPattern.pulse(at=1, amount=0.1)
-        b = AxisPattern.pulse(at=2, amount=0.2)
-        c = AxisPattern.pulse(at=3, amount=0.3)
+        a = AxisPattern.pulse(at=1, value=0.1)
+        b = AxisPattern.pulse(at=2, value=0.2)
+        c = AxisPattern.pulse(at=3, value=0.3)
         inner = AxisPattern.combine(a, b)
         result = str(AxisPattern.combine(inner, c))
         assert result.startswith("(") and result.endswith(")")
@@ -408,17 +408,17 @@ class TestSecurityValidation:
     @pytest.mark.parametrize(
         "pattern",
         [
-            AxisPattern.pulse(at=5, amount=0.1),
-            AxisPattern.pulses(at=[1, 3, 5], amount=0.1),
-            AxisPattern.periodic(period=7, amount=0.1),
-            AxisPattern.periodic(period=7, amount=0.1, offset=2),
-            AxisPattern.interval(start=2, end=8, amount=0.1),
+            AxisPattern.pulse(at=5, value=0.1),
+            AxisPattern.pulses(at=[1, 3, 5], value=0.1),
+            AxisPattern.periodic(period=7, value=0.1),
+            AxisPattern.periodic(period=7, value=0.1, offset=2),
+            AxisPattern.interval(start=2, end=8, value=0.1),
             AxisPattern.seasonal(amplitude=0.05, period=10, baseline=0.01),
             AxisPattern.gaussian_pulse(center=5.0, width=2.0, peak=0.1),
             AxisPattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1),
             AxisPattern.combine(
-                AxisPattern.pulse(at=1, amount=0.1),
-                AxisPattern.pulse(at=2, amount=0.2),
+                AxisPattern.pulse(at=1, value=0.1),
+                AxisPattern.pulse(at=2, value=0.2),
                 mode=AxisPattern.MAX,
             ),
         ],

@@ -1,4 +1,4 @@
-"""The initial state: how the fractions expand into compartment populations."""
+"""The initial state: how the fractions expand into compartment amounts."""
 
 import pytest
 
@@ -8,7 +8,7 @@ from tests.support import (
     a_to_b_builder,
     build,
     conditional_pathway_builder,
-    initial_population,
+    initial_state,
     sir_builder,
 )
 
@@ -26,7 +26,7 @@ class TestExpansion:
             )
         )
 
-        assert initial_population(model) == {
+        assert initial_state(model) == {
             "A_g1": 250.0,
             "A_g2": 250.0,
             "B_g1": 250.0,
@@ -42,19 +42,13 @@ class TestExpansion:
             )
         )
 
-        population = initial_population(model)
+        state = initial_state(model)
 
         for bin_id, share in (("S", 0.9), ("I", 0.1)):
-            assert population[f"{bin_id}_y60"] == pytest.approx(1000 * share * 0.8)
-            assert population[f"{bin_id}_oe60_nv"] == pytest.approx(
-                1000 * share * 0.2 * 0.7
-            )
-            assert population[f"{bin_id}_oe60_v"] == pytest.approx(
-                1000 * share * 0.2 * 0.3
-            )
-        assert [
-            population[f"R_{suffix}"] for suffix in ("y60", "oe60_nv", "oe60_v")
-        ] == [
+            assert state[f"{bin_id}_y60"] == pytest.approx(1000 * share * 0.8)
+            assert state[f"{bin_id}_oe60_nv"] == pytest.approx(1000 * share * 0.2 * 0.7)
+            assert state[f"{bin_id}_oe60_v"] == pytest.approx(1000 * share * 0.2 * 0.3)
+        assert [state[f"R_{suffix}"] for suffix in ("y60", "oe60_nv", "oe60_v")] == [
             0.0,
             0.0,
             0.0,
@@ -78,14 +72,14 @@ class TestExpansion:
             )
         )
 
-        population = initial_population(model)
+        state = initial_state(model)
 
-        assert population["S_y60"] == pytest.approx(720.0)
-        assert population["I_y60"] == pytest.approx(80.0)
-        assert population["S_oe60_nv_nc"] == pytest.approx(100.8)
-        assert population["S_oe60_nv_c"] == pytest.approx(25.2)
-        assert population["S_oe60_v_nc"] == pytest.approx(43.2)
-        assert population["S_oe60_v_c"] == pytest.approx(10.8)
+        assert state["S_y60"] == pytest.approx(720.0)
+        assert state["I_y60"] == pytest.approx(80.0)
+        assert state["S_oe60_nv_nc"] == pytest.approx(100.8)
+        assert state["S_oe60_nv_c"] == pytest.approx(25.2)
+        assert state["S_oe60_v_nc"] == pytest.approx(43.2)
+        assert state["S_oe60_v_c"] == pytest.approx(10.8)
 
 
 class TestInitialState:
@@ -96,11 +90,11 @@ class TestInitialState:
         state = model.structure.initial_state()
 
         assert [c.name for c in state] == engine.compartments
-        assert [c.population for c in state] == pytest.approx(engine.population)
+        assert [c.amount for c in state] == pytest.approx(engine.state)
         ih_y60 = next(c for c in state if c.name == "IH_y60")
         assert ih_y60.bin == "IH"
         assert ih_y60.categories == {"age": "y60"}
-        assert ih_y60.population == 0.0
+        assert ih_y60.amount == 0.0
 
     def test_the_binding_reports_bins_and_categories(self) -> None:
         model = build(conditional_pathway_builder())
@@ -122,7 +116,7 @@ class TestInitialConditionsBinding:
     def test_overrides_reach_the_engine(self) -> None:
         core = commol_rs.core
         initial_conditions = core.InitialConditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[("A", 1.0)],
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
             compartment_fractions=[("A_g1", 0.2)],
@@ -144,11 +138,11 @@ class TestInitialConditionsBinding:
 
         assert initial_conditions.compartment_fractions == [("A_g1", 0.2)]
         assert engine.compartments == ["A_g1", "A_g2"]
-        assert engine.population == [200.0, 500.0]
+        assert engine.state == [200.0, 500.0]
 
     def test_defaults_to_no_overrides(self) -> None:
         initial_conditions = commol_rs.core.InitialConditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[("A", 1.0)],
         )
 
@@ -156,7 +150,7 @@ class TestInitialConditionsBinding:
 
     def test_uncalibrated_bin_fraction_round_trips(self) -> None:
         initial_conditions = commol_rs.core.InitialConditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[("A", 0.6), ("B", None)],
         )
 
@@ -164,13 +158,13 @@ class TestInitialConditionsBinding:
 
     def test_every_declared_attribute_is_readable(self) -> None:
         initial_conditions = commol_rs.core.InitialConditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[("A", 0.5), ("B", 0.5)],
             stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
             compartment_fractions=[("A_g1", 0.2)],
         )
 
-        assert initial_conditions.population_size == 1000
+        assert initial_conditions.total == 1000
         assert initial_conditions.bin_fractions == [("A", 0.5), ("B", 0.5)]
         assert {
             name: dict(categories)

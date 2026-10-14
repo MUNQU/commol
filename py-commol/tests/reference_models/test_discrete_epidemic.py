@@ -37,7 +37,7 @@ def test_the_sir_epidemic_ends_with_the_final_size_relation() -> None:
     # [1], [2]: beta = 0.5 and sigma = exp(-0.25), so R0 = 2.26.
     beta, sigma = 0.5, math.exp(-0.25)
     flows = [
-        Flow("infection", "S", "I", "S * (1 - exp(-beta * I / N))"),
+        Flow("infection", "S", "I", "S * (1 - exp(-beta * I / total))"),
         Flow("recovery", "I", "R", "(1 - sigma) * I"),
     ]
     model = flow_model(
@@ -72,7 +72,7 @@ def _staged_treatment(infectivity: dict[str, float]) -> Model:
     """
     eps1, eps2, dlt1, dlt2 = infectivity
     infectious = f"{eps1} * I1 + {eps2} * I2 + {dlt1} * T1 + {dlt2} * T2"
-    force = f"S * (1 - exp(-beta * ({infectious}) / N))"
+    force = f"S * (1 - exp(-beta * ({infectious}) / total))"
     flows = [
         Flow("infection_untreated", "S", "I1", f"(1 - p1) * {force}"),
         Flow("infection_treated", "S", "T1", f"p1 * {force}"),

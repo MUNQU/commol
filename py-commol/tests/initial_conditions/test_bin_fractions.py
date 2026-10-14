@@ -1,14 +1,17 @@
-"""Bin fractions and the population size of the initial conditions."""
+"""Bin fractions and the total of the initial conditions."""
+
+import math
 
 import pytest
 from pydantic import ValidationError
 
 from commol.context.initial_conditions import BinFraction, InitialConditions
+from tests.support import a_to_b_builder, build, initial_state
 
 
 def _conditions() -> InitialConditions:
     return InitialConditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             BinFraction(bin="A", fraction=0.5),
             BinFraction(bin="B", fraction=0.5),
@@ -52,15 +55,20 @@ class TestBinFractionUpdates:
         ]
 
 
-class TestPopulationSize:
-    @pytest.mark.parametrize("population_size", [0, -10])
-    def test_a_non_positive_population_size_is_rejected(
-        self, population_size: int
+class TestTotal:
+    @pytest.mark.parametrize("total", [0, -10, math.nan, math.inf])
+    def test_a_total_that_is_not_finite_and_positive_is_rejected(
+        self, total: float
     ) -> None:
         with pytest.raises(
-            ValidationError, match="population_size must be greater than 0"
+            ValidationError, match="total must be finite and greater than 0"
         ):
             InitialConditions(
-                population_size=population_size,
+                total=total,
                 bin_fractions=[BinFraction(bin="A", fraction=1.0)],
             )
+
+    def test_a_real_total_starts_with_amounts_that_sum_to_it(self) -> None:
+        model = build(a_to_b_builder(total=2.5))
+
+        assert sum(initial_state(model).values()) == pytest.approx(2.5)

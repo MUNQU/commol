@@ -16,7 +16,7 @@ from tests.support import (
     ENGINE_REL,
     SIR_START,
     assert_close,
-    assert_population_conserved,
+    assert_total_conserved,
     build,
     reference_run,
     sir_builder,
@@ -70,7 +70,7 @@ def _matches_by_hand(
         steps,
     )
     assert_close(result, expected, rel=ENGINE_REL)
-    assert_population_conserved(result, 1000.0)
+    assert_total_conserved(result, 1000.0)
 
 
 RATE_FAMILIES = [
@@ -103,7 +103,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta": 0.3, "gamma": 0.05},
-        "beta * S * I / N",
+        "beta * S * I / total",
         "gamma * I",
         lambda x: 0.3 * x.s * x.i / x.n,
         lambda x: 0.05 * x.i,
@@ -112,7 +112,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta_avg": 0.25, "seasonal_amp": 0.2, "gamma": 0.05},
-        "(beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365))) * S * I / N",
+        "(beta_avg * (1 + seasonal_amp * sin(2 * pi * step / 365))) * S * I / total",
         "gamma * I",
         lambda x: (
             0.25 * (1 + 0.2 * math.sin(2 * math.pi * x.t / 365)) * x.s * x.i / x.n
@@ -123,7 +123,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta_0": 0.4, "decay_rate": 0.01, "gamma": 0.05},
-        "beta_0 * exp(-decay_rate * step) * S * I / N",
+        "beta_0 * exp(-decay_rate * step) * S * I / total",
         "gamma * I",
         lambda x: 0.4 * math.exp(-0.01 * x.t) * x.s * x.i / x.n,
         lambda x: 0.05 * x.i,
@@ -138,7 +138,7 @@ RATE_FAMILIES = [
             "gamma": 0.05,
         },
         "(beta_pre + (beta_post - beta_pre) * "
-        "(1 / (1 + exp(-10 * (t - intervention_time))))) * S * I / N",
+        "(1 / (1 + exp(-10 * (t - intervention_time))))) * S * I / total",
         "gamma * I",
         lambda x: (
             (0.3 + (0.1 - 0.3) / (1 + math.exp(-10 * (x.t - 5)))) * x.s * x.i / x.n
@@ -149,7 +149,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"max_beta": 0.4, "steepness": 0.1, "midpoint": 30, "gamma": 0.05},
-        "max_beta * (1 / (1 + exp(-steepness * (step - midpoint)))) * S * I / N",
+        "max_beta * (1 / (1 + exp(-steepness * (step - midpoint)))) * S * I / total",
         "gamma * I",
         lambda x: 0.4 / (1 + math.exp(-0.1 * (x.t - 30))) * x.s * x.i / x.n,
         lambda x: 0.05 * x.i,
@@ -158,7 +158,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta": 0.25, "gamma_0": 0.05, "power": 0.5},
-        "beta * S * I / N",
+        "beta * S * I / total",
         "gamma_0 * pow(I, power)",
         lambda x: 0.25 * x.s * x.i / x.n,
         lambda x: 0.05 * x.i**0.5,
@@ -168,7 +168,7 @@ RATE_FAMILIES = [
     pytest.param(
         {"beta_base": 0.2, "amplitude_1": 0.1, "amplitude_2": 0.05, "gamma": 0.05},
         "(beta_base + amplitude_1 * sin(2 * pi * step / 365) + "
-        "amplitude_2 * cos(4 * pi * step / 365)) * S * I / N",
+        "amplitude_2 * cos(4 * pi * step / 365)) * S * I / total",
         "gamma * I",
         lambda x: (
             (
@@ -186,7 +186,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"tiny_beta": 1e-6, "tiny_gamma": 1e-7},
-        "tiny_beta * S * I / N",
+        "tiny_beta * S * I / total",
         "tiny_gamma * I",
         lambda x: 1e-6 * x.s * x.i / x.n,
         lambda x: 1e-7 * x.i,
@@ -195,7 +195,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta_max": 0.4, "beta_min": 0.1, "threshold": 100, "gamma": 0.05},
-        "max(beta_min, min(beta_max, beta_max * (1 - I / threshold))) * S * I / N",
+        "max(beta_min, min(beta_max, beta_max * (1 - I / threshold))) * S * I / total",
         "gamma * I",
         lambda x: max(0.1, min(0.4, 0.4 * (1 - x.i / 100))) * x.s * x.i / x.n,
         lambda x: 0.05 * x.i,
@@ -204,7 +204,7 @@ RATE_FAMILIES = [
     ),
     pytest.param(
         {"beta": 0.25, "gamma_base": 0.05, "step_scale": 10},
-        "beta * S * I / N",
+        "beta * S * I / total",
         "gamma_base * (1 + 0.1 * floor(step / step_scale)) * I",
         lambda x: 0.25 * x.s * x.i / x.n,
         lambda x: 0.05 * (1 + 0.1 * math.floor(x.t / 10)) * x.i,
@@ -250,7 +250,7 @@ def test_a_rate_formula_gives_the_flow_it_computes(
 def test_without_a_recovery_transition_nobody_recovers() -> None:
     _matches_by_hand(
         {"beta": 0.2},
-        "beta * S * I / N",
+        "beta * S * I / total",
         None,
         lambda x: 0.2 * x.s * x.i / x.n,
         None,
@@ -269,89 +269,93 @@ def _round_half_up(value: float) -> float:
 FUNCTIONS = [
     (
         "exp",
-        "exp(-I / scale) * S * I / N",
+        "exp(-I / scale) * S * I / total",
         lambda x: math.exp(-x.i / SCALE) * x.s * x.i / x.n,
     ),
     (
         "log",
-        "log(1 + I / offset) * S * I / N",
+        "log(1 + I / offset) * S * I / total",
         lambda x: math.log(1 + x.i / OFFSET) * x.s * x.i / x.n,
     ),
     (
         "log10",
-        "log10(1 + I / offset) * S * I / N",
+        "log10(1 + I / offset) * S * I / total",
         lambda x: math.log10(1 + x.i / OFFSET) * x.s * x.i / x.n,
     ),
     (
         "log2",
-        "log2(1 + I / offset) * S * I / N",
+        "log2(1 + I / offset) * S * I / total",
         lambda x: math.log2(1 + x.i / OFFSET) * x.s * x.i / x.n,
     ),
     (
         "ln",
-        "ln(1 + I / offset) * S * I / N",
+        "ln(1 + I / offset) * S * I / total",
         lambda x: math.log(1 + x.i / OFFSET) * x.s * x.i / x.n,
     ),
     (
         "sin",
-        "(1 + 0.1 * sin(I / scale)) * S * I / N",
+        "(1 + 0.1 * sin(I / scale)) * S * I / total",
         lambda x: (1 + 0.1 * math.sin(x.i / SCALE)) * x.s * x.i / x.n,
     ),
     (
         "cos",
-        "(1 + 0.1 * cos(I / scale)) * S * I / N",
+        "(1 + 0.1 * cos(I / scale)) * S * I / total",
         lambda x: (1 + 0.1 * math.cos(x.i / SCALE)) * x.s * x.i / x.n,
     ),
     (
         "tan",
-        "(1 + 0.01 * tan(I / (10 * scale))) * S * I / N",
+        "(1 + 0.01 * tan(I / (10 * scale))) * S * I / total",
         lambda x: (1 + 0.01 * math.tan(x.i / (10 * SCALE))) * x.s * x.i / x.n,
     ),
     (
         "sinh",
-        "(1 + 0.01 * sinh(I / scale)) * S * I / N",
+        "(1 + 0.01 * sinh(I / scale)) * S * I / total",
         lambda x: (1 + 0.01 * math.sinh(x.i / SCALE)) * x.s * x.i / x.n,
     ),
     (
         "cosh",
-        "cosh(I / scale) * S * I / N",
+        "cosh(I / scale) * S * I / total",
         lambda x: math.cosh(x.i / SCALE) * x.s * x.i / x.n,
     ),
     (
         "tanh",
-        "tanh(I / scale) * S * I / N",
+        "tanh(I / scale) * S * I / total",
         lambda x: math.tanh(x.i / SCALE) * x.s * x.i / x.n,
     ),
-    ("abs", "abs(I - offset) * S / N", lambda x: abs(x.i - OFFSET) * x.s / x.n),
-    ("sqrt", "sqrt(I + 1) * S / N", lambda x: math.sqrt(x.i + 1) * x.s / x.n),
-    ("pow", "pow(I + 1, 0.5) * S / N", lambda x: (x.i + 1) ** 0.5 * x.s / x.n),
+    ("abs", "abs(I - offset) * S / total", lambda x: abs(x.i - OFFSET) * x.s / x.n),
+    ("sqrt", "sqrt(I + 1) * S / total", lambda x: math.sqrt(x.i + 1) * x.s / x.n),
+    ("pow", "pow(I + 1, 0.5) * S / total", lambda x: (x.i + 1) ** 0.5 * x.s / x.n),
     (
         "floor",
-        "(1 + floor(I / offset) * 0.01) * S * I / N",
+        "(1 + floor(I / offset) * 0.01) * S * I / total",
         lambda x: (1 + math.floor(x.i / OFFSET) * 0.01) * x.s * x.i / x.n,
     ),
     (
         "ceil",
-        "(1 + ceil(I / offset) * 0.01) * S * I / N",
+        "(1 + ceil(I / offset) * 0.01) * S * I / total",
         lambda x: (1 + math.ceil(x.i / OFFSET) * 0.01) * x.s * x.i / x.n,
     ),
     (
         "round",
-        "(1 + round(I / offset) * 0.01) * S * I / N",
+        "(1 + round(I / offset) * 0.01) * S * I / total",
         lambda x: (1 + _round_half_up(x.i / OFFSET) * 0.01) * x.s * x.i / x.n,
     ),
     (
         "asin",
-        "asin(I / (10 * scale)) * S / N",
+        "asin(I / (10 * scale)) * S / total",
         lambda x: math.asin(x.i / (10 * SCALE)) * x.s / x.n,
     ),
     (
         "acos",
-        "acos(I / (10 * scale)) * S / N",
+        "acos(I / (10 * scale)) * S / total",
         lambda x: math.acos(x.i / (10 * SCALE)) * x.s / x.n,
     ),
-    ("atan", "atan(I / scale) * S / N", lambda x: math.atan(x.i / SCALE) * x.s / x.n),
-    ("atan2", "atan2(I, S) * I / N", lambda x: math.atan2(x.i, x.s) * x.i / x.n),
+    (
+        "atan",
+        "atan(I / scale) * S / total",
+        lambda x: math.atan(x.i / SCALE) * x.s / x.n,
+    ),
+    ("atan2", "atan2(I, S) * I / total", lambda x: math.atan2(x.i, x.s) * x.i / x.n),
 ]
 
 

@@ -15,14 +15,14 @@ def _make_schedule_ab(
     *,
     categories: list[str] | None = None,
     steps: int = 20,
-    pop: int = 1000,
+    total: float = 1000,
 ) -> dict[str, list[float]]:
     """Run A → B split by ``group``, with a AxisPattern rate."""
     categories = categories or ["cat1", "cat2"]
     builder = a_to_b_builder(
         rate=rate,
         parameters={},
-        population=pop,
+        total=total,
         stratifications={
             "group": {category: 1.0 / len(categories) for category in categories}
         },
@@ -35,14 +35,14 @@ class TestScheduleUnit:
         """AxisPattern.add_group as classmethod returns a AxisPattern instance."""
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, value=0.1),
         )
         assert isinstance(rate, AxisPattern)
         # Builder hook returns one stratified rate, no default.
         assert rate._builder_stratified_rates() == [
             {
                 "conditions": [condition("group", "cat1")],
-                "rate": str(AxisPattern.pulse(at=5, amount=0.1)),
+                "rate": str(AxisPattern.pulse(at=5, value=0.1)),
             }
         ]
         assert rate._builder_rate() is None
@@ -50,10 +50,10 @@ class TestScheduleUnit:
     def test_add_group_chained_appends(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, value=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=AxisPattern.pulse(at=10, amount=0.2),
+            schedule=AxisPattern.pulse(at=10, value=0.2),
         )
         srs = stratified_rates(rate)
         assert len(srs) == 2
@@ -63,7 +63,7 @@ class TestScheduleUnit:
     def test_set_default_attaches_fallback(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, value=0.1),
         ).set_default(AxisPattern.from_formula("0.01"))
         assert rate._builder_rate() is not None
         builder_rate = rate._builder_rate()
@@ -72,12 +72,12 @@ class TestScheduleUnit:
 
     def test_add_group_on_single_pattern_raises(self):
         """Single AxisPatterns reject instance-level add_group (use the class)."""
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         with pytest.raises(TypeError, match="class-level"):
             p.add_group(conditions=[condition("group", "cat1")], schedule=p)
 
     def test_set_default_on_single_pattern_raises(self):
-        p = AxisPattern.pulse(at=5, amount=0.1)
+        p = AxisPattern.pulse(at=5, value=0.1)
         with pytest.raises(TypeError, match="schedule"):
             p.set_default(AxisPattern.from_formula("0.01"))
 
@@ -165,7 +165,7 @@ class TestScheduleUnit:
     def test_default_absolute_is_inferred(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.from_formula("0.001 * N"),
+            schedule=AxisPattern.from_formula("0.001 * total"),
         )
         srs = stratified_rates(rate)
         assert "absolute" not in srs[0]
@@ -173,7 +173,7 @@ class TestScheduleUnit:
     def test_explicit_absolute_false_is_preserved(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.from_formula("0.001 * N"),
+            schedule=AxisPattern.from_formula("0.001 * total"),
             absolute=False,
         )
         srs = stratified_rates(rate)
@@ -182,7 +182,7 @@ class TestScheduleUnit:
     def test_absolute_true_is_preserved(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=1.0),
+            schedule=AxisPattern.pulse(at=5, value=1.0),
             absolute=True,
         )
         srs = stratified_rates(rate)
@@ -195,7 +195,7 @@ class TestScheduleIntegration:
     def test_conditional_exclusion_cat2_unchanged(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, value=0.1),
         )
         result = _make_schedule_ab(rate, steps=30)
         assert all(v == pytest.approx(0.0, abs=1e-8) for v in result["B_cat2"])
@@ -203,10 +203,10 @@ class TestScheduleIntegration:
     def test_differential_schedules(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, value=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=AxisPattern.periodic(period=30, amount=0.1),
+            schedule=AxisPattern.periodic(period=30, value=0.1),
         )
         result = _make_schedule_ab(rate, steps=61)
         b1_events = sum(
@@ -221,8 +221,8 @@ class TestScheduleIntegration:
     def test_default_covers_unmatched_groups(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=0.5),
-        ).set_default(AxisPattern.pulse(at=5, amount=0.2))
+            schedule=AxisPattern.pulse(at=5, value=0.5),
+        ).set_default(AxisPattern.pulse(at=5, value=0.2))
         result = _make_schedule_ab(rate, steps=10)
         # Both cat1 and cat2 fire at step 5 — flow appears between index 5 and 6.
         # Each group holds 500; cat1 moves half at step 5, cat2 the default 0.2.
@@ -233,7 +233,7 @@ class TestScheduleIntegration:
         """`to:` condition routes flow between categories of the same bin."""
         rate = AxisPattern.add_group(
             conditions=[condition("status", "s0", to="s1")],
-            schedule=AxisPattern.pulse(at=5, amount=0.5),
+            schedule=AxisPattern.pulse(at=5, value=0.5),
         )
 
         model = (
@@ -242,7 +242,7 @@ class TestScheduleIntegration:
             .add_stratification("status", ["s0", "s1"])
             .add_transition("flow", ["A"], ["A"], rate=rate)
             .set_initial_conditions(
-                population_size=1000,
+                total=1000,
                 bin_fractions=[{"bin": "A", "fraction": 1.0}],
                 stratification_fractions=[
                     {
@@ -283,7 +283,7 @@ class TestScheduleIntegration:
                 ],
             )
             .set_initial_conditions(
-                population_size=1000,
+                total=1000,
                 bin_fractions=[
                     {"bin": "A", "fraction": 1.0},
                     {"bin": "B", "fraction": 0.0},
@@ -307,15 +307,15 @@ class TestScheduleIntegration:
         assert result["B_g1"][1] == pytest.approx(0.0)
         assert result["B_g2"][1] == pytest.approx(1000.0)
 
-    def test_population_conservation(self):
+    def test_the_total_is_kept(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, value=0.1),
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=AxisPattern.periodic(period=7, amount=0.1),
+            schedule=AxisPattern.periodic(period=7, value=0.1),
         )
-        result = _make_schedule_ab(rate, steps=30, pop=1000)
+        result = _make_schedule_ab(rate, steps=30, total=1000)
         for t in range(31):
             total = (
                 result["A_cat1"][t]
@@ -328,15 +328,15 @@ class TestScheduleIntegration:
     def test_mixed_absolute_and_relative_groups(self):
         rate = AxisPattern.add_group(
             conditions=[condition("group", "cat1")],
-            schedule=AxisPattern.pulse(at=5, amount=10.0),
+            schedule=AxisPattern.pulse(at=5, value=10.0),
             absolute=True,
         ).add_group(
             conditions=[condition("group", "cat2")],
-            schedule=AxisPattern.pulse(at=5, amount=0.1),
+            schedule=AxisPattern.pulse(at=5, value=0.1),
             absolute=False,
         )
 
-        result = _make_schedule_ab(rate, steps=10, pop=1000)
+        result = _make_schedule_ab(rate, steps=10, total=1000)
         cat1_flow = result["A_cat1"][5] - result["A_cat1"][6]
         cat2_flow = result["A_cat2"][5] - result["A_cat2"][6]
 

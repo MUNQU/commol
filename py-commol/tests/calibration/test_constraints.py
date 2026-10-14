@@ -134,12 +134,12 @@ class TestOutputConstraints:
             assert calibrated["S"][step] + calibrated["I"][step] <= 955.0, step
             assert calibrated["R"][step] >= 45.0, step
 
-    def test_n_is_the_population_without_accumulators(self) -> None:
+    def test_total_excludes_the_accumulators(self) -> None:
         """
-        ``N`` in a constraint must be the population total only.
+        ``total`` in a constraint must be the sum of the compartments only.
 
         Accumulators are appended to each output row after the compartments.
-        If they were summed into ``N``, a bound written as a fraction of ``N``
+        If they were summed into ``total``, a bound written as a fraction of ``total``
         would loosen as the accumulator grew.
         """
         model = build(
@@ -149,16 +149,16 @@ class TestOutputConstraints:
             )
         )
         results = Simulation(model).run(200)
-        # The accumulator must be big enough that inflating N would be visible.
-        population = sum(results[b][-1] for b in ("S", "I", "R"))
-        assert results["cumulative_infections"][-1] > 0.2 * population
+        # The accumulator must be big enough that inflating total would be visible.
+        compartments = sum(results[b][-1] for b in ("S", "I", "R"))
+        assert results["cumulative_infections"][-1] > 0.2 * compartments
         problem = CalibrationProblem(
             observed_data=observed(results, "I", range(200)),
             parameters=[bounded("beta", 0.05, 1.0)],
             constraints=[
                 CalibrationConstraint(
                     id="max_cumulative_infections",
-                    expression="0.5 * N - cumulative_infections",
+                    expression="0.5 * total - cumulative_infections",
                     at=[200],
                 ),
             ],
@@ -173,8 +173,8 @@ class TestOutputConstraints:
 
         model.update_parameters(fitted)
         rerun = Simulation(model).run(200)
-        rerun_population = sum(rerun[b][-1] for b in ("S", "I", "R"))
-        assert rerun["cumulative_infections"][-1] <= 0.5 * rerun_population + 1e-6
+        rerun_total = sum(rerun[b][-1] for b in ("S", "I", "R"))
+        assert rerun["cumulative_infections"][-1] <= 0.5 * rerun_total + 1e-6
 
 
 class TestExpressionSecurity:

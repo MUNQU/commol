@@ -4,7 +4,7 @@ from commol import Simulation
 from tests.support import (
     ENGINE_REL,
     assert_close,
-    assert_population_conserved,
+    assert_total_conserved,
     build,
     reference_run,
     sir_builder,
@@ -54,14 +54,14 @@ class TestBinTotals:
             10,
         )
         assert_close(result, expected, rel=ENGINE_REL)
-        assert_population_conserved(result, 1000.0)
+        assert_total_conserved(result, 1000.0)
 
     def test_a_bin_id_equals_the_explicit_sum(self) -> None:
         by_bin = build(sir_builder(stratifications=AGE))
         by_sum = build(
             sir_builder(
                 stratifications=AGE,
-                infection="beta * (S_young + S_old) * (I_young + I_old) / N",
+                infection="beta * (S_young + S_old) * (I_young + I_old) / total",
                 recovery="gamma * (I_young + I_old)",
             )
         )

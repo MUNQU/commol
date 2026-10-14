@@ -92,7 +92,7 @@ class TestStructureInterface:
         with pytest.raises(ValueError, match="TestEngine engine runs test models"):
             engine.compartments
         with pytest.raises(ValueError, match="not compartmental"):
-            engine.population
+            engine.state
 
     def test_a_kind_without_equations_says_so(self) -> None:
         with pytest.raises(NotImplementedError, match="test model"):

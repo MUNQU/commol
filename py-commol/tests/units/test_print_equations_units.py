@@ -22,7 +22,7 @@ def _reinfection(**options) -> Model:
             id="infection",
             source=["S", "I"],
             target=["I", "I"],
-            rate="beta * S * I / N",
+            rate="beta * S * I / total",
         )
         .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
     )
@@ -55,7 +55,7 @@ class TestUnits:
             "Bin Transitions:\n"
             "infection (S -> I):\n"
             "  $S \\to I: \\frac{\\beta(\\text{1/day}) \\cdot S(\\text{person}) "
-            "\\cdot I(\\text{person})}{N(\\text{person})} [\\text{person / day}]$\n"
+            "\\cdot I(\\text{person})}{total(\\text{person})} [\\text{person / day}]$\n"
             "\n"
             "recovery (I -> R):\n"
             "  $I \\to R: \\gamma(\\text{1/day}) \\cdot I(\\text{person}) "
@@ -66,8 +66,8 @@ class TestUnits:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "\\[\\frac{dS}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{N})\\]\n"
-            "\\[\\frac{dI}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{N}) "
+            "\\[\\frac{dS}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total})\\]\n"
+            "\\[\\frac{dI}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) "
             "- (\\gamma \\cdot I)\\]\n"
             "\\[\\frac{dR}{dt} = (\\gamma \\cdot I)\\]\n"
         )
@@ -94,8 +94,10 @@ class TestUnits:
             "\n"
             "Bin Transitions:\n"
             "infection (I, S -> I):\n"
-            "  S -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
-            "  I -> I: beta(1/day) * S(person) * I(person) / N(person) [person / day]\n"
+            "  S -> I: beta(1/day) * S(person) * I(person) / total(person) "
+            "[person / day]\n"
+            "  I -> I: beta(1/day) * S(person) * I(person) / total(person) "
+            "[person / day]\n"
             "\n"
             "recovery (I -> R):\n"
             "  I -> R: gamma(1/day) * I(person) [person / day]\n"
@@ -105,8 +107,8 @@ class TestUnits:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / N)\n"
-            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / N) - (gamma * I)\n"
+            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / total)\n"
+            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / total) - (gamma * I)\n"
             "[R(t+Dt) - R(t)] / Dt = (gamma * I)\n"
         )
         assert output == expected
@@ -132,8 +134,8 @@ class TestUnits:
             "\n"
             "Bin Transitions:\n"
             "infection (I, S -> I):\n"
-            "  S -> I: beta * S * I / N\n"
-            "  I -> I: beta * S * I / N\n"
+            "  S -> I: beta * S * I / total\n"
+            "  I -> I: beta * S * I / total\n"
             "\n"
             "recovery (I -> R):\n"
             "  I -> R: gamma * I\n"
@@ -143,8 +145,8 @@ class TestUnits:
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / N)\n"
-            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / N) - (gamma * I)\n"
+            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / total)\n"
+            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / total) - (gamma * I)\n"
             "[R(t+Dt) - R(t)] / Dt = (gamma * I)\n"
         )
         assert output == expected
@@ -174,7 +176,7 @@ class TestUnits:
             )
             .add_transition(id="backward", source=["C"], target=["A"], rate="k2 * C")
             .set_initial_conditions(
-                population_size=100,
+                total=100,
                 bin_fractions=[
                     {"bin": "A", "fraction": 0.4},
                     {"bin": "B", "fraction": 0.4},

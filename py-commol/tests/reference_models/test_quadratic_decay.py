@@ -21,7 +21,7 @@ TIMES = [0.5, 1.0, 4.0, 20.0]
 F1 = pytest.mark.xfail(
     strict=True,
     raises=ValidationError,
-    reason="F1: the initial state must add up to a positive integer population",
+    reason="F1: the total of the initial state must be greater than 0",
 )
 
 
@@ -34,7 +34,7 @@ def test_one_over_t_plus_one_from_one() -> None:
     assert_close(_decay(1)["Y"], [1 / (t + 1) for t in TIMES], rel=ODE_REL)
 
 
-@pytest.mark.parametrize("y0", [1, 2, 4, pytest.param(0.5, marks=F1)])
+@pytest.mark.parametrize("y0", [1, 2, 4, 0.5])
 def test_every_initial_value_gives_one_over_t_plus_c(y0: float) -> None:
     assert_close(_decay(y0)["Y"], [1 / (t + 1 / y0) for t in TIMES], rel=ODE_REL)
 
