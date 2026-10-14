@@ -23,7 +23,7 @@ SEED = 42
 
 
 def _problem(
-    sir_model,
+    abc_model,
     ensemble_selection: ProbNsga2Config | ProbGreedyLocalSearchConfig | None = None,
     *,
     loss_function: str = "sse",
@@ -31,20 +31,20 @@ def _problem(
         "observed_predictions"
     ),
 ) -> CalibrationProblem:
-    simulation = Simulation(sir_model)
+    simulation = Simulation(abc_model)
     true_results = simulation.run(30)
     noise = np.random.default_rng(SEED).normal(0.0, 3.0, size=30)
     observations = [
         ObservedDataPoint(
             at=step,
-            output="I",
-            value=max(0.0, true_results["I"][step] + noise[step]),
+            output="B",
+            value=max(0.0, true_results["B"][step] + noise[step]),
         )
         for step in range(30)
     ]
     problem = CalibrationProblem(
         observed_data=observations,
-        parameters=[bounded("beta"), bounded("gamma", high=0.5)],
+        parameters=[bounded("k1"), bounded("k2", high=0.5)],
         loss_function=loss_function,
         optimization_config=ParticleSwarmConfig(
             num_particles=30,
@@ -79,9 +79,9 @@ def _problem(
     return problem
 
 
-def test_fit_gated_calibration_preserves_central_fit(sir_model) -> None:
+def test_fit_gated_calibration_preserves_central_fit(abc_model) -> None:
     problem = _problem(
-        sir_model,
+        abc_model,
         ProbGreedyLocalSearchConfig(
             ensemble_size_mode="bounded",
             ensemble_size_min=4,
@@ -89,14 +89,14 @@ def test_fit_gated_calibration_preserves_central_fit(sir_model) -> None:
             central_fit_max_loss_ratio=1.5,
         ),
     )
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
     ensemble = result.selected_ensemble
 
     assert 4 <= ensemble.ensemble_size <= 10
     assert ensemble.point_loss > 0.0
     assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
     assert ensemble.point_parameters in ensemble.ensemble_parameters
-    assert ensemble.observation_diagnostics["I"]["n_points"] == 30.0
+    assert ensemble.observation_diagnostics["B"]["n_points"] == 30.0
     assert result.ensemble_candidates is not None
     assert len(result.ensemble_candidates) == result.stage_counts["n_representatives"]
     assert all(candidate.parameters for candidate in result.ensemble_candidates)
@@ -104,11 +104,11 @@ def test_fit_gated_calibration_preserves_central_fit(sir_model) -> None:
         ensemble.selection_diagnostics["max_feasible_ensemble_size"]
         >= ensemble.ensemble_size
     )
-    assert len(ensemble.prediction_median["I"]) == 31
+    assert len(ensemble.prediction_median["B"]) == 31
 
 
-def test_nsga2_calibration_is_the_default_selection_backend(sir_model) -> None:
-    result = Calibrator(Simulation(sir_model), _problem(sir_model)).run_probabilistic()
+def test_nsga2_calibration_is_the_default_selection_backend(abc_model) -> None:
+    result = Calibrator(Simulation(abc_model), _problem(abc_model)).run_probabilistic()
 
     assert result.selection_algorithm == "nsga2"
     assert result.selected_pareto_index is not None
@@ -142,7 +142,7 @@ def test_ensemble_configuration_defaults_to_nsga2() -> None:
         ProbabilisticCalibrationConfig(result_detail="full")  # ty: ignore[unknown-argument]
 
 
-def test_invalid_observed_compartment_is_rejected(sir_model) -> None:
+def test_invalid_observed_compartment_is_rejected(abc_model) -> None:
     problem = CalibrationProblem(
         observed_data=[
             ObservedDataPoint(
@@ -151,19 +151,19 @@ def test_invalid_observed_compartment_is_rejected(sir_model) -> None:
                 value=1.0,
             )
         ],
-        parameters=[bounded("beta")],
+        parameters=[bounded("k1")],
         loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
     )
 
     with pytest.raises(ValueError, match="not found in model"):
-        Calibrator(Simulation(sir_model), problem)
+        Calibrator(Simulation(abc_model), problem)
 
 
 def _single_parameter_problem(loss_function: str) -> CalibrationProblem:
     return CalibrationProblem(
-        observed_data=[ObservedDataPoint(at=0, output="I", value=1.0)],
-        parameters=[bounded("beta")],
+        observed_data=[ObservedDataPoint(at=0, output="B", value=1.0)],
+        parameters=[bounded("k1")],
         loss_function=loss_function,
         optimization_config=ParticleSwarmConfig(num_particles=4, max_iterations=1),
     )
@@ -178,17 +178,17 @@ def test_probabilistic_config_accepts_any_loss_family() -> None:
         assert isinstance(problem.probabilistic_config, ProbabilisticCalibrationConfig)
 
 
-def test_rmse_pipeline_gate_is_loss_coherent(sir_model) -> None:
+def test_rmse_pipeline_gate_is_loss_coherent(abc_model) -> None:
     """The greedy central-fit gate scores the median with the members' RMSE loss."""
     problem = _problem(
-        sir_model,
+        abc_model,
         ProbGreedyLocalSearchConfig(
             ensemble_size_mode="automatic",
             central_fit_max_loss_ratio=1.5,
         ),
         loss_function="rmse",
     )
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
     ensemble = result.selected_ensemble
 
     assert ensemble.point_loss > 0.0
@@ -197,34 +197,34 @@ def test_rmse_pipeline_gate_is_loss_coherent(sir_model) -> None:
     assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
 
 
-def test_mae_pipeline_runs_end_to_end(sir_model) -> None:
+def test_mae_pipeline_runs_end_to_end(abc_model) -> None:
     """A mean-absolute-error loss selects a coherent ensemble end-to-end."""
-    problem = _problem(sir_model, loss_function="mae")
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    problem = _problem(abc_model, loss_function="mae")
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
 
     assert result.selected_ensemble.ensemble_size >= 4
 
 
-def test_parameter_feature_space_pipeline(sir_model) -> None:
+def test_parameter_feature_space_pipeline(abc_model) -> None:
     """Parameter-space clustering runs end-to-end with the NSGA-II backend."""
-    problem = _problem(sir_model, feature_space="parameters")
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    problem = _problem(abc_model, feature_space="parameters")
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
 
     assert result.selection_algorithm == "nsga2"
     assert 4 <= result.selected_ensemble.ensemble_size <= 10
-    assert len(result.selected_ensemble.prediction_median["I"]) == 31
+    assert len(result.selected_ensemble.prediction_median["B"]) == 31
 
 
-def test_greedy_automatic_size_mode_pipeline(sir_model) -> None:
+def test_greedy_automatic_size_mode_pipeline(abc_model) -> None:
     """The greedy backend selects a fit-gated ensemble under automatic sizing."""
     problem = _problem(
-        sir_model,
+        abc_model,
         ProbGreedyLocalSearchConfig(
             ensemble_size_mode="automatic",
             central_fit_max_loss_ratio=1.5,
         ),
     )
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
     ensemble = result.selected_ensemble
 
     assert result.selection_algorithm == "greedy_local_search"
@@ -233,28 +233,28 @@ def test_greedy_automatic_size_mode_pipeline(sir_model) -> None:
     assert ensemble.central_loss <= ensemble.point_loss * 1.5 + 1e-9
 
 
-def test_weighted_sse_is_not_a_loss(sir_model) -> None:
+def test_weighted_sse_is_not_a_loss(abc_model) -> None:
     """Every loss uses weights, so there is no separate weighted SSE."""
     with pytest.raises(ValueError, match="weighted_sse"):
-        _problem(sir_model, loss_function="weighted_sse")
+        _problem(abc_model, loss_function="weighted_sse")
 
 
-def _windowed_problem(sir_model, steps: list[int], window: int) -> CalibrationProblem:
+def _windowed_problem(abc_model, steps: list[int], window: int) -> CalibrationProblem:
     """Problem whose observations are windowed at the given steps."""
-    simulation = Simulation(sir_model)
+    simulation = Simulation(abc_model)
     truth = simulation.run(max(steps))
     observations = [
         ObservedDataPoint(
             at=step,
-            output="I",
-            value=truth["I"][step] - truth["I"][step - window],
+            output="B",
+            value=truth["B"][step] - truth["B"][step - window],
             window=window,
         )
         for step in steps
     ]
     problem = CalibrationProblem(
         observed_data=observations,
-        parameters=[bounded("beta")],
+        parameters=[bounded("k1")],
         loss_function="sse",
         optimization_config=ParticleSwarmConfig(num_particles=10, max_iterations=20),
     )
@@ -271,7 +271,7 @@ def _windowed_problem(sir_model, steps: list[int], window: int) -> CalibrationPr
     return problem
 
 
-def test_windowed_bands_are_taken_at_the_observation_positions(sir_model) -> None:
+def test_windowed_bands_are_taken_at_the_observation_positions(abc_model) -> None:
     """
     Windowed values are anchored where the observations are.
 
@@ -282,32 +282,32 @@ def test_windowed_bands_are_taken_at_the_observation_positions(sir_model) -> Non
     steps = [9, 16, 23, 27]
     window = 7
     result = Calibrator(
-        Simulation(sir_model), _windowed_problem(sir_model, steps, window)
+        Simulation(abc_model), _windowed_problem(abc_model, steps, window)
     ).run_probabilistic()
     ensemble = result.selected_ensemble
 
-    assert ensemble.windowed_prediction_positions["I"] == steps
-    assert len(ensemble.windowed_prediction_median["I"]) == len(steps)
-    assert len(ensemble.windowed_prediction_ci_lower["I"]) == len(steps)
-    assert len(ensemble.windowed_prediction_ci_upper["I"]) == len(steps)
+    assert ensemble.windowed_prediction_positions["B"] == steps
+    assert len(ensemble.windowed_prediction_median["B"]) == len(steps)
+    assert len(ensemble.windowed_prediction_ci_lower["B"]) == len(steps)
+    assert len(ensemble.windowed_prediction_ci_upper["B"]) == len(steps)
 
 
-def test_windowed_median_matches_a_member_wise_reduction(sir_model) -> None:
+def test_windowed_median_matches_a_member_wise_reduction(abc_model) -> None:
     steps = [9, 16, 23, 27]
     window = 7
-    problem = _windowed_problem(sir_model, steps, window)
-    result = Calibrator(Simulation(sir_model), problem).run_probabilistic()
+    problem = _windowed_problem(abc_model, steps, window)
+    result = Calibrator(Simulation(abc_model), problem).run_probabilistic()
     ensemble = result.selected_ensemble
 
     member_values: list[list[float]] = []
     for parameters in ensemble.ensemble_parameters:
-        member = Simulation(sir_model)
+        member = Simulation(abc_model)
         member.model_definition.apply_calibration_parameters(parameters, problem)
         run = Simulation(member.model_definition).run(max(steps))
-        member_values.append([run["I"][s] - run["I"][s - window] for s in steps])
+        member_values.append([run["B"][s] - run["B"][s - window] for s in steps])
 
     expected = [
         float(np.median([values[i] for values in member_values]))
         for i in range(len(steps))
     ]
-    assert ensemble.windowed_prediction_median["I"] == pytest.approx(expected, rel=1e-9)
+    assert ensemble.windowed_prediction_median["B"] == pytest.approx(expected, rel=1e-9)

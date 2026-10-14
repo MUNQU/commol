@@ -256,9 +256,9 @@ pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Syn
     collect_prediction_results(predictions)
 }
 
-/// Generate compact predictions for selected `(step, compartment_idx)` points.
+/// Generate compact predictions for selected `(position, compartment_idx)` points.
 ///
-/// A step may be non-integer for an engine in continuous time.
+/// A position may be non-integer for an engine on a continuous axis.
 pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync>(
     base_engine: &E,
     parameter_sets: Vec<Vec<f64>>,
@@ -272,12 +272,12 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
     positions.sort_by(f64::total_cmp);
     positions.dedup();
 
-    let point_time_indices: Vec<usize> = metric_points
+    let point_row_indices: Vec<usize> = metric_points
         .iter()
         .map(|&(position, _)| {
             positions
                 .binary_search_by(|candidate| candidate.total_cmp(&position))
-                .expect("metric point time step must be present")
+                .expect("metric point position must be present")
         })
         .collect();
 
@@ -303,16 +303,16 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
 
             metric_points
                 .iter()
-                .zip(&point_time_indices)
-                .map(|(&(_, compartment_idx), &time_idx)| {
+                .zip(&point_row_indices)
+                .map(|(&(_, compartment_idx), &row_idx)| {
                     sparse_results
-                        .get(time_idx)
+                        .get(row_idx)
                         .and_then(|row| row.get(compartment_idx))
                         .copied()
                         .ok_or_else(|| {
                             PredictionError::SimulationFailed(format!(
                                 "Missing compact prediction at sparse row {} compartment {}",
-                                time_idx, compartment_idx
+                                row_idx, compartment_idx
                             ))
                         })
                 })
@@ -350,12 +350,12 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
     positions.sort_by(f64::total_cmp);
     positions.dedup();
 
-    let point_time_indices: Vec<usize> = metric_points
+    let point_row_indices: Vec<usize> = metric_points
         .iter()
         .map(|&(position, _)| {
             positions
                 .binary_search_by(|candidate| candidate.total_cmp(&position))
-                .expect("metric point time step must be present")
+                .expect("metric point position must be present")
         })
         .collect();
 
@@ -376,16 +376,16 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
 
             metric_points
                 .iter()
-                .zip(&point_time_indices)
-                .map(|(&(_, compartment_idx), &time_idx)| {
+                .zip(&point_row_indices)
+                .map(|(&(_, compartment_idx), &row_idx)| {
                     sparse_results
-                        .get(time_idx)
+                        .get(row_idx)
                         .and_then(|row| row.get(compartment_idx))
                         .copied()
                         .ok_or_else(|| {
                             PredictionError::SimulationFailed(format!(
                                 "Missing compact prediction at sparse row {} compartment {}",
-                                time_idx, compartment_idx
+                                row_idx, compartment_idx
                             ))
                         })
                 })

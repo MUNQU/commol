@@ -152,16 +152,16 @@ class TestInitialConditions:
         assert report["initial_conditions"]["A"]["value"] is None
 
     def test_shared_category_rows_are_qualified(self) -> None:
-        model = build(shared_category_builder(age=(0.3, 0.7), sex=(0.6, 0.4)))
+        model = build(shared_category_builder(group=(0.3, 0.7), level=(0.6, 0.4)))
 
-        report = applied_parameters_report(model, {"sex:y": 0.6})
+        report = applied_parameters_report(model, {"level:c1": 0.6})
         rows = report["initial_conditions"]
 
-        assert rows["age:y"]["fraction"] == pytest.approx(0.3)
-        assert rows["sex:y"]["fraction"] == pytest.approx(0.6)
-        assert rows["sex:y"]["calibrated"] is True
-        assert rows["age:y"]["calibrated"] is False
-        assert "y" not in rows
+        assert rows["group:c1"]["fraction"] == pytest.approx(0.3)
+        assert rows["level:c1"]["fraction"] == pytest.approx(0.6)
+        assert rows["level:c1"]["calibrated"] is True
+        assert rows["group:c1"]["calibrated"] is False
+        assert "c1" not in rows
 
 
 class TestCompartmentOverrides:

@@ -465,7 +465,7 @@ class CompartmentalStructure(ModelStructure):
             Ids of the categories selecting the subgroup this stratification
             subdivides, empty for an unconditional stratification. A category
             name another stratification also declares is qualified, as in
-            ``sex:female``.
+            ``group:g1``.
 
         Raises
         ------
@@ -500,7 +500,7 @@ class CompartmentalStructure(ModelStructure):
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category ids, bare or qualified (``sex:female``), forming a chain
+            Category ids, bare or qualified (``group:g1``), forming a chain
             from the whole model down to the subgroup, outermost first.
 
         Returns

@@ -257,7 +257,7 @@ impl CompiledModel {
     /// Apply the impulses that act at position `t` to `state`, at once.
     ///
     /// Every jump is computed from the state before any of them, as the flows
-    /// of a step are. A per-capita rate moves that fraction of its source; an
+    /// of a step are. A proportional rate moves that fraction of its source; an
     /// absolute rate moves that amount. Each accumulator that counts an
     /// impulse adds the amount it moves. Rates see `step = floor(t)` and `t`.
     ///
@@ -375,7 +375,7 @@ impl CompiledModel {
 }
 
 /// The amount a flow moves: its rate, times its source when the rate is
-/// per-capita.
+/// proportional.
 #[inline]
 fn flow_amount(
     flow_info: &TransitionFlow,

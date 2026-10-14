@@ -19,7 +19,7 @@
 //! from commol_rs import core, engine
 //!
 //! # Load a model
-//! model = core.Model.from_json_file("sir_model.json")
+//! model = core.Model.from_json_file("model.json")
 //!
 //! # Build the engine the model names
 //! simulation = engine.Engine(model)

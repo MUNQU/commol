@@ -307,7 +307,7 @@ On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves
 continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern
 (`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval,
 and the engine restarts the integration at each integer where such a rate can
-jump. A per-capita pulse `p` on step `n` acts as the constant rate `p` for one
+jump. A proportional pulse `p` on step `n` acts as the constant rate `p` for one
 unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To
 move a fraction at once, use an [impulse](transitions.md#impulses).
 
@@ -318,7 +318,7 @@ points and bounds. In a difference model `t` equals `step`, so they give the
 same results as a rate that reads `step`.
 
 A rate can also jump where `t` reaches a value that it compares `t` with, such
-as `if(t >= t_on, beta, 0)`. The engine restarts the integration there too, so
+as `if(t >= t_on, k1, 0)`. The engine restarts the integration there too, so
 the solver cannot step over a short window. This works when the value reads
 only numbers, `pi`, `e` and parameters with a constant or calibrated value, and
 `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump

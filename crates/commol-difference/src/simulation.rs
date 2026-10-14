@@ -657,7 +657,7 @@ mod tests {
     }
 
     #[test]
-    fn pi_alone_is_a_per_capita_constant_rate() {
+    fn pi_alone_is_a_proportional_constant_rate() {
         let model = ab_model_with_rate("pi / 10");
         let mut engine = DifferenceEquations::from_model(&model);
         let results = engine.run(1).unwrap().rows;

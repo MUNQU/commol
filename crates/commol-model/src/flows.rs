@@ -2,7 +2,7 @@
 //!
 //! A plan says which compartment each transition moves an amount from and
 //! to, with which rate, and whether the rate is an absolute flow or a
-//! per-capita rate. It is built from the compartment labels, never from
+//! proportional rate. It is built from the compartment labels, never from
 //! compartment names. The engine compiles the plan into its runtime flows,
 //! and [`describe_flows`] publishes it, so what is printed is what is
 //! simulated.
@@ -23,7 +23,7 @@ use crate::types::AccumulatorOutputRef;
 /// The flow is computed once and applied to every piece: each piece removes it
 /// from its source compartment and adds it to its target compartment. A
 /// transition with several sources or targets (`A + B -> C + C`) has one piece
-/// per position. A per-capita rate is multiplied by the source, so it needs a
+/// per position. A proportional rate is multiplied by the source, so it needs a
 /// single source.
 pub(crate) struct PlannedFlow {
     /// Id of the transition the flow comes from.
@@ -34,7 +34,7 @@ pub(crate) struct PlannedFlow {
     /// Rate expression, with bin names replaced by compartment names when the
     /// transition is `per_compartment`.
     pub(crate) rate: String,
-    /// Whether the rate is an absolute flow rather than a per-capita rate.
+    /// Whether the rate is an absolute flow rather than a proportional rate.
     pub(crate) absolute: bool,
     /// Accumulator output indices the flow increments.
     pub(crate) accumulator_indices: Vec<usize>,
@@ -116,7 +116,7 @@ fn driving_compartments(
 /// Returns a message when a transition mixes bins and categories, when a
 /// category transition does not have exactly one source and one target, when
 /// a stratified rate matches no compartment the transition starts from, when a
-/// transition with several sources has a per-capita rate, or when a flow ends
+/// transition with several sources has a proportional rate, or when a flow ends
 /// in categories no compartment has.
 pub(crate) fn plan_transition_flows(
     structure: &CompartmentalStructure,
@@ -213,7 +213,7 @@ pub(crate) fn plan_transition_flows(
             let absolute = sources.is_empty() || is_absolute(&rate, explicit_absolute);
             if !absolute && sources.len() > 1 {
                 return Err(format!(
-                    "Transition '{}' has several sources and a per-capita rate, which \
+                    "Transition '{}' has several sources and a proportional rate, which \
                      has no single source to multiply. Use an absolute rate that \
                      references the compartments (for example 'k * A * B'), or the \
                      '$compartment' placeholder for independent flows.",
@@ -310,9 +310,9 @@ pub struct FlowDescription {
     pub target: Option<String>,
     /// Rate expression as the engine evaluates it.
     pub rate: String,
-    /// Compartment a per-capita rate is multiplied by, or `None` when the rate
+    /// Compartment a proportional rate is multiplied by, or `None` when the rate
     /// is an absolute flow. Every piece of a transition shares the same flow.
-    pub per_capita_of: Option<String>,
+    pub proportional_to: Option<String>,
 }
 
 /// Every transition flow of a compartmental structure, exactly as the engine
@@ -338,7 +338,7 @@ pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDesc
     Ok(flows
         .into_iter()
         .flat_map(|flow| {
-            let per_capita_of = if flow.absolute {
+            let proportional_to = if flow.absolute {
                 None
             } else {
                 name(flow.pieces[0].0)
@@ -350,7 +350,7 @@ pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDesc
                     source: name(source),
                     target: name(target),
                     rate: flow.rate.clone(),
-                    per_capita_of: per_capita_of.clone(),
+                    proportional_to: proportional_to.clone(),
                 })
                 .collect::<Vec<_>>()
         })
@@ -394,7 +394,7 @@ mod tests {
             .unwrap()
             .into_iter()
             .map(|flow| {
-                let absolute = flow.per_capita_of.is_none();
+                let absolute = flow.proportional_to.is_none();
                 (flow.source, flow.target, flow.rate, absolute)
             })
             .collect()
@@ -409,7 +409,7 @@ mod tests {
         let model = model(
             &["A"],
             "",
-            r#"{"id":"death","source":["A"],"target":[],"rate":"d"}"#,
+            r#"{"id":"out","source":["A"],"target":[],"rate":"d"}"#,
         );
 
         assert_eq!(
@@ -435,16 +435,16 @@ mod tests {
     #[test]
     fn category_transition_moves_every_bin_between_categories() {
         let model = model(
-            &["S", "I"],
-            r#"{"id":"age","categories":["young","old"]}"#,
-            r#"{"id":"aging","source":["young"],"target":["old"],"rate":"a"}"#,
+            &["A", "B"],
+            r#"{"id":"group","categories":["g1","g2"]}"#,
+            r#"{"id":"move","source":["g1"],"target":["g2"],"rate":"a"}"#,
         );
 
         assert_eq!(
             flows(&model),
             vec![
-                (some("S_young"), some("S_old"), "a".to_string(), false),
-                (some("I_young"), some("I_old"), "a".to_string(), false),
+                (some("A_g1"), some("A_g2"), "a".to_string(), false),
+                (some("B_g1"), some("B_g2"), "a".to_string(), false),
             ]
         );
     }
@@ -452,23 +452,23 @@ mod tests {
     #[test]
     fn rate_referencing_a_compartment_is_an_absolute_flow() {
         let model = model(
-            &["S", "I"],
+            &["A", "B"],
             "",
-            r#"{"id":"inf","source":["S"],"target":["I"],"rate":"b * S * I"}"#,
+            r#"{"id":"t1","source":["A"],"target":["B"],"rate":"b * A * B"}"#,
         );
 
         assert_eq!(
             flows(&model),
-            vec![(some("S"), some("I"), "b * S * I".to_string(), true)]
+            vec![(some("A"), some("B"), "b * A * B".to_string(), true)]
         );
     }
 
     #[test]
     fn transition_mixing_bins_and_categories_is_rejected() {
         let model = model(
-            &["S", "I"],
-            r#"{"id":"age","categories":["young","old"]}"#,
-            r#"{"id":"bad","source":["S"],"target":["old"],"rate":"a"}"#,
+            &["A", "B"],
+            r#"{"id":"group","categories":["g1","g2"]}"#,
+            r#"{"id":"bad","source":["A"],"target":["g2"],"rate":"a"}"#,
         );
 
         assert!(describe_flows(&model).unwrap_err().contains("bad"));
@@ -492,11 +492,11 @@ mod tests {
     }
 
     #[test]
-    fn several_sources_with_a_per_capita_rate_are_rejected() {
+    fn several_sources_with_a_proportional_rate_are_rejected() {
         let model = model(
             &["A", "B"],
             "",
-            r#"{"id":"out","source":["A","B"],"target":[],"rate":"mu"}"#,
+            r#"{"id":"out","source":["A","B"],"target":[],"rate":"k"}"#,
         );
 
         assert!(describe_flows(&model).unwrap_err().contains("$compartment"));
@@ -505,13 +505,13 @@ mod tests {
     #[test]
     fn stratified_rate_that_matches_no_source_is_rejected() {
         let model = model(
-            &["S"],
-            r#"{"id":"age","categories":["y","o"]},
-               {"id":"care","categories":["home","hosp"],
-                "conditions":[{"stratification":"age","category":"o"}]}"#,
-            r#"{"id":"aging","source":["S"],"target":["S"],"stratified_rates":[{
-                "conditions":[{"stratification":"age","category":"y","to":"o"},
-                              {"stratification":"care","category":"home"}],
+            &["A"],
+            r#"{"id":"group","categories":["g1","g2"]},
+               {"id":"type","categories":["t1","t2"],
+                "conditions":[{"stratification":"group","category":"g2"}]}"#,
+            r#"{"id":"move","source":["A"],"target":["A"],"stratified_rates":[{
+                "conditions":[{"stratification":"group","category":"g1","to":"g2"},
+                              {"stratification":"type","category":"t1"}],
                 "rate":"a"}]}"#,
         );
 
@@ -523,37 +523,37 @@ mod tests {
     #[test]
     fn to_without_category_routes_into_a_new_stratification() {
         let model = model(
-            &["S"],
-            r#"{"id":"age","categories":["y","o"]},
-               {"id":"care","categories":["home","hosp"],
-                "conditions":[{"stratification":"age","category":"o"}]}"#,
-            r#"{"id":"aging","source":["S"],"target":["S"],"stratified_rates":[{
-                "conditions":[{"stratification":"age","category":"y","to":"o"},
-                              {"stratification":"care","to":"home"}],
+            &["A"],
+            r#"{"id":"group","categories":["g1","g2"]},
+               {"id":"type","categories":["t1","t2"],
+                "conditions":[{"stratification":"group","category":"g2"}]}"#,
+            r#"{"id":"move","source":["A"],"target":["A"],"stratified_rates":[{
+                "conditions":[{"stratification":"group","category":"g1","to":"g2"},
+                              {"stratification":"type","to":"t1"}],
                 "rate":"a"}]}"#,
         );
 
         assert_eq!(
             flows(&model),
-            vec![(some("S_y"), some("S_o_home"), "a".to_string(), false)]
+            vec![(some("A_g1"), some("A_g2_t1"), "a".to_string(), false)]
         );
     }
 
     #[test]
     fn moving_into_a_conditioning_category_needs_the_dependent_category() {
-        let stratifications = r#"{"id":"age","categories":["y","o"]},
-               {"id":"care","categories":["home","hosp"],
-                "conditions":[{"stratification":"age","category":"o"}]}"#;
+        let stratifications = r#"{"id":"group","categories":["g1","g2"]},
+               {"id":"type","categories":["t1","t2"],
+                "conditions":[{"stratification":"group","category":"g2"}]}"#;
         let bare = model(
-            &["S"],
+            &["A"],
             stratifications,
-            r#"{"id":"aging","source":["y"],"target":["o"],"rate":"a"}"#,
+            r#"{"id":"move","source":["g1"],"target":["g2"],"rate":"a"}"#,
         );
         let routed = model(
-            &["S"],
+            &["A"],
             stratifications,
-            r#"{"id":"aging","source":["y"],"target":["o"],"stratified_rates":[{
-                "conditions":[{"stratification":"care","to":"home"}],"rate":"a"}]}"#,
+            r#"{"id":"move","source":["g1"],"target":["g2"],"stratified_rates":[{
+                "conditions":[{"stratification":"type","to":"t1"}],"rate":"a"}]}"#,
         );
 
         assert!(
@@ -563,7 +563,7 @@ mod tests {
         );
         assert_eq!(
             flows(&routed),
-            vec![(some("S_y"), some("S_o_home"), "a".to_string(), false)]
+            vec![(some("A_g1"), some("A_g2_t1"), "a".to_string(), false)]
         );
     }
 }

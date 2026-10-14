@@ -97,8 +97,8 @@ class EnsembleSelector:
         """Generate calibrated values in the exact observed-data space.
 
         These compact vectors are used for prediction-space clustering. They
-        contain weekly differences, aggregates, and member-specific scale
-        parameters, rather than raw compartment values.
+        hold windowed differences, sums of outputs and the scale of each
+        member, rather than raw compartment values.
         """
         metric_points, observation_specs = self._observation_prediction_spec()
         return self._generate_compact_predictions(

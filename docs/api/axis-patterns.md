@@ -2,6 +2,6 @@
 
 [Back to API Reference](index.md)
 
-Time-varying rates and schedules per subgroup. Guide: [Axis Patterns](../guide/axis-patterns.md).
+Rates that change along the axis, and schedules per subgroup. Guide: [Axis Patterns](../guide/axis-patterns.md).
 
 ::: commol.api.patterns.AxisPattern

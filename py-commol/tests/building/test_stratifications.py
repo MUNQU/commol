@@ -3,11 +3,11 @@
 import pytest
 
 from commol import ModelBuilder, Simulation
-from tests.support import assert_total_conserved, build, sir_builder
+from tests.support import assert_total_conserved, build, abc_builder
 
-AGE = {"y60": 0.8, "oe60": 0.2}
-VACCINATION = {"nv": 0.7, "v": 0.3}
-COMORBIDITIES = {"nc": 0.8, "c": 0.2}
+GROUP = {"g1": 0.8, "g2": 0.2}
+STATUS = {"s1": 0.7, "s2": 0.3}
+LEVEL = {"l1": 0.8, "l2": 0.2}
 
 
 def _compartments(builder: ModelBuilder) -> set[str]:
@@ -16,26 +16,26 @@ def _compartments(builder: ModelBuilder) -> set[str]:
 
 class TestFullProduct:
     def test_two_stratifications_give_every_combination(self) -> None:
-        builder = sir_builder(
-            stratifications={"age": AGE, "vaccination": VACCINATION},
+        builder = abc_builder(
+            stratifications={"group": GROUP, "status": STATUS},
         )
 
         assert _compartments(builder) == {
-            f"{bin_id}_{age}_{vaccination}"
-            for bin_id in ("S", "I", "R")
-            for age in AGE
-            for vaccination in VACCINATION
+            f"{bin_id}_{group}_{status}"
+            for bin_id in ("A", "B", "C")
+            for group in GROUP
+            for status in STATUS
         }
 
     def test_a_run_of_a_two_stratification_model_keeps_the_total(
         self,
     ) -> None:
         model = build(
-            sir_builder(
-                parameters={"beta": 0.25, "gamma": 0.1},
+            abc_builder(
+                parameters={"k1": 0.25, "k2": 0.1},
                 stratifications={
-                    "age": {"young": 0.6, "old": 0.4},
-                    "location": {"urban": 0.7, "rural": 0.3},
+                    "group": {"g1": 0.6, "g2": 0.4},
+                    "type": {"t1": 0.7, "t2": 0.3},
                 },
             )
         )
@@ -49,63 +49,63 @@ class TestFullProduct:
 class TestConditionalStratification:
     """A conditional stratification splits only the compartments it names."""
 
-    def test_vaccination_splits_only_the_oe60_compartments(self) -> None:
-        builder = sir_builder(
-            stratifications={"age": AGE, "vaccination": VACCINATION},
-            conditions={"vaccination": {"age": "oe60"}},
+    def test_status_splits_only_the_g2_compartments(self) -> None:
+        builder = abc_builder(
+            stratifications={"group": GROUP, "status": STATUS},
+            conditions={"status": {"group": "g2"}},
         )
 
         assert _compartments(builder) == {
             f"{bin_id}_{suffix}"
-            for bin_id in ("S", "I", "R")
-            for suffix in ("y60", "oe60_nv", "oe60_v")
+            for bin_id in ("A", "B", "C")
+            for suffix in ("g1", "g2_s1", "g2_s2")
         }
 
     def test_two_conditional_stratifications_on_one_category(self) -> None:
-        builder = sir_builder(
-            fractions={"S": 0.98, "I": 0.02, "R": 0.0},
+        builder = abc_builder(
+            fractions={"A": 0.98, "B": 0.02, "C": 0.0},
             stratifications={
-                "age": AGE,
-                "vaccination": VACCINATION,
-                "comorbidities": COMORBIDITIES,
+                "group": GROUP,
+                "status": STATUS,
+                "level": LEVEL,
             },
             conditions={
-                "vaccination": {"age": "oe60"},
-                "comorbidities": {"age": "oe60"},
+                "status": {"group": "g2"},
+                "level": {"group": "g2"},
             },
         )
 
         assert _compartments(builder) == {
             f"{bin_id}_{suffix}"
-            for bin_id in ("S", "I", "R")
+            for bin_id in ("A", "B", "C")
             for suffix in (
-                "y60",
-                "oe60_nv_nc",
-                "oe60_nv_c",
-                "oe60_v_nc",
-                "oe60_v_c",
+                "g1",
+                "g2_s1_l1",
+                "g2_s1_l2",
+                "g2_s2_l1",
+                "g2_s2_l2",
             )
         }
 
     def test_a_run_keeps_the_total(self) -> None:
         model = build(
-            sir_builder(
-                fractions={"S": 0.9, "I": 0.1, "R": 0.0},
-                stratifications={"age": AGE, "vaccination": VACCINATION},
-                conditions={"vaccination": {"age": "oe60"}},
+            abc_builder(
+                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+                stratifications={"group": GROUP, "status": STATUS},
+                conditions={"status": {"group": "g2"}},
             )
         )
 
         assert_total_conserved(Simulation(model).run(20), 1000.0)
 
     def test_a_condition_on_an_undeclared_stratification_is_rejected(self) -> None:
-        builder = ModelBuilder(name="invalid").add_bin(id="S", name="S")
+        builder = ModelBuilder(name="invalid").add_bin(id="A", name="A")
 
         with pytest.raises(ValueError, match="not been declared"):
             builder.add_stratification(
-                id="vaccination",
-                categories=["nv", "v"],
-                conditions=[{"stratification": "age", "category": "oe60"}],
+                id="status",
+                categories=["s1", "s2"],
+                conditions=[{"stratification": "group", "category": "g2"}],
             )
 
     def test_a_condition_without_a_category_is_rejected(self) -> None:

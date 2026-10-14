@@ -4,7 +4,7 @@ import pytest
 
 from commol import ModelBuilder
 from commol.context.model import Model
-from tests.support import build, sir_builder
+from tests.support import build, abc_builder
 
 
 def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
@@ -12,55 +12,55 @@ def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str
     return capsys.readouterr().out
 
 
-def _aging(name: str) -> ModelBuilder:
-    """SIR split by age, with an aging transition from young to old."""
-    return sir_builder(
+def _move(name: str) -> ModelBuilder:
+    """``abc_builder`` split by group, with a transition from g1 to g2."""
+    return abc_builder(
         name=name,
-        parameters={"beta": 0.3, "gamma": 0.1, "aging_rate": 0.01},
-        stratifications={"age": {"young": 0.7, "old": 0.3}},
-    ).add_transition(id="aging", source=["young"], target=["old"], rate="aging_rate")
+        parameters={"k1": 0.3, "k2": 0.1, "k3": 0.01},
+        stratifications={"group": {"g1": 0.7, "g2": 0.3}},
+    ).add_transition(id="move", source=["g1"], target=["g2"], rate="k3")
 
 
 def _conditional(second: str, categories: tuple[str, str]) -> ModelBuilder:
-    """SIR split by age, and by ``second`` only for the old (``o``)."""
-    return sir_builder(
-        name="SIR Conditional",
-        parameters={"beta": 0.3, "gamma": 0.1, "aging": 0.01},
-        infection=None,
-        recovery=None,
-        fractions={"S": 0.99, "I": 0.005, "R": 0.005},
+    """``abc_builder`` split by group, and by ``second`` only for ``g2``."""
+    return abc_builder(
+        name="ABC Conditional",
+        parameters={"k1": 0.3, "k2": 0.1, "k3": 0.01},
+        ab=None,
+        bc=None,
+        fractions={"A": 0.99, "B": 0.005, "C": 0.005},
         stratifications={
-            "age": {"y": 0.7, "o": 0.3},
+            "group": {"g1": 0.7, "g2": 0.3},
             second: {categories[0]: 0.6, categories[1]: 0.4},
         },
-        conditions={second: {"age": "o"}},
+        conditions={second: {"group": "g2"}},
     )
 
 
-def _per_compartment_sir(builder: ModelBuilder) -> ModelBuilder:
+def _per_compartment_abc(builder: ModelBuilder) -> ModelBuilder:
     return builder.add_transition(
-        id="infection",
-        source=["S"],
-        target=["I"],
-        rate="beta * S * I / total",
+        id="ab",
+        source=["A"],
+        target=["B"],
+        rate="k1 * A * B / total",
         per_compartment=True,
     ).add_transition(
-        id="recovery", source=["I"], target=["R"], rate="gamma", per_compartment=True
+        id="bc", source=["B"], target=["C"], rate="k2", per_compartment=True
     )
 
 
-def _aging_to(
+def _move_to(
     builder: ModelBuilder, transition_id: str, rate: str, second: str, category: str
 ) -> ModelBuilder:
-    """Move ``S_y`` to ``S_o`` and into ``category`` of ``second``."""
+    """Move ``A_g1`` to ``A_g2`` and into ``category`` of ``second``."""
     return builder.add_transition(
         id=transition_id,
-        source=["S"],
-        target=["S"],
+        source=["A"],
+        target=["A"],
         stratified_rates=[
             {
                 "conditions": [
-                    {"stratification": "age", "category": "y", "to": "o"},
+                    {"stratification": "group", "category": "g1", "to": "g2"},
                     {"stratification": second, "to": category},
                 ],
                 "rate": rate,
@@ -69,137 +69,135 @@ def _aging_to(
     )
 
 
-def _vaccination() -> Model:
-    builder = _per_compartment_sir(_conditional("vax", ("nv", "v")))
-    return build(_aging_to(builder, "aging_transition", "aging * S_y", "vax", "nv"))
+def _status_model() -> Model:
+    builder = _per_compartment_abc(_conditional("status", ("s1", "s2")))
+    return build(_move_to(builder, "move_transition", "k3 * A_g1", "status", "s1"))
 
 
 class TestText:
     def test_print_equations_with_stratification(self, capsys) -> None:
-        output = _printed(build(_aging("Age-Stratified SIR")), capsys)
+        output = _printed(build(_move("Group-Stratified ABC")), capsys)
 
         expected = (
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: Age-Stratified SIR\n"
+            "Model: Group-Stratified ABC\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 1\n"
             "Number of Parameters: 3\n"
             "Number of Transitions: 3\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [young, old]\n"
+            "  - group: [g1, g2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  S_young -> I_young: beta * S * I / total\n"
-            "  S_old -> I_old: beta * S * I / total\n"
+            "ab (A -> B):\n"
+            "  A_g1 -> B_g1: k1 * A * B / total\n"
+            "  A_g2 -> B_g2: k1 * A * B / total\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I_young -> R_young: gamma * I\n"
-            "  I_old -> R_old: gamma * I\n"
+            "bc (B -> C):\n"
+            "  B_g1 -> C_g1: k2 * B\n"
+            "  B_g2 -> C_g2: k2 * B\n"
             "\n"
-            "Age Stratification Transitions:\n"
-            "aging (young -> old):\n"
-            "  S_young -> S_old: aging_rate * S_young\n"
-            "  I_young -> I_old: aging_rate * I_young\n"
-            "  R_young -> R_old: aging_rate * R_young\n"
+            "Group Stratification Transitions:\n"
+            "move (g1 -> g2):\n"
+            "  A_g1 -> A_g2: k3 * A_g1\n"
+            "  B_g1 -> B_g2: k3 * B_g1\n"
+            "  C_g1 -> C_g2: k3 * C_g1\n"
             "\n"
-            "Total System: 6 coupled equations (3 bins × 2 age)\n"
+            "Total System: 6 coupled equations (3 bins × 2 group)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_young(t+Dt) - S_young(t)] / Dt = - (beta * S * I / total) - "
-            "(aging_rate * S_young)\n"
-            "[S_old(t+Dt) - S_old(t)] / Dt = - (beta * S * I / total) + (aging_rate * "
-            "S_young)\n"
-            "[I_young(t+Dt) - I_young(t)] / Dt = (beta * S * I / total) - (gamma * I) "
-            "- (aging_rate * I_young)\n"
-            "[I_old(t+Dt) - I_old(t)] / Dt = (beta * S * I / total) - (gamma * I) + "
-            "(aging_rate * I_young)\n"
-            "[R_young(t+Dt) - R_young(t)] / Dt = (gamma * I) - (aging_rate * "
-            "R_young)\n"
-            "[R_old(t+Dt) - R_old(t)] / Dt = (gamma * I) + (aging_rate * R_young)\n"
+            "[A_g1(t+Dt) - A_g1(t)] / Dt = - (k1 * A * B / total) - "
+            "(k3 * A_g1)\n"
+            "[A_g2(t+Dt) - A_g2(t)] / Dt = - (k1 * A * B / total) + (k3 * "
+            "A_g1)\n"
+            "[B_g1(t+Dt) - B_g1(t)] / Dt = (k1 * A * B / total) - (k2 * B) "
+            "- (k3 * B_g1)\n"
+            "[B_g2(t+Dt) - B_g2(t)] / Dt = (k1 * A * B / total) - (k2 * B) + "
+            "(k3 * B_g1)\n"
+            "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B) - (k3 * "
+            "C_g1)\n"
+            "[C_g2(t+Dt) - C_g2(t)] / Dt = (k2 * B) + (k3 * C_g1)\n"
         )
         assert output == expected
 
     def test_print_equations_with_multiple_stratifications(self, capsys) -> None:
         """
-        Rates differ by category, use the totals ``total_young`` and ``total_old``, and
+        Rates differ by category, use the totals ``total_g1`` and ``total_g2``, and
         fall back to the transition rate for an unlisted category.
         """
-        young, old = (
-            {"stratification": "age", "category": "young"},
-            {"stratification": "age", "category": "old"},
+        g1, g2 = (
+            {"stratification": "group", "category": "g1"},
+            {"stratification": "group", "category": "g2"},
         )
-        urban, rural = (
-            {"stratification": "location", "category": "urban"},
-            {"stratification": "location", "category": "rural"},
+        t1, t2 = (
+            {"stratification": "type", "category": "t1"},
+            {"stratification": "type", "category": "t2"},
         )
         model = build(
-            sir_builder(
-                name="Age-Location Stratified SIR",
+            abc_builder(
+                name="Group-Type Stratified ABC",
                 parameters={
-                    "beta_young_urban": 0.4,
-                    "beta_young_rural": 0.25,
-                    "beta_old_urban": 0.35,
-                    "gamma_young": 0.15,
-                    "aging_rate": 0.01,
-                    "migration_rate_young": 0.02,
-                    "migration_rate_old": 0.01,
+                    "k1_g1_t1": 0.4,
+                    "k1_g1_t2": 0.25,
+                    "k1_g2_t1": 0.35,
+                    "k2_g1": 0.15,
+                    "k3": 0.01,
+                    "k4_g1": 0.02,
+                    "k4_g2": 0.01,
                 },
-                infection=None,
-                recovery=None,
+                ab=None,
+                bc=None,
                 stratifications={
-                    "age": {"young": 0.7, "old": 0.3},
-                    "location": {"urban": 0.6, "rural": 0.4},
+                    "group": {"g1": 0.7, "g2": 0.3},
+                    "type": {"t1": 0.6, "t2": 0.4},
                 },
             )
             .add_transition(
-                id="infection",
-                source=["S"],
-                target=["I"],
-                rate="0.3 * S * I / total",
+                id="ab",
+                source=["A"],
+                target=["B"],
+                rate="0.3 * A * B / total",
                 stratified_rates=[
                     {
-                        "conditions": [young, urban],
-                        "rate": "beta_young_urban * S * I / total_young",
+                        "conditions": [g1, t1],
+                        "rate": "k1_g1_t1 * A * B / total_g1",
                     },
                     {
-                        "conditions": [young, rural],
-                        "rate": "beta_young_rural * S * I / total_young",
+                        "conditions": [g1, t2],
+                        "rate": "k1_g1_t2 * A * B / total_g1",
                     },
                     {
-                        "conditions": [old, urban],
-                        "rate": "beta_old_urban * S * I / total_old",
+                        "conditions": [g2, t1],
+                        "rate": "k1_g2_t1 * A * B / total_g2",
                     },
                 ],
             )
             .add_transition(
-                id="recovery",
-                source=["I"],
-                target=["R"],
-                rate="0.1 * I",
-                stratified_rates=[{"conditions": [young], "rate": "gamma_young * I"}],
+                id="bc",
+                source=["B"],
+                target=["C"],
+                rate="0.1 * B",
+                stratified_rates=[{"conditions": [g1], "rate": "k2_g1 * B"}],
             )
+            .add_transition(id="move", source=["g1"], target=["g2"], rate="k3")
             .add_transition(
-                id="aging", source=["young"], target=["old"], rate="aging_rate"
-            )
-            .add_transition(
-                id="migration",
-                source=["urban"],
-                target=["rural"],
+                id="cross",
+                source=["t1"],
+                target=["t2"],
                 rate="0.015",
                 stratified_rates=[
-                    {"conditions": [young], "rate": "migration_rate_young"},
-                    {"conditions": [old], "rate": "migration_rate_old"},
+                    {"conditions": [g1], "rate": "k4_g1"},
+                    {"conditions": [g2], "rate": "k4_g2"},
                 ],
             )
         )
@@ -210,159 +208,157 @@ class TestText:
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: Age-Location Stratified SIR\n"
+            "Model: Group-Type Stratified ABC\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 2\n"
             "Number of Parameters: 7\n"
             "Number of Transitions: 4\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [young, old]\n"
-            "  - location: [urban, rural]\n"
+            "  - group: [g1, g2]\n"
+            "  - type: [t1, t2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  S_young_urban -> I_young_urban: beta_young_urban * S * I / total_young\n"
-            "  S_young_rural -> I_young_rural: beta_young_rural * S * I / total_young\n"
-            "  S_old_urban -> I_old_urban: beta_old_urban * S * I / total_old\n"
-            "  S_old_rural -> I_old_rural: 0.3 * S * I / total\n"
+            "ab (A -> B):\n"
+            "  A_g1_t1 -> B_g1_t1: k1_g1_t1 * A * B / total_g1\n"
+            "  A_g1_t2 -> B_g1_t2: k1_g1_t2 * A * B / total_g1\n"
+            "  A_g2_t1 -> B_g2_t1: k1_g2_t1 * A * B / total_g2\n"
+            "  A_g2_t2 -> B_g2_t2: 0.3 * A * B / total\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I_young_urban -> R_young_urban: gamma_young * I\n"
-            "  I_young_rural -> R_young_rural: gamma_young * I\n"
-            "  I_old_urban -> R_old_urban: 0.1 * I\n"
-            "  I_old_rural -> R_old_rural: 0.1 * I\n"
+            "bc (B -> C):\n"
+            "  B_g1_t1 -> C_g1_t1: k2_g1 * B\n"
+            "  B_g1_t2 -> C_g1_t2: k2_g1 * B\n"
+            "  B_g2_t1 -> C_g2_t1: 0.1 * B\n"
+            "  B_g2_t2 -> C_g2_t2: 0.1 * B\n"
             "\n"
-            "Age Stratification Transitions:\n"
-            "aging (young -> old):\n"
-            "  S_young_urban -> S_old_urban: aging_rate * S_young_urban\n"
-            "  S_young_rural -> S_old_rural: aging_rate * S_young_rural\n"
-            "  I_young_urban -> I_old_urban: aging_rate * I_young_urban\n"
-            "  I_young_rural -> I_old_rural: aging_rate * I_young_rural\n"
-            "  R_young_urban -> R_old_urban: aging_rate * R_young_urban\n"
-            "  R_young_rural -> R_old_rural: aging_rate * R_young_rural\n"
+            "Group Stratification Transitions:\n"
+            "move (g1 -> g2):\n"
+            "  A_g1_t1 -> A_g2_t1: k3 * A_g1_t1\n"
+            "  A_g1_t2 -> A_g2_t2: k3 * A_g1_t2\n"
+            "  B_g1_t1 -> B_g2_t1: k3 * B_g1_t1\n"
+            "  B_g1_t2 -> B_g2_t2: k3 * B_g1_t2\n"
+            "  C_g1_t1 -> C_g2_t1: k3 * C_g1_t1\n"
+            "  C_g1_t2 -> C_g2_t2: k3 * C_g1_t2\n"
             "\n"
-            "Location Stratification Transitions:\n"
-            "migration (urban -> rural):\n"
-            "  S_young_urban -> S_young_rural: migration_rate_young * S_young_urban\n"
-            "  S_old_urban -> S_old_rural: migration_rate_old * S_old_urban\n"
-            "  I_young_urban -> I_young_rural: migration_rate_young * I_young_urban\n"
-            "  I_old_urban -> I_old_rural: migration_rate_old * I_old_urban\n"
-            "  R_young_urban -> R_young_rural: migration_rate_young * R_young_urban\n"
-            "  R_old_urban -> R_old_rural: migration_rate_old * R_old_urban\n"
+            "Type Stratification Transitions:\n"
+            "cross (t1 -> t2):\n"
+            "  A_g1_t1 -> A_g1_t2: k4_g1 * A_g1_t1\n"
+            "  A_g2_t1 -> A_g2_t2: k4_g2 * A_g2_t1\n"
+            "  B_g1_t1 -> B_g1_t2: k4_g1 * B_g1_t1\n"
+            "  B_g2_t1 -> B_g2_t2: k4_g2 * B_g2_t1\n"
+            "  C_g1_t1 -> C_g1_t2: k4_g1 * C_g1_t1\n"
+            "  C_g2_t1 -> C_g2_t2: k4_g2 * C_g2_t1\n"
             "\n"
-            "Total System: 12 coupled equations (3 bins × 2 age × 2 location)\n"
+            "Total System: 12 coupled equations (3 bins × 2 group × 2 type)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_young_urban(t+Dt) - S_young_urban(t)] / Dt = - (beta_young_urban * "
-            "S * I / total_young) - (aging_rate * S_young_urban) - "
-            "(migration_rate_young * S_young_urban)\n"
-            "[S_young_rural(t+Dt) - S_young_rural(t)] / Dt = - (beta_young_rural * "
-            "S * I / total_young) - (aging_rate * S_young_rural) + "
-            "(migration_rate_young * S_young_urban)\n"
-            "[S_old_urban(t+Dt) - S_old_urban(t)] / Dt = - (beta_old_urban * S * I "
-            "/ total_old) + (aging_rate * S_young_urban) - (migration_rate_old * "
-            "S_old_urban)\n"
-            "[S_old_rural(t+Dt) - S_old_rural(t)] / Dt = - (0.3 * S * I / total) + "
-            "(aging_rate * S_young_rural) + (migration_rate_old * S_old_urban)\n"
-            "[I_young_urban(t+Dt) - I_young_urban(t)] / Dt = (beta_young_urban * S "
-            "* I / total_young) - (gamma_young * I) - (aging_rate * I_young_urban) - "
-            "(migration_rate_young * I_young_urban)\n"
-            "[I_young_rural(t+Dt) - I_young_rural(t)] / Dt = (beta_young_rural * S "
-            "* I / total_young) - (gamma_young * I) - (aging_rate * I_young_rural) + "
-            "(migration_rate_young * I_young_urban)\n"
-            "[I_old_urban(t+Dt) - I_old_urban(t)] / Dt = (beta_old_urban * S * I / "
-            "total_old) - (0.1 * I) + (aging_rate * I_young_urban) - "
-            "(migration_rate_old * I_old_urban)\n"
-            "[I_old_rural(t+Dt) - I_old_rural(t)] / Dt = (0.3 * S * I / total) - (0.1 "
-            "* I) + (aging_rate * I_young_rural) + (migration_rate_old * "
-            "I_old_urban)\n"
-            "[R_young_urban(t+Dt) - R_young_urban(t)] / Dt = (gamma_young * I) - "
-            "(aging_rate * R_young_urban) - (migration_rate_young * R_young_urban)\n"
-            "[R_young_rural(t+Dt) - R_young_rural(t)] / Dt = (gamma_young * I) - "
-            "(aging_rate * R_young_rural) + (migration_rate_young * R_young_urban)\n"
-            "[R_old_urban(t+Dt) - R_old_urban(t)] / Dt = (0.1 * I) + (aging_rate * "
-            "R_young_urban) - (migration_rate_old * R_old_urban)\n"
-            "[R_old_rural(t+Dt) - R_old_rural(t)] / Dt = (0.1 * I) + (aging_rate * "
-            "R_young_rural) + (migration_rate_old * R_old_urban)\n"
+            "[A_g1_t1(t+Dt) - A_g1_t1(t)] / Dt = - (k1_g1_t1 * "
+            "A * B / total_g1) - (k3 * A_g1_t1) - "
+            "(k4_g1 * A_g1_t1)\n"
+            "[A_g1_t2(t+Dt) - A_g1_t2(t)] / Dt = - (k1_g1_t2 * "
+            "A * B / total_g1) - (k3 * A_g1_t2) + "
+            "(k4_g1 * A_g1_t1)\n"
+            "[A_g2_t1(t+Dt) - A_g2_t1(t)] / Dt = - (k1_g2_t1 * A * B "
+            "/ total_g2) + (k3 * A_g1_t1) - (k4_g2 * "
+            "A_g2_t1)\n"
+            "[A_g2_t2(t+Dt) - A_g2_t2(t)] / Dt = - (0.3 * A * B / total) + "
+            "(k3 * A_g1_t2) + (k4_g2 * A_g2_t1)\n"
+            "[B_g1_t1(t+Dt) - B_g1_t1(t)] / Dt = (k1_g1_t1 * A "
+            "* B / total_g1) - (k2_g1 * B) - (k3 * B_g1_t1) - "
+            "(k4_g1 * B_g1_t1)\n"
+            "[B_g1_t2(t+Dt) - B_g1_t2(t)] / Dt = (k1_g1_t2 * A "
+            "* B / total_g1) - (k2_g1 * B) - (k3 * B_g1_t2) + "
+            "(k4_g1 * B_g1_t1)\n"
+            "[B_g2_t1(t+Dt) - B_g2_t1(t)] / Dt = (k1_g2_t1 * A * B / "
+            "total_g2) - (0.1 * B) + (k3 * B_g1_t1) - "
+            "(k4_g2 * B_g2_t1)\n"
+            "[B_g2_t2(t+Dt) - B_g2_t2(t)] / Dt = (0.3 * A * B / total) - (0.1 "
+            "* B) + (k3 * B_g1_t2) + (k4_g2 * "
+            "B_g2_t1)\n"
+            "[C_g1_t1(t+Dt) - C_g1_t1(t)] / Dt = (k2_g1 * B) - "
+            "(k3 * C_g1_t1) - (k4_g1 * C_g1_t1)\n"
+            "[C_g1_t2(t+Dt) - C_g1_t2(t)] / Dt = (k2_g1 * B) - "
+            "(k3 * C_g1_t2) + (k4_g1 * C_g1_t1)\n"
+            "[C_g2_t1(t+Dt) - C_g2_t1(t)] / Dt = (0.1 * B) + (k3 * "
+            "C_g1_t1) - (k4_g2 * C_g2_t1)\n"
+            "[C_g2_t2(t+Dt) - C_g2_t2(t)] / Dt = (0.1 * B) + (k3 * "
+            "C_g1_t2) + (k4_g2 * C_g2_t1)\n"
         )
         assert output == expected
 
     def test_print_equations_conditional_stratification_text(self, capsys) -> None:
         """
-        ``vax`` splits only ``age=o``, and the aging transition moves ``S_y``
-        to ``S_o_nv`` through its ``to`` overrides.
+        ``status`` splits only ``group=g2``, and the move transition moves ``A_g1``
+        to ``A_g2_s1`` through its ``to`` overrides.
         """
-        output = _printed(_vaccination(), capsys, format="text")
+        output = _printed(_status_model(), capsys, format="text")
 
         expected = (
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Conditional\n"
+            "Model: ABC Conditional\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 2\n"
             "Number of Parameters: 3\n"
             "Number of Transitions: 3\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [y, o]\n"
-            "  - vax: [nv, v]\n"
+            "  - group: [g1, g2]\n"
+            "  - status: [s1, s2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  S_y -> I_y: beta * S_y * I_y / total\n"
-            "  S_o_nv -> I_o_nv: beta * S_o_nv * I_o_nv / total\n"
-            "  S_o_v -> I_o_v: beta * S_o_v * I_o_v / total\n"
+            "ab (A -> B):\n"
+            "  A_g1 -> B_g1: k1 * A_g1 * B_g1 / total\n"
+            "  A_g2_s1 -> B_g2_s1: k1 * A_g2_s1 * B_g2_s1 / total\n"
+            "  A_g2_s2 -> B_g2_s2: k1 * A_g2_s2 * B_g2_s2 / total\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I_y -> R_y: gamma * I_y\n"
-            "  I_o_nv -> R_o_nv: gamma * I_o_nv\n"
-            "  I_o_v -> R_o_v: gamma * I_o_v\n"
+            "bc (B -> C):\n"
+            "  B_g1 -> C_g1: k2 * B_g1\n"
+            "  B_g2_s1 -> C_g2_s1: k2 * B_g2_s1\n"
+            "  B_g2_s2 -> C_g2_s2: k2 * B_g2_s2\n"
             "\n"
-            "aging_transition (S -> S):\n"
-            "  S_y -> S_o_nv: aging * S_y\n"
+            "move_transition (A -> A):\n"
+            "  A_g1 -> A_g2_s1: k3 * A_g1\n"
             "\n"
-            "Total System: 9 coupled equations (3 bins × 2 age × 2 vax)\n"
+            "Total System: 9 coupled equations (3 bins × 2 group × 2 status)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / total) - (aging * S_y)\n"
-            "[S_o_nv(t+Dt) - S_o_nv(t)] / Dt = - (beta * S_o_nv * I_o_nv / total) + "
-            "(aging * S_y)\n"
-            "[S_o_v(t+Dt) - S_o_v(t)] / Dt = - (beta * S_o_v * I_o_v / total)\n"
-            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / total) - (gamma * I_y)\n"
-            "[I_o_nv(t+Dt) - I_o_nv(t)] / Dt = (beta * S_o_nv * I_o_nv / total) - "
-            "(gamma * I_o_nv)\n"
-            "[I_o_v(t+Dt) - I_o_v(t)] / Dt = (beta * S_o_v * I_o_v / total) - (gamma * "
-            "I_o_v)\n"
-            "[R_y(t+Dt) - R_y(t)] / Dt = (gamma * I_y)\n"
-            "[R_o_nv(t+Dt) - R_o_nv(t)] / Dt = (gamma * I_o_nv)\n"
-            "[R_o_v(t+Dt) - R_o_v(t)] / Dt = (gamma * I_o_v)\n"
+            "[A_g1(t+Dt) - A_g1(t)] / Dt = - (k1 * A_g1 * B_g1 / total) - (k3 * A_g1)\n"
+            "[A_g2_s1(t+Dt) - A_g2_s1(t)] / Dt = - (k1 * A_g2_s1 * B_g2_s1 / total) + "
+            "(k3 * A_g1)\n"
+            "[A_g2_s2(t+Dt) - A_g2_s2(t)] / Dt = - (k1 * A_g2_s2 * B_g2_s2 / total)\n"
+            "[B_g1(t+Dt) - B_g1(t)] / Dt = (k1 * A_g1 * B_g1 / total) - (k2 * B_g1)\n"
+            "[B_g2_s1(t+Dt) - B_g2_s1(t)] / Dt = (k1 * A_g2_s1 * B_g2_s1 / total) - "
+            "(k2 * B_g2_s1)\n"
+            "[B_g2_s2(t+Dt) - B_g2_s2(t)] / Dt = (k1 * A_g2_s2 * B_g2_s2 / total) - "
+            "(k2 * B_g2_s2)\n"
+            "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B_g1)\n"
+            "[C_g2_s1(t+Dt) - C_g2_s1(t)] / Dt = (k2 * B_g2_s1)\n"
+            "[C_g2_s2(t+Dt) - C_g2_s2(t)] / Dt = (k2 * B_g2_s2)\n"
         )
         assert output == expected
 
     def test_print_equations_cross_category_multiple_targets(self, capsys) -> None:
-        """Aging from ``y`` splits between the two comorbidity categories."""
-        builder = _per_compartment_sir(_conditional("comorbidity", ("nc", "c")))
-        builder.add_parameter(id="p_c", value=0.2)
-        builder = _aging_to(
-            builder, "aging_nc", "aging * (1 - p_c) * S_y", "comorbidity", "nc"
-        )
-        builder = _aging_to(builder, "aging_c", "aging * p_c * S_y", "comorbidity", "c")
+        """The move from ``g1`` splits between the two categories of ``level``."""
+        builder = _per_compartment_abc(_conditional("level", ("l1", "l2")))
+        builder.add_parameter(id="p_l2", value=0.2)
+        builder = _move_to(builder, "move_l1", "k3 * (1 - p_l2) * A_g1", "level", "l1")
+        builder = _move_to(builder, "move_l2", "k3 * p_l2 * A_g1", "level", "l2")
 
         output = _printed(build(builder), capsys, format="text")
 
@@ -370,63 +366,65 @@ class TestText:
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Conditional\n"
+            "Model: ABC Conditional\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 2\n"
             "Number of Parameters: 4\n"
             "Number of Transitions: 4\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [y, o]\n"
-            "  - comorbidity: [nc, c]\n"
+            "  - group: [g1, g2]\n"
+            "  - level: [l1, l2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  S_y -> I_y: beta * S_y * I_y / total\n"
-            "  S_o_nc -> I_o_nc: beta * S_o_nc * I_o_nc / total\n"
-            "  S_o_c -> I_o_c: beta * S_o_c * I_o_c / total\n"
+            "ab (A -> B):\n"
+            "  A_g1 -> B_g1: k1 * A_g1 * B_g1 / total\n"
+            "  A_g2_l1 -> B_g2_l1: k1 * A_g2_l1 * B_g2_l1 / total\n"
+            "  A_g2_l2 -> B_g2_l2: k1 * A_g2_l2 * B_g2_l2 / total\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I_y -> R_y: gamma * I_y\n"
-            "  I_o_nc -> R_o_nc: gamma * I_o_nc\n"
-            "  I_o_c -> R_o_c: gamma * I_o_c\n"
+            "bc (B -> C):\n"
+            "  B_g1 -> C_g1: k2 * B_g1\n"
+            "  B_g2_l1 -> C_g2_l1: k2 * B_g2_l1\n"
+            "  B_g2_l2 -> C_g2_l2: k2 * B_g2_l2\n"
             "\n"
-            "aging_nc (S -> S):\n"
-            "  S_y -> S_o_nc: aging * (1 - p_c) * S_y\n"
+            "move_l1 (A -> A):\n"
+            "  A_g1 -> A_g2_l1: k3 * (1 - p_l2) * A_g1\n"
             "\n"
-            "aging_c (S -> S):\n"
-            "  S_y -> S_o_c: aging * p_c * S_y\n"
+            "move_l2 (A -> A):\n"
+            "  A_g1 -> A_g2_l2: k3 * p_l2 * A_g1\n"
             "\n"
-            "Total System: 9 coupled equations (3 bins × 2 age × 2 comorbidity)\n"
+            "Total System: 9 coupled equations (3 bins × 2 group × 2 level)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S_y(t+Dt) - S_y(t)] / Dt = - (beta * S_y * I_y / total) - (aging * S_y)\n"
-            "[S_o_nc(t+Dt) - S_o_nc(t)] / Dt = - (beta * S_o_nc * I_o_nc / total) + "
-            "(aging * (1 - p_c) * S_y)\n"
-            "[S_o_c(t+Dt) - S_o_c(t)] / Dt = - (beta * S_o_c * I_o_c / total) + (aging "
-            "* p_c * S_y)\n"
-            "[I_y(t+Dt) - I_y(t)] / Dt = (beta * S_y * I_y / total) - (gamma * I_y)\n"
-            "[I_o_nc(t+Dt) - I_o_nc(t)] / Dt = (beta * S_o_nc * I_o_nc / total) - "
-            "(gamma * I_o_nc)\n"
-            "[I_o_c(t+Dt) - I_o_c(t)] / Dt = (beta * S_o_c * I_o_c / total) - (gamma * "
-            "I_o_c)\n"
-            "[R_y(t+Dt) - R_y(t)] / Dt = (gamma * I_y)\n"
-            "[R_o_nc(t+Dt) - R_o_nc(t)] / Dt = (gamma * I_o_nc)\n"
-            "[R_o_c(t+Dt) - R_o_c(t)] / Dt = (gamma * I_o_c)\n"
+            "[A_g1(t+Dt) - A_g1(t)] / Dt = - (k1 * A_g1 * B_g1 / total) - (k3 * A_g1)\n"
+            "[A_g2_l1(t+Dt) - A_g2_l1(t)] / Dt = - (k1 * A_g2_l1 * B_g2_l1 / total) + "
+            "(k3 * (1 - p_l2) * A_g1)\n"
+            "[A_g2_l2(t+Dt) - A_g2_l2(t)] / Dt = - (k1 * A_g2_l2 * B_g2_l2 / total) + "
+            "(k3 * p_l2 * A_g1)\n"
+            "[B_g1(t+Dt) - B_g1(t)] / Dt = (k1 * A_g1 * B_g1 / total) - (k2 * B_g1)\n"
+            "[B_g2_l1(t+Dt) - B_g2_l1(t)] / Dt = (k1 * A_g2_l1 * B_g2_l1 / total) - "
+            "(k2 * B_g2_l1)\n"
+            "[B_g2_l2(t+Dt) - B_g2_l2(t)] / Dt = (k1 * A_g2_l2 * B_g2_l2 / total) - "
+            "(k2 * B_g2_l2)\n"
+            "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B_g1)\n"
+            "[C_g2_l1(t+Dt) - C_g2_l1(t)] / Dt = (k2 * B_g2_l1)\n"
+            "[C_g2_l2(t+Dt) - C_g2_l2(t)] / Dt = (k2 * B_g2_l2)\n"
         )
         assert output == expected
 
 
 class TestLatex:
     def test_print_equations_latex_with_stratification(self, capsys) -> None:
-        model = _aging("Age-Stratified SIR Model").build(engine="DifferentialEquations")
+        model = _move("Group-Stratified ABC Model").build(
+            engine="DifferentialEquations"
+        )
 
         output = _printed(model, capsys, format="latex")
 
@@ -434,122 +432,122 @@ class TestLatex:
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: Age-Stratified SIR Model\n"
+            "Model: Group-Stratified ABC Model\n"
             "Model Type: DifferentialEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 1\n"
             "Number of Parameters: 3\n"
             "Number of Transitions: 3\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [young, old]\n"
+            "  - group: [g1, g2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  $S_{young} \\to I_{young}: \\frac{\\beta \\cdot S \\cdot I}{total}$\n"
-            "  $S_{old} \\to I_{old}: \\frac{\\beta \\cdot S \\cdot I}{total}$\n"
+            "ab (A -> B):\n"
+            "  $A_{g1} \\to B_{g1}: \\frac{k1 \\cdot A \\cdot B}{total}$\n"
+            "  $A_{g2} \\to B_{g2}: \\frac{k1 \\cdot A \\cdot B}{total}$\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  $I_{young} \\to R_{young}: \\gamma \\cdot I$\n"
-            "  $I_{old} \\to R_{old}: \\gamma \\cdot I$\n"
+            "bc (B -> C):\n"
+            "  $B_{g1} \\to C_{g1}: k2 \\cdot B$\n"
+            "  $B_{g2} \\to C_{g2}: k2 \\cdot B$\n"
             "\n"
-            "Age Stratification Transitions:\n"
-            "aging (young -> old):\n"
-            "  $S_{young} \\to S_{old}: aging_{rate} \\cdot S_{young}$\n"
-            "  $I_{young} \\to I_{old}: aging_{rate} \\cdot I_{young}$\n"
-            "  $R_{young} \\to R_{old}: aging_{rate} \\cdot R_{young}$\n"
+            "Group Stratification Transitions:\n"
+            "move (g1 -> g2):\n"
+            "  $A_{g1} \\to A_{g2}: k3 \\cdot A_{g1}$\n"
+            "  $B_{g1} \\to B_{g2}: k3 \\cdot B_{g1}$\n"
+            "  $C_{g1} \\to C_{g2}: k3 \\cdot C_{g1}$\n"
             "\n"
-            "Total System: 6 coupled equations (3 bins × 2 age)\n"
+            "Total System: 6 coupled equations (3 bins × 2 group)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "\\[\\frac{dS_{young}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
-            "(aging_{rate} \\cdot S_{young})\\]\n"
-            "\\[\\frac{dS_{old}}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total}) + "
-            "(aging_{rate} \\cdot S_{young})\\]\n"
-            "\\[\\frac{dI_{young}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
-            "(\\gamma "
-            "\\cdot I) - (aging_{rate} \\cdot I_{young})\\]\n"
-            "\\[\\frac{dI_{old}}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) - "
-            "(\\gamma "
-            "\\cdot I) + (aging_{rate} \\cdot I_{young})\\]\n"
-            "\\[\\frac{dR_{young}}{dt} = (\\gamma \\cdot I) - (aging_{rate} \\cdot "
-            "R_{young})\\]\n"
-            "\\[\\frac{dR_{old}}{dt} = (\\gamma \\cdot I) + (aging_{rate} \\cdot "
-            "R_{young})\\]\n"
+            "\\[\\frac{dA_{g1}}{dt} = - (\\frac{k1 \\cdot A \\cdot B}{total}) - "
+            "(k3 \\cdot A_{g1})\\]\n"
+            "\\[\\frac{dA_{g2}}{dt} = - (\\frac{k1 \\cdot A \\cdot B}{total}) + "
+            "(k3 \\cdot A_{g1})\\]\n"
+            "\\[\\frac{dB_{g1}}{dt} = (\\frac{k1 \\cdot A \\cdot B}{total}) - "
+            "(k2 "
+            "\\cdot B) - (k3 \\cdot B_{g1})\\]\n"
+            "\\[\\frac{dB_{g2}}{dt} = (\\frac{k1 \\cdot A \\cdot B}{total}) - "
+            "(k2 "
+            "\\cdot B) + (k3 \\cdot B_{g1})\\]\n"
+            "\\[\\frac{dC_{g1}}{dt} = (k2 \\cdot B) - (k3 \\cdot "
+            "C_{g1})\\]\n"
+            "\\[\\frac{dC_{g2}}{dt} = (k2 \\cdot B) + (k3 \\cdot "
+            "C_{g1})\\]\n"
         )
         assert output == expected
 
     def test_print_equations_conditional_stratification_latex(self, capsys) -> None:
-        output = _printed(_vaccination(), capsys, format="latex")
+        output = _printed(_status_model(), capsys, format="latex")
 
         expected = (
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Conditional\n"
+            "Model: ABC Conditional\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 2\n"
             "Number of Parameters: 3\n"
             "Number of Transitions: 3\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "Stratifications:\n"
-            "  - age: [y, o]\n"
-            "  - vax: [nv, v]\n"
+            "  - group: [g1, g2]\n"
+            "  - status: [s1, s2]\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  $S_{y} \\to I_{y}: \\frac{\\beta \\cdot S_{y} \\cdot I_{y}}{total}$\n"
-            "  $S_{o,nv} \\to I_{o,nv}: \\frac{\\beta \\cdot S_{o,nv} \\cdot "
-            "I_{o,nv}}{total}$\n"
-            "  $S_{o,v} \\to I_{o,v}: \\frac{\\beta \\cdot S_{o,v} \\cdot "
-            "I_{o,v}}{total}$\n"
+            "ab (A -> B):\n"
+            "  $A_{g1} \\to B_{g1}: \\frac{k1 \\cdot A_{g1} \\cdot B_{g1}}{total}$\n"
+            "  $A_{g2,s1} \\to B_{g2,s1}: \\frac{k1 \\cdot A_{g2,s1} \\cdot "
+            "B_{g2,s1}}{total}$\n"
+            "  $A_{g2,s2} \\to B_{g2,s2}: \\frac{k1 \\cdot A_{g2,s2} \\cdot "
+            "B_{g2,s2}}{total}$\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  $I_{y} \\to R_{y}: \\gamma \\cdot I_{y}$\n"
-            "  $I_{o,nv} \\to R_{o,nv}: \\gamma \\cdot I_{o,nv}$\n"
-            "  $I_{o,v} \\to R_{o,v}: \\gamma \\cdot I_{o,v}$\n"
+            "bc (B -> C):\n"
+            "  $B_{g1} \\to C_{g1}: k2 \\cdot B_{g1}$\n"
+            "  $B_{g2,s1} \\to C_{g2,s1}: k2 \\cdot B_{g2,s1}$\n"
+            "  $B_{g2,s2} \\to C_{g2,s2}: k2 \\cdot B_{g2,s2}$\n"
             "\n"
-            "aging_transition (S -> S):\n"
-            "  $S_{y} \\to S_{o,nv}: aging \\cdot S_{y}$\n"
+            "move_transition (A -> A):\n"
+            "  $A_{g1} \\to A_{g2,s1}: k3 \\cdot A_{g1}$\n"
             "\n"
-            "Total System: 9 coupled equations (3 bins × 2 age × 2 vax)\n"
+            "Total System: 9 coupled equations (3 bins × 2 group × 2 status)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "\\[\\frac{S_{y}(t+\\Delta t) - S_{y}(t)}{\\Delta t} = - (\\frac{\\beta "
-            "\\cdot S_{y} \\cdot I_{y}}{total}) - (aging \\cdot S_{y})\\]\n"
-            "\\[\\frac{S_{o,nv}(t+\\Delta t) - S_{o,nv}(t)}{\\Delta t} = - "
-            "(\\frac{\\beta \\cdot S_{o,nv} \\cdot I_{o,nv}}{total}) + (aging \\cdot "
-            "S_{y})\\]\n"
-            "\\[\\frac{S_{o,v}(t+\\Delta t) - S_{o,v}(t)}{\\Delta t} = - "
-            "(\\frac{\\beta "
-            "\\cdot S_{o,v} \\cdot I_{o,v}}{total})\\]\n"
-            "\\[\\frac{I_{y}(t+\\Delta t) - I_{y}(t)}{\\Delta t} = "
-            "(\\frac{\\beta \\cdot "
-            "S_{y} \\cdot I_{y}}{total}) - (\\gamma \\cdot I_{y})\\]\n"
-            "\\[\\frac{I_{o,nv}(t+\\Delta t) - I_{o,nv}(t)}{\\Delta t} = "
-            "(\\frac{\\beta "
-            "\\cdot S_{o,nv} \\cdot I_{o,nv}}{total}) - (\\gamma \\cdot I_{o,nv})\\]\n"
-            "\\[\\frac{I_{o,v}(t+\\Delta t) - I_{o,v}(t)}{\\Delta t} = (\\frac{\\beta "
-            "\\cdot S_{o,v} \\cdot I_{o,v}}{total}) - (\\gamma \\cdot I_{o,v})\\]\n"
-            "\\[\\frac{R_{y}(t+\\Delta t) - R_{y}(t)}{\\Delta t} = (\\gamma \\cdot "
-            "I_{y})\\]\n"
-            "\\[\\frac{R_{o,nv}(t+\\Delta t) - R_{o,nv}(t)}{\\Delta t} = "
-            "(\\gamma \\cdot "
-            "I_{o,nv})\\]\n"
-            "\\[\\frac{R_{o,v}(t+\\Delta t) - R_{o,v}(t)}{\\Delta t} = (\\gamma \\cdot "
-            "I_{o,v})\\]\n"
+            "\\[\\frac{A_{g1}(t+\\Delta t) - A_{g1}(t)}{\\Delta t} = - (\\frac{k1 "
+            "\\cdot A_{g1} \\cdot B_{g1}}{total}) - (k3 \\cdot A_{g1})\\]\n"
+            "\\[\\frac{A_{g2,s1}(t+\\Delta t) - A_{g2,s1}(t)}{\\Delta t} = - "
+            "(\\frac{k1 \\cdot A_{g2,s1} \\cdot B_{g2,s1}}{total}) + (k3 \\cdot "
+            "A_{g1})\\]\n"
+            "\\[\\frac{A_{g2,s2}(t+\\Delta t) - A_{g2,s2}(t)}{\\Delta t} = - "
+            "(\\frac{k1 "
+            "\\cdot A_{g2,s2} \\cdot B_{g2,s2}}{total})\\]\n"
+            "\\[\\frac{B_{g1}(t+\\Delta t) - B_{g1}(t)}{\\Delta t} = "
+            "(\\frac{k1 \\cdot "
+            "A_{g1} \\cdot B_{g1}}{total}) - (k2 \\cdot B_{g1})\\]\n"
+            "\\[\\frac{B_{g2,s1}(t+\\Delta t) - B_{g2,s1}(t)}{\\Delta t} = "
+            "(\\frac{k1 "
+            "\\cdot A_{g2,s1} \\cdot B_{g2,s1}}{total}) - (k2 \\cdot B_{g2,s1})\\]\n"
+            "\\[\\frac{B_{g2,s2}(t+\\Delta t) - B_{g2,s2}(t)}{\\Delta t} = (\\frac{k1 "
+            "\\cdot A_{g2,s2} \\cdot B_{g2,s2}}{total}) - (k2 \\cdot B_{g2,s2})\\]\n"
+            "\\[\\frac{C_{g1}(t+\\Delta t) - C_{g1}(t)}{\\Delta t} = (k2 \\cdot "
+            "B_{g1})\\]\n"
+            "\\[\\frac{C_{g2,s1}(t+\\Delta t) - C_{g2,s1}(t)}{\\Delta t} = "
+            "(k2 \\cdot "
+            "B_{g2,s1})\\]\n"
+            "\\[\\frac{C_{g2,s2}(t+\\Delta t) - C_{g2,s2}(t)}{\\Delta t} = (k2 \\cdot "
+            "B_{g2,s2})\\]\n"
         )
         assert output == expected

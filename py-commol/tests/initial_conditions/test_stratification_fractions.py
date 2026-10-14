@@ -136,7 +136,7 @@ class TestUpdateStratificationFractions:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.update_stratification_fractions({"y": 0.6})
+            model.structure.update_stratification_fractions({"c1": 0.6})
 
 
 class TestQualifiedCategoryReads:
@@ -146,41 +146,41 @@ class TestQualifiedCategoryReads:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.subgroup_total(["y"])
+            model.structure.subgroup_total(["c1"])
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.initial_conditions.get_category_fraction("y")
+            model.structure.initial_conditions.get_category_fraction("c1")
 
     def test_qualified_name_selects_its_stratification(self) -> None:
         model = build(shared_category_builder())
-        model.structure.update_stratification_fractions({"sex:y": 0.8})
+        model.structure.update_stratification_fractions({"level:c1": 0.8})
 
-        assert model.structure.subgroup_total(["sex:y"]) == pytest.approx(800.0)
-        assert model.structure.subgroup_total(["age:y"]) == pytest.approx(500.0)
+        assert model.structure.subgroup_total(["level:c1"]) == pytest.approx(800.0)
+        assert model.structure.subgroup_total(["group:c1"]) == pytest.approx(500.0)
 
     def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
         model = build(
             shared_category_builder(
-                compartment_fractions=[{"compartment": "A_y_y", "fraction": 0.0}]
+                compartment_fractions=[{"compartment": "A_c1_c1", "fraction": 0.0}]
             )
         )
 
-        # A_y_y is pinned to 0, so only A_o_y holds sex:y.
-        assert model.structure.subgroup_total(["sex:y"]) == pytest.approx(250.0)
-        assert model.structure.subgroup_total(["age:o", "sex:y"]) == pytest.approx(
-            250.0
-        )
+        # A_c1_c1 is pinned to 0, so only A_c2_c1 holds level:c1.
+        assert model.structure.subgroup_total(["level:c1"]) == pytest.approx(250.0)
+        assert model.structure.subgroup_total(
+            ["group:c2", "level:c1"]
+        ) == pytest.approx(250.0)
 
     def test_conditioning_categories_are_qualified_when_shared(self) -> None:
         model = build(
             a_to_b_builder(
                 stratifications={
-                    "age": {"y": 0.5, "o": 0.5},
-                    "sex": {"y": 0.5, "o": 0.5},
-                    "care": {"home": 0.5, "hosp": 0.5},
+                    "group": {"c1": 0.5, "c2": 0.5},
+                    "level": {"c1": 0.5, "c2": 0.5},
+                    "type": {"t1": 0.5, "t2": 0.5},
                 },
-                conditions={"care": {"sex": "y"}},
+                conditions={"type": {"level": "c1"}},
             )
         )
 
-        assert model.structure.get_conditioning_categories("care") == ("sex:y",)
-        assert model.structure.subgroup_total(("sex:y",)) == pytest.approx(500.0)
+        assert model.structure.get_conditioning_categories("type") == ("level:c1",)
+        assert model.structure.subgroup_total(("level:c1",)) == pytest.approx(500.0)

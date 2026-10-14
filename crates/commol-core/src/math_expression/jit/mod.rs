@@ -17,7 +17,7 @@
 //! use commol_core::math_expression::jit::{JITCompiler, JITFunction};
 //!
 //! let mut compiler = JITCompiler::new()?;
-//! let jit_fn = compiler.compile("beta * gamma")?;
+//! let jit_fn = compiler.compile("k1 * k2")?;
 //! let result = jit_fn.call(&context)?;
 //! ```
 

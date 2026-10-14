@@ -104,7 +104,7 @@ class TestOperators:
     def test_modulo_alone_is_an_operator(self) -> None:
         result = run(_ab_model("step % 2"), 2)
 
-        # Per-capita rate 0 at step 0, 1 at step 1.
+        # Proportional rate 0 at step 0, 1 at step 1.
         assert result["A"][1] == pytest.approx(1000.0)
         assert result["A"][2] == pytest.approx(0.0)
 

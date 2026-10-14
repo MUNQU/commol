@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
-# Separator of a qualified category id, as in ``sex:female``.
+# Separator of a qualified category id, as in ``group:g1``.
 CATEGORY_SEPARATOR = ":"
 
 
@@ -86,7 +86,7 @@ class CompartmentFraction(BaseModel):
     Attributes
     ----------
     compartment : str
-        The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.
+        The expanded compartment name, for example ``A_g1`` or ``B_g2_t1``.
     fraction : float
         The fraction of the total in this compartment, between 0.0 and 1.0.
     """
@@ -276,7 +276,7 @@ class InitialConditions(BaseModel):
         """
         Resolve a category id to its stratification and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
 
         Parameters
@@ -329,7 +329,7 @@ class InitialConditions(BaseModel):
         Parameters
         ----------
         category : str
-            A category id, bare or qualified (``sex:female``).
+            A category id, bare or qualified (``group:g1``).
 
         Returns
         -------
@@ -384,7 +384,7 @@ class InitialConditions(BaseModel):
         """
         Return the stratification that declares a category, and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
         """
         stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
@@ -453,7 +453,7 @@ class InitialConditions(BaseModel):
 
         Categories belonging to several stratifications may be given in one
         call. A category name declared by more than one stratification must be
-        qualified with its stratification, as in ``sex:female``. Within each
+        qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
         category receives the remaining fraction so that the stratification
         sums to 1.0. When every category is given, the values

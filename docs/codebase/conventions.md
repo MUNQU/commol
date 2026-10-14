@@ -186,7 +186,8 @@ topic inside its package.
 ### Models: use the factories
 
 - Build models with the factories of `tests/support/models.py`:
-  `sir_builder`, `seir_builder` and `a_to_b_builder`, and the special models
+  `abc_builder` (A → B → C), `abcd_builder` (A → B → C → D) and
+  `a_to_b_builder`, and the special models
   `override_builder`, `shared_category_builder` and
   `conditional_pathway_builder`. A keyword overrides one part of the default
   model, so a test names only what it changes. `build` builds for difference
@@ -194,7 +195,11 @@ topic inside its package.
   solver settings `TIGHT` by default; `run` builds and simulates.
 - Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to `support/`.
-- Fixtures: `sir_model` and `sir_simulation` (`tests/conftest.py`); `truth`
+- Test models use abstract names, as examples do: bins `A`, `B`, `C`,
+  parameters `k1`, `k2`, categories `g1`, `t1`. Only `tests/reference_models/`
+  and the support code that only it uses (`support/oracles.py`,
+  `support/flows.py`) keep the names of their published source.
+- Fixtures: `abc_model` and `abc_simulation` (`tests/conftest.py`); `truth`
   and `truth_run` (`tests/calibration/conftest.py`). A fixture is
   function-scoped unless its cost is measured; a wider scope never holds an
   object a test can change. A class-scoped fixture is never an instance
@@ -207,9 +212,9 @@ A test compares a result with an oracle:
 | Oracle | Example |
 |---|---|
 | A value computed by hand in the test | `reference_run` (`tests/support/reference.py`) evaluates the flows in plain Python, as the engine does: every flow from the state at the start of the step, no clamping. `tests/rates/test_formulas.py` compares whole trajectories with it. |
-| An analytic value | A death rate `d` on every bin gives `total(t) = total(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
+| An analytic value | An outflow rate `d` on every bin gives `total(t) = total(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
 | An invariant | A total that the model keeps (`assert_total_conserved`); two paths that must agree, such as a bin id and the explicit sum of its compartments. |
-| What a stated result predicts about a run | `tests/support/oracles.py`: `final_size` solves the final size relation, `assert_threshold` checks that an infection grows at a reproduction number of `1.05` and dies out at `0.95`, `settled` reads a limit once doubling the horizon no longer moves it. |
+| What a stated result predicts about a run | `tests/support/oracles.py`, for the reference models: `final_size` solves the final size relation, `assert_threshold` checks that a model grows at a reproduction number of `1.05` and decays at `0.95`, `settled` reads a limit once doubling the horizon no longer moves it. |
 
 "It runs" is not a result. A test whose only check is that no exception
 occurs is allowed only when the exception is its subject, such as a validator
@@ -234,7 +239,7 @@ that accepts a valid input.
 
 `tests/reference_models/` shows that commol can state published models and
 computes their stated results. A module holds one model family and is named
-after its epidemiology (`test_pulse_vaccination.py`); a test checks one stated
+after the published model (`test_pulse_vaccination.py`); a test checks one stated
 result (`test_the_fixed_point_starts_the_periodic_orbit`).
 
 - **Attribution.** The module docstring has a `References` section in the NumPy
@@ -273,7 +278,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
   `ci`, `chore`.
 
 ```text
-feat(transitions): add time-varying rates
+feat(transitions): add rate patterns
 fix(simulation): correct the total of a subgroup
 docs(codebase): add repository map
 ```

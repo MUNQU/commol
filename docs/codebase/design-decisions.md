@@ -10,7 +10,7 @@ test that guards it. Read the ones of your area before you change it.
 |---|---|
 | Model kinds | [One interface for every kind](#one-interface-for-every-model-kind), [a model by composition](#a-model-is-a-header-an-engine-and-a-structure) |
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [what they hold](#state-amount-total-and-subgroup-total), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
-| Transitions and rates | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
+| Transitions and rates | [Rate semantics](#absolute-and-proportional-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
@@ -177,22 +177,28 @@ to check rates and give units.
 
 ## Transitions and rates
 
-### Absolute and per-capita rates
+### Absolute and proportional rates
 
 The flow planner (`plan_transition_flows` in
 `crates/commol-model/src/flows.rs`) decides for each flow whether the rate
-is absolute or per-capita:
+is absolute or proportional:
 
 | Case | Rate is | Flow per step |
 |---|---|---|
 | A stratified rate sets `absolute` | As set | — |
 | The rate references a compartment, a bin total, `total` or a `total_…` variable | Absolute | `rate` |
 | The transition has no source | Absolute | `rate` |
-| Otherwise | Per-capita | `rate × source` |
+| Otherwise | Proportional | `rate × source` |
 
-A transition with several sources and a per-capita rate is rejected, because
+A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. `print_equations` shows the planned flows,
-so a per-capita rate prints as `k1 * A`.
+so a proportional rate prints as `k1 * A`.
+
+The name says what the flow is: proportional to its source. The name
+"per-capita" counts heads, which assumes the source holds individuals; a
+source can hold a mass or a concentration. "Relative" would clash with the
+relative tolerance `rtol` of the ODE solver, and "per-unit" with units of
+measure.
 
 **Guard:** `tests/transitions/test_flows.py`.
 
@@ -325,7 +331,7 @@ Whether an expression reads `step` comes from `reads_variable`, not from
 `get_variables`: `get_variables` leaves out the special variables, because it
 lists the variables a model must define.
 
-**Consequence:** a per-capita pulse `p` moves `p` of its source in a difference
+**Consequence:** a proportional pulse `p` moves `p` of its source in a difference
 model and `1 − e^(−p)` in a differential model. An impulse moves `p` in both.
 The alternative, `step = t`, makes a pulse `step == n` true on a set of zero
 length, so it would never act.

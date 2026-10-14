@@ -15,17 +15,18 @@ merged or archived.
 | 3 | `odd/archive/tasks/model-type-registry.md` | merged by PR #105 (squash of `131a5ab`, 2026-10-14) | 2 | Yes |
 | 4 | `odd/archive/tasks/model-kind-interface.md` | merged by PR #106 (squash `77aa9fd`, 2026-10-14) | 3 | Yes |
 | 5 | `odd/archive/tasks/neutral-state-terms.md` | delivered by PR #108 | 4 | Yes |
-| 6 | `odd/tasks/axis-scale-refactor.md` | T1 → T6 (T0 done) | 5 | Yes |
-| 7 | Release 0.3.0 (`docs/development/release.md`) | — | 2–6 | — |
-| 8 | `odd/tasks/library-benchmark.md` | T1 → T5 | 7 | No |
+| 6 | `odd/tasks/domain-agnostic-audit.md` | T1 → T6 | 5 | Yes |
+| 7 | `odd/tasks/axis-scale-refactor.md` | T1 → T6 (T0 done) | 6 | Yes |
+| 8 | Release 0.3.0 (`docs/development/release.md`) | — | 2–7 | — |
+| 9 | `odd/tasks/library-benchmark.md` | T1 → T5 | 8 | No |
 
 ## Why this order
 
 - **#102 first.** It fixes wrong results of the ODE engine (`step` stayed 0 in
   rate expressions; the solver stepped over a window on `t`). Every later
   test of a differential model needs it.
-- **Reference model tests before the refactors.** Steps 2–6 change the public
-  API five times. Tests against closed-form and published results guard the
+- **Reference model tests before the refactors.** Steps 2–7 change the public
+  API six times. Tests against closed-form and published results guard the
   behavior through all of them, and they can find engine faults, as the work
   that led to #102 did, before the refactors build on them. Cost: each
   refactor migrates these tests too; most of them go through `tests/support/`,
@@ -43,10 +44,14 @@ merged or archived.
   written against the final names and its tests migrate once; that ODD also
   adds `steps(amount, unit)`, which must not give "amount" a third meaning
   (`neutral-state-terms` D5).
+- **`domain-agnostic-audit` before `axis-scale-refactor`.** It renames
+  "per-capita" to "proportional" and the test models to abstract ones, so
+  `axis-scale-refactor`, which writes "per-capita" (S4) and rewrites tests of
+  `units/`, is written against the final names and its tests migrate once.
 - **`axis-scale-refactor` last of the refactors.** `AxisUnits` reads
   `step_unit` and the engine of the new `Model`, and its rate conversions ask
   the registry what a rate means.
-- **One release for every break.** Steps 2–6 all break the API; commol is
+- **One release for every break.** Steps 2–7 all break the API; commol is
   alpha, so the break is no cost, and one 0.3.0 release with one changelog
   mapping is easier to read than four.
 - **Benchmark last.** It compares commol with other libraries on the API and
@@ -54,6 +59,6 @@ merged or archived.
 
 ## Not in parallel
 
-Steps 1–6 change the same tests and modules (`tests/support/`,
+Steps 1–7 change the same tests and modules (`tests/support/`,
 `api/reporting.py`, `context/`), so they run one after the other. Each starts
 from `develop` after the previous PR merges.

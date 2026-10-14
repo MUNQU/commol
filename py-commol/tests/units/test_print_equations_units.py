@@ -4,9 +4,9 @@ import pytest
 
 from commol import ModelBuilder
 from commol.context.model import Model
-from tests.support import build, sir_builder
+from tests.support import build, abc_builder
 
-DAILY = {"beta": "1/day", "gamma": "1/day"}
+DAILY = {"k1": "1/day", "k2": "1/day"}
 
 
 def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
@@ -14,24 +14,24 @@ def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str
     return capsys.readouterr().out
 
 
-def _reinfection(**options) -> Model:
-    """SIR whose infection names I as a source and a target."""
+def _ab_into_b(**options) -> Model:
+    """``abc_builder`` whose ``ab`` names B as a source and a target."""
     return build(
-        sir_builder(name="SIR Model", infection=None, recovery=None, **options)
+        abc_builder(name="ABC Model", ab=None, bc=None, **options)
         .add_transition(
-            id="infection",
-            source=["S", "I"],
-            target=["I", "I"],
-            rate="beta * S * I / total",
+            id="ab",
+            source=["A", "B"],
+            target=["B", "B"],
+            rate="k1 * A * B / total",
         )
-        .add_transition(id="recovery", source=["I"], target=["R"], rate="gamma * I")
+        .add_transition(id="bc", source=["B"], target=["C"], rate="k2 * B")
     )
 
 
 class TestUnits:
     def test_print_equations_latex_with_units(self, capsys) -> None:
-        model = sir_builder(
-            name="SIR Model with Units", bin_unit="person", units=DAILY
+        model = abc_builder(
+            name="ABC Model with Units", bin_unit="item", units=DAILY
         ).build(engine="DifferentialEquations")
 
         output = _printed(model, capsys, format="latex")
@@ -40,135 +40,135 @@ class TestUnits:
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Model with Units\n"
+            "Model: ABC Model with Units\n"
             "Model Type: DifferentialEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 0\n"
             "Number of Parameters: 2\n"
             "Number of Transitions: 2\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (S -> I):\n"
-            "  $S \\to I: \\frac{\\beta(\\text{1/day}) \\cdot S(\\text{person}) "
-            "\\cdot I(\\text{person})}{total(\\text{person})} [\\text{person / day}]$\n"
+            "ab (A -> B):\n"
+            "  $A \\to B: \\frac{k1(\\text{1/day}) \\cdot A(\\text{item}) "
+            "\\cdot B(\\text{item})}{total(\\text{item})} [\\text{item / day}]$\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  $I \\to R: \\gamma(\\text{1/day}) \\cdot I(\\text{person}) "
-            "[\\text{person / day}]$\n"
+            "bc (B -> C):\n"
+            "  $B \\to C: k2(\\text{1/day}) \\cdot B(\\text{item}) "
+            "[\\text{item / day}]$\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "\\[\\frac{dS}{dt} = - (\\frac{\\beta \\cdot S \\cdot I}{total})\\]\n"
-            "\\[\\frac{dI}{dt} = (\\frac{\\beta \\cdot S \\cdot I}{total}) "
-            "- (\\gamma \\cdot I)\\]\n"
-            "\\[\\frac{dR}{dt} = (\\gamma \\cdot I)\\]\n"
+            "\\[\\frac{dA}{dt} = - (\\frac{k1 \\cdot A \\cdot B}{total})\\]\n"
+            "\\[\\frac{dB}{dt} = (\\frac{k1 \\cdot A \\cdot B}{total}) "
+            "- (k2 \\cdot B)\\]\n"
+            "\\[\\frac{dC}{dt} = (k2 \\cdot B)\\]\n"
         )
         assert output == expected
 
     def test_print_equations_compact_with_complete_units(self, capsys) -> None:
-        output = _printed(_reinfection(bin_unit="person", units=DAILY), capsys)
+        output = _printed(_ab_into_b(bin_unit="item", units=DAILY), capsys)
 
         expected = (
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Model\n"
+            "Model: ABC Model\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 0\n"
             "Number of Parameters: 2\n"
             "Number of Transitions: 2\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (I, S -> I):\n"
-            "  S -> I: beta(1/day) * S(person) * I(person) / total(person) "
-            "[person / day]\n"
-            "  I -> I: beta(1/day) * S(person) * I(person) / total(person) "
-            "[person / day]\n"
+            "ab (A, B -> B):\n"
+            "  A -> B: k1(1/day) * A(item) * B(item) / total(item) "
+            "[item / day]\n"
+            "  B -> B: k1(1/day) * A(item) * B(item) / total(item) "
+            "[item / day]\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I -> R: gamma(1/day) * I(person) [person / day]\n"
+            "bc (B -> C):\n"
+            "  B -> C: k2(1/day) * B(item) [item / day]\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / total)\n"
-            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / total) - (gamma * I)\n"
-            "[R(t+Dt) - R(t)] / Dt = (gamma * I)\n"
+            "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
+            "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
         )
         assert output == expected
 
     def test_print_equations_compact_without_units(self, capsys) -> None:
-        output = _printed(_reinfection(), capsys)
+        output = _printed(_ab_into_b(), capsys)
 
         expected = (
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: SIR Model\n"
+            "Model: ABC Model\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 0\n"
             "Number of Parameters: 2\n"
             "Number of Transitions: 2\n"
-            "Bins: S, I, R\n"
+            "Bins: A, B, C\n"
             "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
-            "infection (I, S -> I):\n"
-            "  S -> I: beta * S * I / total\n"
-            "  I -> I: beta * S * I / total\n"
+            "ab (A, B -> B):\n"
+            "  A -> B: k1 * A * B / total\n"
+            "  B -> B: k1 * A * B / total\n"
             "\n"
-            "recovery (I -> R):\n"
-            "  I -> R: gamma * I\n"
+            "bc (B -> C):\n"
+            "  B -> C: k2 * B\n"
             "\n"
             "Total System: 3 coupled equations (3 bins)\n"
             "\n"
             "========================================\n"
             "EXPANDED FORM\n"
             "========================================\n"
-            "[S(t+Dt) - S(t)] / Dt = - (beta * S * I / total)\n"
-            "[I(t+Dt) - I(t)] / Dt = (beta * S * I / total) - (gamma * I)\n"
-            "[R(t+Dt) - R(t)] / Dt = (gamma * I)\n"
+            "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
+            "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
         )
         assert output == expected
 
     def test_print_equations_compact_with_partial_units(self) -> None:
-        model = _reinfection(bin_unit="person", units={"beta": "1/day"})
+        model = _ab_into_b(bin_unit="item", units={"k1": "1/day"})
 
         with pytest.raises(ValueError, match="Some parameters have units but not all"):
             model.print_equations()
 
     def test_print_equations_compact_with_bin_unit_only(self) -> None:
-        model = _reinfection(bin_unit="person")
+        model = _ab_into_b(bin_unit="item")
 
         with pytest.raises(ValueError, match="Some parameters have units but not all"):
             model.print_equations()
 
     def test_print_equations_compact_with_different_bin_units(self, capsys) -> None:
         model = build(
-            ModelBuilder(name="Chemical Reaction", version="1.0", bin_unit="mol")
-            .add_bin(id="A", name="Reactant A")
-            .add_bin(id="B", name="Reactant B")
-            .add_bin(id="C", name="Product C")
+            ModelBuilder(name="Mole Units", version="1.0", bin_unit="mol")
+            .add_bin(id="A", name="A")
+            .add_bin(id="B", name="B")
+            .add_bin(id="C", name="C")
             .add_parameter(id="k1", value=0.5, unit="1/s")
             .add_parameter(id="k2", value=0.2, unit="1/s")
             .add_transition(
@@ -191,7 +191,7 @@ class TestUnits:
             "========================================\n"
             "MODEL INFORMATION\n"
             "========================================\n"
-            "Model: Chemical Reaction\n"
+            "Model: Mole Units\n"
             "Model Type: DifferenceEquations\n"
             "Number of Bins: 3\n"
             "Number of Stratifications: 0\n"

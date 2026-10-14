@@ -9,37 +9,37 @@ from tests.support import (
     assert_close,
     build,
     reference_run,
-    sir_builder,
+    abc_builder,
     stratify,
     total,
 )
 from tests.support.reference import State
 
 
-def _susceptible(state: State) -> float:
-    return state["S_young"] + state["S_old"]
+def _amount_a(state: State) -> float:
+    return state["A_g1"] + state["A_g2"]
 
 
-def _infected(state: State) -> float:
-    return state["I_young"] + state["I_old"]
+def _amount_b(state: State) -> float:
+    return state["B_g1"] + state["B_g2"]
 
 
 class TestFallbackRate:
     def test_a_group_without_a_stratified_rate_takes_the_rate(self) -> None:
         model = build(
-            sir_builder(
-                parameters={"beta_young": 0.4, "beta_default": 0.2, "gamma": 0.1},
-                infection=None,
-                stratifications={"age": {"young": 0.5, "old": 0.5}},
+            abc_builder(
+                parameters={"k1_g1": 0.4, "k1_default": 0.2, "k2": 0.1},
+                ab=None,
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
             ).add_transition(
-                id="infection",
-                source=["S"],
-                target=["I"],
-                rate="beta_default * S * I / total",
+                id="ab",
+                source=["A"],
+                target=["B"],
+                rate="k1_default * A * B / total",
                 stratified_rates=[
                     {
-                        "conditions": [{"stratification": "age", "category": "young"}],
-                        "rate": "beta_young * S * I / total",
+                        "conditions": [{"stratification": "group", "category": "g1"}],
+                        "rate": "k1_g1 * A * B / total",
                     }
                 ],
             )
@@ -47,77 +47,77 @@ class TestFallbackRate:
 
         result = Simulation(model).run(5)
 
-        # S and I are the bin totals, so both groups lose a share of the same
-        # product; young at 0.4, old at the fallback 0.2.
+        # A and B are the bin totals, so both groups lose a share of the same
+        # product; g1 at 0.4, g2 at the fallback 0.2.
         expected = reference_run(
             {
-                "S_young": 495.0,
-                "S_old": 495.0,
-                "I_young": 5.0,
-                "I_old": 5.0,
-                "R_young": 0.0,
-                "R_old": 0.0,
+                "A_g1": 495.0,
+                "A_g2": 495.0,
+                "B_g1": 5.0,
+                "B_g2": 5.0,
+                "C_g1": 0.0,
+                "C_g2": 0.0,
             },
             [
                 (
-                    "S_young",
-                    "I_young",
-                    lambda s, _: 0.4 * _susceptible(s) * _infected(s) / total(s),
+                    "A_g1",
+                    "B_g1",
+                    lambda s, _: 0.4 * _amount_a(s) * _amount_b(s) / total(s),
                 ),
                 (
-                    "S_old",
-                    "I_old",
-                    lambda s, _: 0.2 * _susceptible(s) * _infected(s) / total(s),
+                    "A_g2",
+                    "B_g2",
+                    lambda s, _: 0.2 * _amount_a(s) * _amount_b(s) / total(s),
                 ),
-                ("I_young", "R_young", lambda s, _: 0.1 * _infected(s)),
-                ("I_old", "R_old", lambda s, _: 0.1 * _infected(s)),
+                ("B_g1", "C_g1", lambda s, _: 0.1 * _amount_b(s)),
+                ("B_g2", "C_g2", lambda s, _: 0.1 * _amount_b(s)),
             ],
             5,
         )
         assert_close(result, expected, rel=ENGINE_REL)
-        assert result["S_young"][1] == pytest.approx(495.0 - 3.96)
-        assert result["S_old"][1] == pytest.approx(495.0 - 1.98)
+        assert result["A_g1"][1] == pytest.approx(495.0 - 3.96)
+        assert result["A_g2"][1] == pytest.approx(495.0 - 1.98)
 
 
 class TestConditionalCompartments:
     def test_each_conditional_group_takes_its_own_rate(self) -> None:
         model = build(
-            sir_builder(
+            abc_builder(
                 parameters={
-                    "beta": 0.0,
-                    "gamma_y60": 0.0,
-                    "gamma_oe60_nv": 0.5,
-                    "gamma_oe60_v": 0.8,
+                    "k1": 0.0,
+                    "k2_g1": 0.0,
+                    "k2_g2_t1": 0.5,
+                    "k2_g2_t2": 0.8,
                 },
-                recovery=None,
-                fractions={"S": 0.0, "I": 1.0, "R": 0.0},
+                bc=None,
+                fractions={"A": 0.0, "B": 1.0, "C": 0.0},
                 stratifications={
-                    "age": {"y60": 0.5, "oe60": 0.5},
-                    "vaccination": {"nv": 0.5, "v": 0.5},
+                    "group": {"g1": 0.5, "g2": 0.5},
+                    "type": {"t1": 0.5, "t2": 0.5},
                 },
-                conditions={"vaccination": {"age": "oe60"}},
+                conditions={"type": {"group": "g2"}},
             ).add_transition(
-                id="recovery",
-                source=["I"],
-                target=["R"],
+                id="bc",
+                source=["B"],
+                target=["C"],
                 stratified_rates=[
                     {
-                        "conditions": [{"stratification": "age", "category": "y60"}],
-                        "rate": "gamma_y60 * I_y60",
+                        "conditions": [{"stratification": "group", "category": "g1"}],
+                        "rate": "k2_g1 * B_g1",
                     },
                     {
                         "conditions": [
-                            {"stratification": "age", "category": "oe60"},
-                            {"stratification": "vaccination", "category": "nv"},
+                            {"stratification": "group", "category": "g2"},
+                            {"stratification": "type", "category": "t1"},
                         ],
-                        "rate": "gamma_oe60_nv * I_oe60_nv",
+                        "rate": "k2_g2_t1 * B_g2_t1",
                     },
                     {
                         "conditions": [
-                            {"stratification": "age", "category": "oe60"},
-                            {"stratification": "vaccination", "category": "v"},
+                            {"stratification": "group", "category": "g2"},
+                            {"stratification": "type", "category": "t2"},
                         ],
-                        "rate": "gamma_oe60_v * I_oe60_v",
+                        "rate": "k2_g2_t2 * B_g2_t2",
                     },
                 ],
             )
@@ -126,33 +126,33 @@ class TestConditionalCompartments:
         result = Simulation(model).run(5)
 
         expected = reference_run(
-            {"I_y60": 500.0, "I_oe60_nv": 250.0, "I_oe60_v": 250.0},
+            {"B_g1": 500.0, "B_g2_t1": 250.0, "B_g2_t2": 250.0},
             [
-                ("I_oe60_nv", None, lambda s, _: 0.5 * s["I_oe60_nv"]),
-                ("I_oe60_v", None, lambda s, _: 0.8 * s["I_oe60_v"]),
+                ("B_g2_t1", None, lambda s, _: 0.5 * s["B_g2_t1"]),
+                ("B_g2_t2", None, lambda s, _: 0.8 * s["B_g2_t2"]),
             ],
             5,
         )
         for name, values in expected.items():
             assert_close(result[name], values, rel=ENGINE_REL)
-        assert result["R_y60"] == [0.0] * 6
+        assert result["C_g1"] == [0.0] * 6
 
 
 class TestStratifiedRateValidation:
     def test_a_condition_the_source_cannot_meet_is_rejected_at_build(self) -> None:
         builder = (
             ModelBuilder(name="Routing", version="1.0")
-            .add_bin(id="S", name="S")
+            .add_bin(id="A", name="A")
             .add_parameter(id="a", value=0.1)
             .add_transition(
-                id="aging",
-                source=["S"],
-                target=["S"],
+                id="move",
+                source=["A"],
+                target=["A"],
                 stratified_rates=[
                     {
                         "conditions": [
-                            {"stratification": "age", "category": "y", "to": "o"},
-                            {"stratification": "care", "category": "home"},
+                            {"stratification": "group", "category": "g1", "to": "g2"},
+                            {"stratification": "type", "category": "t1"},
                         ],
                         "rate": "a",
                     }
@@ -161,11 +161,11 @@ class TestStratifiedRateValidation:
         )
         builder.set_initial_conditions(
             total=1000,
-            bin_fractions=[{"bin": "S", "fraction": 1.0}],
+            bin_fractions=[{"bin": "A", "fraction": 1.0}],
             stratification_fractions=stratify(
                 builder,
-                {"age": {"y": 0.5, "o": 0.5}, "care": {"home": 0.5, "hosp": 0.5}},
-                {"care": {"age": "o"}},
+                {"group": {"g1": 0.5, "g2": 0.5}, "type": {"t1": 0.5, "t2": 0.5}},
+                {"type": {"group": "g2"}},
             ),
         )
 

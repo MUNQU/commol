@@ -45,7 +45,7 @@ Use this page before you make or review a change. It turns the
 ### Transitions and rates
 
 - [ ] Plan the flows in `flows.rs`; reject what cannot be simulated.
-- [ ] Check the [rate semantics](design-decisions.md#absolute-and-per-capita-rates).
+- [ ] Check the [rate semantics](design-decisions.md#absolute-and-proportional-rates).
 - [ ] Add a case to `tests/transitions/test_flows.py`, and check `print_equations`.
 - [ ] Update [Building models](../guide/building-models.md).
 

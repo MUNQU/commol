@@ -91,7 +91,7 @@ the optimization starts:
 | `id` | Error |
 |---|---|
 | Names nothing in the model | `Invalid bin, compartment or category 'X'`, with the compartments |
-| A category of a stratification with three or more categories, such as `"y"` of `age = [y, m, o]` | `Initial condition category 'age:y' needs a binary stratification` |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
 | A category name that two stratifications declare | `… is ambiguous`, with the qualified names |
 
 ## The remainder

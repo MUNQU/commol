@@ -17,8 +17,8 @@ model = (
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
-    .add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_seasonal * A * B / total")
+    .add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_periodic * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
     .set_initial_conditions(
         total=1000,
@@ -39,7 +39,7 @@ results = Simulation(model).run(num_steps=60)
 
 Whether a rate is the flow itself or a rate per member of the source depends on
 the variables it names; see
-[Absolute and per-capita rates](transitions.md#absolute-and-per-capita-rates).
+[Absolute and proportional rates](transitions.md#absolute-and-proportional-rates).
 
 ## Operators
 
@@ -156,19 +156,19 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Rounding | `floor`, `ceil`, `round` (halves round up: `round(2.5)` is 3) |
 | Conditional | `if(condition, value_if_true, value_if_false)` |
 
-For rates that change over time, [`AxisPattern`](axis-patterns.md) builds tested
-expressions for pulses, windows, ramps and seasons.
+For rates that change along the axis, [`AxisPattern`](axis-patterns.md) builds
+tested expressions for pulses, windows, ramps and sinusoids.
 
 ## Common patterns
 
 ```python
 patterns = {
-    "mass action": "k1 * A * B",
+    "product of two amounts": "k1 * A * B",
     "frequency dependent": "k1 * A * B / total",
     "saturation": "k1 * B / (1 + B)",
-    "linear growth over time": "0.1 + 0.001 * step",
-    "exponential decay over time": "k1 * exp(-0.01 * step)",
-    "annual cycle": "k1 * (1 + 0.3 * sin(2 * pi * step / 365))",
+    "linear growth along the axis": "0.1 + 0.001 * step",
+    "exponential decay along the axis": "k1 * exp(-0.01 * step)",
+    "cycle of 365 steps": "k1 * (1 + 0.3 * sin(2 * pi * step / 365))",
     "never negative": "max(0, k1 - 0.001 * step)",
     "capped above a threshold": "k1 * min(1, 100 / max(B, 1))",
     "only after step 30": "if(step > 30, k1, 0)",
@@ -177,8 +177,8 @@ patterns = {
 ```
 
 To keep a rate readable, move part of it into a formula parameter:
-`add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")`
-and then `rate="k1_seasonal * A * B / total"`.
+`add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")`
+and then `rate="k1_periodic * A * B / total"`.
 
 ## Security
 
@@ -208,6 +208,6 @@ except ValueError as error:
 
 | To learn | Read |
 |---|---|
-| Ready-made time-varying rates | [Axis Patterns](axis-patterns.md) |
+| Ready-made rates that change along the axis | [Axis Patterns](axis-patterns.md) |
 | How rates become flows | [Transitions](transitions.md) |
 | Running a model | [Running Simulations](simulations.md) |

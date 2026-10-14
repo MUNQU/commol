@@ -306,8 +306,8 @@ impl PyEngine {
         compartmental!(&self.inner, engine => engine.state()).map_err(PyValueError::new_err)
     }
 
-    /// Names of the compartments of a compartmental model (e.g., ["S",
-    /// "I_young", "R_old"])
+    /// Names of the compartments of a compartmental model (e.g., ["A",
+    /// "B_g1", "C_g2"])
     ///
     /// Raises:
     ///     ValueError: If the engine does not run compartmental models
@@ -539,7 +539,7 @@ mod tests {
     use super::*;
     use commol_core::{EngineSettings, Model, ModelEngine, OdeSolver};
 
-    /// A → B at the per-capita rate 0.1, run by `engine`.
+    /// A → B at the proportional rate 0.1, run by `engine`.
     fn decay_model(engine: EngineType) -> Model {
         let mut model: Model = serde_json::from_str(
             r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},

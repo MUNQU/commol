@@ -27,7 +27,7 @@ def _problem() -> CalibrationProblem:
         observed_data=[
             ObservedDataPoint(at=0, output="reported", value=10.5),
             ObservedDataPoint(at=1, output="reported", value=19.5),
-            ObservedDataPoint(at=0, output="admissions", value=5.0),
+            ObservedDataPoint(at=0, output="counted", value=5.0),
         ],
         parameters=[bounded("rate")],
         loss_function="sse",
@@ -56,7 +56,7 @@ def _normalized_weight_problem(case_weight: float) -> CalibrationProblem:
             ),
             ObservedDataPoint(
                 at=0,
-                output="admissions",
+                output="counted",
                 value=10.0,
                 weight=1.0,
             ),
@@ -264,7 +264,7 @@ def test_central_fit_loss_uses_weights_in_every_metric() -> None:
 
 def test_normalized_central_loss_respects_explicit_relative_series_weights() -> None:
     """After RMS normalization, weights control relative series importance."""
-    predictions = {"reported": [[110.0]], "admissions": [[11.0]]}
+    predictions = {"reported": [[110.0]], "counted": [[11.0]]}
     ensemble = [CalibrationEvaluation([0.5], 1.0, ["rate"])]
 
     calculator = StatisticsCalculator.__new__(StatisticsCalculator)
@@ -319,11 +319,11 @@ def test_observation_diagnostics_reports_each_series() -> None:
     ]
     predictions = {
         "reported": [[10.0, 20.0], [11.0, 19.0]],
-        "admissions": [[5.0], [5.0]],
+        "counted": [[5.0], [5.0]],
     }
 
     diagnostics = calculator.calculate_observation_diagnostics(predictions, ensemble)
 
     assert diagnostics["reported"]["n_points"] == 2.0
     assert diagnostics["reported"]["coverage_percentage"] == 100.0
-    assert diagnostics["admissions"]["coverage_percentage"] == 100.0
+    assert diagnostics["counted"]["coverage_percentage"] == 100.0

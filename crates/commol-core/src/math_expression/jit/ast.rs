@@ -201,10 +201,10 @@ mod tests {
     fn test_expr_display() {
         let expr = Expr::binary(
             BinaryOperator::Mul,
-            Expr::Variable("beta".to_string()),
+            Expr::Variable("k1".to_string()),
             Expr::Constant(2.0),
         );
-        assert_eq!(expr.to_string(), "(beta * 2)");
+        assert_eq!(expr.to_string(), "(k1 * 2)");
     }
 
     #[test]

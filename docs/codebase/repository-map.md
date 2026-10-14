@@ -20,7 +20,7 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-model/src/flows.rs` | Transition flow planning (`plan_transition_flows`) and its description for Python (`describe_flows`). | Rate evaluation at run time. |
 | `crates/commol-model/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
 | `crates/commol-model/src/rates.rs` | Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback. | Flow logic. |
-| `crates/commol-model/src/system.rs` | The right-hand side `CompiledModel::derivatives`, impulses (`apply_impulses`, `impulse_positions`) and the accessors both engines use. | Time stepping. |
+| `crates/commol-model/src/system.rs` | The right-hand side `CompiledModel::derivatives`, impulses (`apply_impulses`, `impulse_positions`) and the accessors both engines use. | Stepping along the axis. |
 | `crates/commol-model/src/types.rs` | `CompiledModel`, compiled flows, impulse schedules, series lookup (`SeriesParameter`). | Python types. |
 | `crates/commol-difference/src/simulation.rs` | `DifferenceEquations`: the discrete step (`state += derivatives`), impulses at integer steps, the positions it accepts (integers), and its `SimulationEngine` and `CompartmentalEngine` implementations. | Model compilation. |
 | `crates/commol-differential/src/lib.rs` | `DifferentialEquations`: state, output positions, impulses, and its `SimulationEngine` and `CompartmentalEngine` implementations. | Numerical methods. |

@@ -15,17 +15,17 @@ class TestBasicValidation:
         """Test that valid mathematical expressions pass validation."""
         valid_expressions = [
             # Basic variables and numbers
-            "beta",
-            "gamma",
+            "k1",
+            "k2",
             "0.5",
             "42",
             "3.14159",
             # Basic arithmetic
-            "beta * gamma",
-            "S + I + R",
-            "total - S",
-            "beta * S * I / total",
-            "gamma * I",
+            "k1 * k2",
+            "A + B + C",
+            "total - A",
+            "k1 * A * B / total",
+            "k2 * B",
             # Mathematical functions
             "sin(step)",
             "cos(2 * pi * step / 365)",
@@ -34,16 +34,16 @@ class TestBasicValidation:
             "sqrt(variance)",
             "abs(difference)",
             "max(a, b)",
-            "min(susceptible, exposed)",
+            "min(amount_a, amount_b)",
             "pow(base, exponent)",
             "floor(continuous_value)",
             "ceil(fractional_value)",
             "round(precise_value)",
             # Complex expressions
-            "(S + I + R) / total",
-            "beta * (1 - vaccination_rate)",
+            "(A + B + C) / total",
+            "k1 * (1 - fraction_b)",
             "1 / (1 + exp(-steepness * (step - midpoint)))",
-            "beta * (1 + 0.1 * sin(2 * pi * step / 365))",
+            "k1 * (1 + 0.1 * sin(2 * pi * step / 365))",
         ]
         for expr in valid_expressions:
             validate_expression_security(expr)
@@ -112,12 +112,12 @@ class TestBasicValidation:
         """Test expression tokenization."""
         validator = ExpressionSecurityValidator()
         # Test basic tokenization
-        tokens = validator._tokenize_expression("beta * S + gamma")  # pyright: ignore[reportPrivateUsage]  # noqa: E501
-        assert "beta" in tokens
+        tokens = validator._tokenize_expression("k1 * A + k2")  # pyright: ignore[reportPrivateUsage]  # noqa: E501
+        assert "k1" in tokens
         assert "*" in tokens
-        assert "S" in tokens
+        assert "A" in tokens
         assert "+" in tokens
-        assert "gamma" in tokens
+        assert "k2" in tokens
         # Test function tokenization
         tokens = validator._tokenize_expression("sin(2 * pi * t)")  # pyright: ignore[reportPrivateUsage]  # noqa: E501
         assert "sin" in tokens
@@ -309,9 +309,9 @@ class TestAdvancedAttackVectors:
     def test_encoding_attacks(self):
         """Test detection of encoding-based attacks."""
         encoding_attacks = [
-            "beta + \\x41",  # Hex escape sequences
+            "k1 + \\x41",  # Hex escape sequences
             "\\x48\\x65\\x6c\\x6c\\x6f",
-            "beta + \\u0041",  # Unicode escape sequences
+            "k1 + \\u0041",  # Unicode escape sequences
             "\\u0048\\u0065\\u006c\\u006c\\u006f",
             "aGVsbG8gd29ybGQgdGhpcyBpcyBhIGxvbmcgc3RyaW5n",  # Base64-like
             "VGhpcyBpcyBhIHN1c3BpY2lvdXMgcGF5bG9hZA==",
@@ -337,8 +337,8 @@ class TestAdvancedAttackVectors:
         """Test detection of format string attacks."""
         format_attacks = [
             "rate * {0}",
-            "beta + {variable}",
-            "gamma * %s",
+            "k1 + {variable}",
+            "k2 * %s",
             "delta / %d",
             "%x + alpha",
             "value.format(args)",
@@ -391,7 +391,7 @@ class TestExpressionLimitsAndComplexity:
         """Test expression length validation."""
         config = SecurityConfig(max_expression_length=100)
         # Valid length
-        short_expr = "beta * gamma"
+        short_expr = "k1 * k2"
         validate_expression_security(short_expr, config)
         # Too long
         long_expr = "x + " * 50  # Creates expression longer than 100 chars
@@ -460,9 +460,9 @@ class TestDisallowedCharacters:
     def test_disallowed_special_characters(self):
         """Test that disallowed special characters are rejected."""
         disallowed_chars = [
-            "beta;gamma",  # Semicolon
-            "alpha&beta",  # Ampersand
-            "gamma|delta",  # Pipe
+            "k1;k2",  # Semicolon
+            "alpha&k1",  # Ampersand
+            "k2|delta",  # Pipe
             "value`backdoor`",  # Backtick
             "param$injection",  # Dollar sign
             "var#comment",  # Hash symbol
@@ -480,7 +480,7 @@ class TestDisallowedCharacters:
     def test_allowed_characters(self):
         """Test that allowed characters are accepted."""
         allowed_expressions = [
-            "beta_gamma",  # Underscore
+            "k1_k2",  # Underscore
             "alpha123",  # Alphanumeric
             "value + 2.5",  # Decimal point in numbers
             "func(arg1, arg2)",  # Parentheses and comma

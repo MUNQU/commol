@@ -20,7 +20,7 @@ what it changes. The factories share these keywords:
   ``set_initial_conditions``.
 - ``bin_unit`` and ``units``: the unit of every bin, and of each parameter by
   id.
-- A rate keyword (``infection``, ``rate``, …): ``None`` leaves that
+- A rate keyword (``ab``, ``rate``, …): ``None`` leaves that
   transition out.
 - ``accumulator``: the id of an accumulator that counts the first transition.
 """
@@ -122,12 +122,12 @@ def _finish(
     )
 
 
-def sir_builder(
+def abc_builder(
     *,
-    name: str = "SIR",
+    name: str = "ABC",
     parameters: Parameters | None = None,
-    infection: Rate = "beta * S * I / total",
-    recovery: Rate = "gamma * I",
+    ab: Rate = "k1 * A * B / total",
+    bc: Rate = "k2 * B",
     total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     stratifications: Stratifications | None = None,
@@ -137,71 +137,68 @@ def sir_builder(
     accumulator: str | None = None,
 ) -> ModelBuilder:
     """
-    S → I → R: ``infection`` at ``beta * S * I / total``, ``recovery`` at ``gamma * I``.
+    A → B → C: ``ab`` at ``k1 * A * B / total``, ``bc`` at ``k2 * B``.
 
-    The defaults are ``beta = 0.3``, ``gamma = 0.1``, 1000 people, 99 % S and
-    1 % I. See the module docstring for the keywords.
+    The defaults are ``k1 = 0.3``, ``k2 = 0.1``, a total of 1000, 99 % in A
+    and 1 % in B. See the module docstring for the keywords.
     """
     builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
-    builder.add_bin(id="S", name="Susceptible")
-    builder.add_bin(id="I", name="Infected")
-    builder.add_bin(id="R", name="Recovered")
+    builder.add_bin(id="A", name="State A")
+    builder.add_bin(id="B", name="State B")
+    builder.add_bin(id="C", name="State C")
     if accumulator is not None:
         builder.add_accumulator(id=accumulator, name=accumulator)
-    if infection is not None:
+    if ab is not None:
         builder.add_transition(
-            id="infection",
-            source=["S"],
-            target=["I"],
-            rate=infection,
+            id="ab",
+            source=["A"],
+            target=["B"],
+            rate=ab,
             accumulators=[accumulator] if accumulator else None,
         )
-    if recovery is not None:
-        builder.add_transition(id="recovery", source=["I"], target=["R"], rate=recovery)
+    if bc is not None:
+        builder.add_transition(id="bc", source=["B"], target=["C"], rate=bc)
     return _finish(
         builder,
-        parameters={"beta": 0.3, "gamma": 0.1} if parameters is None else parameters,
+        parameters={"k1": 0.3, "k2": 0.1} if parameters is None else parameters,
         units=units or {},
         total=total,
         fractions=fractions
         if fractions is not None
-        else {"S": 0.99, "I": 0.01, "R": 0.0},
+        else {"A": 0.99, "B": 0.01, "C": 0.0},
         stratifications=stratifications,
         conditions=conditions,
         compartment_fractions=None,
     )
 
 
-def seir_builder(
+def abcd_builder(
     *,
-    name: str = "SEIR",
+    name: str = "ABCD",
     parameters: Parameters | None = None,
-    exposure: Rate = "beta * S * I / total",
-    progression: Rate = "sigma * E",
-    recovery: Rate = "gamma * I",
+    ab: Rate = "k1 * A * C / total",
+    bc: Rate = "k3 * B",
+    cd: Rate = "k2 * C",
     total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     bin_unit: str | None = None,
     units: Mapping[str, str] | None = None,
 ) -> ModelBuilder:
     """
-    S → E → I → R: ``exposure``, ``progression`` and ``recovery``.
+    A → B → C → D: ``ab`` at ``k1 * A * C / total``, ``bc`` at ``k3 * B``,
+    ``cd`` at ``k2 * C``.
 
-    The defaults are ``beta = 0.5``, ``sigma = 0.2``, ``gamma = 0.1``, 1000
-    people, 98 % S, 1 % E and 1 % I. See the module docstring for the keywords.
+    The defaults are ``k1 = 0.5``, ``k3 = 0.2``, ``k2 = 0.1``, a total of
+    1000, 98 % in A, 1 % in B and 1 % in C. See the module docstring for the
+    keywords.
     """
     builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
-    for bin_id, bin_name in (
-        ("S", "Susceptible"),
-        ("E", "Exposed"),
-        ("I", "Infected"),
-        ("R", "Recovered"),
-    ):
-        builder.add_bin(id=bin_id, name=bin_name)
+    for bin_id in ("A", "B", "C", "D"):
+        builder.add_bin(id=bin_id, name=bin_id)
     for transition_id, source, target, rate in (
-        ("exposure", "S", "E", exposure),
-        ("progression", "E", "I", progression),
-        ("recovery", "I", "R", recovery),
+        ("ab", "A", "B", ab),
+        ("bc", "B", "C", bc),
+        ("cd", "C", "D", cd),
     ):
         if rate is not None:
             builder.add_transition(
@@ -210,15 +207,13 @@ def seir_builder(
     return _finish(
         builder,
         parameters=(
-            {"beta": 0.5, "sigma": 0.2, "gamma": 0.1}
-            if parameters is None
-            else parameters
+            {"k1": 0.5, "k3": 0.2, "k2": 0.1} if parameters is None else parameters
         ),
         units=units or {},
         total=total,
         fractions=fractions
         if fractions is not None
-        else {"S": 0.98, "E": 0.01, "I": 0.01, "R": 0.0},
+        else {"A": 0.98, "B": 0.01, "C": 0.01, "D": 0.0},
         stratifications=None,
         conditions=None,
         compartment_fractions=None,
@@ -244,8 +239,8 @@ def a_to_b_builder(
     """
     One transition, ``transition_id``, from bin A to bin B.
 
-    The default rate ``k = 0.1`` is per capita, so ``0.1 * A`` moves each step,
-    and the 1000 people start in A. ``per_compartment`` is passed to
+    The default rate ``k = 0.1`` is proportional, so ``0.1 * A`` moves each
+    step, and the total of 1000 starts in A. ``per_compartment`` is passed to
     ``add_transition``. See the module docstring for the other keywords.
     """
     builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
@@ -290,14 +285,15 @@ def override_builder(fraction: float = 0.3) -> ModelBuilder:
 
 def shared_category_builder(
     *,
-    age: tuple[float, float] = (0.5, 0.5),
-    sex: tuple[float, float] = (0.5, 0.5),
+    group: tuple[float, float] = (0.5, 0.5),
+    level: tuple[float, float] = (0.5, 0.5),
     compartment_fractions: list[CompartmentFractionDict] | None = None,
 ) -> ModelBuilder:
     """
-    One bin A, stratified by ``age`` and ``sex``, which share the categories
-    ``y`` and ``o``; so a bare ``y`` is ambiguous and needs ``age:y`` or
-    ``sex:y``. Each tuple gives the fractions of ``y`` and ``o``.
+    One bin A, stratified by ``group`` and ``level``, which share the
+    categories ``c1`` and ``c2``; so a bare ``c1`` is ambiguous and needs
+    ``group:c1`` or ``level:c1``. Each tuple gives the fractions of ``c1`` and
+    ``c2``.
     """
     builder = ModelBuilder(name="SharedCategory", version="1.0")
     builder.add_bin(id="A", name="A")
@@ -311,8 +307,8 @@ def shared_category_builder(
         total=1000,
         fractions={"A": 1.0},
         stratifications={
-            "age": {"y": age[0], "o": age[1]},
-            "sex": {"y": sex[0], "o": sex[1]},
+            "group": {"c1": group[0], "c2": group[1]},
+            "level": {"c1": level[0], "c2": level[1]},
         },
         conditions=None,
         compartment_fractions=compartment_fractions,
@@ -321,39 +317,39 @@ def shared_category_builder(
 
 def conditional_pathway_builder() -> ModelBuilder:
     """
-    Bins S and IH, where only the ``oe60`` stratum moves from S to IH.
+    Bins A and B, where only group ``g2`` moves from A to B.
 
-    ``care`` splits only ``oe60``, and the override pins ``IH_y60`` to zero, so
+    ``type`` splits only ``g2``, and the override pins ``B_g1`` to zero, so
     the compartments and their initial amounts are::
 
-        S_y60 450, S_oe60_home 225, S_oe60_hosp 225,
-        IH_y60 0,  IH_oe60_home 25, IH_oe60_hosp 25
+        A_g1 450, A_g2_t1 225, A_g2_t2 225,
+        B_g1 0,   B_g2_t1 25,  B_g2_t2 25
     """
     builder = ModelBuilder(name="ConditionalPathway", version="1.0")
-    builder.add_bin(id="S", name="Susceptible")
-    builder.add_bin(id="IH", name="Hospitalized")
+    builder.add_bin(id="A", name="A")
+    builder.add_bin(id="B", name="B")
     builder.add_transition(
-        id="hosp",
-        source=["S"],
-        target=["IH"],
+        id="ab",
+        source=["A"],
+        target=["B"],
         rate="0.0",
         stratified_rates=[
             {
-                "conditions": [{"stratification": "age", "category": "oe60"}],
-                "rate": "beta * S",
+                "conditions": [{"stratification": "group", "category": "g2"}],
+                "rate": "k1 * A",
             }
         ],
     )
     return _finish(
         builder,
-        parameters={"beta": 0.01},
+        parameters={"k1": 0.01},
         units={},
         total=1000,
-        fractions={"S": 0.9, "IH": 0.1},
+        fractions={"A": 0.9, "B": 0.1},
         stratifications={
-            "age": {"y60": 0.5, "oe60": 0.5},
-            "care": {"home": 0.5, "hosp": 0.5},
+            "group": {"g1": 0.5, "g2": 0.5},
+            "type": {"t1": 0.5, "t2": 0.5},
         },
-        conditions={"care": {"age": "oe60"}},
-        compartment_fractions=[{"compartment": "IH_y60", "fraction": 0.0}],
+        conditions={"type": {"group": "g2"}},
+        compartment_fractions=[{"compartment": "B_g1", "fraction": 0.0}],
     )

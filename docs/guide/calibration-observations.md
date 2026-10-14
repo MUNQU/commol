@@ -156,8 +156,8 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 
 ## Counts per period: windows
 
-Data often counts what happened **in** each period, such as new arrivals per
-week. Observe a cumulative output (an accumulator) with `window`, and the
+Data often counts what happened **in** each period, such as the amount that
+entered a bin in each interval of 7 steps. Observe a cumulative output (an accumulator) with `window`, and the
 model's prediction becomes the gain over the window:
 
 ```text
@@ -167,14 +167,14 @@ predicted(at) = output(at) - output(at - window)
 ```python
 from commol import window_ends, windowed_totals
 
-weekly_ends = window_ends(window=7, end=70)
-weekly_counts = windowed_totals(truth["cum_ab"], truth.positions, 7, weekly_ends)
+ends = window_ends(window=7, end=70)
+counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
 
-weekly = [
+windowed = [
     ObservedDataPoint(at=end, output="cum_ab", value=count, window=7)
-    for end, count in zip(weekly_ends, weekly_counts)
+    for end, count in zip(ends, counts)
 ]
-print(calibrate_k1(weekly))  # 0.4
+print(calibrate_k1(windowed))  # 0.4
 ```
 
 | Rule | Detail |

@@ -10,16 +10,16 @@ from matplotlib.figure import Figure
 from commol import ObservedDataPoint, PlotConfig, Simulation
 from commol.api.plotter import SimulationPlotter
 from commol.context.calibration import CalibrationResult
-from tests.support import a_to_b_builder, build, build_ode, sir_builder
+from tests.support import a_to_b_builder, build, build_ode, abc_builder
 
-BINS = ["S", "I", "R"]
-TITLES = {"S": "Susceptible", "I": "Infected", "R": "Recovered"}
+BINS = ["A", "B", "C"]
+TITLES = {"A": "State A", "B": "State B", "C": "State C"}
 
 
 @pytest.fixture
-def plotter(sir_simulation: Simulation) -> SimulationPlotter:
-    """A plotter of 100 steps of the default SIR model."""
-    return SimulationPlotter(sir_simulation, sir_simulation.run(100))
+def plotter(abc_simulation: Simulation) -> SimulationPlotter:
+    """A plotter of 100 steps of the default model of ``abc_builder``."""
+    return SimulationPlotter(abc_simulation, abc_simulation.run(100))
 
 
 def _visible(fig: Figure):
@@ -40,20 +40,20 @@ def _scatter(ax) -> np.ndarray:
     return offsets[int(np.argmax([len(o) for o in offsets]))]
 
 
-def _observed_infected(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
+def _observed_b(results: dict[str, list[float]]) -> list[ObservedDataPoint]:
     return [
-        ObservedDataPoint(at=step, output="I", value=results["I"][step])
+        ObservedDataPoint(at=step, output="B", value=results["B"][step])
         for step in range(0, 100, 10)
     ]
 
 
 class TestSimulationPlotter:
-    def test_plotter_initialization(self, sir_simulation: Simulation) -> None:
-        results = sir_simulation.run(100)
+    def test_plotter_initialization(self, abc_simulation: Simulation) -> None:
+        results = abc_simulation.run(100)
 
-        plotter = SimulationPlotter(sir_simulation, results)
+        plotter = SimulationPlotter(abc_simulation, results)
 
-        assert plotter.simulation == sir_simulation
+        assert plotter.simulation == abc_simulation
         assert plotter.results == results
         assert len(plotter.bins) == 3
         assert plotter.results.positions == [float(step) for step in range(101)]
@@ -75,7 +75,7 @@ class TestSimulationPlotter:
     def test_plot_series_draws_the_observations(
         self, plotter: SimulationPlotter
     ) -> None:
-        observed = _observed_infected(plotter.results)
+        observed = _observed_b(plotter.results)
 
         fig = plotter.plot_series(observed_data=observed)
 
@@ -91,8 +91,8 @@ class TestSimulationPlotter:
         observed = [
             ObservedDataPoint(
                 at=i,
-                output="I",
-                value=results["I"][i] * scale_factor,
+                output="B",
+                value=results["B"][i] * scale_factor,
                 factor_id="detection_rate",
             )
             for i in range(0, 100, 10)
@@ -108,18 +108,18 @@ class TestSimulationPlotter:
         fig = plotter.plot_series(
             observed_data=observed,
             calibration_result=calibration_result,
-            series=["I"],
+            series=["B"],
         )
 
         ax = fig.axes[0]
         plotted_y = np.asarray(ax.lines[0].get_ydata(), dtype=float)
-        assert plotted_y[10] == pytest.approx(results["I"][10] * scale_factor)
-        assert _scatter(ax)[1, 1] == pytest.approx(results["I"][10] * scale_factor)
+        assert plotted_y[10] == pytest.approx(results["B"][10] * scale_factor)
+        assert _scatter(ax)[1, 1] == pytest.approx(results["B"][10] * scale_factor)
 
     def test_plot_series_subset_of_bins(self, plotter: SimulationPlotter) -> None:
-        fig = plotter.plot_series(series=["I", "R"])
+        fig = plotter.plot_series(series=["B", "C"])
 
-        _assert_draws(fig, {name: plotter.results[name] for name in ("I", "R")})
+        _assert_draws(fig, {name: plotter.results[name] for name in ("B", "C")})
 
     def test_plot_series_with_custom_config(self, plotter: SimulationPlotter) -> None:
         config = PlotConfig(
@@ -165,7 +165,7 @@ class TestSimulationPlotter:
     def test_plot_cumulative_draws_the_running_sum_of_observations(
         self, plotter: SimulationPlotter
     ) -> None:
-        observed = _observed_infected(plotter.results)
+        observed = _observed_b(plotter.results)
 
         fig = plotter.plot_cumulative(observed_data=observed)
 
@@ -184,16 +184,16 @@ class TestSimulationPlotter:
 
     def test_group_observed_data(self, plotter: SimulationPlotter) -> None:
         observed = [
-            ObservedDataPoint(at=10, output="I", value=50.0),
-            ObservedDataPoint(at=20, output="I", value=60.0),
-            ObservedDataPoint(at=10, output="R", value=10.0),
+            ObservedDataPoint(at=10, output="B", value=50.0),
+            ObservedDataPoint(at=20, output="B", value=60.0),
+            ObservedDataPoint(at=10, output="C", value=10.0),
         ]
 
         grouped = plotter._group_observed_data(observed)
 
         assert {name: [p.at for p in points] for name, points in grouped.items()} == {
-            "I": [10, 20],
-            "R": [10],
+            "B": [10, 20],
+            "C": [10],
         }
 
     def test_apply_x_labels_anchors_ticks_to_first_plotted_step(
@@ -395,16 +395,16 @@ class TestDifferentialModel:
     def test_observations_at_non_integer_steps_are_drawn_where_they_are(
         self,
     ) -> None:
-        simulation = Simulation(build_ode(sir_builder()))
+        simulation = Simulation(build_ode(abc_builder()))
         steps = [0.5, 10.25, 40.75]
         at = simulation.run_at(steps)
         observed = [
-            ObservedDataPoint(at=step, output="I", value=value)
-            for step, value in zip(steps, at["I"], strict=True)
+            ObservedDataPoint(at=step, output="B", value=value)
+            for step, value in zip(steps, at["B"], strict=True)
         ]
 
         fig = SimulationPlotter(simulation, simulation.run(50)).plot_series(
-            observed_data=observed, series=["I"]
+            observed_data=observed, series=["B"]
         )
 
         np.testing.assert_allclose(_scatter(fig.axes[0])[:, 0], steps)

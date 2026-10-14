@@ -199,7 +199,7 @@ pub trait SimulationEngine: Clone {
     ///
     /// # Arguments
     ///
-    /// * `parameter_id` - The unique identifier of the parameter (e.g., "beta", "gamma")
+    /// * `parameter_id` - The unique identifier of the parameter (e.g., "k1", "k2")
     /// * `value` - The new value to assign
     ///
     /// # Returns
@@ -210,8 +210,8 @@ pub trait SimulationEngine: Clone {
     /// # Example
     ///
     /// ```rust,ignore
-    /// engine.set_parameter("beta", 0.3)?;
-    /// engine.set_parameter("gamma", 0.1)?;
+    /// engine.set_parameter("k1", 0.3)?;
+    /// engine.set_parameter("k2", 0.1)?;
     /// ```
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String>;
 
@@ -223,7 +223,7 @@ pub trait SimulationEngine: Clone {
     ///
     /// ```rust,ignore
     /// let params = engine.get_parameters();
-    /// assert_eq!(params.get("beta"), Some(&0.3));
+    /// assert_eq!(params.get("k1"), Some(&0.3));
     /// ```
     fn get_parameters(&self) -> &HashMap<String, f64>;
 

@@ -69,9 +69,9 @@ plugins:
         User guide:
           - guide/core-concepts.md: Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
           - guide/building-models.md: Every ModelBuilder method and argument, series parameters, validation rules, save and load
-          - guide/transitions.md: Absolute and per-capita rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
+          - guide/transitions.md: Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
           - guide/mathematical-expressions.md: Operators, variables, subgroup totals, functions and security limits of rate formulas
-          - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, seasons, combinations and schedules per subgroup
+          - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
           - guide/units-and-equations.md: Unit checking and print_equations (text and LaTeX)
           - guide/simulations.md: Simulation.run, output formats, totals by bin and category, windowed totals, plotting
           - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, results and writing results back

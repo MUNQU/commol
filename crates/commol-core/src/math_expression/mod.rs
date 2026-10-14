@@ -153,11 +153,11 @@ enum CompiledExpr {
 /// use commol_core::MathExpression;
 /// use commol_core::MathExpressionContext;
 ///
-/// let expr = MathExpression::new("beta * S * I".to_string());
+/// let expr = MathExpression::new("k1 * A * B".to_string());
 /// let mut context = MathExpressionContext::new();
-/// context.set_parameter("beta".to_string(), 0.5);
-/// context.set_compartment("S".to_string(), 990.0);
-/// context.set_compartment("I".to_string(), 10.0);
+/// context.set_parameter("k1".to_string(), 0.5);
+/// context.set_compartment("A".to_string(), 990.0);
+/// context.set_compartment("B".to_string(), 10.0);
 /// let result = expr.evaluate(&mut context).unwrap();
 /// ```
 #[derive(Debug, Clone, Serialize)]
@@ -355,8 +355,8 @@ impl RateMathExpression {
     /// Parse a string into the appropriate rate expression type.
     ///
     /// - Numeric values become `Constant`
-    /// - Single variable names become `Parameter` (e.g., "beta")
-    /// - Complex expressions become `Formula` (e.g., "beta * 2")
+    /// - Single variable names become `Parameter` (e.g., "k1")
+    /// - Complex expressions become `Formula` (e.g., "k1 * 2")
     /// - Invalid expressions are treated as `Parameter` for backward compatibility
     pub fn from_string(s: String) -> Self {
         // First check if it's a numeric constant
@@ -431,10 +431,10 @@ mod tests {
     #[test]
     fn test_basic_expressions() {
         let mut ctx = MathExpressionContext::new();
-        ctx.set_parameter("beta".to_string(), 0.5);
-        ctx.set_parameter("gamma".to_string(), 0.2);
+        ctx.set_parameter("k1".to_string(), 0.5);
+        ctx.set_parameter("k2".to_string(), 0.2);
 
-        let expr = MathExpression::new("beta * gamma".to_string());
+        let expr = MathExpression::new("k1 * k2".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 0.1).abs() < 1e-10);
     }
@@ -442,18 +442,18 @@ mod tests {
     #[test]
     fn test_complex_expressions() {
         let mut ctx = MathExpressionContext::new();
-        ctx.set_parameter("beta".to_string(), 0.5);
-        ctx.set_compartment("S".to_string(), 990.0);
-        ctx.set_compartment("I".to_string(), 10.0);
-        ctx.set_compartment("R".to_string(), 0.0);
+        ctx.set_parameter("k1".to_string(), 0.5);
+        ctx.set_compartment("A".to_string(), 990.0);
+        ctx.set_compartment("B".to_string(), 10.0);
+        ctx.set_compartment("C".to_string(), 0.0);
 
-        // Test triple product (common in SIR models)
-        let expr = MathExpression::new("beta * S * I".to_string());
+        // Test a triple product
+        let expr = MathExpression::new("k1 * A * B".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 4950.0).abs() < 1e-10);
 
-        // Test normalized infection rate
-        let expr = MathExpression::new("beta * S * I / total".to_string());
+        // Test a product divided by the total
+        let expr = MathExpression::new("k1 * A * B / total".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 4.95).abs() < 1e-10);
     }
@@ -475,10 +475,10 @@ mod tests {
     #[test]
     fn test_rate_math_expression() {
         let mut ctx = MathExpressionContext::new();
-        ctx.set_parameter("beta".to_string(), 0.5);
+        ctx.set_parameter("k1".to_string(), 0.5);
 
         // Test parameter
-        let rate = RateMathExpression::from_string("beta".to_string());
+        let rate = RateMathExpression::from_string("k1".to_string());
         assert!(matches!(rate, RateMathExpression::Parameter(_)));
         assert!((rate.evaluate(&mut ctx).unwrap() - 0.5).abs() < 1e-10);
 
@@ -488,7 +488,7 @@ mod tests {
         assert!((rate.evaluate(&mut ctx).unwrap() - 0.3).abs() < 1e-10);
 
         // Test formula
-        let rate = RateMathExpression::from_string("beta * 2".to_string());
+        let rate = RateMathExpression::from_string("k1 * 2".to_string());
         assert!(matches!(rate, RateMathExpression::Formula(_)));
         assert!((rate.evaluate(&mut ctx).unwrap() - 1.0).abs() < 1e-10);
     }

@@ -30,12 +30,12 @@ def check_equation_units(
     Parameters
     ----------
     equation : str
-        The mathematical equation to check (e.g., "beta * S * I / total").
+        The mathematical equation to check (e.g., "k1 * A * B / total").
     variable_units : dict[str, str]
         Mapping of variable names to their units
-        (e.g., {"beta": "1/day", "S": "person"}).
+        (e.g., {"k1": "1/day", "A": "item"}).
     expected_unit : str
-        The expected unit of the equation result (e.g., "person/day").
+        The expected unit of the equation result (e.g., "item/day").
 
     Returns
     -------
@@ -47,7 +47,7 @@ def check_equation_units(
     Notes
     -----
     The unit must be equal to ``expected_unit``, not only convertible to it:
-    ``person/week`` does not match ``person/day``, because the engine never
+    ``item/week`` does not match ``item/day``, because the engine never
     converts values between units.
     """
     try:

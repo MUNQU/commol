@@ -104,10 +104,10 @@ class Transition(BaseModel):
         Note: Both ^ and ** are supported for exponentiation (** is converted to ^).
 
         Examples:
-        - "beta" (parameter reference)
+        - "k1" (parameter reference)
         - "0.5" (constant, can also be passed as float 0.5)
-        - "beta * S * I / total" (mathematical formula)
-        - "0.3 * sin(2 * pi * t / 365)" (time-dependent formula)
+        - "k1 * A * B / total" (mathematical formula)
+        - "0.3 * sin(2 * pi * t / 365)" (formula that changes along the axis)
         - "2^10" or "2**10" (power: both syntaxes work)
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
@@ -128,8 +128,8 @@ class Transition(BaseModel):
         None,
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
-            "Can be a parameter reference (e.g., 'beta'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'beta * S * I / total'). "
+            "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
+            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
             "Numeric values are automatically converted to strings during validation."
         ),
     )
@@ -151,7 +151,7 @@ class Transition(BaseModel):
         default=None,
         description=(
             "Positions on the axis where the transition is an impulse: at each "
-            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "one, the rate is a fraction (proportional) or an amount (absolute) "
             "moved at once. Between them the transition moves nothing."
         ),
     )

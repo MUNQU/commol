@@ -79,10 +79,10 @@ class TestPulses:
         assert "step == 9, 0.3" in formula
 
     def test_per_step_amounts_string_values(self):
-        p = AxisPattern.pulses(at=[1, 4], value=["alpha", "beta"])
+        p = AxisPattern.pulses(at=[1, 4], value=["alpha", "k1"])
         formula = str(p)
         assert "step == 1, alpha" in formula
-        assert "step == 4, beta" in formula
+        assert "step == 4, k1" in formula
 
     def test_per_step_amounts_length_mismatch_raises(self):
         with pytest.raises(ValidationError):
@@ -164,26 +164,26 @@ class TestInterval:
         assert formula.startswith("(") and formula.endswith(")")
 
 
-class TestSeasonal:
+class TestSinusoid:
     def test_formula_contains_sin(self):
-        formula = str(AxisPattern.seasonal(amplitude=1.0, period=4))
+        formula = str(AxisPattern.sinusoid(amplitude=1.0, period=4))
         assert "sin" in formula
 
     def test_period_zero_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.seasonal(amplitude=1.0, period=0)
+            AxisPattern.sinusoid(amplitude=1.0, period=0)
 
     def test_string_period_zero_raises(self):
         with pytest.raises(ValidationError):
-            AxisPattern.seasonal(amplitude=1.0, period="0")
+            AxisPattern.sinusoid(amplitude=1.0, period="0")
 
     def test_string_period_symbolic_is_accepted(self):
-        p = AxisPattern.seasonal(amplitude=1.0, period="period_param")
+        p = AxisPattern.sinusoid(amplitude=1.0, period="period_param")
         assert "period_param" in str(p)
 
     def test_formula_contains_all_params(self):
         formula = str(
-            AxisPattern.seasonal(amplitude=2.0, period=12.0, phase=3.0, baseline=1.0)
+            AxisPattern.sinusoid(amplitude=2.0, period=12.0, phase=3.0, baseline=1.0)
         )
         assert "2.0" in formula
         assert "12.0" in formula
@@ -310,12 +310,12 @@ class TestCombine:
 
 class TestFromFormula:
     def test_passthrough(self):
-        p = AxisPattern.from_formula("beta * t")
-        assert "beta * t" in str(p)
+        p = AxisPattern.from_formula("k1 * t")
+        assert "k1 * t" in str(p)
 
     def test_wraps_in_parens(self):
         """from_formula always wraps in parens for safe composition."""
-        p = AxisPattern.from_formula("beta * t")
+        p = AxisPattern.from_formula("k1 * t")
         formula = str(p)
         assert formula.startswith("(") and formula.endswith(")")
 
@@ -348,37 +348,37 @@ class TestFromFormula:
 class TestForGroup:
     def test_conditions_are_attached(self):
         p = AxisPattern.pulse(at=5, value=0.1)
-        grouped = p.for_group([{"stratification": "age", "category": "elderly"}])
-        assert grouped.conditions == [{"stratification": "age", "category": "elderly"}]
+        grouped = p.for_group([{"stratification": "group", "category": "g2"}])
+        assert grouped.conditions == [{"stratification": "group", "category": "g2"}]
 
     def test_original_is_unchanged(self):
         p = AxisPattern.pulse(at=5, value=0.1)
-        p.for_group([{"stratification": "age", "category": "elderly"}])
+        p.for_group([{"stratification": "group", "category": "g2"}])
         assert p.conditions is None
 
     def test_source_compartment_is_attached(self):
         p = AxisPattern.pulse(at=5, value=0.1)
         grouped = p.for_group(
-            [{"stratification": "age", "category": "elderly"}],
-            source_compartment="S_elderly",
+            [{"stratification": "group", "category": "g2"}],
+            source_compartment="A_g2",
         )
-        assert grouped.source_compartment == "S_elderly"
+        assert grouped.source_compartment == "A_g2"
 
 
 class TestToStratifiedRate:
     def test_without_source_compartment(self):
-        p = AxisPattern.pulse(at=5, value=0.1).for_group([condition("age", "elderly")])
+        p = AxisPattern.pulse(at=5, value=0.1).for_group([condition("group", "g2")])
         sr = p.to_stratified_rate()
-        assert sr["conditions"] == [condition("age", "elderly")]
-        assert "S_" not in rate_string(sr)
+        assert sr["conditions"] == [condition("group", "g2")]
+        assert "A_" not in rate_string(sr)
 
     def test_with_source_compartment(self):
         p = AxisPattern.pulse(at=5, value=0.1).for_group(
-            [condition("age", "elderly")],
-            source_compartment="S_elderly",
+            [condition("group", "g2")],
+            source_compartment="A_g2",
         )
         sr = p.to_stratified_rate()
-        assert "S_elderly" in rate_string(sr)
+        assert "A_g2" in rate_string(sr)
 
     def test_no_conditions_gives_empty_list(self):
         p = AxisPattern.pulse(at=5, value=0.1)
@@ -413,7 +413,7 @@ class TestSecurityValidation:
             AxisPattern.periodic(period=7, value=0.1),
             AxisPattern.periodic(period=7, value=0.1, offset=2),
             AxisPattern.interval(start=2, end=8, value=0.1),
-            AxisPattern.seasonal(amplitude=0.05, period=10, baseline=0.01),
+            AxisPattern.sinusoid(amplitude=0.05, period=10, baseline=0.01),
             AxisPattern.gaussian_pulse(center=5.0, width=2.0, peak=0.1),
             AxisPattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1),
             AxisPattern.combine(

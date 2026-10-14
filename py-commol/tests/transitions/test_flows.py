@@ -11,36 +11,36 @@ from commol.context.model import Model
 from tests.support import a_to_b_builder, assert_total_conserved, build, run
 
 
-def _age_model() -> Model:
-    """A → B in each age group, and aging from young to old."""
+def _group_model() -> Model:
+    """A → B in each group, and a move from g1 to g2."""
     return build(
         a_to_b_builder(
-            name="Aging",
+            name="Move",
             parameters={"g": 0.1, "a": 0.2},
             rate="g",
-            transition_id="rec",
-            stratifications={"age": {"young": 0.5, "old": 0.5}},
-        ).add_transition(id="aging", source=["young"], target=["old"], rate="a")
+            transition_id="ab",
+            stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+        ).add_transition(id="move", source=["g1"], target=["g2"], rate="a")
     )
 
 
 class TestCategoryTransitions:
     def test_the_engine_moves_amounts_between_categories(self) -> None:
-        result = run(_age_model(), 1)
+        result = run(_group_model(), 1)
 
-        # rec moves 0.1 of each A compartment; aging moves 0.2 of A_young.
-        assert result["A_young"][1] == pytest.approx(500 - 50 - 100)
-        assert result["A_old"][1] == pytest.approx(500 - 50 + 100)
+        # ab moves 0.1 of each A compartment; move moves 0.2 of A_g1.
+        assert result["A_g1"][1] == pytest.approx(500 - 50 - 100)
+        assert result["A_g2"][1] == pytest.approx(500 - 50 + 100)
         assert_total_conserved(result, 1000.0)
 
     def test_printed_flows_are_the_simulated_ones(self) -> None:
         flows = {
             (flow.transition, flow.source, flow.target, flow.term)
-            for flow in transition_flows(_age_model().structure)
+            for flow in transition_flows(_group_model().structure)
         }
 
-        assert ("aging", "A_young", "A_old", "a * A_young") in flows
-        assert ("rec", "A_young", "B_young", "g * A_young") in flows
+        assert ("move", "A_g1", "A_g2", "a * A_g1") in flows
+        assert ("ab", "A_g1", "B_g1", "g * A_g1") in flows
 
 
 class TestBinsSharingAPrefix:
@@ -70,10 +70,10 @@ class TestBinsSharingAPrefix:
         assert result["B"][1] == pytest.approx(375.0)
 
 
-class TestStoichiometricTransitions:
+class TestSeveralSourcesAndTargets:
     def test_every_source_loses_and_every_target_gains_the_flow(self) -> None:
         model = build(
-            ModelBuilder(name="Reaction", version="1.0")
+            ModelBuilder(name="Merge", version="1.0")
             .add_bin(id="A", name="A")
             .add_bin(id="B", name="B")
             .add_bin(id="C", name="C")
@@ -112,7 +112,7 @@ class TestNoTransitionConditions:
         assert not hasattr(ModelBuilder, "create_condition")
 
     def test_a_model_file_with_a_condition_key_names_it(self, tmp_path) -> None:
-        model = _age_model()
+        model = _group_model()
         data = model.model_dump(mode="json")
         data["structure"]["transitions"][0]["condition"] = {
             "logic": "and",

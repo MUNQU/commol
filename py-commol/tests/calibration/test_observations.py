@@ -19,7 +19,7 @@ from tests.support import (
     build,
     build_ode,
     observed,
-    sir_builder,
+    abc_builder,
 )
 
 SEED = 42
@@ -44,7 +44,7 @@ def _fit(
 class TestScaleFactors:
     def test_a_scale_alone_is_recovered(self, truth: Model, truth_run) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 10), factor=0.5, factor_id="detection_rate"
+            truth_run, "B", range(0, 100, 10), factor=0.5, factor_id="detection_rate"
         )
 
         result = _fit(
@@ -61,25 +61,25 @@ class TestScaleFactors:
         self, truth: Model, truth_run
     ) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 5), factor=0.3, factor_id="detection_rate"
+            truth_run, "B", range(0, 100, 5), factor=0.3, factor_id="detection_rate"
         )
 
         result = _fit(
             truth,
             observations,
-            [bounded("beta"), bounded("detection_rate", 0.1, 1.0, kind="factor")],
+            [bounded("k1"), bounded("detection_rate", 0.1, 1.0, kind="factor")],
             ParticleSwarmConfig(max_iterations=300, num_particles=25, verbose=False),
         )
 
         assert result.best_parameters == pytest.approx(
-            {"beta": 0.1, "detection_rate": 0.3}, abs=1e-3
+            {"k1": 0.1, "detection_rate": 0.3}, abs=1e-3
         )
 
     def test_each_output_has_its_own_scale(self, truth: Model, truth_run) -> None:
         observations = observed(
-            truth_run, "I", range(0, 100, 10), factor=0.6, factor_id="i_detection_rate"
+            truth_run, "B", range(0, 100, 10), factor=0.6, factor_id="i_detection_rate"
         ) + observed(
-            truth_run, "R", range(0, 100, 10), factor=0.9, factor_id="r_detection_rate"
+            truth_run, "C", range(0, 100, 10), factor=0.9, factor_id="r_detection_rate"
         )
 
         result = _fit(
@@ -97,7 +97,7 @@ class TestScaleFactors:
         )
 
 
-ODE_TRUTH = {"beta": 0.3, "gamma": 0.1}
+ODE_TRUTH = {"k1": 0.3, "k2": 0.1}
 STEPS = [0.5 + 1.5 * j for j in range(40)]
 """Observation steps, none of them an integer."""
 
@@ -110,23 +110,23 @@ class TestStepsBetweenIntegers:
     """A DifferentialEquations model observed at any step."""
 
     def test_observations_at_non_integer_steps_recover_the_parameters(self) -> None:
-        truth = build_ode(sir_builder())
+        truth = build_ode(abc_builder())
         results = Simulation(truth).run_at(STEPS)
         problem = CalibrationProblem(
             observed_data=[
-                ObservedDataPoint(at=step, output="I", value=value)
-                for step, value in zip(STEPS, results["I"], strict=True)
+                ObservedDataPoint(at=step, output="B", value=value)
+                for step, value in zip(STEPS, results["B"], strict=True)
             ],
             parameters=[
-                bounded("beta", initial_guess=0.5),
-                bounded("gamma", high=0.5, initial_guess=0.2),
+                bounded("k1", initial_guess=0.5),
+                bounded("k2", high=0.5, initial_guess=0.2),
             ],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=2000, verbose=False),
         )
 
         fitted = _fit_ode(
-            problem, build_ode(sir_builder(parameters={"beta": None, "gamma": None}))
+            problem, build_ode(abc_builder(parameters={"k1": None, "k2": None}))
         )
 
         assert fitted == pytest.approx(ODE_TRUTH, rel=1e-4)
@@ -160,17 +160,17 @@ class TestStepsBetweenIntegers:
 
 class TestPositionsAndEngines:
     def test_one_output_names_its_series(self) -> None:
-        point = ObservedDataPoint(at=3, output="I", value=1.0)
+        point = ObservedDataPoint(at=3, output="B", value=1.0)
 
-        assert point.label == "I" and point.observed_outputs == ["I"]
+        assert point.label == "B" and point.observed_outputs == ["B"]
 
     def test_a_sum_of_outputs_needs_a_label(self) -> None:
         with pytest.raises(ValidationError, match="label"):
-            ObservedDataPoint(at=3, outputs=["I", "R"], value=1.0)
+            ObservedDataPoint(at=3, outputs=["B", "C"], value=1.0)
 
     def test_output_and_outputs_exclude_each_other(self) -> None:
         with pytest.raises(ValidationError, match="exactly one"):
-            ObservedDataPoint(at=3, output="I", outputs=["R"], label="x", value=1.0)
+            ObservedDataPoint(at=3, output="B", outputs=["C"], label="x", value=1.0)
 
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:
         problem = CalibrationProblem(

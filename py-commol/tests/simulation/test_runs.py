@@ -15,14 +15,14 @@ from commol import (
 from commol.context.model import Model
 from tests.support import (
     ENGINE_REL,
-    SIR_START,
+    ABC_START,
     a_to_b_builder,
     assert_close,
     assert_total_conserved,
     build,
     reference_run,
-    sir_builder,
-    sir_flows,
+    abc_builder,
+    abc_flows,
 )
 
 
@@ -30,64 +30,62 @@ def _model(k: float | None = 0.1) -> Model:
     return build(a_to_b_builder(parameters={"k": k}))
 
 
-def _per_capita_sir() -> Model:
+def _proportional_abc() -> Model:
     return build(
-        sir_builder(
-            parameters={"infection_rate": 0.1, "recovery_rate": 0.05},
-            infection="infection_rate",
-            recovery="recovery_rate",
+        abc_builder(
+            parameters={"rate_ab": 0.1, "rate_bc": 0.05},
+            ab="rate_ab",
+            bc="rate_bc",
         )
     )
 
 
-PER_CAPITA_SIR = reference_run(
-    SIR_START,
-    sir_flows(lambda s, _: 0.1 * s["S"], lambda s, _: 0.05 * s["I"]),
+PROPORTIONAL_ABC = reference_run(
+    ABC_START,
+    abc_flows(lambda s, _: 0.1 * s["A"], lambda s, _: 0.05 * s["B"]),
     10,
 )
 """
-The run of ``_per_capita_sir``. By hand, step 1 is S = 990 - 99 = 891,
-I = 10 + 99 - 0.5 = 108.5 and R = 0.5.
+The run of ``_proportional_abc``. By hand, step 1 is A = 990 - 99 = 891,
+B = 10 + 99 - 0.5 = 108.5 and C = 0.5.
 """
 
 
 class TestResults:
     def test_results_map_each_output_to_its_values(self) -> None:
-        result = Simulation(_per_capita_sir()).run(10)
+        result = Simulation(_proportional_abc()).run(10)
 
         assert isinstance(result, dict)
-        assert list(result) == ["S", "I", "R"]
-        assert_close(result, PER_CAPITA_SIR, rel=ENGINE_REL)
-        assert result["I"][1] == pytest.approx(108.5)
+        assert list(result) == ["A", "B", "C"]
+        assert_close(result, PROPORTIONAL_ABC, rel=ENGINE_REL)
+        assert result["B"][1] == pytest.approx(108.5)
         assert_total_conserved(result, 1000.0)
 
     def test_a_run_holds_the_positions_of_its_grid(self) -> None:
-        result = Simulation(_per_capita_sir()).run(10)
+        result = Simulation(_proportional_abc()).run(10)
 
         assert result.positions == [float(step) for step in range(11)]
 
     def test_rows_give_every_output_at_each_position(self) -> None:
-        rows = Simulation(_per_capita_sir()).run(10).rows()
+        rows = Simulation(_proportional_abc()).run(10).rows()
 
         assert len(rows) == 11
         for step, row in enumerate(rows):
-            expected = [PER_CAPITA_SIR[name][step] for name in ("S", "I", "R")]
+            expected = [PROPORTIONAL_ABC[name][step] for name in ("A", "B", "C")]
             assert_close(row, expected, rel=ENGINE_REL)
 
     def test_results_serialize_as_a_mapping(self) -> None:
-        result = Simulation(_per_capita_sir()).run(2)
+        result = Simulation(_proportional_abc()).run(2)
 
         assert json.loads(json.dumps(result)) == dict(result)
 
     def test_a_run_with_an_uncalibrated_parameter_is_rejected(self) -> None:
-        simulation = Simulation(
-            build(sir_builder(parameters={"beta": None, "gamma": 0.05}))
-        )
+        simulation = Simulation(build(abc_builder(parameters={"k1": None, "k2": 0.05})))
 
         with pytest.raises(ValueError, match="Cannot run Simulation") as error:
             simulation.run(100)
 
-        assert "beta" in str(error.value)
+        assert "k1" in str(error.value)
         assert "calibration" in str(error.value).lower()
 
 

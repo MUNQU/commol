@@ -1,19 +1,19 @@
 """The builder assembles bins, parameters, transitions and initial conditions."""
 
 from commol.context.model import Model
-from tests.support import a_to_b_builder, build, sir_builder
+from tests.support import a_to_b_builder, build, abc_builder
 
 
 class TestBuild:
     def test_build_simple_model(self) -> None:
-        model = build(sir_builder(name="TestModel"))
+        model = build(abc_builder(name="TestModel"))
 
         assert isinstance(model, Model)
         assert model.name == "TestModel"
         assert model.version == "1.0"
-        assert [bin_.id for bin_ in model.structure.bins] == ["S", "I", "R"]
-        assert [parameter.id for parameter in model.parameters] == ["beta", "gamma"]
-        assert [t.id for t in model.structure.transitions] == ["infection", "recovery"]
+        assert [bin_.id for bin_ in model.structure.bins] == ["A", "B", "C"]
+        assert [parameter.id for parameter in model.parameters] == ["k1", "k2"]
+        assert [t.id for t in model.structure.transitions] == ["ab", "bc"]
         assert model.structure.initial_conditions.total == 1000
 
 

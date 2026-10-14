@@ -78,7 +78,7 @@ results = Simulation(model).run(num_steps=100)
 | Fluent, validated model building | [Building Models](guide/building-models.md) |
 | Stratifications, conditional stratifications, per-compartment initial conditions | [Core Concepts](guide/core-concepts.md#stratifications) |
 | Rate formulas compiled with Cranelift | [Mathematical Expressions](guide/mathematical-expressions.md) |
-| Pulses, windows, ramps, seasons and schedules per subgroup | [Axis Patterns](guide/axis-patterns.md) |
+| Pulses, windows, ramps, sinusoids and schedules per subgroup | [Axis Patterns](guide/axis-patterns.md) |
 | Unit checking and equation output (text, LaTeX) | [Units and Equations](guide/units-and-equations.md) |
 | Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
 | Ensembles and prediction intervals | [Probabilistic Calibration](guide/probabilistic-calibration.md) |

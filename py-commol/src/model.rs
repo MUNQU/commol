@@ -80,10 +80,10 @@ fn expanded_outputs(
 ///         model
 ///
 /// Returns:
-///     One `(transition, source, target, rate, per_capita_of)` tuple per flow
+///     One `(transition, source, target, rate, proportional_to)` tuple per flow
 ///     piece, in transition order. `source` or `target` is None for a
-///     source-less or target-less transition. `per_capita_of` is the
-///     compartment a per-capita rate is multiplied by, or None for an absolute
+///     source-less or target-less transition. `proportional_to` is the
+///     compartment a proportional rate is multiplied by, or None for an absolute
 ///     flow; the pieces of a transition with several sources share it.
 ///
 /// Raises:
@@ -112,7 +112,7 @@ fn transition_flows(
                 flow.source,
                 flow.target,
                 flow.rate,
-                flow.per_capita_of,
+                flow.proportional_to,
             )
         })
         .collect())

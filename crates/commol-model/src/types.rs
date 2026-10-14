@@ -76,7 +76,7 @@ pub(crate) struct TransitionFlow {
     /// overhead for simple transition expressions and falls back to
     /// `rate_expression` for unsupported formulas.
     pub(crate) fast_rate_expression: Option<FastRateExpression>,
-    /// Whether the rate expression is an absolute flow rather than a per-capita rate.
+    /// Whether the rate expression is an absolute flow rather than a proportional rate.
     pub(crate) is_absolute_flow: bool,
     /// Pre-resolved input slots for the JIT path. `Some` when the rate is a
     /// JIT-compiled formula whose variables we could resolve at build time;
@@ -275,7 +275,7 @@ impl SeriesParameter {
 pub(crate) struct SubgroupTotalMapping {
     /// Compartment indices that contribute to this subgroup total
     pub(crate) contributing_compartment_indices: Vec<usize>,
-    /// Variable name of this subgroup total (e.g., "total_young")
+    /// Variable name of this subgroup total (e.g., "total_g1")
     pub(crate) parameter_name: String,
     /// Index into `MathExpressionContext`'s parameter value storage, filled in
     /// after parameter slots have been reserved.

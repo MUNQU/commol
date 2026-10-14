@@ -7,49 +7,49 @@ from tests.support import (
     assert_total_conserved,
     build,
     reference_run,
-    sir_builder,
+    abc_builder,
     total,
 )
 from tests.support.reference import State
 
-AGE = {"age": {"young": 0.6, "old": 0.4}}
+GROUP = {"group": {"g1": 0.6, "g2": 0.4}}
 
 
 def _bin_total(bin_id: str):
     def bin_total(state: State) -> float:
-        return state[f"{bin_id}_young"] + state[f"{bin_id}_old"]
+        return state[f"{bin_id}_g1"] + state[f"{bin_id}_g2"]
 
     return bin_total
 
 
 class TestBinTotals:
     def test_a_bin_id_in_a_rate_sums_its_compartments(self) -> None:
-        model = build(sir_builder(stratifications=AGE))
+        model = build(abc_builder(stratifications=GROUP))
 
         result = Simulation(model).run(10)
 
-        # Each age group moves the same absolute flow, computed on the totals.
-        susceptible, infected = _bin_total("S"), _bin_total("I")
+        # Each group moves the same absolute flow, computed on the totals.
+        amount_a, amount_b = _bin_total("A"), _bin_total("B")
         expected = reference_run(
             {
-                "S_young": 990 * 0.6,
-                "S_old": 990 * 0.4,
-                "I_young": 10 * 0.6,
-                "I_old": 10 * 0.4,
-                "R_young": 0.0,
-                "R_old": 0.0,
+                "A_g1": 990 * 0.6,
+                "A_g2": 990 * 0.4,
+                "B_g1": 10 * 0.6,
+                "B_g2": 10 * 0.4,
+                "C_g1": 0.0,
+                "C_g2": 0.0,
             },
             [
                 (
-                    f"S_{age}",
-                    f"I_{age}",
-                    lambda s, _: 0.3 * susceptible(s) * infected(s) / total(s),
+                    f"A_{group}",
+                    f"B_{group}",
+                    lambda s, _: 0.3 * amount_a(s) * amount_b(s) / total(s),
                 )
-                for age in ("young", "old")
+                for group in ("g1", "g2")
             ]
             + [
-                (f"I_{age}", f"R_{age}", lambda s, _: 0.1 * infected(s))
-                for age in ("young", "old")
+                (f"B_{group}", f"C_{group}", lambda s, _: 0.1 * amount_b(s))
+                for group in ("g1", "g2")
             ],
             10,
         )
@@ -57,12 +57,12 @@ class TestBinTotals:
         assert_total_conserved(result, 1000.0)
 
     def test_a_bin_id_equals_the_explicit_sum(self) -> None:
-        by_bin = build(sir_builder(stratifications=AGE))
+        by_bin = build(abc_builder(stratifications=GROUP))
         by_sum = build(
-            sir_builder(
-                stratifications=AGE,
-                infection="beta * (S_young + S_old) * (I_young + I_old) / total",
-                recovery="gamma * (I_young + I_old)",
+            abc_builder(
+                stratifications=GROUP,
+                ab="k1 * (A_g1 + A_g2) * (B_g1 + B_g2) / total",
+                bc="k2 * (B_g1 + B_g2)",
             )
         )
 

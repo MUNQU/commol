@@ -82,7 +82,7 @@ class TestIntervalIntegration:
 
 
 class TestDifferentialIntegration:
-    """A pattern holds for one time unit: `amount` acts as a constant rate."""
+    """A pattern holds for one unit of the axis: `value` acts as a constant rate."""
 
     @staticmethod
     def _run_ode(pattern: AxisPattern, steps: int) -> list[float]:
@@ -112,21 +112,21 @@ class TestDifferentialIntegration:
 
     def test_periodic_acts_on_each_period_start(self):
         a = self._run_ode(AxisPattern.periodic(period=5, value=0.5), steps=20)
-        # [0, 1), [5, 6), [10, 11) and [15, 16): four time units.
+        # [0, 1), [5, 6), [10, 11) and [15, 16): four units of the axis.
         assert_close(a[20], 1000.0 * math.exp(-2.0), rel=1e-7)
 
 
-class TestSeasonalIntegration:
-    def test_seasonal_time_average_near_baseline(self):
+class TestSinusoidIntegration:
+    def test_sinusoid_average_near_baseline(self):
         """Average flow over many full periods should approximate baseline × source."""
         # Use a small rate so A does not deplete to zero quickly
         result = _run_ab(
-            str(AxisPattern.seasonal(amplitude=0.001, period=10, baseline=0.005)),
+            str(AxisPattern.sinusoid(amplitude=0.001, period=10, baseline=0.005)),
             steps=200,
             total=10_000,
         )
         a = result["A"]
-        # flow at step t = a[t] - a[t+1], per-capita rate ≈ 0.005 on average
+        # flow at step t = a[t] - a[t+1], proportional rate ≈ 0.005 on average
         flows = [a[t] - a[t + 1] for t in range(200)]
         avg_flow = sum(flows) / len(flows)
         avg_a = sum(a[:200]) / 200
@@ -194,7 +194,7 @@ class TestLinearRampIntegration:
         p = AxisPattern.linear_ramp(start=0, end=10, start_value=0.0, end_value=0.1)
         result = _run_ab(str(p), steps=12)
         a = result["A"]
-        # Per-capita rate increases from 0 at step 0 to ~0.09 at step 9.
+        # Proportional rate increases from 0 at step 0 to ~0.09 at step 9.
         # Flow at step t = a[t] - a[t+1] should grow as we move from t=1 to t=8
         # (early flows dominated by small rate; later flows by larger rate).
         flow_early = a[1] - a[2]
@@ -227,7 +227,7 @@ class TestPulsesIntegration:
         # only the three listed steps trigger a flow
         nonzero = {t for t in range(15) if a[t] - a[t + 1] > 1e-9}
         assert nonzero == {2, 6, 11}
-        # per-capita rates differ by the prescribed amounts (0.1, 0.2, 0.4)
+        # proportional rates differ by the prescribed amounts (0.1, 0.2, 0.4)
         rate2 = (a[2] - a[3]) / a[2]
         rate6 = (a[6] - a[7]) / a[6]
         rate11 = (a[11] - a[12]) / a[11]
@@ -270,7 +270,7 @@ class TestAddTransitionAcceptsAxisPattern:
         """A single AxisPattern can be passed as rate= without conversion."""
         model_dict = run(self._build_ab(rate=AxisPattern.pulse(at=5, value=0.1)), 10)
         a = model_dict["A"]
-        # Nonzero per-capita flow only at step 5; zero elsewhere.
+        # Nonzero proportional flow only at step 5; zero elsewhere.
         for t in range(10):
             delta = a[t] - a[t + 1]
             if t == 5:
@@ -293,7 +293,7 @@ class TestAddTransitionAcceptsAxisPattern:
                 )
             )
 
-    def test_generated_time_series_parameter_collision_raises(self):
+    def test_generated_series_parameter_collision_raises(self):
         with pytest.raises(ValueError, match="already exists"):
             (
                 ModelBuilder("AB")

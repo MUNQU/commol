@@ -57,7 +57,7 @@ def _category_ids(
     """
     Ids that name a stratification category, preferred first.
 
-    The qualified id (``sex:female``) always names it. The bare name does too
+    The qualified id (``group:g1``) always names it. The bare name does too
     when no other stratification declares a category of that name.
     """
     qualified = f"{stratification}{CATEGORY_SEPARATOR}{category}"

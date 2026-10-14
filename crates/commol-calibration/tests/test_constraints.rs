@@ -5,9 +5,9 @@ use commol_core::MathExpression;
 
 #[test]
 fn test_constraint_creation() {
-    let constraint = CalibrationConstraint::new("test".to_string(), "5.0 - beta/gamma".to_string());
+    let constraint = CalibrationConstraint::new("test".to_string(), "5.0 - k1/k2".to_string());
     assert_eq!(constraint.id, "test");
-    assert_eq!(constraint.expression, "5.0 - beta/gamma");
+    assert_eq!(constraint.expression, "5.0 - k1/k2");
     assert_eq!(constraint.weight, 1.0);
     assert!(constraint.is_parameter_only());
     assert!(!constraint.has_positions());
@@ -15,8 +15,9 @@ fn test_constraint_creation() {
 
 #[test]
 fn test_constraint_with_positions() {
-    let constraint = CalibrationConstraint::new("time_test".to_string(), "500.0 - I".to_string())
-        .with_positions(vec![10.0, 20.0, 30.0]);
+    let constraint =
+        CalibrationConstraint::new("at_positions".to_string(), "500.0 - B".to_string())
+            .with_positions(vec![10.0, 20.0, 30.0]);
 
     assert!(constraint.has_positions());
     assert!(!constraint.is_parameter_only());
@@ -25,20 +26,17 @@ fn test_constraint_with_positions() {
 
 #[test]
 fn test_constraint_with_description_and_weight() {
-    let constraint = CalibrationConstraint::new("weighted".to_string(), "beta - gamma".to_string())
-        .with_description("Beta must be >= gamma".to_string())
+    let constraint = CalibrationConstraint::new("weighted".to_string(), "k1 - k2".to_string())
+        .with_description("k1 must be >= k2".to_string())
         .with_weight(5.0);
 
-    assert_eq!(
-        constraint.description,
-        Some("Beta must be >= gamma".to_string())
-    );
+    assert_eq!(constraint.description, Some("k1 must be >= k2".to_string()));
     assert_eq!(constraint.weight, 5.0);
 }
 
 #[test]
 fn test_constraint_compilation() {
-    let constraint = CalibrationConstraint::new("r0".to_string(), "5.0 - beta/gamma".to_string());
+    let constraint = CalibrationConstraint::new("ratio".to_string(), "5.0 - k1/k2".to_string());
 
     let expr = MathExpression::new(constraint.expression.clone());
     assert!(expr.validate().is_ok());
@@ -48,7 +46,7 @@ fn test_constraint_compilation() {
 fn test_invalid_constraint_expression() {
     let constraint = CalibrationConstraint::new(
         "invalid".to_string(),
-        "5.0 - beta / / gamma".to_string(), // Invalid syntax
+        "5.0 - k1 / / k2".to_string(), // Invalid syntax
     );
 
     let expr = MathExpression::new(constraint.expression.clone());
@@ -58,7 +56,7 @@ fn test_invalid_constraint_expression() {
 #[test]
 fn test_linear_constraint_expression() {
     let constraint =
-        CalibrationConstraint::new("sum_bound".to_string(), "0.5 - (beta + gamma)".to_string());
+        CalibrationConstraint::new("sum_bound".to_string(), "0.5 - (k1 + k2)".to_string());
 
     let expr = MathExpression::new(constraint.expression.clone());
     assert!(expr.validate().is_ok());
@@ -68,7 +66,7 @@ fn test_linear_constraint_expression() {
 fn test_nonlinear_constraint_with_functions() {
     let constraint = CalibrationConstraint::new(
         "euclidean".to_string(),
-        "1.0 - sqrt(beta^2 + gamma^2)".to_string(),
+        "1.0 - sqrt(k1^2 + k2^2)".to_string(),
     );
 
     let expr = MathExpression::new(constraint.expression.clone());
@@ -79,7 +77,7 @@ fn test_nonlinear_constraint_with_functions() {
 fn test_constraint_with_special_variables() {
     // Constraints can reference special variables like total, step, t, pi, e
     let constraint =
-        CalibrationConstraint::new("time_dependent".to_string(), "total - 1000.0".to_string())
+        CalibrationConstraint::new("total_bound".to_string(), "total - 1000.0".to_string())
             .with_positions(vec![10.0]);
 
     let expr = MathExpression::new(constraint.expression.clone());
@@ -89,12 +87,12 @@ fn test_constraint_with_special_variables() {
 #[test]
 fn test_constraint_with_mathematical_functions() {
     let expressions = vec![
-        "max(beta, gamma) - 0.5",
-        "min(beta, gamma) - 0.1",
-        "abs(beta - gamma) - 0.05",
-        "exp(beta) - 2.0",
-        "ln(beta + 1.0) - 0.5",
-        "sin(beta * pi) + 1.0",
+        "max(k1, k2) - 0.5",
+        "min(k1, k2) - 0.1",
+        "abs(k1 - k2) - 0.05",
+        "exp(k1) - 2.0",
+        "ln(k1 + 1.0) - 0.5",
+        "sin(k1 * pi) + 1.0",
     ];
 
     for expr_str in expressions {
@@ -110,17 +108,16 @@ fn test_constraint_with_mathematical_functions() {
 
 #[test]
 fn test_constraint_builder_pattern() {
-    let constraint =
-        CalibrationConstraint::new("complex".to_string(), "5.0 - beta/gamma".to_string())
-            .with_description("R0 must be less than 5".to_string())
-            .with_weight(2.5)
-            .with_positions(vec![10.0, 20.0, 30.0]);
+    let constraint = CalibrationConstraint::new("complex".to_string(), "5.0 - k1/k2".to_string())
+        .with_description("k1/k2 must be less than 5".to_string())
+        .with_weight(2.5)
+        .with_positions(vec![10.0, 20.0, 30.0]);
 
     assert_eq!(constraint.id, "complex");
-    assert_eq!(constraint.expression, "5.0 - beta/gamma");
+    assert_eq!(constraint.expression, "5.0 - k1/k2");
     assert_eq!(
         constraint.description,
-        Some("R0 must be less than 5".to_string())
+        Some("k1/k2 must be less than 5".to_string())
     );
     assert_eq!(constraint.weight, 2.5);
     assert_eq!(constraint.at, Some(vec![10.0, 20.0, 30.0]));
