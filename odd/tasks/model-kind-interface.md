@@ -191,3 +191,12 @@ Each row says why the recommendation beats each alternative.
   that `axis-positions` S6 kept.
 - L7 (user, 2026-10-13): while ordering the pending tasks, `Model.engine`
   moved to `model-type-registry` T2; T0 here makes only `Model.structure`.
+- L8 (user, 2026-10-14): S1 and S3 need the test kind to have its own engine
+  in the list, which is in Rust, and calibration runs in Rust; a kind written
+  only in Python cannot have either. Approved: the test kind's engine is in
+  Rust, in `EngineType`, compiled only with the cargo feature `test-kind`;
+  its `ModelStructure` is in `tests/support/`. The tests build with
+  `maturin develop --release --features test-kind`; published wheels do not
+  have it. Rejected: an engine that calls Python (a new product feature, the
+  GIL in calibration) and a test kind that becomes a compartmental model (S1
+  cannot be tested).

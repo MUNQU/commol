@@ -282,7 +282,6 @@ class EnsembleSelector:
                 self._calibration_runner.build_rust_parameters(),
                 self._calibration_runner.build_rust_constraints(),
                 self._calibration_runner.build_loss_config(),
-                self._calibration_runner.initial_population_size(),
                 parameter_sets,
                 metric_points,
                 initial_condition_remainder=(

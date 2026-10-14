@@ -1,4 +1,4 @@
-"""Initial state of a model, as the Rust engine builds it.
+"""The engine of a model, and what it says about a compartmental structure.
 
 The engine is the single source of truth for how bins expand over
 stratifications, how fractions become head counts, how per-compartment
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         CalibrationParameterTypeProtocol,
         EngineProtocol,
         ObservedDataPointProtocol,
+        RustCompartmentalStructureProtocol,
         RustModelProtocol,
     )
     from commol.context.calibration import (
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
         CalibrationParameter,
         ObservedDataPoint,
     )
+    from commol.context.compartmental import CompartmentalStructure
     from commol.context.model import Model
 
 
@@ -80,6 +82,12 @@ def _rust_model(model: "Model") -> "RustModelProtocol":
     return commol_rs.core.Model.from_json(model.model_dump_json())
 
 
+def _rust_structure(
+    structure: "CompartmentalStructure",
+) -> "RustCompartmentalStructureProtocol":
+    return commol_rs.core.CompartmentalStructure.from_json(structure.model_dump_json())
+
+
 def build_engine(model: "Model | str") -> "EngineProtocol":
     """
     Build the engine that a model names.
@@ -103,14 +111,14 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
     return commol_rs.engine.Engine(commol_rs.core.Model.from_json(model_json))
 
 
-def initial_state(model: "Model") -> list[InitialCompartment]:
+def initial_state(structure: "CompartmentalStructure") -> list[InitialCompartment]:
     """
-    Expand a model into its compartments and their initial populations.
+    Expand a structure into its compartments and their initial populations.
 
     Parameters
     ----------
-    model : Model
-        The model definition.
+    structure : CompartmentalStructure
+        The structure of a compartmental model.
 
     Returns
     -------
@@ -127,28 +135,30 @@ def initial_state(model: "Model") -> list[InitialCompartment]:
     return [
         InitialCompartment(name, bin_id, dict(categories), population)
         for name, bin_id, categories, population in commol_rs.model.initial_state(
-            _rust_model(model)
+            _rust_structure(structure)
         )
     ]
 
 
 def expanded_outputs(
-    model: "Model",
+    structure: "CompartmentalStructure",
 ) -> tuple[list[ExpandedOutput], list[ExpandedOutput]]:
     """
-    Expand the bins and accumulators of a model over its stratifications.
+    Expand the bins and accumulators of a structure over its stratifications.
 
     Parameters
     ----------
-    model : Model
-        The model definition.
+    structure : CompartmentalStructure
+        The structure of a compartmental model.
 
     Returns
     -------
     tuple[list[ExpandedOutput], list[ExpandedOutput]]
         The expanded compartments and accumulator outputs, in engine order.
     """
-    compartments, accumulators = commol_rs.model.expanded_outputs(_rust_model(model))
+    compartments, accumulators = commol_rs.model.expanded_outputs(
+        _rust_structure(structure)
+    )
     return (
         [
             ExpandedOutput(name, source, dict(cats))
@@ -195,14 +205,14 @@ class TransitionFlow(NamedTuple):
         return f"{self.rate} * {self.per_capita_of}"
 
 
-def transition_flows(model: "Model") -> list[TransitionFlow]:
+def transition_flows(structure: "CompartmentalStructure") -> list[TransitionFlow]:
     """
-    Every transition flow of a model, exactly as the engine simulates it.
+    Every transition flow of a structure, exactly as the engine simulates it.
 
     Parameters
     ----------
-    model : Model
-        The model definition, whatever its engine.
+    structure : CompartmentalStructure
+        The structure of a compartmental model, whatever its engine.
 
     Returns
     -------
@@ -217,7 +227,7 @@ def transition_flows(model: "Model") -> list[TransitionFlow]:
     """
     return [
         TransitionFlow(*flow)
-        for flow in commol_rs.model.transition_flows(_rust_model(model))
+        for flow in commol_rs.model.transition_flows(_rust_structure(structure))
     ]
 
 
@@ -311,34 +321,52 @@ def check_positions(
     )
 
 
-def check_initial_conditions(
+def check_model_values(
+    model: "Model",
     engine: "EngineProtocol",
     parameters: Sequence["CalibrationParameter"],
     remainder: str | None = None,
 ) -> None:
     """
-    Check that every initial-condition id and the remainder resolve.
+    Check the values of the model kind that a calibration sets.
 
-    The engine resolves the ids as the calibration objective does, so its
+    ``parameter`` and ``factor`` values are not checked here. Every other type
+    must be one the kind of the model accepts
+    (`ModelStructure.calibration_value_types`), and the engine must resolve
+    each value and the remainder as the calibration objective does, so its
     message names the problem: an unknown id, an ambiguous category, or a
     category of a stratification that is not binary.
 
     Parameters
     ----------
+    model : Model
+        The model the calibration runs on.
     engine : EngineProtocol
-        The engine the calibration runs on.
+        The engine built from it.
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
     remainder : str | None
-        Compartment or bin that absorbs the difference to the population size.
+        The id that takes what the values leave of the total the kind keeps,
+        such as a compartment or bin of a compartmental model.
 
     Raises
     ------
     ValueError
-        If an initial-condition id or the remainder cannot be resolved.
+        If the kind does not accept a type of value, or a value or the
+        remainder cannot be resolved.
     """
+    accepted = model.structure.calibration_value_types()
+    generic = {CalibrationParameterType.PARAMETER, CalibrationParameterType.FACTOR}
+    for param in parameters:
+        if param.parameter_type not in generic and param.parameter_type not in accepted:
+            raise ValueError(
+                f"Calibration parameter '{param.id}' is a "
+                f"{param.parameter_type} value, which a {model.structure.kind} "
+                f"model does not accept. It accepts: "
+                f"{sorted(generic | accepted)}"
+            )
     try:
-        commol_rs.calibration.check_initial_conditions(
+        commol_rs.calibration.check_model_values(
             engine,
             _rust_parameters(parameters),
             initial_condition_remainder=remainder,
@@ -367,8 +395,8 @@ class CalibratedInitialPopulation(NamedTuple):
     covered: list[str]
 
 
-def calibrated_initial_population(
-    model: "Model",
+def calibrated_initial_population[S: "CompartmentalStructure"](
+    model: "Model[S]",
     parameters: Sequence["CalibrationParameter"],
     values: Sequence[float],
     remainder: str | None = None,
@@ -383,7 +411,7 @@ def calibrated_initial_population(
 
     Parameters
     ----------
-    model : Model
+    model : Model[CompartmentalStructure]
         The model definition the calibration problem was built on.
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
@@ -408,7 +436,6 @@ def calibrated_initial_population(
         engine,
         _rust_parameters(parameters),
         list(values),
-        model.population.initial_conditions.population_size,
         initial_condition_remainder=remainder,
     )
     return CalibratedInitialPopulation(
@@ -425,7 +452,7 @@ def check_names(model: "Model") -> None:
     Parameters
     ----------
     model : Model
-        The model definition.
+        A compartmental model.
 
     Raises
     ------

@@ -266,7 +266,7 @@ class TestCompartmentOverrides:
         model.apply_calibration_parameters({"A": 0.6}, initial_condition_problem("A"))
         names = [
             override.compartment
-            for override in model.population.initial_conditions.compartment_fractions
+            for override in model.structure.initial_conditions.compartment_fractions
         ]
 
         assert names == sorted(names)
@@ -379,9 +379,11 @@ class TestReportPerformance:
                 ),
             )
         )
-        names = [compartment.name for compartment in model.initial_state()]
+        names = [compartment.name for compartment in model.structure.initial_state()]
         assert len(names) == 256
-        model.update_compartment_fractions({name: 1 / 256 for name in names[:128]})
+        model.structure.update_compartment_fractions(
+            {name: 1 / 256 for name in names[:128]}
+        )
 
         start = time.perf_counter()
         report = applied_parameters_report(model, {"g0a": 0.5})

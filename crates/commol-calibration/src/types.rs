@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 pub enum CalibrationParameterType {
     /// Model parameter (e.g., beta, gamma)
     Parameter,
-    /// Initial population in a compartment (e.g., initial I value)
+    /// A value of the state the model starts from. The engine of the model
+    /// kind resolves its id; a compartmental engine takes a bin, a
+    /// compartment or a category.
     InitialCondition,
     /// Factor that multiplies the model output of an observation before
     /// comparison

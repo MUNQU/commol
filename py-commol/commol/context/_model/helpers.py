@@ -31,7 +31,9 @@ class ModelCompartmentHelper:
     ) -> tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]:
         """Compartments and accumulator outputs, as the engine expands them."""
         if self._expanded is None:
-            compartments, accumulators = engine_state.expanded_outputs(self._model)
+            compartments, accumulators = engine_state.expanded_outputs(
+                self._model.structure
+            )
             self._expanded = (
                 [(output.source, output.categories) for output in compartments],
                 [(output.source, output.categories) for output in accumulators],
@@ -63,7 +65,7 @@ class ModelCompartmentHelper:
         bin_id, applied = compartment
         parts = [bin_id] + [
             applied[s.id]
-            for s in self._model.population.stratifications
+            for s in self._model.structure.stratifications
             if s.id in applied
         ]
         name = "_".join(parts)
@@ -80,7 +82,7 @@ class ModelCompartmentHelper:
 
     def has_all_units(self) -> bool:
         """Check if all units are defined. Raises error if partial units."""
-        has_any_bin_unit = any(b.unit for b in self._model.population.bins)
+        has_any_bin_unit = any(b.unit for b in self._model.structure.bins)
         has_any_param_unit = any(
             p.unit for p in self._model.parameters if not isinstance(p.value, str)
         )
@@ -88,7 +90,7 @@ class ModelCompartmentHelper:
         if not has_any_bin_unit and not has_any_param_unit:
             return False
 
-        if not all(b.unit for b in self._model.population.bins):
+        if not all(b.unit for b in self._model.structure.bins):
             raise ValueError("Some bins have units but not all")
         if any(
             p.unit is None
@@ -120,22 +122,22 @@ class ModelCompartmentHelper:
                 variable_units[param.id] = param.unit
 
     def _add_bin_units(self, variable_units: dict[str, str]) -> None:
-        for state in self._model.population.bins:
+        for state in self._model.structure.bins:
             if state.unit:
                 variable_units[state.id] = state.unit
 
     def _add_stratification_category_units(
         self, variable_units: dict[str, str]
     ) -> None:
-        if not self._model.population.bins or not self._model.population.bins[0].unit:
+        if not self._model.structure.bins or not self._model.structure.bins[0].unit:
             return
-        bin_unit = self._model.population.bins[0].unit
-        for strat in self._model.population.stratifications:
+        bin_unit = self._model.structure.bins[0].unit
+        for strat in self._model.structure.stratifications:
             for category in strat.categories:
                 variable_units[category] = bin_unit
 
     def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
-        if not self._model.population.stratifications:
+        if not self._model.structure.stratifications:
             return
         compartments = self.generate_compartments()
         for compartment in compartments:
@@ -144,17 +146,17 @@ class ModelCompartmentHelper:
             )
             bin_id = compartment[0]
             bin_obj = next(
-                (b for b in self._model.population.bins if b.id == bin_id), None
+                (b for b in self._model.structure.bins if b.id == bin_id), None
             )
             if bin_obj and bin_obj.unit:
                 variable_units[compartment_str] = bin_obj.unit
 
     def _add_predefined_variable_units(self, variable_units: dict[str, str]) -> None:
         bin_unit = (
-            self._model.population.bins[0].unit if self._model.population.bins else None
+            self._model.structure.bins[0].unit if self._model.structure.bins else None
         )
         predefined_units = get_predefined_variable_units(
-            self._model.population.stratifications, bin_unit
+            self._model.structure.stratifications, bin_unit
         )
         variable_units.update(predefined_units)
 
@@ -275,7 +277,7 @@ class ModelCompartmentHelper:
     def register_custom_units(self) -> None:
         """Register custom units in the pint registry."""
         units_to_register: set[str] = set()
-        for bin_item in self._model.population.bins:
+        for bin_item in self._model.structure.bins:
             if bin_item.unit:
                 units_to_register.add(bin_item.unit)
         for param in self._model.parameters:

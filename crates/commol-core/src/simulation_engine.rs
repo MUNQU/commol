@@ -1,40 +1,10 @@
-//! The interface every simulation engine implements, and the labels of its outputs.
+//! The interface every simulation engine implements, whatever the kind of its
+//! model.
 
 use std::collections::HashMap;
+use std::fmt::Debug;
 
-/// Source and applied stratification categories of one simulation output.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OutputLabels {
-    /// Bin or accumulator the output expands from.
-    pub source: String,
-    /// `(stratification id, category)` pairs applied to the output, in
-    /// stratification declaration order.
-    pub categories: Vec<(String, String)>,
-}
-
-impl OutputLabels {
-    /// Names the output answers to as a prefix: its source, then its source
-    /// followed by each leading category (`A`, `A_g1`, `A_g1_s2`). The last
-    /// one is the output's own name.
-    pub fn prefixes(&self) -> Vec<String> {
-        let mut prefix = self.source.clone();
-        let mut prefixes = vec![prefix.clone()];
-        for (_, category) in &self.categories {
-            prefix.push('_');
-            prefix.push_str(category);
-            prefixes.push(prefix.clone());
-        }
-        prefixes
-    }
-
-    /// Category applied to the output for a stratification, if any.
-    pub fn category(&self, stratification: &str) -> Option<&str> {
-        self.categories
-            .iter()
-            .find(|(id, _)| id == stratification)
-            .map(|(_, category)| category.as_str())
-    }
-}
+use crate::types::ModelValueType;
 
 /// Outputs of a run and the positions on the axis they were reported at.
 #[derive(Debug, Clone, PartialEq)]
@@ -80,13 +50,33 @@ pub fn check_positions(
     Ok(())
 }
 
+/// A value of the model kind that calibration sets, besides parameters: its
+/// type and its id, such as an initial condition of bin `A`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelValue {
+    /// The type of the value.
+    pub value_type: ModelValueType,
+    /// The id the engine resolves, such as a bin or a compartment.
+    pub id: String,
+}
+
+/// Values of a model kind that an engine has resolved, ready to write
+/// ([`SimulationEngine::plan_values`]).
+pub trait ValuePlan: Clone + Debug + Send + Sync {
+    /// Why the state is infeasible, for a positive excess returned by
+    /// [`SimulationEngine::apply_values`].
+    fn infeasibility(&self, excess: f64) -> String;
+}
+
 /// Common interface that all model engines must implement
 /// to be compatible with calibration and other analysis tools.
 ///
 /// Calibration and optimization only use this trait, so they work with any
-/// engine that implements it. A position on the axis is an `f64` everywhere;
-/// each engine decides which positions its model type accepts
-/// ([`Self::check_position`]).
+/// engine that implements it, whatever the kind of its model. A position on
+/// the axis is an `f64` everywhere; each engine decides which positions its
+/// model type accepts ([`Self::check_position`]). The values of its model
+/// kind that calibration sets, such as initial conditions, are resolved and
+/// written by the engine ([`Self::plan_values`], [`Self::apply_values`]).
 ///
 /// # Example Implementation
 ///
@@ -100,6 +90,8 @@ pub fn check_positions(
 /// }
 ///
 /// impl SimulationEngine for MyModel {
+///     type ValuePlan = MyValuePlan;
+///
 ///     fn check_position(&self, position: f64) -> Result<(), String> {
 ///         // Implementation
 ///     }
@@ -108,6 +100,9 @@ pub fn check_positions(
 /// }
 /// ```
 pub trait SimulationEngine: Clone {
+    /// The values of the model kind, resolved by [`Self::plan_values`].
+    type ValuePlan: ValuePlan;
+
     /// Check that the engine can report at a position on the axis.
     ///
     /// # Errors
@@ -173,43 +168,27 @@ pub trait SimulationEngine: Clone {
     /// Returns an error string if the step fails
     fn step(&mut self) -> Result<(), String>;
 
-    /// Get the names of all compartments in order.
-    ///
-    /// The order must match the column order in the rows returned by `run()`
-    /// and `population()`.
-    ///
-    /// # Example
-    ///
-    /// For an SIR model: `vec!["S", "I", "R"]`
-    /// For a stratified model: `vec!["S_child", "S_adult", "I_child", "I_adult", ...]`
-    fn compartments(&self) -> Vec<String>;
+    /// Names of the outputs, in the order of each row a run returns.
+    fn output_names(&self) -> Vec<String>;
 
-    /// Get the source and applied stratification categories of each output.
-    ///
-    /// The order must match `output_names()`, so the compartments come first.
-    /// Calibration uses these labels to resolve initial conditions and
-    /// aggregate names without parsing output names.
-    fn output_labels(&self) -> Vec<OutputLabels>;
+    /// How many leading outputs are the state of the model. An expression
+    /// reads their sum as `N`; the outputs after them, such as accumulators,
+    /// do not count towards it.
+    fn state_outputs(&self) -> usize;
 
-    /// Get the names of all simulation output columns.
-    ///
-    /// By default this is the same as `compartments()`. Engines with tracked
-    /// non-population outputs, such as accumulators, should append those names here.
-    fn output_names(&self) -> Vec<String> {
-        self.compartments()
+    /// Named sums of outputs an expression may read besides the output
+    /// names, as `(name, output indices)`: for example the total of a bin
+    /// over its categories. None by default.
+    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
+        Vec::new()
     }
-
-    /// Get the current population state across all compartments.
-    ///
-    /// Returns a vector where `result[i]` is the population in compartment `i`,
-    /// matching the order from `compartments()`.
-    fn population(&self) -> Vec<f64>;
 
     /// Reset the simulation to its initial state.
     ///
     /// After calling this method:
     /// - `current_position()` should return 0.0
-    /// - `population()` should return initial conditions
+    /// - the state is the initial state, with the values last written by
+    ///   [`Self::apply_values`]
     /// - Parameters remain unchanged (use `set_parameter()` to modify them)
     ///
     /// This is essential for calibration workflows where the same model
@@ -253,35 +232,39 @@ pub trait SimulationEngine: Clone {
     /// Should return 0.0 immediately after construction or `reset()`.
     fn current_position(&self) -> f64;
 
-    /// Set the initial condition for a specific compartment.
-    ///
-    /// This method allows modifying the initial population value for a compartment,
-    /// which is useful for calibration workflows where initial conditions need to be
-    /// optimized alongside parameters.
+    /// Resolve values of the model kind that calibration sets.
     ///
     /// # Arguments
     ///
-    /// * `compartment_index` - The index of the compartment (matching the order from `compartments()`)
-    /// * `value` - The new initial population value
+    /// * `values` - The type and id of each value, in the order
+    ///   [`Self::apply_values`] takes their numbers.
+    /// * `remainder` - An id that takes what the values leave of a total the
+    ///   kind keeps, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the kind does not accept a type of value, or an
+    /// id or the remainder does not resolve.
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<Self::ValuePlan, String>;
+
+    /// Write values of the model kind into the state the engine starts from.
+    ///
+    /// # Arguments
+    ///
+    /// * `plan` - Values resolved by [`Self::plan_values`].
+    /// * `values` - The number of each value, parallel to the plan.
     ///
     /// # Returns
     ///
-    /// `Ok(())` if successful, or an error message if the compartment index is invalid
-    /// or the value is invalid (e.g., negative).
+    /// How far the state is from feasible: `0.0` for a feasible state.
+    /// [`ValuePlan::infeasibility`] says why a positive excess is not.
     ///
-    /// # Note
+    /// # Errors
     ///
-    /// This method updates the stored initial conditions. The current population state
-    /// is also updated to reflect the new initial value. After calling this method,
-    /// `reset()` will restore the population to these new initial conditions.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// // For an SIR model with compartments ["S", "I", "R"]
-    /// engine.set_initial_condition(1, 10.0)?;  // Set initial I to 10
-    /// engine.reset();  // Reset to new initial conditions
-    /// ```
-    fn set_initial_condition(&mut self, compartment_index: usize, value: f64)
-    -> Result<(), String>;
+    /// Returns a message when the engine rejects a value.
+    fn apply_values(&mut self, plan: &Self::ValuePlan, values: &[f64]) -> Result<f64, String>;
 }

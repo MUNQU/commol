@@ -332,7 +332,7 @@ builder = (
 )
 stratified_model = builder.build(engine="DifferenceEquations")
 
-print([c.name for c in stratified_model.initial_state()])
+print([c.name for c in stratified_model.structure.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 

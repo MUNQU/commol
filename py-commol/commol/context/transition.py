@@ -1,4 +1,4 @@
-"""Transitions, stratified rates and the dynamics of a model."""
+"""Transitions of a compartmental model and their stratified rates."""
 
 import math
 from typing import Self
@@ -215,39 +215,3 @@ class Transition(BaseModel):
         except ValueError as e:
             raise ValueError(f"Validation failed for rate '{value}': {e}")
         return value
-
-
-class Dynamics(BaseModel):
-    """
-    Defines how the system evolves.
-
-    Attributes
-    ----------
-    transitions : List[Transition]
-        A list of rules for state changes.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    transitions: list[Transition]
-
-    @field_validator("transitions")
-    @classmethod
-    def validate_transitions_not_empty(cls, v: list[Transition]) -> list[Transition]:
-        """Require at least one transition."""
-        if not v:
-            raise ValueError("At least one transition must be defined.")
-        return v
-
-    @model_validator(mode="after")
-    def validate_unique_transition_ids(self) -> Self:
-        """
-        Validates that transition IDs are unique.
-        """
-        transition_ids = [t.id for t in self.transitions]
-        if len(transition_ids) != len(set(transition_ids)):
-            duplicates = [
-                item for item in set(transition_ids) if transition_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate transition IDs found: {duplicates}")
-        return self

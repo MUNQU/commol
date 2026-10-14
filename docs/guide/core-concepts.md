@@ -194,7 +194,7 @@ stratified = (
     .build(engine="DifferenceEquations")
 )
 
-for compartment in stratified.initial_state():
+for compartment in stratified.structure.initial_state():
     print(compartment.name, compartment.population)
 ```
 
@@ -262,7 +262,7 @@ conditional = (
     .build(engine="DifferenceEquations")
 )
 
-print([c.name for c in conditional.initial_state()])
+print([c.name for c in conditional.structure.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
@@ -271,10 +271,10 @@ splits, not of the whole population. `subgroup_population` multiplies along the
 chain, and `get_conditioning_categories` names the subgroup:
 
 ```python
-print(conditional.subgroup_population())                # 10000
-print(conditional.subgroup_population(["g2"]))          # 10000 x 0.4 = 4000
-print(conditional.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
-print(conditional.get_conditioning_categories("subtype"))  # ('g2',)
+print(conditional.structure.subgroup_population())                # 10000
+print(conditional.structure.subgroup_population(["g2"]))          # 10000 x 0.4 = 4000
+print(conditional.structure.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
+print(conditional.structure.get_conditioning_categories("subtype"))  # ('g2',)
 ```
 
 See [Conditional Stratifications](building-models.md#stratifications)
@@ -315,7 +315,7 @@ overridden = (
     .build(engine="DifferenceEquations")
 )
 
-print({c.name: c.population for c in overridden.initial_state()})
+print({c.name: c.population for c in overridden.structure.initial_state()})
 # B_g1 starts empty; the other compartments keep their product
 ```
 
@@ -331,8 +331,8 @@ on a built model.
 ### Updating fractions after building
 
 ```python
-overridden.update_initial_conditions({"A": 0.85, "B": 0.15})
-overridden.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
+overridden.structure.update_initial_conditions({"A": 0.85, "B": 0.15})
+overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
 | Method | Rule |
@@ -391,7 +391,7 @@ outflow = (
     )
     .build(engine="DifferenceEquations")
 )
-print([t.id for t in outflow.dynamics.transitions])  # ['outflow__A', 'outflow__B']
+print([t.id for t in outflow.structure.transitions])  # ['outflow__A', 'outflow__B']
 ```
 
 ## Steps and physical time

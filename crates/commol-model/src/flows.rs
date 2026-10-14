@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use commol_core::{Model, RateMathExpression, Stratification, Transition};
+use commol_core::{CompartmentalStructure, RateMathExpression, Stratification, Transition};
 
 use crate::builder::{accumulator_output_ref, generate_accumulators, subpopulation_names};
 use crate::helpers::{
@@ -48,18 +48,17 @@ enum TransitionKind<'a> {
 }
 
 fn transition_kind<'a>(
-    model: &'a Model,
+    structure: &'a CompartmentalStructure,
     transition: &Transition,
 ) -> Result<TransitionKind<'a>, String> {
     let ids: Vec<&String> = transition.source.iter().chain(&transition.target).collect();
     if ids
         .iter()
-        .all(|id| model.population.bins.iter().any(|bin| &bin.id == *id))
+        .all(|id| structure.bins.iter().any(|bin| &bin.id == *id))
     {
         return Ok(TransitionKind::Bins);
     }
-    let stratification = model
-        .population
+    let stratification = structure
         .stratifications
         .iter()
         .find(|strat| ids.iter().all(|id| strat.categories.contains(id)))
@@ -120,12 +119,12 @@ fn driving_compartments(
 /// transition with several sources has a per-capita rate, or when a flow ends
 /// in categories no compartment has.
 pub(crate) fn plan_transition_flows(
-    model: &Model,
+    structure: &CompartmentalStructure,
     layout: &CompartmentLayout,
     accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
     subpopulation_names: &HashSet<String>,
 ) -> Result<Vec<PlannedFlow>, String> {
-    let stratifications = &model.population.stratifications;
+    let stratifications = &structure.stratifications;
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
     let is_absolute = |rate: &str, explicit: Option<bool>| {
         explicit.unwrap_or_else(|| {
@@ -137,11 +136,11 @@ pub(crate) fn plan_transition_flows(
     };
 
     let mut flows = Vec::new();
-    for transition in &model.dynamics.transitions {
+    for transition in &structure.transitions {
         if transition.source.is_empty() && transition.target.is_empty() {
             continue;
         }
-        let kind = transition_kind(model, transition)?;
+        let kind = transition_kind(structure, transition)?;
         let driving = driving_compartments(transition, kind, layout);
         check_stratified_rates_match(transition, &driving, layout)?;
 
@@ -316,24 +315,25 @@ pub struct FlowDescription {
     pub per_capita_of: Option<String>,
 }
 
-/// Every transition flow of a model, exactly as the engine simulates it.
+/// Every transition flow of a compartmental structure, exactly as the engine
+/// simulates it.
 ///
-/// It does not depend on the engine of the model, so any model definition can be
+/// It does not depend on the engine of the model, so any structure can be
 /// described.
 ///
 /// # Errors
 ///
 /// Returns a message when a transition mixes bins and categories, or when a
 /// category transition has no source or no target.
-pub fn describe_flows(model: &Model) -> Result<Vec<FlowDescription>, String> {
-    let layout = CompartmentLayout::new(model);
-    let accumulator_map: HashMap<AccumulatorOutputRef, usize> = generate_accumulators(model)
+pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDescription>, String> {
+    let layout = CompartmentLayout::new(structure);
+    let accumulator_map: HashMap<AccumulatorOutputRef, usize> = generate_accumulators(structure)
         .into_iter()
         .enumerate()
         .map(|(idx, output)| (output.output_ref, idx))
         .collect();
-    let names = subpopulation_names(&layout, model);
-    let flows = plan_transition_flows(model, &layout, &accumulator_map, &names)?;
+    let names = subpopulation_names(&layout, structure);
+    let flows = plan_transition_flows(structure, &layout, &accumulator_map, &names)?;
     let name = |idx: Option<usize>| idx.map(|idx| layout.name(idx).to_string());
     Ok(flows
         .into_iter()
@@ -361,8 +361,8 @@ pub fn describe_flows(model: &Model) -> Result<Vec<FlowDescription>, String> {
 mod tests {
     use super::*;
 
-    /// A model with the given bins, stratifications and transitions.
-    fn model(bins: &[&str], stratifications: &str, transitions: &str) -> Model {
+    /// A structure with the given bins, stratifications and transitions.
+    fn model(bins: &[&str], stratifications: &str, transitions: &str) -> CompartmentalStructure {
         let bins: Vec<String> = bins
             .iter()
             .map(|id| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
@@ -376,20 +376,20 @@ mod tests {
             })
             .collect();
         let json = format!(
-            r#"{{"name":"m","population":{{"bins":[{}],"stratifications":[{}],
-            "transitions":[],"initial_conditions":{{"population_size":100,
-            "bin_fractions":[{}],"stratification_fractions":[]}}}},
-            "parameters":[],"dynamics":{{"transitions":[{}]}},
-            "engine":{{"type":"DifferenceEquations"}}}}"#,
+            r#"{{"bins":[{}],"stratifications":[{}],
+            "transitions":[{}],"initial_conditions":{{"population_size":100,
+            "bin_fractions":[{}],"stratification_fractions":[]}}}}"#,
             bins.join(","),
             stratifications,
-            fractions.join(","),
-            transitions
+            transitions,
+            fractions.join(",")
         );
-        serde_json::from_str(&json).expect("valid model JSON")
+        serde_json::from_str(&json).expect("valid structure JSON")
     }
 
-    fn flows(model: &Model) -> Vec<(Option<String>, Option<String>, String, bool)> {
+    fn flows(
+        model: &CompartmentalStructure,
+    ) -> Vec<(Option<String>, Option<String>, String, bool)> {
         describe_flows(model)
             .unwrap()
             .into_iter()

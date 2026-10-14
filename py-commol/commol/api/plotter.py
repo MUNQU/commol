@@ -368,7 +368,9 @@ class SimulationPlotter:
         try:
             return self.simulation.outputs_for(series_id)
         except KeyError:
-            sources = sorted(self.simulation.model_definition.get_outputs_by_source())
+            sources = sorted(
+                self.simulation.model_definition.structure.outputs_by_source()
+            )
             raise ValueError(
                 f"'{series_id}' is neither an output nor a bin or accumulator id. "
                 f"Outputs: {self.bins}. Bins and accumulators: {sources}"
@@ -669,17 +671,9 @@ class SimulationPlotter:
                 legend=show_legend,
             )
 
-        # Get bin unit from model for label
-        bin_obj = next(
-            (
-                b
-                for b in self.simulation.model_definition.population.bins
-                if b.id == bin_id
-            ),
-            None,
-        )
-        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
-        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+        label = self.simulation.model_definition.structure.series_label(bin_id)
+        unit_str = label.unit or ""
+        bin_name = label.name
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
@@ -831,17 +825,9 @@ class SimulationPlotter:
                 legend=show_legend,
             )
 
-        # Get bin unit from model for label
-        bin_obj = next(
-            (
-                b
-                for b in self.simulation.model_definition.population.bins
-                if b.id == bin_id
-            ),
-            None,
-        )
-        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
-        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+        label = self.simulation.model_definition.structure.series_label(bin_id)
+        unit_str = label.unit or ""
+        bin_name = label.name
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"{unit_str}")
@@ -925,17 +911,9 @@ class SimulationPlotter:
                 zorder=5,
             )
 
-        # Get bin unit from model for label
-        bin_obj = next(
-            (
-                b
-                for b in self.simulation.model_definition.population.bins
-                if b.id == bin_id
-            ),
-            None,
-        )
-        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
-        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+        label = self.simulation.model_definition.structure.series_label(bin_id)
+        unit_str = label.unit or ""
+        bin_name = label.name
 
         ax.set_xlabel("Step")
         ax.set_ylabel(f"{unit_str}")
@@ -1031,17 +1009,9 @@ class SimulationPlotter:
                 zorder=5,
             )
 
-        # Get bin unit from model for label
-        bin_obj = next(
-            (
-                b
-                for b in self.simulation.model_definition.population.bins
-                if b.id == bin_id
-            ),
-            None,
-        )
-        unit_str = f"{bin_obj.unit}" if bin_obj and bin_obj.unit else ""
-        bin_name = bin_obj.name if bin_obj and bin_obj.name else bin_id
+        label = self.simulation.model_definition.structure.series_label(bin_id)
+        unit_str = label.unit or ""
+        bin_name = label.name
 
         ax.set_xlabel("Step")
         ax.set_ylabel(f"{unit_str}")

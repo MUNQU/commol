@@ -21,7 +21,7 @@ from commol.api import (
     window_start,
     windowed_totals,
 )
-from commol.context import Model
+from commol.context import CompartmentalStructure, Model, ModelStructure
 from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
@@ -69,8 +69,10 @@ __all__ = [
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
+    "CompartmentalStructure",
     "Model",
     "ModelBuilder",
+    "ModelStructure",
     "NelderMeadConfig",
     "ObservedDataPoint",
     "OdeSolver",

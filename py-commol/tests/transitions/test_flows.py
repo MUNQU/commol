@@ -36,7 +36,7 @@ class TestCategoryTransitions:
     def test_printed_flows_are_the_simulated_ones(self) -> None:
         flows = {
             (flow.transition, flow.source, flow.target, flow.term)
-            for flow in transition_flows(_age_model())
+            for flow in transition_flows(_age_model().structure)
         }
 
         assert ("aging", "A_young", "A_old", "a * A_young") in flows
@@ -114,7 +114,7 @@ class TestNoTransitionConditions:
     def test_a_model_file_with_a_condition_key_names_it(self, tmp_path) -> None:
         model = _age_model()
         data = model.model_dump(mode="json")
-        data["dynamics"]["transitions"][0]["condition"] = {
+        data["structure"]["transitions"][0]["condition"] = {
             "logic": "and",
             "rules": [{"variable": "state:A", "operator": "gt", "value": 0}],
         }

@@ -216,6 +216,7 @@ dependencies = [
  "commol-core",
  "commol-difference",
  "commol-differential",
+ "commol-model",
  "rand 0.10.3",
  "rayon",
  "serde",

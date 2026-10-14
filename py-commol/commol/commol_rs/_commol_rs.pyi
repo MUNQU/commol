@@ -49,24 +49,34 @@ class InitialConditionsProtocol(Protocol):
     stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
     compartment_fractions: list[tuple[str, float]]
 
-class PopulationProtocol(Protocol):
-    bins: list[BinProtocol]
-    stratifications: list[StratificationProtocol]
-    transitions: list[TransitionProtocol]
-    initial_conditions: InitialConditionsProtocol
+class RustCompartmentalStructureProtocol(Protocol):
+    """The structure of a compartmental model."""
 
-class DynamicsProtocol(Protocol):
-    transitions: list[TransitionProtocol]
+    def __init__(
+        self,
+        bins: list[BinProtocol],
+        stratifications: list[StratificationProtocol],
+        initial_conditions: InitialConditionsProtocol,
+        transitions: list[TransitionProtocol] | None = None,
+        accumulators: list[object] | None = None,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json_str: str) -> RustCompartmentalStructureProtocol: ...
 
 class RustModelProtocol(Protocol):
-    name: str
-    description: str | None
-    version: str | None
-    population: PopulationProtocol
-    parameters: list[ParameterProtocol]
-    dynamics: DynamicsProtocol
+    """A model of any kind: its header, engine and structure."""
+
+    def __init__(
+        self,
+        name: str,
+        structure: RustCompartmentalStructureProtocol,
+        parameters: list[ParameterProtocol],
+        engine: str,
+        description: str | None = None,
+        version: str | None = None,
+    ) -> None: ...
     @staticmethod
-    def from_json(json_string: str) -> RustModelProtocol: ...
+    def from_json(json_str: str) -> RustModelProtocol: ...
 
 class EngineProtocol(Protocol):
     """The engine a model names, built from the model."""
@@ -104,21 +114,33 @@ class EngineTypeProtocol(Protocol):
     def rate_meaning(self) -> str: ...
     def equation_lhs(self, variable: str, latex: bool) -> str: ...
     def check_settings(self, settings_json: str | None = None) -> None: ...
+    def check_kind(self, kind: str) -> None: ...
+
+class ModelKindProtocol(Protocol):
+    """One kind of model of the engine's list."""
+
+    def __init__(self, name: str) -> None: ...
+    @staticmethod
+    def names() -> list[str]: ...
+    @property
+    def name(self) -> str: ...
+    def value_types(self) -> list[str]: ...
 
 class EngineModule(Protocol):
     Engine: type[EngineProtocol]
     EngineType: type[EngineTypeProtocol]
+    ModelKind: type[ModelKindProtocol]
 
 class ModelModule(Protocol):
     def initial_state(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
     def transition_flows(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
     def check_names(self, model: RustModelProtocol) -> None: ...
     def expanded_outputs(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> tuple[
         list[tuple[str, str, list[tuple[str, str]]]],
         list[tuple[str, str, list[tuple[str, str]]]],
@@ -390,7 +412,6 @@ class CalibrationModule(Protocol):
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
     def check_positions(
@@ -399,7 +420,7 @@ class CalibrationModule(Protocol):
         observed_data: list[ObservedDataPointProtocol],
         constraints: list[CalibrationConstraintProtocol],
     ) -> None: ...
-    def check_initial_conditions(
+    def check_model_values(
         self,
         engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],
@@ -410,7 +431,6 @@ class CalibrationModule(Protocol):
         engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],
         values: list[float],
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> tuple[list[float], list[float], list[int]]: ...
     def calibrate_with_history(
@@ -421,7 +441,6 @@ class CalibrationModule(Protocol):
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultWithHistoryProtocol: ...
     def run_multiple_calibrations(
@@ -432,7 +451,6 @@ class CalibrationModule(Protocol):
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         n_runs: int,
         seed: int,
         evaluation_retention: str = "all",
@@ -458,7 +476,6 @@ class CalibrationModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
-        initial_population_size: int,
         parameter_sets: list[list[float]],
         positions: list[float],
         initial_condition_remainder: str | None = None,
@@ -477,7 +494,6 @@ class CalibrationModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
-        initial_population_size: int,
         parameter_sets: list[list[float]],
         metric_points: list[tuple[float, int]],
         initial_condition_remainder: str | None = None,
@@ -537,7 +553,7 @@ class RateMathExpressionProtocol(Protocol):
 
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
-    Population: type[PopulationProtocol]
+    CompartmentalStructure: type[RustCompartmentalStructureProtocol]
     Bin: type[BinProtocol]
     Stratification: type[StratificationProtocol]
     StratificationCondition: type[StratificationConditionProtocol]
@@ -547,7 +563,6 @@ class CoreModule(Protocol):
     InitialConditions: type[InitialConditionsProtocol]
     StratificationFraction: type[StratificationFractionProtocol]
     StratificationFractions: type[StratificationFractionsProtocol]
-    Dynamics: type[DynamicsProtocol]
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]
 

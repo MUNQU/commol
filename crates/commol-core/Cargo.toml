@@ -12,6 +12,10 @@ description = "Core data structures for compartment models"
 name = "commol_core"
 crate-type = ["rlib"]
 
+[features]
+# The model kind of the tests (`types::test_kind`). Never in a release build.
+test-kind = []
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

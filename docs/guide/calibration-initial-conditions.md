@@ -64,7 +64,7 @@ result = Calibrator(Simulation(model), problem).run()
 print(round(result.best_parameters["B"], 4))  # 0.02
 
 model.apply_calibration_parameters(result, problem)
-print({c.name: round(c.population, 1) for c in model.initial_state()})
+print({c.name: round(c.population, 1) for c in model.structure.initial_state()})
 # {'A': 980.0, 'B': 20.0, 'C': 0.0}
 ```
 
@@ -186,7 +186,7 @@ result = Calibrator(Simulation(composite), problem).run()
 print(round(result.best_parameters["B_g1"], 4))  # 0.01
 
 composite.apply_calibration_parameters(result, problem)
-print({c.name: round(c.population, 1) for c in composite.initial_state()})
+print({c.name: round(c.population, 1) for c in composite.structure.initial_state()})
 # {'A_g1': 490.0, 'A_g2': 450.0, 'B_g1': 10.0, 'B_g2': 50.0}
 ```
 

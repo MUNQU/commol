@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use argmin::core::CostFunction;
 use commol_calibration::{
-    calibrated_initial_population, CalibrationParameter, CalibrationParameterType,
-    CalibrationProblem, LossConfig, ObservedDataPoint,
+    configured_engine, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
+    LossConfig, ObservedDataPoint,
 };
-use commol_core::{OutputLabels, SimulationEngine};
+use commol_core::{ModelValue, SimulationEngine};
+use commol_model::{CompartmentalEngine, InitialConditionPlan, OutputLabels};
 
 #[derive(Clone)]
 struct TestEngine {
@@ -64,6 +65,8 @@ impl TestEngine {
 }
 
 impl SimulationEngine for TestEngine {
+    type ValuePlan = InitialConditionPlan;
+
     fn check_position(&self, _position: f64) -> Result<(), String> {
         Ok(())
     }
@@ -82,6 +85,45 @@ impl SimulationEngine for TestEngine {
         Ok(())
     }
 
+    fn output_names(&self) -> Vec<String> {
+        self.compartments.clone()
+    }
+
+    fn state_outputs(&self) -> usize {
+        self.compartments.len()
+    }
+
+    fn reset(&mut self) {
+        self.population.clone_from(&self.initial_population);
+    }
+
+    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.parameters.insert(parameter_id.to_string(), value);
+        Ok(())
+    }
+
+    fn get_parameters(&self) -> &HashMap<String, f64> {
+        &self.parameters
+    }
+
+    fn current_position(&self) -> f64 {
+        0.0
+    }
+
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<InitialConditionPlan, String> {
+        InitialConditionPlan::new(self, values, remainder)
+    }
+
+    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
+        plan.apply(self, values)
+    }
+}
+
+impl CompartmentalEngine for TestEngine {
     fn compartments(&self) -> Vec<String> {
         self.compartments.clone()
     }
@@ -107,21 +149,8 @@ impl SimulationEngine for TestEngine {
         self.population.clone()
     }
 
-    fn reset(&mut self) {
-        self.population.clone_from(&self.initial_population);
-    }
-
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.parameters.insert(parameter_id.to_string(), value);
-        Ok(())
-    }
-
-    fn get_parameters(&self) -> &HashMap<String, f64> {
-        &self.parameters
-    }
-
-    fn current_position(&self) -> f64 {
-        0.0
+    fn population_size(&self) -> f64 {
+        1000.0
     }
 
     fn set_initial_condition(
@@ -152,8 +181,8 @@ fn initial_population(
     values: &[f64],
 ) -> Result<Vec<f64>, String> {
     let parameters: Vec<_> = ids.iter().map(|id| initial_condition(id)).collect();
-    calibrated_initial_population(engine, &parameters, remainder, values, 1000)
-        .map(|state| state.population)
+    configured_engine(engine, &parameters, remainder, values)
+        .map(|(engine, _, _)| engine.population())
 }
 
 fn assert_close(actual: &[f64], expected: &[f64]) {
@@ -235,7 +264,6 @@ fn infeasible_initial_conditions_are_penalized() {
         vec![initial_condition("A")],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .unwrap()
     .with_initial_condition_remainder("B")
@@ -270,7 +298,6 @@ fn aggregate_initial_conditions_keep_existing_subgroup_percentages() {
         ],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .expect("aggregate bin IDs should be valid initial-condition targets");
 
@@ -298,7 +325,6 @@ fn paired_category_initial_condition_redistributes_without_changing_pair_totals(
         )],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .expect("paired category IDs should be valid initial-condition targets");
 
@@ -324,7 +350,6 @@ fn paired_category_initial_condition_can_target_either_binary_category() {
         )],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .expect("either category in a binary pair should be a valid target");
 
@@ -348,7 +373,6 @@ fn paired_category_initial_condition_infers_generic_category_names() {
         )],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .expect("binary category names should be inferred from compartment names");
 
@@ -369,7 +393,6 @@ fn exact_compartment_initial_conditions_are_still_accepted() {
         )],
         vec![],
         LossConfig::SumSquaredError,
-        1000,
     )
     .expect("expanded compartment IDs should remain valid initial-condition targets");
 }

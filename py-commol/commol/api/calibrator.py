@@ -130,9 +130,6 @@ class Calibrator:
         logger.info("Converted problem definition to Rust types.")
         logger.info("Running optimization...")
 
-        # Get initial population size for initial condition fraction conversion
-        initial_population_size = self._get_initial_population_size()
-
         # Call the Rust calibrate function
         rust_result = rust_calibration.calibrate(
             self._engine,
@@ -141,7 +138,6 @@ class Calibrator:
             rust_constraints,
             rust_loss_config,
             rust_optimization_config,
-            initial_population_size,
             initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
@@ -200,9 +196,6 @@ class Calibrator:
         # Convert optimization config to Rust type
         rust_optimization_config = self._build_optimization_config()
 
-        # Get initial population size for initial condition fraction conversion
-        initial_population_size = self._get_initial_population_size()
-
         # Call the Rust calibrate_with_history function
         rust_result = rust_calibration.calibrate_with_history(
             self._engine,
@@ -211,7 +204,6 @@ class Calibrator:
             rust_constraints,
             rust_loss_config,
             rust_optimization_config,
-            initial_population_size,
             initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
@@ -400,57 +392,21 @@ class Calibrator:
                         f"parameters. Available parameters: "
                         f"{sorted(model_param_ids)}"
                     )
-            elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                # The engine resolves initial-condition ids below.
-                pass
             elif param.parameter_type == CalibrationParameterType.FACTOR:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
                         f"Factor parameter '{param.id}' must have positive bounds "
                         f"(got min={param.min_bound}, max={param.max_bound})"
                     )
-            else:
-                raise ValueError(
-                    f"Unknown calibration parameter type: {param.parameter_type}"
-                )
 
-        engine_state.check_initial_conditions(
+        # The structure and the engine check the values of the model kind,
+        # such as initial conditions.
+        engine_state.check_model_values(
+            model,
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
         )
-
-    def _get_compartment_index(self, bin_id: str) -> int:
-        """
-        Get the index of a bin/compartment by its ID.
-
-        Parameters
-        ----------
-        bin_id : str
-            The bin identifier
-
-        Returns
-        -------
-        int
-            The index of the compartment in the population vector
-
-        Raises
-        ------
-        ValueError
-            If the bin_id is not found
-        """
-        bins = self.simulation.model_definition.population.bins
-        for idx, bin_obj in enumerate(bins):
-            if bin_obj.id == bin_id:
-                return idx
-        raise ValueError(f"Bin '{bin_id}' not found in model")
-
-    def _get_initial_population_size(self) -> int:
-        """Get the initial population size from the model."""
-        initial_conditions = (
-            self.simulation.model_definition.population.initial_conditions
-        )
-        return initial_conditions.population_size
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.

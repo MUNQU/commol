@@ -13,6 +13,7 @@ from commol.context.initial_conditions import CATEGORY_SEPARATOR, InitialConditi
 
 if TYPE_CHECKING:
     from commol.context.calibration import CalibrationProblem
+    from commol.context.compartmental import CompartmentalStructure
     from commol.context.model import Model
 
 # Relative tolerance under which a rebuilt head count matches the scored one.
@@ -20,17 +21,14 @@ _MATCH_TOLERANCE = 1e-9
 
 
 def with_initial_conditions(
-    model: "Model", initial_conditions: InitialConditions
-) -> "Model":
-    """Shallow copy of a model that holds other initial conditions."""
-    population = model.population.model_copy(
-        update={"initial_conditions": initial_conditions}
-    )
-    return model.model_copy(update={"population": population})
+    structure: "CompartmentalStructure", initial_conditions: InitialConditions
+) -> "CompartmentalStructure":
+    """Shallow copy of a structure that holds other initial conditions."""
+    return structure.model_copy(update={"initial_conditions": initial_conditions})
 
 
-def calibrated_initial_conditions(
-    model: "Model",
+def calibrated_initial_conditions[S: "CompartmentalStructure"](
+    model: "Model[S]",
     problem: "CalibrationProblem",
     values: Mapping[str, float],
 ) -> InitialConditions:
@@ -48,7 +46,7 @@ def calibrated_initial_conditions(
 
     Parameters
     ----------
-    model : Model
+    model : Model[CompartmentalStructure]
         The model the calibration problem was built on. It is not modified.
     problem : CalibrationProblem
         The calibration problem, for its parameters and remainder.
@@ -66,7 +64,8 @@ def calibrated_initial_conditions(
         If the engine cannot resolve an initial-condition id or the remainder,
         or the initial population exceeds the population size.
     """
-    current = model.population.initial_conditions
+    structure = model.structure
+    current = structure.initial_conditions
     parameters = [
         param
         for param in problem.parameters
@@ -84,15 +83,15 @@ def calibrated_initial_conditions(
     )
 
     candidate = _declared_fraction_update(
-        model, scored.values, scored.population, scored.covered
+        structure, scored.values, scored.population, scored.covered
     )
     try:
-        rebuilt = initial_state(with_initial_conditions(model, candidate))
+        rebuilt = initial_state(with_initial_conditions(structure, candidate))
     except ValueError:
         # The declared updates combined with the existing overrides do not
         # build; pin the scored population on the current definition instead.
         candidate = current.model_copy(deep=True)
-        rebuilt = initial_state(with_initial_conditions(model, candidate))
+        rebuilt = initial_state(with_initial_conditions(structure, candidate))
 
     population_size = float(current.population_size)
     target = scored.population
@@ -112,7 +111,7 @@ def calibrated_initial_conditions(
 
 
 def _declared_fraction_update(
-    model: "Model",
+    structure: "CompartmentalStructure",
     applied: Mapping[str, float],
     scored: Mapping[str, float],
     covered: Sequence[str],
@@ -125,11 +124,11 @@ def _declared_fraction_update(
     the engine applied. A group of updates that the definition rejects is
     skipped; the pins that follow cover the compartments it would have set.
     """
-    candidate = model.population.initial_conditions.model_copy(deep=True)
+    candidate = structure.initial_conditions.model_copy(deep=True)
     population_size = float(candidate.population_size)
-    bin_ids = {bin_item.id for bin_item in model.population.bins}
+    bin_ids = {bin_item.id for bin_item in structure.bins}
     categories = candidate.get_categories_with_fractions()
-    state = initial_state(model)
+    state = initial_state(structure)
 
     bin_totals: dict[str, float] = {}
     for compartment in state:

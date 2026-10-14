@@ -10,8 +10,11 @@
 //! ## Module Organization
 //!
 //! - `builder` - Expansion, initial state, name checks and compilation
+//! - `engine` - What a compartmental engine gives besides the generic trait
 //! - `flows` - Planning of the transition flows
 //! - `helpers` - Utility functions for stratification and rate resolution
+//! - `initial_conditions` - Initial conditions that calibration writes
+//! - `labels` - Labels of the outputs and the sums they name
 //! - `layout` - Structured index of the compartments
 //! - `rates` - Evaluation of a compiled rate
 //! - `system` - The right-hand side and the accessors of a compiled model
@@ -32,8 +35,11 @@
 #![warn(missing_docs)]
 
 mod builder;
+mod engine;
 mod flows;
 mod helpers;
+mod initial_conditions;
+mod labels;
 mod layout;
 mod rates;
 mod system;
@@ -43,5 +49,8 @@ pub use builder::{
     ExpandedOutput, InitialCompartment, check_names, expand_accumulators, expand_compartments,
     initial_state,
 };
+pub use engine::CompartmentalEngine;
 pub use flows::{FlowDescription, describe_flows};
+pub use initial_conditions::InitialConditionPlan;
+pub use labels::{OutputLabels, output_sums};
 pub use types::CompiledModel;

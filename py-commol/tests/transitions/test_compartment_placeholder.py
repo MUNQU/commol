@@ -27,7 +27,7 @@ class TestExpansion:
         )
 
         assert [
-            (t.id, t.source, t.target, t.rate) for t in model.dynamics.transitions
+            (t.id, t.source, t.target, t.rate) for t in model.structure.transitions
         ] == [
             ("death__S", ["S"], [], "d * S"),
             ("death__I", ["I"], [], "d * I"),
@@ -60,7 +60,7 @@ class TestExpansion:
         model = build(builder)
 
         assert [
-            (t.id, t.source, t.target, t.rate) for t in model.dynamics.transitions
+            (t.id, t.source, t.target, t.rate) for t in model.structure.transitions
         ] == [
             ("treatment__I_mild", ["I_mild"], ["R"], "treatment_rate * I_mild"),
             ("treatment__I_severe", ["I_severe"], ["R"], "treatment_rate * I_severe"),
@@ -78,7 +78,7 @@ class TestExpansion:
             )
         )
 
-        assert [t.rate for t in model.dynamics.transitions] == [
+        assert [t.rate for t in model.structure.transitions] == [
             "d * S * (1 + 0.1 * S / K)",
             "d * I * (1 + 0.1 * I / K)",
         ]
@@ -108,7 +108,7 @@ class TestExpansion:
             )
         )
 
-        transitions = model.dynamics.transitions
+        transitions = model.structure.transitions
         assert [t.rate for t in transitions] == ["d_base * S", "d_base * I"]
         assert [
             [rate.rate for rate in t.stratified_rates or []] for t in transitions

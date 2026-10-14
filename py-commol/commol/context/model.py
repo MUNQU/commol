@@ -1,19 +1,24 @@
 """The `Model` definition and its update, inspection and serialization methods."""
 
-from collections.abc import Iterable, Mapping
-from itertools import combinations, product
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Self
+from typing import Generic, Self, TypeVar
 
-from pydantic import ConfigDict, BaseModel, Field, model_validator
-
-from commol.constants import RESERVED_VARIABLE_NAMES, PrintEquationsOutputFormat
-from commol.context._model import engine_state
-from commol.context._model.calibration_write_back import (
-    calibrated_initial_conditions,
-    with_initial_conditions,
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializeAsAny,
+    field_validator,
+    model_validator,
 )
-from commol.context._model.engine_state import InitialCompartment
+
+try:
+    from commol.commol_rs import _commol_rs as commol_rs
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
+
+from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
 from commol.context.calibration import (
     CalibrationProblem,
@@ -21,17 +26,22 @@ from commol.context.calibration import (
     calibrated_values,
 )
 from commol.context.constants import CalibrationParameterType
-from commol.context.dynamics import Dynamics, Transition
 from commol.context.engine import ModelEngine
 from commol.context.parameter import Parameter
-from commol.context.population import Population
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
-from commol.utils.security import get_expression_variables
+from commol.context.structure import ModelStructure
+
+StructureT = TypeVar("StructureT", bound=ModelStructure)
+"""The structure class of a model, which sets its kind."""
 
 
-class Model(BaseModel):
+class Model(BaseModel, Generic[StructureT]):
     """
-    Root class of compartment model.
+    A model of any kind: a header, an engine and the structure of its kind.
+
+    ``Model[CompartmentalStructure]`` is a compartmental model, the model
+    `ModelBuilder` builds. A model loaded without a structure class reads the
+    class from the ``kind`` of its structure.
 
     Attributes
     ----------
@@ -41,14 +51,13 @@ class Model(BaseModel):
         A human-readable description of the model's purpose and function.
     version : str | None
         The version number of the model.
-    population : Population
-        Population details, subpopulations, stratifications and initial conditions.
     parameters : list[Parameter]
         A list of global model parameters.
-    dynamics : Dynamics
-        The rules that govern system evolution.
     engine : ModelEngine
         The engine that runs the model, and its settings.
+    structure : StructureT
+        The part of the model that depends on its kind, such as the bins,
+        stratifications and transitions of a compartmental model.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check uses it; when None, the check infers it
@@ -64,10 +73,9 @@ class Model(BaseModel):
     )
     version: str | None = Field(None, description="Version number of the model.")
 
-    population: Population
     parameters: list[Parameter]
-    dynamics: Dynamics
     engine: ModelEngine
+    structure: SerializeAsAny[StructureT]
     step_unit: str | None = Field(
         None,
         description=(
@@ -76,6 +84,20 @@ class Model(BaseModel):
             "Inferred from the parameter units when None."
         ),
     )
+
+    @field_validator("structure", mode="before")
+    @classmethod
+    def read_structure_kind(cls, value: object) -> object:
+        """Read a structure given as a mapping as the class of its ``kind``."""
+        if not isinstance(value, Mapping):
+            return value
+        kind = value.get("kind")
+        if not isinstance(kind, str):
+            raise ValueError(
+                "A model structure needs a 'kind'. Known kinds: "
+                f"{sorted(ModelStructure._kinds)}"
+            )
+        return ModelStructure.of_kind(kind).model_validate(value)
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:
@@ -130,6 +152,12 @@ class Model(BaseModel):
         )
 
     @model_validator(mode="after")
+    def validate_engine_runs_structure(self) -> Self:
+        """Ask the engine whether it runs the kind of the structure."""
+        commol_rs.engine.EngineType(self.engine.type).check_kind(self.structure.kind)
+        return self
+
+    @model_validator(mode="after")
     def validate_unique_parameter_ids(self) -> Self:
         """
         Validates that parameter IDs are unique.
@@ -143,34 +171,9 @@ class Model(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_parameter_names_not_reserved(self) -> Self:
-        """
-        Validates that parameter IDs do not conflict with reserved variable names.
-
-        ``N``, ``step``, ``t``, ``pi`` and ``e`` are engine variables, and bin
-        IDs are the population of each bin. Expanded compartment names and
-        subpopulation totals are checked by the engine
-        (``validate_names_with_engine``).
-        """
-        bin_ids = {bin_item.id for bin_item in self.population.bins}
-        parameter_ids = {p.id for p in self.parameters}
-
-        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
-        if special:
-            raise ValueError(
-                f"Parameter IDs conflict with engine variables: {special}. "
-                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
-                f"Please rename the conflicting parameters."
-            )
-
-        conflicting_names = bin_ids & parameter_ids
-        if conflicting_names:
-            raise ValueError(
-                f"Parameter IDs conflict with reserved compartment names: "
-                f"{sorted(conflicting_names)}. "
-                f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
-                f"Please rename the conflicting parameters."
-            )
+    def validate_structure(self) -> Self:
+        """Check the structure against the parameters and the engine."""
+        self.structure.check_model(self)
         return self
 
     def update_parameters(self, parameter_values: Mapping[str, float | None]) -> None:
@@ -210,103 +213,6 @@ class Model(BaseModel):
         """
         return [param.id for param in self.parameters if param.value is None]
 
-    def get_uncalibrated_initial_conditions(self) -> list[str]:
-        """
-        Get a list of bin IDs that have None fractions (need calibration).
-
-        Returns
-        -------
-        list[str]
-            List of bin IDs with uncalibrated initial conditions.
-        """
-        return self.population.initial_conditions.get_uncalibrated_bins()
-
-    def update_initial_conditions(
-        self, bin_fractions: Mapping[str, float | None]
-    ) -> None:
-        """
-        Update initial condition fractions for specified bins.
-
-        Parameters
-        ----------
-        bin_fractions : Mapping[str, float | None]
-            Dictionary mapping bin IDs to their new fraction values.
-
-        Raises
-        ------
-        ValueError
-            If a bin ID in the dictionary doesn't exist in the model.
-        """
-        self.population.initial_conditions.update_bin_fractions(bin_fractions)
-
-    def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
-        """
-        Update initial stratification fractions for specified categories.
-
-        Within each stratification, at most one category may be omitted; the
-        omitted category receives the remaining fraction.
-
-        Parameters
-        ----------
-        fractions : Mapping[str, float]
-            Dictionary mapping category names to their new fraction values.
-
-        Raises
-        ------
-        ValueError
-            If a category doesn't exist in the model, a value lies outside
-            [0.0, 1.0], a stratification has more than one category omitted, or
-            the resulting fractions do not sum to 1.0.
-        """
-        self.population.initial_conditions.update_stratification_fractions(fractions)
-
-    def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
-        """
-        Upsert per-compartment initial condition overrides.
-
-        A compartment already declared in the model definition has its
-        fraction replaced; a new one is appended. The engine validates the
-        result before it is stored, so a rejected call leaves the model
-        unchanged.
-
-        Parameters
-        ----------
-        fractions : Mapping[str, float]
-            Dictionary mapping expanded compartment names to their new fraction
-            of the total population.
-
-        Raises
-        ------
-        ValueError
-            If a name is not an expanded compartment of the model, a value lies
-            outside ``[0.0, 1.0]``, or the resulting overrides make the initial
-            population exceed ``population_size``.
-        """
-        candidate = self.population.initial_conditions.model_copy(deep=True)
-        candidate.update_compartment_fractions(fractions)
-        engine_state.initial_state(with_initial_conditions(self, candidate))
-        self.population.initial_conditions = candidate
-
-    def initial_state(self) -> list[InitialCompartment]:
-        """
-        Expanded compartments and the population each one starts with.
-
-        The engine builds this state from the bin fractions, the stratification
-        fractions and the per-compartment overrides; it is the population a
-        simulation of this model starts from.
-
-        Returns
-        -------
-        list[InitialCompartment]
-            One entry per expanded compartment, in engine order.
-
-        Raises
-        ------
-        ValueError
-            If the per-compartment overrides are not valid for the model.
-        """
-        return engine_state.initial_state(self)
-
     def apply_calibration_parameters(
         self,
         result: CalibrationResult
@@ -318,16 +224,12 @@ class Model(BaseModel):
         Write calibrated values back onto the model.
 
         Each value is routed by the ``parameter_type`` declared for it in
-        ``problem``: ``parameter`` values update model parameters, and
-        ``scale`` values are ignored because they apply to observations rather
-        than to the model.
-
-        ``initial_condition`` values are persisted so that the model rebuilds
-        the initial population the engine scored for them. Bin and category
-        values update the fractions they declare. Every compartment that those
-        fractions do not reproduce, such as an exact compartment value or a
-        value that overlaps a per-compartment override, is persisted as a
-        per-compartment override.
+        ``problem``: ``parameter`` values update model parameters, ``factor``
+        values are ignored because they apply to observations rather than to
+        the model, and the structure writes back the values of its kind
+        (`ModelStructure.with_calibrated_values`). A compartmental structure
+        writes ``initial_condition`` values so that the model rebuilds the
+        initial population the engine scored for them.
 
         Parameters
         ----------
@@ -341,8 +243,8 @@ class Model(BaseModel):
         Raises
         ------
         ValueError
-            If an id is not declared in ``problem``, or the engine cannot
-            resolve an initial condition id.
+            If an id is not declared in ``problem``, or the structure cannot
+            write back a value of its kind.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -360,375 +262,11 @@ class Model(BaseModel):
         }
         # Computed before any mutation, so a rejected value leaves the model
         # unchanged.
-        initial_conditions = calibrated_initial_conditions(self, problem, values)
+        structure = self.structure.with_calibrated_values(self, problem, values)
 
         if parameters:
             self.update_parameters(parameters)
-        self.population.initial_conditions = initial_conditions
-
-    @model_validator(mode="after")
-    def validate_transitions_with_engine(self) -> Self:
-        """
-        Validate the transitions against the flows the engine plans for them.
-
-        The engine rejects a category transition without exactly one source and
-        one target category, and a stratified rate whose conditions match none
-        of the compartments the transition starts from.
-        """
-        engine_state.transition_flows(self)
-        return self
-
-    @model_validator(mode="after")
-    def validate_names_with_engine(self) -> Self:
-        """
-        Validate parameter ids and subpopulation variables with the engine.
-
-        A parameter id cannot be an expanded compartment or a subpopulation
-        total, and every ``N_…`` variable must name a subpopulation.
-        """
-        engine_state.check_names(self)
-        return self
-
-    @model_validator(mode="after")
-    def validate_compartment_fractions(self) -> Self:
-        """Validate per-compartment overrides against the engine expansion."""
-        if self.population.initial_conditions.compartment_fractions:
-            engine_state.initial_state(self)
-        return self
-
-    @model_validator(mode="after")
-    def validate_formula_variables(self) -> Self:
-        """
-        Validate that all variables in rate expressions are defined.
-        This is done by gathering all valid identifiers and checking each
-        transition's rate expressions against them.
-        """
-        valid_identifiers = self._get_valid_identifiers()
-
-        for transition in self.dynamics.transitions:
-            self._validate_transition_rates(transition, valid_identifiers)
-        return self
-
-    def _get_valid_identifiers(self) -> set[str]:
-        """Gathers all valid identifiers for use in rate expressions."""
-        special_vars = set(RESERVED_VARIABLE_NAMES)
-        param_ids = {param.id for param in self.parameters}
-        bin_ids = {bin_item.id for bin_item in self.population.bins}
-
-        strat_category_ids: set[str] = {
-            cat for strat in self.population.stratifications for cat in strat.categories
-        }
-
-        subpopulation_n_vars = self._get_subpopulation_n_vars()
-        full_compartment_names = self._get_full_compartment_names()
-        bin_subpopulation_vars = self._get_bin_subpopulation_vars()
-
-        return (
-            param_ids
-            | bin_ids
-            | strat_category_ids
-            | special_vars
-            | subpopulation_n_vars
-            | full_compartment_names
-            | bin_subpopulation_vars
-        )
-
-    def _get_subpopulation_n_vars(self) -> set[str]:
-        """Generates all possible N_{category...} variable names."""
-        if not self.population.stratifications:
-            return set()
-
-        subpopulation_n_vars: set[str] = set()
-        category_groups = [s.categories for s in self.population.stratifications]
-
-        full_category_combos = product(*category_groups)
-
-        for combo_tuple in full_category_combos:
-            for i in range(1, len(combo_tuple) + 1):
-                for subset in combinations(combo_tuple, i):
-                    var_name = f"N_{'_'.join(subset)}"
-                    subpopulation_n_vars.add(var_name)
-
-        return subpopulation_n_vars
-
-    def get_conditioning_categories(self, stratification_id: str) -> tuple[str, ...]:
-        """
-        Get the categories a stratification is conditioned on.
-
-        An unconditional stratification subdivides the whole population and has
-        no conditioning categories. A conditional one subdivides only the
-        subgroup its conditions select, and its fractions are relative to that
-        subgroup rather than to the whole population.
-
-        Parameters
-        ----------
-        stratification_id : str
-            Id of a stratification of the model.
-
-        Returns
-        -------
-        tuple[str, ...]
-            Ids of the categories selecting the subgroup this stratification
-            subdivides, empty for an unconditional stratification. A category
-            name another stratification also declares is qualified, as in
-            ``sex:female``.
-
-        Raises
-        ------
-        ValueError
-            If the stratification is not found.
-        """
-        initial_conditions = self.population.initial_conditions
-        for stratification in self.population.stratifications:
-            if stratification.id == stratification_id:
-                return tuple(
-                    initial_conditions.category_id(
-                        condition.stratification, condition.category
-                    )
-                    for condition in (stratification.conditions or [])
-                    if condition.category is not None
-                )
-        raise ValueError(
-            f"Stratification '{stratification_id}' not found in model "
-            f"'{self.name}'. Available: "
-            f"{sorted(s.id for s in self.population.stratifications)}"
-        )
-
-    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
-        """
-        Get the initial head count of a subgroup.
-
-        See
-        :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
-
-        Per-compartment overrides are folded into the sum for every compartment
-        the category chain selects, not just when it selects one, so the head
-        count matches the population the engine builds. Without overrides the
-        declared fractions are multiplied exactly as before.
-
-        Parameters
-        ----------
-        categories : Iterable[str], optional
-            Category ids, bare or qualified (``sex:female``), forming a chain
-            from the whole population down to the subgroup, outermost first.
-
-        Returns
-        -------
-        float
-            Number of individuals in the subgroup at step 0.
-
-        Raises
-        ------
-        ValueError
-            If a category is not found or a bare name is ambiguous.
-        """
-        selected = tuple(categories)
-        initial_conditions = self.population.initial_conditions
-        if not initial_conditions.compartment_fractions:
-            return initial_conditions.subgroup_population(selected)
-        resolved = [initial_conditions.resolve_category(c) for c in selected]
-        return sum(
-            compartment.population
-            for compartment in self.initial_state()
-            if all(
-                compartment.categories.get(stratification) == name
-                for stratification, name in resolved
-            )
-        )
-
-    def get_outputs_by_source(self) -> dict[str, list[str]]:
-        """
-        Map each bin and accumulator id to the output names it expands into.
-
-        A bin or accumulator produces one output per combination of the
-        stratification categories that apply to it. Without stratifications it
-        produces a single output named after the id itself.
-
-        Returns
-        -------
-        dict[str, list[str]]
-            Bin and accumulator ids, each mapped to its output names in
-            declaration order.
-        """
-        from commol.context._model.helpers import ModelCompartmentHelper
-
-        helper = ModelCompartmentHelper(self)
-        outputs: dict[str, list[str]] = {
-            source_id: []
-            for source_id in (
-                *(bin_item.id for bin_item in self.population.bins),
-                *(accumulator.id for accumulator in self.population.accumulators),
-            )
-        }
-        expanded = (
-            *helper.generate_compartments(),
-            *helper.generate_accumulator_outputs(),
-        )
-        for source_id, applied in expanded:
-            name = "_".join(
-                [source_id]
-                + [
-                    applied[stratification.id]
-                    for stratification in self.population.stratifications
-                    if stratification.id in applied
-                ]
-            )
-            outputs[source_id].append(name)
-        return outputs
-
-    def _get_full_compartment_names(self) -> set[str]:
-        """Returns all full stratified compartment names."""
-        if not self.population.stratifications:
-            return set()
-
-        from commol.context._model.helpers import ModelCompartmentHelper
-
-        helper = ModelCompartmentHelper(self)
-        compartments = helper.generate_compartments()
-        return {
-            helper.compartment_to_string(comp, PrintEquationsOutputFormat.TEXT)
-            for comp in compartments
-        }
-
-    def _get_bin_subpopulation_vars(self) -> set[str]:
-        """Generates partial bin-stratification sum variable names.
-
-        For bins and stratifications, generates the combinations. These represent
-        partial sums over one or more stratification dimensions. Requires 2+
-        stratifications (with 1, partial sums duplicate existing names).
-        """
-        if len(self.population.stratifications) < 2:
-            return set()
-
-        bin_strat_vars: set[str] = set()
-        bin_ids = [bin_item.id for bin_item in self.population.bins]
-        category_groups = [s.categories for s in self.population.stratifications]
-
-        for combo_tuple in product(*category_groups):
-            num_cats = len(combo_tuple)
-            full_mask = (1 << num_cats) - 1
-            for subset_mask in range(1, full_mask):
-                subset = [
-                    cat for k, cat in enumerate(combo_tuple) if (subset_mask >> k) & 1
-                ]
-                suffix = "_".join(subset)
-                for bin_id in bin_ids:
-                    bin_strat_vars.add(f"{bin_id}_{suffix}")
-
-        return bin_strat_vars
-
-    def _validate_transition_rates(
-        self, transition: Transition, valid_identifiers: set[str]
-    ) -> None:
-        """Validates the rate expressions for a single transition."""
-        if transition.rate:
-            self._validate_rate_expression(
-                transition.rate, transition.id, "rate", valid_identifiers
-            )
-
-        if transition.stratified_rates:
-            for sr in transition.stratified_rates:
-                self._validate_rate_expression(
-                    sr.rate, transition.id, "stratified_rate", valid_identifiers
-                )
-
-    def _validate_rate_expression(
-        self, rate: str, transition_id: str, context: str, valid_identifiers: set[str]
-    ) -> None:
-        """Validates variables in a single rate expression."""
-        variables = get_expression_variables(rate)
-        undefined_vars = [var for var in variables if var not in valid_identifiers]
-        if undefined_vars:
-            param_ids = {param.id for param in self.parameters}
-            bin_ids = {bin_item.id for bin_item in self.population.bins}
-            message = (
-                f"Undefined variables in transition '{transition_id}' "
-                f"{context} '{rate}': {', '.join(undefined_vars)}. "
-                f"Available parameters: "
-                f"{', '.join(sorted(param_ids)) if param_ids else 'none'}. "
-                f"Available bins: "
-                f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
-            )
-            if any(var.startswith("N_") for var in undefined_vars):
-                n_vars = sorted(self._get_subpopulation_n_vars())
-                message += (
-                    " Subpopulation names follow the declaration order of the "
-                    "stratifications. Available subpopulations: "
-                    f"{', '.join(n_vars) if n_vars else 'none'}."
-                )
-            raise ValueError(message)
-
-    @model_validator(mode="after")
-    def validate_transition_ids(self) -> Self:
-        """
-        Validates that transition ids (source/target) are consistent in type
-        and match the defined Bin IDs or Stratification Categories
-        in the Population instance.
-        """
-
-        bin_ids = {bin_item.id for bin_item in self.population.bins}
-        categories_ids = {
-            cat for strat in self.population.stratifications for cat in strat.categories
-        }
-        bin_and_categories_ids = bin_ids.union(categories_ids)
-
-        for transition in self.dynamics.transitions:
-            source = set(transition.source)
-            target = set(transition.target)
-            transition_ids = source.union(target)
-
-            if not transition_ids.issubset(bin_and_categories_ids):
-                invalid_ids = transition_ids - bin_and_categories_ids
-                raise ValueError(
-                    (
-                        f"Transition '{transition.id}' contains invalid ids: "
-                        f"{invalid_ids}. Ids must be defined in Bin ids "
-                        f"or Stratification Categories."
-                    )
-                )
-
-            is_bin_flow = transition_ids.issubset(bin_ids)
-            is_stratification_flow = transition_ids.issubset(categories_ids)
-
-            if (not is_bin_flow) and (not is_stratification_flow):
-                bin_elements = transition_ids.intersection(bin_ids)
-                categories_elements = transition_ids.intersection(categories_ids)
-                raise ValueError(
-                    (
-                        f"Transition '{transition.id}' mixes id types. "
-                        f"Found Bin ids ({bin_elements}) and "
-                        f"Stratification Categories ids ({categories_elements}). "
-                        "Transitions must be purely Bin flow or purely "
-                        f"Stratification flow."
-                    )
-                )
-
-            if is_stratification_flow:
-                category_to_stratification_map = {
-                    cat: strat.id
-                    for strat in self.population.stratifications
-                    for cat in strat.categories
-                }
-                parent_stratification_ids = {
-                    category_to_stratification_map[cat_id] for cat_id in transition_ids
-                }
-                if len(parent_stratification_ids) > 1:
-                    mixed_strats = ", ".join(parent_stratification_ids)
-                    raise ValueError(
-                        (
-                            f"Transition '{transition.id}' is a Stratification flow "
-                            f"but involves categories from multiple stratifications: "
-                            f"{mixed_strats}. A single transition must only move "
-                            f"between categories belonging to the same parent "
-                            f"stratification."
-                        )
-                    )
-
-        return self
-
-    # ------------------------------------------------------------------
-    # Delegation to extracted modules
-    # ------------------------------------------------------------------
+        self.structure = structure
 
     def print_equations(
         self,
@@ -738,8 +276,10 @@ class Model(BaseModel):
         """
         Prints the equations of the model in mathematical form.
 
-        Displays model metadata and the system of equations in both
-        compact (mathematical notation) and expanded (individual equations) forms.
+        The structure prints them (`ModelStructure.print_equations`). A
+        compartmental model displays its metadata and the system of equations
+        in both compact (mathematical notation) and expanded (individual
+        equations) forms.
 
         For DifferentialEquations models, displays equations as dX/dt = ...
         For DifferenceEquations models,
@@ -759,6 +299,8 @@ class Model(BaseModel):
         ------
         ValueError
             If format is not "text" or "latex"
+        NotImplementedError
+            If the kind of the model has no equations to print.
 
         Examples
         --------
@@ -769,16 +311,16 @@ class Model(BaseModel):
         ...     output_file="equations.txt", format="latex"
         ... )  # Save LaTeX
         """
-        from commol.context._model.equations import EquationPrinter
-
-        EquationPrinter(self).print_equations(output_file, format)
+        self.structure.print_equations(self, output_file, format)
 
     def check_unit_consistency(self, verbose: bool = False) -> None:
         """
         Check unit consistency of all equations in the model.
 
-        The engine applies every flow once per step and converts no value
-        between units. So the check infers one step unit from the parameter
+        The structure checks them (`ModelStructure.check_unit_consistency`).
+        For a compartmental model, the engine applies every flow once per step
+        and converts no value between units. So the check infers one step unit
+        from the parameter
         units: the one unit of time (``day``, ``week``, ``step``, …) that they
         use, or ``step`` when they use none. Every flow must then be exactly
         ``<bin unit>/<step unit>``, such as ``person/day``.
@@ -796,6 +338,8 @@ class Model(BaseModel):
             does not have the unit ``<bin unit>/<step unit>``.
         ValueError
             If the model type doesn't support unit checking.
+        NotImplementedError
+            If the kind of the model has no unit check.
 
         Notes
         -----
@@ -803,6 +347,4 @@ class Model(BaseModel):
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
-        from commol.context._model.units import UnitChecker
-
-        UnitChecker(self).check_unit_consistency(verbose)
+        self.structure.check_unit_consistency(self, verbose)

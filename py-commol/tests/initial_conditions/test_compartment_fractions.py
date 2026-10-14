@@ -29,7 +29,7 @@ def _all_in_g1(overrides: list[CompartmentFractionDict]) -> ModelBuilder:
 def _overrides(model: Model) -> dict[str, float]:
     return {
         fraction.compartment: fraction.fraction
-        for fraction in model.population.initial_conditions.compartment_fractions
+        for fraction in model.structure.initial_conditions.compartment_fractions
     }
 
 
@@ -98,7 +98,7 @@ class TestBuilderCompartmentFractions:
     def test_empty_compartment_fractions_use_uniform_expansion(self) -> None:
         model = build(_all_in_g1([]))
 
-        assert model.population.initial_conditions.compartment_fractions == []
+        assert model.structure.initial_conditions.compartment_fractions == []
 
     def test_uncalibrated_bin_fractions_count_as_zero(self) -> None:
         model = build(
@@ -139,7 +139,7 @@ class TestCompartmentFractionValidation:
         model = build(override_builder())
 
         with pytest.raises(ValueError, match="Unknown compartment 'A_missing'"):
-            model.update_compartment_fractions({"A_missing": 0.1})
+            model.structure.update_compartment_fractions({"A_missing": 0.1})
 
     def test_initial_conditions_upsert_without_the_expansion(self) -> None:
         conditions = InitialConditions(
@@ -172,14 +172,14 @@ class TestCompartmentFractionValidation:
 
         # Uniform A_g2 = 0.5, so an override of 0.9 on A_g1 totals 1.4.
         with pytest.raises(ValueError, match="exceed population_size"):
-            model.update_compartment_fractions({"A_g1": 0.9})
+            model.structure.update_compartment_fractions({"A_g1": 0.9})
 
         assert _overrides(model) == {"A_g1": 0.3}
 
     def test_model_allows_overrides_within_the_population(self) -> None:
         model = build(override_builder(0.3))
 
-        model.update_compartment_fractions({"A_g1": 0.4})
+        model.structure.update_compartment_fractions({"A_g1": 0.4})
 
         assert _overrides(model) == pytest.approx({"A_g1": 0.4})
 
@@ -192,7 +192,7 @@ class TestCompartmentFractionValidation:
 
     def test_an_unknown_override_fails_when_the_simulation_is_built(self) -> None:
         model = build(override_builder())
-        model.population.initial_conditions.compartment_fractions.append(
+        model.structure.initial_conditions.compartment_fractions.append(
             CompartmentFraction(compartment="A_missing", fraction=0.0)
         )
 

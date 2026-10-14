@@ -190,7 +190,7 @@ To select compartments by category, use their labels from
 ```python
 in_g1 = [
     compartment.name
-    for compartment in stratified.initial_state()
+    for compartment in stratified.structure.initial_state()
     if compartment.categories.get("group") == "g1"
 ]
 print(in_g1)  # ['A_g1_t1', 'A_g1_t2', 'B_g1_t1', 'B_g1_t2']

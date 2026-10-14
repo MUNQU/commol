@@ -24,7 +24,7 @@ def _stratified_model() -> Model:
 
 
 def _fractions_of(model: Model, stratification_id: str) -> dict[str, float]:
-    for stratification in model.population.initial_conditions.stratification_fractions:
+    for stratification in model.structure.initial_conditions.stratification_fractions:
         if stratification.stratification == stratification_id:
             return {f.category: f.fraction for f in stratification.fractions}
     raise AssertionError(f"stratification '{stratification_id}' not found")
@@ -34,35 +34,39 @@ class TestUpdateStratificationFractions:
     def test_writing_one_of_two_categories_fills_the_other(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"group1": 0.25})
+        model.structure.update_stratification_fractions({"group1": 0.25})
 
         assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
 
     def test_writing_the_other_category_is_symmetric(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"group2": 0.25})
+        model.structure.update_stratification_fractions({"group2": 0.25})
 
         assert _fractions_of(model, "group") == {"group1": 0.75, "group2": 0.25}
 
     def test_all_categories_of_a_ternary_stratification_can_be_set(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"low": 0.2, "mid": 0.3, "high": 0.5})
+        model.structure.update_stratification_fractions(
+            {"low": 0.2, "mid": 0.3, "high": 0.5}
+        )
 
         assert _fractions_of(model, "tier") == {"low": 0.2, "mid": 0.3, "high": 0.5}
 
     def test_one_omitted_category_takes_the_remainder(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"low": 0.2, "mid": 0.3})
+        model.structure.update_stratification_fractions({"low": 0.2, "mid": 0.3})
 
         assert _fractions_of(model, "tier") == {"low": 0.2, "mid": 0.3, "high": 0.5}
 
     def test_several_stratifications_update_in_one_call(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"group1": 0.25, "low": 0.1, "mid": 0.4})
+        model.structure.update_stratification_fractions(
+            {"group1": 0.25, "low": 0.1, "mid": 0.4}
+        )
 
         assert _fractions_of(model, "group") == {"group1": 0.25, "group2": 0.75}
         assert _fractions_of(model, "tier") == {"low": 0.1, "mid": 0.4, "high": 0.5}
@@ -70,7 +74,7 @@ class TestUpdateStratificationFractions:
     def test_fractions_still_sum_to_one(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions(
+        model.structure.update_stratification_fractions(
             {"group1": 0.123, "low": 0.077, "mid": 0.401}
         )
 
@@ -81,7 +85,7 @@ class TestUpdateStratificationFractions:
         model = _stratified_model()
 
         with pytest.raises(ValueError, match="left unnamed"):
-            model.update_stratification_fractions({"low": 0.4})
+            model.structure.update_stratification_fractions({"low": 0.4})
 
         assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
 
@@ -89,19 +93,21 @@ class TestUpdateStratificationFractions:
         model = _stratified_model()
 
         with pytest.raises(ValueError, match="must sum to 1.0"):
-            model.update_stratification_fractions({"low": 0.2, "mid": 0.2, "high": 0.2})
+            model.structure.update_stratification_fractions(
+                {"low": 0.2, "mid": 0.2, "high": 0.2}
+            )
 
     def test_values_exceeding_one_are_rejected(self) -> None:
         model = _stratified_model()
 
         with pytest.raises(ValueError, match="negative fraction"):
-            model.update_stratification_fractions({"low": 0.7, "mid": 0.6})
+            model.structure.update_stratification_fractions({"low": 0.7, "mid": 0.6})
 
     def test_unknown_category_is_rejected_and_lists_available(self) -> None:
         model = _stratified_model()
 
         with pytest.raises(ValueError, match="Category 'nope' not found") as excinfo:
-            model.update_stratification_fractions({"nope": 0.4})
+            model.structure.update_stratification_fractions({"nope": 0.4})
 
         assert "group1" in str(excinfo.value)
 
@@ -110,19 +116,19 @@ class TestUpdateStratificationFractions:
         model = _stratified_model()
 
         with pytest.raises(ValueError, match="between 0.0 and 1.0"):
-            model.update_stratification_fractions({"group1": value})
+            model.structure.update_stratification_fractions({"group1": value})
 
     def test_boundary_values_are_allowed(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"group1": 0.0})
+        model.structure.update_stratification_fractions({"group1": 0.0})
 
         assert _fractions_of(model, "group") == {"group1": 0.0, "group2": 1.0}
 
     def test_untouched_stratifications_keep_their_fractions(self) -> None:
         model = _stratified_model()
 
-        model.update_stratification_fractions({"group1": 0.25})
+        model.structure.update_stratification_fractions({"group1": 0.25})
 
         assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
 
@@ -130,7 +136,7 @@ class TestUpdateStratificationFractions:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.update_stratification_fractions({"y": 0.6})
+            model.structure.update_stratification_fractions({"y": 0.6})
 
 
 class TestQualifiedCategoryReads:
@@ -140,16 +146,16 @@ class TestQualifiedCategoryReads:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.subgroup_population(["y"])
+            model.structure.subgroup_population(["y"])
         with pytest.raises(ValueError, match="ambiguous"):
-            model.population.initial_conditions.get_category_fraction("y")
+            model.structure.initial_conditions.get_category_fraction("y")
 
     def test_qualified_name_selects_its_stratification(self) -> None:
         model = build(shared_category_builder())
-        model.update_stratification_fractions({"sex:y": 0.8})
+        model.structure.update_stratification_fractions({"sex:y": 0.8})
 
-        assert model.subgroup_population(["sex:y"]) == pytest.approx(800.0)
-        assert model.subgroup_population(["age:y"]) == pytest.approx(500.0)
+        assert model.structure.subgroup_population(["sex:y"]) == pytest.approx(800.0)
+        assert model.structure.subgroup_population(["age:y"]) == pytest.approx(500.0)
 
     def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
         model = build(
@@ -159,8 +165,10 @@ class TestQualifiedCategoryReads:
         )
 
         # A_y_y is pinned to 0, so only A_o_y holds sex:y.
-        assert model.subgroup_population(["sex:y"]) == pytest.approx(250.0)
-        assert model.subgroup_population(["age:o", "sex:y"]) == pytest.approx(250.0)
+        assert model.structure.subgroup_population(["sex:y"]) == pytest.approx(250.0)
+        assert model.structure.subgroup_population(["age:o", "sex:y"]) == pytest.approx(
+            250.0
+        )
 
     def test_conditioning_categories_are_qualified_when_shared(self) -> None:
         model = build(
@@ -174,5 +182,5 @@ class TestQualifiedCategoryReads:
             )
         )
 
-        assert model.get_conditioning_categories("care") == ("sex:y",)
-        assert model.subgroup_population(("sex:y",)) == pytest.approx(500.0)
+        assert model.structure.get_conditioning_categories("care") == ("sex:y",)
+        assert model.structure.subgroup_population(("sex:y",)) == pytest.approx(500.0)

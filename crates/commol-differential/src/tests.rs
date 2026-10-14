@@ -37,16 +37,17 @@ fn model(
         .map(|id| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
         .collect();
     let json = format!(
-        r#"{{"name":"m","population":{{"bins":[{}],"accumulators":[{}],
-        "stratifications":[],"transitions":[],
+        r#"{{"name":"m","parameters":[{}],
+        "engine":{{"type":"{engine_type}"{settings}}},
+        "structure":{{"kind":"compartmental","bins":[{}],"accumulators":[{}],
+        "stratifications":[],"transitions":[{}],
         "initial_conditions":{{"population_size":{size},"bin_fractions":[{}],
-        "stratification_fractions":[]}}}},"parameters":[{}],
-        "dynamics":{{"transitions":[{}]}},"engine":{{"type":"{engine_type}"{settings}}}}}"#,
+        "stratification_fractions":[]}}}}}}"#,
+        parameter_json.join(","),
         bin_json.join(","),
         accumulator_json.join(","),
-        fractions.join(","),
-        parameter_json.join(","),
         transitions.join(","),
+        fractions.join(","),
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
@@ -658,19 +659,21 @@ fn coupled_groups(groups: usize, method: &str) -> Model {
         })
         .collect();
     let json = format!(
-        r#"{{"name":"m","population":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
+        r#"{{"name":"m",
+        "parameters":[{{"id":"k1","value":0.3}},{{"id":"k2","value":0.1}}],
+        "engine":{{"type":"DifferentialEquations",
+        "settings":{{"method":"{method}","rtol":1e-6,"atol":1e-6}}}},
+        "structure":{{"kind":"compartmental",
+        "bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
         {{"id":"C","name":"C"}}],"accumulators":[],
-        "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[],
+        "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[{},{}],
         "initial_conditions":{{"population_size":10000,"bin_fractions":[
         {{"bin":"A","fraction":0.99}},{{"bin":"B","fraction":0.01}},{{"bin":"C","fraction":0.0}}],
-        "stratification_fractions":[{{"stratification":"group","fractions":[{}]}}]}}}},
-        "parameters":[{{"id":"k1","value":0.3}},{{"id":"k2","value":0.1}}],
-        "dynamics":{{"transitions":[{},{}]}},"engine":{{"type":"DifferentialEquations",
-        "settings":{{"method":"{method}","rtol":1e-6,"atol":1e-6}}}}}}"#,
+        "stratification_fractions":[{{"stratification":"group","fractions":[{}]}}]}}}}}}"#,
         categories.join(","),
-        fractions.join(","),
         transition("ab", &["A"], &["B"], "k1 * B / N", ""),
         transition("bc", &["B"], &["C"], "k2", ""),
+        fractions.join(","),
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }

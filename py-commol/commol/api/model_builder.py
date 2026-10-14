@@ -13,13 +13,12 @@ from commol.api.patterns import (
     _ScheduleAxisPattern,
 )
 from commol.context.bin import Accumulator, Bin
-from commol.context.dynamics import (
-    Dynamics,
-    StratificationCondition,
-    StratifiedRate,
-    Transition,
+from commol.context.compartmental import CompartmentalStructure
+from commol.context.engine import (
+    CompartmentalEngineType,
+    EngineSettings,
+    ModelEngine,
 )
-from commol.context.engine import EngineSettings, EngineType, ModelEngine
 from commol.context.initial_conditions import (
     BinFraction,
     CompartmentFraction,
@@ -29,8 +28,9 @@ from commol.context.initial_conditions import (
 )
 from commol.context.model import Model
 from commol.context.parameter import Parameter, SeriesValue
-from commol.context.population import Population
 from commol.context.stratification import Stratification
+from commol.context.stratification_condition import StratificationCondition
+from commol.context.transition import StratifiedRate, Transition
 
 logger = logging.getLogger(__name__)
 
@@ -926,14 +926,16 @@ class ModelBuilder:
         return self
 
     def build(
-        self, engine: EngineType, settings: EngineSettings | None = None
-    ) -> Model:
+        self,
+        engine: CompartmentalEngineType,
+        settings: EngineSettings | None = None,
+    ) -> Model[CompartmentalStructure]:
         """
-        Build and return the final Model instance.
+        Build and return the final compartmental Model.
 
         Parameters
         ----------
-        engine : EngineType
+        engine : CompartmentalEngineType
             The engine that runs the model: ``"DifferenceEquations"``
             (discrete time) or ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
@@ -942,8 +944,8 @@ class ModelBuilder:
 
         Returns
         -------
-        Model
-            The constructed compartment model.
+        Model[CompartmentalStructure]
+            The constructed compartmental model.
 
         Raises
         ------
@@ -956,7 +958,7 @@ class ModelBuilder:
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
 
-        population = Population(
+        structure = CompartmentalStructure(
             bins=self._bins,
             accumulators=self._accumulators,
             stratifications=self._stratifications,
@@ -964,16 +966,13 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(transitions=self._transitions)
-
-        model = Model(
+        model = Model[CompartmentalStructure](
             name=self._name,
             description=self._description,
             version=self._version,
-            population=population,
             parameters=self._parameters,
-            dynamics=dynamics,
             engine=ModelEngine(type=engine, settings=settings),
+            structure=structure,
             step_unit=self._step_unit,
         )
 

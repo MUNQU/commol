@@ -18,11 +18,10 @@ pub struct PyModel {
 #[pymethods]
 impl PyModel {
     #[new]
-    #[pyo3(signature = (name, population, dynamics, parameters, engine, description=None, version=None))]
+    #[pyo3(signature = (name, structure, parameters, engine, description=None, version=None))]
     fn new(
         name: String,
-        population: PyPopulation,
-        dynamics: PyDynamics,
+        structure: PyCompartmentalStructure,
         parameters: Vec<PyParameter>,
         engine: &str,
         description: Option<String>,
@@ -35,19 +34,19 @@ impl PyModel {
                 name,
                 description,
                 version,
-                population: population.inner,
                 parameters: parameters.into_iter().map(|p| p.inner).collect(),
-                dynamics: dynamics.inner,
                 engine: commol_core::ModelEngine::new(engine_type),
+                structure: commol_core::ModelStructure::Compartmental(structure.inner),
             },
         })
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "Model(bins={}, transitions={})",
-            self.inner.population.bins.len(),
-            self.inner.dynamics.transitions.len()
+            "Model(name={:?}, kind={}, engine={})",
+            self.inner.name,
+            self.inner.structure.kind().name(),
+            self.inner.engine.engine_type().name()
         )
     }
 
@@ -85,15 +84,15 @@ impl PyModel {
     }
 }
 
-/// Wrapper for commol_core::Population
-#[pyclass(name = "Population", from_py_object)]
+/// Wrapper for commol_core::CompartmentalStructure
+#[pyclass(name = "CompartmentalStructure", from_py_object)]
 #[derive(Clone)]
-pub struct PyPopulation {
-    pub inner: commol_core::Population,
+pub struct PyCompartmentalStructure {
+    pub inner: commol_core::CompartmentalStructure,
 }
 
 #[pymethods]
-impl PyPopulation {
+impl PyCompartmentalStructure {
     #[new]
     #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None, accumulators=None))]
     fn new(
@@ -104,7 +103,7 @@ impl PyPopulation {
         accumulators: Option<Vec<PyAccumulator>>,
     ) -> Self {
         Self {
-            inner: commol_core::Population {
+            inner: commol_core::CompartmentalStructure {
                 bins: bins.into_iter().map(|ds| ds.inner).collect(),
                 accumulators: accumulators
                     .unwrap_or_default()
@@ -119,6 +118,25 @@ impl PyPopulation {
                     .collect(),
                 initial_conditions: initial_conditions.inner,
             },
+        }
+    }
+
+    /// Load a compartmental structure from JSON, with its `kind`
+    ///
+    /// Raises:
+    ///     ValueError: If the JSON is not a structure, or the structure is
+    ///         not compartmental
+    #[staticmethod]
+    fn from_json(json_str: String) -> PyResult<Self> {
+        let structure: commol_core::ModelStructure = serde_json::from_str(&json_str)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        match structure {
+            commol_core::ModelStructure::Compartmental(inner) => Ok(Self { inner }),
+            #[cfg(feature = "test-kind")]
+            other => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "The structure is a {} structure, not a compartmental structure",
+                other.kind().name()
+            ))),
         }
     }
 }
@@ -295,26 +313,6 @@ impl PyInitialConditions {
     }
 }
 
-/// Wrapper for commol_core::Dynamics
-#[pyclass(name = "Dynamics", from_py_object)]
-#[derive(Clone)]
-pub struct PyDynamics {
-    pub inner: commol_core::Dynamics,
-}
-
-#[pymethods]
-impl PyDynamics {
-    #[new]
-    #[pyo3(signature = (transitions))]
-    fn new(transitions: Vec<PyTransition>) -> Self {
-        Self {
-            inner: commol_core::Dynamics {
-                transitions: transitions.into_iter().map(|t| t.inner).collect(),
-            },
-        }
-    }
-}
-
 /// Wrapper for commol_core::Transition
 #[pyclass(name = "Transition", from_py_object)]
 #[derive(Clone)]
@@ -451,12 +449,11 @@ impl PyMathExpression {
 /// Register all core types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModel>()?;
-    m.add_class::<PyPopulation>()?;
+    m.add_class::<PyCompartmentalStructure>()?;
     m.add_class::<PyBin>()?;
     m.add_class::<PyAccumulator>()?;
     m.add_class::<PyStratification>()?;
     m.add_class::<PyInitialConditions>()?;
-    m.add_class::<PyDynamics>()?;
     m.add_class::<PyTransition>()?;
     m.add_class::<PyParameter>()?;
     m.add_class::<PyMathExpression>()?;

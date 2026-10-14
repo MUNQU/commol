@@ -1,19 +1,22 @@
-//! Application of calibrated values to a simulation engine.
+//! Initial conditions that calibration writes into a compartmental engine.
 //!
-//! This module is the single source of truth for how calibration values reach
-//! an engine: how an initial-condition id resolves to compartments, in which
-//! order the values are written, and how the remainder keeps the population.
-//! The calibration objective, the calibrated predictions, and the model
-//! write-back all use it.
+//! This module is the single source of truth for how an initial-condition
+//! value reaches a compartmental engine: how its id resolves to compartments,
+//! in which order the values are written, and how the remainder keeps the
+//! population. Both engines resolve and write values of their kind through it
+//! ([`commol_core::SimulationEngine::plan_values`] and
+//! [`commol_core::SimulationEngine::apply_values`]), so the calibration
+//! objective, the calibrated predictions and the model write-back all use it.
 //!
 //! Initial conditions are written in the same layers as a model definition:
 //! bin values first, then stratification-category splits, then exact
 //! compartments, and finally the remainder, which absorbs the difference to the
-//! population size. Within a layer, values are written in parameter order.
+//! population size. Within a layer, values are written in the order given.
 
-use commol_core::{OutputLabels, SimulationEngine};
+use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
-use crate::types::{CalibrationParameter, CalibrationParameterType};
+use crate::engine::CompartmentalEngine;
+use crate::labels::OutputLabels;
 
 /// Separator of a qualified category id, as in `sex:female`.
 const CATEGORY_SEPARATOR: char = ':';
@@ -73,19 +76,21 @@ impl InitialConditionTarget {
     }
 }
 
-/// Resolved initial-condition targets of a set of calibration parameters.
+/// Resolved initial-condition targets of a set of values.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct InitialConditionPlan {
-    /// Target of each parameter, parallel to the parameters. `None` for
-    /// parameters that are not initial conditions.
-    targets: Vec<Option<InitialConditionTarget>>,
+pub struct InitialConditionPlan {
+    /// Id and target of each value, in the order their numbers come.
+    targets: Vec<(String, InitialConditionTarget)>,
+    /// Population the fractions are taken of.
+    population_size: f64,
     /// Compartments that absorb the difference to the population size, if
     /// any, with the id they were resolved from.
     remainder: Option<(String, Vec<usize>)>,
 }
 
 impl InitialConditionPlan {
-    /// Resolve the initial-condition target of every calibration parameter.
+    /// Resolve the target of every initial-condition value, and the
+    /// remainder.
     ///
     /// An initial-condition id names, in order of precedence:
     /// - an expanded compartment (`A_g1`);
@@ -95,31 +100,43 @@ impl InitialConditionPlan {
     ///
     /// # Errors
     ///
-    /// Returns a message when an id matches none of these, names a category
-    /// declared by more than one stratification, or names a category of a
-    /// stratification that is not binary for some compartment.
-    pub(crate) fn new<E: SimulationEngine>(
+    /// The remainder, when given, names the compartments that absorb the
+    /// difference to the population size ([`Self::with_remainder`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a value is not an initial condition, when an id
+    /// matches none of these, names a category declared by more than one
+    /// stratification, or names a category of a stratification that is not
+    /// binary for some compartment, or when the remainder does not resolve.
+    pub fn new<E: CompartmentalEngine>(
         engine: &E,
-        parameters: &[CalibrationParameter],
+        values: &[ModelValue],
+        remainder: Option<&str>,
     ) -> Result<Self, String> {
         let compartments = engine.compartments();
         let labels = compartment_labels(engine);
         let population = engine.population();
 
-        let targets = parameters
+        let targets = values
             .iter()
-            .map(|param| match param.parameter_type {
-                CalibrationParameterType::InitialCondition => {
-                    resolve_target(&param.id, &compartments, &labels, &population).map(Some)
+            .map(|value| match value.value_type {
+                ModelValueType::InitialCondition => {
+                    resolve_target(&value.id, &compartments, &labels, &population)
+                        .map(|target| (value.id.clone(), target))
                 }
-                _ => Ok(None),
             })
             .collect::<Result<Vec<_>, String>>()?;
 
-        Ok(Self {
+        let plan = Self {
             targets,
+            population_size: engine.population_size(),
             remainder: None,
-        })
+        };
+        match remainder {
+            Some(remainder) => plan.with_remainder(engine, remainder),
+            None => Ok(plan),
+        }
     }
 
     /// Name the compartments that absorb the difference to the population size.
@@ -129,10 +146,9 @@ impl InitialConditionPlan {
     /// Returns a message when the id is not a compartment, bin or bin prefix,
     /// or when it covers a compartment that a calibrated bin or compartment
     /// value already sets.
-    pub(crate) fn with_remainder<E: SimulationEngine>(
+    fn with_remainder<E: CompartmentalEngine>(
         mut self,
         engine: &E,
-        parameters: &[CalibrationParameter],
         remainder_id: &str,
     ) -> Result<Self, String> {
         let compartments = engine.compartments();
@@ -146,8 +162,7 @@ impl InitialConditionPlan {
                 )
             })?;
 
-        for (param, target) in parameters.iter().zip(&self.targets) {
-            let Some(target) = target else { continue };
+        for (id, target) in &self.targets {
             if target
                 .covered_population()
                 .iter()
@@ -156,7 +171,7 @@ impl InitialConditionPlan {
                 return Err(format!(
                     "Initial-condition remainder '{}' overlaps the calibrated initial \
                      condition '{}'",
-                    remainder_id, param.id
+                    remainder_id, id
                 ));
             }
         }
@@ -168,12 +183,11 @@ impl InitialConditionPlan {
     /// Compartments whose head count a calibrated bin or compartment value, or
     /// the remainder, sets, in engine order. Category splits keep the pair
     /// totals, so they cover none.
-    pub(crate) fn covered_population(&self) -> Vec<usize> {
+    pub fn covered_population(&self) -> Vec<usize> {
         let mut covered: Vec<usize> = self
             .targets
             .iter()
-            .flatten()
-            .flat_map(InitialConditionTarget::covered_population)
+            .flat_map(|(_, target)| target.covered_population())
             .chain(
                 self.remainder
                     .iter()
@@ -185,45 +199,42 @@ impl InitialConditionPlan {
         covered
     }
 
-    /// Write calibration values into an engine.
+    /// Write initial-condition values into an engine.
     ///
-    /// Parameters are set by id. Initial conditions are written layer by layer
-    /// (bins, category splits, exact compartments) and then the remainder
-    /// takes the difference to the population size, keeping its own split.
-    /// Factor values are skipped because they apply to observations.
+    /// The values are written layer by layer (bins, category splits, exact
+    /// compartments) and then the remainder takes the difference to the
+    /// population size, keeping its own split.
     ///
     /// # Returns
     ///
     /// How far the initial population exceeds the population size, as a
     /// fraction of it: `0.0` for a feasible state. With a remainder, the
     /// remainder is floored at zero and the deficit is reported. Without one,
-    /// the excess of the total over the population size is reported.
+    /// the excess of the total over the population size is reported. An
+    /// excess within the tolerance is `0.0`.
     ///
     /// # Errors
     ///
-    /// Returns a message when the engine rejects a parameter or initial
-    /// condition.
-    pub(crate) fn apply<E: SimulationEngine>(
+    /// Returns a message when the number of values is wrong or the engine
+    /// rejects an initial condition.
+    pub fn apply<E: CompartmentalEngine>(
         &self,
         engine: &mut E,
-        parameters: &[CalibrationParameter],
-        population_size: f64,
         values: &[f64],
     ) -> Result<f64, String> {
-        for (param, value) in parameters.iter().zip(values) {
-            if param.parameter_type == CalibrationParameterType::Parameter {
-                engine
-                    .set_parameter(&param.id, *value)
-                    .map_err(|e| format!("Failed to set parameter '{}': {}", param.id, e))?;
-            }
+        if values.len() != self.targets.len() {
+            return Err(format!(
+                "Expected {} initial-condition values, got {}",
+                self.targets.len(),
+                values.len()
+            ));
         }
-
+        let population_size = self.population_size;
         for layer in 0..3 {
-            for ((param, value), target) in parameters.iter().zip(values).zip(&self.targets) {
-                let Some(target) = target else { continue };
+            for ((id, target), value) in self.targets.iter().zip(values) {
                 if target.layer() == layer {
                     write_target(engine, target, *value, population_size).map_err(|e| {
-                        format!("Failed to set initial condition for '{}': {}", param.id, e)
+                        format!("Failed to set initial condition for '{}': {}", id, e)
                     })?;
                 }
             }
@@ -232,7 +243,7 @@ impl InitialConditionPlan {
         let population = engine.population();
         let Some((_, indices)) = &self.remainder else {
             let total: f64 = population.iter().sum();
-            return Ok((total / population_size - 1.0).max(0.0));
+            return Ok(feasible_or((total / population_size - 1.0).max(0.0)));
         };
 
         let others: f64 = population
@@ -256,17 +267,38 @@ impl InitialConditionPlan {
                 .set_initial_condition(idx, remainder * share)
                 .map_err(|e| format!("Failed to set the initial-condition remainder: {}", e))?;
         }
-        Ok(deficit)
+        Ok(feasible_or(deficit))
     }
 }
 
-/// Whether an initial-population excess returned by
-/// [`InitialConditionPlan::apply`] makes the state infeasible.
-pub(crate) fn is_infeasible(excess: f64) -> bool {
-    excess > POPULATION_TOLERANCE
+impl ValuePlan for InitialConditionPlan {
+    fn infeasibility(&self, excess: f64) -> String {
+        match &self.remainder {
+            Some((id, _)) => format!(
+                "Invalid initial conditions: the calibrated values leave the \
+                 remainder '{}' {:.6} of the population below zero",
+                id, excess
+            ),
+            None => format!(
+                "Invalid initial conditions: the calibrated values exceed the \
+                 population size by {:.6} of it",
+                excess
+            ),
+        }
+    }
 }
 
-fn write_target<E: SimulationEngine>(
+/// An excess of the population size, or `0.0` when it is within the
+/// tolerance.
+fn feasible_or(excess: f64) -> f64 {
+    if excess > POPULATION_TOLERANCE {
+        excess
+    } else {
+        0.0
+    }
+}
+
+fn write_target<E: CompartmentalEngine>(
     engine: &mut E,
     target: &InitialConditionTarget,
     value: f64,
@@ -294,7 +326,7 @@ fn write_target<E: SimulationEngine>(
 }
 
 /// Labels of the compartments of an engine (its first outputs).
-fn compartment_labels<E: SimulationEngine>(engine: &E) -> Vec<OutputLabels> {
+fn compartment_labels<E: CompartmentalEngine>(engine: &E) -> Vec<OutputLabels> {
     let mut labels = engine.output_labels();
     labels.truncate(engine.compartments().len());
     labels
@@ -413,141 +445,6 @@ fn paired_category(
         ));
     }
     Ok(InitialConditionTarget::PairedCategory { pairs })
-}
-
-/// Clamp parameter values to their defined bounds.
-pub(crate) fn clamp_to_bounds(parameters: &[CalibrationParameter], values: &[f64]) -> Vec<f64> {
-    values
-        .iter()
-        .zip(parameters)
-        .map(|(value, param)| value.clamp(param.min_bound, param.max_bound))
-        .collect()
-}
-
-/// Build an engine clone with calibration values applied exactly as in
-/// objective evaluation.
-///
-/// # Returns
-///
-/// The configured engine and the values it applied (clamped to their bounds).
-///
-/// # Errors
-///
-/// Returns a message when the vector length is wrong, the engine rejects a
-/// value, or the initial population exceeds the population size.
-pub(crate) fn configure_engine<E: SimulationEngine>(
-    base_engine: &E,
-    parameters: &[CalibrationParameter],
-    plan: &InitialConditionPlan,
-    population_size: f64,
-    values: &[f64],
-) -> Result<(E, Vec<f64>), String> {
-    if values.len() != parameters.len() {
-        return Err(format!(
-            "Expected {} parameters, got {}",
-            parameters.len(),
-            values.len()
-        ));
-    }
-    let clamped = clamp_to_bounds(parameters, values);
-    let mut engine = base_engine.clone();
-    engine.reset();
-    let excess = plan.apply(&mut engine, parameters, population_size, &clamped)?;
-    if is_infeasible(excess) {
-        return Err(match &plan.remainder {
-            Some((id, _)) => format!(
-                "Invalid initial conditions: the calibrated values leave the \
-                 remainder '{}' {:.6} of the population below zero",
-                id, excess
-            ),
-            None => format!(
-                "Invalid initial conditions: the calibrated values exceed the \
-                 population size by {:.6} of it",
-                excess
-            ),
-        });
-    }
-    Ok((engine, clamped))
-}
-
-/// Initial state an engine starts from once calibration values are applied.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CalibratedInitialPopulation {
-    /// Values the engine applied, parallel to the parameters (clamped to their
-    /// bounds).
-    pub values: Vec<f64>,
-    /// Initial population of each compartment, in engine order.
-    pub population: Vec<f64>,
-    /// Compartments whose head count a calibrated bin or compartment value, or
-    /// the remainder, sets, in engine order.
-    pub covered: Vec<usize>,
-}
-
-/// Check that every initial-condition id and the remainder resolve.
-///
-/// The ids are resolved as the calibration objective resolves them, so the
-/// first check that sees an id gives the engine's message, for example that a
-/// category needs a binary stratification.
-///
-/// # Errors
-///
-/// Returns a message when an initial-condition id or the remainder cannot be
-/// resolved.
-pub fn check_initial_conditions<E: SimulationEngine>(
-    engine: &E,
-    parameters: &[CalibrationParameter],
-    remainder: Option<&str>,
-) -> Result<(), String> {
-    let plan = InitialConditionPlan::new(engine, parameters)?;
-    if let Some(remainder) = remainder {
-        plan.with_remainder(engine, parameters, remainder)?;
-    }
-    Ok(())
-}
-
-/// Initial population an engine starts from once calibration values are
-/// applied, exactly as the calibration objective scores them.
-///
-/// This is the authority for persisting calibrated initial conditions: a model
-/// definition that rebuilds this population reproduces the scored state.
-///
-/// # Arguments
-///
-/// * `base_engine` - Engine built from the model definition, before calibration.
-/// * `parameters` - Calibration parameters, in problem order.
-/// * `remainder` - Compartment or bin that absorbs the difference to the
-///   population size, if any.
-/// * `values` - Value of each parameter, parallel to `parameters`.
-/// * `population_size` - Population the fractions are taken of.
-///
-/// # Errors
-///
-/// Returns a message when an initial-condition id or the remainder cannot be
-/// resolved, the vector length is wrong, or the initial population exceeds the
-/// population size.
-pub fn calibrated_initial_population<E: SimulationEngine>(
-    base_engine: &E,
-    parameters: &[CalibrationParameter],
-    remainder: Option<&str>,
-    values: &[f64],
-    population_size: u64,
-) -> Result<CalibratedInitialPopulation, String> {
-    let mut plan = InitialConditionPlan::new(base_engine, parameters)?;
-    if let Some(remainder) = remainder {
-        plan = plan.with_remainder(base_engine, parameters, remainder)?;
-    }
-    let (engine, values) = configure_engine(
-        base_engine,
-        parameters,
-        &plan,
-        population_size as f64,
-        values,
-    )?;
-    Ok(CalibratedInitialPopulation {
-        values,
-        population: engine.population(),
-        covered: plan.covered_population(),
-    })
 }
 
 #[cfg(test)]

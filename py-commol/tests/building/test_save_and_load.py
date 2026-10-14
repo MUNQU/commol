@@ -45,7 +45,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.get_uncalibrated_initial_conditions() == ["A"]
+        assert restored.structure.uncalibrated_values() == ["A"]
 
     def test_accepts_a_string_path(self, tmp_path: Path) -> None:
         model = _model()
