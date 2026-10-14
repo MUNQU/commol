@@ -229,7 +229,7 @@ class Model(BaseModel, Generic[StructureT]):
         the model, and the structure writes back the values of its kind
         (`ModelStructure.with_calibrated_values`). A compartmental structure
         writes ``initial_condition`` values so that the model rebuilds the
-        initial population the engine scored for them.
+        initial state the engine scored for them.
 
         Parameters
         ----------
@@ -343,7 +343,7 @@ class Model(BaseModel, Generic[StructureT]):
 
         Notes
         -----
-        - Predefined variables (N, N_young, etc.) have the bin unit
+        - Predefined variables (total, total_young, etc.) have the bin unit
         - Time step variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """

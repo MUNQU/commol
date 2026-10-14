@@ -99,13 +99,13 @@ def applied_parameters_report(
     ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions of a compartmental model carry the effective head
+    Initial conditions of a compartmental model carry the effective
     ``value`` the engine builds
     from the uniform expansion plus the declared compartment overrides, its
-    ``fraction`` as that head count over the declared population size, and the
-    ``group`` it belongs to: ``population`` for bins and unconditional
+    ``fraction`` as that value over the declared total, and the
+    ``group`` it belongs to: ``total`` for bins and unconditional
     stratifications, and the conditioning categories for a conditional one.
-    ``N`` is the declared population size, with fraction 1.0. A bin left
+    The ``total`` row is the declared total, with fraction 1.0. A bin left
     uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
     calibration" marker even when overrides touch some of its compartments.
 
@@ -113,8 +113,8 @@ def applied_parameters_report(
     ensemble spread. A parameter is in the unit it was calibrated in. An
     initial-condition entry is in the fraction the row reports: a conditional
     stratification's category is calibrated as a group fraction but reported
-    over the whole population, so its interval is rescaled by the group's share
-    of the population and brackets the reported fraction.
+    over the total, so its interval is rescaled by the group's share of the
+    total and brackets the reported fraction.
 
     Parameters
     ----------

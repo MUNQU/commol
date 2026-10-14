@@ -13,7 +13,7 @@ class CalibrationParameterType(StrEnum):
     PARAMETER
         Model parameter
     INITIAL_CONDITION
-        Initial population in a compartment
+        Initial amount of a compartment, bin or category
     FACTOR
         Factor that multiplies the model output of an observation
     """

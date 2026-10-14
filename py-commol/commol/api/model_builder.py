@@ -83,13 +83,13 @@ class ModelBuilder:
     _bins : list[Bin]
         List of bins (compartments) in the model.
     _stratifications : list[Stratification]
-        List of population stratifications.
+        List of stratifications.
     _transitions : list[Transition]
         List of transitions between states.
     _parameters : list[Parameter]
         List of model parameters.
     _initial_conditions : InitialConditions | None
-        Initial population conditions.
+        Initial conditions.
     """
 
     def __init__(
@@ -181,7 +181,7 @@ class ModelBuilder:
         conditions: list[StratificationConditionDict] | None = None,
     ) -> Self:
         """
-        Add a population stratification to the model.
+        Add a stratification to the model.
 
         Parameters
         ----------
@@ -262,8 +262,9 @@ class ModelBuilder:
             Value of the parameter. Can be:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
-                   special variables (N, N_category, step, t, pi, e), or contain
-                   mathematical expressions (e.g., "beta * 2", "N_young / N")
+                   special variables (total, total_<category>, step, t, pi, e),
+                   or contain mathematical expressions (e.g., "beta * 2",
+                   "total_young / total")
             - list[tuple[float, float]]: Empirical series as (position, value)
                    points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
@@ -392,7 +393,7 @@ class ModelBuilder:
 
         Each transition's rate is evaluated independently, giving per-compartment
         dynamics. This is ideal for processes like per-capita death rates, where the
-        rate should be proportional to each compartment's population.
+        rate should be proportional to the amount of each compartment.
 
         **$compartment Usage Rules**:
         - Only valid when len(source) > 1
@@ -430,7 +431,9 @@ class ModelBuilder:
             - A formula with $compartment placeholder
 
             Special variables available in formulas:
-            - N: Total population (automatically calculated)
+            - total: The sum of every compartment, accumulators excluded
+            - total_<category>…: The sum of the compartments with these
+              categories, in the declaration order of the stratifications
             - t: The current position on the axis
             - step: The step that holds it, ``floor(t)``; in a
               DifferenceEquations model ``t`` and ``step`` are equal
@@ -447,8 +450,8 @@ class ModelBuilder:
             When True, base compartment names in the rate
             expression are automatically replaced with the specific stratified
             compartment name for each expanded transition flow. This ensures
-            each subpopulation transitions based on its own compartment value
-            rather than the total across all subpopulations.
+            each subgroup transitions based on its own compartment value
+            rather than the total across all subgroups.
 
         accumulators : list[str] | None, default=None
             Ids of accumulators that add up the flow of this transition.
@@ -748,7 +751,7 @@ class ModelBuilder:
 
     def set_initial_conditions(
         self,
-        population_size: int,
+        total: float,
         bin_fractions: list[BinFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
         *,
@@ -759,8 +762,9 @@ class ModelBuilder:
 
         Parameters
         ----------
-        population_size : int
-            Total population size.
+        total : float
+            The sum of every compartment at the start, finite and greater than
+            0. It can be a count, a mass or a concentration.
         bin_fractions : list[BinFractionDict]
             List of bin fractions. Each item is a dictionary with:
             - "bin": str (bin id)
@@ -793,14 +797,14 @@ class ModelBuilder:
             List of per-compartment overrides applied after the uniform
             expansion. Each item is a dictionary with:
             - "compartment": str (expanded compartment name)
-            - "fraction": float (fraction of the total population)
+            - "fraction": float (fraction of the total)
 
             Example:
             [
                 {"compartment": "IH_y60", "fraction": 0.0}
             ]
 
-            Compartment names and the resulting total population are checked
+            Compartment names and the resulting sum of the amounts are checked
             against the engine expansion when the model is built.
 
         Returns
@@ -811,8 +815,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If initial conditions have already been set, a compartment name is
-            repeated, or a fraction lies outside ``[0.0, 1.0]``.
+            If initial conditions have already been set, the total is not
+            finite or not greater than 0, a compartment name is repeated, or a
+            fraction lies outside ``[0.0, 1.0]``.
         """
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
@@ -852,18 +857,13 @@ class ModelBuilder:
         ]
 
         self._initial_conditions = InitialConditions(
-            population_size=population_size,
+            total=total,
             bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
             compartment_fractions=compartment_fraction_list,
         )
         bin_ids = [bf["bin"] for bf in bin_fractions]
-        logging.info(
-            (
-                f"Set initial conditions: population_size={population_size}, "
-                f"bins={bin_ids}"
-            )
-        )
+        logging.info((f"Set initial conditions: total={total}, bins={bin_ids}"))
         return self
 
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
@@ -953,7 +953,7 @@ class ModelBuilder:
             If validation fails, required components are missing, the engine
             is unknown, the settings are not settings of that engine, or a
             per-compartment override names an unknown compartment or makes
-            the initial population exceed ``population_size``.
+            the initial amounts exceed the total.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")

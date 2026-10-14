@@ -1,13 +1,13 @@
 """Dimensional analysis of model equations with pint."""
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import cast
 
 import pint
 
 from commol.context.parameter import Parameter
-from commol.context.stratification import Stratification
+from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 
 ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
 ureg.define("step = [step]")
@@ -30,7 +30,7 @@ def check_equation_units(
     Parameters
     ----------
     equation : str
-        The mathematical equation to check (e.g., "beta * S * I / N").
+        The mathematical equation to check (e.g., "beta * S * I / total").
     variable_units : dict[str, str]
         Mapping of variable names to their units
         (e.g., {"beta": "1/day", "S": "person"}).
@@ -227,16 +227,19 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
 
 
 def get_predefined_variable_units(
-    stratifications: list[Stratification],
+    subgroup_totals: Iterable[str],
     bin_unit: str | None = None,
 ) -> dict[str, str]:
     """
-    Get units for predefined variables like N, N_young, etc.
+    Get units for the predefined variables ``total`` and ``total_<cat>…``.
 
     Parameters
     ----------
-    stratifications : list
-        List of stratification objects with categories.
+    subgroup_totals : Iterable[str]
+        Names of the subgroup totals of the model, as the engine provides them
+        (``engine_state.subgroup_total_names``). Names without the
+        ``total_`` prefix, such as bin totals, are skipped: they take the unit
+        of their bin.
     bin_unit : str | None
         The unit for bins. If None, predefined variables will not be added to the
         units mapping.
@@ -246,38 +249,10 @@ def get_predefined_variable_units(
     dict[str, str]
         Mapping of predefined variable names to their units.
     """
-    predefined_units: dict[str, str] = {}
-
-    # Only add predefined variables if bin_unit is specified
     if bin_unit is None:
-        return predefined_units
-
-    # Total population N
-    predefined_units["N"] = bin_unit
-
-    # Add N_{category} for each category in stratifications
-    for strat in stratifications:
-        for category in strat.categories:
-            predefined_units[f"N_{category}"] = bin_unit
-
-    # Add N_{category1}_{category2} for combinations
-    # This handles cases like N_young_urban, etc.
-    if len(stratifications) > 1:
-        from itertools import combinations, product
-
-        category_groups = [s.categories for s in stratifications]
-
-        # All possible combinations of categories across different stratifications
-        full_category_combos = product(*category_groups)
-
-        for combo_tuple in full_category_combos:
-            # For each combo, find all non-empty subsets
-            for i in range(1, len(combo_tuple) + 1):
-                for subset in combinations(combo_tuple, i):
-                    var_name = f"N_{'_'.join(subset)}"
-                    predefined_units[var_name] = bin_unit
-
-    return predefined_units
+        return {}
+    names = [name for name in subgroup_totals if name.startswith(SUBGROUP_TOTAL_PREFIX)]
+    return {name: bin_unit for name in (TOTAL_VARIABLE, *names)}
 
 
 def check_all_parameters_have_units(parameters: list[Parameter]) -> bool:
