@@ -141,13 +141,13 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1, S2 | An engine checks the kind of its model (D1); the interface (D2); `Model` meets it | direct | |
-| T2 | S3 | `Simulation`, `Calibrator`, `ProbabilisticCalibrator` and the calibration runner on the interface (D4) | direct | |
-| T3 | S3 | Reports and plotter on the interface (D3); the test model kind | direct | |
-| T4 | S4 | Engine trait for any state | direct | |
-| T0 | S6 | `Model.structure` (D1): replaces `Population` and the rest of `Dynamics`, transitions once; Python, Rust, builder, every read | direct | |
-| T5 | S5 | Documentation | direct | |
-| T6 | all | Final audit: every runner | direct | |
+| T1 | S1, S2 | An engine checks the kind of its model (D1); the interface (D2); `Model` meets it | direct | `f513ed7` |
+| T2 | S3 | `Simulation`, `Calibrator`, `ProbabilisticCalibrator` and the calibration runner on the interface (D4) | direct | `f513ed7` |
+| T3 | S3 | Reports and plotter on the interface (D3); the test model kind | direct | `f513ed7` |
+| T4 | S4 | Engine trait for any state | direct | `f513ed7` |
+| T0 | S6 | `Model.structure` (D1): replaces `Population` and the rest of `Dynamics`, transitions once; Python, Rust, builder, every read | direct | `f513ed7` |
+| T5 | S5 | Documentation | direct | `docs(api): document the model kind interface` |
+| T6 | all | Final audit: every runner | direct | — |
 
 ## Delivery
 
@@ -161,7 +161,69 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Branch `refactor/model-kind-interface` from `develop` at `e3ed45a`
+(2026-10-14).
+
+- T0 (S6, D1): Rust `Model { name, description, version, parameters, engine,
+  structure }` (`commol-core/src/types/model.rs`); `ModelStructure`
+  (`structure.rs`), tagged by `kind`, with `CompartmentalStructure`
+  (`compartmental.rs`, was `population.rs`) that holds the transitions once;
+  `transitions.rs` (was `dynamics.rs`). `Model::compartmental` and
+  `compartmental_mut` give the structure or an error that names the kind.
+  `commol-model` functions take the structure (`expand_compartments`,
+  `initial_state`, `describe_flows`), or the model when they need the
+  parameters (`CompiledModel::try_from_model`, `check_names`). Python:
+  `Model` is generic in its structure (`Model[CompartmentalStructure]`,
+  `context/model.py`); `CompartmentalStructure` (`context/compartmental.py`)
+  takes the validators of `Population`, `Dynamics` and the compartmental ones
+  of `Model`, and its methods (`initial_state`, the `update_*` methods,
+  `subgroup_population`, `get_conditioning_categories`, `outputs_by_source`);
+  `context/transition.py` (was `dynamics.py`). `Population` and `Dynamics` are
+  gone in both languages and in the bindings (`commol_rs.core.CompartmentalStructure`).
+- T1 (S1, S2, D2): `ModelKind` (`ALL`, `from_name`, `value_types`) and
+  `EngineType::check_kind`; `Model::check_kind` in `Engine::build`; Python
+  `Model.validate_engine_runs_structure` asks `commol_rs.engine.EngineType.check_kind`.
+  `ModelStructure` (`context/structure.py`) is an ABC with a registry of kinds
+  (`of_kind`), abstract `check_model` and `outputs_by_source`, and defaults for
+  `series_label`, `calibration_value_types` (asks `commol_rs.engine.ModelKind`),
+  `uncalibrated_values`, `with_calibrated_values`, `report_sections`,
+  `print_equations` and `check_unit_consistency`. `ModelEngine.type` is a `str`
+  the list checks; the `Literal` is `CompartmentalEngineType`, checked against
+  the compartmental entries.
+- L8 (test kind): `ModelKind::Test`, `EngineType::TestEngine` and
+  `TestStructure` behind the cargo feature `test-kind` (`commol-core`, and
+  `commol` with `py-commol/src/test_kind.rs`); `tests/support/kinds.py`
+  (`DecayStructure`). CI builds the extension with `--features test-kind`
+  (`code-quality.yaml`, `build.yaml`); wheels do not.
+- T2 (S3, D4): `Simulation`, `Calibrator`, `ProbabilisticCalibrator` and the
+  runners read only the interface: `uncalibrated_values`, `outputs_by_source`,
+  `engine_state.check_model_values` (the kind's value types, then the
+  engine); no `initial_population_size` (the engine knows it). `Simulation`
+  rejects a structure that is not a `ModelStructure` (`TypeError`).
+- T3 (S3, D3): `applied_parameters_report` adds `ModelStructure.report_sections`;
+  the compartmental `initial_conditions` section moved to
+  `context/_model/report.py`, keys unchanged; `Interval` and `entry_interval`
+  in `context/report_entry.py`. The plotter names a series with
+  `series_label`. `tests/model_kinds/` runs the test kind through a
+  simulation, a calibration, a report (with its own `outputs` section) and a
+  plot.
+- T4 (S4, D4): `SimulationEngine` keeps outputs (`output_names`,
+  `state_outputs`, `output_sums`), positions, parameters and reset, and adds
+  `plan_values` and `apply_values` with an associated `ValuePlan`. `compartments`,
+  `output_labels`, `population`, `set_initial_condition` moved to
+  `CompartmentalEngine` (`commol-model/src/engine.rs`); `OutputLabels` to
+  `commol-model/src/labels.rs` with `output_sums`; `initial_conditions.rs` moved
+  from `commol-calibration` to `commol-model` (`InitialConditionPlan`).
+  `commol-calibration` uses only the trait (`values.rs`: `ValueWriter`,
+  `check_model_values`, `configured_engine`) and depends on no engine crate
+  outside its tests. D4 says "one trait method": the engine needs two, one to
+  resolve the values once (`plan_values`) and one to write them per
+  evaluation (`apply_values`), so ids are not resolved at every evaluation.
+- T5 (S5): `mental-model.md` ("Model kind and engine"), `repository-map.md`,
+  `design-decisions.md` ("Model kinds"), `maintainer-playbook.md` ("Model
+  kind"), `conventions.md` (`model_kinds/`), `advanced/model-structure.md`,
+  `api/model.md`, the guides, `development/workflow.md`, `AGENTS.md` and the
+  changelog (`[Unreleased]`: Added, Changed with a mapping table, Removed).
 
 ## Log
 
@@ -200,3 +262,6 @@ Each row says why the recommendation beats each alternative.
   have it. Rejected: an engine that calls Python (a new product feature, the
   GIL in calibration) and a test kind that becomes a compartmental model (S1
   cannot be tested).
+- L9 (agent, 2026-10-14): implemented T0–T6 (see Evidence). T4 went before
+  T2 in the code, because the test engine implements the final trait and the
+  Python calibration lost `initial_population_size` with it.

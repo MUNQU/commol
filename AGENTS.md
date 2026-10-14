@@ -30,11 +30,11 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Task | Command |
 |---|---|
 | Install dependencies | `uv sync --extra dev --extra docs` |
-| Build the extension | `source .venv/bin/activate && maturin develop --release` |
+| Build the extension | `source .venv/bin/activate && maturin develop --release --features test-kind` (the tests need the test model kind; a release never has it) |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
 | Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
-| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol` |
+| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol && cargo test -p commol --features test-kind` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
 | Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration` |
@@ -64,16 +64,17 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change the difference step | `crates/commol-difference/src/simulation.rs` | `crates/commol-core/src/simulation_engine.rs` |
 | Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/engine.rs` (`OdeSolver`), `py-commol/commol/context/engine.py` |
 | Add a model type (engine) | `crates/commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `py-commol/commol/context/engine.py`, the [checklist](docs/codebase/maintainer-playbook.md#model-type-engine) |
-| Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/dynamics.py` |
+| Add a model kind | `py-commol/commol/context/structure.py` (`ModelStructure`) | `crates/commol-core/src/types/structure.rs`, `engine.rs` (`ModelKind`), `py-commol/src/engine.rs`, the [checklist](docs/codebase/maintainer-playbook.md#model-kind) |
+| Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/transition.py` |
 | Change which positions a model type accepts | `crates/commol-core/src/simulation_engine.rs` (`check_position`) | each engine's `check_position`, `crates/commol-calibration/src/calibration_problem.rs` (`check_positions`) |
 | Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/probabilistic/statistics_calculator.py` |
 | Add a function or variable to rate expressions | `crates/commol-core/src/math_expression/` | `py-commol/commol/utils/security.py`, `docs/guide/mathematical-expressions.md` |
-| Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `docs/guide/building-models.md` |
-| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |
+| Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `py-commol/commol/context/compartmental.py`, `docs/guide/building-models.md` |
+| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |
 | Change probabilistic calibration | `py-commol/commol/api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
-| Change reports | `py-commol/commol/api/reporting.py` | [Design decisions](docs/codebase/design-decisions.md#reports) |
+| Change reports | `py-commol/commol/api/reporting.py` | `ModelStructure.report_sections`, `context/_model/report.py`, [Design decisions](docs/codebase/design-decisions.md#reports) |
 
 ## Documentation map
 

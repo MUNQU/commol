@@ -8,22 +8,25 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns | Do not put here |
 |---|---|---|
-| `crates/commol-core/src/types/` | The model data types shared by all crates and serialized from Python (`Model`, `Population`, `Transition`, `InitialConditions`, …). | Engine behavior. |
-| `crates/commol-core/src/types/engine.rs` | `EngineType`, the one list of engines (model types): per entry, the model kind it runs, its settings and their validation, the form of its equations and the meaning of a rate. `ModelEngine`, the engine and settings of a model. | The engines themselves. |
+| `crates/commol-core/src/types/` | The model data types shared by all crates and serialized from Python: `Model` (header, `engine`, `structure`), `ModelStructure` (one variant per kind, tagged by `kind`), `CompartmentalStructure` (`compartmental.rs`), `Transition` (`transitions.rs`), `InitialConditions`, …; `test_kind.rs` only with the `test-kind` feature. | Engine behavior. |
+| `crates/commol-core/src/types/engine.rs` | `EngineType`, the one list of engines (model types): per entry, the model kind it runs (`ModelKind`, with the value types it accepts, `ModelValueType`), its settings and their validation, the form of its equations and the meaning of a rate. `ModelEngine`, the engine and settings of a model. | The engines themselves. |
 | `crates/commol-core/src/math_expression/` | Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (`jit/`). | Model-specific variables. |
-| `crates/commol-core/src/simulation_engine.rs` | The `SimulationEngine` trait (runs at positions, `check_position`), `Trajectory`, `check_positions` and `OutputLabels`: what calibration needs from any engine. | Code for one engine. |
+| `crates/commol-core/src/simulation_engine.rs` | The `SimulationEngine` trait, for an engine of any kind: runs at positions (`check_position`), outputs (`output_names`, `state_outputs`, `output_sums`), parameters, reset, and the values of its kind (`plan_values`, `apply_values`, `ValuePlan`); `Trajectory`, `check_positions`. What calibration needs from any engine. | Code for one engine or one kind. |
 | `crates/commol-model/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), name checks (`check_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
 | `crates/commol-model/src/layout.rs` | `CompartmentLayout`: compartments in engine order with their labels, and lookups by bin and categories. | Name parsing. |
+| `crates/commol-model/src/labels.rs` | `OutputLabels` (bin and categories of an output) and `output_sums` (bin totals and partial totals). | Name parsing. |
+| `crates/commol-model/src/engine.rs` | `CompartmentalEngine`: what a compartmental engine gives besides `SimulationEngine` (compartments, labels, population, population size, `set_initial_condition`). | Code for one engine. |
+| `crates/commol-model/src/initial_conditions.rs` | How initial-condition values reach a compartmental engine (`InitialConditionPlan`: resolution, layers, remainder); both engines' `plan_values` and `apply_values` use it. | Parameter values. |
 | `crates/commol-model/src/flows.rs` | Transition flow planning (`plan_transition_flows`) and its description for Python (`describe_flows`). | Rate evaluation at run time. |
 | `crates/commol-model/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
 | `crates/commol-model/src/rates.rs` | Evaluation of a compiled rate: fast path, JIT with resolved slots, evalexpr fallback. | Flow logic. |
 | `crates/commol-model/src/system.rs` | The right-hand side `CompiledModel::derivatives`, impulses (`apply_impulses`, `impulse_positions`) and the accessors both engines use. | Time stepping. |
 | `crates/commol-model/src/types.rs` | `CompiledModel`, compiled flows, impulse schedules, series lookup (`SeriesParameter`). | Python types. |
-| `crates/commol-difference/src/simulation.rs` | `DifferenceEquations`: the discrete step (`state += derivatives`), impulses at integer steps, the positions it accepts (integers), and its `SimulationEngine` implementation. | Model compilation. |
-| `crates/commol-differential/src/lib.rs` | `DifferentialEquations`: state, output positions, impulses, and its `SimulationEngine` implementation. | Numerical methods. |
+| `crates/commol-difference/src/simulation.rs` | `DifferenceEquations`: the discrete step (`state += derivatives`), impulses at integer steps, the positions it accepts (integers), and its `SimulationEngine` and `CompartmentalEngine` implementations. | Model compilation. |
+| `crates/commol-differential/src/lib.rs` | `DifferentialEquations`: state, output positions, impulses, and its `SimulationEngine` and `CompartmentalEngine` implementations. | Numerical methods. |
 | `crates/commol-differential/src/solve.rs` | The integration with `diffsol`: pieces between breakpoints, the finite-difference `J·v`, dense or sparse matrices (`SPARSE_THRESHOLD`). | Model compilation. |
-| `crates/commol-calibration/src/calibration_problem.rs` | Loss, constraints, the objective function, and the position check that names an observation or constraint (`check_positions`). | Optimizer setup. |
-| `crates/commol-calibration/src/initial_conditions.rs` | How calibrated initial-condition values reach the engine (`InitialConditionPlan`, `calibrated_initial_population`). | Parameter values. |
+| `crates/commol-calibration/src/calibration_problem.rs` | Loss, constraints, the objective function, and the position check that names an observation or constraint (`check_positions`). It uses only `SimulationEngine`. | Optimizer setup; anything of one model kind. |
+| `crates/commol-calibration/src/values.rs` | How calibrated values reach any engine: parameters by id, values of the model kind through the engine (`ValueWriter`, `check_model_values`, `configured_engine`). | How a kind resolves its values. |
 | `crates/commol-calibration/src/optimization.rs` | Nelder-Mead and particle swarm setup on the argmin fork. | Loss definitions. |
 | `crates/commol-calibration/src/probabilistic/` | Parallel calibration runs, deduplication, clustering and ensemble selection (NSGA-II). | Statistics for reports. |
 
@@ -31,9 +34,10 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns | Do not put here |
 |---|---|---|
-| `py-commol/src/core.rs` | Bindings of the model types. | Logic. |
-| `py-commol/src/model.rs` | The model queries of `commol_rs.model`: `initial_state`, `expanded_outputs`, `transition_flows`, `check_names`. | Logic beyond type conversion. |
-| `py-commol/src/engine.rs` | `commol_rs.engine`: `Engine::build`, which builds the engine an `EngineType` entry names, and the Python classes `Engine` (any engine, built from a model) and `EngineType` (the list, for Python to ask). | Engine logic. |
+| `py-commol/src/core.rs` | Bindings of the model types (`Model`, `CompartmentalStructure`, …). | Logic. |
+| `py-commol/src/model.rs` | The queries of `commol_rs.model` on a compartmental structure: `initial_state`, `expanded_outputs`, `transition_flows`; and `check_names` on a model. | Logic beyond type conversion. |
+| `py-commol/src/engine.rs` | `commol_rs.engine`: `Engine::build`, which checks the kind and builds the engine an `EngineType` entry names, and the Python classes `Engine` (any engine, built from a model), `EngineType` (the list, for Python to ask) and `ModelKind`. | Engine logic. |
+| `py-commol/src/test_kind.rs` | `TestEngine`, the engine of the test model kind; only with the `test-kind` feature. | Anything a release needs. |
 | `py-commol/src/calibration.rs` | Calibration types and functions; each takes an `Engine`. | Logic beyond type conversion. |
 | `py-commol/commol/commol_rs/_commol_rs.pyi` | The type stub of the extension. Update it with every binding change. | — |
 
@@ -42,17 +46,22 @@ Use this page when you know what to change but not where it belongs.
 | Path | Owns | Do not put here |
 |---|---|---|
 | `api/model_builder.py` | The fluent `ModelBuilder`. | Validation rules that belong to the model. |
-| `api/simulation.py` | `Simulation`: runs (`run`, `run_at`), output grouping. | Expansion rules; which positions a model type accepts. |
+| `api/simulation.py` | `Simulation`: runs (`run`, `run_at`), output grouping through `ModelStructure.outputs_by_source`. | Expansion rules; which positions a model type accepts; anything of one model kind. |
 | `api/results.py` | `SimulationResults` (values with their positions), `index_at`, `sample`. | Engine rules. |
 | `api/calibrator.py`, `api/probabilistic_calibrator.py` | Calibration entry points and conversion to Rust types. | Loss or optimizer logic. |
 | `api/probabilistic/` | Ensemble statistics, normalization and confidence intervals (`intervals.py`). | New interval conventions outside `ci_percentiles`. |
-| `api/reporting.py` | `simulation_report` and `applied_parameters_report`. | Domain vocabulary. |
+| `api/reporting.py` | `simulation_report` and `applied_parameters_report`, with the sections the structure adds (`ModelStructure.report_sections`). | Domain vocabulary; sections of one model kind. |
 | `api/patterns.py`, `api/time_scale.py`, `api/windows.py` | Rates that change along the axis (`AxisPattern`), step/physical-time conversion, the window grid and windowed totals. | Physical time inside the model. |
 | `api/plotter.py` | Plots of results. | Computation of results. |
 | `context/` | The Pydantic model: fields, validation, JSON I/O, update methods. | Engine rules. |
-| `context/engine.py` | `ModelEngine` (`Model.engine`: the engine type and its settings), `OdeSolver`, and the `EngineType` names as a `Literal` for static typing. | Settings validation or engine meanings: ask `commol_rs.engine.EngineType`. |
+| `context/model.py` | `Model`: the header, the engine and the structure of any kind, generic in its structure class (`Model[CompartmentalStructure]`). | Anything of one model kind. |
+| `context/structure.py` | `ModelStructure`, the interface every model kind gives the generic layers, and its registry of kinds. | Code of one kind. |
+| `context/compartmental.py` | `CompartmentalStructure`: bins, stratifications, transitions and initial conditions, their validation, and the compartmental side of the interface. | Generic code. |
+| `context/transition.py` | `Transition` and `StratifiedRate`. | — |
+| `context/engine.py` | `ModelEngine` (`Model.engine`: the engine type and its settings), `OdeSolver`, and the names of the compartmental engines as the `Literal` `CompartmentalEngineType`. | Settings validation or engine meanings: ask `commol_rs.engine.EngineType`. |
 | `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the model names. | Python re-implementations of them. |
-| `context/_model/` (other files) | Internals of `Model`: equation printer, unit checker, calibration write-back, JSON rendering. | Public API. |
+| `context/_model/` (other files) | Internals of a compartmental model: equation printer, unit checker, calibration write-back, the `initial_conditions` report section (`report.py`); JSON rendering of any model. | Public API. |
+| `context/report_entry.py` | The ensemble spread of a report entry (`Interval`, `entry_interval`), for every kind. | — |
 | `utils/security.py` | Validation of every user expression (`SecurityConfig` limits). | Expression evaluation. |
 | `utils/equations.py` | Dimensional analysis with `pint`. | — |
 
@@ -60,7 +69,7 @@ Use this page when you know what to change but not where it belongs.
 
 | Path | Owns |
 |---|---|
-| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; and `support/` with the shared model factories, the flow models, the reference solver, the oracles and the assertions. See [Tests](conventions.md#tests). |
+| `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; and `support/` with the shared model factories, the test kind (`kinds.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](conventions.md#tests). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
 | `odd/` | Task records and review ledgers of past work. History, not specification. |
@@ -75,10 +84,11 @@ Use this page when you know what to change but not where it belongs.
 | Change the difference step | `commol-difference/src/simulation.rs` | `simulation_engine.rs` |
 | Change the ODE integration or the solver settings | `commol-differential/src/solve.rs` | `commol-differential/src/lib.rs`, `commol-core/src/types/engine.rs` (`OdeSolver`), `context/engine.py` |
 | Add a model type (engine) | `commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `context/engine.py`, [checklist](maintainer-playbook.md#model-type-engine) |
-| Change impulses | `commol-model/src/system.rs` (`apply_impulses`) | `types.rs` (`ImpulseSchedule`), both engines, `context/dynamics.py`, `tests/transitions/test_impulses.py` |
+| Add a model kind | `context/structure.py` (`ModelStructure`) | `commol-core/src/types/structure.rs`, `engine.rs` (`ModelKind`), `py-commol/src/engine.rs`, [checklist](maintainer-playbook.md#model-kind) |
+| Change impulses | `commol-model/src/system.rs` (`apply_impulses`) | `types.rs` (`ImpulseSchedule`), both engines, `context/transition.py`, `tests/transitions/test_impulses.py` |
 | Add an expression function or variable | `math_expression/` | `utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `tests/initial_conditions/` |
-| Change calibration | `calibration_problem.rs` | `initial_conditions.rs`, `api/calibrator.py`, `tests/calibration/` |
+| Change calibration | `calibration_problem.rs` | `values.rs`, `commol-model/src/initial_conditions.rs`, `api/calibrator.py`, `tests/calibration/` |
 | Change ensembles | `api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Expose an engine rule to Python | `py-commol/src/` | `_commol_rs.pyi`, `engine_state.py` |
 | Change a report | `api/reporting.py` | [Design decisions](design-decisions.md#reports), `tests/reporting/` |

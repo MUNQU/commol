@@ -318,7 +318,7 @@ builder = builder.set_initial_conditions(
 
 The initial population of a compartment is
 `population_size × bin fraction × the fraction of each of its categories`,
-unless an override names it. `Model.initial_state()` shows the result. To change
+unless an override names it. `CompartmentalStructure.initial_state()` shows the result. To change
 fractions on a built model, see
 [Core Concepts](core-concepts.md#updating-fractions-after-building).
 

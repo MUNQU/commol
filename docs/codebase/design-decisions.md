@@ -8,14 +8,68 @@ test that guards it. Read the ones of your area before you change it.
 
 | Area | Decisions |
 |---|---|
+| Model kinds | [One interface for every kind](#one-interface-for-every-model-kind), [a model by composition](#a-model-is-a-header-an-engine-and-a-structure) |
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
-| Dynamics | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
+| Transitions and rates | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup head counts](#subgroup-head-counts-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
+
+## Model kinds
+
+### One interface for every model kind
+
+The layers that do not depend on how a model is built (`Simulation`,
+`Calibrator`, `ProbabilisticCalibrator`, the reports and `SimulationPlotter`)
+use only `Model` and the methods of `ModelStructure`
+(`py-commol/commol/context/structure.py`), and in Rust only the
+`SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What
+only a compartmental model has (bins, stratifications, initial conditions) is
+behind them: `CompartmentalStructure` (`context/compartmental.py`), and in Rust
+`CompartmentalEngine` and `InitialConditionPlan` (`crates/commol-model/`). A
+new kind, such as an agent network, is a new `ModelStructure` subclass with its
+engines in the list; nothing that exists changes.
+
+| Part | Rule | Why, against the alternative |
+|---|---|---|
+| `ModelStructure` | An abstract base class (Pydantic's metaclass derives from `ABCMeta`). A missing method fails when the object is made and names it; optional methods have a default. | A `typing.Protocol` shows a missing method only under `ty`, or mid-run as an `AttributeError`, and gives no defaults. |
+| Engine kind | Each entry of `EngineType` names the kind it runs. `Model` asks the list (`check_kind`) when it is made, and `Engine::build` asks it again; the error names the engine and both kinds. | Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. |
+| Values calibration sets | `parameter` and `factor` are generic. Each kind declares the types of value of its own it accepts (`ModelKind::value_types`, which `ModelStructure.calibration_value_types` asks); the compartmental kind accepts `initial_condition`. The engine resolves and writes them (`SimulationEngine::plan_values`, `apply_values`). | The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it. |
+| Report sections | `ModelStructure.report_sections` adds the sections of a kind to `applied_parameters_report` (default: none); the compartmental kind adds `initial_conditions`. | A check of the kind in `reporting.py` brings back a branch per kind. |
+| Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `N`) and `output_sums` (a bin total, for a compartmental engine). | The calibration would rebuild bin totals from compartment labels. |
+
+The test kind (`tests/support/kinds.py`, engine `TestEngine` in
+`py-commol/src/test_kind.rs`) is written only against the interface. The
+extension has it only when it is built with the cargo feature `test-kind`, as
+the tests and CI build it; a release build does not.
+
+**Guards:** `tests/model_kinds/` (a test model through a simulation, a
+calibration, a report and a plot; the kind check both ways),
+`py-commol/src/engine.rs::an_engine_rejects_a_model_of_another_kind`,
+`crates/commol-core/src/types/engine.rs::an_engine_rejects_a_model_of_another_kind`.
+
+### A model is a header, an engine and a structure
+
+`Model` (Python `context/model.py`, Rust `crates/commol-core/src/types/model.rs`)
+is one class for every kind: `name`, `description`, `version`, `step_unit`,
+`parameters`, `engine` (`{type, settings}`) and `structure`, tagged in JSON by
+`kind`. In Python it is generic in its structure class:
+`ModelBuilder.build` returns `Model[CompartmentalStructure]`, so
+`model.structure.bins` type-checks, and `Model.from_json` reads the class from
+the `kind` of the file. The engine is part of the model because it sets what a
+rate means. Transitions are held once, in the structure.
+
+Inheritance (an abstract `Model` with a `CompartmentalModel`) gives direct
+access (`model.bins`) but two parallel hierarchies, of models and of builders,
+and the header repeated per kind; with composition, `Simulation` and
+`Calibrator` take one type.
+
+**Guards:** `crates/commol-core/src/types/model.rs` (tests),
+`tests/building/test_save_and_load.py`,
+`tests/model_kinds/test_interface.py::TestStructureInterface`.
 
 ## Model structure
 
@@ -24,7 +78,7 @@ test that guards it. Read the ones of your area before you change it.
 A compartment is a bin plus one category for each stratification that applies
 to it, in declaration order. Its name, `{bin}_{category}_{category}…`, is for
 display only. Its identity is its label: `OutputLabels` in
-`crates/commol-core/src/simulation_engine.rs` and `CompartmentLayout` in
+`crates/commol-model/src/labels.rs` and `CompartmentLayout` in
 `crates/commol-model/src/layout.rs`.
 
 **Rule:** never parse a compartment name or match it by prefix. Bin `A` and bin
@@ -47,7 +101,7 @@ compartments exist and what they are named.
 
 ### Outputs are resolved by label
 
-`Model.get_outputs_by_source()` maps each bin or accumulator id to its output
+`CompartmentalStructure.outputs_by_source()` maps each bin or accumulator id to its output
 names in engine order. It uses the engine expansion (`expanded_outputs`), so
 `Simulation.outputs_for`, `group_outputs` and `total_series` group outputs by
 label, not by name.
@@ -62,8 +116,8 @@ The engine sets one variable per expanded compartment and per subpopulation
 total (`N_<categories>`, bin totals and partial bin totals).
 `check_names` in `crates/commol-model/src/builder.rs` rejects a parameter
 id that is one of those names, and an `N_…` variable in a rate or a formula
-parameter that names no subpopulation. `Model.validate_names_with_engine`
-calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
+parameter that names no subpopulation. `CompartmentalStructure.check_model`
+calls it at `build`, and `CompiledModel::try_from_model` calls it again.
 
 **Rule:** never list these names in Python. Ask the engine.
 
@@ -72,7 +126,7 @@ calls it at `build`, and `DifferenceEquations::try_from_model` calls it again.
 `subpopulation_variable_out_of_declaration_order_is_a_build_error`;
 `tests/building/test_reserved_names.py`.
 
-## Dynamics
+## Transitions and rates
 
 ### Absolute and per-capita rates
 
@@ -122,20 +176,25 @@ same formula always runs the same machine code, so results are reproducible.
 The fractions of a conditional stratification are relative to the subgroup that
 its conditions select, not to the whole population. Head counts therefore
 multiply along the chain: `N × fraction(group1) × fraction(cat1)`.
-`InitialConditions.subgroup_population` owns this; `Model.subgroup_population`
-and `Model.get_conditioning_categories` delegate to it.
+`InitialConditions.subgroup_population` owns this; `CompartmentalStructure.subgroup_population`
+and `CompartmentalStructure.get_conditioning_categories` delegate to it.
 
 **Guard:** `tests/simulation/test_outputs.py::TestSubgroupPopulation` compares the
 result with the population the engine starts from.
 
 ### Calibrated initial conditions are applied in layers
 
-`InitialConditionPlan` in `crates/commol-calibration/src/initial_conditions.rs`
+`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`
 applies calibrated values in a fixed order: bins, category splits, exact
 compartments, and then the remainder named by
-`CalibrationProblem.initial_condition_remainder`. The objective, the predictions
-and the write-back all use `calibrated_initial_population`, so they agree by
-construction. `Model.apply_calibration_parameters`
+`CalibrationProblem.initial_condition_remainder`. Both compartmental engines
+resolve and write initial conditions through it
+(`SimulationEngine::plan_values` and `apply_values`), and the calibration
+writes every value through the engine (`ValueWriter` in
+`crates/commol-calibration/src/values.rs`), so the objective, the predictions
+and the write-back (`configured_engine`, then the binding
+`calibrated_initial_population`) agree by construction.
+`CompartmentalStructure.with_calibrated_values`
 (`context/_model/calibration_write_back.py`) writes the values back as
 fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.
@@ -314,12 +373,15 @@ so a saved model reproduces its runs.
 
 Python asks the list (`commol_rs.engine.EngineType`): it builds the engine,
 prints the left-hand side of an equation and checks settings through it, and
-never branches on an engine name. It keeps the names only as the `Literal`
-`EngineType` (`context/engine.py`) for static typing and completion; a test
-checks that it equals the list. Generating the `Literal` from Rust would need
+never branches on an engine name. It keeps the names of the compartmental
+engines only as the `Literal` `CompartmentalEngineType` (`context/engine.py`),
+for static typing and completion of `ModelBuilder.build`; a test checks that it
+equals the compartmental entries of the list. `ModelEngine.type` is a `str` that
+the list checks, so a model can name an engine of any kind. Generating the `Literal` from Rust would need
 a code-generation step for two names; the test catches the same drift. The
 entry names its model kind, so another kind (for example an agent network)
-adds entries, not a second meaning of the type.
+adds entries, not a second meaning of the type; see
+[One interface for every model kind](#one-interface-for-every-model-kind).
 
 The builder takes the engine and its settings where it chooses the engine,
 `build(engine, settings=None)`, so one builder builds a model for each engine
@@ -416,7 +478,8 @@ members. Taking percentiles first gives a band that describes no member.
 
 `api/reporting.py` returns blocks of data, not documents:
 `simulation_report` (observed values, series, accumulators) and
-`applied_parameters_report` (calibrated parameters and initial conditions).
+`applied_parameters_report` (calibrated parameters, and the sections of the
+model kind: `initial_conditions` for a compartmental model).
 
 - A single run and an ensemble differ only at the leaves (`ReportLeaf`).
 - The key order of each entry is part of the contract, because it changes saved

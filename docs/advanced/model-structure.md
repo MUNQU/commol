@@ -7,34 +7,52 @@ writes it, and the Rust engine reads the same structure from JSON
 (`crates/commol-core/src/types/`). Most users never build these types by hand;
 read this page to understand model files or to work on Commol.
 
+A model has a header that every kind of model has, an engine, and a
+`structure`: the part of its kind, tagged in JSON by `kind`. The only kind is
+`compartmental`, which `ModelBuilder` builds.
+
 ```text
 Model                      name, description, version, step_unit
-├── population: Population
-│   ├── bins: [Bin]
-│   ├── accumulators: [Accumulator]
-│   ├── stratifications: [Stratification]
-│   │   └── conditions: [StratificationCondition]
-│   ├── transitions: [Transition]          (the engine reads dynamics.transitions)
-│   └── initial_conditions: InitialConditions
-│       ├── bin_fractions: [BinFraction]
-│       ├── stratification_fractions: [StratificationFractions]
-│       │   └── fractions: [StratificationFraction]
-│       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
-├── dynamics: Dynamics
-│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-│       └── stratified_rates: [StratifiedRate]
-│           └── conditions: [StratificationCondition]
-└── engine: ModelEngine
-    ├── type: "DifferenceEquations" or "DifferentialEquations"
-    └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+├── engine: ModelEngine
+│   ├── type: "DifferenceEquations" or "DifferentialEquations"
+│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+└── structure: CompartmentalStructure      (kind: "compartmental")
+    ├── bins: [Bin]
+    ├── accumulators: [Accumulator]
+    ├── stratifications: [Stratification]
+    │   └── conditions: [StratificationCondition]
+    ├── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+    │   └── stratified_rates: [StratifiedRate]
+    │       └── conditions: [StratificationCondition]
+    └── initial_conditions: InitialConditions
+        ├── bin_fractions: [BinFraction]
+        ├── stratification_fractions: [StratificationFractions]
+        │   └── fractions: [StratificationFraction]
+        └── compartment_fractions: [CompartmentFraction]
 ```
 
-`Model` itself is documented in [Model API](../api/model.md).
+In JSON the structure is an object with its `kind` and the fields of its
+class:
 
-## Population
+```json
+{
+  "name": "Model",
+  "parameters": [],
+  "engine": {"type": "DifferenceEquations", "settings": null},
+  "structure": {"kind": "compartmental", "bins": [], "...": "..."},
+  "step_unit": null
+}
+```
 
-::: commol.context.population.Population
+`Model` itself is documented in [Model API](../api/model.md). The engine must
+run the kind of the structure: a model whose engine runs another kind is
+rejected when it is made, with an error that names the engine and both kinds.
+
+## Compartmental structure
+
+`CompartmentalStructure` and `ModelStructure`, the interface every kind gives,
+are documented in [Model API](../api/model.md).
 
 ::: commol.context.bin.Bin
 
@@ -52,13 +70,11 @@ Model                      name, description, version, step_unit
 
 ::: commol.context.parameter.SeriesValue
 
-## Dynamics
+## Transitions
 
-::: commol.context.dynamics.Dynamics
+::: commol.context.transition.Transition
 
-::: commol.context.dynamics.Transition
-
-::: commol.context.dynamics.StratifiedRate
+::: commol.context.transition.StratifiedRate
 
 ## Engine
 

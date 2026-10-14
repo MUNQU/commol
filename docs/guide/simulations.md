@@ -185,7 +185,7 @@ print(round(total_ab[-1]))  # 1000: A and B hold the whole population
 ### Totals by category
 
 To select compartments by category, use their labels from
-`Model.initial_state()`: each entry has `name`, `bin` and `categories`.
+`CompartmentalStructure.initial_state()`: each entry has `name`, `bin` and `categories`.
 
 ```python
 in_g1 = [

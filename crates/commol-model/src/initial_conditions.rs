@@ -101,7 +101,7 @@ impl InitialConditionPlan {
     /// # Errors
     ///
     /// The remainder, when given, names the compartments that absorb the
-    /// difference to the population size ([`Self::with_remainder`]).
+    /// difference to the population size.
     ///
     /// # Errors
     ///

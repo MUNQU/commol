@@ -134,9 +134,20 @@ print(sorted(results))   # ['A', 'B', 'C', 'cum_ab']
 print(len(results["A"]))  # 51: step 0 to step 50
 ```
 
-Two typologies run, with the same model definition:
+A `Model` has a header (its name, parameters and step unit), the `engine` that
+runs it, and its `structure`: the part of its kind. `ModelBuilder` builds the
+compartmental kind, so `model.structure` is a `CompartmentalStructure` that
+holds the bins, stratifications, transitions and initial conditions:
 
-| Typology | Time | Engine |
+```python
+print(model.engine.type)                    # DifferenceEquations
+print(model.structure.kind)                 # compartmental
+print([b.id for b in model.structure.bins])  # ['A', 'B', 'C']
+```
+
+Two engines run a compartmental model, with the same structure:
+
+| Engine | Time | Crate |
 |---|---|---|
 | `DifferenceEquations` | Advances in whole steps; each step applies every flow once. | `commol-difference` |
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
@@ -205,7 +216,7 @@ for compartment in stratified.structure.initial_state():
 | `B_g1` | 10000 × 0.1 × 0.6 | 600 |
 | `B_g2` | 10000 × 0.1 × 0.4 | 400 |
 
-`Model.initial_state()` returns this table as the engine builds it: each
+`CompartmentalStructure.initial_state()` returns this table as the engine builds it: each
 compartment with its bin, its categories and its population.
 
 Use a stratification when subgroups have different rates, when you need output
@@ -325,8 +336,8 @@ print({c.name: c.population for c in overridden.structure.initial_state()})
 | Each name is an expanded compartment | The model is built |
 | The initial population does not exceed `population_size` | The model is built |
 
-`Model.update_compartment_fractions({"B_g1": 0.05})` changes or adds overrides
-on a built model.
+`model.structure.update_compartment_fractions({"B_g1": 0.05})` changes or adds
+overrides on a built model.
 
 ### Updating fractions after building
 

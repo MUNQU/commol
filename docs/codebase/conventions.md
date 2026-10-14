@@ -157,9 +157,10 @@ The tests live in `py-commol/tests/`.
 A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
-`api/probabilistic/`) goes in the package of its feature. The one exception is
-`reference_models/`: it checks published models across features (see
-[Reference models](#reference-models)).
+`api/probabilistic/`) goes in the package of its feature. The exceptions are
+`reference_models/`, which checks published models across features (see
+[Reference models](#reference-models)), and `model_kinds/`, which runs a model
+kind that is not compartmental through every generic layer.
 
 | Package | Tests of | Guide page |
 |---|---|---|
@@ -176,6 +177,7 @@ of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
 | `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
+| `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind. It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](design-decisions.md#one-interface-for-every-model-kind)) |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
