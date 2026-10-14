@@ -12,6 +12,7 @@ from commol.api.results import SimulationResults
 from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
 from commol.context.model import Model
+from commol.context.structure import ModelStructure
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,21 @@ class Simulation:
         Parameters
         ----------
         model : Model
-            A fully constructed and validated model object.
+            A fully constructed and validated model object, of any kind.
             None values for parameters/initial conditions if used for calibration.
 
+        Raises
+        ------
+        TypeError
+            If the structure of the model is not a `ModelStructure`.
+
         """
+        if not isinstance(model.structure, ModelStructure):
+            raise TypeError(
+                f"The structure of model '{model.name}' is a "
+                f"{type(model.structure).__name__}, not a ModelStructure. A model "
+                "holds the structure of its kind, such as a CompartmentalStructure."
+            )
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
         self._build_engine(model.model_dump_json())
@@ -44,10 +56,9 @@ class Simulation:
         """Build the engine and its output names from a model JSON."""
         self._model_json: str = model_json
         self._engine: "EngineProtocol" = build_engine(model_json)
-        self._compartments: list[str] = self._engine.compartments
         self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
-            f"Simulation engine ready. Total compartments: {len(self._compartments)}"
+            f"Simulation engine ready. Outputs: {len(self._simulation_outputs)}"
         )
 
     def _sync_engine(self) -> None:
@@ -59,8 +70,8 @@ class Simulation:
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
         """
-        Validates that all parameters and initial conditions have values
-        (are calibrated).
+        Validates that every parameter, and every value of the model kind, has
+        a value (is calibrated).
 
         Parameters
         ----------
@@ -70,10 +81,11 @@ class Simulation:
         Raises
         ------
         ValueError
-            If any parameter or initial condition has a None value.
+            If any parameter, or any value of the model kind such as an
+            initial condition, has a None value.
         """
         uncalibrated_params = model.get_uncalibrated_parameters()
-        uncalibrated_ics = model.get_uncalibrated_initial_conditions()
+        uncalibrated_ics = model.structure.uncalibrated_values()
 
         errors = []
         if uncalibrated_params:
@@ -179,12 +191,16 @@ class Simulation:
 
     def outputs_for(self, id: str) -> list[str]:
         """
-        Names of the outputs a bin or accumulator expands into.
+        Names of the outputs a source id expands into.
+
+        The structure of the model groups its outputs by source
+        (`ModelStructure.outputs_by_source`): for a compartmental model, by
+        bin and accumulator.
 
         Parameters
         ----------
         id : str
-            A bin id or an accumulator id.
+            A source id, such as a bin id or an accumulator id.
 
         Returns
         -------
@@ -194,9 +210,9 @@ class Simulation:
         Raises
         ------
         KeyError
-            If `id` is not a bin or accumulator of the model.
+            If `id` is not a source of the model.
         """
-        outputs = self.model_definition.get_outputs_by_source()
+        outputs = self.model_definition.structure.outputs_by_source()
         if id not in outputs:
             raise KeyError(
                 f"'{id}' is not a bin or accumulator of model "

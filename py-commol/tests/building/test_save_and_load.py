@@ -1,6 +1,10 @@
 """A model saved to JSON loads back as an equal model."""
 
+import json
 from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
 
 from commol.context.model import Model
 from commol.context.parameter import SeriesValue
@@ -19,6 +23,43 @@ def _model(k: float | None = 0.1, fraction: float | None = 1.0) -> Model:
 
 
 class TestToJson:
+    def test_the_file_holds_the_header_the_engine_and_the_structure(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "model.json"
+        _model().to_json(path)
+
+        data = json.loads(path.read_text())
+
+        assert list(data) == [
+            "name",
+            "description",
+            "version",
+            "parameters",
+            "engine",
+            "structure",
+            "step_unit",
+        ]
+        assert data["structure"]["kind"] == "compartmental"
+        assert len(data["structure"]["transitions"]) == 1
+
+    def test_a_file_with_population_and_dynamics_names_them(
+        self, tmp_path: Path
+    ) -> None:
+        data = _model().model_dump(mode="json")
+        structure = data.pop("structure")
+        structure.pop("kind")
+        data["dynamics"] = {"transitions": structure["transitions"]}
+        data["population"] = structure
+        path = tmp_path / "old.json"
+        path.write_text(json.dumps(data))
+
+        with pytest.raises(ValidationError) as error:
+            Model.from_json(path)
+
+        assert "population" in str(error.value)
+        assert "dynamics" in str(error.value)
+
     def test_round_trips_to_an_equal_model(self, tmp_path: Path) -> None:
         model = _model()
         path = tmp_path / "model.json"
@@ -45,7 +86,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.get_uncalibrated_initial_conditions() == ["A"]
+        assert restored.structure.uncalibrated_values() == ["A"]
 
     def test_accepts_a_string_path(self, tmp_path: Path) -> None:
         model = _model()

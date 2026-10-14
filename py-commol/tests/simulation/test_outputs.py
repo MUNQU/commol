@@ -29,11 +29,8 @@ class TestOutputsBySource:
     def test_expansion_matches_the_engine_output_names(self) -> None:
         simulation = _model()
 
-        derived = [
-            name
-            for names in simulation.model_definition.get_outputs_by_source().values()
-            for name in names
-        ]
+        outputs = simulation.model_definition.structure.outputs_by_source()
+        derived = [name for names in outputs.values() for name in names]
 
         assert derived == simulation.simulation_outputs
 
@@ -42,11 +39,8 @@ class TestOutputsBySource:
     ) -> None:
         simulation = _model(conditional=True)
 
-        derived = [
-            name
-            for names in simulation.model_definition.get_outputs_by_source().values()
-            for name in names
-        ]
+        outputs = simulation.model_definition.structure.outputs_by_source()
+        derived = [name for names in outputs.values() for name in names]
 
         assert derived == simulation.simulation_outputs
 
@@ -163,14 +157,15 @@ class TestSubgroupPopulation:
     def test_no_categories_is_the_whole_population(self) -> None:
         simulation = _model()
 
-        assert simulation.model_definition.subgroup_population() == pytest.approx(
-            1000.0
+        assert (
+            simulation.model_definition.structure.subgroup_population()
+            == pytest.approx(1000.0)
         )
 
     def test_one_category_scales_by_its_fraction(self) -> None:
         simulation = _model()
 
-        assert simulation.model_definition.subgroup_population(
+        assert simulation.model_definition.structure.subgroup_population(
             ["group1"]
         ) == pytest.approx(600.0)
 
@@ -185,7 +180,9 @@ class TestSubgroupPopulation:
                 for name in simulation.simulation_outputs
                 if name.split("_")[1:2] == [category]
             )
-            assert model.subgroup_population([category]) == pytest.approx(engine_total)
+            assert model.structure.subgroup_population([category]) == pytest.approx(
+                engine_total
+            )
 
     def test_matches_the_engine_for_a_nested_conditional_subgroup(self) -> None:
         simulation = _model(conditional=True)
@@ -199,7 +196,7 @@ class TestSubgroupPopulation:
             if name.startswith(("A_group1_s1", "B_group1_s1"))
         )
 
-        assert model.subgroup_population(["group1", "s1"]) == pytest.approx(
+        assert model.structure.subgroup_population(["group1", "s1"]) == pytest.approx(
             engine_total
         )
 
@@ -207,15 +204,15 @@ class TestSubgroupPopulation:
         simulation = _model()
 
         with pytest.raises(ValueError, match="Category 'nope' not found"):
-            simulation.model_definition.subgroup_population(["nope"])
+            simulation.model_definition.structure.subgroup_population(["nope"])
 
     def test_overrides_are_folded_into_each_subgroup(self) -> None:
         model = build(override_builder(0.3))
 
         # group1 selects A_g1 (the 0.3 override) and B_g1 (0.0).
-        assert model.subgroup_population(("g1",)) == pytest.approx(300.0)
+        assert model.structure.subgroup_population(("g1",)) == pytest.approx(300.0)
         # group2 selects A_g2 (0.5) and B_g2 (0.0).
-        assert model.subgroup_population(("g2",)) == pytest.approx(500.0)
+        assert model.structure.subgroup_population(("g2",)) == pytest.approx(500.0)
 
     def test_a_single_overridden_compartment_sets_its_subgroup(self) -> None:
         model = build(
@@ -226,24 +223,27 @@ class TestSubgroupPopulation:
             )
         )
 
-        assert model.subgroup_population(("group1",)) == pytest.approx(200.0)
+        assert model.structure.subgroup_population(("group1",)) == pytest.approx(200.0)
 
 
 class TestConditioningCategories:
     def test_unconditional_stratification_has_none(self) -> None:
         simulation = _model()
 
-        assert simulation.model_definition.get_conditioning_categories("group") == ()
+        assert (
+            simulation.model_definition.structure.get_conditioning_categories("group")
+            == ()
+        )
 
     def test_conditional_stratification_reports_its_condition(self) -> None:
         simulation = _model(conditional=True)
 
-        assert simulation.model_definition.get_conditioning_categories("sub") == (
-            "group1",
-        )
+        assert simulation.model_definition.structure.get_conditioning_categories(
+            "sub"
+        ) == ("group1",)
 
     def test_unknown_stratification_is_rejected(self) -> None:
         simulation = _model()
 
         with pytest.raises(ValueError, match="Stratification 'nope' not found"):
-            simulation.model_definition.get_conditioning_categories("nope")
+            simulation.model_definition.structure.get_conditioning_categories("nope")

@@ -2,6 +2,7 @@
 
 use crate::flows::{PlannedFlow, plan_transition_flows};
 use crate::helpers::rate_to_string;
+use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp,
@@ -13,7 +14,9 @@ use commol_core::math_expression::jit::parser::parse_expression;
 use commol_core::math_expression::preprocessing::{
     SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
 };
-use commol_core::{MathExpression, MathExpressionContext, Model, OutputLabels, RateMathExpression};
+use commol_core::{
+    CompartmentalStructure, MathExpression, MathExpressionContext, Model, RateMathExpression,
+};
 use std::collections::{HashMap, HashSet};
 
 /// Series parameter payload collected before parameter slots are
@@ -36,21 +39,23 @@ impl CompiledModel {
     ///
     /// # Errors
     ///
-    /// Returns a message when a name of the model conflicts with a name the
-    /// engine provides ([`check_names`]), when a transition cannot be planned,
-    /// or when an initial-condition override is not valid for the expansion.
+    /// Returns a message when the model is not compartmental, when a name of
+    /// the model conflicts with a name the engine provides ([`check_names`]),
+    /// when a transition cannot be planned, or when an initial-condition
+    /// override is not valid for the expansion.
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
+        let structure = model.compartmental()?;
         check_names(model)?;
 
         // Generate all compartment and accumulator output combinations
-        let layout = CompartmentLayout::new(model);
+        let layout = CompartmentLayout::new(structure);
         let compartments: Vec<String> = layout.names().to_vec();
         let compartment_map: HashMap<String, usize> = compartments
             .iter()
             .enumerate()
             .map(|(index, name)| (name.clone(), index))
             .collect();
-        let accumulator_outputs = generate_accumulators(model);
+        let accumulator_outputs = generate_accumulators(structure);
         let accumulator_names: Vec<String> = accumulator_outputs
             .iter()
             .map(|output| output.name.clone())
@@ -68,7 +73,7 @@ impl CompiledModel {
 
         // Initial population of each compartment, in the same order as
         // `compartments`
-        let state = initial_state(model)?;
+        let state = initial_state(structure)?;
         debug_assert!(
             state
                 .iter()
@@ -83,7 +88,7 @@ impl CompiledModel {
             .iter()
             .cloned()
             .chain(
-                expand_accumulators(model)
+                expand_accumulators(structure)
                     .into_iter()
                     .map(|output| OutputLabels {
                         source: output.source,
@@ -137,7 +142,7 @@ impl CompiledModel {
         // Pre-compute subpopulation mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subpopulation variable names)
-        let subpopulation_layout = build_subpopulation_mappings(&layout, model);
+        let subpopulation_layout = build_subpopulation_mappings(&layout, structure);
 
         let subpopulation_param_names: HashSet<String> = subpopulation_layout
             .iter()
@@ -191,9 +196,13 @@ impl CompiledModel {
             .collect::<Result<_, _>>()?;
 
         // Plan the transition flows and compile them
-        let planned_flows =
-            plan_transition_flows(model, &layout, &accumulator_map, &subpopulation_param_names)?;
-        let schedules = impulse_schedules(model)?;
+        let planned_flows = plan_transition_flows(
+            structure,
+            &layout,
+            &accumulator_map,
+            &subpopulation_param_names,
+        )?;
+        let schedules = impulse_schedules(structure)?;
         let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
             .into_iter()
             .partition(|flow| schedules.contains_key(&flow.transition_id));
@@ -267,6 +276,7 @@ impl CompiledModel {
 
         Ok(Self {
             compartments,
+            population_size: structure.initial_conditions.population_size as f64,
             output_labels,
             output_names,
             initial_state,
@@ -292,9 +302,11 @@ impl CompiledModel {
 /// Returns a message that names the transition when it sets both
 /// `impulse_at` and `impulse_every`, when a position is not finite or is
 /// negative, or when the period is not positive.
-fn impulse_schedules(model: &Model) -> Result<HashMap<String, ImpulseSchedule>, String> {
+fn impulse_schedules(
+    structure: &CompartmentalStructure,
+) -> Result<HashMap<String, ImpulseSchedule>, String> {
     let mut schedules = HashMap::new();
-    for transition in &model.dynamics.transitions {
+    for transition in &structure.transitions {
         let schedule = match (&transition.impulse_at, transition.impulse_every) {
             (None, None) => continue,
             (Some(_), Some(_)) => {
@@ -374,7 +386,7 @@ pub struct ExpandedOutput {
 /// outputs whose already-applied categories satisfy all of them; the others are
 /// kept as-is, so the result is a non-uniform Cartesian product.
 fn expand<'a>(
-    model: &Model,
+    structure: &CompartmentalStructure,
     source_ids: impl IntoIterator<Item = &'a str>,
 ) -> Vec<(ExpandedOutput, HashMap<String, String>)> {
     // Each element: (source, name, applied categories by stratification id)
@@ -383,7 +395,7 @@ fn expand<'a>(
         .map(|id| (id.to_string(), id.to_string(), HashMap::new()))
         .collect();
 
-    for stratification in &model.population.stratifications {
+    for stratification in &structure.stratifications {
         let mut new_partials = Vec::with_capacity(partials.len());
         for (source, name, applied) in partials {
             if stratification_conditions_met(&stratification.conditions, &applied) {
@@ -402,8 +414,7 @@ fn expand<'a>(
     partials
         .into_iter()
         .map(|(source, name, applied)| {
-            let categories = model
-                .population
+            let categories = structure
                 .stratifications
                 .iter()
                 .filter_map(|s| applied.get(&s.id).map(|c| (s.id.clone(), c.clone())))
@@ -420,19 +431,19 @@ fn expand<'a>(
         .collect()
 }
 
-/// Expanded compartments of a model, in engine order.
-pub fn expand_compartments(model: &Model) -> Vec<ExpandedOutput> {
-    expand(model, model.population.bins.iter().map(|b| b.id.as_str()))
+/// Expanded compartments of a structure, in engine order.
+pub fn expand_compartments(structure: &CompartmentalStructure) -> Vec<ExpandedOutput> {
+    expand(structure, structure.bins.iter().map(|b| b.id.as_str()))
         .into_iter()
         .map(|(output, _)| output)
         .collect()
 }
 
-/// Expanded accumulator outputs of a model, in engine order.
-pub fn expand_accumulators(model: &Model) -> Vec<ExpandedOutput> {
+/// Expanded accumulator outputs of a structure, in engine order.
+pub fn expand_accumulators(structure: &CompartmentalStructure) -> Vec<ExpandedOutput> {
     expand(
-        model,
-        model.population.accumulators.iter().map(|a| a.id.as_str()),
+        structure,
+        structure.accumulators.iter().map(|a| a.id.as_str()),
     )
     .into_iter()
     .map(|(output, _)| output)
@@ -453,19 +464,17 @@ pub(crate) fn accumulator_output_ref(
     }
 }
 
-pub(crate) fn generate_accumulators(model: &Model) -> Vec<GeneratedAccumulatorOutput> {
+pub(crate) fn generate_accumulators(
+    structure: &CompartmentalStructure,
+) -> Vec<GeneratedAccumulatorOutput> {
     expand(
-        model,
-        model.population.accumulators.iter().map(|a| a.id.as_str()),
+        structure,
+        structure.accumulators.iter().map(|a| a.id.as_str()),
     )
     .into_iter()
     .map(|(output, applied)| GeneratedAccumulatorOutput {
         name: output.name,
-        output_ref: accumulator_output_ref(
-            output.source,
-            &applied,
-            &model.population.stratifications,
-        ),
+        output_ref: accumulator_output_ref(output.source, &applied, &structure.stratifications),
     })
     .collect()
 }
@@ -489,9 +498,10 @@ pub struct InitialCompartment {
 /// within `population_size`.
 const POPULATION_TOLERANCE: f64 = 1e-9;
 
-/// Expand a model into its compartments and their initial populations.
+/// Expand a structure into its compartments and their initial populations.
 ///
-/// This is the single source of truth for the initial state of a model. Bins
+/// This is the single source of truth for the initial state of a
+/// compartmental model. Bins
 /// are expanded over the stratifications in declaration order; when a
 /// stratification has conditions that a compartment's already-applied
 /// categories do not meet, that compartment is kept as-is and its population
@@ -506,8 +516,10 @@ const POPULATION_TOLERANCE: f64 = 1e-9;
 /// Returns a message when an override names a compartment that is not part of
 /// the expansion, names a compartment twice, holds a fraction outside
 /// `[0.0, 1.0]`, or makes the initial population exceed `population_size`.
-pub fn initial_state(model: &Model) -> Result<Vec<InitialCompartment>, String> {
-    let initial_conditions = &model.population.initial_conditions;
+pub fn initial_state(
+    structure: &CompartmentalStructure,
+) -> Result<Vec<InitialCompartment>, String> {
+    let initial_conditions = &structure.initial_conditions;
     let total_population = initial_conditions.population_size as f64;
 
     let bin_fraction_map: HashMap<&str, Option<f64>> = initial_conditions
@@ -515,8 +527,7 @@ pub fn initial_state(model: &Model) -> Result<Vec<InitialCompartment>, String> {
         .iter()
         .map(|bf| (bf.bin.as_str(), bf.fraction))
         .collect();
-    let category_fraction_map: HashMap<(&str, &str), f64> = model
-        .population
+    let category_fraction_map: HashMap<(&str, &str), f64> = structure
         .stratifications
         .iter()
         .filter_map(|stratification| {
@@ -538,7 +549,7 @@ pub fn initial_state(model: &Model) -> Result<Vec<InitialCompartment>, String> {
     // Each compartment holds its bin's share of the population, split by the
     // fraction of every category applied to it. An uncalibrated bin or an
     // undeclared category counts as zero.
-    let mut state: Vec<InitialCompartment> = expand_compartments(model)
+    let mut state: Vec<InitialCompartment> = expand_compartments(structure)
         .into_iter()
         .map(|output| {
             let bin_fraction = bin_fraction_map
@@ -656,14 +667,14 @@ fn compile_transition_flows(
 /// Every mapping is built from the compartment labels.
 fn build_subpopulation_mappings(
     layout: &CompartmentLayout,
-    model: &Model,
+    structure: &CompartmentalStructure,
 ) -> Vec<SubpopulationLayout> {
-    if model.population.stratifications.is_empty() {
+    if structure.stratifications.is_empty() {
         return Vec::new();
     }
 
     let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
-    let partial_bin_totals = model.population.stratifications.len() >= 2;
+    let partial_bin_totals = structure.stratifications.len() >= 2;
 
     for (compartment_index, label) in layout.labels().iter().enumerate() {
         let categories: Vec<&str> = label
@@ -720,8 +731,11 @@ fn build_subpopulation_mappings(
 }
 
 /// Names of the subpopulation totals a rate expression may reference.
-pub(crate) fn subpopulation_names(layout: &CompartmentLayout, model: &Model) -> HashSet<String> {
-    build_subpopulation_mappings(layout, model)
+pub(crate) fn subpopulation_names(
+    layout: &CompartmentLayout,
+    structure: &CompartmentalStructure,
+) -> HashSet<String> {
+    build_subpopulation_mappings(layout, structure)
         .into_iter()
         .map(|mapping| mapping.parameter_name)
         .collect()
@@ -743,12 +757,13 @@ pub(crate) fn subpopulation_names(layout: &CompartmentLayout, model: &Model) -> 
 ///
 /// # Errors
 ///
-/// Returns a message that names each conflict and lists the valid
-/// subpopulation names.
+/// Returns a message when the model is not compartmental, or a message that
+/// names each conflict and lists the valid subpopulation names.
 pub fn check_names(model: &Model) -> Result<(), String> {
-    let layout = CompartmentLayout::new(model);
+    let structure = model.compartmental()?;
+    let layout = CompartmentLayout::new(structure);
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
-    let subpopulations = subpopulation_names(&layout, model);
+    let subpopulations = subpopulation_names(&layout, structure);
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
 
     let mut reserved: Vec<String> = model
@@ -775,7 +790,7 @@ pub fn check_names(model: &Model) -> Result<(), String> {
     }
 
     let mut used: HashSet<String> = HashSet::new();
-    for transition in &model.dynamics.transitions {
+    for transition in &structure.transitions {
         if let Some(rate) = &transition.rate {
             // A deserialized rate is a `Parameter` until it is parsed again.
             used.extend(RateMathExpression::from_string(rate_to_string(rate)).get_variables());
@@ -1289,7 +1304,7 @@ mod tests {
     ///
     /// Returns a tuple of (compartments vector, compartment_map for lookups).
     fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>) {
-        let compartments: Vec<String> = expand_compartments(model)
+        let compartments: Vec<String> = expand_compartments(model.compartmental().unwrap())
             .into_iter()
             .map(|output| output.name)
             .collect();
@@ -1302,15 +1317,24 @@ mod tests {
 
         (compartments, compartment_map)
     }
-    use commol_core::types::population::CompartmentFraction;
     use commol_core::{
-        Bin, BinFraction, Dynamics, EngineType, InitialConditions, ModelEngine, Population,
-        Stratification, StratificationCondition, StratificationFraction, StratificationFractions,
+        Bin, BinFraction, CompartmentFraction, EngineType, InitialConditions, ModelEngine,
+        ModelStructure, Stratification, StratificationCondition, StratificationFraction,
+        StratificationFractions,
     };
+
+    /// The compartmental structure of a test model.
+    fn structure(model: &Model) -> &CompartmentalStructure {
+        model.compartmental().unwrap()
+    }
+
+    fn structure_mut(model: &mut Model) -> &mut CompartmentalStructure {
+        model.compartmental_mut().unwrap()
+    }
 
     /// Initial population of each compartment, in the order of `compartments`.
     fn initialize_population(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
-        let state = initial_state(model)?;
+        let state = initial_state(structure(model))?;
         let population: HashMap<&str, f64> = state
             .iter()
             .map(|compartment| (compartment.name.as_str(), compartment.population))
@@ -1377,7 +1401,9 @@ mod tests {
             name: "test".to_string(),
             description: None,
             version: None,
-            population: Population {
+            parameters: vec![],
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -1397,12 +1423,7 @@ mod tests {
                     stratification_fractions,
                     compartment_fractions,
                 },
-            },
-            parameters: vec![],
-            dynamics: Dynamics {
-                transitions: vec![],
-            },
-            engine: ModelEngine::new(EngineType::DifferenceEquations),
+            }),
         }
     }
 
@@ -1605,7 +1626,7 @@ mod tests {
                 fraction: 0.5,
             }],
         );
-        let error = initial_state(&model).unwrap_err();
+        let error = initial_state(structure(&model)).unwrap_err();
 
         assert!(error.contains("exceed population_size"), "{error}");
     }
@@ -1626,7 +1647,7 @@ mod tests {
             vec![group_fractions(0.6, 0.4), sub_fractions(0.5, 0.5)],
             vec![],
         );
-        let state = initial_state(&model).unwrap();
+        let state = initial_state(structure(&model)).unwrap();
         let a_g1_s2 = &state[1];
         let a_g2 = &state[2];
 
@@ -1665,7 +1686,7 @@ mod tests {
             value: Some(ParameterValue::Constant(0.1)),
             description: None,
         }];
-        model.dynamics.transitions = vec![Transition {
+        structure_mut(&mut model).transitions = vec![Transition {
             id: "ab".to_string(),
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],

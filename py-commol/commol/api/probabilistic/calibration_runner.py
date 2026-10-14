@@ -94,7 +94,6 @@ class CalibrationRunner:
         rust_constraints = self.build_rust_constraints()
         rust_loss_config = self.build_loss_config()
         rust_optimization_config = self._build_optimization_config()
-        initial_population_size = self.initial_population_size()
 
         # Call Rust function for parallel execution
         try:
@@ -105,7 +104,6 @@ class CalibrationRunner:
                 rust_constraints,
                 rust_loss_config,
                 rust_optimization_config,
-                initial_population_size,
                 n_runs,
                 self.seed,
                 evaluation_retention,
@@ -141,10 +139,6 @@ class CalibrationRunner:
     def build_loss_config(self) -> "LossConfigProtocol":
         """Convert the configured Python loss function to Rust."""
         return self._build_loss_config()
-
-    def initial_population_size(self) -> int:
-        """Return the model initial population size used by Rust calibration."""
-        return self._get_initial_population_size()
 
     def _to_rust_parameter_type(
         self, param_type: str
@@ -277,10 +271,3 @@ class CalibrationRunner:
                 c2_final=acceleration.c2_final,
             )
         return None
-
-    def _get_initial_population_size(self) -> int:
-        """Get the initial population size from the model."""
-        initial_conditions = (
-            self.simulation.model_definition.population.initial_conditions
-        )
-        return initial_conditions.population_size

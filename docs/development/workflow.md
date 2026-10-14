@@ -12,12 +12,14 @@ git clone https://github.com/MUNQU/commol.git
 cd commol/py-commol
 uv sync --extra dev --extra docs
 source .venv/bin/activate
-maturin develop --release
+maturin develop --release --features test-kind
 pre-commit install
 ```
 
-Run `maturin develop --release` again after every Rust change, before you run
-`pytest`. `cargo build --workspace` does not link the PyO3 crate outside
+Run `maturin develop --release --features test-kind` again after every Rust
+change, before you run `pytest`. The `test-kind` feature adds the model kind of
+the tests (`py-commol/src/test_kind.rs`); the tests of `tests/model_kinds/`
+need it, and a release build never has it. `cargo build --workspace` does not link the PyO3 crate outside
 maturin; use `cargo clippy` and the per-crate tests instead (see
 [Quick commands](#quick-commands)).
 
@@ -191,6 +193,7 @@ vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol
+cargo test -p commol --features test-kind   # the engine of the test model kind
 
 # Documentation, from the repository root
 mkdocs build --strict

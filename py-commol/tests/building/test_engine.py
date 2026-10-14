@@ -8,22 +8,24 @@ from pydantic import ValidationError
 
 from commol import Model, OdeSolver, Simulation
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine import EngineType
+from commol.context.engine import CompartmentalEngineType
 from tests.support import a_to_b_builder, assert_close, build, build_ode
 
 
 class TestEngineList:
-    def test_the_python_names_equal_the_engine_list(self) -> None:
-        assert list(get_args(EngineType)) == commol_rs.engine.EngineType.names()
+    def test_the_python_names_equal_the_compartmental_engines(self) -> None:
+        compartmental = [
+            name
+            for name in commol_rs.engine.EngineType.names()
+            if commol_rs.engine.EngineType(name).kind == "compartmental"
+        ]
 
-    @pytest.mark.parametrize("name", get_args(EngineType))
-    def test_every_engine_runs_compartmental_models(self, name: str) -> None:
-        assert commol_rs.engine.EngineType(name).kind == "compartmental"
+        assert list(get_args(CompartmentalEngineType)) == compartmental
 
     def test_each_engine_says_what_a_rate_means(self) -> None:
         meanings = {
             name: commol_rs.engine.EngineType(name).rate_meaning
-            for name in get_args(EngineType)
+            for name in get_args(CompartmentalEngineType)
         }
 
         assert meanings == {
@@ -35,9 +37,27 @@ class TestEngineList:
         with pytest.raises(ValueError, match="DifferentialEquations"):
             commol_rs.engine.EngineType("Stochastic")
 
+    def test_every_engine_runs_a_kind_of_the_list(self) -> None:
+        kinds = commol_rs.engine.ModelKind.names()
+
+        assert "compartmental" in kinds
+        for name in commol_rs.engine.EngineType.names():
+            assert commol_rs.engine.EngineType(name).kind in kinds
+
+    def test_a_compartmental_model_accepts_initial_conditions(self) -> None:
+        kind = commol_rs.engine.ModelKind("compartmental")
+
+        assert kind.value_types() == ["initial_condition"]
+
+    def test_an_unknown_kind_lists_the_kinds(self) -> None:
+        engine = commol_rs.engine.EngineType("DifferenceEquations")
+
+        with pytest.raises(ValueError, match="compartmental"):
+            engine.check_kind("network")
+
 
 class TestBuild:
-    @pytest.mark.parametrize("name", get_args(EngineType))
+    @pytest.mark.parametrize("name", get_args(CompartmentalEngineType))
     def test_one_builder_builds_the_model_for_each_engine(self, name: str) -> None:
         model = a_to_b_builder().build(engine=name)
 

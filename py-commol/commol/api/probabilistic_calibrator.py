@@ -150,7 +150,8 @@ class ProbabilisticCalibrator:
                         f"Calibration parameter '{param.id}' not found in model. "
                         f"Available parameters: {sorted(model_param_ids)}"
                     )
-        engine_state.check_initial_conditions(
+        engine_state.check_model_values(
+            self.simulation.model_definition,
             self.simulation.engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,

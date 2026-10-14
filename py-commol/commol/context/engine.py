@@ -1,9 +1,10 @@
 """The engine of a model and its settings.
 
 The engine's list of engines (``commol_rs.engine.EngineType``) is the source
-of truth: it validates the settings and says what each engine means. Python
-keeps the engine names only as the ``Literal`` of `EngineType`, for static
-typing, and a test checks that it equals the engine's list.
+of truth: it knows every name, validates the settings and says what each
+engine means. Python keeps the names of the engines of compartmental models
+as the ``Literal`` of `CompartmentalEngineType`, for static typing of
+`ModelBuilder.build`, and a test checks that it equals those of the list.
 """
 
 from typing import Literal, Self, TypeAlias
@@ -16,8 +17,10 @@ except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
 
-EngineType: TypeAlias = Literal["DifferenceEquations", "DifferentialEquations"]
-"""Names of the engines a model can name."""
+CompartmentalEngineType: TypeAlias = Literal[
+    "DifferenceEquations", "DifferentialEquations"
+]
+"""Names of the engines that run compartmental models."""
 
 
 class OdeSolver(BaseModel):
@@ -54,9 +57,11 @@ class ModelEngine(BaseModel):
 
     Attributes
     ----------
-    type : EngineType
-        Name of the engine: ``"DifferenceEquations"`` (discrete time) or
-        ``"DifferentialEquations"`` (continuous time).
+    type : str
+        Name of an engine of the engine's list, such as
+        ``"DifferenceEquations"`` (discrete time) or
+        ``"DifferentialEquations"`` (continuous time). The engine must run the
+        kind of the model.
     settings : EngineSettings | None
         Settings of that engine; None uses its defaults. Only
         ``DifferentialEquations`` takes settings (`OdeSolver`).
@@ -64,14 +69,14 @@ class ModelEngine(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: EngineType = Field(..., description="Name of the engine.")
+    type: str = Field(..., description="Name of the engine.")
     settings: EngineSettings | None = Field(
         default=None, description="Settings of the engine; None uses its defaults."
     )
 
     @model_validator(mode="after")
     def check_settings(self) -> Self:
-        """Ask the engine whether the settings are its own."""
+        """Ask the engine's list whether it has the engine and the settings."""
         settings_json = (
             None if self.settings is None else self.settings.model_dump_json()
         )

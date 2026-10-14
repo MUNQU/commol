@@ -11,10 +11,10 @@ class TestBuild:
         assert isinstance(model, Model)
         assert model.name == "TestModel"
         assert model.version == "1.0"
-        assert [bin_.id for bin_ in model.population.bins] == ["S", "I", "R"]
+        assert [bin_.id for bin_ in model.structure.bins] == ["S", "I", "R"]
         assert [parameter.id for parameter in model.parameters] == ["beta", "gamma"]
-        assert [t.id for t in model.dynamics.transitions] == ["infection", "recovery"]
-        assert model.population.initial_conditions.population_size == 1000
+        assert [t.id for t in model.structure.transitions] == ["infection", "recovery"]
+        assert model.structure.initial_conditions.population_size == 1000
 
 
 class TestCloneAndReset:
@@ -31,7 +31,7 @@ class TestCloneAndReset:
 
         clone.add_accumulator(id="other", name="Other")
 
-        accumulators = build(original).population.accumulators
+        accumulators = build(original).structure.accumulators
         assert [accumulator.id for accumulator in accumulators] == ["moved"]
 
     def test_reset_removes_every_accumulator(self) -> None:
@@ -51,4 +51,4 @@ class TestCloneAndReset:
             )
         )
 
-        assert model.population.accumulators == []
+        assert model.structure.accumulators == []

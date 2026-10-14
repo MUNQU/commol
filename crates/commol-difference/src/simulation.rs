@@ -1,7 +1,9 @@
 //! The difference equations engine: one step adds the right-hand side once.
 
-use commol_core::OutputLabels;
-use commol_model::CompiledModel;
+use commol_core::ModelValue;
+use commol_model::{
+    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
+};
 use std::collections::HashMap;
 
 /// Difference equations simulation engine.
@@ -194,6 +196,8 @@ fn check_step(position: f64) -> Result<(), String> {
 
 /// Implementation of the SimulationEngine trait.
 impl commol_core::SimulationEngine for DifferenceEquations {
+    type ValuePlan = InitialConditionPlan;
+
     fn check_position(&self, position: f64) -> Result<(), String> {
         check_step(position)
     }
@@ -213,20 +217,8 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         DifferenceEquations::step(self)
     }
 
-    fn compartments(&self) -> Vec<String> {
-        DifferenceEquations::compartments(self)
-    }
-
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.model.output_labels().to_vec()
-    }
-
     fn output_names(&self) -> Vec<String> {
         DifferenceEquations::output_names(self)
-    }
-
-    fn population(&self) -> Vec<f64> {
-        DifferenceEquations::population(self)
     }
 
     fn reset(&mut self) {
@@ -246,6 +238,44 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 
     fn current_position(&self) -> f64 {
         self.current_step
+    }
+
+    fn state_outputs(&self) -> usize {
+        self.model.num_compartments()
+    }
+
+    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
+        output_sums(self.model.output_labels())
+    }
+
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<InitialConditionPlan, String> {
+        InitialConditionPlan::new(self, values, remainder)
+    }
+
+    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
+        plan.apply(self, values)
+    }
+}
+
+impl CompartmentalEngine for DifferenceEquations {
+    fn compartments(&self) -> Vec<String> {
+        DifferenceEquations::compartments(self)
+    }
+
+    fn output_labels(&self) -> Vec<OutputLabels> {
+        self.model.output_labels().to_vec()
+    }
+
+    fn population(&self) -> Vec<f64> {
+        DifferenceEquations::population(self)
+    }
+
+    fn population_size(&self) -> f64 {
+        self.model.population_size()
     }
 
     fn set_initial_condition(
@@ -269,8 +299,8 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 mod tests {
     use super::*;
     use commol_core::{
-        Bin, BinFraction, Dynamics, EngineType, InitialConditions, Model, ModelEngine, Population,
-        RateMathExpression, SimulationEngine, Transition,
+        Bin, BinFraction, CompartmentalStructure, EngineType, InitialConditions, Model,
+        ModelEngine, ModelStructure, RateMathExpression, SimulationEngine, Transition,
     };
 
     /// One difference step is exactly `state + derivatives(n, state)`.
@@ -303,7 +333,7 @@ mod tests {
             description: None,
             version: None,
             parameters: vec![],
-            population: Population {
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -316,24 +346,6 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
-                transitions: vec![],
-                initial_conditions: InitialConditions {
-                    population_size: 1000,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(1.0),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
-                },
-            },
-            dynamics: Dynamics {
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -347,31 +359,6 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
-            },
-            engine: ModelEngine::new(EngineType::DifferenceEquations),
-        }
-    }
-
-    fn make_missing_parameter_model() -> Model {
-        Model {
-            name: "AB_missing_parameter".to_string(),
-            description: None,
-            version: None,
-            parameters: vec![],
-            population: Population {
-                bins: vec![
-                    Bin {
-                        id: "A".to_string(),
-                        name: "Source".to_string(),
-                    },
-                    Bin {
-                        id: "B".to_string(),
-                        name: "Sink".to_string(),
-                    },
-                ],
-                accumulators: vec![],
-                stratifications: vec![],
-                transitions: vec![],
                 initial_conditions: InitialConditions {
                     population_size: 1000,
                     bin_fractions: vec![
@@ -387,8 +374,30 @@ mod tests {
                     stratification_fractions: vec![],
                     compartment_fractions: vec![],
                 },
-            },
-            dynamics: Dynamics {
+            }),
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
+        }
+    }
+
+    fn make_missing_parameter_model() -> Model {
+        Model {
+            name: "AB_missing_parameter".to_string(),
+            description: None,
+            version: None,
+            parameters: vec![],
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "Source".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "Sink".to_string(),
+                    },
+                ],
+                accumulators: vec![],
+                stratifications: vec![],
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -400,7 +409,22 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
-            },
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![
+                        BinFraction {
+                            bin: "A".to_string(),
+                            fraction: Some(1.0),
+                        },
+                        BinFraction {
+                            bin: "B".to_string(),
+                            fraction: Some(0.0),
+                        },
+                    ],
+                    stratification_fractions: vec![],
+                    compartment_fractions: vec![],
+                },
+            }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
@@ -487,7 +511,7 @@ mod tests {
                     description: None,
                 },
             ],
-            population: Population {
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -504,28 +528,6 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
-                transitions: vec![],
-                initial_conditions: InitialConditions {
-                    population_size: 1000,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(0.99),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.01),
-                        },
-                        BinFraction {
-                            bin: "C".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
-                },
-            },
-            dynamics: Dynamics {
                 transitions: vec![
                     Transition {
                         id: "a_to_b".to_string(),
@@ -552,7 +554,26 @@ mod tests {
                         impulse_every: None,
                     },
                 ],
-            },
+                initial_conditions: InitialConditions {
+                    population_size: 1000,
+                    bin_fractions: vec![
+                        BinFraction {
+                            bin: "A".to_string(),
+                            fraction: Some(0.99),
+                        },
+                        BinFraction {
+                            bin: "B".to_string(),
+                            fraction: Some(0.01),
+                        },
+                        BinFraction {
+                            bin: "C".to_string(),
+                            fraction: Some(0.0),
+                        },
+                    ],
+                    stratification_fractions: vec![],
+                    compartment_fractions: vec![],
+                },
+            }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
@@ -592,7 +613,7 @@ mod tests {
 
     fn ab_model_with_rate(rate: &str) -> Model {
         let mut model = make_three_bin_model();
-        model.dynamics.transitions = vec![Transition {
+        model.compartmental_mut().unwrap().transitions = vec![Transition {
             id: "a_to_b".to_string(),
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
@@ -691,5 +712,36 @@ mod tests {
         engine.run(4).unwrap();
         let error = engine.run_at(&[2.0]).unwrap_err();
         assert!(error.contains("before the current position 4"), "{error}");
+    }
+
+    #[test]
+    fn the_engine_writes_initial_conditions_that_reset_keeps() {
+        use commol_core::{ModelValue, ModelValueType};
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let plan = engine
+            .plan_values(
+                &[ModelValue {
+                    value_type: ModelValueType::InitialCondition,
+                    id: "B".to_string(),
+                }],
+                Some("A"),
+            )
+            .unwrap();
+
+        assert_eq!(engine.apply_values(&plan, &[0.25]).unwrap(), 0.0);
+        engine.step().unwrap();
+        engine.reset();
+
+        assert_eq!(engine.population(), vec![750.0, 250.0, 0.0]);
+        assert_eq!(engine.population_size(), 1000.0);
+    }
+
+    #[test]
+    fn the_state_is_the_compartments_and_a_bin_total_is_a_sum() {
+        let engine = DifferenceEquations::from_model(&make_three_bin_model());
+
+        assert_eq!(engine.state_outputs(), 3);
+        // Without stratifications no name sums several outputs.
+        assert!(engine.output_sums().is_empty());
     }
 }

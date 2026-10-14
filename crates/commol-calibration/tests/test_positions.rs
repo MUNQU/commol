@@ -11,15 +11,16 @@ use commol_differential::DifferentialEquations;
 /// A → B at the per-capita rate `k`, run by the given engine.
 fn decay_model(engine: &str) -> Model {
     let json = format!(
-        r#"{{"name":"m","population":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
-        "accumulators":[],"stratifications":[],"transitions":[],
+        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],
+        "engine":{{"type":"{engine}"}},
+        "structure":{{"kind":"compartmental",
+        "bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{{"id":"ab","source":["A"],
+        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}],
         "initial_conditions":{{"population_size":1000,"bin_fractions":[
         {{"bin":"A","fraction":1.0}},{{"bin":"B","fraction":0.0}}],
-        "stratification_fractions":[]}}}},
-        "parameters":[{{"id":"k","value":0.1}}],
-        "dynamics":{{"transitions":[{{"id":"ab","source":["A"],
-        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}]}},
-        "engine":{{"type":"{engine}"}}}}"#
+        "stratification_fractions":[]}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
@@ -35,7 +36,6 @@ fn problem<E: SimulationEngine>(
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
         constraints,
         LossConfig::SumSquaredError,
-        1000,
     )
 }
 

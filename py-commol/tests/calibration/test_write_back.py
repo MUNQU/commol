@@ -99,7 +99,7 @@ def _scored(
 def _overrides(model: Model) -> dict[str, float]:
     return {
         fraction.compartment: fraction.fraction
-        for fraction in model.population.initial_conditions.compartment_fractions
+        for fraction in model.structure.initial_conditions.compartment_fractions
     }
 
 
@@ -170,7 +170,7 @@ class TestWriteBackReadability:
             {"A": 0.4, "B": 0.6}, initial_condition_problem("A", "B")
         )
 
-        bins = model.population.initial_conditions.bin_fractions
+        bins = model.structure.initial_conditions.bin_fractions
         assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
             {"A": 0.4, "B": 0.6}
         )
@@ -183,7 +183,7 @@ class TestWriteBackReadability:
             {"A": 0.7}, initial_condition_problem("A", remainder="B")
         )
 
-        bins = model.population.initial_conditions.bin_fractions
+        bins = model.structure.initial_conditions.bin_fractions
         assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
             {"A": 0.7, "B": 0.3}
         )
@@ -196,7 +196,7 @@ class TestWriteBackReadability:
 
         fractions = {
             f.category: f.fraction
-            for s in model.population.initial_conditions.stratification_fractions
+            for s in model.structure.initial_conditions.stratification_fractions
             for f in s.fractions
         }
         assert fractions == pytest.approx({"g1": 0.3, "g2": 0.7})
@@ -211,7 +211,7 @@ class TestWriteBackReadability:
 
         fractions = {
             (s.stratification, f.category): f.fraction
-            for s in model.population.initial_conditions.stratification_fractions
+            for s in model.structure.initial_conditions.stratification_fractions
             for f in s.fractions
         }
         assert fractions == pytest.approx(
@@ -234,7 +234,7 @@ class TestWriteBackReadability:
 
         # IH totals 0 + 25 + 70 = 95, so S takes the remaining 905 and keeps
         # its split; only the IH compartments need overrides.
-        bins = model.population.initial_conditions.bin_fractions
+        bins = model.structure.initial_conditions.bin_fractions
         assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
             {"S": 0.905, "IH": 0.095}
         )
@@ -282,7 +282,7 @@ class TestWriteBackReadability:
             {"A": 0.3}, initial_condition_problem("A", remainder="A_x")
         )
 
-        bins = model.population.initial_conditions.bin_fractions
+        bins = model.structure.initial_conditions.bin_fractions
         assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
             {"A": 0.3, "A_x": 0.7}
         )
@@ -343,7 +343,7 @@ class TestCompositeStateCalibration:
 
     def test_calibrated_composite_state_is_written_back(self) -> None:
         truth = build(conditional_pathway_builder())
-        truth.update_compartment_fractions({"IH_oe60_hosp": 0.07})
+        truth.structure.update_compartment_fractions({"IH_oe60_hosp": 0.07})
         observed = Simulation(truth).run(10)
         problem = CalibrationProblem(
             observed_data=[
@@ -456,7 +456,7 @@ class TestApplyCalibrationParameters:
 
         fractions = {
             f.category: f.fraction
-            for s in model.population.initial_conditions.stratification_fractions
+            for s in model.structure.initial_conditions.stratification_fractions
             for f in s.fractions
         }
         assert fractions["group1"] == pytest.approx(result.best_parameters["group1"])
@@ -473,7 +473,7 @@ class TestApplyCalibrationParameters:
         )
 
         assert model.parameters[0].value == pytest.approx(0.15)
-        group = model.population.initial_conditions.stratification_fractions[0]
+        group = model.structure.initial_conditions.stratification_fractions[0]
         assert group.fractions[0].fraction == pytest.approx(0.4)
 
     def test_scale_parameters_are_ignored(self) -> None:
@@ -519,7 +519,7 @@ class TestApplyCalibrationParameters:
 
         overrides = [
             (fraction.compartment, fraction.fraction)
-            for fraction in model.population.initial_conditions.compartment_fractions
+            for fraction in model.structure.initial_conditions.compartment_fractions
         ]
         assert overrides == [
             ("A_group1", pytest.approx(0.4)),

@@ -35,8 +35,10 @@ pub use solve::SPARSE_THRESHOLD;
 
 use std::collections::HashMap;
 
-use commol_core::{EngineSettings, OdeSolver, OutputLabels};
-use commol_model::CompiledModel;
+use commol_core::{EngineSettings, ModelValue, OdeSolver};
+use commol_model::{
+    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
+};
 
 /// Differential equations simulation engine.
 ///
@@ -188,6 +190,8 @@ fn check_time(position: f64) -> Result<(), String> {
 }
 
 impl commol_core::SimulationEngine for DifferentialEquations {
+    type ValuePlan = InitialConditionPlan;
+
     fn check_position(&self, position: f64) -> Result<(), String> {
         check_time(position)
     }
@@ -206,20 +210,8 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         self.integrate_to(positions, buffer)
     }
 
-    fn compartments(&self) -> Vec<String> {
-        DifferentialEquations::compartments(self)
-    }
-
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.model.output_labels().to_vec()
-    }
-
     fn output_names(&self) -> Vec<String> {
         DifferentialEquations::output_names(self)
-    }
-
-    fn population(&self) -> Vec<f64> {
-        DifferentialEquations::population(self)
     }
 
     fn reset(&mut self) {
@@ -239,6 +231,44 @@ impl commol_core::SimulationEngine for DifferentialEquations {
 
     fn current_position(&self) -> f64 {
         self.current_time
+    }
+
+    fn state_outputs(&self) -> usize {
+        self.model.num_compartments()
+    }
+
+    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
+        output_sums(self.model.output_labels())
+    }
+
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<InitialConditionPlan, String> {
+        InitialConditionPlan::new(self, values, remainder)
+    }
+
+    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
+        plan.apply(self, values)
+    }
+}
+
+impl CompartmentalEngine for DifferentialEquations {
+    fn compartments(&self) -> Vec<String> {
+        DifferentialEquations::compartments(self)
+    }
+
+    fn output_labels(&self) -> Vec<OutputLabels> {
+        self.model.output_labels().to_vec()
+    }
+
+    fn population(&self) -> Vec<f64> {
+        DifferentialEquations::population(self)
+    }
+
+    fn population_size(&self) -> f64 {
+        self.model.population_size()
     }
 
     fn set_initial_condition(

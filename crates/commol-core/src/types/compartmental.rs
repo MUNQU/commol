@@ -1,6 +1,9 @@
+//! The structure of a compartmental model: bins expanded over
+//! stratifications, joined by transitions, and the initial conditions.
+
 use serde::{Deserialize, Serialize};
 
-use super::dynamics::{StratificationCondition, Transition};
+use super::transitions::{StratificationCondition, Transition};
 
 /// A state of the model. Stratifications expand it into compartments.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -74,7 +77,7 @@ pub struct CompartmentFraction {
     pub fraction: f64,
 }
 
-/// Initial conditions for the population model
+/// How the compartments of a model start.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
     /// Total population at step 0.
@@ -88,9 +91,10 @@ pub struct InitialConditions {
     pub compartment_fractions: Vec<CompartmentFraction>,
 }
 
-/// The population of a model: its bins, accumulators, stratifications and initial conditions.
+/// The structure of a compartmental model: its bins, accumulators,
+/// stratifications, transitions and initial conditions.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Population {
+pub struct CompartmentalStructure {
     /// Bins, in declaration order.
     pub bins: Vec<Bin>,
     /// Accumulators, in declaration order.
@@ -98,9 +102,9 @@ pub struct Population {
     pub accumulators: Vec<Accumulator>,
     /// Stratifications, in declaration order. The order defines the expansion.
     pub stratifications: Vec<Stratification>,
-    /// The transitions as declared. The engine reads `Dynamics::transitions`.
+    /// Transitions, in declaration order.
     pub transitions: Vec<Transition>,
-    /// How the population starts.
+    /// How the compartments start.
     pub initial_conditions: InitialConditions,
 }
 

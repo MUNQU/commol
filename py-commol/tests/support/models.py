@@ -27,7 +27,7 @@ what it changes. The factories share these keywords:
 
 from collections.abc import Mapping
 
-from commol import ModelBuilder, OdeSolver
+from commol import CompartmentalStructure, ModelBuilder, OdeSolver
 from commol.api.model_builder import (
     BinFractionDict,
     CompartmentFractionDict,
@@ -47,12 +47,14 @@ Conditions = Mapping[str, Mapping[str, str]]
 """Stratification id to the stratification and category it is conditional on."""
 
 
-def build(builder: ModelBuilder) -> Model:
+def build(builder: ModelBuilder) -> Model[CompartmentalStructure]:
     """Build a difference-equation model."""
     return builder.build(engine="DifferenceEquations")
 
 
-def build_ode(builder: ModelBuilder, settings: OdeSolver | None = TIGHT) -> Model:
+def build_ode(
+    builder: ModelBuilder, settings: OdeSolver | None = TIGHT
+) -> Model[CompartmentalStructure]:
     """Build a differential-equation model with `settings`."""
     return builder.build(engine="DifferentialEquations", settings=settings)
 

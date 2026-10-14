@@ -6,11 +6,15 @@
 
 use std::collections::HashMap;
 
-use commol_core::{EngineType, OutputLabels, SimulationEngine};
+use commol_core::{EngineType, ModelKind, ModelValue, SimulationEngine, ValuePlan};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
+use commol_model::{CompartmentalEngine, InitialConditionPlan};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+
+#[cfg(feature = "test-kind")]
+use crate::test_kind::{TestEngine, TestValuePlan};
 
 /// The engine of one entry of [`EngineType`].
 #[derive(Clone)]
@@ -19,6 +23,29 @@ pub enum Engine {
     Difference(DifferenceEquations),
     /// Continuous time.
     Differential(DifferentialEquations),
+    /// The engine of the test model kind.
+    #[cfg(feature = "test-kind")]
+    Test(TestEngine),
+}
+
+/// The values of the model kind of an [`Engine`], resolved by it.
+#[derive(Clone, Debug)]
+pub enum EngineValuePlan {
+    /// Initial conditions of a compartmental model.
+    Compartmental(InitialConditionPlan),
+    /// The test model kind has none.
+    #[cfg(feature = "test-kind")]
+    Test(TestValuePlan),
+}
+
+impl ValuePlan for EngineValuePlan {
+    fn infeasibility(&self, excess: f64) -> String {
+        match self {
+            Self::Compartmental(plan) => plan.infeasibility(excess),
+            #[cfg(feature = "test-kind")]
+            Self::Test(plan) => plan.infeasibility(excess),
+        }
+    }
 }
 
 impl Engine {
@@ -26,8 +53,10 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns a message when the engine cannot compile the model.
+    /// Returns a message when the engine does not run the kind of the model
+    /// (it names the engine and both kinds), or cannot compile the model.
     pub fn build(model: &commol_core::Model) -> Result<Self, String> {
+        model.check_kind()?;
         match model.engine.engine_type() {
             EngineType::DifferenceEquations => {
                 DifferenceEquations::try_from_model(model).map(Self::Difference)
@@ -35,6 +64,8 @@ impl Engine {
             EngineType::DifferentialEquations => {
                 DifferentialEquations::try_from_model(model).map(Self::Differential)
             }
+            #[cfg(feature = "test-kind")]
+            EngineType::TestEngine => TestEngine::try_from_model(model).map(Self::Test),
         }
     }
 
@@ -43,6 +74,8 @@ impl Engine {
         match self {
             Self::Difference(_) => EngineType::DifferenceEquations,
             Self::Differential(_) => EngineType::DifferentialEquations,
+            #[cfg(feature = "test-kind")]
+            Self::Test(_) => EngineType::TestEngine,
         }
     }
 }
@@ -53,11 +86,50 @@ macro_rules! dispatch {
         match $self {
             Engine::Difference($engine) => $body,
             Engine::Differential($engine) => $body,
+            #[cfg(feature = "test-kind")]
+            Engine::Test($engine) => $body,
         }
     };
 }
 
+/// Call `$body` with `$engine` bound to the compartmental engine inside an
+/// [`Engine`], or return an error that names the kind of the engine.
+macro_rules! compartmental {
+    ($self:expr, $engine:ident => $body:expr) => {
+        match $self {
+            Engine::Difference($engine) => Ok::<_, String>($body),
+            Engine::Differential($engine) => Ok::<_, String>($body),
+            #[cfg(feature = "test-kind")]
+            other => Err(format!(
+                "The {} engine runs {} models, not compartmental models",
+                other.engine_type().name(),
+                other.engine_type().kind().name()
+            )),
+        }
+    };
+}
+
+/// The initial population of a compartmental engine, and the compartments a
+/// plan of initial conditions covers.
+///
+/// # Errors
+///
+/// Returns a message when the engine or the plan is not compartmental.
+pub fn compartmental_state(
+    engine: &Engine,
+    plan: &EngineValuePlan,
+) -> Result<(Vec<f64>, Vec<usize>), String> {
+    let population = compartmental!(engine, engine => engine.population())?;
+    match plan {
+        EngineValuePlan::Compartmental(plan) => Ok((population, plan.covered_population())),
+        #[cfg(feature = "test-kind")]
+        EngineValuePlan::Test(_) => Err("The plan is not of a compartmental model".to_string()),
+    }
+}
+
 impl SimulationEngine for Engine {
+    type ValuePlan = EngineValuePlan;
+
     fn check_position(&self, position: f64) -> Result<(), String> {
         dispatch!(self, engine => engine.check_position(position))
     }
@@ -74,20 +146,16 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => SimulationEngine::step(engine))
     }
 
-    fn compartments(&self) -> Vec<String> {
-        dispatch!(self, engine => SimulationEngine::compartments(engine))
-    }
-
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        dispatch!(self, engine => engine.output_labels())
-    }
-
     fn output_names(&self) -> Vec<String> {
         dispatch!(self, engine => SimulationEngine::output_names(engine))
     }
 
-    fn population(&self) -> Vec<f64> {
-        dispatch!(self, engine => SimulationEngine::population(engine))
+    fn state_outputs(&self) -> usize {
+        dispatch!(self, engine => engine.state_outputs())
+    }
+
+    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
+        dispatch!(self, engine => engine.output_sums())
     }
 
     fn reset(&mut self) {
@@ -106,12 +174,41 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.current_position())
     }
 
-    fn set_initial_condition(
-        &mut self,
-        compartment_index: usize,
-        value: f64,
-    ) -> Result<(), String> {
-        dispatch!(self, engine => engine.set_initial_condition(compartment_index, value))
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<EngineValuePlan, String> {
+        match self {
+            Self::Difference(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Compartmental),
+            Self::Differential(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Compartmental),
+            #[cfg(feature = "test-kind")]
+            Self::Test(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Test),
+        }
+    }
+
+    fn apply_values(&mut self, plan: &EngineValuePlan, values: &[f64]) -> Result<f64, String> {
+        match (self, plan) {
+            (Self::Difference(engine), EngineValuePlan::Compartmental(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            (Self::Differential(engine), EngineValuePlan::Compartmental(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            #[cfg(feature = "test-kind")]
+            (Self::Test(engine), EngineValuePlan::Test(plan)) => engine.apply_values(plan, values),
+            #[cfg(feature = "test-kind")]
+            (engine, _) => Err(format!(
+                "The plan of values is not a plan of the {} engine",
+                engine.engine_type().name()
+            )),
+        }
     }
 }
 
@@ -200,16 +297,23 @@ impl PyEngine {
         SimulationEngine::step(&mut self.inner).map_err(PyRuntimeError::new_err)
     }
 
-    /// Current population of each compartment
+    /// Current population of each compartment of a compartmental model
+    ///
+    /// Raises:
+    ///     ValueError: If the engine does not run compartmental models
     #[getter]
-    fn population(&self) -> Vec<f64> {
-        SimulationEngine::population(&self.inner)
+    fn population(&self) -> PyResult<Vec<f64>> {
+        compartmental!(&self.inner, engine => engine.population()).map_err(PyValueError::new_err)
     }
 
-    /// Names of the compartments (e.g., ["S", "I_young", "R_old"])
+    /// Names of the compartments of a compartmental model (e.g., ["S",
+    /// "I_young", "R_old"])
+    ///
+    /// Raises:
+    ///     ValueError: If the engine does not run compartmental models
     #[getter]
-    fn compartments(&self) -> Vec<String> {
-        SimulationEngine::compartments(&self.inner)
+    fn compartments(&self) -> PyResult<Vec<String>> {
+        compartmental!(&self.inner, engine => engine.compartments()).map_err(PyValueError::new_err)
     }
 
     /// Names of the simulation outputs, including accumulators
@@ -251,18 +355,19 @@ impl PyEngine {
     ///     value: The new initial population value
     ///
     /// Raises:
-    ///     ValueError: If compartment_index is invalid or value is negative
+    ///     ValueError: If the engine does not run compartmental models,
+    ///         compartment_index is invalid or value is negative
     fn set_initial_condition(&mut self, compartment_index: usize, value: f64) -> PyResult<()> {
-        self.inner
-            .set_initial_condition(compartment_index, value)
+        compartmental!(&mut self.inner, engine => engine.set_initial_condition(compartment_index, value))
+            .and_then(|result| result)
             .map_err(PyValueError::new_err)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "Engine(type={}, compartments={}, position={})",
+            "Engine(type={}, outputs={}, position={})",
             self.inner.engine_type().name(),
-            SimulationEngine::compartments(&self.inner).len(),
+            self.inner.output_names().len(),
             self.inner.current_position()
         )
     }
@@ -353,8 +458,71 @@ impl PyEngineType {
             .map_err(PyValueError::new_err)
     }
 
+    /// Check that the engine runs a model kind
+    ///
+    /// Args:
+    ///     kind: Name of the kind of a model structure, for example
+    ///         "compartmental"
+    ///
+    /// Raises:
+    ///     ValueError: If the kind is unknown, or the engine runs another
+    ///         kind; the message names the engine and both kinds
+    fn check_kind(&self, kind: &str) -> PyResult<()> {
+        let kind = ModelKind::from_name(kind).map_err(PyValueError::new_err)?;
+        self.inner.check_kind(kind).map_err(PyValueError::new_err)
+    }
+
     fn __repr__(&self) -> String {
         format!("EngineType('{}')", self.inner.name())
+    }
+}
+
+/// One kind of model the engines of the list run
+#[pyclass(name = "ModelKind", frozen)]
+pub struct PyModelKind {
+    inner: ModelKind,
+}
+
+#[pymethods]
+impl PyModelKind {
+    /// The kind with a name
+    ///
+    /// Args:
+    ///     name: Name of the kind, for example "compartmental"
+    ///
+    /// Raises:
+    ///     ValueError: If no kind has the name; the message lists them all
+    #[new]
+    fn new(name: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: ModelKind::from_name(name).map_err(PyValueError::new_err)?,
+        })
+    }
+
+    /// Names of every kind, in order
+    #[staticmethod]
+    fn names() -> Vec<&'static str> {
+        ModelKind::ALL.iter().map(|kind| kind.name()).collect()
+    }
+
+    /// Name of the kind
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    /// Types of value of the kind that calibration may set besides
+    /// parameters and factors, for example ["initial_condition"]
+    fn value_types(&self) -> Vec<&'static str> {
+        self.inner
+            .value_types()
+            .iter()
+            .map(|value_type| value_type.name())
+            .collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("ModelKind('{}')", self.inner.name())
     }
 }
 
@@ -362,6 +530,7 @@ impl PyEngineType {
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngine>()?;
     m.add_class::<PyEngineType>()?;
+    m.add_class::<PyModelKind>()?;
     Ok(())
 }
 
@@ -373,14 +542,15 @@ mod tests {
     /// A → B at the per-capita rate 0.1, run by `engine`.
     fn decay_model(engine: EngineType) -> Model {
         let mut model: Model = serde_json::from_str(
-            r#"{"name":"m","population":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
-            "accumulators":[],"stratifications":[],"transitions":[],
+            r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},
+            "structure":{"kind":"compartmental",
+            "bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+            "accumulators":[],"stratifications":[],
+            "transitions":[{"id":"ab","source":["A"],"target":["B"],
+            "rate":"0.1","stratified_rates":null,"per_compartment":null}],
             "initial_conditions":{"population_size":1000,"bin_fractions":[
             {"bin":"A","fraction":1.0},{"bin":"B","fraction":0.0}],
-            "stratification_fractions":[]}},"parameters":[],
-            "dynamics":{"transitions":[{"id":"ab","source":["A"],"target":["B"],
-            "rate":"0.1","stratified_rates":null,"per_compartment":null}]},
-            "engine":{"type":"DifferenceEquations"}}"#,
+            "stratification_fractions":[]}}}"#,
         )
         .expect("valid model JSON");
         model.engine = ModelEngine::new(engine);
@@ -389,7 +559,10 @@ mod tests {
 
     #[test]
     fn every_entry_builds_its_engine_and_runs() {
-        for engine_type in EngineType::ALL {
+        for &engine_type in EngineType::ALL {
+            if engine_type.kind() != commol_core::ModelKind::Compartmental {
+                continue;
+            }
             let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
             assert_eq!(engine.engine_type(), engine_type);
             let rows = SimulationEngine::run(&mut engine, 1).unwrap().rows;
@@ -409,5 +582,46 @@ mod tests {
             panic!("expected the differential engine");
         };
         assert_eq!(*engine.settings(), settings);
+    }
+
+    /// A test model: one output that starts at 10 and decays at rate `k`.
+    #[cfg(feature = "test-kind")]
+    fn test_model() -> Model {
+        serde_json::from_str(
+            r#"{"name":"t","parameters":[{"id":"k","value":0.5}],
+            "engine":{"type":"TestEngine"},
+            "structure":{"kind":"test","outputs":[{"id":"x","initial":10.0,"rate":"k"}]}}"#,
+        )
+        .expect("valid model JSON")
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn an_engine_rejects_a_model_of_another_kind() {
+        let mut test_model = test_model();
+        test_model.engine = ModelEngine::new(EngineType::DifferenceEquations);
+        let error = Engine::build(&test_model).err().expect("a kind mismatch");
+        for name in ["DifferenceEquations", "compartmental", "test"] {
+            assert!(error.contains(name), "{error}");
+        }
+
+        let mut compartmental = decay_model(EngineType::DifferenceEquations);
+        compartmental.engine = ModelEngine::new(EngineType::TestEngine);
+        let error = Engine::build(&compartmental)
+            .err()
+            .expect("a kind mismatch");
+        for name in ["TestEngine", "compartmental", "test"] {
+            assert!(error.contains(name), "{error}");
+        }
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn the_test_engine_decays_each_output() {
+        let mut engine = Engine::build(&test_model()).unwrap();
+        let rows = engine.run_at(&[0.0, 2.0]).unwrap();
+        assert_eq!(rows[0], vec![10.0]);
+        assert!((rows[1][0] - 10.0 * (-1.0f64).exp()).abs() < 1e-12);
+        assert!(engine.plan_values(&[], Some("x")).is_err());
     }
 }

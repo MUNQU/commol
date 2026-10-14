@@ -1,3 +1,5 @@
+//! Transitions of a compartmental model and their stratified rates.
+
 use serde::{Deserialize, Serialize};
 
 use crate::math_expression::RateMathExpression;
@@ -72,11 +74,4 @@ impl Transition {
     pub fn is_impulse(&self) -> bool {
         self.impulse_at.is_some() || self.impulse_every.is_some()
     }
-}
-
-/// The transitions of a model.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Dynamics {
-    /// The transitions the engine plans and simulates.
-    pub transitions: Vec<Transition>,
 }

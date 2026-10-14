@@ -13,13 +13,69 @@ use serde_json::Value;
 pub enum ModelKind {
     /// Bins expanded over stratifications, joined by transitions with rates.
     Compartmental,
+    /// The model kind of the tests (`types::test_kind`).
+    #[cfg(feature = "test-kind")]
+    Test,
 }
 
 impl ModelKind {
-    /// Name of the kind, as Python shows it.
+    /// Every kind.
+    pub const ALL: &'static [Self] = &[
+        Self::Compartmental,
+        #[cfg(feature = "test-kind")]
+        Self::Test,
+    ];
+
+    /// Name of the kind, as the `kind` of a model structure.
     pub fn name(self) -> &'static str {
         match self {
             Self::Compartmental => "compartmental",
+            #[cfg(feature = "test-kind")]
+            Self::Test => "test",
+        }
+    }
+
+    /// The kind with a name.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message with every name when no kind has it.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|kind| kind.name() == name)
+            .ok_or_else(|| {
+                let names: Vec<&str> = Self::ALL.iter().map(|kind| kind.name()).collect();
+                format!("Unknown model kind '{name}'; the kinds are {names:?}")
+            })
+    }
+
+    /// The types of value of the kind that calibration may set, besides
+    /// parameters and factors.
+    pub fn value_types(self) -> &'static [ModelValueType] {
+        match self {
+            Self::Compartmental => &[ModelValueType::InitialCondition],
+            #[cfg(feature = "test-kind")]
+            Self::Test => &[],
+        }
+    }
+}
+
+/// A type of value that calibration sets in a model, besides its parameters
+/// and the factors of its observations. Each model kind accepts some of them
+/// ([`ModelKind::value_types`]), and its engine resolves and writes them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ModelValueType {
+    /// A value of the state the model starts from.
+    InitialCondition,
+}
+
+impl ModelValueType {
+    /// Name of the type, as Python's `CalibrationParameterType` names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::InitialCondition => "initial_condition",
         }
     }
 }
@@ -52,17 +108,28 @@ pub enum EngineType {
     /// Continuous time: the engine integrates `dX/dt = Σ flows` with an ODE
     /// solver (`commol-differential`).
     DifferentialEquations,
+    /// The engine of the test model kind: each output decays exponentially
+    /// (`types::test_kind`).
+    #[cfg(feature = "test-kind")]
+    TestEngine,
 }
 
 impl EngineType {
     /// Every entry of the list.
-    pub const ALL: [Self; 2] = [Self::DifferenceEquations, Self::DifferentialEquations];
+    pub const ALL: &'static [Self] = &[
+        Self::DifferenceEquations,
+        Self::DifferentialEquations,
+        #[cfg(feature = "test-kind")]
+        Self::TestEngine,
+    ];
 
     /// Name of the engine, as a model names it.
     pub fn name(self) -> &'static str {
         match self {
             Self::DifferenceEquations => "DifferenceEquations",
             Self::DifferentialEquations => "DifferentialEquations",
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => "TestEngine",
         }
     }
 
@@ -73,7 +140,8 @@ impl EngineType {
     /// Returns a message with every name of the list when no entry has it.
     pub fn from_name(name: &str) -> Result<Self, String> {
         Self::ALL
-            .into_iter()
+            .iter()
+            .copied()
             .find(|engine| engine.name() == name)
             .ok_or_else(|| {
                 let names: Vec<&str> = Self::ALL.iter().map(|engine| engine.name()).collect();
@@ -85,7 +153,27 @@ impl EngineType {
     pub fn kind(self) -> ModelKind {
         match self {
             Self::DifferenceEquations | Self::DifferentialEquations => ModelKind::Compartmental,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => ModelKind::Test,
         }
+    }
+
+    /// Check that the engine runs a model kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the engine, the kind it runs and the
+    /// given kind.
+    pub fn check_kind(self, kind: ModelKind) -> Result<(), String> {
+        if self.kind() == kind {
+            return Ok(());
+        }
+        Err(format!(
+            "The {} engine runs {} models, not {} models",
+            self.name(),
+            self.kind().name(),
+            kind.name()
+        ))
     }
 
     /// What the value of a rate expression means to the engine.
@@ -93,6 +181,8 @@ impl EngineType {
         match self {
             Self::DifferenceEquations => RateMeaning::PerStep,
             Self::DifferentialEquations => RateMeaning::Continuous,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => RateMeaning::Continuous,
         }
     }
 
@@ -108,6 +198,10 @@ impl EngineType {
             }
             (Self::DifferentialEquations, false) => format!("d{variable}/dt"),
             (Self::DifferentialEquations, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+            #[cfg(feature = "test-kind")]
+            (Self::TestEngine, false) => format!("d{variable}/dt"),
+            #[cfg(feature = "test-kind")]
+            (Self::TestEngine, true) => format!("\\frac{{d{variable}}}{{dt}}"),
         }
     }
 
@@ -124,7 +218,8 @@ impl EngineType {
         };
         self.parse_settings(value).map_err(|error| {
             let owners: Vec<&str> = Self::ALL
-                .into_iter()
+                .iter()
+                .copied()
                 .filter(|other| *other != self && other.takes_settings())
                 .filter(|other| other.parse_settings(value).is_ok())
                 .map(|other| other.name())
@@ -146,6 +241,8 @@ impl EngineType {
             Self::DifferentialEquations => {
                 EngineSettings::DifferentialEquations(OdeSolver::default())
             }
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => EngineSettings::TestEngine,
         }
     }
 
@@ -154,17 +251,20 @@ impl EngineType {
         match self {
             Self::DifferenceEquations => false,
             Self::DifferentialEquations => true,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => false,
         }
     }
 
     fn parse_settings(self, value: &Value) -> Result<EngineSettings, String> {
+        let no_settings = |settings: EngineSettings| match value {
+            Value::Object(fields) if fields.is_empty() => Ok(settings),
+            _ => Err("this engine takes no settings".to_string()),
+        };
         match self {
-            Self::DifferenceEquations => match value {
-                Value::Object(fields) if fields.is_empty() => {
-                    Ok(EngineSettings::DifferenceEquations)
-                }
-                _ => Err("this engine takes no settings".to_string()),
-            },
+            Self::DifferenceEquations => no_settings(EngineSettings::DifferenceEquations),
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => no_settings(EngineSettings::TestEngine),
             Self::DifferentialEquations => {
                 let solver: OdeSolver =
                     serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
@@ -182,6 +282,9 @@ pub enum EngineSettings {
     DifferenceEquations,
     /// Solver settings of the differential engine.
     DifferentialEquations(OdeSolver),
+    /// The engine of the test model kind has no settings.
+    #[cfg(feature = "test-kind")]
+    TestEngine,
 }
 
 impl EngineSettings {
@@ -190,6 +293,8 @@ impl EngineSettings {
         match self {
             Self::DifferenceEquations => EngineType::DifferenceEquations,
             Self::DifferentialEquations(_) => EngineType::DifferentialEquations,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => EngineType::TestEngine,
         }
     }
 
@@ -198,6 +303,8 @@ impl EngineSettings {
         match self {
             Self::DifferenceEquations => None,
             Self::DifferentialEquations(solver) => serde_json::to_value(solver).ok(),
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => None,
         }
     }
 }
@@ -338,7 +445,7 @@ mod tests {
 
     #[test]
     fn every_entry_has_a_unique_name_that_reads_back() {
-        for engine in EngineType::ALL {
+        for &engine in EngineType::ALL {
             assert_eq!(EngineType::from_name(engine.name()), Ok(engine));
             let json = serde_json::to_value(engine).unwrap();
             assert_eq!(json, json!(engine.name()));
@@ -349,9 +456,14 @@ mod tests {
 
     #[test]
     fn every_entry_names_its_kind_and_rate_meaning() {
-        for engine in EngineType::ALL {
-            assert_eq!(engine.kind().name(), "compartmental");
-        }
+        assert_eq!(
+            EngineType::DifferenceEquations.kind(),
+            ModelKind::Compartmental
+        );
+        assert_eq!(
+            EngineType::DifferentialEquations.kind(),
+            ModelKind::Compartmental
+        );
         assert_eq!(
             EngineType::DifferenceEquations.rate_meaning(),
             RateMeaning::PerStep
@@ -364,7 +476,7 @@ mod tests {
 
     #[test]
     fn every_entry_prints_its_equations() {
-        for engine in EngineType::ALL {
+        for &engine in EngineType::ALL {
             for latex in [false, true] {
                 assert!(engine.equation_lhs("S", latex).contains('S'));
             }
@@ -381,7 +493,7 @@ mod tests {
 
     #[test]
     fn every_entry_takes_its_defaults() {
-        for engine in EngineType::ALL {
+        for &engine in EngineType::ALL {
             let settings = engine.settings(None).unwrap();
             assert_eq!(settings.engine_type(), engine);
         }
@@ -390,7 +502,7 @@ mod tests {
     #[test]
     fn every_entry_rejects_wrong_settings() {
         let wrong = json!({"no_such_setting": 1});
-        for engine in EngineType::ALL {
+        for &engine in EngineType::ALL {
             let error = engine.settings(Some(&wrong)).unwrap_err();
             assert!(error.contains(engine.name()), "{error}");
         }
@@ -404,6 +516,38 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("DifferentialEquations"), "{error}");
         assert!(error.contains("DifferenceEquations"), "{error}");
+    }
+
+    #[test]
+    fn an_engine_rejects_a_model_of_another_kind() {
+        assert_eq!(
+            EngineType::DifferenceEquations.check_kind(ModelKind::Compartmental),
+            Ok(())
+        );
+        for &kind in ModelKind::ALL {
+            for &engine in EngineType::ALL {
+                if engine.kind() == kind {
+                    continue;
+                }
+                let error = engine.check_kind(kind).unwrap_err();
+                assert!(error.contains(engine.name()), "{error}");
+                assert!(error.contains(engine.kind().name()), "{error}");
+                assert!(error.contains(kind.name()), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_kind_has_a_unique_name_that_reads_back() {
+        for &kind in ModelKind::ALL {
+            assert_eq!(ModelKind::from_name(kind.name()), Ok(kind));
+        }
+        let error = ModelKind::from_name("network").unwrap_err();
+        assert!(error.contains("compartmental"), "{error}");
+        assert_eq!(
+            ModelKind::Compartmental.value_types(),
+            &[ModelValueType::InitialCondition]
+        );
     }
 
     #[test]

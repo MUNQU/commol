@@ -104,7 +104,7 @@ class TestDefinition:
         path = tmp_path / "impulse.json"
         model.to_json(path)
 
-        transition = Model.from_json(path).dynamics.transitions[0]
+        transition = Model.from_json(path).structure.transitions[0]
 
         assert transition.impulse_every == (7.5, 0.5)
         assert transition.is_impulse

@@ -6,6 +6,7 @@ Axes
 Figure
 EngineProtocol
 RustModelProtocol
+RustCompartmentalStructureProtocol
 CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
 CalibrationConstraintProtocol

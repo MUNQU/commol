@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use commol_core::{MathExpressionContext, OutputLabels};
+use commol_core::MathExpressionContext;
+
+use crate::labels::OutputLabels;
 
 use crate::rates::{Clock, evaluate_rate};
 use crate::types::{CompiledModel, TransitionFlow};
@@ -46,6 +48,11 @@ impl CompiledModel {
     /// [`Self::output_names`].
     pub fn output_labels(&self) -> &[OutputLabels] {
         &self.output_labels
+    }
+
+    /// The population size the initial fractions are taken of.
+    pub fn population_size(&self) -> f64 {
+        self.population_size
     }
 
     /// Number of compartments. The accumulators follow them in the state.

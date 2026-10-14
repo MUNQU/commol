@@ -1,6 +1,6 @@
 //! # Commol Calibration
 //!
-//! Model-agnostic calibration and parameter estimation for compartment models.
+//! Model-agnostic calibration and parameter estimation.
 //!
 //! This crate provides tools for calibrating any model that implements the
 //! `SimulationEngine` trait from `commol-core`. It uses the `argmin` optimization
@@ -9,7 +9,8 @@
 //!
 //! ## Features
 //!
-//! - **Model-agnostic**: Works with DifferenceEquations, NetworkModel, or any future model type
+//! - **Model-agnostic**: Works with the engine of any model kind; the engine
+//!   resolves and writes the values of its kind, such as initial conditions
 //! - **Multiple algorithms**: Nelder-Mead, L-BFGS, Particle Swarm Optimization
 //! - **Flexible loss functions**: SSE, RMSE, MAE
 //! - **Type-safe**: Leverages Rust's type system for compile-time guarantees
@@ -65,16 +66,13 @@
 #![warn(missing_docs)]
 
 pub mod calibration_problem;
-pub mod initial_conditions;
 pub mod optimization;
 pub mod probabilistic;
 pub mod types;
+pub mod values;
 
 // Re-export commonly used items
 pub use calibration_problem::{check_positions, CalibrationProblem};
-pub use initial_conditions::{
-    calibrated_initial_population, check_initial_conditions, CalibratedInitialPopulation,
-};
 pub use optimization::{
     converged, optimize, optimize_with_history, optimize_with_observer, AccelerationStrategy,
     InertiaWeightStrategy, InitializationStrategy, MutationApplication, MutationStrategy,
@@ -94,3 +92,4 @@ pub use types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
     CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
 };
+pub use values::{check_model_values, configured_engine};

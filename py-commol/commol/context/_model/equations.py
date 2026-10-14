@@ -30,7 +30,7 @@ class EquationPrinter:
 
     def _transition_flows(self) -> list[TransitionFlow]:
         if self._flows is None:
-            self._flows = engine_state.transition_flows(self._model)
+            self._flows = engine_state.transition_flows(self._model.structure)
         return self._flows
 
     def print_equations(
@@ -69,19 +69,19 @@ class EquationPrinter:
         lines.append("=" * 40)
         lines.append(f"Model: {self._model.name}")
         lines.append(f"Model Type: {self._model.engine.type}")
-        lines.append(f"Number of Bins: {len(self._model.population.bins)}")
+        lines.append(f"Number of Bins: {len(self._model.structure.bins)}")
         lines.append(
-            f"Number of Stratifications: {len(self._model.population.stratifications)}"
+            f"Number of Stratifications: {len(self._model.structure.stratifications)}"
         )
         lines.append(f"Number of Parameters: {len(self._model.parameters)}")
-        lines.append(f"Number of Transitions: {len(self._model.dynamics.transitions)}")
+        lines.append(f"Number of Transitions: {len(self._model.structure.transitions)}")
 
-        bin_ids = [bin_item.id for bin_item in self._model.population.bins]
+        bin_ids = [bin_item.id for bin_item in self._model.structure.bins]
         lines.append(f"Bins: {', '.join(bin_ids)}")
 
-        if self._model.population.stratifications:
+        if self._model.structure.stratifications:
             lines.append("Stratifications:")
-            for strat in self._model.population.stratifications:
+            for strat in self._model.structure.stratifications:
                 categories = ", ".join(strat.categories)
                 lines.append(f"  - {strat.id}: [{categories}]")
 
@@ -109,15 +109,15 @@ class EquationPrinter:
 
         # Transitions are grouped as the definition declares them: between
         # bins, or between the categories of one stratification.
-        bin_ids = {bin_item.id for bin_item in self._model.population.bins}
+        bin_ids = {bin_item.id for bin_item in self._model.structure.bins}
         groups: list[tuple[str, list]] = [("Bin Transitions:", [])]
         by_stratification: dict[str, list] = {}
-        for transition in self._model.dynamics.transitions:
+        for transition in self._model.structure.transitions:
             states = set(transition.source) | set(transition.target)
             if states <= bin_ids:
                 groups[0][1].append(transition)
                 continue
-            for strat in self._model.population.stratifications:
+            for strat in self._model.structure.stratifications:
                 if states <= set(strat.categories):
                     by_stratification.setdefault(strat.id, []).append(transition)
                     break
@@ -144,7 +144,7 @@ class EquationPrinter:
         num_compartments = len(self._helper.generate_compartments())
         lines.extend(
             self._format_total_system_size(
-                [bin_item.id for bin_item in self._model.population.bins],
+                [bin_item.id for bin_item in self._model.structure.bins],
                 num_compartments,
             )
         )
@@ -184,12 +184,12 @@ class EquationPrinter:
         self, bin_ids: list[str], num_compartments: int
     ) -> list[str]:
         num_bins = len(bin_ids)
-        if not self._model.population.stratifications:
+        if not self._model.structure.stratifications:
             return [f"Total System: {num_bins} coupled equations ({num_bins} bins)"]
 
         strat_details = [
             f"{len(strat.categories)} {strat.id}"
-            for strat in self._model.population.stratifications
+            for strat in self._model.structure.stratifications
         ]
         return [
             f"Total System: {num_compartments} coupled equations "
@@ -207,14 +207,14 @@ class EquationPrinter:
         lines.append("EXPANDED FORM")
         lines.append("=" * 40)
 
-        compartments, _ = engine_state.expanded_outputs(self._model)
+        compartments, _ = engine_state.expanded_outputs(self._model.structure)
         # Net coefficient of each flow term per compartment, in first-seen
         # order: a piece that leaves and enters the same compartment cancels,
         # and a compartment a flow enters twice gains it twice.
         net: dict[str, dict[str, int]] = {
             compartment.name: {} for compartment in compartments
         }
-        impulse_ids = {t.id for t in self._model.dynamics.transitions if t.is_impulse}
+        impulse_ids = {t.id for t in self._model.structure.transitions if t.is_impulse}
         for flow in self._transition_flows():
             if flow.transition in impulse_ids:
                 continue
@@ -247,7 +247,7 @@ class EquationPrinter:
 
     def _generate_impulses(self, format: str) -> list[str]:
         """Each impulse transition: where it acts and the amounts it moves."""
-        transitions = [t for t in self._model.dynamics.transitions if t.is_impulse]
+        transitions = [t for t in self._model.structure.transitions if t.is_impulse]
         if not transitions:
             return []
         lines = ["=" * 40, "IMPULSES", "=" * 40]

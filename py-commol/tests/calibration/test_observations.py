@@ -158,7 +158,7 @@ class TestStepsBetweenIntegers:
         assert fitted["k"] == pytest.approx(0.2, rel=1e-5)
 
 
-class TestPositionsAndTypology:
+class TestPositionsAndEngines:
     def test_one_output_names_its_series(self) -> None:
         point = ObservedDataPoint(at=3, output="I", value=1.0)
 

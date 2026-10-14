@@ -1,16 +1,16 @@
-//! Python bindings for commol-model: what a model expands into, whatever
-//! engine runs it.
+//! Python bindings for commol-model: what a compartmental structure expands
+//! into, whatever engine runs it.
 
-use crate::core::PyModel;
+use crate::core::{PyCompartmentalStructure, PyModel};
 use pyo3::prelude::*;
 
-/// Expand a model into its compartments and their initial populations
+/// Expand a structure into its compartments and their initial populations
 ///
-/// This is the authority for the initial state of a model, including
-/// per-compartment overrides.
+/// This is the authority for the initial state of a compartmental model,
+/// including per-compartment overrides.
 ///
 /// Args:
-///     model: The compartment model
+///     structure: The compartmental structure
 ///
 /// Returns:
 ///     One `(name, bin, categories, population)` tuple per expanded compartment,
@@ -23,8 +23,10 @@ use pyo3::prelude::*;
 ///         exceed population_size
 #[pyfunction]
 #[allow(clippy::type_complexity)]
-fn initial_state(model: &PyModel) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64)>> {
-    let state = commol_model::initial_state(&model.inner)
+fn initial_state(
+    structure: &PyCompartmentalStructure,
+) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64)>> {
+    let state = commol_model::initial_state(&structure.inner)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(state
         .into_iter()
@@ -39,12 +41,12 @@ fn initial_state(model: &PyModel) -> PyResult<Vec<(String, String, Vec<(String, 
         .collect())
 }
 
-/// Expand the bins and accumulators of a model over its stratifications
+/// Expand the bins and accumulators of a structure over its stratifications
 ///
-/// This is the authority for the names a model expands into.
+/// This is the authority for the names a compartmental model expands into.
 ///
 /// Args:
-///     model: The compartment model
+///     structure: The compartmental structure
 ///
 /// Returns:
 ///     A `(compartments, accumulators)` tuple. Each holds one
@@ -54,7 +56,7 @@ fn initial_state(model: &PyModel) -> PyResult<Vec<(String, String, Vec<(String, 
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn expanded_outputs(
-    model: &PyModel,
+    structure: &PyCompartmentalStructure,
 ) -> (
     Vec<(String, String, Vec<(String, String)>)>,
     Vec<(String, String, Vec<(String, String)>)>,
@@ -66,15 +68,16 @@ fn expanded_outputs(
             .collect()
     };
     (
-        as_tuples(commol_model::expand_compartments(&model.inner)),
-        as_tuples(commol_model::expand_accumulators(&model.inner)),
+        as_tuples(commol_model::expand_compartments(&structure.inner)),
+        as_tuples(commol_model::expand_accumulators(&structure.inner)),
     )
 }
 
-/// Every transition flow of a model, exactly as the engine simulates it
+/// Every transition flow of a structure, exactly as the engine simulates it
 ///
 /// Args:
-///     model: The compartment model, whatever its engine
+///     structure: The compartmental structure, whatever the engine of its
+///         model
 ///
 /// Returns:
 ///     One `(transition, source, target, rate, per_capita_of)` tuple per flow
@@ -89,7 +92,7 @@ fn expanded_outputs(
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn transition_flows(
-    model: &PyModel,
+    structure: &PyCompartmentalStructure,
 ) -> PyResult<
     Vec<(
         String,
@@ -99,7 +102,7 @@ fn transition_flows(
         Option<String>,
     )>,
 > {
-    let flows = commol_model::describe_flows(&model.inner)
+    let flows = commol_model::describe_flows(&structure.inner)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(flows
         .into_iter()
@@ -118,10 +121,10 @@ fn transition_flows(
 /// Check the names a model uses against the names the engine provides
 ///
 /// Args:
-///     model: The compartment model
+///     model: A compartmental model
 ///
 /// Raises:
-///     ValueError: If a parameter id is an expanded compartment or a
+///     ValueError: If the model is not compartmental, a parameter id is an expanded compartment or a
 ///         subpopulation total, or a rate uses an `N_…` name that is not a
 ///         subpopulation of the model
 #[pyfunction]

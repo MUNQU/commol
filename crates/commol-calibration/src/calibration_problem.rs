@@ -5,13 +5,11 @@ use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
-use crate::initial_conditions::{
-    clamp_to_bounds, configure_engine, is_infeasible, InitialConditionPlan,
-};
 use crate::types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
     LossConfig, ObservedDataPoint,
 };
+use crate::values::{clamp_to_bounds, configure_engine, ValueWriter};
 
 /// Generic calibration problem that works with any SimulationEngine implementation.
 ///
@@ -71,8 +69,8 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
 
-    /// Resolved initial-condition targets and remainder of the parameters.
-    initial_conditions: InitialConditionPlan,
+    /// How the parameters and the values of the model kind reach the engine.
+    values: ValueWriter<E>,
 
     /// Factor parameter indices for observed data points (parallel to observed_data vec)
     /// None if no factor is applied, Some(param_idx) if a factor parameter should be applied
@@ -93,10 +91,6 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Wrapped in RwLock to allow thread-safe mutation in cost() method
     result_buffer: RwLock<Vec<Vec<f64>>>,
 
-    /// Initial population size for converting fractions to absolute values
-    /// From the model's defined initial_population_size
-    initial_population_size: f64,
-
     /// Constraints on parameters and/or compartment values
     constraints: Vec<CalibrationConstraint>,
 
@@ -112,19 +106,15 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Indices of constraints at positions (evaluated at those positions during simulation)
     time_dependent_constraint_indices: Vec<usize>,
 
-    /// Pre-computed prefix → compartment-index mappings for constraint evaluation.
-    ///
-    /// A prefix referenced in a constraint expression resolves to the total
-    /// population of all compartments that share that prefix. This covers full bin
-    /// names (aggregating over all strata) as well as partial stratification
-    /// specifications (aggregating over the remaining unspecified strata),
-    /// consistent with how such names behave everywhere else in the model.
-    bin_aggregates: Vec<(String, Vec<usize>)>,
+    /// Named sums of outputs a constraint may read
+    /// ([`SimulationEngine::output_sums`]), such as the total of a bin over
+    /// its categories.
+    output_sums: Vec<(String, Vec<usize>)>,
 
-    /// Outputs that are not population compartments (accumulators), as
-    /// `(name, row index)`. These are injected by name during constraint
-    /// evaluation so they resolve without counting towards `N`.
-    non_population_outputs: Vec<(String, usize)>,
+    /// Outputs after the state ([`SimulationEngine::state_outputs`]), such as
+    /// accumulators, as `(name, row index)`. These are injected by name during
+    /// constraint evaluation so they resolve without counting towards `N`.
+    non_state_outputs: Vec<(String, usize)>,
 
     /// Phantom data for type parameter
     _phantom: PhantomData<E>,
@@ -146,47 +136,21 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             observed_previous_time_indices: self.observed_previous_time_indices.clone(),
             constraint_time_indices: self.constraint_time_indices.clone(),
             parameters: self.parameters.clone(),
-            initial_conditions: self.initial_conditions.clone(),
+            values: self.values.clone(),
             observed_factor_indices: self.observed_factor_indices.clone(),
             observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
             result_buffer: RwLock::new(result_buffer),
-            initial_population_size: self.initial_population_size,
             constraints: self.constraints.clone(),
             compiled_constraints: self.compiled_constraints.clone(),
             evaluations: RwLock::new(Vec::new()), // Each clone gets fresh evaluation history
             parameter_constraint_indices: self.parameter_constraint_indices.clone(),
             time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
-            bin_aggregates: self.bin_aggregates.clone(),
-            non_population_outputs: self.non_population_outputs.clone(),
+            output_sums: self.output_sums.clone(),
+            non_state_outputs: self.non_state_outputs.clone(),
             _phantom: PhantomData,
         }
     }
-}
-
-/// Build a mapping from output name prefixes to the indices of every output
-/// that shares that prefix.
-///
-/// A prefix is an output's source followed by any number of its leading
-/// categories (`A`, `A_g1`), short of its full name, and is built from the
-/// labels rather than by splitting names, so a bin `A` never covers the
-/// outputs of a bin `A_x`. A key is retained only when two or more outputs
-/// share it, making it useful for aggregation. This covers both full bin names
-/// (aggregating over all strata) and partial stratification specifications
-/// (aggregating over the remaining unspecified strata).
-fn compute_bin_aggregates(labels: &[commol_core::OutputLabels]) -> Vec<(String, Vec<usize>)> {
-    let mut map: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
-    for (idx, label) in labels.iter().enumerate() {
-        let mut prefixes = label.prefixes();
-        prefixes.pop();
-        for prefix in prefixes {
-            map.entry(prefix).or_default().push(idx);
-        }
-    }
-    let mut result: Vec<(String, Vec<usize>)> =
-        map.into_iter().filter(|(_, v)| v.len() > 1).collect();
-    result.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
-    result
 }
 
 /// Compute per-observation normalization factors (parallel to `observed_data`).
@@ -260,7 +224,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         parameters: Vec<CalibrationParameter>,
         constraints: Vec<CalibrationConstraint>,
         loss_config: LossConfig,
-        initial_population_size: u64,
     ) -> Result<Self, String> {
         // Validate inputs
         if observed_data.is_empty() {
@@ -281,15 +244,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .map(|(idx, name)| (name.as_str(), idx))
             .collect();
 
-        // Aggregate prefixes over every output, so a constraint can name a bare bin
-        // or a bare accumulator and get the total across strata. Indices address
-        // full output rows, matching the rows that time-dependent constraints are
-        // evaluated against.
-        let output_aggregates = compute_bin_aggregates(&base_engine.output_labels());
-        let output_aggregate_names: std::collections::HashSet<&str> = output_aggregates
-            .iter()
-            .map(|(name, _)| name.as_str())
-            .collect();
+        // Named sums of outputs, so a constraint can name, for example, a bare
+        // bin and get its total across categories. Indices address full output
+        // rows, matching the rows that time-dependent constraints are evaluated
+        // against.
+        let output_sums = base_engine.output_sums();
+        let output_sum_names: std::collections::HashSet<&str> =
+            output_sums.iter().map(|(name, _)| name.as_str()).collect();
 
         // Validate observed output names and convert to indices.
         let mut observed_output_indices = Vec::with_capacity(observed_data.len());
@@ -320,9 +281,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_output_indices.push(indices);
         }
 
-        // Resolve the initial-condition target of every calibration parameter
-        let compartments = base_engine.compartments();
-        let initial_conditions = InitialConditionPlan::new(&base_engine, &parameters)?;
+        // Ask the engine to resolve the values of its model kind
+        let values = ValueWriter::new(&base_engine, &parameters, None)?;
 
         // Build parameter ID to index mapping for factor lookups
         let param_id_map: std::collections::HashMap<&str, usize> = parameters
@@ -409,7 +369,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 // reference accumulators as well as state compartments, plus any
                 // aggregate prefix of either.
                 let is_compartment = output_map.contains_key(var.as_str())
-                    || output_aggregate_names.contains(var.as_str());
+                    || output_sum_names.contains(var.as_str());
 
                 if !is_parameter && !is_compartment {
                     return Err(format!(
@@ -478,13 +438,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let buffer_capacity = simulation_positions.len();
         let result_buffer = Vec::with_capacity(buffer_capacity);
 
-        let bin_aggregates = output_aggregates;
-        // Outputs past the population block are accumulators; keep their row
-        // indices so constraints can name them individually.
-        let non_population_outputs: Vec<(String, usize)> = output_names
+        // Outputs past the state, such as accumulators; keep their row indices
+        // so constraints can name them individually.
+        let non_state_outputs: Vec<(String, usize)> = output_names
             .iter()
             .enumerate()
-            .skip(compartments.len())
+            .skip(base_engine.state_outputs())
             .map(|(idx, name)| (name.clone(), idx))
             .collect();
 
@@ -497,19 +456,18 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_previous_time_indices,
             constraint_time_indices,
             parameters,
-            initial_conditions,
+            values,
             observed_factor_indices,
             observed_normalization,
             loss_config,
             result_buffer: RwLock::new(result_buffer),
-            initial_population_size: initial_population_size as f64,
             constraints,
             compiled_constraints,
             evaluations: RwLock::new(Vec::new()),
             parameter_constraint_indices,
             time_dependent_constraint_indices,
-            bin_aggregates,
-            non_population_outputs,
+            output_sums,
+            non_state_outputs,
             _phantom: PhantomData,
         })
     }
@@ -529,24 +487,23 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         self
     }
 
-    /// Name the compartment or bin that absorbs the difference to the
-    /// population size once the calibrated initial conditions are applied.
+    /// Name the id that takes what the calibrated initial conditions leave of
+    /// the total the model kind keeps; the engine resolves it.
     ///
-    /// Without a remainder, calibrated initial conditions are applied as
-    /// given and only a total above the population size is penalized. With
-    /// one, the initial population always equals the population size, and a
-    /// combination that would leave the remainder negative is penalized.
+    /// For a compartmental model it is a compartment or bin that absorbs the
+    /// difference to the population size. Without a remainder, calibrated
+    /// initial conditions are applied as given and only a total above the
+    /// population size is penalized. With one, the initial population always
+    /// equals the population size, and a combination that would leave the
+    /// remainder negative is penalized.
     ///
     /// # Errors
     ///
-    /// Returns a message when the id is not a compartment, bin or bin prefix,
-    /// or overlaps a calibrated bin or compartment.
+    /// Returns the engine's message when the id does not resolve, for example
+    /// when it is not a compartment, bin or bin prefix, or overlaps a
+    /// calibrated bin or compartment.
     pub fn with_initial_condition_remainder(mut self, remainder: &str) -> Result<Self, String> {
-        self.initial_conditions = self.initial_conditions.with_remainder(
-            &self.base_engine,
-            &self.parameters,
-            remainder,
-        )?;
+        self.values = ValueWriter::new(&self.base_engine, &self.parameters, Some(remainder))?;
         Ok(self)
     }
 
@@ -686,8 +643,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         configure_engine(
             &self.base_engine,
             &self.parameters,
-            &self.initial_conditions,
-            self.initial_population_size,
+            &self.values,
             param_values,
         )
         .map(|(engine, _)| engine)
@@ -772,11 +728,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Create context with parameter values
         let mut context = MathExpressionContext::new();
 
-        // Only population compartments are registered, so `N` stays the population
-        // total. Accumulators live further along each result row and are injected by
-        // name below, alongside the aggregates.
-        let compartment_names = self.base_engine.compartments();
-        context.init_compartments(compartment_names);
+        // Only the state outputs are registered, so `N` stays the total of the
+        // state. Outputs after it, such as accumulators, are injected by name
+        // below, alongside the sums.
+        let mut state_names = self.base_engine.output_names();
+        state_names.truncate(self.base_engine.state_outputs());
+        context.init_compartments(state_names);
 
         // Set parameter values
         for (idx, param) in self.parameters.iter().enumerate() {
@@ -802,16 +759,16 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 if let Some(step_data) = simulation_results.get(time_idx) {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
-                    // Accumulators are not registered as compartments (they must not
+                    // Outputs after the state are not registered (they must not
                     // count towards `N`), so inject them by name.
-                    for (name, idx) in &self.non_population_outputs {
+                    for (name, idx) in &self.non_state_outputs {
                         context.set_parameter_str(name, step_data[*idx]);
                     }
-                    // Inject bin totals so bare bin names resolve to the sum across
-                    // all strata, overriding any calibration parameter with the same name.
-                    for (bin_name, indices) in &self.bin_aggregates {
+                    // Inject the sums, overriding any calibration parameter with
+                    // the same name.
+                    for (name, indices) in &self.output_sums {
                         let total: f64 = indices.iter().map(|&i| step_data[i]).sum();
-                        context.set_parameter_str(bin_name, total);
+                        context.set_parameter_str(name, total);
                     }
                     context.set_step(time_step);
 
@@ -879,19 +836,14 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
         // Reset engine to initial conditions
         engine.reset();
 
-        // Update parameters and initial conditions
+        // Update parameters and the values of the model kind
         let excess = self
-            .initial_conditions
-            .apply(
-                &mut engine,
-                &self.parameters,
-                self.initial_population_size,
-                &clamped_params,
-            )
+            .values
+            .apply(&mut engine, &self.parameters, &clamped_params)
             .map_err(Error::msg)?;
 
-        if is_infeasible(excess) {
-            // The initial population exceeds the population size
+        if excess > 0.0 {
+            // The values make the starting state infeasible
             let base_penalty = self.calculate_base_penalty();
             return Ok(base_penalty * (1.0 + excess * 100.0));
         }
@@ -1002,40 +954,4 @@ pub fn check_positions<E: SimulationEngine>(
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod aggregate_tests {
-    use super::*;
-    use commol_core::OutputLabels;
-
-    fn label(source: &str, categories: &[(&str, &str)]) -> OutputLabels {
-        OutputLabels {
-            source: source.to_string(),
-            categories: categories
-                .iter()
-                .map(|(id, category)| (id.to_string(), category.to_string()))
-                .collect(),
-        }
-    }
-
-    #[test]
-    fn aggregates_follow_labels_not_name_prefixes() {
-        let labels = vec![
-            label("A", &[("group", "g1"), ("sub", "s1")]),
-            label("A", &[("group", "g1"), ("sub", "s2")]),
-            label("A", &[("group", "g2"), ("sub", "s1")]),
-            label("A_x", &[("group", "g1"), ("sub", "s1")]),
-            label("A_x", &[("group", "g1"), ("sub", "s2")]),
-        ];
-
-        let aggregates: std::collections::HashMap<String, Vec<usize>> =
-            compute_bin_aggregates(&labels).into_iter().collect();
-
-        assert_eq!(aggregates["A"], vec![0, 1, 2]);
-        assert_eq!(aggregates["A_g1"], vec![0, 1]);
-        assert_eq!(aggregates["A_x"], vec![3, 4]);
-        assert_eq!(aggregates["A_x_g1"], vec![3, 4]);
-        assert!(!aggregates.contains_key("A_g2"));
-    }
 }

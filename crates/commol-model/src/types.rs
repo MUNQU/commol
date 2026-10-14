@@ -313,8 +313,10 @@ pub(crate) struct GeneratedAccumulatorOutput {
 #[derive(Clone)]
 pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
+    /// The population size the initial fractions are taken of.
+    pub(crate) population_size: f64,
     /// Source and applied categories of each output, parallel to `output_names`
-    pub(crate) output_labels: Vec<commol_core::OutputLabels>,
+    pub(crate) output_labels: Vec<crate::labels::OutputLabels>,
     pub(crate) output_names: Vec<String>,
     /// Initial state: compartments, then accumulators (which start at zero).
     pub(crate) initial_state: Vec<f64>,

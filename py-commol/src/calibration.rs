@@ -1065,7 +1065,6 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 ///     constraints: List of calibration constraints
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population size from the model
 ///     initial_condition_remainder: Compartment or bin that absorbs the
 ///         difference to the population size, if any
 ///
@@ -1073,7 +1072,7 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 ///     CalibrationResult with best parameters and optimization statistics
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
 fn calibrate(
     engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
@@ -1081,7 +1080,6 @@ fn calibrate(
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<PyCalibrationResult> {
     // Extract inner Rust types
@@ -1099,7 +1097,6 @@ fn calibrate(
         parameters,
         constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1139,7 +1136,6 @@ fn calibrate(
 ///     constraints: List of constraints on parameters/compartments
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population for fraction calculations
 ///     initial_condition_remainder: Compartment or bin that absorbs the
 ///         difference to the population size, if any
 ///
@@ -1147,7 +1143,7 @@ fn calibrate(
 ///     CalibrationResultWithHistory containing best parameters and all evaluations
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
 fn calibrate_with_history(
     engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
@@ -1155,7 +1151,6 @@ fn calibrate_with_history(
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<PyCalibrationResultWithHistory> {
     // Extract inner Rust types
@@ -1173,7 +1168,6 @@ fn calibrate_with_history(
         parameters,
         constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1199,7 +1193,6 @@ fn calibrate_with_history(
 ///     constraints: List of constraints on parameters/compartments
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population for fraction calculations
 ///     initial_condition_remainder: Compartment or bin that absorbs the
 ///         difference to the population size, if any
 ///     n_runs: Number of calibration runs to perform
@@ -1208,7 +1201,7 @@ fn calibrate_with_history(
 /// Returns:
 ///     List of CalibrationResultWithHistory for each successful run
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_multiple_calibrations(
     engine: PyRef<'_, PyEngine>,
@@ -1217,7 +1210,6 @@ fn run_multiple_calibrations(
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     n_runs: usize,
     seed: u64,
     evaluation_retention: &str,
@@ -1237,7 +1229,6 @@ fn run_multiple_calibrations(
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1346,7 +1337,7 @@ fn generate_predictions_parallel(
 /// Generate predictions for calibration parameter sets, including calibrated
 /// initial conditions, with one row per position, aligned with `positions`.
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, positions, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, positions, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_parallel(
     engine: PyRef<'_, PyEngine>,
@@ -1354,7 +1345,6 @@ fn generate_calibrated_predictions_parallel(
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
-    initial_population_size: u64,
     parameter_sets: Vec<Vec<f64>>,
     positions: Vec<f64>,
     initial_condition_remainder: Option<String>,
@@ -1368,7 +1358,6 @@ fn generate_calibrated_predictions_parallel(
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1384,17 +1373,17 @@ fn generate_calibrated_predictions_parallel(
     Ok(predictions)
 }
 
-/// Initial population an engine starts from once calibration values are applied
+/// Initial population a compartmental engine starts from once calibration
+/// values are applied
 ///
 /// The values are applied exactly as the calibration objective scores them:
 /// clamped to their bounds, with the remainder initial condition
 /// auto-calculated, and written in parameter order.
 ///
 /// Args:
-///     engine: Engine built from the model definition, before calibration
+///     engine: Engine built from a compartmental model, before calibration
 ///     parameters: Calibration parameters, in problem order
 ///     values: Value of each parameter, parallel to `parameters`
-///     initial_population_size: Population the fractions are taken of
 ///     initial_condition_remainder: Compartment or bin that absorbs the
 ///         difference to the population size, if any
 ///
@@ -1405,50 +1394,53 @@ fn generate_calibrated_predictions_parallel(
 ///     or compartment value, or the remainder, sets
 ///
 /// Raises:
-///     ValueError: If an initial-condition id cannot be resolved, the number of
-///         values is wrong, or the initial-condition fractions exceed 1.0
+///     ValueError: If the engine is not compartmental, an initial-condition id
+///         cannot be resolved, the number of values is wrong, or the
+///         initial-condition fractions exceed 1.0
 #[pyfunction]
-#[pyo3(signature = (engine, parameters, values, initial_population_size, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, parameters, values, initial_condition_remainder=None))]
 fn calibrated_initial_population(
     engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     values: Vec<f64>,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<usize>)> {
     let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let state = commol_calibration::calibrated_initial_population(
+    let (configured, applied, plan) = commol_calibration::configured_engine(
         &engine.engine(),
         &parameters,
         initial_condition_remainder.as_deref(),
         &values,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    Ok((state.values, state.population, state.covered))
+    let (population, covered) = crate::engine::compartmental_state(&configured, &plan)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    Ok((applied, population, covered))
 }
 
-/// Check that every initial-condition id and the remainder resolve
+/// Check that the engine resolves every value of its model kind, such as an
+/// initial condition, and the remainder
 ///
 /// Args:
 ///     engine: The simulation engine
 ///     parameters: Calibration parameters, in problem order
-///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///     initial_condition_remainder: The id that takes what the values leave
+///         of the total the model kind keeps (a compartment or bin of a
+///         compartmental model), if any
 ///
 /// Raises:
-///     ValueError: If an initial-condition id or the remainder cannot be
-///         resolved, for example a category of a stratification that is not
-///         binary
+///     ValueError: If the kind does not accept a type of value, or a value
+///         or the remainder cannot be resolved; for example a category of a
+///         stratification that is not binary
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
-fn check_initial_conditions(
+fn check_model_values(
     engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<()> {
     let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    commol_calibration::check_initial_conditions(
+    commol_calibration::check_model_values(
         &engine.engine(),
         &parameters,
         initial_condition_remainder.as_deref(),
@@ -1500,7 +1492,7 @@ fn generate_predictions_at_points_parallel(
 /// Generate compact predictions for calibration parameter sets, including
 /// calibrated initial conditions.
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, metric_points, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, metric_points, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_at_points_parallel(
     engine: PyRef<'_, PyEngine>,
@@ -1508,7 +1500,6 @@ fn generate_calibrated_predictions_at_points_parallel(
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
-    initial_population_size: u64,
     parameter_sets: Vec<Vec<f64>>,
     metric_points: Vec<(f64, usize)>,
     initial_condition_remainder: Option<String>,
@@ -1522,7 +1513,6 @@ fn generate_calibrated_predictions_at_points_parallel(
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1740,7 +1730,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEnsembleSelectionResult>()?;
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
     m.add_function(wrap_pyfunction!(calibrated_initial_population, m)?)?;
-    m.add_function(wrap_pyfunction!(check_initial_conditions, m)?)?;
+    m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;

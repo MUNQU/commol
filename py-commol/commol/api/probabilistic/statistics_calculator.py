@@ -171,7 +171,6 @@ class StatisticsCalculator:
                 runner.build_rust_parameters(),
                 runner.build_rust_constraints(),
                 runner.build_loss_config(),
-                runner.initial_population_size(),
                 [ep.parameters for ep in ensemble_params],
                 self.positions,
                 initial_condition_remainder=runner.problem.initial_condition_remainder,
