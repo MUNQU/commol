@@ -172,7 +172,7 @@ pub trait SimulationEngine: Clone {
     fn output_names(&self) -> Vec<String>;
 
     /// How many leading outputs are the state of the model. An expression
-    /// reads their sum as `N`; the outputs after them, such as accumulators,
+    /// reads their sum as `total`; the outputs after them, such as accumulators,
     /// do not count towards it.
     fn state_outputs(&self) -> usize;
 

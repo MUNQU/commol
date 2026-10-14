@@ -46,7 +46,7 @@ class CompartmentalStructure(ModelStructure):
     transitions : list[Transition]
         Flows between bins, or between the categories of one stratification.
     initial_conditions : InitialConditions
-        Population size and the fractions the compartments start with.
+        The total and the fractions the compartments start with.
     """
 
     kind: Literal["compartmental"] = "compartmental"

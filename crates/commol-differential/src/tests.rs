@@ -200,7 +200,7 @@ fn sir_model(settings: &str) -> Model {
 
 #[test]
 fn sir_keeps_the_final_size_relation() {
-    // ln(S(t) / S(0)) = -(beta / gamma) R(t) / N holds at every t.
+    // ln(S(t) / S(0)) = -(beta / gamma) R(t) / total holds at every t.
     let rows = engine(&sir_model(TIGHT)).run(300).unwrap().rows;
     for row in rows.iter().step_by(25) {
         let residual = (row[0] / 990.0).ln() + 3.0 * row[2] / 1000.0;
@@ -645,7 +645,7 @@ fn stiff_chain(n: usize) -> Model {
     )
 }
 
-/// A, B, C stratified into `groups` categories; A → B at `k1 * B / N` reads
+/// A, B, C stratified into `groups` categories; A → B at `k1 * B / total` reads
 /// the bin total `B`, so every A row of the Jacobian reads every B
 /// compartment.
 fn coupled_groups(groups: usize, method: &str) -> Model {

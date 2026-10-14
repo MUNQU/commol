@@ -113,7 +113,7 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 
     /// Outputs after the state ([`SimulationEngine::state_outputs`]), such as
     /// accumulators, as `(name, row index)`. These are injected by name during
-    /// constraint evaluation so they resolve without counting towards `N`.
+    /// constraint evaluation so they resolve without counting towards `total`.
     non_state_outputs: Vec<(String, usize)>,
 
     /// Phantom data for type parameter
@@ -733,7 +733,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Create context with parameter values
         let mut context = MathExpressionContext::new();
 
-        // Only the state outputs are registered, so `N` stays the total of the
+        // Only the state outputs are registered, so `total` stays the sum of the
         // state. Outputs after it, such as accumulators, are injected by name
         // below, alongside the sums.
         let mut state_names = self.base_engine.output_names();
@@ -765,7 +765,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
                     // Outputs after the state are not registered (they must not
-                    // count towards `N`), so inject them by name.
+                    // count towards `total`), so inject them by name.
                     for (name, idx) in &self.non_state_outputs {
                         context.set_parameter_str(name, step_data[*idx]);
                     }
