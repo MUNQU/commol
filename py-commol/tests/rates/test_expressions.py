@@ -1,9 +1,10 @@
-"""Rate expressions: constants, operators and population variables."""
+"""Rate expressions: constants, operators, the total and the subgroup totals."""
 
 import math
 
 import pytest
 
+from commol.context._model import engine_state
 from commol.context.model import Model
 from tests.support import a_to_b_builder, build, run
 
@@ -33,40 +34,45 @@ class TestConstants:
         assert result["B"][1] == pytest.approx(constant * 0.1 * 1000)
 
 
-class TestSubpopulationVariables:
+class TestSubgroupTotals:
     def test_categories_out_of_declaration_order_are_rejected(self) -> None:
-        with pytest.raises(ValueError, match="N_t1_g1") as error:
+        with pytest.raises(ValueError, match="total_t1_g1") as error:
             build(
-                a_to_b_builder(rate="k * N_t1_g1 / N", stratifications=GROUP_AND_TYPE)
+                a_to_b_builder(
+                    rate="k * total_t1_g1 / total", stratifications=GROUP_AND_TYPE
+                )
             )
 
-        assert "N_g1_t1" in str(error.value)
+        assert "total_g1_t1" in str(error.value)
 
     def test_categories_in_declaration_order_are_accepted(self) -> None:
         result = run(
-            a_to_b_builder(rate="k * N_g1_t1 / N", stratifications=GROUP_AND_TYPE), 1
+            a_to_b_builder(
+                rate="k * total_g1_t1 / total", stratifications=GROUP_AND_TYPE
+            ),
+            1,
         )
 
         # 0.1 * 250 / 1000 moves from each A compartment.
         assert result["B_g1_t1"][1] == pytest.approx(0.025)
 
-    def test_an_unknown_subpopulation_in_a_formula_parameter_is_rejected(
+    def test_an_unknown_subgroup_total_in_a_formula_parameter_is_rejected(
         self,
     ) -> None:
         builder = a_to_b_builder(
-            parameters={"share": "N_t1_g1 / N"},
+            parameters={"share": "total_t1_g1 / total"},
             rate="share",
             stratifications=GROUP_AND_TYPE,
         )
 
-        with pytest.raises(ValueError, match="'N_t1_g1'.*Valid names: N_g1, "):
+        with pytest.raises(ValueError, match="'total_t1_g1'.*Valid names: total_g1, "):
             build(builder)
 
     def test_a_combination_a_conditional_stratification_never_creates(
         self,
     ) -> None:
         builder = a_to_b_builder(
-            rate="k * N_g2_s1",
+            rate="k * total_g2_s1",
             stratifications={
                 "group": {"g1": 0.5, "g2": 0.5},
                 "sub": {"s1": 0.5, "s2": 0.5},
@@ -74,8 +80,24 @@ class TestSubpopulationVariables:
             conditions={"sub": {"group": "g1"}},
         )
 
-        with pytest.raises(ValueError, match="'N_g2_s1'"):
+        with pytest.raises(ValueError, match="'total_g2_s1'"):
             build(builder)
+
+    def test_every_name_the_engine_provides_is_accepted_in_a_rate(self) -> None:
+        strata = {
+            "stratifications": {
+                "group": {"g1": 0.5, "g2": 0.5},
+                "sub": {"s1": 0.5, "s2": 0.5},
+            },
+            "conditions": {"sub": {"group": "g1"}},
+        }
+        structure = build(a_to_b_builder(**strata)).structure
+        names = engine_state.subgroup_total_names(structure)
+
+        assert "total_g1_s1" in names
+        assert "total_g2_s1" not in names
+        for name in names:
+            build(a_to_b_builder(rate=f"k * {name} / total", **strata))
 
 
 class TestOperators:

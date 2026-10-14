@@ -47,7 +47,7 @@ mod types;
 
 pub use builder::{
     ExpandedOutput, InitialCompartment, check_names, expand_accumulators, expand_compartments,
-    initial_state,
+    initial_state, subgroup_total_names,
 };
 pub use engine::CompartmentalEngine;
 pub use flows::{FlowDescription, describe_flows};

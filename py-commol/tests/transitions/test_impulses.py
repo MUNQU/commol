@@ -31,7 +31,7 @@ def _impulse_model(
         impulse_every=impulse_every,
     )
     builder.set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
     return build_ode(builder) if ode else build(builder)
@@ -58,7 +58,7 @@ class TestJump:
         builder.add_transition("jump", ["A"], ["B"], rate="p", impulse_at=[1])
         builder.add_transition("flow", ["A"], ["B"], rate="k")
         builder.set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0}],
         )
 
@@ -86,7 +86,7 @@ class TestJump:
             "vaccination", ["S"], ["V"], rate="p", impulse_every=(period, period)
         )
         builder.set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "S", "fraction": 1.0}, {"bin": "V", "fraction": 0}],
         )
         steps = [j * period for j in range(1, 201)]
@@ -135,7 +135,7 @@ class TestDefinition:
                 "t",
                 ["A"],
                 ["B"],
-                rate=AxisPattern.pulse(at=1, amount=0.1),
+                rate=AxisPattern.pulse(at=1, value=0.1),
                 impulse_at=[1],
             )
 

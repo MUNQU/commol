@@ -38,15 +38,15 @@ class TestFormulaParameters:
             rel=ENGINE_REL,
         )
 
-    def test_a_formula_may_use_subpopulation_totals(self) -> None:
+    def test_a_formula_may_use_subgroup_totals(self) -> None:
         model = build(
             sir_builder(
                 parameters={
-                    "young_fraction": "N_young / N",
+                    "young_fraction": "total_young / total",
                     "beta": 0.3,
                     "gamma": 0.1,
                 },
-                infection="beta * young_fraction * S * I / N",
+                infection="beta * young_fraction * S * I / total",
                 stratifications={"age": {"young": 0.3, "old": 0.7}},
             )
         )
@@ -57,7 +57,7 @@ class TestFormulaParameters:
             )
         )
 
-        # N_young / N stays 0.3: no transition moves people between ages.
+        # total_young / total stays 0.3: no transition moves people between ages.
         assert_close(
             Simulation(model).run(20),
             Simulation(same_as_number).run(20),

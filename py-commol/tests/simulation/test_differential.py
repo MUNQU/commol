@@ -97,7 +97,7 @@ class TestRunAt:
 
 class TestTimeInsideAStep:
     def test_a_pulse_is_a_constant_rate_on_its_unit_interval(self) -> None:
-        pulse = AxisPattern.pulse(at=2, amount=0.2)
+        pulse = AxisPattern.pulse(at=2, value=0.2)
         ode = Simulation(build_ode(a_to_b_builder(rate=pulse))).run(4)
         difference = Simulation(build(a_to_b_builder(rate=pulse))).run(4)
 

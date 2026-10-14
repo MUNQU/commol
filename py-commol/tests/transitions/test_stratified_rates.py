@@ -35,11 +35,11 @@ class TestFallbackRate:
                 id="infection",
                 source=["S"],
                 target=["I"],
-                rate="beta_default * S * I / N",
+                rate="beta_default * S * I / total",
                 stratified_rates=[
                     {
                         "conditions": [{"stratification": "age", "category": "young"}],
-                        "rate": "beta_young * S * I / N",
+                        "rate": "beta_young * S * I / total",
                     }
                 ],
             )
@@ -160,7 +160,7 @@ class TestStratifiedRateValidation:
             )
         )
         builder.set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "S", "fraction": 1.0}],
             stratification_fractions=stratify(
                 builder,

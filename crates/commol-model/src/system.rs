@@ -2,15 +2,14 @@
 
 use std::collections::HashMap;
 
-use commol_core::MathExpressionContext;
+use commol_core::{MathExpressionContext, SPECIAL_VAR_TOTAL};
 
 use crate::labels::OutputLabels;
 
 use crate::rates::{Clock, evaluate_rate};
 use crate::types::{CompiledModel, TransitionFlow};
 
-// Cached parameter names to avoid string allocations
-const PARAM_N: &str = "N";
+// Cached parameter name to avoid string allocations
 const PARAM_T: &str = "t";
 
 /// Set a reserved parameter slot during an evaluation. When `keep_cache_live`
@@ -50,9 +49,9 @@ impl CompiledModel {
         &self.output_labels
     }
 
-    /// The population size the initial fractions are taken of.
-    pub fn population_size(&self) -> f64 {
-        self.population_size
+    /// The total the initial fractions are taken of.
+    pub fn total(&self) -> f64 {
+        self.total
     }
 
     /// Number of compartments. The accumulators follow them in the state.
@@ -70,7 +69,7 @@ impl CompiledModel {
         &self.initial_state
     }
 
-    /// Change the initial population of one compartment.
+    /// Change the initial amount of one compartment.
     ///
     /// # Errors
     ///
@@ -105,7 +104,7 @@ impl CompiledModel {
     }
 
     /// Current values of the parameters, including the variables the last
-    /// evaluation set (`N`, `t`, subpopulation totals).
+    /// evaluation set (`total`, `t`, subgroup totals).
     pub fn parameters(&self) -> &HashMap<String, f64> {
         self.expression_context.get_parameters()
     }
@@ -135,9 +134,9 @@ impl CompiledModel {
         out: &mut [f64],
     ) -> Result<(), String> {
         let num_compartments = self.compartments.len();
-        let population = &state[..num_compartments];
+        let amounts = &state[..num_compartments];
         out.fill(0.0);
-        let clock = self.prepare_context(step, t, population)?;
+        let clock = self.prepare_context(step, t, amounts)?;
 
         // Stack buffer for the JIT input vector — most rate expressions
         // reference <= 16 variables.
@@ -146,7 +145,7 @@ impl CompiledModel {
         for flow_info in &self.transition_flows {
             let flow = flow_amount(
                 flow_info,
-                population,
+                amounts,
                 &mut self.expression_context,
                 clock,
                 &mut jit_buf,
@@ -277,8 +276,8 @@ impl CompiledModel {
         }
         let num_compartments = self.compartments.len();
         let before = state.to_vec();
-        let population = &before[..num_compartments];
-        let clock = self.prepare_context(t.floor(), t, population)?;
+        let amounts = &before[..num_compartments];
+        let clock = self.prepare_context(t.floor(), t, amounts)?;
 
         let mut jit_buf = [0.0_f64; 16];
         let (compartment_out, accumulator_out) = state.split_at_mut(num_compartments);
@@ -288,7 +287,7 @@ impl CompiledModel {
             }
             let amount = flow_amount(
                 &impulse.flow,
-                population,
+                amounts,
                 &mut self.expression_context,
                 clock,
                 &mut jit_buf,
@@ -298,21 +297,21 @@ impl CompiledModel {
         Ok(true)
     }
 
-    /// Set every variable a rate may read for the state `population` at
-    /// `step` and `t`.
-    fn prepare_context(&mut self, step: f64, t: f64, population: &[f64]) -> Result<Clock, String> {
+    /// Set every variable a rate may read for the compartment amounts
+    /// `amounts` at `step` and `t`.
+    fn prepare_context(&mut self, step: f64, t: f64, amounts: &[f64]) -> Result<Clock, String> {
         let keep_cache_live = self.requires_compartment_context;
         let clock = Clock { step, time: t };
 
         self.expression_context.set_step(step);
         self.expression_context.set_time(t);
 
-        let total_population: f64 = population.iter().sum();
+        let total: f64 = amounts.iter().sum();
         set_step_parameter(
             &mut self.expression_context,
-            PARAM_N,
-            self.n_parameter_index,
-            total_population,
+            SPECIAL_VAR_TOTAL,
+            self.total_parameter_index,
+            total,
             keep_cache_live,
         )?;
         set_step_parameter(
@@ -327,15 +326,14 @@ impl CompiledModel {
         // values in the expression context. JIT-resolved transition formulas
         // and fast-path rates read compartment values directly from the state.
         if keep_cache_live {
-            self.expression_context
-                .set_compartments_by_index(population);
+            self.expression_context.set_compartments_by_index(amounts);
         }
 
-        for mapping in &self.subpopulation_mappings {
+        for mapping in &self.subgroup_total_mappings {
             let total: f64 = mapping
                 .contributing_compartment_indices
                 .iter()
-                .map(|&idx| population[idx])
+                .map(|&idx| amounts[idx])
                 .sum();
             set_step_parameter(
                 &mut self.expression_context,
@@ -381,16 +379,16 @@ impl CompiledModel {
 #[inline]
 fn flow_amount(
     flow_info: &TransitionFlow,
-    population: &[f64],
+    amounts: &[f64],
     ctx: &mut MathExpressionContext,
     clock: Clock,
     jit_buf: &mut [f64; 16],
 ) -> Result<f64, String> {
-    let rate = evaluate_rate(flow_info, population, ctx, clock, jit_buf)?;
+    let rate = evaluate_rate(flow_info, amounts, ctx, clock, jit_buf)?;
     Ok(if flow_info.is_absolute_flow {
         rate
     } else {
-        flow_info.source_index.map(|i| population[i]).unwrap_or(0.0) * rate
+        flow_info.source_index.map(|i| amounts[i]).unwrap_or(0.0) * rate
     })
 }
 

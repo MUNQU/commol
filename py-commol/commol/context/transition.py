@@ -36,8 +36,8 @@ class StratifiedRate(BaseModel):
     absolute: bool | None = Field(
         default=None,
         description=(
-            "When True, the flow is treated as absolute (not multiplied by source "
-            "population). When None, inferred from whether the rate references "
+            "When True, the flow is treated as absolute (not multiplied by the "
+            "source amount). When None, inferred from whether the rate references "
             "any compartment variable."
         ),
     )
@@ -106,7 +106,7 @@ class Transition(BaseModel):
         Examples:
         - "beta" (parameter reference)
         - "0.5" (constant, can also be passed as float 0.5)
-        - "beta * S * I / N" (mathematical formula)
+        - "beta * S * I / total" (mathematical formula)
         - "0.3 * sin(2 * pi * t / 365)" (time-dependent formula)
         - "2^10" or "2**10" (power: both syntaxes work)
     stratified_rates : list[StratifiedRate] | None
@@ -129,7 +129,7 @@ class Transition(BaseModel):
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
             "Can be a parameter reference (e.g., 'beta'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'beta * S * I / N'). "
+            "or a mathematical expression (e.g., 'beta * S * I / total'). "
             "Numeric values are automatically converted to strings during validation."
         ),
     )

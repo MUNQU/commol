@@ -156,7 +156,7 @@ class ModelCompartmentHelper:
             self._model.structure.bins[0].unit if self._model.structure.bins else None
         )
         predefined_units = get_predefined_variable_units(
-            self._model.structure.stratifications, bin_unit
+            engine_state.subgroup_total_names(self._model.structure), bin_unit
         )
         variable_units.update(predefined_units)
 

@@ -89,7 +89,7 @@ mod tests {
                 "stratifications": [],
                 "transitions": [],
                 "initial_conditions": {
-                    "population_size": 10,
+                    "total": 10.0,
                     "bin_fractions": [{"bin": "A", "fraction": 1.0}],
                     "stratification_fractions": []
                 }

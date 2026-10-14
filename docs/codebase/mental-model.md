@@ -75,7 +75,7 @@ These hold for every change. A pull request that breaks one needs a design
 discussion first.
 
 - **Rust is the single source of truth.** Python asks the engine how a model
-  expands, which population it starts with, and which flows it has. It never
+  expands, which state it starts with, and which flows it has. It never
   keeps a second implementation of those rules.
 - **Compartments are identified by labels, not by names.** A compartment is a
   bin plus one category per applied stratification (`OutputLabels`,
@@ -90,7 +90,7 @@ discussion first.
   code (global JIT cache), and calibrations accept a `seed`.
 - **What the user saves, the engine reloads.** `Model.to_json` writes every
   field, and calibrated values written back to a model reproduce the
-  population the optimizer scored.
+  state the optimizer scored.
 
 ## Checklist
 

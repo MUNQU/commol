@@ -18,10 +18,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.5, unit="1/day")
     .add_parameter(id="k2", value=0.1, unit="1/day")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -50,7 +50,7 @@ transition that fails.
 | Item | How it gets a unit |
 |---|---|
 | Bins | `ModelBuilder(bin_unit=...)`, or `add_bin(unit=...)` for one bin. Required: the check names every bin without one. |
-| `N`, `N_<category>…` | The bin unit, automatically |
+| `total`, `total_<category>…` | The bin unit, automatically |
 | Constant parameters | `add_parameter(unit=...)`. Required: the check raises if one is missing. |
 | Formula parameters | Inferred from the formula; a unit is optional |
 | `step`, `t`, `pi`, `e` | Dimensionless, automatically |
@@ -99,7 +99,7 @@ along_a_line = (
     .add_parameter(id="k1", value=0.01, unit="1/meter")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
     .build(engine="DifferentialEquations")
@@ -127,10 +127,10 @@ wrong_units = (
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.5, unit="day")  # should be "1/day"
     .add_parameter(id="k2", value=0.1, unit="1/day")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="k2 * sin(B) * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
     )
     .build(engine="DifferenceEquations")
@@ -172,7 +172,7 @@ For the model above, the compact form is:
 
 ```text
 t_ab (A -> B):
-  A -> B: k1(1/day) * A(item) * B(item) / N(item) [item / day]
+  A -> B: k1(1/day) * A(item) * B(item) / total(item) [item / day]
 t_bc (B -> C):
   B -> C: k2(1/day) * B(item) [item / day]
 ```
@@ -180,8 +180,8 @@ t_bc (B -> C):
 and the expanded form is:
 
 ```text
-[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / N)
-[B(t+Dt) - B(t)] / Dt = (k1 * A * B / N) - (k2 * B)
+[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)
+[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)
 [C(t+Dt) - C(t)] / Dt = (k2 * B)
 ```
 

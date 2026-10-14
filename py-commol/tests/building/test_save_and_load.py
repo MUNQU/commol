@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from commol.context.model import Model
 from commol.context.parameter import SeriesValue
-from tests.support import a_to_b_builder, build
+from tests.support import a_to_b_builder, build, initial_state
 
 
 def _model(k: float | None = 0.1, fraction: float | None = 1.0) -> Model:
@@ -16,7 +16,7 @@ def _model(k: float | None = 0.1, fraction: float | None = 1.0) -> Model:
     return build(
         a_to_b_builder(
             parameters={"k": k},
-            population=100,
+            total=100,
             fractions={"A": fraction, "B": 0.0},
         )
     )
@@ -59,6 +59,27 @@ class TestToJson:
 
         assert "population" in str(error.value)
         assert "dynamics" in str(error.value)
+
+    def test_a_file_with_population_size_names_it(self, tmp_path: Path) -> None:
+        data = _model().model_dump(mode="json")
+        conditions = data["structure"]["initial_conditions"]
+        conditions["population_size"] = conditions.pop("total")
+        path = tmp_path / "old.json"
+        path.write_text(json.dumps(data))
+
+        with pytest.raises(ValidationError, match="population_size"):
+            Model.from_json(path)
+
+    def test_a_real_total_reloads_with_the_same_initial_state(
+        self, tmp_path: Path
+    ) -> None:
+        model = build(a_to_b_builder(total=2.5, fractions={"A": 0.4, "B": 0.6}))
+        path = tmp_path / "model.json"
+
+        model.to_json(path)
+
+        assert initial_state(Model.from_json(path)) == initial_state(model)
+        assert initial_state(model) == pytest.approx({"A": 1.0, "B": 1.5})
 
     def test_round_trips_to_an_equal_model(self, tmp_path: Path) -> None:
         model = _model()

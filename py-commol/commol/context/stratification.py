@@ -9,7 +9,7 @@ from commol.context.stratification_condition import StratificationCondition
 
 class Stratification(BaseModel):
     """
-    Defines a categorical subdivision of the population.
+    Defines a categorical subdivision of the compartments.
 
     Attributes
     ----------

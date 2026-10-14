@@ -7,7 +7,7 @@ use evalexpr::{ContextWithMutableVariables, HashMapContext, Value};
 use std::collections::HashMap;
 
 use super::preprocessing::{
-    SPECIAL_VAR_E, SPECIAL_VAR_N, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
 };
 
 /// Context for evaluating mathematical expressions
@@ -76,12 +76,12 @@ impl MathExpressionContext {
                         .ok();
                 }
             }
-            // Update N (total population). Callers may pass a wider row than the
+            // Update the total. Callers may pass a wider row than the
             // registered compartments (simulation outputs append accumulators after
-            // the population), so only the registered compartments count towards N
-            // — matching the assignment loop above.
-            let total_pop: f64 = values.iter().take(self.compartment_names.len()).sum();
-            ctx.set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
+            // the state), so only the registered compartments count towards the
+            // total — matching the assignment loop above.
+            let total: f64 = values.iter().take(self.compartment_names.len()).sum();
+            ctx.set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
                 .ok();
         } else {
             self.cache_dirty = true;
@@ -133,7 +133,7 @@ impl MathExpressionContext {
         self.cache_dirty = true;
     }
 
-    /// Set a compartment population value
+    /// Set the amount of a compartment
     pub fn set_compartment(&mut self, name: String, value: f64) {
         self.compartments.insert(name, value);
         self.cache_dirty = true;
@@ -263,9 +263,9 @@ impl MathExpressionContext {
             // is not associative, so summing in different orders produces different results.
             let mut sorted_values: Vec<f64> = self.compartments.values().copied().collect();
             sorted_values.sort_by(|a, b| a.total_cmp(b));
-            let total_pop: f64 = sorted_values.iter().sum();
+            let total: f64 = sorted_values.iter().sum();
             context
-                .set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
+                .set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
                 .ok();
             context
                 .set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(self.step))

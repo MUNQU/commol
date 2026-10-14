@@ -48,7 +48,7 @@ class TestExpansion:
                 rate="treatment_rate * $compartment",
             )
             .set_initial_conditions(
-                population_size=1000,
+                total=1000,
                 bin_fractions=[
                     {"bin": "I_mild", "fraction": 0.6},
                     {"bin": "I_severe", "fraction": 0.3},
@@ -165,7 +165,7 @@ class TestRuns:
         results = Simulation(model).run(200)
 
         # Infection and recovery move people between bins; each step the
-        # death rate removes 1 % of every bin, so N(t) = 1000 * 0.99**t.
+        # death rate removes 1 % of every bin, so total(t) = 1000 * 0.99**t.
         totals = [
             sum(results[bin_id][step] for bin_id in ("S", "I", "R"))
             for step in range(201)

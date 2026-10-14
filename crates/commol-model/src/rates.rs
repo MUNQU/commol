@@ -21,17 +21,17 @@ pub(crate) struct Clock {
 #[inline]
 pub(crate) fn evaluate_rate(
     flow: &TransitionFlow,
-    population: &[f64],
+    amounts: &[f64],
     ctx: &mut MathExpressionContext,
     clock: Clock,
     jit_buf: &mut [f64; 16],
 ) -> Result<f64, String> {
     let rate_result = if let Some(fast_expr) = &flow.fast_rate_expression {
-        eval_fast_rate(fast_expr, population, ctx, clock)
+        eval_fast_rate(fast_expr, amounts, ctx, clock)
     } else if let (RateMathExpression::Formula(expr), Some(slots)) =
         (&flow.rate_expression, &flow.resolved_slots)
     {
-        evaluate_jit_rate(expr, slots, population, ctx, clock, jit_buf)
+        evaluate_jit_rate(expr, slots, amounts, ctx, clock, jit_buf)
     } else {
         flow.rate_expression
             .evaluate(ctx)
@@ -53,7 +53,7 @@ pub(crate) fn evaluate_rate(
 fn evaluate_jit_rate(
     expr: &MathExpression,
     slots: &[VarSlot],
-    population: &[f64],
+    amounts: &[f64],
     ctx: &MathExpressionContext,
     clock: Clock,
     jit_buf: &mut [f64; 16],
@@ -62,14 +62,14 @@ fn evaluate_jit_rate(
     if n <= jit_buf.len() {
         let values = &mut jit_buf[..n];
         for (i, slot) in slots.iter().enumerate() {
-            values[i] = resolve_slot(slot, population, ctx, clock)?;
+            values[i] = resolve_slot(slot, amounts, ctx, clock)?;
         }
         expr.call_jit_with_buffer(values)
             .map_err(|error| error.to_string())
     } else {
         let mut heap = vec![0.0; n];
         for (i, slot) in slots.iter().enumerate() {
-            heap[i] = resolve_slot(slot, population, ctx, clock)?;
+            heap[i] = resolve_slot(slot, amounts, ctx, clock)?;
         }
         expr.call_jit_with_buffer(&heap)
             .map_err(|error| error.to_string())
@@ -81,12 +81,12 @@ fn evaluate_jit_rate(
 #[inline]
 fn resolve_slot(
     slot: &VarSlot,
-    population: &[f64],
+    amounts: &[f64],
     ctx: &MathExpressionContext,
     clock: Clock,
 ) -> Result<f64, String> {
     match slot {
-        VarSlot::Compartment(idx) => Ok(population[*idx]),
+        VarSlot::Compartment(idx) => Ok(amounts[*idx]),
         VarSlot::Step => Ok(clock.step),
         VarSlot::Time => Ok(clock.time),
         VarSlot::Constant(value) => Ok(*value),
@@ -102,33 +102,33 @@ fn resolve_slot(
 #[inline]
 fn eval_fast_rate(
     expr: &FastRateExpression,
-    population: &[f64],
+    amounts: &[f64],
     ctx: &MathExpressionContext,
     clock: Clock,
 ) -> Result<f64, String> {
     match expr {
         FastRateExpression::Constant(value) => return Ok(*value),
         FastRateExpression::Slot(slot) => {
-            return resolve_slot(slot, population, ctx, clock);
+            return resolve_slot(slot, amounts, ctx, clock);
         }
         FastRateExpression::Mul2(a, b) => {
             return Ok(
-                resolve_slot(a, population, ctx, clock)? * resolve_slot(b, population, ctx, clock)?
+                resolve_slot(a, amounts, ctx, clock)? * resolve_slot(b, amounts, ctx, clock)?
             );
         }
         FastRateExpression::Mul3(a, b, c) => {
-            return Ok(resolve_slot(a, population, ctx, clock)?
-                * resolve_slot(b, population, ctx, clock)?
-                * resolve_slot(c, population, ctx, clock)?);
+            return Ok(resolve_slot(a, amounts, ctx, clock)?
+                * resolve_slot(b, amounts, ctx, clock)?
+                * resolve_slot(c, amounts, ctx, clock)?);
         }
         FastRateExpression::OneMinusMul3 {
             subtract,
             factor,
             value,
         } => {
-            return Ok((1.0 - resolve_slot(subtract, population, ctx, clock)?)
-                * resolve_slot(factor, population, ctx, clock)?
-                * resolve_slot(value, population, ctx, clock)?);
+            return Ok((1.0 - resolve_slot(subtract, amounts, ctx, clock)?)
+                * resolve_slot(factor, amounts, ctx, clock)?
+                * resolve_slot(value, amounts, ctx, clock)?);
         }
         FastRateExpression::MulAddDiv {
             first,
@@ -137,11 +137,11 @@ fn eval_fast_rate(
             add_right,
             denominator,
         } => {
-            return Ok(resolve_slot(first, population, ctx, clock)?
-                * resolve_slot(second, population, ctx, clock)?
-                * (resolve_slot(add_left, population, ctx, clock)?
-                    + resolve_slot(add_right, population, ctx, clock)?)
-                / resolve_slot(denominator, population, ctx, clock)?);
+            return Ok(resolve_slot(first, amounts, ctx, clock)?
+                * resolve_slot(second, amounts, ctx, clock)?
+                * (resolve_slot(add_left, amounts, ctx, clock)?
+                    + resolve_slot(add_right, amounts, ctx, clock)?)
+                / resolve_slot(denominator, amounts, ctx, clock)?);
         }
         FastRateExpression::Program(_) => {}
     }
@@ -158,7 +158,7 @@ fn eval_fast_rate(
             FastRateOp::Slot(slot) => push_stack(
                 &mut stack,
                 &mut sp,
-                resolve_slot(slot, population, ctx, clock)?,
+                resolve_slot(slot, amounts, ctx, clock)?,
             )?,
             FastRateOp::Add => {
                 let rhs = pop_stack(&stack, &mut sp)?;
@@ -252,19 +252,19 @@ mod tests {
     #[test]
     fn fast_rate_slot_resolves_compartment_step_and_time() {
         let ctx = MathExpressionContext::new();
-        let population = vec![10.0, 20.0];
+        let amounts = vec![10.0, 20.0];
 
         let compartment = FastRateExpression::Slot(VarSlot::Compartment(1));
         assert_eq!(
-            eval_fast_rate(&compartment, &population, &ctx, FIVE).unwrap(),
+            eval_fast_rate(&compartment, &amounts, &ctx, FIVE).unwrap(),
             20.0
         );
 
         let step = FastRateExpression::Slot(VarSlot::Step);
-        assert_eq!(eval_fast_rate(&step, &population, &ctx, FIVE).unwrap(), 5.0);
+        assert_eq!(eval_fast_rate(&step, &amounts, &ctx, FIVE).unwrap(), 5.0);
 
         let time = FastRateExpression::Slot(VarSlot::Time);
-        assert_eq!(eval_fast_rate(&time, &population, &ctx, FIVE).unwrap(), 5.5);
+        assert_eq!(eval_fast_rate(&time, &amounts, &ctx, FIVE).unwrap(), 5.5);
     }
 
     #[test]

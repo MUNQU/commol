@@ -16,7 +16,7 @@ Flow = tuple[str | None, str | None, FlowRate]
 
 
 def total(state: State) -> float:
-    """``N``: the sum of every compartment."""
+    """``total``: the sum of every compartment."""
     return sum(state.values())
 
 
@@ -29,10 +29,10 @@ def reference_run(
     Parameters
     ----------
     initial : Mapping[str, float]
-        The population of each compartment at step 0.
+        The amount of each compartment at step 0.
     flows : Sequence[Flow]
         Each flow as ``(source, target, rate)``. ``rate(state, step)`` returns
-        the amount that moves in that step, so a per-capita rate must multiply
+        what moves in that step, so a per-capita rate must multiply
         by the source itself.
     steps : int
         The number of steps.
@@ -48,11 +48,11 @@ def reference_run(
     for step in range(steps):
         change = dict.fromkeys(state, 0.0)
         for source, target, rate in flows:
-            amount = rate(state, step)
+            moved = rate(state, step)
             if source is not None:
-                change[source] -= amount
+                change[source] -= moved
             if target is not None:
-                change[target] += amount
+                change[target] += moved
         for name in state:
             state[name] += change[name]
             series[name].append(state[name])
@@ -71,4 +71,4 @@ def sir_flows(
 
 
 SIR_START = {"S": 990.0, "I": 10.0, "R": 0.0}
-"""The initial state of ``sir_builder`` with its default population and fractions."""
+"""The initial state of ``sir_builder`` with its default total and fractions."""

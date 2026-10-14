@@ -9,7 +9,7 @@ use super::DifferentialEquations;
 
 /// A model with one compartment per bin, built from JSON.
 ///
-/// `bins` holds `(id, initial population)`, `parameters` `(id, JSON value)`,
+/// `bins` holds `(id, initial amount)`, `parameters` `(id, JSON value)`,
 /// `transitions` the JSON objects of the transitions.
 fn model(
     engine_type: &str,
@@ -19,14 +19,14 @@ fn model(
     transitions: &[String],
     settings: &str,
 ) -> Model {
-    let size: f64 = bins.iter().map(|(_, population)| population).sum();
+    let total: f64 = bins.iter().map(|(_, amount)| amount).sum();
     let bin_json: Vec<String> = bins
         .iter()
         .map(|(id, _)| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
         .collect();
     let fractions: Vec<String> = bins
         .iter()
-        .map(|(id, population)| format!(r#"{{"bin":"{id}","fraction":{}}}"#, population / size))
+        .map(|(id, amount)| format!(r#"{{"bin":"{id}","fraction":{}}}"#, amount / total))
         .collect();
     let parameter_json: Vec<String> = parameters
         .iter()
@@ -41,7 +41,7 @@ fn model(
         "engine":{{"type":"{engine_type}"{settings}}},
         "structure":{{"kind":"compartmental","bins":[{}],"accumulators":[{}],
         "stratifications":[],"transitions":[{}],
-        "initial_conditions":{{"population_size":{size},"bin_fractions":[{}],
+        "initial_conditions":{{"total":{total},"bin_fractions":[{}],
         "stratification_fractions":[]}}}}}}"#,
         parameter_json.join(","),
         bin_json.join(","),
@@ -191,7 +191,7 @@ fn sir_model(settings: &str) -> Model {
         &[("beta", "0.3"), ("gamma", "0.1")],
         &[],
         &[
-            transition("infection", &["S"], &["I"], "beta * S * I / N", ""),
+            transition("infection", &["S"], &["I"], "beta * S * I / total", ""),
             transition("recovery", &["I"], &["R"], "gamma", ""),
         ],
         settings,
@@ -200,7 +200,7 @@ fn sir_model(settings: &str) -> Model {
 
 #[test]
 fn sir_keeps_the_final_size_relation() {
-    // ln(S(t) / S(0)) = -(beta / gamma) R(t) / N holds at every t.
+    // ln(S(t) / S(0)) = -(beta / gamma) R(t) / total holds at every t.
     let rows = engine(&sir_model(TIGHT)).run(300).unwrap().rows;
     for row in rows.iter().step_by(25) {
         let residual = (row[0] / 990.0).ln() + 3.0 * row[2] / 1000.0;
@@ -218,7 +218,7 @@ fn sis_reaches_its_endemic_equilibrium() {
         &[("beta", "0.4"), ("gamma", "0.1")],
         &[],
         &[
-            transition("infection", &["S"], &["I"], "beta * S * I / N", ""),
+            transition("infection", &["S"], &["I"], "beta * S * I / total", ""),
             transition("recovery", &["I"], &["S"], "gamma", ""),
         ],
         TIGHT,
@@ -645,7 +645,7 @@ fn stiff_chain(n: usize) -> Model {
     )
 }
 
-/// A, B, C stratified into `groups` categories; A → B at `k1 * B / N` reads
+/// A, B, C stratified into `groups` categories; A → B at `k1 * B / total` reads
 /// the bin total `B`, so every A row of the Jacobian reads every B
 /// compartment.
 fn coupled_groups(groups: usize, method: &str) -> Model {
@@ -667,11 +667,11 @@ fn coupled_groups(groups: usize, method: &str) -> Model {
         "bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
         {{"id":"C","name":"C"}}],"accumulators":[],
         "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[{},{}],
-        "initial_conditions":{{"population_size":10000,"bin_fractions":[
+        "initial_conditions":{{"total":10000,"bin_fractions":[
         {{"bin":"A","fraction":0.99}},{{"bin":"B","fraction":0.01}},{{"bin":"C","fraction":0.0}}],
         "stratification_fractions":[{{"stratification":"group","fractions":[{}]}}]}}}}}}"#,
         categories.join(","),
-        transition("ab", &["A"], &["B"], "k1 * B / N", ""),
+        transition("ab", &["A"], &["B"], "k1 * B / total", ""),
         transition("bc", &["B"], &["C"], "k2", ""),
         fractions.join(","),
     );
@@ -813,5 +813,5 @@ fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
     assert_eq!(engine.apply_values(&plan, &[0.4]).unwrap(), 0.0);
     engine.reset();
 
-    assert_eq!(CompartmentalEngine::population(&engine), vec![400.0, 600.0]);
+    assert_eq!(CompartmentalEngine::state(&engine), vec![400.0, 600.0]);
 }

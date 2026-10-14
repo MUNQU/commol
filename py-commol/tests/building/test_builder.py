@@ -14,7 +14,7 @@ class TestBuild:
         assert [bin_.id for bin_ in model.structure.bins] == ["S", "I", "R"]
         assert [parameter.id for parameter in model.parameters] == ["beta", "gamma"]
         assert [t.id for t in model.structure.transitions] == ["infection", "recovery"]
-        assert model.structure.initial_conditions.population_size == 1000
+        assert model.structure.initial_conditions.total == 1000
 
 
 class TestCloneAndReset:
@@ -43,7 +43,7 @@ class TestCloneAndReset:
             .add_parameter(id="k", value=0.1)
             .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
             .set_initial_conditions(
-                population_size=100,
+                total=100,
                 bin_fractions=[
                     {"bin": "A", "fraction": 1.0},
                     {"bin": "B", "fraction": 0.0},

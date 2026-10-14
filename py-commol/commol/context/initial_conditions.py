@@ -1,4 +1,4 @@
-"""Initial conditions: population size, bin, category and compartment fractions."""
+"""Initial conditions: the total, and bin, category and compartment fractions."""
 
 import math
 from collections.abc import Iterable, Mapping
@@ -88,8 +88,7 @@ class CompartmentFraction(BaseModel):
     compartment : str
         The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.
     fraction : float
-        The fraction of the total population in this compartment,
-        between 0.0 and 1.0.
+        The fraction of the total in this compartment, between 0.0 and 1.0.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -97,7 +96,7 @@ class CompartmentFraction(BaseModel):
     compartment: str = Field(default=..., description="The expanded compartment name.")
     fraction: float = Field(
         default=...,
-        description="The fraction of the total population in this compartment.",
+        description="The fraction of the total in this compartment.",
     )
 
     @field_validator("fraction")
@@ -115,8 +114,9 @@ class InitialConditions(BaseModel):
 
     Attributes
     ----------
-    population_size : int
-        Population size.
+    total : float
+        The sum of every compartment at the start, finite and greater than 0.
+        It can be a count, a mass or a concentration.
     bin_fractions : list[BinFraction]
         List of bin fractions. Each item contains a bin id and
         its initial fractional size. Fractions can be None if they need calibration.
@@ -126,12 +126,15 @@ class InitialConditions(BaseModel):
     compartment_fractions : list[CompartmentFraction], optional
         List of per-compartment overrides applied after the uniform expansion. Each
         item contains an expanded compartment name and the fraction of the total
-        population it holds.
+        it holds.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    population_size: int = Field(..., description="Population size.")
+    total: float = Field(
+        ...,
+        description="The sum of every compartment at the start, finite and > 0.",
+    )
     bin_fractions: list[BinFraction] = Field(
         default=...,
         description=(
@@ -151,21 +154,21 @@ class InitialConditions(BaseModel):
         description=(
             "List of per-compartment overrides applied after the uniform expansion. "
             "Each item contains an expanded compartment name and the fraction of the "
-            "total population it holds."
+            "total it holds."
         ),
     )
 
-    @field_validator("population_size")
+    @field_validator("total")
     @classmethod
-    def validate_population_size(cls, value: int) -> int:
-        """Enforce a strictly positive population size.
+    def validate_total(cls, value: float) -> float:
+        """Enforce a finite total greater than 0.
 
-        A zero population size would make every fraction-to-head-count
-        conversion a division by zero, so it is rejected as a domain error
-        rather than surfacing later as ``ZeroDivisionError``.
+        Every fraction of a zero total is zero, and the report divides by the
+        total, so a zero, negative or non-finite total is rejected as a domain
+        error.
         """
-        if value <= 0:
-            raise ValueError(f"population_size must be greater than 0, got {value}.")
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(f"total must be finite and greater than 0, got {value}.")
         return value
 
     @model_validator(mode="after")
@@ -192,7 +195,7 @@ class InitialConditions(BaseModel):
         Uncalibrated (``None``) fractions floor the calibrated total strictly
         below 1.0 so they can be filled later. When every bin is calibrated,
         the fractions must sum to 1.0, because they are shares of a single
-        population. Construction and updates apply the same rule, so an update
+        total. Construction and updates apply the same rule, so an update
         never produces a definition that cannot be loaded again.
 
         Parameters
@@ -332,7 +335,7 @@ class InitialConditions(BaseModel):
         -------
         float
             The declared fraction, relative to the group the category's
-            stratification applies to rather than to the whole population.
+            stratification applies to rather than to the whole model.
 
         Raises
         ------
@@ -346,34 +349,34 @@ class InitialConditions(BaseModel):
             if fraction.category == name
         )
 
-    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
+    def subgroup_total(self, categories: Iterable[str] = ()) -> float:
         """
-        Get the initial head count of a subgroup.
+        Get the initial total of a subgroup.
 
         Category fractions are relative to the group their stratification
         applies to, so the fractions of a nested chain of categories multiply.
-        Passing no categories gives the whole population.
+        Passing no categories gives the total.
 
         Parameters
         ----------
         categories : Iterable[str], optional
             Category ids, bare or qualified, forming a chain from the whole
-            population down to the subgroup, outermost first.
+            model down to the subgroup, outermost first.
 
         Returns
         -------
         float
-            Number of individuals in the subgroup at step 0.
+            The sum of the compartments of the subgroup at step 0.
 
         Raises
         ------
         ValueError
             If a category is not found or a bare name is ambiguous.
         """
-        population = float(self.population_size)
+        total = self.total
         for category in categories:
-            population *= self.get_category_fraction(category)
-        return population
+            total *= self.get_category_fraction(category)
+        return total
 
     def _owning_stratification(
         self, category: str
@@ -493,7 +496,7 @@ class InitialConditions(BaseModel):
 
         A compartment already present in ``compartment_fractions`` has its
         fraction replaced; a new one is appended. Compartment names and the
-        total population depend on the model expansion, so they are validated
+        sum of the amounts depend on the model expansion, so they are validated
         by :meth:`~commol.context.model.Model.update_compartment_fractions`
         against the engine, not here.
 
@@ -501,7 +504,7 @@ class InitialConditions(BaseModel):
         ----------
         fractions : Mapping[str, float]
             Dictionary mapping expanded compartment names to their new
-            fraction of the total population. Each value must lie between
+            fraction of the total. Each value must lie between
             0.0 and 1.0.
 
         Raises
@@ -531,7 +534,7 @@ class InitialConditions(BaseModel):
         rejected call leaves the initial conditions unchanged. The conservation
         rule of :meth:`validate_calibrated_fractions_sum_to_one` is re-applied
         to the resulting mapping: the bin fractions must sum to 1.0, while
-        uncalibrated (``None``) bins reserve the remainder. To move population
+        uncalibrated (``None``) bins reserve the remainder. To move an amount
         between bins, update every bin involved in one call.
 
         Parameters

@@ -3,7 +3,7 @@
 import pytest
 
 from commol import ModelBuilder, Simulation
-from tests.support import assert_population_conserved, build, sir_builder
+from tests.support import assert_total_conserved, build, sir_builder
 
 AGE = {"y60": 0.8, "oe60": 0.2}
 VACCINATION = {"nv": 0.7, "v": 0.3}
@@ -27,7 +27,7 @@ class TestFullProduct:
             for vaccination in VACCINATION
         }
 
-    def test_a_run_of_a_two_stratification_model_conserves_the_population(
+    def test_a_run_of_a_two_stratification_model_keeps_the_total(
         self,
     ) -> None:
         model = build(
@@ -43,7 +43,7 @@ class TestFullProduct:
         results = Simulation(model).run(10)
 
         assert len(results) == 12
-        assert_population_conserved(results, 1000.0)
+        assert_total_conserved(results, 1000.0)
 
 
 class TestConditionalStratification:
@@ -87,7 +87,7 @@ class TestConditionalStratification:
             )
         }
 
-    def test_a_run_conserves_the_population(self) -> None:
+    def test_a_run_keeps_the_total(self) -> None:
         model = build(
             sir_builder(
                 fractions={"S": 0.9, "I": 0.1, "R": 0.0},
@@ -96,7 +96,7 @@ class TestConditionalStratification:
             )
         )
 
-        assert_population_conserved(Simulation(model).run(20), 1000.0)
+        assert_total_conserved(Simulation(model).run(20), 1000.0)
 
     def test_a_condition_on_an_undeclared_stratification_is_rejected(self) -> None:
         builder = ModelBuilder(name="invalid").add_bin(id="S", name="S")

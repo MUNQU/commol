@@ -4,7 +4,7 @@
 use crate::core::{PyCompartmentalStructure, PyModel};
 use pyo3::prelude::*;
 
-/// Expand a structure into its compartments and their initial populations
+/// Expand a structure into its compartments and their initial amounts
 ///
 /// This is the authority for the initial state of a compartmental model,
 /// including per-compartment overrides.
@@ -13,14 +13,14 @@ use pyo3::prelude::*;
 ///     structure: The compartmental structure
 ///
 /// Returns:
-///     One `(name, bin, categories, population)` tuple per expanded compartment,
+///     One `(name, bin, categories, amount)` tuple per expanded compartment,
 ///     in engine order. `categories` holds the `(stratification, category)`
 ///     pairs applied to the compartment, in declaration order.
 ///
 /// Raises:
-///     ValueError: If an override names an unknown or repeated compartment,
-///         holds a fraction outside [0, 1], or makes the initial population
-///         exceed population_size
+///     ValueError: If the total is not finite or not greater than 0, or an
+///         override names an unknown or repeated compartment, holds a fraction
+///         outside [0, 1], or makes the initial amounts exceed the total
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn initial_state(
@@ -35,7 +35,7 @@ fn initial_state(
                 compartment.name,
                 compartment.bin,
                 compartment.categories,
-                compartment.population,
+                compartment.amount,
             )
         })
         .collect())
@@ -124,12 +124,28 @@ fn transition_flows(
 ///     model: A compartmental model
 ///
 /// Raises:
-///     ValueError: If the model is not compartmental, a parameter id is an expanded compartment or a
-///         subpopulation total, or a rate uses an `N_…` name that is not a
-///         subpopulation of the model
+///     ValueError: If the model is not compartmental, a parameter id is an
+///         expanded compartment or a subgroup total, or a rate uses a
+///         `total_…` name that is not a subgroup total of the model
 #[pyfunction]
 fn check_names(model: &PyModel) -> PyResult<()> {
     commol_model::check_names(&model.inner).map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
+/// Names of the subgroup totals a rate of a structure may read, sorted
+///
+/// This is the authority for those names: the `total_<categories>` names,
+/// the bin totals and the partial bin totals. Category suffixes follow the
+/// declaration order of the stratifications.
+///
+/// Args:
+///     structure: The compartmental structure
+///
+/// Returns:
+///     The names, sorted. A structure without stratifications has none.
+#[pyfunction]
+fn subgroup_total_names(structure: &PyCompartmentalStructure) -> Vec<String> {
+    commol_model::subgroup_total_names(&structure.inner)
 }
 
 /// Register the model helpers with the Python module
@@ -138,5 +154,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expanded_outputs, m)?)?;
     m.add_function(wrap_pyfunction!(transition_flows, m)?)?;
     m.add_function(wrap_pyfunction!(check_names, m)?)?;
+    m.add_function(wrap_pyfunction!(subgroup_total_names, m)?)?;
     Ok(())
 }

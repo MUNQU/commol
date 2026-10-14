@@ -5,7 +5,7 @@ use commol_core::SimulationEngine;
 
 use crate::labels::OutputLabels;
 
-/// An engine whose state is the population of the compartments of a
+/// An engine whose state is the amount of each compartment of a
 /// compartmental model, followed by its accumulators.
 ///
 /// Both engines of the compartmental kind implement it; the initial
@@ -20,13 +20,13 @@ pub trait CompartmentalEngine: SimulationEngine {
     /// [`SimulationEngine::output_names`].
     fn output_labels(&self) -> Vec<OutputLabels>;
 
-    /// Current population of each compartment, in engine order.
-    fn population(&self) -> Vec<f64>;
+    /// Current amount of each compartment, in engine order.
+    fn state(&self) -> Vec<f64>;
 
-    /// The population size the initial fractions are taken of.
-    fn population_size(&self) -> f64;
+    /// The total the initial fractions are taken of.
+    fn total(&self) -> f64;
 
-    /// Change the initial population of one compartment, and the current one
+    /// Change the initial amount of one compartment, and the current one
     /// when the engine is at its start.
     ///
     /// After this call, [`SimulationEngine::reset`] restores the new value.

@@ -20,7 +20,7 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
         .add_bin(id="B", name="State B")
         .add_transition(id="inflow", source=[], target=["B"], rate=rate)
         .set_initial_conditions(
-            population_size=100,
+            total=100,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
         .build(engine="DifferenceEquations")
@@ -28,12 +28,12 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
     series = Simulation(model).run(num_steps=num_steps)["B"]
     return [round(series[i + 1] - series[i], 4) for i in range(num_steps)]
 
-print(flow_per_step(AxisPattern.interval(start=3, end=6, amount=1.0)))
+print(flow_per_step(AxisPattern.interval(start=3, end=6, value=1.0)))
 # [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
 A transition with no source uses the pattern as the flow. With a source, a
-pattern that names no compartment is per-capita: `amount=0.1` moves 10% of the
+pattern that names no compartment is per-capita: `value=0.1` moves 10% of the
 source. See [Absolute and per-capita rates](transitions.md#absolute-and-per-capita-rates).
 
 ## Single patterns
@@ -44,26 +44,26 @@ difference model both are the step `s`.
 
 | Pattern | Reads | Value | Arguments |
 |---|---|---|---|
-| `pulse(at, amount)` | `step` | `amount` when `step == at`, else 0 | integer `at >= 0` |
-| `pulses(at, amount)` | `step` | `amount` at each step in `at`, else 0 | unique integer steps, not empty; `amount` may be one value per step |
-| `periodic(period, amount, offset=0)` | `step` | `amount` when `step = offset, offset + period, …`, else 0 | integer `period > 0`, `0 <= offset < period` |
-| `interval(start, end, amount)` | `t` | `amount` for `start <= t < end`, else 0 | `start < end`, any finite positions |
+| `pulse(at, value)` | `step` | `value` when `step == at`, else 0 | integer `at >= 0` |
+| `pulses(at, value)` | `step` | `value` at each step in `at`, else 0 | unique integer steps, not empty; `value` may be one value per step |
+| `periodic(period, value, offset=0)` | `step` | `value` when `step = offset, offset + period, …`, else 0 | integer `period > 0`, `0 <= offset < period` |
+| `interval(start, end, value)` | `t` | `value` for `start <= t < end`, else 0 | `start < end`, any finite positions |
 | `linear_ramp(start, end, start_value, end_value)` | `t` | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions |
 | `seasonal(amplitude, period, phase=0, baseline=0)` | `t` | `baseline + amplitude × sin(2π (t − phase) / period)` | numeric `period != 0` |
 | `gaussian_pulse(center, width, peak)` | `t` | `peak × exp(−(t − center)² / (2 width²))` | `width > 0` |
 | `from_formula(expr)` | Any expression, wrapped in parentheses | not empty; passes the security check |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These
-arguments also accept a parameter name, so calibration can fit them: `amount`
+arguments also accept a parameter name, so calibration can fit them: `value`
 of `pulse`, `pulses`, `periodic` and `interval`; every argument of `seasonal`; and
 `peak` of `gaussian_pulse`.
 
 ```python
-print(flow_per_step(AxisPattern.pulse(at=3, amount=1.0)))
+print(flow_per_step(AxisPattern.pulse(at=3, value=1.0)))
 # [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-print(flow_per_step(AxisPattern.pulses(at=[2, 5], amount=1.0)))
+print(flow_per_step(AxisPattern.pulses(at=[2, 5], value=1.0)))
 # [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
-print(flow_per_step(AxisPattern.periodic(period=4, amount=1.0, offset=1)))
+print(flow_per_step(AxisPattern.periodic(period=4, value=1.0, offset=1)))
 # [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 print(flow_per_step(AxisPattern.linear_ramp(start=2, end=6, start_value=0.0, end_value=1.0)))
 # [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]
@@ -76,7 +76,7 @@ print(flow_per_step(AxisPattern.gaussian_pulse(center=5.0, width=1.0, peak=1.0))
 `str(pattern)` and `pattern.formula` give the expression:
 
 ```python
-print(AxisPattern.pulse(at=10, amount=0.05).formula)  # (if(step == 10, 0.05, 0))
+print(AxisPattern.pulse(at=10, value=0.05).formula)  # (if(step == 10, 0.05, 0))
 print(f"2 * {AxisPattern.from_formula('k1 + k2')}")    # 2 * (k1 + k2)
 ```
 
@@ -95,8 +95,8 @@ expression.
 
 ```python
 peak_or_interval = AxisPattern.combine(
-    AxisPattern.pulse(at=3, amount=2.0),
-    AxisPattern.interval(start=2, end=5, amount=1.0),
+    AxisPattern.pulse(at=3, value=2.0),
+    AxisPattern.interval(start=2, end=5, value=1.0),
     mode=AxisPattern.MAX,
 )
 print(flow_per_step(peak_or_interval))
@@ -127,7 +127,7 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
         .add_stratification(id="group", categories=["cat1", "cat2"])
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
             stratification_fractions=[
                 {
@@ -151,11 +151,11 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
 schedule = (
     AxisPattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.periodic(period=3, amount=0.1),
+        schedule=AxisPattern.periodic(period=3, value=0.1),
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.interval(start=2, end=4, amount=0.2),
+        schedule=AxisPattern.interval(start=2, end=4, value=0.2),
     )
 )
 print(stratified_flows(schedule))
@@ -178,13 +178,13 @@ print(stratified_flows(schedule))
 ```python
 only_cat1 = AxisPattern.add_group(
     conditions=[{"stratification": "group", "category": "cat1"}],
-    schedule=AxisPattern.pulse(at=1, amount=0.1),
+    schedule=AxisPattern.pulse(at=1, value=0.1),
 )
 with_default = only_cat1.set_default(AxisPattern.from_formula("0.01"))
 print(stratified_flows(with_default, num_steps=3))
 # {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [5.0, 4.95, 4.9]}
 
-print(stratified_flows(AxisPattern.pulse(at=1, amount=0.1).for_group(
+print(stratified_flows(AxisPattern.pulse(at=1, value=0.1).for_group(
     [{"stratification": "group", "category": "cat1"}]
 ), num_steps=3))
 # {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [0.0, 0.0, 0.0]}
@@ -195,20 +195,20 @@ print(stratified_flows(AxisPattern.pulse(at=1, amount=0.1).for_group(
 | Argument of `add_group` | Effect |
 |---|---|
 | `absolute=None` (default) | Inferred: a pattern that names a compartment is absolute, otherwise per-capita |
-| `absolute=False` | Per-capita: `amount=0.1` moves 10% of each matching source compartment |
-| `absolute=True` | Absolute: `amount=100.0` moves exactly 100 |
+| `absolute=False` | Per-capita: `value=0.1` moves 10% of each matching source compartment |
+| `absolute=True` | Absolute: `value=100.0` moves exactly 100 |
 | `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute |
 
 ```python
 mixed = (
     AxisPattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.pulse(at=1, amount=0.1),
+        schedule=AxisPattern.pulse(at=1, value=0.1),
         absolute=False,
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.pulse(at=1, amount=100.0),
+        schedule=AxisPattern.pulse(at=1, value=100.0),
         absolute=True,
     )
 )
@@ -233,11 +233,11 @@ routing = (
         target=["A"],
         rate=AxisPattern.add_group(
             conditions=[{"stratification": "status", "category": "s0", "to": "s1"}],
-            schedule=AxisPattern.pulse(at=1, amount=0.5),
+            schedule=AxisPattern.pulse(at=1, value=0.5),
         ),
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}],
         stratification_fractions=[
             {
@@ -262,7 +262,7 @@ In a `DifferentialEquations` model `step` is constant on each unit interval
 
 | Pattern | In a differential model |
 |---|---|
-| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a per-capita `pulse` of `amount` moves `1 − e^(−amount)` of its source, and `amount` in a difference model. To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
+| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a per-capita `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
 | `interval`, `linear_ramp` (read `t`) | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds. |
 | `seasonal`, `gaussian_pulse` (read `t`) | Continuous in `t`. |
 
@@ -275,7 +275,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
         .add_bin(id="B", name="State B")
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
         .build(engine="DifferentialEquations")
@@ -283,7 +283,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
     return Simulation(model).run_at([at])["A"][0]
 
 # The rate 0.5 acts on [2.5, 4): A keeps exp(-0.75) of its start.
-print(round(remaining_a(AxisPattern.interval(start=2.5, end=4, amount=0.5), 6), 2))
+print(round(remaining_a(AxisPattern.interval(start=2.5, end=4, value=0.5), 6), 2))
 # 472.37
 ```
 

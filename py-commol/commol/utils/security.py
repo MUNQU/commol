@@ -860,7 +860,7 @@ def validate_expression_security(
 
     Examples
     --------
-    >>> validate_expression_security("beta * S * I / N")  # OK
+    >>> validate_expression_security("beta * S * I / total")  # OK
     >>> validate_expression_security("__import__('os')")  # Raises SecurityError
     >>> validate_expression_security("unsafe { *ptr }")  # Raises SecurityError
     >>> validate_expression_security("α * β")  # Raises SecurityError (unicode)

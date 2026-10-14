@@ -1066,7 +1066,7 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
 ///     CalibrationResult with best parameters and optimization statistics
@@ -1137,7 +1137,7 @@ fn calibrate(
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
 ///     CalibrationResultWithHistory containing best parameters and all evaluations
@@ -1194,7 +1194,7 @@ fn calibrate_with_history(
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///     n_runs: Number of calibration runs to perform
 ///     seed: Base random seed (each run gets seed + run_index)
 ///
@@ -1373,7 +1373,7 @@ fn generate_calibrated_predictions_parallel(
     Ok(predictions)
 }
 
-/// Initial population a compartmental engine starts from once calibration
+/// Initial state a compartmental engine starts from once calibration
 /// values are applied
 ///
 /// The values are applied exactly as the calibration objective scores them:
@@ -1385,11 +1385,11 @@ fn generate_calibrated_predictions_parallel(
 ///     parameters: Calibration parameters, in problem order
 ///     values: Value of each parameter, parallel to `parameters`
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
-///     A `(values, population, covered)` tuple: the values the engine applied,
-///     parallel to `parameters`; the initial population of each compartment,
+///     A `(values, state, covered)` tuple: the values the engine applied,
+///     parallel to `parameters`; the initial amount of each compartment,
 ///     in engine order; and the indices of the compartments a calibrated bin
 ///     or compartment value, or the remainder, sets
 ///
@@ -1399,7 +1399,7 @@ fn generate_calibrated_predictions_parallel(
 ///         initial-condition fractions exceed 1.0
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, values, initial_condition_remainder=None))]
-fn calibrated_initial_population(
+fn calibrated_initial_state(
     engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     values: Vec<f64>,
@@ -1413,9 +1413,9 @@ fn calibrated_initial_population(
         &values,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    let (population, covered) = crate::engine::compartmental_state(&configured, &plan)
+    let (state, covered) = crate::engine::compartmental_state(&configured, &plan)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    Ok((applied, population, covered))
+    Ok((applied, state, covered))
 }
 
 /// Check that the engine resolves every value of its model kind, such as an
@@ -1729,7 +1729,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyParetoSolution>()?;
     m.add_class::<PyEnsembleSelectionResult>()?;
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
-    m.add_function(wrap_pyfunction!(calibrated_initial_population, m)?)?;
+    m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;

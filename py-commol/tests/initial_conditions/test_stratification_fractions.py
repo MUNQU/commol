@@ -146,7 +146,7 @@ class TestQualifiedCategoryReads:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.subgroup_population(["y"])
+            model.structure.subgroup_total(["y"])
         with pytest.raises(ValueError, match="ambiguous"):
             model.structure.initial_conditions.get_category_fraction("y")
 
@@ -154,8 +154,8 @@ class TestQualifiedCategoryReads:
         model = build(shared_category_builder())
         model.structure.update_stratification_fractions({"sex:y": 0.8})
 
-        assert model.structure.subgroup_population(["sex:y"]) == pytest.approx(800.0)
-        assert model.structure.subgroup_population(["age:y"]) == pytest.approx(500.0)
+        assert model.structure.subgroup_total(["sex:y"]) == pytest.approx(800.0)
+        assert model.structure.subgroup_total(["age:y"]) == pytest.approx(500.0)
 
     def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
         model = build(
@@ -165,8 +165,8 @@ class TestQualifiedCategoryReads:
         )
 
         # A_y_y is pinned to 0, so only A_o_y holds sex:y.
-        assert model.structure.subgroup_population(["sex:y"]) == pytest.approx(250.0)
-        assert model.structure.subgroup_population(["age:o", "sex:y"]) == pytest.approx(
+        assert model.structure.subgroup_total(["sex:y"]) == pytest.approx(250.0)
+        assert model.structure.subgroup_total(["age:o", "sex:y"]) == pytest.approx(
             250.0
         )
 
@@ -183,4 +183,4 @@ class TestQualifiedCategoryReads:
         )
 
         assert model.structure.get_conditioning_categories("care") == ("sex:y",)
-        assert model.structure.subgroup_population(("sex:y",)) == pytest.approx(500.0)
+        assert model.structure.subgroup_total(("sex:y",)) == pytest.approx(500.0)

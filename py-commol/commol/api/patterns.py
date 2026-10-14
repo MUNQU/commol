@@ -97,11 +97,11 @@ def _number(value: float) -> str:
     return str(int(value)) if float(value).is_integer() else repr(float(value))
 
 
-def _validate_amount_string(amount: float | str) -> None:
-    """Reject string amounts that would break the surrounding ``if(..., AMOUNT, 0)``."""
-    if isinstance(amount, str) and "," in amount:
+def _validate_value_string(value: float | str) -> None:
+    """Reject string values that would break the surrounding ``if(..., VALUE, 0)``."""
+    if isinstance(value, str) and "," in value:
         raise ValueError(
-            f"'amount' string must not contain commas (got {amount!r}); "
+            f"'value' string must not contain commas (got {value!r}); "
             "commas would break the surrounding if(...) expression"
         )
 
@@ -279,16 +279,16 @@ class AxisPattern(BaseModel):
     --------
     >>> from commol import AxisPattern
     >>> # Single pattern
-    >>> rate = AxisPattern.pulse(at=10, amount=0.05)
+    >>> rate = AxisPattern.pulse(at=10, value=0.05)
     >>> str(rate)
     '(if(step == 10, 0.05, 0))'
     >>> # Multi-group schedule
     >>> rate = AxisPattern.add_group(
     ...     conditions=[{"stratification": "group", "category": "cat1"}],
-    ...     schedule=AxisPattern.pulse(at=10, amount=0.05),
+    ...     schedule=AxisPattern.pulse(at=10, value=0.05),
     ... ).add_group(
     ...     conditions=[{"stratification": "group", "category": "cat2"}],
-    ...     schedule=AxisPattern.pulse(at=10, amount=0.02),
+    ...     schedule=AxisPattern.pulse(at=10, value=0.02),
     ... )
     """
 
@@ -315,7 +315,7 @@ class AxisPattern(BaseModel):
         """Return pulse data as (step, value) points if representable as a series.
 
         Returns None for patterns that cannot be expressed as a numeric
-        series (e.g. formula amounts, mathematical patterns).
+        series (e.g. formula values, mathematical patterns).
         Overridden only by ``_PulseAxisPattern`` and ``_PulsesAxisPattern``.
         """
         return None
@@ -391,16 +391,16 @@ class AxisPattern(BaseModel):
     # ------------------------------------------------------------------
 
     @classmethod
-    def pulse(cls, at: int, amount: float | str) -> "AxisPattern":
-        """Single-step pulse: rate = ``amount`` at step ``at``, else 0."""
-        _validate_amount_string(amount)
-        return _PulseAxisPattern(at=at, amount=amount)
+    def pulse(cls, at: int, value: float | str) -> "AxisPattern":
+        """Single-step pulse: rate = ``value`` at step ``at``, else 0."""
+        _validate_value_string(value)
+        return _PulseAxisPattern(at=at, value=value)
 
     @classmethod
     def pulses(
         cls,
         at: Iterable[int],
-        amount: float | str | Iterable[float | str],
+        value: float | str | Iterable[float | str],
     ) -> "AxisPattern":
         """Multi-step discrete pulses. Steps must be unique and non-negative.
 
@@ -408,44 +408,44 @@ class AxisPattern(BaseModel):
         ----------
         at : Iterable[int]
             Step indices at which the pulse fires. Must be unique and non-negative.
-        amount : float | str | Iterable[float | str]
+        value : float | str | Iterable[float | str]
             Pulse magnitude. Either a single value applied to every step, or an
             iterable of values with the same length as ``at`` — one per step.
         """
-        amount_resolved: float | str | list[float | str] = (
-            list(amount) if not isinstance(amount, (float, int, str)) else amount
+        value_resolved: float | str | list[float | str] = (
+            list(value) if not isinstance(value, (float, int, str)) else value
         )
-        if isinstance(amount_resolved, (float, int, str)):
-            _validate_amount_string(amount_resolved)
-        return _PulsesAxisPattern(steps=list(at), amount=amount_resolved)
+        if isinstance(value_resolved, (float, int, str)):
+            _validate_value_string(value_resolved)
+        return _PulsesAxisPattern(steps=list(at), value=value_resolved)
 
     @classmethod
     def periodic(
         cls,
         period: int,
-        amount: float | str,
+        value: float | str,
         offset: int = 0,
     ) -> "AxisPattern":
         """Periodic pulse every ``period`` steps starting at ``offset``."""
-        _validate_amount_string(amount)
-        return _PeriodicAxisPattern(period=period, amount=amount, offset=offset)
+        _validate_value_string(value)
+        return _PeriodicAxisPattern(period=period, value=value, offset=offset)
 
     @classmethod
     def interval(
         cls,
         start: float,
         end: float,
-        amount: float | str,
+        value: float | str,
     ) -> "AxisPattern":
-        """Constant rate ``amount`` while ``t`` is in ``[start, end)``, else 0.
+        """Constant rate ``value`` while ``t`` is in ``[start, end)``, else 0.
 
         In a DifferenceEquations model ``t`` is the step, so the rate acts on
         the steps ``start <= step < end``. In a DifferentialEquations model the
         interval opens and closes at any position, and the engine restarts its
         integration at both ends.
         """
-        _validate_amount_string(amount)
-        return _IntervalAxisPattern(start=start, end=end, amount=amount)
+        _validate_value_string(value)
+        return _IntervalAxisPattern(start=start, end=end, value=value)
 
     @classmethod
     def seasonal(
@@ -552,21 +552,21 @@ class AxisPattern(BaseModel):
 
 class _PulseAxisPattern(AxisPattern):
     at: Annotated[int, Field(ge=0)]
-    amount: float | str
+    value: float | str
 
     @property
     def formula(self) -> str:
-        return f"(if(step == {self.at}, {self.amount}, 0))"
+        return f"(if(step == {self.at}, {self.value}, 0))"
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
-        if not isinstance(self.amount, (int, float)):
+        if not isinstance(self.value, (int, float)):
             return None
-        return [(self.at, float(self.amount))]
+        return [(self.at, float(self.value))]
 
 
 class _PulsesAxisPattern(AxisPattern):
     steps: list[Annotated[int, Field(ge=0)]]
-    amount: float | str | list[float | str]
+    value: float | str | list[float | str]
 
     @field_validator("steps")
     @classmethod
@@ -578,40 +578,40 @@ class _PulsesAxisPattern(AxisPattern):
         return v
 
     @model_validator(mode="after")
-    def validate_amount_list(self) -> "_PulsesAxisPattern":
-        if isinstance(self.amount, list):
-            if len(self.amount) != len(self.steps):
+    def validate_value_list(self) -> "_PulsesAxisPattern":
+        if isinstance(self.value, list):
+            if len(self.value) != len(self.steps):
                 raise ValueError(
-                    f"'amount' list length ({len(self.amount)}) must match "
+                    f"'value' list length ({len(self.value)}) must match "
                     f"'at' length ({len(self.steps)})"
                 )
-            for a in self.amount:
-                _validate_amount_string(a)
+            for a in self.value:
+                _validate_value_string(a)
         return self
 
     @property
     def formula(self) -> str:
-        if isinstance(self.amount, list):
+        if isinstance(self.value, list):
             terms = " + ".join(
-                f"if(step == {s}, {a}, 0)" for s, a in zip(self.steps, self.amount)
+                f"if(step == {s}, {a}, 0)" for s, a in zip(self.steps, self.value)
             )
         else:
-            terms = " + ".join(f"if(step == {s}, {self.amount}, 0)" for s in self.steps)
+            terms = " + ".join(f"if(step == {s}, {self.value}, 0)" for s in self.steps)
         return f"({terms})"
 
     def _as_series_data(self) -> list[tuple[int, float]] | None:
-        if isinstance(self.amount, list):
-            if not all(isinstance(a, (int, float)) for a in self.amount):
+        if isinstance(self.value, list):
+            if not all(isinstance(a, (int, float)) for a in self.value):
                 return None
-            return [(s, float(a)) for s, a in zip(self.steps, self.amount)]
-        if not isinstance(self.amount, (int, float)):
+            return [(s, float(a)) for s, a in zip(self.steps, self.value)]
+        if not isinstance(self.value, (int, float)):
             return None
-        return [(s, float(self.amount)) for s in self.steps]
+        return [(s, float(self.value)) for s in self.steps]
 
 
 class _PeriodicAxisPattern(AxisPattern):
     period: Annotated[int, Field(gt=0)]
-    amount: float | str
+    value: float | str
     offset: Annotated[int, Field(ge=0)] = 0
 
     @model_validator(mode="after")
@@ -626,18 +626,18 @@ class _PeriodicAxisPattern(AxisPattern):
     def formula(self) -> str:
         p = self.period
         if self.offset == 0:
-            return f"(if(step - floor(step / {p}) * {p} == 0, {self.amount}, 0))"
+            return f"(if(step - floor(step / {p}) * {p} == 0, {self.value}, 0))"
         o = self.offset
         return (
             f"(if((step - {o}) - floor((step - {o}) / {p}) * {p} == 0,"
-            f" {self.amount}, 0))"
+            f" {self.value}, 0))"
         )
 
 
 class _IntervalAxisPattern(AxisPattern):
     start: FinitePosition
     end: FinitePosition
-    amount: float | str
+    value: float | str
 
     @model_validator(mode="after")
     def validate_interval_bounds(self) -> "_IntervalAxisPattern":
@@ -650,7 +650,7 @@ class _IntervalAxisPattern(AxisPattern):
     @property
     def formula(self) -> str:
         start, end = _number(self.start), _number(self.end)
-        return f"(if(t >= {start}, if(t < {end}, {self.amount}, 0), 0))"
+        return f"(if(t >= {start}, if(t < {end}, {self.value}, 0), 0))"
 
 
 class _SeasonalAxisPattern(AxisPattern):

@@ -1,8 +1,8 @@
 """The engine of a model, and what it says about a compartmental structure.
 
 The engine is the single source of truth for how bins expand over
-stratifications, how fractions become head counts, how per-compartment
-overrides apply, and how calibrated values reach the initial population.
+stratifications, how fractions become amounts, how per-compartment
+overrides apply, and how calibrated values reach the initial state.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 class InitialCompartment(NamedTuple):
     """
-    One expanded compartment and the population it starts with.
+    One expanded compartment and the amount it starts with.
 
     Attributes
     ----------
@@ -49,14 +49,14 @@ class InitialCompartment(NamedTuple):
         Category applied to the compartment, keyed by stratification id. A
         conditional stratification whose conditions the compartment does not
         meet is absent.
-    population : float
-        Initial head count, including per-compartment overrides.
+    amount : float
+        Initial amount, including per-compartment overrides.
     """
 
     name: str
     bin: str
     categories: dict[str, str]
-    population: float
+    amount: float
 
 
 class ExpandedOutput(NamedTuple):
@@ -113,7 +113,7 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
 
 def initial_state(structure: "CompartmentalStructure") -> list[InitialCompartment]:
     """
-    Expand a structure into its compartments and their initial populations.
+    Expand a structure into its compartments and their initial amounts.
 
     Parameters
     ----------
@@ -128,13 +128,13 @@ def initial_state(structure: "CompartmentalStructure") -> list[InitialCompartmen
     Raises
     ------
     ValueError
-        If a per-compartment override names an unknown or repeated compartment,
-        holds a fraction outside ``[0.0, 1.0]``, or makes the initial population
-        exceed ``population_size``.
+        If the total is not finite or not greater than 0, or a per-compartment
+        override names an unknown or repeated compartment, holds a fraction
+        outside ``[0.0, 1.0]``, or makes the initial amounts exceed the total.
     """
     return [
-        InitialCompartment(name, bin_id, dict(categories), population)
-        for name, bin_id, categories, population in commol_rs.model.initial_state(
+        InitialCompartment(name, bin_id, dict(categories), amount)
+        for name, bin_id, categories, amount in commol_rs.model.initial_state(
             _rust_structure(structure)
         )
     ]
@@ -173,7 +173,7 @@ def expanded_outputs(
 
 class TransitionFlow(NamedTuple):
     """
-    One flow of population between two compartments, as the engine runs it.
+    One flow of an amount between two compartments, as the engine runs it.
 
     Attributes
     ----------
@@ -375,7 +375,7 @@ def check_model_values(
         raise ValueError(f"Calibration initial condition: {error}") from error
 
 
-class CalibratedInitialPopulation(NamedTuple):
+class CalibratedInitialState(NamedTuple):
     """
     Initial state the engine scores for a set of calibration values.
 
@@ -383,31 +383,31 @@ class CalibratedInitialPopulation(NamedTuple):
     ----------
     values : dict[str, float]
         Value the engine applied per parameter id, clamped to its bounds.
-    population : dict[str, float]
-        Initial head count per expanded compartment, in engine order.
+    state : dict[str, float]
+        Initial amount per expanded compartment, in engine order.
     covered : list[str]
-        Compartments whose head count a calibrated bin or compartment value, or
+        Compartments whose amount a calibrated bin or compartment value, or
         the remainder, sets.
     """
 
     values: dict[str, float]
-    population: dict[str, float]
+    state: dict[str, float]
     covered: list[str]
 
 
-def calibrated_initial_population[S: "CompartmentalStructure"](
+def calibrated_initial_state[S: "CompartmentalStructure"](
     model: "Model[S]",
     parameters: Sequence["CalibrationParameter"],
     values: Sequence[float],
     remainder: str | None = None,
-) -> CalibratedInitialPopulation:
+) -> CalibratedInitialState:
     """
     Initial state the engine scores for a set of calibration values.
 
     The engine applies the values as the calibration objective does: clamped
     to their bounds, written as bins, then category splits, then exact
     compartments, with the remainder absorbing the difference to the
-    population size.
+    total.
 
     Parameters
     ----------
@@ -418,29 +418,29 @@ def calibrated_initial_population[S: "CompartmentalStructure"](
     values : Sequence[float]
         Value of each parameter, parallel to ``parameters``.
     remainder : str | None
-        Compartment or bin that absorbs the difference to the population size.
+        Compartment or bin that absorbs the difference to the total.
 
     Returns
     -------
-    CalibratedInitialPopulation
-        The values the engine applied and the population it built.
+    CalibratedInitialState
+        The values the engine applied and the state it built.
 
     Raises
     ------
     ValueError
         If an initial-condition id or the remainder cannot be resolved, or the
-        initial population exceeds the population size.
+        initial amounts exceed the total.
     """
     engine = build_engine(model)
-    applied, population, covered = commol_rs.calibration.calibrated_initial_population(
+    applied, state, covered = commol_rs.calibration.calibrated_initial_state(
         engine,
         _rust_parameters(parameters),
         list(values),
         initial_condition_remainder=remainder,
     )
-    return CalibratedInitialPopulation(
+    return CalibratedInitialState(
         values=dict(zip((param.id for param in parameters), applied, strict=True)),
-        population=dict(zip(engine.compartments, population, strict=True)),
+        state=dict(zip(engine.compartments, state, strict=True)),
         covered=[engine.compartments[index] for index in covered],
     )
 
@@ -457,8 +457,28 @@ def check_names(model: "Model") -> None:
     Raises
     ------
     ValueError
-        If a parameter id is an expanded compartment or a subpopulation total,
-        or a rate or formula parameter uses an ``N_…`` name that is not a
-        subpopulation of the model.
+        If a parameter id is an expanded compartment or a subgroup total,
+        or a rate or formula parameter uses a ``total_…`` name that is not a
+        subgroup total of the model.
     """
     commol_rs.model.check_names(_rust_model(model))
+
+
+def subgroup_total_names(structure: "CompartmentalStructure") -> list[str]:
+    """
+    Names of the subgroup totals a rate of a structure may read.
+
+    They are the ``total_<categories>`` names, the bin totals and the partial
+    bin totals, as the engine provides them.
+
+    Parameters
+    ----------
+    structure : CompartmentalStructure
+        The structure of a compartmental model.
+
+    Returns
+    -------
+    list[str]
+        The names, sorted. A structure without stratifications has none.
+    """
+    return commol_rs.model.subgroup_total_names(_rust_structure(structure))

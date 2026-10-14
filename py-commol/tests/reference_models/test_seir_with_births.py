@@ -37,8 +37,8 @@ N = 1000.0
 def _seir(r0: float, i0: float) -> Model:
     """[1]_ with ``b = mu`` and ``beta`` set from ``R0 = beta k / (gamma (k + mu))``."""
     flows = [
-        Flow("births", None, "S", "mu * N"),
-        Flow("infection", "S", "E", "beta * S * I / N"),
+        Flow("births", None, "S", "mu * total"),
+        Flow("infection", "S", "E", "beta * S * I / total"),
         Flow("progression", "E", "I", "k * E"),
         Flow("recovery", "I", "R", "r * I"),
         *(Flow(f"{x.lower()}_deaths", x, None, f"mu * {x}") for x in "SEIR"),

@@ -64,7 +64,7 @@ def test_r0_sums_the_stage_infectivities() -> None:
     q = [1.0, 0.8, 0.5, 0.2, 0.0]
     beta = [0.6, 0.5, 0.3, 0.1]
     force = " + ".join(f"b{i} * I{i}" for i in range(1, 5))
-    flows = [Flow("infection", "S", "E", f"S * (1 - exp(-({force}) / N))")]
+    flows = [Flow("infection", "S", "E", f"S * (1 - exp(-({force}) / total))")]
     flows += _infective_chain("", q, "E")
     values = {"S": n - e0, "E": e0} | {f"I{i}": 0.0 for i in range(1, 5)} | {"R": 0.0}
     parameters = {"alpha": 0.6} | {f"b{i}": beta[i - 1] for i in range(1, 5)}

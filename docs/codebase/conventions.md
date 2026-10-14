@@ -207,8 +207,8 @@ A test compares a result with an oracle:
 | Oracle | Example |
 |---|---|
 | A value computed by hand in the test | `reference_run` (`tests/support/reference.py`) evaluates the flows in plain Python, as the engine does: every flow from the state at the start of the step, no clamping. `tests/rates/test_formulas.py` compares whole trajectories with it. |
-| An analytic value | A death rate `d` on every bin gives `N(t) = N(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
-| An invariant | Conservation of the population (`assert_population_conserved`); two paths that must agree, such as a bin id and the explicit sum of its compartments. |
+| An analytic value | A death rate `d` on every bin gives `total(t) = total(0) (1 - d)^t` (`tests/transitions/test_compartment_placeholder.py`). |
+| An invariant | A total that the model keeps (`assert_total_conserved`); two paths that must agree, such as a bin id and the explicit sum of its compartments. |
 | What a stated result predicts about a run | `tests/support/oracles.py`: `final_size` solves the final size relation, `assert_threshold` checks that an infection grows at a reproduction number of `1.05` and dies out at `0.95`, `settled` reads a limit once doubling the horizon no longer moves it. |
 
 "It runs" is not a result. A test whose only check is that no exception
@@ -274,7 +274,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```text
 feat(transitions): add time-varying rates
-fix(simulation): correct population calculation
+fix(simulation): correct the total of a subgroup
 docs(codebase): add repository map
 ```
 

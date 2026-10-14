@@ -12,14 +12,14 @@ from commol import (
     Simulation,
 )
 from commol.api.model_builder import ModelBuilder
-from commol.context._model.engine_state import calibrated_initial_population
+from commol.context._model.engine_state import calibrated_initial_state
 from commol.context.model import Model
 from tests.support import (
     a_to_b_builder,
     build,
     conditional_pathway_builder,
     initial_condition_problem,
-    initial_population,
+    initial_state,
     override_builder,
     shared_category_builder,
     stratify,
@@ -70,7 +70,7 @@ def _prefixed_bins() -> ModelBuilder:
         .add_transition(id="flow", source=["A"], target=["A_x"], rate="k * A")
     )
     return builder.set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.5},
             {"bin": "A_x", "fraction": 0.5},
@@ -82,18 +82,18 @@ def _prefixed_bins() -> ModelBuilder:
 def _scored(
     model: Model, problem: CalibrationProblem, values: dict[str, float]
 ) -> dict[str, float]:
-    """Population the engine scores for the values, before any write-back."""
+    """State the engine scores for the values, before any write-back."""
     parameters = [
         param
         for param in problem.parameters
         if param.parameter_type == "initial_condition" and param.id in values
     ]
-    return calibrated_initial_population(
+    return calibrated_initial_state(
         model,
         parameters,
         [values[param.id] for param in parameters],
         problem.initial_condition_remainder,
-    ).population
+    ).state
 
 
 def _overrides(model: Model) -> dict[str, float]:
@@ -135,7 +135,7 @@ WRITE_BACK_CASES = [
 
 
 class TestWriteBackRebuildsTheScoredState:
-    """The definition written back rebuilds the population the engine scored."""
+    """The definition written back rebuilds the state the engine scored."""
 
     @pytest.mark.parametrize(("factory", "values", "remainder"), WRITE_BACK_CASES)
     def test_rebuild_matches_the_engine(self, factory, values, remainder) -> None:
@@ -145,7 +145,7 @@ class TestWriteBackRebuildsTheScoredState:
 
         model.apply_calibration_parameters(values, problem)
 
-        assert initial_population(model) == pytest.approx(expected)
+        assert initial_state(model) == pytest.approx(expected)
 
     @pytest.mark.parametrize(("factory", "values", "remainder"), WRITE_BACK_CASES)
     def test_definition_round_trips_through_json(
@@ -157,7 +157,7 @@ class TestWriteBackRebuildsTheScoredState:
 
         reloaded = Model.model_validate_json(model.model_dump_json())
 
-        assert initial_population(reloaded) == pytest.approx(initial_population(model))
+        assert initial_state(reloaded) == pytest.approx(initial_state(model))
 
 
 class TestWriteBackReadability:
@@ -176,7 +176,7 @@ class TestWriteBackReadability:
         )
         assert _overrides(model) == {}
 
-    def test_remainder_bin_takes_the_rest_of_the_population(self) -> None:
+    def test_remainder_bin_takes_the_rest_of_the_total(self) -> None:
         model = build(_two_bins())
 
         model.apply_calibration_parameters(
@@ -239,7 +239,7 @@ class TestWriteBackReadability:
             {"S": 0.905, "IH": 0.095}
         )
         assert set(_overrides(model)) == {"IH_y60", "IH_oe60_home", "IH_oe60_hosp"}
-        rebuilt = initial_population(model)
+        rebuilt = initial_state(model)
         assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0)
         assert rebuilt["IH_y60"] == 0.0
         assert sum(rebuilt.values()) == pytest.approx(1000.0)
@@ -251,14 +251,14 @@ class TestWriteBackReadability:
             {"A_g1": 0.2}, initial_condition_problem("A_g1")
         )
 
-        assert initial_population(model)["A_g1"] == pytest.approx(200.0)
-        assert sum(initial_population(model).values()) == pytest.approx(200.0)
+        assert initial_state(model)["A_g1"] == pytest.approx(200.0)
+        assert sum(initial_state(model).values()) == pytest.approx(200.0)
 
     def test_without_remainder_an_excess_is_rejected(self) -> None:
         model = build(_two_bins())
         before = model.model_dump_json()
 
-        with pytest.raises(ValueError, match="exceed the population size"):
+        with pytest.raises(ValueError, match="exceed the total"):
             model.apply_calibration_parameters(
                 {"A": 0.6}, initial_condition_problem("A")
             )
@@ -287,7 +287,7 @@ class TestWriteBackReadability:
             {"A": 0.3, "A_x": 0.7}
         )
         assert _overrides(model) == {}
-        assert initial_population(model) == pytest.approx(
+        assert initial_state(model) == pytest.approx(
             {"A_g1": 150.0, "A_g2": 150.0, "A_x_g1": 350.0, "A_x_g2": 350.0}
         )
 
@@ -309,14 +309,14 @@ class TestSharedCategory:
 
         assert model.model_dump_json() == before
 
-    def test_qualified_id_conserves_the_population(self) -> None:
+    def test_qualified_id_keeps_the_total(self) -> None:
         model = build(shared_category_builder())
 
         model.apply_calibration_parameters(
             {"age:y": 0.6}, initial_condition_problem("age:y")
         )
 
-        assert sum(initial_population(model).values()) == pytest.approx(1000.0)
+        assert sum(initial_state(model).values()) == pytest.approx(1000.0)
 
 
 class TestAtomicity:
@@ -372,7 +372,7 @@ class TestCompositeStateCalibration:
 
         model.apply_calibration_parameters(result, problem)
 
-        rebuilt = initial_population(model)
+        rebuilt = initial_state(model)
         assert rebuilt == pytest.approx(expected)
         assert rebuilt["IH_y60"] == 0.0
         assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0, abs=0.5)

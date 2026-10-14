@@ -37,7 +37,9 @@ def test_arbitrary_stage_durations_end_with_the_control_final_size_relation() ->
     q = [1.0, 0.9, 0.7, 0.3, 0.0]
     gamma, sigma = 0.8, 0.7
     infectious = " + ".join(f"I{i} + (1 - rho) * H{i}" for i in range(4))
-    flows = [Flow("infection", "S", "L0", f"S * (1 - exp(-beta * ({infectious}) / N))")]
+    flows = [
+        Flow("infection", "S", "L0", f"S * (1 - exp(-beta * ({infectious}) / total))")
+    ]
     for j in range(4):
         stay = p[j + 1] / p[j]
         if j < 3:
@@ -96,7 +98,9 @@ def test_geometric_durations_reduce_to_five_equations() -> None:
     # sums over the history of new infections A and new infectives B.
     alpha, delta, gamma, sigma, steps = 0.7, 0.8, 0.9, 0.6, 60
     flows = [
-        Flow("infection", "S", "E", "S * (1 - exp(-beta * (I + (1 - rho) * H) / N))"),
+        Flow(
+            "infection", "S", "E", "S * (1 - exp(-beta * (I + (1 - rho) * H) / total))"
+        ),
         Flow("quarantine", "E", "Q", "alpha * (1 - gamma) * E"),
         Flow("onset", "E", "I", "(1 - alpha) * E"),
         Flow("admission", "Q", "H", "(1 - alpha) * Q"),

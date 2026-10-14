@@ -1,8 +1,8 @@
 # Commol
 
 Build, simulate and calibrate compartment models in Python, with a fast Rust
-engine. You describe the states, the flows between them and how the population
-starts; Commol expands the model over your stratifications, compiles every rate
+engine. You describe the states, the flows between them and the amount each
+state starts with; Commol expands the model over your stratifications, compiles every rate
 formula to machine code, and fits unknown values to your data.
 
 > **Before version 1.0**: the API can change between minor versions
@@ -44,10 +44,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},

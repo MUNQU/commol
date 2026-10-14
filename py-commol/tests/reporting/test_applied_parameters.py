@@ -105,47 +105,47 @@ class TestParameters:
 
 
 class TestInitialConditions:
-    def test_population_size_is_reported_as_n(self) -> None:
+    def test_the_total_is_reported_as_total(self) -> None:
         report = applied_parameters_report(_model(), {})
 
-        assert report["initial_conditions"]["N"] == {
-            "group": "population",
+        assert report["initial_conditions"]["total"] == {
+            "group": "total",
             "fraction": 1.0,
             "value": 1000.0,
             "calibrated": False,
         }
 
-    def test_bin_fractions_are_taken_of_the_whole_population(self) -> None:
+    def test_bin_fractions_are_taken_of_the_total(self) -> None:
         report = applied_parameters_report(_model(), {})
 
         assert report["initial_conditions"]["A"] == {
-            "group": "population",
+            "group": "total",
             "fraction": 0.9,
             "value": pytest.approx(900.0),
             "calibrated": False,
         }
 
-    def test_unconditional_categories_are_taken_of_the_whole_population(self) -> None:
+    def test_unconditional_categories_are_taken_of_the_total(self) -> None:
         report = applied_parameters_report(_model(), {})
 
         entry = report["initial_conditions"]["group1"]
-        assert entry["group"] == "population"
+        assert entry["group"] == "total"
         assert entry["value"] == pytest.approx(600.0)
 
-    def test_conditional_category_fractions_use_the_population_denominator(
+    def test_conditional_category_fractions_use_the_total_as_denominator(
         self,
     ) -> None:
         report = applied_parameters_report(_model(conditional=True), {})
 
         entry = report["initial_conditions"]["s1"]
         assert entry["group"] == "group1"
-        # The head count is 0.25 of the group1 subgroup; the reported fraction
-        # is that head count over the declared population size, so every row
-        # shares one denominator.
+        # The amount is 0.25 of the group1 subgroup; the reported fraction
+        # is that amount over the declared total, so every row shares one
+        # denominator.
         assert entry["value"] == pytest.approx(0.25 * 600.0)
         assert entry["fraction"] == pytest.approx(150.0 / 1000.0)
 
-    def test_an_uncalibrated_fraction_reports_no_head_count(self) -> None:
+    def test_an_uncalibrated_fraction_reports_no_value(self) -> None:
         report = applied_parameters_report(_model(s_fraction=None), {})
 
         assert report["initial_conditions"]["A"]["fraction"] is None
@@ -171,13 +171,13 @@ class TestCompartmentOverrides:
         report = applied_parameters_report(build(override_builder(0.2)), {})
 
         assert report["initial_conditions"]["A_g1"] == {
-            "group": "population",
+            "group": "total",
             "fraction": 0.2,
             "value": pytest.approx(200.0),
             "calibrated": False,
         }
 
-    def test_population_group_rows_share_the_population_denominator(self) -> None:
+    def test_total_group_rows_share_the_total_as_denominator(self) -> None:
         report = applied_parameters_report(build(override_builder(0.3)), {})
         rows = report["initial_conditions"]
 
@@ -190,14 +190,14 @@ class TestCompartmentOverrides:
         assert rows["g1"]["fraction"] == pytest.approx(0.3)
         assert rows["g2"]["fraction"] == pytest.approx(0.5)
 
-    def test_bin_rows_report_the_effective_head_count(self) -> None:
+    def test_bin_rows_report_the_effective_amount(self) -> None:
         report = applied_parameters_report(build(override_builder(0.3)), {})
 
         entry = report["initial_conditions"]["A"]
         assert entry["fraction"] == pytest.approx(0.8)
         assert entry["value"] == pytest.approx(800.0)
 
-    def test_category_rows_report_the_effective_head_count(self) -> None:
+    def test_category_rows_report_the_effective_amount(self) -> None:
         report = applied_parameters_report(build(override_builder(0.3)), {})
 
         assert report["initial_conditions"]["g1"]["value"] == pytest.approx(300.0)
@@ -291,11 +291,11 @@ class TestIntervals:
             "std": 0.1,
         }
 
-    def test_conditional_category_interval_is_rescaled_to_the_population(
+    def test_conditional_category_interval_is_rescaled_to_the_total(
         self,
     ) -> None:
         # A conditional category is calibrated as a fraction of its subgroup but
-        # reported as a fraction of the whole population. The interval must be
+        # reported as a fraction of the total. The interval must be
         # rescaled by the group share so it brackets the reported fraction.
         statistics = {
             "s1": ParameterSetStatistics(
@@ -371,7 +371,7 @@ class TestReportPerformance:
         )
         model = build(
             builder.set_initial_conditions(
-                population_size=1000,
+                total=1000,
                 bin_fractions=[{"bin": "A", "fraction": 1.0}],
                 stratification_fractions=stratify(
                     builder,

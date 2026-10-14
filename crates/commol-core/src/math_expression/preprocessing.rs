@@ -5,8 +5,12 @@
 use evalexpr::{Node, build_operator_tree};
 use std::collections::HashSet;
 
-/// Total population.
-pub const SPECIAL_VAR_N: &str = "N";
+/// The total: the sum of every compartment at the current position,
+/// accumulators excluded.
+pub const SPECIAL_VAR_TOTAL: &str = "total";
+/// The prefix of a subgroup total: `total_<cat>…` is the sum of the
+/// compartments with the categories `<cat>…`.
+pub const SUBGROUP_TOTAL_PREFIX: &str = "total_";
 /// The step that holds the current position: `floor(t)`.
 pub const SPECIAL_VAR_STEP: &str = "step";
 /// The current position on the axis. A difference engine reads it at each
@@ -16,6 +20,15 @@ pub const SPECIAL_VAR_T: &str = "t";
 pub const SPECIAL_VAR_PI: &str = "pi";
 /// The constant e.
 pub const SPECIAL_VAR_E: &str = "e";
+/// Every variable the engine provides in every expression. No parameter, bin
+/// or accumulator may take one of these ids.
+pub const ENGINE_VARIABLES: [&str; 5] = [
+    SPECIAL_VAR_TOTAL,
+    SPECIAL_VAR_STEP,
+    SPECIAL_VAR_T,
+    SPECIAL_VAR_PI,
+    SPECIAL_VAR_E,
+];
 
 /// Preprocesses a formula by adding `math::` prefix to mathematical functions that require it
 /// and converting Python-style operators to evalexpr syntax.
@@ -89,12 +102,7 @@ pub fn preprocess_formula(formula: &str) -> String {
 pub fn get_variables_from_node(node: &Node, variables: &mut HashSet<String>) {
     for ident in node.iter_variable_identifiers() {
         // Exclude special variables that are automatically available
-        if ident != SPECIAL_VAR_PI
-            && ident != SPECIAL_VAR_E
-            && ident != SPECIAL_VAR_N
-            && ident != SPECIAL_VAR_STEP
-            && ident != SPECIAL_VAR_T
-        {
+        if !ENGINE_VARIABLES.contains(&ident) {
             variables.insert(ident.to_string());
         }
     }
@@ -155,7 +163,7 @@ mod tests {
         assert!(vars.contains(&"I".to_string()));
 
         // Special variables should be excluded
-        let vars = get_variables("beta * N + pi");
+        let vars = get_variables("beta * total + pi");
         assert_eq!(vars.len(), 1);
         assert!(vars.contains(&"beta".to_string()));
     }

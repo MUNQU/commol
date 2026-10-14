@@ -227,8 +227,8 @@ mod tests {
 
     #[test]
     fn test_parse_complex_expression() {
-        let expr = parse_expression("beta * S * I / N").unwrap();
-        // Should parse as ((beta * S) * I) / N
+        let expr = parse_expression("beta * S * I / total").unwrap();
+        // Should parse as ((beta * S) * I) / total
         assert!(matches!(expr, Expr::BinaryOp { .. }));
     }
 

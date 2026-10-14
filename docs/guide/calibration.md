@@ -38,10 +38,10 @@ def basic_model(k1: float | None, k2: float | None):
         .add_bin(id="C", name="State C")
         .add_parameter(id="k1", value=k1)
         .add_parameter(id="k2", value=k2)
-        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "A", "fraction": 0.99},
                 {"bin": "B", "fraction": 0.01},
@@ -127,7 +127,7 @@ also when it was created while a parameter was `None`. See
 | `parameter_type` | `id` names | The value is |
 |---|---|---|
 | `"parameter"` | A model parameter, usually declared with `value=None` | The parameter value |
-| `"initial_condition"` | A bin, a category, or an expanded compartment | A fraction of the population; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
+| `"initial_condition"` | A bin, a category, or an expanded compartment | A fraction of the total; see [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | `"factor"` | Any new id, used by observations through `factor_id` | A factor on the predictions; not part of the model |
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are
@@ -188,7 +188,7 @@ value into the model, routed by its `parameter_type`:
 | `parameter_type` | Written to |
 |---|---|
 | `"parameter"` | The model parameter with that id |
-| `"initial_condition"` | The initial conditions, so the model rebuilds exactly the population the optimizer scored |
+| `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
 | `"factor"` | Nothing: it describes the observations, not the model |
 
 It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then

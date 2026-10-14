@@ -1,19 +1,18 @@
 """The structure of a compartmental model.
 
 Bins expand over stratifications into compartments, transitions move
-population between them, and initial conditions say how they start. The
+amounts between them, and initial conditions say how they start. The
 engine (``commol_rs.model``) expands, plans and initializes the structure;
 this module validates it and asks the engine.
 """
 
 import math
 from collections.abc import Iterable, Mapping
-from itertools import combinations, product
 from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from commol.constants import RESERVED_VARIABLE_NAMES
+from commol.constants import RESERVED_VARIABLE_NAMES, SUBGROUP_TOTAL_PREFIX
 from commol.context._model import engine_state
 from commol.context._model.engine_state import InitialCompartment
 from commol.context.bin import Accumulator, Bin
@@ -47,7 +46,7 @@ class CompartmentalStructure(ModelStructure):
     transitions : list[Transition]
         Flows between bins, or between the categories of one stratification.
     initial_conditions : InitialConditions
-        Population size and the fractions the compartments start with.
+        The total and the fractions the compartments start with.
     """
 
     kind: Literal["compartmental"] = "compartmental"
@@ -275,7 +274,7 @@ class CompartmentalStructure(ModelStructure):
         """
         The structure with calibrated initial conditions written back.
 
-        The written structure rebuilds the initial population the engine
+        The written structure rebuilds the initial state the engine
         scored. Bin and category values update the fractions they declare.
         Every compartment those fractions do not reproduce, such as an exact
         compartment value or a value that overlaps a per-compartment override,
@@ -299,7 +298,7 @@ class CompartmentalStructure(ModelStructure):
         ------
         ValueError
             If the engine cannot resolve an initial-condition id or the
-            remainder, or the initial population exceeds the population size.
+            remainder, or the initial amounts exceed the total.
         """
         from commol.context._model.calibration_write_back import (
             calibrated_initial_conditions,
@@ -410,14 +409,14 @@ class CompartmentalStructure(ModelStructure):
         ----------
         fractions : Mapping[str, float]
             Dictionary mapping expanded compartment names to their new fraction
-            of the total population.
+            of the total.
 
         Raises
         ------
         ValueError
             If a name is not an expanded compartment of the model, a value lies
             outside ``[0.0, 1.0]``, or the resulting overrides make the initial
-            population exceed ``population_size``.
+            amounts exceed the total.
         """
         candidate = self.initial_conditions.model_copy(deep=True)
         candidate.update_compartment_fractions(fractions)
@@ -428,10 +427,10 @@ class CompartmentalStructure(ModelStructure):
 
     def initial_state(self) -> list[InitialCompartment]:
         """
-        Expanded compartments and the population each one starts with.
+        Expanded compartments and the amount each one starts with.
 
         The engine builds this state from the bin fractions, the stratification
-        fractions and the per-compartment overrides; it is the population a
+        fractions and the per-compartment overrides; it is the state a
         simulation starts from.
 
         Returns
@@ -450,10 +449,10 @@ class CompartmentalStructure(ModelStructure):
         """
         Get the categories a stratification is conditioned on.
 
-        An unconditional stratification subdivides the whole population and has
+        An unconditional stratification subdivides the whole model and has
         no conditioning categories. A conditional one subdivides only the
         subgroup its conditions select, and its fractions are relative to that
-        subgroup rather than to the whole population.
+        subgroup rather than to the whole model.
 
         Parameters
         ----------
@@ -487,28 +486,27 @@ class CompartmentalStructure(ModelStructure):
             f"{sorted(s.id for s in self.stratifications)}"
         )
 
-    def subgroup_population(self, categories: Iterable[str] = ()) -> float:
+    def subgroup_total(self, categories: Iterable[str] = ()) -> float:
         """
-        Get the initial head count of a subgroup.
+        Get the initial total of a subgroup.
 
         See
-        :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_population`.
+        :meth:`~commol.context.initial_conditions.InitialConditions.subgroup_total`.
 
         Per-compartment overrides are folded into the sum for every compartment
-        the category chain selects, so the head count matches the population
-        the engine builds. Without overrides the declared fractions are
-        multiplied.
+        the category chain selects, so the result matches the state the engine
+        builds. Without overrides the declared fractions are multiplied.
 
         Parameters
         ----------
         categories : Iterable[str], optional
             Category ids, bare or qualified (``sex:female``), forming a chain
-            from the whole population down to the subgroup, outermost first.
+            from the whole model down to the subgroup, outermost first.
 
         Returns
         -------
         float
-            Number of individuals in the subgroup at step 0.
+            The sum of the compartments of the subgroup at step 0.
 
         Raises
         ------
@@ -518,10 +516,10 @@ class CompartmentalStructure(ModelStructure):
         selected = tuple(categories)
         initial_conditions = self.initial_conditions
         if not initial_conditions.compartment_fractions:
-            return initial_conditions.subgroup_population(selected)
+            return initial_conditions.subgroup_total(selected)
         resolved = [initial_conditions.resolve_category(c) for c in selected]
         return sum(
-            compartment.population
+            compartment.amount
             for compartment in self.initial_state()
             if all(
                 compartment.categories.get(stratification) == name
@@ -537,7 +535,7 @@ class CompartmentalStructure(ModelStructure):
         """
         Check that parameter ids are not engine variables or bin ids.
 
-        Expanded compartment names and subpopulation totals are checked by the
+        Expanded compartment names and subgroup totals are checked by the
         engine (``engine_state.check_names``).
         """
         bin_ids = {bin_item.id for bin_item in self.bins}
@@ -585,23 +583,13 @@ class CompartmentalStructure(ModelStructure):
             {bin_item.id for bin_item in self.bins}
             | category_ids
             | set(RESERVED_VARIABLE_NAMES)
-            | self._subpopulation_n_vars()
+            | self._subgroup_total_names()
             | self._full_compartment_names()
-            | self._bin_subpopulation_vars()
         )
 
-    def _subpopulation_n_vars(self) -> set[str]:
-        """Generates all possible N_{category...} variable names."""
-        if not self.stratifications:
-            return set()
-
-        subpopulation_n_vars: set[str] = set()
-        category_groups = [s.categories for s in self.stratifications]
-        for combo_tuple in product(*category_groups):
-            for i in range(1, len(combo_tuple) + 1):
-                for subset in combinations(combo_tuple, i):
-                    subpopulation_n_vars.add(f"N_{'_'.join(subset)}")
-        return subpopulation_n_vars
+    def _subgroup_total_names(self) -> set[str]:
+        """Names of the subgroup totals the engine provides for rates."""
+        return set(engine_state.subgroup_total_names(self))
 
     def _full_compartment_names(self) -> set[str]:
         """Returns all full stratified compartment names."""
@@ -609,33 +597,6 @@ class CompartmentalStructure(ModelStructure):
             return set()
         compartments, _ = engine_state.expanded_outputs(self)
         return {output.name for output in compartments}
-
-    def _bin_subpopulation_vars(self) -> set[str]:
-        """Generates partial bin-stratification sum variable names.
-
-        For bins and stratifications, generates the combinations. These represent
-        partial sums over one or more stratification dimensions. Requires 2+
-        stratifications (with 1, partial sums duplicate existing names).
-        """
-        if len(self.stratifications) < 2:
-            return set()
-
-        bin_strat_vars: set[str] = set()
-        bin_ids = [bin_item.id for bin_item in self.bins]
-        category_groups = [s.categories for s in self.stratifications]
-
-        for combo_tuple in product(*category_groups):
-            num_cats = len(combo_tuple)
-            full_mask = (1 << num_cats) - 1
-            for subset_mask in range(1, full_mask):
-                subset = [
-                    cat for k, cat in enumerate(combo_tuple) if (subset_mask >> k) & 1
-                ]
-                suffix = "_".join(subset)
-                for bin_id in bin_ids:
-                    bin_strat_vars.add(f"{bin_id}_{suffix}")
-
-        return bin_strat_vars
 
     def _check_rate_variables(
         self,
@@ -659,12 +620,16 @@ class CompartmentalStructure(ModelStructure):
             f"Available bins: "
             f"{', '.join(sorted(bin_ids)) if bin_ids else 'none'}."
         )
-        if any(var.startswith("N_") for var in undefined_vars):
-            n_vars = sorted(self._subpopulation_n_vars())
+        if any(var.startswith(SUBGROUP_TOTAL_PREFIX) for var in undefined_vars):
+            names = sorted(
+                name
+                for name in self._subgroup_total_names()
+                if name.startswith(SUBGROUP_TOTAL_PREFIX)
+            )
             message += (
-                " Subpopulation names follow the declaration order of the "
-                "stratifications. Available subpopulations: "
-                f"{', '.join(n_vars) if n_vars else 'none'}."
+                " Subgroup total names follow the declaration order of the "
+                "stratifications. Available subgroup totals: "
+                f"{', '.join(names) if names else 'none'}."
             )
         raise ValueError(message)
 

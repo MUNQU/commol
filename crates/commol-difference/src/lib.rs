@@ -19,9 +19,9 @@
 //! // Run for 100 time steps
 //! let results = engine.run(100)?;
 //!
-//! // Access compartment names and final populations
+//! // Access compartment names and the final state
 //! let compartments = engine.compartments();
-//! let final_state = engine.population();
+//! let final_state = engine.state();
 //! ```
 
 #![warn(missing_docs)]

@@ -27,12 +27,12 @@ N = 1000.0
 
 def _tuberculosis(c1: float, c2: float, values: dict[str, float]) -> Model:
     flows = [
-        Flow("births", None, "S", "mu * N"),
-        Flow("sensitive", "S", "L1", "c1 * S * I1 / N"),
-        Flow("resistant", "S", "L2", "c2 * S * I2 / N"),
-        Flow("superinfection", "L1", "L2", "c2 * L1 * I2 / N"),
-        Flow("treated_sensitive", "T", "L1", "cstar * T * I1 / N"),
-        Flow("treated_resistant", "T", "L2", "c2 * T * I2 / N"),
+        Flow("births", None, "S", "mu * total"),
+        Flow("sensitive", "S", "L1", "c1 * S * I1 / total"),
+        Flow("resistant", "S", "L2", "c2 * S * I2 / total"),
+        Flow("superinfection", "L1", "L2", "c2 * L1 * I2 / total"),
+        Flow("treated_sensitive", "T", "L1", "cstar * T * I1 / total"),
+        Flow("treated_resistant", "T", "L2", "c2 * T * I2 / total"),
         Flow("activation1", "L1", "I1", "kappa1 * L1"),
         Flow("prophylaxis", "L1", "T", "r1 * L1"),
         Flow("failure", "I1", "L1", "p * r2 * I1"),

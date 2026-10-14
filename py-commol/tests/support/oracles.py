@@ -49,7 +49,7 @@ def final_size(reproduction_number: float, s0: float, extra: float = 0.0) -> flo
     reproduction_number : float
         ``R`` in the final size relation.
     s0 : float
-        The initial susceptible fraction, ``S0 / N``.
+        The initial susceptible fraction, ``S0 / total``.
     extra : float
         A constant term, such as the infection caused by an initial pathogen.
 

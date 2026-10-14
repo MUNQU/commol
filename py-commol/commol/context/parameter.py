@@ -38,10 +38,10 @@ class SeriesValue(BaseModel):
             raise ValueError("Series data must contain at least one point")
 
         positions: list[float] = []
-        for position, amount in value:
+        for position, point_value in value:
             if not (math.isfinite(position) and position >= 0):
                 raise ValueError("Series positions must be finite and non-negative")
-            if not math.isfinite(amount):
+            if not math.isfinite(point_value):
                 raise ValueError("Series values must be finite")
             positions.append(position)
 
@@ -63,7 +63,7 @@ class Parameter(BaseModel):
         Value of the parameter. Can be:
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
-               special variables (N, N_category, step, t, pi, e), or contain
+               special variables (total, total_<category>, step, t, pi, e), or contain
                mathematical expressions
         - SeriesValue: An empirical series evaluated via binary search
         - None: Indicates that the parameter needs to be calibrated before use

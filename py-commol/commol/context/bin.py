@@ -1,4 +1,4 @@
-"""Bins and accumulators of a model population."""
+"""Bins and accumulators of a compartmental model."""
 
 from typing import override
 
@@ -42,7 +42,7 @@ class Bin(BaseModel):
 
 
 class Accumulator(BaseModel):
-    """A cumulative event counter tracked as output but not as population state."""
+    """A cumulative event counter tracked as output but not as part of the state."""
 
     model_config = ConfigDict(extra="forbid")
 

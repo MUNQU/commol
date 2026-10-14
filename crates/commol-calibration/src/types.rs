@@ -325,9 +325,9 @@ impl std::fmt::Display for LossConfig {
 /// )
 /// .with_positions(vec![10.0, 20.0, 30.0, 40.0])
 ///
-/// // Total population must stay <= 1000
+/// // The total must stay <= 1000
 /// CalibrationConstraint::new(
-///     "population_bound".to_string(),
+///     "total_bound".to_string(),
 ///     "1000.0 - (S + I + R)".to_string(),
 /// )
 /// .with_positions(vec![0.0, 5.0, 10.0, 15.0, 20.0])

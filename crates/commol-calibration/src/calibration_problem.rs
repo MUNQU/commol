@@ -1,7 +1,7 @@
 //! Calibration problem definition and implementation
 
 use argmin::core::{CostFunction, Error};
-use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
+use commol_core::{MathExpression, MathExpressionContext, SimulationEngine, ENGINE_VARIABLES};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
@@ -113,7 +113,7 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 
     /// Outputs after the state ([`SimulationEngine::state_outputs`]), such as
     /// accumulators, as `(name, row index)`. These are injected by name during
-    /// constraint evaluation so they resolve without counting towards `N`.
+    /// constraint evaluation so they resolve without counting towards `total`.
     non_state_outputs: Vec<(String, usize)>,
 
     /// Phantom data for type parameter
@@ -236,7 +236,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
 
         // Build output name to index mapping for observations. Outputs include
-        // state compartments and non-population outputs such as accumulators.
+        // state compartments and outputs outside the total, such as accumulators.
         let output_names = base_engine.output_names();
         let output_map: std::collections::HashMap<&str, usize> = output_names
             .iter()
@@ -360,7 +360,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             // Validate that all variables are either parameters, compartments, or special constants
             for var in &variables {
                 // Skip special variables
-                if var == "N" || var == "step" || var == "t" || var == "pi" || var == "e" {
+                if ENGINE_VARIABLES.contains(&var.as_str()) {
                     continue;
                 }
 
@@ -491,11 +491,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// the total the model kind keeps; the engine resolves it.
     ///
     /// For a compartmental model it is a compartment or bin that absorbs the
-    /// difference to the population size. Without a remainder, calibrated
-    /// initial conditions are applied as given and only a total above the
-    /// population size is penalized. With one, the initial population always
-    /// equals the population size, and a combination that would leave the
-    /// remainder negative is penalized.
+    /// difference to the total. Without a remainder, calibrated initial
+    /// conditions are applied as given and only a sum above the total is
+    /// penalized. With one, the sum of the initial amounts always equals the
+    /// total, and a combination that would leave the remainder negative is
+    /// penalized.
     ///
     /// # Errors
     ///
@@ -728,7 +728,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         // Create context with parameter values
         let mut context = MathExpressionContext::new();
 
-        // Only the state outputs are registered, so `N` stays the total of the
+        // Only the state outputs are registered, so `total` stays the sum of the
         // state. Outputs after it, such as accumulators, are injected by name
         // below, alongside the sums.
         let mut state_names = self.base_engine.output_names();
@@ -760,7 +760,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                     // Update context with compartment values at this time step
                     context.set_compartments_by_index(step_data);
                     // Outputs after the state are not registered (they must not
-                    // count towards `N`), so inject them by name.
+                    // count towards `total`), so inject them by name.
                     for (name, idx) in &self.non_state_outputs {
                         context.set_parameter_str(name, step_data[*idx]);
                     }
