@@ -12,7 +12,7 @@ time axis and discrete-time rates. Audit T0 below found that more of the API
 assumes one model type; that work is split into three ODDs (L5).
 Branch: `refactor/axis-scale` from `develop`, after
 `odd/archive/tasks/axis-positions.md`, `odd/archive/tasks/model-type-registry.md` and
-`odd/tasks/model-kind-interface.md` are merged.
+`odd/archive/tasks/model-kind-interface.md` are merged.
 Last of four ODDs; the order of all pending work is in
 `odd/execution-order.md`.
 Engram mirror: topic `odd/axis-scale-refactor/tasks` (project `commol`).
