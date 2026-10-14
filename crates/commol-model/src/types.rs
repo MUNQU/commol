@@ -11,12 +11,12 @@ use commol_core::{MathExpression, MathExpressionContext, RateMathExpression, Ser
 /// storage is name-keyed in `MathExpressionContext`.
 #[derive(Clone)]
 pub(crate) enum VarSlot {
-    /// Direct index into the engine's `population` vector.
+    /// Direct index into the amounts of the compartments in the state.
     Compartment(usize),
     /// Direct index into `MathExpressionContext`'s parameter value storage.
     ParameterIndex(usize),
     /// Look up by name in `MathExpressionContext.parameters` (covers user
-    /// parameters, formula parameters, series, subpopulation totals,
+    /// parameters, formula parameters, series, subgroup totals,
     /// base bin sums, and partial bin-strat sums).
     Parameter(String),
     /// The step that holds the current time (`step`).
@@ -270,22 +270,22 @@ impl SeriesParameter {
     }
 }
 
-/// Pre-computed subpopulation mapping for stratifications
+/// Pre-computed subgroup total mapping for stratifications
 #[derive(Clone)]
-pub(crate) struct SubpopulationMapping {
-    /// Compartment indices that contribute to this subpopulation total
+pub(crate) struct SubgroupTotalMapping {
+    /// Compartment indices that contribute to this subgroup total
     pub(crate) contributing_compartment_indices: Vec<usize>,
-    /// Parameter name for this subpopulation (e.g., "N_young")
+    /// Variable name of this subgroup total (e.g., "total_young")
     pub(crate) parameter_name: String,
     /// Index into `MathExpressionContext`'s parameter value storage, filled in
     /// after parameter slots have been reserved.
     pub(crate) parameter_index: usize,
 }
 
-/// Subpopulation mapping with only the structural data known before
+/// Subgroup total mapping with only the structural data known before
 /// parameter slot reservation. The builder converts this into a
-/// [`SubpopulationMapping`] once the expression context indices exist.
-pub(crate) struct SubpopulationLayout {
+/// [`SubgroupTotalMapping`] once the expression context indices exist.
+pub(crate) struct SubgroupTotalLayout {
     pub(crate) contributing_compartment_indices: Vec<usize>,
     pub(crate) parameter_name: String,
 }
@@ -313,8 +313,8 @@ pub(crate) struct GeneratedAccumulatorOutput {
 #[derive(Clone)]
 pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
-    /// The population size the initial fractions are taken of.
-    pub(crate) population_size: f64,
+    /// The total the initial fractions are taken of.
+    pub(crate) total: f64,
     /// Source and applied categories of each output, parallel to `output_names`
     pub(crate) output_labels: Vec<crate::labels::OutputLabels>,
     pub(crate) output_names: Vec<String>,
@@ -332,14 +332,14 @@ pub struct CompiledModel {
     /// Values that a rate or a formula parameter compares `t` with, such as
     /// `t_on` in `t >= t_on`: the right-hand side jumps where `t` reaches them.
     pub(crate) time_thresholds: Vec<MathExpression>,
-    /// Pre-computed subpopulation mappings for stratifications
-    pub(crate) subpopulation_mappings: Vec<SubpopulationMapping>,
+    /// Pre-computed subgroup total mappings for stratifications
+    pub(crate) subgroup_total_mappings: Vec<SubgroupTotalMapping>,
     /// Parameters defined as formulas that need to be evaluated each step
     pub(crate) formula_parameters: Vec<(String, RateMathExpression)>,
     /// Parameters defined as empirical series; evaluated via binary search
     /// each time the right-hand side is evaluated
     pub(crate) series_parameters: Vec<SeriesParameter>,
-    pub(crate) n_parameter_index: usize,
+    pub(crate) total_parameter_index: usize,
     pub(crate) t_parameter_index: usize,
     /// Whether any per-step expression still needs compartment values in the
     /// expression context. JIT-resolved transition formulas read compartments

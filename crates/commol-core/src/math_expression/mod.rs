@@ -12,7 +12,9 @@
 //! ## Special Variables
 //!
 //! The following variables are automatically available in all expressions:
-//! - `N` - Total population (sum of all compartments)
+//! - `total` - The sum of every compartment, accumulators excluded
+//! - `total_<cat>…` - A subgroup total: the sum of the compartments with the
+//!   categories `<cat>…`
 //! - `step` - The step that holds the current position, `floor(t)`
 //! - `t` - The current position on the axis; equal to `step` in a difference
 //!   engine, continuous in a differential engine
@@ -88,6 +90,7 @@ pub mod preprocessing;
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
 pub use jit::{JITCompiler, JITFunction};
+pub use preprocessing::{SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 
 use preprocessing::{get_variables, preprocess_formula, reads_variable};
 
@@ -273,7 +276,9 @@ impl MathExpression {
         }
 
         // Add special variables
-        context.set_value("N".to_string(), Value::Float(1.0)).ok();
+        context
+            .set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(1.0))
+            .ok();
         context
             .set_value("step".to_string(), Value::Float(1.0))
             .ok();
@@ -448,7 +453,7 @@ mod tests {
         assert!((result - 4950.0).abs() < 1e-10);
 
         // Test normalized infection rate
-        let expr = MathExpression::new("beta * S * I / N".to_string());
+        let expr = MathExpression::new("beta * S * I / total".to_string());
         let result = expr.evaluate(&mut ctx).unwrap();
         assert!((result - 4.95).abs() < 1e-10);
     }

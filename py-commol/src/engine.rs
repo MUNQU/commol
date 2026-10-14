@@ -109,7 +109,7 @@ macro_rules! compartmental {
     };
 }
 
-/// The initial population of a compartmental engine, and the compartments a
+/// The initial state of a compartmental engine, and the compartments a
 /// plan of initial conditions covers.
 ///
 /// # Errors
@@ -119,9 +119,9 @@ pub fn compartmental_state(
     engine: &Engine,
     plan: &EngineValuePlan,
 ) -> Result<(Vec<f64>, Vec<usize>), String> {
-    let population = compartmental!(engine, engine => engine.population())?;
+    let state = compartmental!(engine, engine => engine.state())?;
     match plan {
-        EngineValuePlan::Compartmental(plan) => Ok((population, plan.covered_population())),
+        EngineValuePlan::Compartmental(plan) => Ok((state, plan.covered_compartments())),
         #[cfg(feature = "test-kind")]
         EngineValuePlan::Test(_) => Err("The plan is not of a compartmental model".to_string()),
     }
@@ -297,13 +297,13 @@ impl PyEngine {
         SimulationEngine::step(&mut self.inner).map_err(PyRuntimeError::new_err)
     }
 
-    /// Current population of each compartment of a compartmental model
+    /// Current amount of each compartment of a compartmental model
     ///
     /// Raises:
     ///     ValueError: If the engine does not run compartmental models
     #[getter]
-    fn population(&self) -> PyResult<Vec<f64>> {
-        compartmental!(&self.inner, engine => engine.population()).map_err(PyValueError::new_err)
+    fn state(&self) -> PyResult<Vec<f64>> {
+        compartmental!(&self.inner, engine => engine.state()).map_err(PyValueError::new_err)
     }
 
     /// Names of the compartments of a compartmental model (e.g., ["S",
@@ -352,7 +352,7 @@ impl PyEngine {
     ///
     /// Args:
     ///     compartment_index: The index of the compartment (0-based)
-    ///     value: The new initial population value
+    ///     value: The new initial amount
     ///
     /// Raises:
     ///     ValueError: If the engine does not run compartmental models,
@@ -548,7 +548,7 @@ mod tests {
             "accumulators":[],"stratifications":[],
             "transitions":[{"id":"ab","source":["A"],"target":["B"],
             "rate":"0.1","stratified_rates":null,"per_compartment":null}],
-            "initial_conditions":{"population_size":1000,"bin_fractions":[
+            "initial_conditions":{"total":1000,"bin_fractions":[
             {"bin":"A","fraction":1.0},{"bin":"B","fraction":0.0}],
             "stratification_fractions":[]}}}"#,
         )

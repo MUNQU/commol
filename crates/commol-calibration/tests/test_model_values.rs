@@ -212,7 +212,7 @@ fn an_infeasible_state_is_penalized_and_its_reason_comes_from_the_engine() {
 
 #[test]
 fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
-    // At k = 1 and start = 0.5: x = 0.5, y = 2, xy = 2.5 and N = x = 0.5.
+    // At k = 1 and start = 0.5: x = 0.5, y = 2, xy = 2.5 and total = x = 0.5.
     let penalty = |expression: &str| {
         problem(vec![CalibrationConstraint::new(
             "c".to_string(),
@@ -225,9 +225,9 @@ fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
     };
 
     assert_eq!(penalty("2.5 - xy"), 0.0);
-    assert_eq!(penalty("0.5 - N"), 0.0);
+    assert_eq!(penalty("0.5 - total"), 0.0);
     assert!(penalty("xy - 3") > 0.0);
-    assert!(penalty("N - 1") > 0.0);
+    assert!(penalty("total - 1") > 0.0);
 
     let error = problem(vec![CalibrationConstraint::new(
         "c".to_string(),

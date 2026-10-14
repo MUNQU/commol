@@ -1,7 +1,7 @@
 //! Calibration problem definition and implementation
 
 use argmin::core::{CostFunction, Error};
-use commol_core::{MathExpression, MathExpressionContext, SimulationEngine};
+use commol_core::{MathExpression, MathExpressionContext, SimulationEngine, SPECIAL_VAR_TOTAL};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
@@ -236,7 +236,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         }
 
         // Build output name to index mapping for observations. Outputs include
-        // state compartments and non-population outputs such as accumulators.
+        // state compartments and outputs outside the total, such as accumulators.
         let output_names = base_engine.output_names();
         let output_map: std::collections::HashMap<&str, usize> = output_names
             .iter()
@@ -360,7 +360,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             // Validate that all variables are either parameters, compartments, or special constants
             for var in &variables {
                 // Skip special variables
-                if var == "N" || var == "step" || var == "t" || var == "pi" || var == "e" {
+                if var == SPECIAL_VAR_TOTAL
+                    || var == "step"
+                    || var == "t"
+                    || var == "pi"
+                    || var == "e"
+                {
                     continue;
                 }
 
@@ -491,11 +496,11 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// the total the model kind keeps; the engine resolves it.
     ///
     /// For a compartmental model it is a compartment or bin that absorbs the
-    /// difference to the population size. Without a remainder, calibrated
-    /// initial conditions are applied as given and only a total above the
-    /// population size is penalized. With one, the initial population always
-    /// equals the population size, and a combination that would leave the
-    /// remainder negative is penalized.
+    /// difference to the total. Without a remainder, calibrated initial
+    /// conditions are applied as given and only a sum above the total is
+    /// penalized. With one, the sum of the initial amounts always equals the
+    /// total, and a combination that would leave the remainder negative is
+    /// penalized.
     ///
     /// # Errors
     ///

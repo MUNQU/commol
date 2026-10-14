@@ -31,7 +31,7 @@ impl DifferenceEquations {
     /// Panics when [`Self::try_from_model`] returns an error.
     pub fn from_model(model: &commol_core::Model) -> Self {
         Self::try_from_model(model)
-            .unwrap_or_else(|error| panic!("Failed to build population: {error}"))
+            .unwrap_or_else(|error| panic!("Failed to build the engine: {error}"))
     }
 
     /// Fallible counterpart of [`Self::from_model`].
@@ -100,8 +100,8 @@ impl DifferenceEquations {
         &self.model
     }
 
-    /// Get the current population vector.
-    pub fn population(&self) -> Vec<f64> {
+    /// Current amount of each compartment, without the accumulators.
+    pub fn state(&self) -> Vec<f64> {
         self.state[..self.model.num_compartments()].to_vec()
     }
 
@@ -270,12 +270,12 @@ impl CompartmentalEngine for DifferenceEquations {
         self.model.output_labels().to_vec()
     }
 
-    fn population(&self) -> Vec<f64> {
-        DifferenceEquations::population(self)
+    fn state(&self) -> Vec<f64> {
+        DifferenceEquations::state(self)
     }
 
-    fn population_size(&self) -> f64 {
-        self.model.population_size()
+    fn total(&self) -> f64 {
+        self.model.total()
     }
 
     fn set_initial_condition(
@@ -284,7 +284,7 @@ impl CompartmentalEngine for DifferenceEquations {
         value: f64,
     ) -> Result<(), String> {
         self.model.set_initial_condition(compartment_index, value)?;
-        // Also update current population to reflect the change
+        // Also update the current state to reflect the change
         self.state[compartment_index] = value;
         if self.current_step == 0.0 && self.settled {
             // The impulses at step 0 must act on the new initial state.
@@ -324,7 +324,7 @@ mod tests {
         assert_step_adds_derivatives(&make_periodic_ab_model(), 9);
         assert_step_adds_derivatives(&make_three_bin_model(), 20);
         assert_step_adds_derivatives(&ab_model_with_rate("if(step >= 0, e * k2 * A, 0)"), 5);
-        assert_step_adds_derivatives(&ab_model_with_rate("k1 * A * B / N + t * 0.001"), 5);
+        assert_step_adds_derivatives(&ab_model_with_rate("k1 * A * B / total + t * 0.001"), 5);
     }
 
     fn make_periodic_ab_model() -> Model {
@@ -360,7 +360,7 @@ mod tests {
                     impulse_every: None,
                 }],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![
                         BinFraction {
                             bin: "A".to_string(),
@@ -410,7 +410,7 @@ mod tests {
                     impulse_every: None,
                 }],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![
                         BinFraction {
                             bin: "A".to_string(),
@@ -469,11 +469,11 @@ mod tests {
             );
         }
 
-        // Population conserved at every recorded state
+        // Total kept at every recorded state
         for k in 0..=14 {
             assert!(
                 (a[k] + b[k] - 1000.0).abs() < 1e-8,
-                "Population not conserved at step {}: A={}, B={}, total={}",
+                "Total not kept at step {}: A={}, B={}, total={}",
                 k,
                 a[k],
                 b[k],
@@ -535,7 +535,7 @@ mod tests {
                         target: vec!["B".to_string()],
                         accumulators: vec![],
                         rate: Some(RateMathExpression::from_string(
-                            "k1 * A * B / N".to_string(),
+                            "k1 * A * B / total".to_string(),
                         )),
                         stratified_rates: None,
                         per_compartment: None,
@@ -555,7 +555,7 @@ mod tests {
                     },
                 ],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![
                         BinFraction {
                             bin: "A".to_string(),
@@ -579,23 +579,27 @@ mod tests {
     }
 
     #[test]
-    fn get_parameters_exposes_n_after_step_without_compartment_context() {
+    fn get_parameters_exposes_the_total_after_step_without_compartment_context() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
 
         engine.step().unwrap();
 
         let params = engine.get_parameters();
-        let n = params
-            .get("N")
+        let total = params
+            .get("total")
             .copied()
-            .expect("N must be visible in get_parameters() after a step");
-        // The model conserves total population at 1000 across the first step.
-        assert!((n - 1000.0).abs() < 1e-6, "expected N=1000, got {}", n);
+            .expect("total must be visible in get_parameters() after a step");
+        // The model keeps its total at 1000 across the first step.
+        assert!(
+            (total - 1000.0).abs() < 1e-6,
+            "expected total=1000, got {}",
+            total
+        );
     }
 
     #[test]
-    fn three_bin_model_conserves_population_through_fast_path() {
+    fn three_bin_model_keeps_its_total_through_fast_path() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
         let results = engine.run(50).unwrap().rows;
@@ -604,7 +608,7 @@ mod tests {
             let total: f64 = state.iter().sum();
             assert!(
                 (total - 1000.0).abs() < 1e-6,
-                "population not conserved at step {}: total = {}",
+                "total not kept at step {}: total = {}",
                 k,
                 total
             );
@@ -732,8 +736,8 @@ mod tests {
         engine.step().unwrap();
         engine.reset();
 
-        assert_eq!(engine.population(), vec![750.0, 250.0, 0.0]);
-        assert_eq!(engine.population_size(), 1000.0);
+        assert_eq!(engine.state(), vec![750.0, 250.0, 0.0]);
+        assert_eq!(engine.total(), 1000.0);
     }
 
     #[test]

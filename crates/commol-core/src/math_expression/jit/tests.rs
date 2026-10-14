@@ -145,13 +145,13 @@ mod jit_tests {
     #[test]
     fn test_jit_product3_div() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta * S * I / N");
+        let preprocessed = preprocess_formula("beta * S * I / total");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // beta=0.5, S=990, I=10, N=1000, result=4.95
+        // beta=0.5, S=990, I=10, total=1000, result=4.95
         assert!(
             (result - 4.95).abs() < 1e-10,
             "Expected 4.95, got {}",
@@ -162,7 +162,7 @@ mod jit_tests {
     #[test]
     fn test_jit_complex_expression() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("(beta * S + gamma * I) / N");
+        let preprocessed = preprocess_formula("(beta * S + gamma * I) / total");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -190,15 +190,15 @@ mod jit_tests {
     }
 
     #[test]
-    fn test_jit_special_variable_n() {
+    fn test_jit_special_variable_total() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("N");
+        let preprocessed = preprocess_formula("total");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // N = S + I + R = 990 + 10 + 0 = 1000
+        // total = S + I + R = 990 + 10 + 0 = 1000
         assert!(
             (result - 1000.0).abs() < 1e-10,
             "Expected 1000.0, got {}",

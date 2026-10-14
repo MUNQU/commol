@@ -8,6 +8,7 @@ use super::libm::LibmRegistry;
 use super::parser::parse_expression;
 use crate::math_expression::MathExpressionContext;
 use crate::math_expression::error::MathExpressionError;
+use crate::math_expression::preprocessing::{SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 use cranelift::prelude::*;
 use cranelift_codegen::ir::AbiParam;
 use cranelift_jit::{JITBuilder, JITModule};
@@ -73,7 +74,7 @@ impl JITFunction {
         };
 
         for (i, name) in self.variable_names.iter().enumerate() {
-            // Preferred order: precomputed parameter (includes N, N_*, base bin
+            // Preferred order: precomputed parameter (includes `total`, `total_*`, base bin
             // totals, and partial bin-strat sums that the engine updates once
             // per step), then compartment values, then the special variables `step` and `t`,
             // and only then the expensive on-demand recomputation fallback.
@@ -88,19 +89,19 @@ impl JITFunction {
                 context.step
             } else if name == "t" {
                 context.time
-            } else if name == "N" {
+            } else if name == SPECIAL_VAR_TOTAL {
                 // Fallback: sum all compartments in sorted order for
                 // deterministic floating-point results.
                 let mut sorted_values: Vec<f64> = context.compartments.values().copied().collect();
                 sorted_values.sort_by(|a, b| a.total_cmp(b));
                 sorted_values.iter().sum()
-            } else if name.starts_with("N_") {
-                // Fallback: stratified population sum in sorted order.
-                let suffix = &name[1..];
+            } else if let Some(categories) = name.strip_prefix(SUBGROUP_TOTAL_PREFIX) {
+                // Fallback: subgroup total in sorted order.
+                let suffix = format!("_{categories}");
                 let mut filtered_values: Vec<f64> = context
                     .compartments
                     .iter()
-                    .filter(|(comp_name, _)| comp_name.ends_with(suffix))
+                    .filter(|(comp_name, _)| comp_name.ends_with(&suffix))
                     .map(|(_, val)| *val)
                     .collect();
                 if filtered_values.is_empty() {

@@ -214,9 +214,9 @@ pub struct PyInitialConditions {
 #[pymethods]
 impl PyInitialConditions {
     #[new]
-    #[pyo3(signature = (population_size, bin_fractions, stratification_fractions=None, compartment_fractions=None))]
+    #[pyo3(signature = (total, bin_fractions, stratification_fractions=None, compartment_fractions=None))]
     fn new(
-        population_size: u64,
+        total: f64,
         bin_fractions: Vec<(String, Option<f64>)>,
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
         compartment_fractions: Option<Vec<(String, f64)>>,
@@ -254,7 +254,7 @@ impl PyInitialConditions {
 
         Self {
             inner: commol_core::InitialConditions {
-                population_size,
+                total,
                 bin_fractions,
                 stratification_fractions,
                 compartment_fractions,
@@ -262,10 +262,10 @@ impl PyInitialConditions {
         }
     }
 
-    /// Declared population size.
+    /// The sum of every compartment at the start.
     #[getter]
-    fn population_size(&self) -> u64 {
-        self.inner.population_size
+    fn total(&self) -> f64 {
+        self.inner.total
     }
 
     /// Declared bin fractions as ``(bin, fraction)`` pairs.

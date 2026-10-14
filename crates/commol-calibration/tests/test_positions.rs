@@ -18,7 +18,7 @@ fn decay_model(engine: &str) -> Model {
         "accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],
         "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}],
-        "initial_conditions":{{"population_size":1000,"bin_fractions":[
+        "initial_conditions":{{"total":1000,"bin_fractions":[
         {{"bin":"A","fraction":1.0}},{{"bin":"B","fraction":0.0}}],
         "stratification_fractions":[]}}}}}}"#
     );

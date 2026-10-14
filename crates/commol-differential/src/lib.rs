@@ -101,8 +101,8 @@ impl DifferentialEquations {
         &self.settings
     }
 
-    /// Current population of each compartment.
-    pub fn population(&self) -> Vec<f64> {
+    /// Current amount of each compartment, without the accumulators.
+    pub fn state(&self) -> Vec<f64> {
         self.state[..self.model.num_compartments()].to_vec()
     }
 
@@ -263,12 +263,12 @@ impl CompartmentalEngine for DifferentialEquations {
         self.model.output_labels().to_vec()
     }
 
-    fn population(&self) -> Vec<f64> {
-        DifferentialEquations::population(self)
+    fn state(&self) -> Vec<f64> {
+        DifferentialEquations::state(self)
     }
 
-    fn population_size(&self) -> f64 {
-        self.model.population_size()
+    fn total(&self) -> f64 {
+        self.model.total()
     }
 
     fn set_initial_condition(

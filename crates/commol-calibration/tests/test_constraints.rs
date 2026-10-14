@@ -77,9 +77,9 @@ fn test_nonlinear_constraint_with_functions() {
 
 #[test]
 fn test_constraint_with_special_variables() {
-    // Constraints can reference special variables like N, step, t, pi, e
+    // Constraints can reference special variables like total, step, t, pi, e
     let constraint =
-        CalibrationConstraint::new("time_dependent".to_string(), "N - 1000.0".to_string())
+        CalibrationConstraint::new("time_dependent".to_string(), "total - 1000.0".to_string())
             .with_positions(vec![10.0]);
 
     let expr = MathExpression::new(constraint.expression.clone());

@@ -39,12 +39,12 @@ class StratificationFractionsProtocol(Protocol):
 class InitialConditionsProtocol(Protocol):
     def __init__(
         self,
-        population_size: int,
+        total: float,
         bin_fractions: list[tuple[str, float | None]],
         stratification_fractions: dict[str, dict[str, float]] | None = None,
         compartment_fractions: list[tuple[str, float]] | None = None,
     ) -> None: ...
-    population_size: int
+    total: float
     bin_fractions: list[tuple[str, float | None]]
     stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
     compartment_fractions: list[tuple[str, float]]
@@ -94,7 +94,7 @@ class EngineProtocol(Protocol):
     def current_position(self) -> float: ...
     def set_initial_condition(self, compartment_index: int, value: float) -> None: ...
     @property
-    def population(self) -> list[float]: ...
+    def state(self) -> list[float]: ...
     @property
     def compartments(self) -> list[str]: ...
     @property
@@ -139,6 +139,9 @@ class ModelModule(Protocol):
         self, structure: RustCompartmentalStructureProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
     def check_names(self, model: RustModelProtocol) -> None: ...
+    def subgroup_total_names(
+        self, structure: RustCompartmentalStructureProtocol
+    ) -> list[str]: ...
     def expanded_outputs(
         self, structure: RustCompartmentalStructureProtocol
     ) -> tuple[
@@ -426,7 +429,7 @@ class CalibrationModule(Protocol):
         parameters: list[CalibrationParameterProtocol],
         initial_condition_remainder: str | None = None,
     ) -> None: ...
-    def calibrated_initial_population(
+    def calibrated_initial_state(
         self,
         engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],

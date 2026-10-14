@@ -1,6 +1,6 @@
 //! Planning of the transition flows of a model.
 //!
-//! A plan says which compartment each transition moves population from and
+//! A plan says which compartment each transition moves an amount from and
 //! to, with which rate, and whether the rate is an absolute flow or a
 //! per-capita rate. It is built from the compartment labels, never from
 //! compartment names. The engine compiles the plan into its runtime flows,
@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 
 use commol_core::{CompartmentalStructure, RateMathExpression, Stratification, Transition};
 
-use crate::builder::{accumulator_output_ref, generate_accumulators, subpopulation_names};
+use crate::builder::{accumulator_output_ref, generate_accumulators, subgroup_total_name_set};
 use crate::helpers::{
     category_overrides, get_rate_string_for_compartment, replace_bin_in_rate, target_categories,
 };
@@ -122,7 +122,7 @@ pub(crate) fn plan_transition_flows(
     structure: &CompartmentalStructure,
     layout: &CompartmentLayout,
     accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
-    subpopulation_names: &HashSet<String>,
+    subgroup_total_names: &HashSet<String>,
 ) -> Result<Vec<PlannedFlow>, String> {
     let stratifications = &structure.stratifications;
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
@@ -131,7 +131,7 @@ pub(crate) fn plan_transition_flows(
             RateMathExpression::from_string(rate.to_string())
                 .get_variables()
                 .iter()
-                .any(|v| compartment_names.contains(v.as_str()) || subpopulation_names.contains(v))
+                .any(|v| compartment_names.contains(v.as_str()) || subgroup_total_names.contains(v))
         })
     };
 
@@ -299,7 +299,7 @@ fn accumulator_indices(
         .collect()
 }
 
-/// One flow of population between two compartments of a model.
+/// One flow of an amount between two compartments of a model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlowDescription {
     /// Id of the transition the flow comes from.
@@ -332,7 +332,7 @@ pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDesc
         .enumerate()
         .map(|(idx, output)| (output.output_ref, idx))
         .collect();
-    let names = subpopulation_names(&layout, structure);
+    let names = subgroup_total_name_set(&layout, structure);
     let flows = plan_transition_flows(structure, &layout, &accumulator_map, &names)?;
     let name = |idx: Option<usize>| idx.map(|idx| layout.name(idx).to_string());
     Ok(flows
@@ -377,7 +377,7 @@ mod tests {
             .collect();
         let json = format!(
             r#"{{"bins":[{}],"stratifications":[{}],
-            "transitions":[{}],"initial_conditions":{{"population_size":100,
+            "transitions":[{}],"initial_conditions":{{"total":100.0,
             "bin_fractions":[{}],"stratification_fractions":[]}}}}"#,
             bins.join(","),
             stratifications,

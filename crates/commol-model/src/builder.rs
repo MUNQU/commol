@@ -6,13 +6,14 @@ use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp,
-    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter, SubpopulationLayout,
-    SubpopulationMapping, TransitionFlow, VarSlot,
+    GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter, SubgroupTotalLayout,
+    SubgroupTotalMapping, TransitionFlow, VarSlot,
 };
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
 use commol_core::math_expression::preprocessing::{
-    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
+    SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
     CompartmentalStructure, MathExpression, MathExpressionContext, Model, RateMathExpression,
@@ -33,9 +34,9 @@ impl CompiledModel {
     ///
     /// This constructor performs several pre-computation steps for efficiency:
     /// 1. Generates all stratified compartment combinations
-    /// 2. Initializes population distribution across compartments
+    /// 2. Distributes the total across the compartments
     /// 3. Pre-computes transition flows with parsed rate expressions
-    /// 4. Pre-computes subpopulation mappings for stratifications
+    /// 4. Pre-computes the subgroup total mappings for stratifications
     ///
     /// # Errors
     ///
@@ -71,7 +72,7 @@ impl CompiledModel {
             .cloned()
             .collect();
 
-        // Initial population of each compartment, in the same order as
+        // Initial amount of each compartment, in the same order as
         // `compartments`
         let state = initial_state(structure)?;
         debug_assert!(
@@ -80,7 +81,7 @@ impl CompiledModel {
                 .map(|compartment| &compartment.name)
                 .eq(compartments.iter())
         );
-        let population: Vec<f64> = state.iter().map(|c| c.population).collect();
+        let amounts: Vec<f64> = state.iter().map(|c| c.amount).collect();
 
         // Labels of every output: compartments first, then accumulators
         let output_labels: Vec<OutputLabels> = layout
@@ -139,12 +140,12 @@ impl CompiledModel {
         expression_context.set_parameters(constant_parameters);
         expression_context.init_compartments(compartments.clone());
 
-        // Pre-compute subpopulation mappings for stratifications
+        // Pre-compute the subgroup total mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
-        // needs to know about subpopulation variable names)
-        let subpopulation_layout = build_subpopulation_mappings(&layout, structure);
+        // needs to know about subgroup total names)
+        let subgroup_total_layout = build_subgroup_total_mappings(&layout, structure);
 
-        let subpopulation_param_names: HashSet<String> = subpopulation_layout
+        let subgroup_total_param_names: HashSet<String> = subgroup_total_layout
             .iter()
             .map(|m| m.parameter_name.clone())
             .collect();
@@ -153,31 +154,31 @@ impl CompiledModel {
         // `set_parameter_str` can update in place and JIT input resolution can
         // use direct indexed parameter reads where possible.
         expression_context.reserve_parameters(
-            std::iter::once("N".to_string())
+            std::iter::once(SPECIAL_VAR_TOTAL.to_string())
                 .chain(std::iter::once("t".to_string()))
                 .chain(model.parameters.iter().map(|p| p.id.clone()))
                 .chain(
-                    subpopulation_layout
+                    subgroup_total_layout
                         .iter()
                         .map(|m| m.parameter_name.clone()),
                 )
                 .chain(series_payloads.iter().map(|payload| payload.name.clone()))
                 .chain(formula_parameters.iter().map(|(name, _)| name.clone())),
         );
-        let n_parameter_index = expression_context
-            .parameter_index("N")
-            .expect("N parameter slot must be reserved");
+        let total_parameter_index = expression_context
+            .parameter_index(SPECIAL_VAR_TOTAL)
+            .expect("total parameter slot must be reserved");
         let t_parameter_index = expression_context
             .parameter_index("t")
             .expect("t parameter slot must be reserved");
 
-        let mut subpopulation_mappings: Vec<SubpopulationMapping> = subpopulation_layout
+        let mut subgroup_total_mappings: Vec<SubgroupTotalMapping> = subgroup_total_layout
             .into_iter()
             .map(|layout| {
                 let parameter_index = expression_context
                     .parameter_index(&layout.parameter_name)
-                    .expect("subpopulation parameter slot must be reserved");
-                SubpopulationMapping {
+                    .expect("subgroup total parameter slot must be reserved");
+                SubgroupTotalMapping {
                     contributing_compartment_indices: layout.contributing_compartment_indices,
                     parameter_name: layout.parameter_name,
                     parameter_index,
@@ -200,7 +201,7 @@ impl CompiledModel {
             structure,
             &layout,
             &accumulator_map,
-            &subpopulation_param_names,
+            &subgroup_total_param_names,
         )?;
         let schedules = impulse_schedules(structure)?;
         let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
@@ -251,13 +252,13 @@ impl CompiledModel {
             &formula_parameters,
             &fixed_parameters,
         );
-        subpopulation_mappings
+        subgroup_total_mappings
             .retain(|mapping| used_context_variables.contains(&mapping.parameter_name));
 
         // The HashMap-backed compartment context is only needed when an
         // expression must fall back to evalexpr. Both the JIT path (via
         // `resolved_slots`) and the fast path (via `fast_rate_expression`)
-        // read compartment values directly from `population`, so they do
+        // read compartment values directly from the state, so they do
         // not require the HashMap to be kept up to date.
         let requires_compartment_context = !formula_parameters.is_empty()
             || transition_flows
@@ -269,14 +270,14 @@ impl CompiledModel {
                         && flow.fast_rate_expression.is_none()
                 });
 
-        let initial_state: Vec<f64> = population
+        let initial_state: Vec<f64> = amounts
             .into_iter()
             .chain(std::iter::repeat_n(0.0, accumulator_map.len()))
             .collect();
 
         Ok(Self {
             compartments,
-            population_size: structure.initial_conditions.population_size as f64,
+            total: structure.initial_conditions.total,
             output_labels,
             output_names,
             initial_state,
@@ -285,10 +286,10 @@ impl CompiledModel {
             impulse_flows,
             depends_on_step,
             time_thresholds,
-            subpopulation_mappings,
+            subgroup_total_mappings,
             formula_parameters,
             series_parameters,
-            n_parameter_index,
+            total_parameter_index,
             t_parameter_index,
             requires_compartment_context,
         })
@@ -479,7 +480,7 @@ pub(crate) fn generate_accumulators(
     .collect()
 }
 
-/// One expanded compartment of a model and the population it starts with.
+/// One expanded compartment of a model and the amount it starts with.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialCompartment {
     /// Expanded compartment name, for example `IH_y60` or `S_oe60_home`.
@@ -490,37 +491,43 @@ pub struct InitialCompartment {
     /// stratification declaration order. A conditional stratification whose
     /// conditions the compartment does not meet is absent.
     pub categories: Vec<(String, String)>,
-    /// Initial population, including `compartment_fractions` overrides.
-    pub population: f64,
+    /// Initial amount, including `compartment_fractions` overrides.
+    pub amount: f64,
 }
 
-/// Relative tolerance of the check that overrides keep the initial population
-/// within `population_size`.
-const POPULATION_TOLERANCE: f64 = 1e-9;
+/// Relative tolerance of the check that overrides keep the sum of the initial
+/// amounts within the total.
+const TOTAL_TOLERANCE: f64 = 1e-9;
 
-/// Expand a structure into its compartments and their initial populations.
+/// Expand a structure into its compartments and their initial amounts.
 ///
 /// This is the single source of truth for the initial state of a
 /// compartmental model. Bins
 /// are expanded over the stratifications in declaration order; when a
 /// stratification has conditions that a compartment's already-applied
-/// categories do not meet, that compartment is kept as-is and its population
+/// categories do not meet, that compartment is kept as-is and its amount
 /// is not split by that stratification's fractions. An uncalibrated bin
 /// fraction counts as zero.
 ///
 /// After the uniform distribution is computed, `compartment_fractions` overrides
-/// replace the value of the named compartments with `population_size * fraction`.
+/// replace the value of the named compartments with `total * fraction`.
 ///
 /// # Errors
 ///
-/// Returns a message when an override names a compartment that is not part of
-/// the expansion, names a compartment twice, holds a fraction outside
-/// `[0.0, 1.0]`, or makes the initial population exceed `population_size`.
+/// Returns a message when the total is not finite or not greater than 0, or
+/// when an override names a compartment that is not part of the expansion,
+/// names a compartment twice, holds a fraction outside `[0.0, 1.0]`, or makes
+/// the sum of the initial amounts exceed the total.
 pub fn initial_state(
     structure: &CompartmentalStructure,
 ) -> Result<Vec<InitialCompartment>, String> {
     let initial_conditions = &structure.initial_conditions;
-    let total_population = initial_conditions.population_size as f64;
+    let total = initial_conditions.total;
+    if !total.is_finite() || total <= 0.0 {
+        return Err(format!(
+            "The total of the initial conditions must be finite and greater than 0, got {total}."
+        ));
+    }
 
     let bin_fraction_map: HashMap<&str, Option<f64>> = initial_conditions
         .bin_fractions
@@ -546,7 +553,7 @@ pub fn initial_state(
         })
         .collect();
 
-    // Each compartment holds its bin's share of the population, split by the
+    // Each compartment holds its bin's share of the total, split by the
     // fraction of every category applied to it. An uncalibrated bin or an
     // undeclared category counts as zero.
     let mut state: Vec<InitialCompartment> = expand_compartments(structure)
@@ -556,21 +563,22 @@ pub fn initial_state(
                 .get(output.source.as_str())
                 .and_then(|f| *f)
                 .unwrap_or(0.0);
-            let population =
+            let amount =
                 output
                     .categories
                     .iter()
-                    .fold(total_population * bin_fraction, |pop, (id, cat)| {
-                        pop * category_fraction_map
-                            .get(&(id.as_str(), cat.as_str()))
-                            .copied()
-                            .unwrap_or(0.0)
+                    .fold(total * bin_fraction, |amount, (id, cat)| {
+                        amount
+                            * category_fraction_map
+                                .get(&(id.as_str(), cat.as_str()))
+                                .copied()
+                                .unwrap_or(0.0)
                     });
             InitialCompartment {
                 name: output.name,
                 bin: output.source,
                 categories: output.categories,
-                population,
+                amount,
             }
         })
         .collect();
@@ -613,15 +621,14 @@ pub fn initial_state(
 
     for compartment_fraction in overrides {
         let index = compartment_index[&compartment_fraction.compartment];
-        state[index].population = total_population * compartment_fraction.fraction;
+        state[index].amount = total * compartment_fraction.fraction;
     }
 
-    let total: f64 = state.iter().map(|c| c.population).sum();
-    if total > total_population * (1.0 + POPULATION_TOLERANCE) {
+    let sum: f64 = state.iter().map(|c| c.amount).sum();
+    if sum > total * (1.0 + TOTAL_TOLERANCE) {
         return Err(format!(
-            "Per-compartment overrides would make the initial population exceed \
-             population_size ({} > {}).",
-            total, total_population
+            "Per-compartment overrides would make the initial amounts exceed \
+             the total ({sum} > {total})."
         ));
     }
 
@@ -657,18 +664,18 @@ fn compile_transition_flows(
         .collect()
 }
 
-/// Build pre-computed subpopulation mappings for stratifications.
+/// Build pre-computed subgroup total mappings for stratifications.
 ///
 /// This function creates mappings for:
-/// 1. Subpopulation totals over categories (`N_young`, `N_young_urban`, ...)
+/// 1. Subgroup totals over categories (`total_young`, `total_young_urban`, ...)
 /// 2. Bin totals (`S`, `I`, `R`): the sum of all stratified versions
 /// 3. Partial bin totals (`S_young` when a second stratification splits it)
 ///
 /// Every mapping is built from the compartment labels.
-fn build_subpopulation_mappings(
+fn build_subgroup_total_mappings(
     layout: &CompartmentLayout,
     structure: &CompartmentalStructure,
-) -> Vec<SubpopulationLayout> {
+) -> Vec<SubgroupTotalLayout> {
     if structure.stratifications.is_empty() {
         return Vec::new();
     }
@@ -702,9 +709,9 @@ fn build_subpopulation_mappings(
                 .collect();
             let combination = subset.join("_");
 
-            // Subpopulation total over every bin
+            // Subgroup total over every bin
             totals
-                .entry(format!("N_{combination}"))
+                .entry(format!("{SUBGROUP_TOTAL_PREFIX}{combination}"))
                 .or_default()
                 .push(compartment_index);
 
@@ -722,7 +729,7 @@ fn build_subpopulation_mappings(
     totals
         .into_iter()
         .map(
-            |(parameter_name, contributing_compartment_indices)| SubpopulationLayout {
+            |(parameter_name, contributing_compartment_indices)| SubgroupTotalLayout {
                 contributing_compartment_indices,
                 parameter_name,
             },
@@ -730,40 +737,57 @@ fn build_subpopulation_mappings(
         .collect()
 }
 
-/// Names of the subpopulation totals a rate expression may reference.
-pub(crate) fn subpopulation_names(
+/// Names of the subgroup totals a rate expression may reference.
+pub(crate) fn subgroup_total_name_set(
     layout: &CompartmentLayout,
     structure: &CompartmentalStructure,
 ) -> HashSet<String> {
-    build_subpopulation_mappings(layout, structure)
+    build_subgroup_total_mappings(layout, structure)
         .into_iter()
         .map(|mapping| mapping.parameter_name)
         .collect()
 }
 
+/// Names of the subgroup totals a rate expression of a structure may read,
+/// sorted.
+///
+/// They are the `total_<categories>` names, the bin totals and the partial bin
+/// totals. Category suffixes follow the declaration order of the
+/// stratifications, and a conditional stratification adds its categories only
+/// to the compartments it expands. A structure without stratifications has
+/// none.
+pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
+    let mut names: Vec<String> =
+        subgroup_total_name_set(&CompartmentLayout::new(structure), structure)
+            .into_iter()
+            .collect();
+    names.sort_unstable();
+    names
+}
+
 /// Check the names a model uses against the names the engine provides.
 ///
 /// The engine provides one variable per expanded compartment and one per
-/// subpopulation total: `N_<categories>`, bin totals and partial bin totals.
+/// subgroup total: `total_<categories>`, bin totals and partial bin totals.
 /// This function returns an error when:
 ///
 /// - a parameter id is one of those names, because the parameter and the
 ///   engine variable would share one slot;
-/// - a transition rate or a formula parameter uses an `N_…` name that is not
-///   a subpopulation of the model. Category suffixes follow the declaration
-///   order of the stratifications, so `N_t1_g1` is not a name when `group` is
-///   declared before `type`. A parameter or compartment whose id starts with
-///   `N_` is not such a name.
+/// - a transition rate or a formula parameter uses a `total_…` name that is
+///   not a subgroup total of the model. Category suffixes follow the
+///   declaration order of the stratifications, so `total_t1_g1` is not a name
+///   when `group` is declared before `type`. A parameter or compartment whose
+///   id starts with `total_` is not such a name.
 ///
 /// # Errors
 ///
 /// Returns a message when the model is not compartmental, or a message that
-/// names each conflict and lists the valid subpopulation names.
+/// names each conflict and lists the valid subgroup total names.
 pub fn check_names(model: &Model) -> Result<(), String> {
     let structure = model.compartmental()?;
     let layout = CompartmentLayout::new(structure);
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
-    let subpopulations = subpopulation_names(&layout, structure);
+    let subgroup_totals = subgroup_total_name_set(&layout, structure);
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
 
     let mut reserved: Vec<String> = model
@@ -773,8 +797,8 @@ pub fn check_names(model: &Model) -> Result<(), String> {
             let id = parameter.id.as_str();
             if compartments.contains(id) {
                 Some(format!("'{id}' (a compartment)"))
-            } else if subpopulations.contains(id) {
-                Some(format!("'{id}' (a subpopulation total)"))
+            } else if subgroup_totals.contains(id) {
+                Some(format!("'{id}' (a subgroup total)"))
             } else {
                 None
             }
@@ -807,8 +831,8 @@ pub fn check_names(model: &Model) -> Result<(), String> {
 
     let mut unknown: Vec<&String> = used
         .iter()
-        .filter(|name| name.starts_with("N_"))
-        .filter(|name| !subpopulations.contains(*name))
+        .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
+        .filter(|name| !subgroup_totals.contains(*name))
         .filter(|name| !compartments.contains(name.as_str()))
         .filter(|name| !parameter_ids.contains(name.as_str()))
         .collect();
@@ -816,10 +840,10 @@ pub fn check_names(model: &Model) -> Result<(), String> {
         return Ok(());
     }
     unknown.sort();
-    let mut valid: Vec<&str> = subpopulations
+    let mut valid: Vec<&str> = subgroup_totals
         .iter()
         .map(String::as_str)
-        .filter(|name| name.starts_with("N_"))
+        .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
         .collect();
     valid.sort_unstable();
     let valid = if valid.is_empty() {
@@ -828,7 +852,7 @@ pub fn check_names(model: &Model) -> Result<(), String> {
         valid.join(", ")
     };
     Err(format!(
-        "Unknown subpopulation variable(s) {}. Category suffixes follow the \
+        "Unknown subgroup total(s) {}. Category suffixes follow the \
          declaration order of the stratifications. Valid names: {valid}",
         unknown
             .iter()
@@ -1332,16 +1356,16 @@ mod tests {
         model.compartmental_mut().unwrap()
     }
 
-    /// Initial population of each compartment, in the order of `compartments`.
-    fn initialize_population(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
+    /// Initial amount of each compartment, in the order of `compartments`.
+    fn initial_amounts(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
         let state = initial_state(structure(model))?;
-        let population: HashMap<&str, f64> = state
+        let amounts: HashMap<&str, f64> = state
             .iter()
-            .map(|compartment| (compartment.name.as_str(), compartment.population))
+            .map(|compartment| (compartment.name.as_str(), compartment.amount))
             .collect();
         Ok(compartments
             .iter()
-            .map(|name| *population.get(name.as_str()).unwrap_or(&0.0))
+            .map(|name| *amounts.get(name.as_str()).unwrap_or(&0.0))
             .collect())
     }
 
@@ -1418,7 +1442,7 @@ mod tests {
                 stratifications,
                 transitions: vec![],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![bin_fraction("A", 1.0), bin_fraction("B", 0.0)],
                     stratification_fractions,
                     compartment_fractions,
@@ -1466,10 +1490,10 @@ mod tests {
             }],
         );
         let (compartments, _) = generate_compartments(&model);
-        let population = initialize_population(&model, &compartments).unwrap();
+        let amounts = initial_amounts(&model, &compartments).unwrap();
 
         assert_eq!(compartments, vec!["A_g1", "A_g2", "B_g1", "B_g2"]);
-        assert_eq!(population, vec![600.0, 250.0, 0.0, 0.0]);
+        assert_eq!(amounts, vec![600.0, 250.0, 0.0, 0.0]);
     }
 
     #[test]
@@ -1492,13 +1516,13 @@ mod tests {
             }],
         );
         let (compartments, _) = generate_compartments(&model);
-        let population = initialize_population(&model, &compartments).unwrap();
+        let amounts = initial_amounts(&model, &compartments).unwrap();
 
         assert_eq!(
             compartments,
             vec!["A_g1_s1", "A_g1_s2", "A_g2", "B_g1_s1", "B_g1_s2", "B_g2"]
         );
-        assert_eq!(population, vec![350.0, 350.0, 100.0, 0.0, 0.0, 0.0]);
+        assert_eq!(amounts, vec![350.0, 350.0, 100.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]
@@ -1512,13 +1536,13 @@ mod tests {
             }],
         );
         let (compartments, _) = generate_compartments(&model);
-        let error = initialize_population(&model, &compartments).unwrap_err();
+        let error = initial_amounts(&model, &compartments).unwrap_err();
 
         assert!(error.contains("Unknown compartment 'Missing'"));
     }
 
     #[test]
-    fn population_is_conserved_with_overrides() {
+    fn the_total_is_kept_with_overrides() {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
@@ -1534,10 +1558,10 @@ mod tests {
             ],
         );
         let (compartments, _) = generate_compartments(&model);
-        let population = initialize_population(&model, &compartments).unwrap();
+        let amounts = initial_amounts(&model, &compartments).unwrap();
 
-        assert_eq!(population, vec![400.0, 600.0, 0.0, 0.0]);
-        assert!((population.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
+        assert_eq!(amounts, vec![400.0, 600.0, 0.0, 0.0]);
+        assert!((amounts.iter().sum::<f64>() - 1000.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1551,7 +1575,7 @@ mod tests {
             }],
         );
         let (compartments, _) = generate_compartments(&model);
-        let error = initialize_population(&model, &compartments).unwrap_err();
+        let error = initial_amounts(&model, &compartments).unwrap_err();
 
         assert!(error.contains("between 0.0 and 1.0"), "{error}");
     }
@@ -1567,7 +1591,7 @@ mod tests {
             }],
         );
         let (compartments, _) = generate_compartments(&model);
-        let error = initialize_population(&model, &compartments).unwrap_err();
+        let error = initial_amounts(&model, &compartments).unwrap_err();
 
         assert!(error.contains("between 0.0 and 1.0"), "{error}");
     }
@@ -1589,7 +1613,7 @@ mod tests {
             ],
         );
         let (compartments, _) = generate_compartments(&model);
-        let error = initialize_population(&model, &compartments).unwrap_err();
+        let error = initial_amounts(&model, &compartments).unwrap_err();
 
         assert!(error.contains("Duplicate compartment 'A_g1'"), "{error}");
     }
@@ -1611,13 +1635,13 @@ mod tests {
             ],
         );
         let (compartments, _) = generate_compartments(&model);
-        let population = initialize_population(&model, &compartments).unwrap();
+        let amounts = initial_amounts(&model, &compartments).unwrap();
 
-        assert_eq!(population, vec![0.0, 1000.0, 0.0, 0.0]);
+        assert_eq!(amounts, vec![0.0, 1000.0, 0.0, 0.0]);
     }
 
     #[test]
-    fn override_exceeding_population_is_a_build_error() {
+    fn override_exceeding_the_total_is_a_build_error() {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
@@ -1628,7 +1652,7 @@ mod tests {
         );
         let error = initial_state(structure(&model)).unwrap_err();
 
-        assert!(error.contains("exceed population_size"), "{error}");
+        assert!(error.contains("exceed the total"), "{error}");
     }
 
     #[test]
@@ -1660,13 +1684,13 @@ mod tests {
                 ("sub".to_string(), "s2".to_string())
             ]
         );
-        assert_eq!(a_g1_s2.population, 300.0);
+        assert_eq!(a_g1_s2.amount, 300.0);
         assert_eq!(a_g2.name, "A_g2");
         assert_eq!(
             a_g2.categories,
             vec![("group".to_string(), "g2".to_string())]
         );
-        assert_eq!(a_g2.population, 400.0);
+        assert_eq!(a_g2.amount, 400.0);
     }
 
     fn model_with_rate(rate: &str) -> Model {
@@ -1701,25 +1725,36 @@ mod tests {
     }
 
     #[test]
-    fn subpopulation_variable_out_of_declaration_order_is_a_build_error() {
-        let error = CompiledModel::try_from_model(&model_with_rate("k * N_s1_g1 / N"))
+    fn subgroup_total_out_of_declaration_order_is_a_build_error() {
+        let error = CompiledModel::try_from_model(&model_with_rate("k * total_s1_g1 / total"))
             .err()
-            .expect("N_s1_g1 names no subpopulation");
-        assert!(error.contains("'N_s1_g1'"), "{error}");
-        assert!(error.contains("N_g1_s1"), "{error}");
+            .expect("total_s1_g1 names no subgroup");
+        assert!(error.contains("'total_s1_g1'"), "{error}");
+        assert!(error.contains("total_g1_s1"), "{error}");
     }
 
     #[test]
-    fn unknown_subpopulation_variable_is_a_build_error() {
-        let error = CompiledModel::try_from_model(&model_with_rate("k * N_x"))
-            .err()
-            .expect("N_x names no subpopulation");
-        assert!(error.contains("'N_x'"), "{error}");
+    fn subgroup_total_names_follow_the_declaration_order() {
+        let names = subgroup_total_names(structure(&model_with_rate("k")));
+
+        for name in ["total_g1", "total_s2", "total_g1_s1", "A", "A_g1", "B_s2"] {
+            assert!(names.contains(&name.to_string()), "{name}: {names:?}");
+        }
+        assert!(!names.contains(&"total_s1_g1".to_string()), "{names:?}");
+        assert!(names.is_sorted());
     }
 
     #[test]
-    fn subpopulation_variable_in_declaration_order_builds() {
-        assert!(CompiledModel::try_from_model(&model_with_rate("k * N_g1_s1 / N")).is_ok());
+    fn unknown_subgroup_total_is_a_build_error() {
+        let error = CompiledModel::try_from_model(&model_with_rate("k * total_x"))
+            .err()
+            .expect("total_x names no subgroup");
+        assert!(error.contains("'total_x'"), "{error}");
+    }
+
+    #[test]
+    fn subgroup_total_in_declaration_order_builds() {
+        assert!(CompiledModel::try_from_model(&model_with_rate("k * total_g1_s1 / total")).is_ok());
     }
 
     #[test]
@@ -1728,7 +1763,7 @@ mod tests {
         let mut model = CompiledModel::try_from_model(&model_with_rate("step % 2")).unwrap();
         let state = model.initial_state().to_vec();
         let mut rates = vec![0.0; state.len()];
-        // Compartment 0 is A_g1_s1 with 250 people.
+        // Compartment 0 is A_g1_s1 with an amount of 250.
         model.derivatives(0.0, 0.0, &state, &mut rates).unwrap();
         assert_eq!(rates[0], 0.0);
         model.derivatives(1.0, 1.0, &state, &mut rates).unwrap();
@@ -1747,17 +1782,43 @@ mod tests {
     }
 
     #[test]
-    fn parameter_id_cannot_be_a_compartment_or_a_subpopulation() {
+    fn parameter_id_cannot_be_a_compartment_or_a_subgroup_total() {
         for (id, kind) in [
             ("A_g1_s1", "a compartment"),
-            ("N_g1", "a subpopulation total"),
-            ("A_g1", "a subpopulation total"),
-            ("A", "a subpopulation total"),
+            ("total_g1", "a subgroup total"),
+            ("A_g1", "a subgroup total"),
+            ("A", "a subgroup total"),
         ] {
             let error =
                 check_names(&model_with_parameter(id)).expect_err("a reserved id must be rejected");
             assert!(error.contains(&format!("'{id}' ({kind})")), "{error}");
         }
-        assert!(check_names(&model_with_parameter("N_max")).is_ok());
+        assert!(check_names(&model_with_parameter("total_max")).is_ok());
+    }
+
+    #[test]
+    fn a_real_total_starts_with_amounts_that_sum_to_it() {
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.6, 0.4)],
+            vec![],
+        );
+        structure_mut(&mut model).initial_conditions.total = 2.5;
+        let state = initial_state(structure(&model)).unwrap();
+
+        let sum: f64 = state.iter().map(|compartment| compartment.amount).sum();
+        assert!((sum - 2.5).abs() < 1e-12, "{sum}");
+        assert!(CompiledModel::try_from_model(&model).is_ok());
+    }
+
+    #[test]
+    fn a_total_that_is_not_finite_and_positive_is_a_build_error() {
+        for total in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let mut model = make_model(vec![], vec![], vec![]);
+            structure_mut(&mut model).initial_conditions.total = total;
+            let error = initial_state(structure(&model)).unwrap_err();
+
+            assert!(error.contains("finite and greater than 0"), "{error}");
+        }
     }
 }

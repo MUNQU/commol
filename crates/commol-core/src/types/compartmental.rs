@@ -14,7 +14,7 @@ pub struct Bin {
     pub name: String,
 }
 
-/// A cumulative event counter tracked by the engine but excluded from population totals.
+/// A cumulative event counter tracked by the engine but excluded from the total.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Accumulator {
     /// Identifier, and the output name before expansion.
@@ -41,7 +41,7 @@ pub struct Stratification {
     pub conditions: Option<Vec<StratificationCondition>>,
 }
 
-/// Specifies the fraction of population in a particular bin
+/// Specifies the fraction of the total in a particular bin
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BinFraction {
     /// Id of the bin.
@@ -50,7 +50,7 @@ pub struct BinFraction {
     pub fraction: Option<f64>,
 }
 
-/// Specifies the fraction of population in a stratification category
+/// Specifies the fraction of a group in a stratification category
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StratificationFraction {
     /// The category.
@@ -73,16 +73,16 @@ pub struct StratificationFractions {
 pub struct CompartmentFraction {
     /// Name of the expanded compartment, such as `A_g1`.
     pub compartment: String,
-    /// Fraction of the total population, applied after the uniform expansion
+    /// Fraction of the total, applied after the uniform expansion
     pub fraction: f64,
 }
 
 /// How the compartments of a model start.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitialConditions {
-    /// Total population at step 0.
-    pub population_size: u64,
-    /// Fraction of the population in each bin.
+    /// The sum of every compartment at the start, finite and greater than 0.
+    pub total: f64,
+    /// Fraction of the total in each bin.
     pub bin_fractions: Vec<BinFraction>,
     /// Category fractions of each stratification.
     pub stratification_fractions: Vec<StratificationFractions>,
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn initial_conditions_without_compartment_fractions_deserialize() {
         let json = r#"{
-            "population_size": 1000,
+            "total": 1000.0,
             "bin_fractions": [{"bin": "A", "fraction": 1.0}],
             "stratification_fractions": []
         }"#;
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn compartment_fractions_round_trip() {
         let json = r#"{
-            "population_size": 1000,
+            "total": 1000.0,
             "bin_fractions": [{"bin": "A", "fraction": 1.0}],
             "stratification_fractions": [],
             "compartment_fractions": [{"compartment": "A_g1", "fraction": 0.25}]

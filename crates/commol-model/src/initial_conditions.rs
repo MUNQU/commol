@@ -3,7 +3,7 @@
 //! This module is the single source of truth for how an initial-condition
 //! value reaches a compartmental engine: how its id resolves to compartments,
 //! in which order the values are written, and how the remainder keeps the
-//! population. Both engines resolve and write values of their kind through it
+//! total. Both engines resolve and write values of their kind through it
 //! ([`commol_core::SimulationEngine::plan_values`] and
 //! [`commol_core::SimulationEngine::apply_values`]), so the calibration
 //! objective, the calibrated predictions and the model write-back all use it.
@@ -11,7 +11,7 @@
 //! Initial conditions are written in the same layers as a model definition:
 //! bin values first, then stratification-category splits, then exact
 //! compartments, and finally the remainder, which absorbs the difference to the
-//! population size. Within a layer, values are written in the order given.
+//! total. Within a layer, values are written in the order given.
 
 use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
@@ -21,18 +21,18 @@ use crate::labels::OutputLabels;
 /// Separator of a qualified category id, as in `sex:female`.
 const CATEGORY_SEPARATOR: char = ':';
 
-/// Relative tolerance under which the initial population is taken to match the
-/// population size.
-const POPULATION_TOLERANCE: f64 = 1e-9;
+/// Relative tolerance under which the sum of the initial amounts is taken to
+/// match the total.
+const TOTAL_TOLERANCE: f64 = 1e-9;
 
 /// Compartments an initial-condition value is written to.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
-    /// A bin or a bin prefix. The value is the fraction of the population the
+    /// A bin or a bin prefix. The value is the fraction of the total the
     /// covered compartments hold, shared by weights taken from the base
-    /// population.
+    /// state.
     Aggregate { entries: Vec<(usize, f64)> },
-    /// One expanded compartment. The value is its fraction of the population.
+    /// One expanded compartment. The value is its fraction of the total.
     Exact { index: usize },
     /// A category of a binary stratification. The value splits each
     /// `(category, complement)` pair of compartments.
@@ -40,13 +40,13 @@ pub(crate) enum InitialConditionTarget {
 }
 
 impl InitialConditionTarget {
-    fn aggregate(indices: Vec<usize>, population: &[f64]) -> Self {
-        let total: f64 = indices.iter().map(|&idx| population[idx]).sum();
+    fn aggregate(indices: Vec<usize>, state: &[f64]) -> Self {
+        let total: f64 = indices.iter().map(|&idx| state[idx]).sum();
         let entries = indices
             .iter()
             .map(|&idx| {
                 let weight = if total > 0.0 {
-                    population[idx] / total
+                    state[idx] / total
                 } else {
                     1.0 / indices.len() as f64
                 };
@@ -56,9 +56,9 @@ impl InitialConditionTarget {
         Self::Aggregate { entries }
     }
 
-    /// Compartments whose head count the value sets. Category splits keep the
-    /// pair totals, so they cover no population.
-    fn covered_population(&self) -> Vec<usize> {
+    /// Compartments whose amount the value sets. Category splits keep the
+    /// pair totals, so they cover no compartment.
+    fn covered_compartments(&self) -> Vec<usize> {
         match self {
             Self::Aggregate { entries } => entries.iter().map(|(idx, _)| *idx).collect(),
             Self::Exact { index } => vec![*index],
@@ -81,9 +81,9 @@ impl InitialConditionTarget {
 pub struct InitialConditionPlan {
     /// Id and target of each value, in the order their numbers come.
     targets: Vec<(String, InitialConditionTarget)>,
-    /// Population the fractions are taken of.
-    population_size: f64,
-    /// Compartments that absorb the difference to the population size, if
+    /// The total the fractions are taken of.
+    total: f64,
+    /// Compartments that absorb the difference to the total, if
     /// any, with the id they were resolved from.
     remainder: Option<(String, Vec<usize>)>,
 }
@@ -101,7 +101,7 @@ impl InitialConditionPlan {
     /// # Errors
     ///
     /// The remainder, when given, names the compartments that absorb the
-    /// difference to the population size.
+    /// difference to the total.
     ///
     /// # Errors
     ///
@@ -116,13 +116,13 @@ impl InitialConditionPlan {
     ) -> Result<Self, String> {
         let compartments = engine.compartments();
         let labels = compartment_labels(engine);
-        let population = engine.population();
+        let state = engine.state();
 
         let targets = values
             .iter()
             .map(|value| match value.value_type {
                 ModelValueType::InitialCondition => {
-                    resolve_target(&value.id, &compartments, &labels, &population)
+                    resolve_target(&value.id, &compartments, &labels, &state)
                         .map(|target| (value.id.clone(), target))
                 }
             })
@@ -130,7 +130,7 @@ impl InitialConditionPlan {
 
         let plan = Self {
             targets,
-            population_size: engine.population_size(),
+            total: engine.total(),
             remainder: None,
         };
         match remainder {
@@ -139,7 +139,7 @@ impl InitialConditionPlan {
         }
     }
 
-    /// Name the compartments that absorb the difference to the population size.
+    /// Name the compartments that absorb the difference to the total.
     ///
     /// # Errors
     ///
@@ -153,7 +153,7 @@ impl InitialConditionPlan {
     ) -> Result<Self, String> {
         let compartments = engine.compartments();
         let indices =
-            population_indices(remainder_id, &compartment_labels(engine)).ok_or_else(|| {
+            prefix_indices(remainder_id, &compartment_labels(engine)).ok_or_else(|| {
                 format!(
                     "Initial-condition remainder '{}' is not a compartment or a bin \
                  (available: {})",
@@ -164,7 +164,7 @@ impl InitialConditionPlan {
 
         for (id, target) in &self.targets {
             if target
-                .covered_population()
+                .covered_compartments()
                 .iter()
                 .any(|idx| indices.contains(idx))
             {
@@ -180,14 +180,14 @@ impl InitialConditionPlan {
         Ok(self)
     }
 
-    /// Compartments whose head count a calibrated bin or compartment value, or
+    /// Compartments whose amount a calibrated bin or compartment value, or
     /// the remainder, sets, in engine order. Category splits keep the pair
     /// totals, so they cover none.
-    pub fn covered_population(&self) -> Vec<usize> {
+    pub fn covered_compartments(&self) -> Vec<usize> {
         let mut covered: Vec<usize> = self
             .targets
             .iter()
-            .flat_map(|(_, target)| target.covered_population())
+            .flat_map(|(_, target)| target.covered_compartments())
             .chain(
                 self.remainder
                     .iter()
@@ -203,15 +203,15 @@ impl InitialConditionPlan {
     ///
     /// The values are written layer by layer (bins, category splits, exact
     /// compartments) and then the remainder takes the difference to the
-    /// population size, keeping its own split.
+    /// total, keeping its own split.
     ///
     /// # Returns
     ///
-    /// How far the initial population exceeds the population size, as a
+    /// How far the sum of the initial amounts exceeds the total, as a
     /// fraction of it: `0.0` for a feasible state. With a remainder, the
     /// remainder is floored at zero and the deficit is reported. Without one,
-    /// the excess of the total over the population size is reported. An
-    /// excess within the tolerance is `0.0`.
+    /// the excess of the sum over the total is reported. An excess within the
+    /// tolerance is `0.0`.
     ///
     /// # Errors
     ///
@@ -229,37 +229,37 @@ impl InitialConditionPlan {
                 values.len()
             ));
         }
-        let population_size = self.population_size;
+        let total = self.total;
         for layer in 0..3 {
             for ((id, target), value) in self.targets.iter().zip(values) {
                 if target.layer() == layer {
-                    write_target(engine, target, *value, population_size).map_err(|e| {
+                    write_target(engine, target, *value, total).map_err(|e| {
                         format!("Failed to set initial condition for '{}': {}", id, e)
                     })?;
                 }
             }
         }
 
-        let population = engine.population();
+        let state = engine.state();
         let Some((_, indices)) = &self.remainder else {
-            let total: f64 = population.iter().sum();
-            return Ok(feasible_or((total / population_size - 1.0).max(0.0)));
+            let sum: f64 = state.iter().sum();
+            return Ok(feasible_or((sum / total - 1.0).max(0.0)));
         };
 
-        let others: f64 = population
+        let others: f64 = state
             .iter()
             .enumerate()
             .filter(|(idx, _)| !indices.contains(idx))
             .map(|(_, value)| value)
             .sum();
-        let remainder = population_size - others;
-        let deficit = (-remainder / population_size).max(0.0);
+        let remainder = total - others;
+        let deficit = (-remainder / total).max(0.0);
         let remainder = remainder.max(0.0);
 
-        let current: f64 = indices.iter().map(|&idx| population[idx]).sum();
+        let current: f64 = indices.iter().map(|&idx| state[idx]).sum();
         for &idx in indices {
             let share = if current > 0.0 {
-                population[idx] / current
+                state[idx] / current
             } else {
                 1.0 / indices.len() as f64
             };
@@ -276,22 +276,21 @@ impl ValuePlan for InitialConditionPlan {
         match &self.remainder {
             Some((id, _)) => format!(
                 "Invalid initial conditions: the calibrated values leave the \
-                 remainder '{}' {:.6} of the population below zero",
+                 remainder '{}' {:.6} of the total below zero",
                 id, excess
             ),
             None => format!(
                 "Invalid initial conditions: the calibrated values exceed the \
-                 population size by {:.6} of it",
+                 total by {:.6} of it",
                 excess
             ),
         }
     }
 }
 
-/// An excess of the population size, or `0.0` when it is within the
-/// tolerance.
+/// An excess of the total, or `0.0` when it is within the tolerance.
 fn feasible_or(excess: f64) -> f64 {
-    if excess > POPULATION_TOLERANCE {
+    if excess > TOTAL_TOLERANCE {
         excess
     } else {
         0.0
@@ -302,21 +301,21 @@ fn write_target<E: CompartmentalEngine>(
     engine: &mut E,
     target: &InitialConditionTarget,
     value: f64,
-    population_size: f64,
+    total: f64,
 ) -> Result<(), String> {
     match target {
         InitialConditionTarget::Aggregate { entries } => {
             for &(idx, weight) in entries {
-                engine.set_initial_condition(idx, value * weight * population_size)?;
+                engine.set_initial_condition(idx, value * weight * total)?;
             }
         }
         InitialConditionTarget::Exact { index } => {
-            engine.set_initial_condition(*index, value * population_size)?;
+            engine.set_initial_condition(*index, value * total)?;
         }
         InitialConditionTarget::PairedCategory { pairs } => {
-            let population = engine.population();
+            let state = engine.state();
             for &(category_idx, complement_idx) in pairs {
-                let pair_total = population[category_idx] + population[complement_idx];
+                let pair_total = state[category_idx] + state[complement_idx];
                 engine.set_initial_condition(category_idx, value * pair_total)?;
                 engine.set_initial_condition(complement_idx, (1.0 - value) * pair_total)?;
             }
@@ -337,7 +336,7 @@ fn compartment_labels<E: CompartmentalEngine>(engine: &E) -> Vec<OutputLabels> {
 /// A compartment is covered when the id is its bin (`A`) or its bin followed
 /// by its leading categories (`A_g1`, `A_g1_s2`). The match is built from the
 /// labels, so a bin `A` does not cover the compartments of a bin `A_x`.
-fn population_indices(id: &str, labels: &[OutputLabels]) -> Option<Vec<usize>> {
+fn prefix_indices(id: &str, labels: &[OutputLabels]) -> Option<Vec<usize>> {
     let indices: Vec<usize> = labels
         .iter()
         .enumerate()
@@ -351,7 +350,7 @@ fn resolve_target(
     id: &str,
     compartments: &[String],
     labels: &[OutputLabels],
-    population: &[f64],
+    state: &[f64],
 ) -> Result<InitialConditionTarget, String> {
     if let Some(index) = compartments.iter().position(|name| name == id) {
         return Ok(InitialConditionTarget::Exact { index });
@@ -359,8 +358,8 @@ fn resolve_target(
     if let Some((stratification, category)) = id.split_once(CATEGORY_SEPARATOR) {
         return paired_category(stratification, category, labels);
     }
-    if let Some(indices) = population_indices(id, labels) {
-        return Ok(InitialConditionTarget::aggregate(indices, population));
+    if let Some(indices) = prefix_indices(id, labels) {
+        return Ok(InitialConditionTarget::aggregate(indices, state));
     }
 
     let mut stratifications: Vec<&str> = Vec::new();
@@ -557,9 +556,9 @@ mod tests {
             ("A_x", &[("group", "g1")]),
         ]);
 
-        assert_eq!(population_indices("A", &labels), Some(vec![0, 1]));
-        assert_eq!(population_indices("A_g1", &labels), Some(vec![0]));
-        assert_eq!(population_indices("A_x", &labels), Some(vec![2]));
-        assert_eq!(population_indices("B", &labels), None);
+        assert_eq!(prefix_indices("A", &labels), Some(vec![0, 1]));
+        assert_eq!(prefix_indices("A_g1", &labels), Some(vec![0]));
+        assert_eq!(prefix_indices("A_x", &labels), Some(vec![2]));
+        assert_eq!(prefix_indices("B", &labels), None);
     }
 }

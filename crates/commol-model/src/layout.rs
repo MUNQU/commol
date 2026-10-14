@@ -2,7 +2,7 @@
 //!
 //! Compartments are identified by their bin and the categories applied to them,
 //! never by parsing their names. Every part of the engine that needs to find a
-//! compartment — transition targets, subpopulation totals, initial conditions —
+//! compartment — transition targets, subgroup totals, initial conditions —
 //! goes through this index.
 
 use std::collections::HashMap;
