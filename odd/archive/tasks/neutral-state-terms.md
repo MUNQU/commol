@@ -237,3 +237,5 @@ Found on the way:
   `steps(value, unit)`. Runners after it: Rust 258 passed (+3), test-kind 4,
   `pytest` 993 passed and 3 xfailed (+7), `pytest -m docs` 62; clippy, fmt,
   rustdoc, ruff, ty, vulture and `mkdocs build --strict` clean.
+- L6 (agent, 2026-10-14): the work is delivered by PR #108; this ODD is
+  archived in the same PR.
