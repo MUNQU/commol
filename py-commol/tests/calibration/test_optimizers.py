@@ -13,19 +13,19 @@ from commol.context.model import Model
 from tests.support import a_to_b_builder, bounded, build, observed
 
 SEED = 42
-TRUTH = {"beta": 0.1, "gamma": 0.05}
+TRUTH = {"k1": 0.1, "k2": 0.05}
 """The parameters of the ``truth`` fixture."""
 TRUE_K = 0.37
 
 
-def _fit_beta_and_gamma(
+def _fit_k1_and_k2(
     truth: Model,
     truth_run: dict[str, list[float]],
     config: NelderMeadConfig | ParticleSwarmConfig,
 ) -> dict[str, float]:
     problem = CalibrationProblem(
-        observed_data=observed(truth_run, "I", range(100)),
-        parameters=[bounded("beta"), bounded("gamma")],
+        observed_data=observed(truth_run, "B", range(100)),
+        parameters=[bounded("k1"), bounded("k2")],
         loss_function="sse",
         optimization_config=config,
         seed=SEED,
@@ -35,14 +35,14 @@ def _fit_beta_and_gamma(
 
 class TestRecovery:
     def test_nelder_mead(self, truth: Model, truth_run) -> None:
-        fitted = _fit_beta_and_gamma(
+        fitted = _fit_k1_and_k2(
             truth, truth_run, NelderMeadConfig(max_iterations=1000, verbose=False)
         )
 
         assert fitted == pytest.approx(TRUTH, abs=1e-5)
 
     def test_particle_swarm(self, truth: Model, truth_run) -> None:
-        fitted = _fit_beta_and_gamma(
+        fitted = _fit_k1_and_k2(
             truth, truth_run, ParticleSwarmConfig(max_iterations=200, verbose=False)
         )
 
@@ -66,7 +66,7 @@ class TestRecovery:
             )
         )
 
-        fitted = _fit_beta_and_gamma(truth, truth_run, config)
+        fitted = _fit_k1_and_k2(truth, truth_run, config)
 
         assert fitted == pytest.approx(TRUTH, abs=1e-4)
 
@@ -78,7 +78,7 @@ class TestRecovery:
             initialization="opposition_based",
         ).inertia("chaotic", w_min=0.4, w_max=0.9)
 
-        fitted = _fit_beta_and_gamma(truth, truth_run, config)
+        fitted = _fit_k1_and_k2(truth, truth_run, config)
 
         assert fitted == pytest.approx(TRUTH, abs=2e-4)
 

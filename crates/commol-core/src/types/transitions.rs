@@ -34,7 +34,7 @@ pub struct StratifiedRate {
     pub conditions: Vec<StratificationCondition>,
     /// The rate expression.
     pub rate: String,
-    /// Forces the rate to be absolute (`true`) or per-capita (`false`); `None` infers it.
+    /// Forces the rate to be absolute (`true`) or proportional (`false`); `None` infers it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub absolute: Option<bool>,
 }
@@ -59,7 +59,7 @@ pub struct Transition {
     /// with the specific stratified compartment name for each expanded flow.
     pub per_compartment: Option<bool>,
     /// Positions on the axis where the transition is an impulse: at each one,
-    /// the rate is a fraction (per-capita) or an amount (absolute) moved at
+    /// the rate is a fraction (proportional) or an amount (absolute) moved at
     /// once, and the transition moves nothing between them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impulse_at: Option<Vec<f64>>,

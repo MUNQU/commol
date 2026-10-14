@@ -180,7 +180,7 @@ class ProbabilisticCalibrator:
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 

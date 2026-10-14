@@ -145,7 +145,7 @@ these ids (`CompartmentalStructure.check_model` and `check_names` in
 
 A bin or an accumulator cannot take an id of the first row either, because the
 engine variable would hide it. A bin whose names read as a subgroup total is
-rejected too: a bin `total_y` stratified by `age = [y, o]` and `sex = [y, o]`
+rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]`
 expands into `total_y_y`, which is also the total of the `y` of both
 stratifications.
 

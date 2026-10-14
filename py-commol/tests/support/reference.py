@@ -32,8 +32,8 @@ def reference_run(
         The amount of each compartment at step 0.
     flows : Sequence[Flow]
         Each flow as ``(source, target, rate)``. ``rate(state, step)`` returns
-        what moves in that step, so a per-capita rate must multiply
-        by the source itself.
+        what moves in that step, so a proportional rate must
+        multiply by the source itself.
     steps : int
         The number of steps.
 
@@ -59,16 +59,16 @@ def reference_run(
     return series
 
 
-def sir_flows(
-    infection: FlowRate,
-    recovery: FlowRate | None = None,
+def abc_flows(
+    ab: FlowRate,
+    bc: FlowRate | None = None,
 ) -> list[Flow]:
-    """The flows of ``sir_builder``: S → I and, if given, I → R."""
-    flows: list[Flow] = [("S", "I", infection)]
-    if recovery is not None:
-        flows.append(("I", "R", recovery))
+    """The flows of ``abc_builder``: A → B and, if given, B → C."""
+    flows: list[Flow] = [("A", "B", ab)]
+    if bc is not None:
+        flows.append(("B", "C", bc))
     return flows
 
 
-SIR_START = {"S": 990.0, "I": 10.0, "R": 0.0}
-"""The initial state of ``sir_builder`` with its default total and fractions."""
+ABC_START = {"A": 990.0, "B": 10.0, "C": 0.0}
+"""The initial state of ``abc_builder`` with its default total and fractions."""

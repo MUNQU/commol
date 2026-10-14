@@ -13,7 +13,7 @@ from commol import (
     Simulation,
 )
 from commol.context.model import Model
-from tests.support import bounded, build, observed, sir_builder
+from tests.support import bounded, build, observed, abc_builder
 
 SEED = 42
 
@@ -26,8 +26,8 @@ class TestLosses:
     ) -> None:
         """The problem's normalize_observations must reach the Rust LossConfig."""
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(at=0, output="I", value=10.0)],
-            parameters=[bounded("beta")],
+            observed_data=[ObservedDataPoint(at=0, output="B", value=10.0)],
+            parameters=[bounded("k1")],
             loss_function=loss_function,
             normalize_observations=normalize,
             optimization_config=NelderMeadConfig(max_iterations=1, verbose=False),
@@ -44,14 +44,14 @@ class TestLosses:
         # Biased targets: no parameter choice drives the residuals to zero,
         # otherwise both losses collapse to 0 and cannot be told apart.
         observations = [
-            ObservedDataPoint(at=i, output="I", value=truth_run["I"][i] + 25.0)
+            ObservedDataPoint(at=i, output="B", value=truth_run["B"][i] + 25.0)
             for i in range(100)
         ]
 
         def final_loss(normalize: bool) -> float:
             problem = CalibrationProblem(
                 observed_data=observations,
-                parameters=[bounded("beta"), bounded("gamma")],
+                parameters=[bounded("k1"), bounded("k2")],
                 loss_function="sse",
                 normalize_observations=normalize,
                 optimization_config=ParticleSwarmConfig(
@@ -74,15 +74,15 @@ class TestWorkflow:
         The quick path of the guide: a model whose unknowns are None cannot
         run; calibration finds them; written back, the model runs again.
         """
-        truth = Simulation(
-            build(sir_builder(parameters={"beta": 0.1, "gamma": 0.05}))
-        ).run(100)
-        model = build(sir_builder(parameters={"beta": None, "gamma": None}))
+        truth = Simulation(build(abc_builder(parameters={"k1": 0.1, "k2": 0.05}))).run(
+            100
+        )
+        model = build(abc_builder(parameters={"k1": None, "k2": None}))
         with pytest.raises(ValueError, match="Cannot run Simulation"):
             Simulation(model).run(100)
         problem = CalibrationProblem(
-            observed_data=observed(truth, "I", range(100)),
-            parameters=[bounded("beta"), bounded("gamma")],
+            observed_data=observed(truth, "B", range(100)),
+            parameters=[bounded("k1"), bounded("k2")],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=1000, verbose=False),
         )
@@ -92,6 +92,6 @@ class TestWorkflow:
         rerun = Simulation(model).run(100)
 
         assert result.best_parameters == pytest.approx(
-            {"beta": 0.1, "gamma": 0.05}, abs=1e-5
+            {"k1": 0.1, "k2": 0.05}, abs=1e-5
         )
-        assert rerun["I"] == pytest.approx(truth["I"], rel=1e-3)
+        assert rerun["B"] == pytest.approx(truth["B"], rel=1e-3)

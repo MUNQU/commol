@@ -83,7 +83,7 @@ impl ModelValueType {
 /// What the value of a rate expression means to an engine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RateMeaning {
-    /// The amount (absolute) or the fraction (per-capita) a flow moves in one
+    /// The amount (absolute) or the fraction (proportional) a flow moves in one
     /// step.
     PerStep,
     /// The instantaneous rate of a flow, per unit of the axis.
@@ -478,16 +478,16 @@ mod tests {
     fn every_entry_prints_its_equations() {
         for &engine in EngineType::ALL {
             for latex in [false, true] {
-                assert!(engine.equation_lhs("S", latex).contains('S'));
+                assert!(engine.equation_lhs("A", latex).contains('A'));
             }
         }
         assert_eq!(
-            EngineType::DifferentialEquations.equation_lhs("S", false),
-            "dS/dt"
+            EngineType::DifferentialEquations.equation_lhs("A", false),
+            "dA/dt"
         );
         assert_eq!(
-            EngineType::DifferenceEquations.equation_lhs("S", false),
-            "[S(t+Dt) - S(t)] / Dt"
+            EngineType::DifferenceEquations.equation_lhs("A", false),
+            "[A(t+Dt) - A(t)] / Dt"
         );
     }
 

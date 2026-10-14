@@ -16,7 +16,7 @@ formula to machine code, and fits unknown values to your data.
 | Fluent model building | `ModelBuilder` with validation of every input |
 | Stratifications | Subgroups with their own rates, including conditional stratifications and per-compartment initial conditions |
 | Rate formulas | Parameters, compartments, totals, `step`, math functions and `if`, compiled with Cranelift |
-| Axis patterns | Pulses, windows, ramps, seasons and schedules per subgroup |
+| Axis patterns | Pulses, windows, ramps, sinusoids and schedules per subgroup |
 | Unit checking | Dimensional analysis of every rate |
 | Calibration | Nelder-Mead and particle swarm, with initial conditions, scale factors, windows and constraints |
 | Probabilistic calibration | Ensembles, prediction intervals and parameter spreads |

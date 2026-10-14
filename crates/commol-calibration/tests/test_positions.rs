@@ -8,7 +8,7 @@ use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 
-/// A → B at the per-capita rate `k`, run by the given engine.
+/// A → B at the proportional rate `k`, run by the given engine.
 fn decay_model(engine: &str) -> Model {
     let json = format!(
         r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],

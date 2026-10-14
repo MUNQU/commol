@@ -7,7 +7,7 @@ shows one technique:
 
 | Example | Technique |
 |---|---|
-| 1. Basic three-state model | Absolute and per-capita rates |
+| 1. Basic three-state model | Absolute and proportional rates |
 | 2. Four-state model | A chain of states |
 | 3. Periodic rates | `sin` of `step` in a rate |
 | 4. Group-specific rates | Stratified rates |
@@ -17,7 +17,7 @@ shows one technique:
 | 8. Subgroup-normalized rate | `total_<category>` variables |
 | 9. Conditional stratification | A stratification that splits one group only |
 | 10. Parameter calibration | `Calibrator` |
-| Time-pattern transition | `AxisPattern` as a rate |
+| Axis-pattern transition | `AxisPattern` as a rate |
 | Schedules per subgroup | `AxisPattern.add_group` |
 
 ## Example 1: Basic Three-State Model
@@ -84,7 +84,7 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
-## Example 3: Periodic (Time-Dependent) Rates
+## Example 3: Periodic Rates
 
 Modelling periodic variation in a transition rate:
 
@@ -547,10 +547,10 @@ calibrated_sim = Simulation(model)
 results = calibrated_sim.run(num_steps=100)
 ```
 
-## Example: Time-Pattern Driven Transition
+## Example: Axis-Pattern Driven Transition
 
-A composed time-varying transition: an opening pulse, a monthly periodic
-event, and a continuous seasonal baseline.
+A composed transition that changes along the axis: an opening pulse, a
+periodic event every 30 steps, and a continuous sinusoid baseline.
 
 ```python
 from commol import ModelBuilder, Simulation, AxisPattern
@@ -558,11 +558,11 @@ from commol import ModelBuilder, Simulation, AxisPattern
 rate = AxisPattern.combine(
     AxisPattern.pulse(at=0, value=0.3),
     AxisPattern.periodic(period=30, value=0.05),
-    AxisPattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+    AxisPattern.sinusoid(amplitude=0.005, period=365, baseline=0.01),
 )
 
 model = (
-    ModelBuilder("AB-time-varying")
+    ModelBuilder("AB-axis-pattern")
     .add_bin("A", "Source")
     .add_bin("B", "Sink")
     .add_transition("flow", ["A"], ["B"], rate=rate)
@@ -632,5 +632,5 @@ results = Simulation(model).run(num_steps=60)
 - [API Reference](../api/model-builder.md) - Complete API documentation
 - [Calibration Guide](calibration.md) - Comprehensive calibration documentation
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
-- [Axis Patterns](axis-patterns.md) - Time-varying rate helpers
+- [Axis Patterns](axis-patterns.md) - Rates that change along the axis
 - [Contributing](../development/contributing.md) - Build your own examples

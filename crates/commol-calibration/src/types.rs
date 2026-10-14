@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Type of value being calibrated
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CalibrationParameterType {
-    /// Model parameter (e.g., beta, gamma)
+    /// Model parameter (e.g., k1, k2)
     Parameter,
     /// A value of the state the model starts from. The engine of the model
     /// kind resolves its id; a compartmental engine takes a bin, a
@@ -31,7 +31,7 @@ pub struct ObservedDataPoint {
     /// Outputs summed before comparison; at least one.
     pub outputs: Vec<String>,
 
-    /// Observed value (e.g., number of infected individuals)
+    /// Observed value of the summed outputs
     pub value: f64,
 
     /// Weight for this observation (default 1.0)
@@ -289,7 +289,7 @@ impl std::fmt::Display for LossConfig {
 /// - Use for relationships between parameters
 ///
 /// **Constraints at positions** (`at: Some(vec)`):
-/// - Evaluated at specified time steps during simulation
+/// - Evaluated at the given positions during simulation
 /// - Can reference both parameter IDs AND compartment names
 /// - Use for constraining compartment values or dynamic relationships
 ///
@@ -297,16 +297,16 @@ impl std::fmt::Display for LossConfig {
 ///
 /// ## Parameter-only constraints:
 /// ```rust,ignore
-/// // R0 = beta/gamma must be <= 5
+/// // k1/k2 must be <= 5
 /// CalibrationConstraint::new(
-///     "r0_bound".to_string(),
-///     "5.0 - beta/gamma".to_string(),
+///     "ratio_bound".to_string(),
+///     "5.0 - k1/k2".to_string(),
 /// )
 ///
-/// // beta must be >= gamma
+/// // k1 must be >= k2
 /// CalibrationConstraint::new(
 ///     "ordering".to_string(),
-///     "beta - gamma".to_string(),
+///     "k1 - k2".to_string(),
 /// )
 ///
 /// // Sum of parameters <= 1.0
@@ -318,24 +318,24 @@ impl std::fmt::Display for LossConfig {
 ///
 /// ## Constraints at positions (output values):
 /// ```rust,ignore
-/// // Infected compartment must stay <= 500 at specific positions
+/// // B must stay <= 500 at specific positions
 /// CalibrationConstraint::new(
-///     "max_infected".to_string(),
-///     "500.0 - I".to_string(),
+///     "max_b".to_string(),
+///     "500.0 - B".to_string(),
 /// )
 /// .with_positions(vec![10.0, 20.0, 30.0, 40.0])
 ///
 /// // The total must stay <= 1000
 /// CalibrationConstraint::new(
 ///     "total_bound".to_string(),
-///     "1000.0 - (S + I + R)".to_string(),
+///     "1000.0 - (A + B + C)".to_string(),
 /// )
 /// .with_positions(vec![0.0, 5.0, 10.0, 15.0, 20.0])
 ///
 /// // Ratio of compartments with parameter reference
 /// CalibrationConstraint::new(
 ///     "ratio_bound".to_string(),
-///     "threshold - I/S".to_string(),
+///     "threshold - B/A".to_string(),
 /// )
 /// .with_positions(vec![10.0, 20.0, 30.0])
 /// ```
@@ -348,13 +348,13 @@ pub struct CalibrationConstraint {
     ///
     /// The expression can reference calibration parameters by their IDs.
     /// When `at` is specified, the expression can also reference output
-    /// values (S, I, R, etc.) at those positions.
+    /// values (A, B, C, etc.) at those positions.
     ///
     /// Examples:
-    /// - "5.0 - beta/gamma" → R0 = beta/gamma must be <= 5
-    /// - "beta - gamma" → beta >= gamma
+    /// - "5.0 - k1/k2" → k1/k2 must be <= 5
+    /// - "k1 - k2" → k1 >= k2
     /// - "1.0 - (param1 + param2)" → param1 + param2 <= 1.0
-    /// - "500.0 - I" (with `at`) → Infected compartment <= 500 at those positions
+    /// - "500.0 - B" (with `at`) → B <= 500 at those positions
     pub expression: String,
 
     /// Human-readable description (optional, for diagnostics)
@@ -457,8 +457,8 @@ pub struct CalibrationEvaluation {
     /// Loss value for this parameter set
     pub loss: f64,
 
-    /// Model predictions at each time step for all compartments
-    /// `predictions[time_step][compartment_idx]`
+    /// Model predictions at each position for all compartments
+    /// `predictions[position_idx][compartment_idx]`
     pub predictions: Vec<Vec<f64>>,
 }
 

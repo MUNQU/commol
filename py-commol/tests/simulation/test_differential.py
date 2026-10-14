@@ -1,4 +1,4 @@
-"""A DifferentialEquations model: the ODE engine, ``run_at`` and the time rule."""
+"""A DifferentialEquations model: the ODE engine, ``run_at`` and the rule of ``t``."""
 
 import math
 
@@ -12,11 +12,11 @@ from tests.support import (
     assert_close,
     build,
     build_ode,
-    sir_builder,
+    abc_builder,
 )
 
 K = 0.1
-"""Per-capita rate of the default A → B model."""
+"""Proportional rate of the default A → B model."""
 
 
 def _decay(**kwargs) -> Model:
@@ -44,10 +44,10 @@ class TestRun:
         assert_close(bdf["A"][20], tsit45["A"][20], rel=1e-6)
 
     def test_the_sir_final_size_relation_holds(self) -> None:
-        results = Simulation(build_ode(sir_builder())).run(200)
+        results = Simulation(build_ode(abc_builder())).run(200)
 
         for step in range(0, 201, 20):
-            s, r = results["S"][step], results["R"][step]
+            s, r = results["A"][step], results["C"][step]
             assert math.log(s / 990) + 3.0 * r / 1000 == pytest.approx(0, abs=1e-7)
 
     def test_the_default_solver_is_used_without_settings(self) -> None:

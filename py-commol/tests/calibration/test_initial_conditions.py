@@ -12,7 +12,7 @@ from commol import (
 )
 from commol.api.probabilistic_calibrator import ProbabilisticCalibrator
 from commol.context.model import Model
-from tests.support import a_to_b_builder, bounded, build, observed, sir_builder
+from tests.support import a_to_b_builder, bounded, build, observed, abc_builder
 
 SEED = 42
 
@@ -67,38 +67,38 @@ class TestIds:
 
     def test_an_unknown_bin_of_an_unstratified_model_is_rejected(self) -> None:
         problem = CalibrationProblem(
-            observed_data=[ObservedDataPoint(at=10, output="I", value=50.0)],
+            observed_data=[ObservedDataPoint(at=10, output="B", value=50.0)],
             parameters=[bounded("X", 0.0, 100.0, kind="initial_condition")],
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=100),
         )
 
         with pytest.raises(ValueError, match="Invalid bin, compartment or category .X"):
-            Calibrator(Simulation(build(sir_builder())), problem)
+            Calibrator(Simulation(build(abc_builder())), problem)
 
 
-def _sir(i_fraction: float | None, beta: float | None = 0.3) -> Model:
+def _sir(i_fraction: float | None, k1: float | None = 0.3) -> Model:
     return build(
-        sir_builder(
-            parameters={"beta": beta, "gamma": 0.1},
-            fractions={"S": 0.98, "I": i_fraction, "R": 0.0},
+        abc_builder(
+            parameters={"k1": k1, "k2": 0.1},
+            fractions={"A": 0.98, "B": i_fraction, "C": 0.0},
         )
     )
 
 
 @pytest.fixture
-def infected_every_5_steps() -> list[ObservedDataPoint]:
-    """I of the SIR with 2 % infected at the start, at steps 0, 5, …, 45."""
-    return observed(Simulation(_sir(0.02)).run(50), "I", range(0, 50, 5))
+def b_every_5_steps() -> list[ObservedDataPoint]:
+    """B of ``abc_builder`` with 2 % in B at the start, at steps 0, 5, …, 45."""
+    return observed(Simulation(_sir(0.02)).run(50), "B", range(0, 50, 5))
 
 
 class TestFitting:
-    def test_an_initial_fraction_is_recovered(self, infected_every_5_steps) -> None:
+    def test_an_initial_fraction_is_recovered(self, b_every_5_steps) -> None:
         model = _sir(None)
         problem = CalibrationProblem(
-            observed_data=infected_every_5_steps,
+            observed_data=b_every_5_steps,
             parameters=[
-                bounded("I", 0.0, 0.1, kind="initial_condition", initial_guess=0.01)
+                bounded("B", 0.0, 0.1, kind="initial_condition", initial_guess=0.01)
             ],
             loss_function="sse",
             optimization_config=NelderMeadConfig(
@@ -109,10 +109,10 @@ class TestFitting:
         result = Calibrator(Simulation(model), problem).run()
 
         assert result.converged
-        assert result.best_parameters["I"] == pytest.approx(0.02, rel=1e-9)
+        assert result.best_parameters["B"] == pytest.approx(0.02, rel=1e-9)
 
     def test_a_parameter_and_an_initial_fraction_together(
-        self, infected_every_5_steps
+        self, b_every_5_steps
     ) -> None:
         config = (
             ParticleSwarmConfig(num_particles=40, max_iterations=1000, verbose=False)
@@ -129,18 +129,18 @@ class TestFitting:
             )
         )
         problem = CalibrationProblem(
-            observed_data=infected_every_5_steps,
+            observed_data=b_every_5_steps,
             parameters=[
-                bounded("beta"),
-                bounded("I", 0.0, 0.1, kind="initial_condition"),
+                bounded("k1"),
+                bounded("B", 0.0, 0.1, kind="initial_condition"),
             ],
             loss_function="sse",
             optimization_config=config,
             seed=SEED,
         )
 
-        result = Calibrator(Simulation(_sir(None, beta=None)), problem).run()
+        result = Calibrator(Simulation(_sir(None, k1=None)), problem).run()
 
         assert result.best_parameters == pytest.approx(
-            {"beta": 0.3, "I": 0.02}, abs=0.001
+            {"k1": 0.3, "B": 0.02}, abs=0.001
         )

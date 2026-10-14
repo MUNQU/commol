@@ -156,16 +156,16 @@ mod tests {
 
     #[test]
     fn test_get_variables() {
-        let vars = get_variables("beta * S * I");
+        let vars = get_variables("k1 * A * B");
         assert_eq!(vars.len(), 3);
-        assert!(vars.contains(&"beta".to_string()));
-        assert!(vars.contains(&"S".to_string()));
-        assert!(vars.contains(&"I".to_string()));
+        assert!(vars.contains(&"k1".to_string()));
+        assert!(vars.contains(&"A".to_string()));
+        assert!(vars.contains(&"B".to_string()));
 
         // Special variables should be excluded
-        let vars = get_variables("beta * total + pi");
+        let vars = get_variables("k1 * total + pi");
         assert_eq!(vars.len(), 1);
-        assert!(vars.contains(&"beta".to_string()));
+        assert!(vars.contains(&"k1".to_string()));
     }
 
     #[test]

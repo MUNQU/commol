@@ -3,7 +3,7 @@
 [Back to Transitions](transitions.md)
 
 `AxisPattern` builds rates that change along the axis: pulses, periodic
-events, intervals, seasons, ramps and bell curves, and schedules that give each
+events, intervals, sinusoids, ramps and bell curves, and schedules that give each
 subgroup its own pattern. Pass a pattern as `rate=` to `add_transition`. Every pattern is
 a tested, parenthesised expression, so patterns combine safely.
 
@@ -33,8 +33,8 @@ print(flow_per_step(AxisPattern.interval(start=3, end=6, value=1.0)))
 ```
 
 A transition with no source uses the pattern as the flow. With a source, a
-pattern that names no compartment is per-capita: `value=0.1` moves 10% of the
-source. See [Absolute and per-capita rates](transitions.md#absolute-and-per-capita-rates).
+pattern that names no compartment is proportional: `value=0.1` moves 10% of the
+source. See [Absolute and proportional rates](transitions.md#absolute-and-proportional-rates).
 
 ## Single patterns
 
@@ -49,13 +49,13 @@ difference model both are the step `s`.
 | `periodic(period, value, offset=0)` | `step` | `value` when `step = offset, offset + period, …`, else 0 | integer `period > 0`, `0 <= offset < period` |
 | `interval(start, end, value)` | `t` | `value` for `start <= t < end`, else 0 | `start < end`, any finite positions |
 | `linear_ramp(start, end, start_value, end_value)` | `t` | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions |
-| `seasonal(amplitude, period, phase=0, baseline=0)` | `t` | `baseline + amplitude × sin(2π (t − phase) / period)` | numeric `period != 0` |
+| `sinusoid(amplitude, period, phase=0, baseline=0)` | `t` | `baseline + amplitude × sin(2π (t − phase) / period)` | numeric `period != 0` |
 | `gaussian_pulse(center, width, peak)` | `t` | `peak × exp(−(t − center)² / (2 width²))` | `width > 0` |
 | `from_formula(expr)` | Any expression, wrapped in parentheses | not empty; passes the security check |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These
 arguments also accept a parameter name, so calibration can fit them: `value`
-of `pulse`, `pulses`, `periodic` and `interval`; every argument of `seasonal`; and
+of `pulse`, `pulses`, `periodic` and `interval`; every argument of `sinusoid`; and
 `peak` of `gaussian_pulse`.
 
 ```python
@@ -67,7 +67,7 @@ print(flow_per_step(AxisPattern.periodic(period=4, value=1.0, offset=1)))
 # [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 print(flow_per_step(AxisPattern.linear_ramp(start=2, end=6, start_value=0.0, end_value=1.0)))
 # [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]
-print(flow_per_step(AxisPattern.seasonal(amplitude=1.0, period=8, baseline=1.0)))
+print(flow_per_step(AxisPattern.sinusoid(amplitude=1.0, period=8, baseline=1.0)))
 # [1.0, 1.7071, 2.0, 1.7071, 1.0, 0.2929, 0.0, 0.2929, 1.0, 1.7071]
 print(flow_per_step(AxisPattern.gaussian_pulse(center=5.0, width=1.0, peak=1.0)))
 # [0.0, 0.0003, 0.0111, 0.1353, 0.6065, 1.0, 0.6065, 0.1353, 0.0111, 0.0003]
@@ -194,8 +194,8 @@ print(stratified_flows(AxisPattern.pulse(at=1, value=0.1).for_group(
 
 | Argument of `add_group` | Effect |
 |---|---|
-| `absolute=None` (default) | Inferred: a pattern that names a compartment is absolute, otherwise per-capita |
-| `absolute=False` | Per-capita: `value=0.1` moves 10% of each matching source compartment |
+| `absolute=None` (default) | Inferred: a pattern that names a compartment is absolute, otherwise proportional |
+| `absolute=False` | Proportional: `value=0.1` moves 10% of each matching source compartment |
 | `absolute=True` | Absolute: `value=100.0` moves exactly 100 |
 | `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute |
 
@@ -262,13 +262,13 @@ In a `DifferentialEquations` model `step` is constant on each unit interval
 
 | Pattern | In a differential model |
 |---|---|
-| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a per-capita `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
+| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a proportional `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](transitions.md#impulses). |
 | `interval`, `linear_ramp` (read `t`) | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds. |
-| `seasonal`, `gaussian_pulse` (read `t`) | Continuous in `t`. |
+| `sinusoid`, `gaussian_pulse` (read `t`) | Continuous in `t`. |
 
 ```python
 def remaining_a(rate: AxisPattern, at: float) -> float:
-    """A of a per-capita A -> B transition, in a differential model."""
+    """A of a proportional A -> B transition, in a differential model."""
     model = (
         ModelBuilder(name="Pattern ODE")
         .add_bin(id="A", name="State A")

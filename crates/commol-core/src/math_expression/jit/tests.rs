@@ -11,11 +11,11 @@ mod jit_tests {
     /// Helper to create a test context
     fn create_test_context() -> MathExpressionContext {
         let mut ctx = MathExpressionContext::new();
-        ctx.set_parameter("beta".to_string(), 0.5);
-        ctx.set_parameter("gamma".to_string(), 0.2);
-        ctx.set_compartment("S".to_string(), 990.0);
-        ctx.set_compartment("I".to_string(), 10.0);
-        ctx.set_compartment("R".to_string(), 0.0);
+        ctx.set_parameter("k1".to_string(), 0.5);
+        ctx.set_parameter("k2".to_string(), 0.2);
+        ctx.set_compartment("A".to_string(), 990.0);
+        ctx.set_compartment("B".to_string(), 10.0);
+        ctx.set_compartment("C".to_string(), 0.0);
         ctx.set_step(5.0);
         ctx
     }
@@ -39,7 +39,7 @@ mod jit_tests {
     #[test]
     fn test_jit_variable() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta");
+        let preprocessed = preprocess_formula("k1");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -51,7 +51,7 @@ mod jit_tests {
     #[test]
     fn test_jit_addition() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta + gamma");
+        let preprocessed = preprocess_formula("k1 + k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -63,7 +63,7 @@ mod jit_tests {
     #[test]
     fn test_jit_subtraction() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta - gamma");
+        let preprocessed = preprocess_formula("k1 - k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -75,7 +75,7 @@ mod jit_tests {
     #[test]
     fn test_jit_multiplication() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta * gamma");
+        let preprocessed = preprocess_formula("k1 * k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -87,7 +87,7 @@ mod jit_tests {
     #[test]
     fn test_jit_division() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta / gamma");
+        let preprocessed = preprocess_formula("k1 / k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -99,7 +99,7 @@ mod jit_tests {
     #[test]
     fn test_jit_negation() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("-beta");
+        let preprocessed = preprocess_formula("-k1");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -115,26 +115,26 @@ mod jit_tests {
     #[test]
     fn test_jit_product2() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta * gamma");
+        let preprocessed = preprocess_formula("k1 * k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // beta=0.5, gamma=0.2, result=0.1
+        // k1=0.5, k2=0.2, result=0.1
         assert!((result - 0.1).abs() < 1e-10, "Expected 0.1, got {}", result);
     }
 
     #[test]
     fn test_jit_product3() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta * S * I");
+        let preprocessed = preprocess_formula("k1 * A * B");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // beta=0.5, S=990, I=10, result=4950
+        // k1=0.5, A=990, B=10, result=4950
         assert!(
             (result - 4950.0).abs() < 1e-10,
             "Expected 4950.0, got {}",
@@ -145,13 +145,13 @@ mod jit_tests {
     #[test]
     fn test_jit_product3_div() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta * S * I / total");
+        let preprocessed = preprocess_formula("k1 * A * B / total");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // beta=0.5, S=990, I=10, total=1000, result=4.95
+        // k1=0.5, A=990, B=10, total=1000, result=4.95
         assert!(
             (result - 4.95).abs() < 1e-10,
             "Expected 4.95, got {}",
@@ -162,7 +162,7 @@ mod jit_tests {
     #[test]
     fn test_jit_complex_expression() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("(beta * S + gamma * I) / total");
+        let preprocessed = preprocess_formula("(k1 * A + k2 * B) / total");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -179,13 +179,13 @@ mod jit_tests {
     #[test]
     fn test_jit_special_variable_step() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("step * beta");
+        let preprocessed = preprocess_formula("step * k1");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // step=5.0, beta=0.5, result=2.5
+        // step=5.0, k1=0.5, result=2.5
         assert!((result - 2.5).abs() < 1e-10, "Expected 2.5, got {}", result);
     }
 
@@ -198,7 +198,7 @@ mod jit_tests {
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // total = S + I + R = 990 + 10 + 0 = 1000
+        // total = A + B + C = 990 + 10 + 0 = 1000
         assert!(
             (result - 1000.0).abs() < 1e-10,
             "Expected 1000.0, got {}",
@@ -241,7 +241,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_lt() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta < gamma");
+        let preprocessed = preprocess_formula("k1 < k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -254,7 +254,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_gt() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta > gamma");
+        let preprocessed = preprocess_formula("k1 > k2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -267,7 +267,7 @@ mod jit_tests {
     #[test]
     fn test_jit_comparison_eq() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("gamma == 0.2");
+        let preprocessed = preprocess_formula("k2 == 0.2");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -280,7 +280,7 @@ mod jit_tests {
     #[test]
     fn test_jit_parentheses() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("(beta + gamma) * 10");
+        let preprocessed = preprocess_formula("(k1 + k2) * 10");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -293,7 +293,7 @@ mod jit_tests {
     #[test]
     fn test_jit_operator_precedence() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("beta + gamma * 10");
+        let preprocessed = preprocess_formula("k1 + k2 * 10");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -444,7 +444,7 @@ mod jit_tests {
     #[test]
     fn test_jit_min() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("min(beta, gamma)");
+        let preprocessed = preprocess_formula("min(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -457,7 +457,7 @@ mod jit_tests {
     #[test]
     fn test_jit_max() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("max(beta, gamma)");
+        let preprocessed = preprocess_formula("max(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -530,20 +530,20 @@ mod jit_tests {
     #[test]
     fn test_jit_conditional() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("if(beta > gamma, beta, gamma)");
+        let preprocessed = preprocess_formula("if(k1 > k2, k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
         let result = jit_fn.call(&ctx).unwrap();
 
-        // beta=0.5 > gamma=0.2, so result = beta = 0.5
+        // k1=0.5 > k2=0.2, so result = k1 = 0.5
         assert!((result - 0.5).abs() < 1e-10, "Expected 0.5, got {}", result);
     }
 
     #[test]
     fn test_jit_complex_math_expression() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("sqrt(pow(beta, 2) + pow(gamma, 2))");
+        let preprocessed = preprocess_formula("sqrt(pow(k1, 2) + pow(k2, 2))");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -564,7 +564,7 @@ mod jit_tests {
     #[test]
     fn test_jit_atan2() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("atan2(gamma, beta)");
+        let preprocessed = preprocess_formula("atan2(k2, k1)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -577,7 +577,7 @@ mod jit_tests {
     #[test]
     fn test_jit_hypot() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("hypot(beta, gamma)");
+        let preprocessed = preprocess_formula("hypot(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -590,7 +590,7 @@ mod jit_tests {
     #[test]
     fn test_jit_copysign() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("copysign(beta, -gamma)");
+        let preprocessed = preprocess_formula("copysign(k1, -k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -603,7 +603,7 @@ mod jit_tests {
     #[test]
     fn test_jit_fma() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("fma(beta, gamma, 0.1)");
+        let preprocessed = preprocess_formula("fma(k1, k2, 0.1)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -617,7 +617,7 @@ mod jit_tests {
     #[test]
     fn test_jit_trunc() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("trunc(beta + 2)");
+        let preprocessed = preprocess_formula("trunc(k1 + 2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -630,7 +630,7 @@ mod jit_tests {
     #[test]
     fn test_jit_erf() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("erf(beta)");
+        let preprocessed = preprocess_formula("erf(k1)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -643,7 +643,7 @@ mod jit_tests {
     #[test]
     fn test_jit_fdim() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("fdim(beta, gamma)");
+        let preprocessed = preprocess_formula("fdim(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -656,7 +656,7 @@ mod jit_tests {
     #[test]
     fn test_jit_fmax_fmin() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("fmax(beta, gamma) + fmin(beta, gamma)");
+        let preprocessed = preprocess_formula("fmax(k1, k2) + fmin(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();
@@ -669,7 +669,7 @@ mod jit_tests {
     #[test]
     fn test_jit_remainder() {
         let compiler = JITCompiler::new().unwrap();
-        let preprocessed = preprocess_formula("remainder(beta, gamma)");
+        let preprocessed = preprocess_formula("remainder(k1, k2)");
         let jit_fn = compiler.compile(&preprocessed).unwrap();
 
         let ctx = create_test_context();

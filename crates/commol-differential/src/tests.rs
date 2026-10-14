@@ -184,47 +184,47 @@ fn a_linear_two_by_two_system_matches_the_closed_form() {
     }
 }
 
-fn sir_model(settings: &str) -> Model {
+fn abc_model(settings: &str) -> Model {
     model(
         "DifferentialEquations",
-        &[("S", 990.0), ("I", 10.0), ("R", 0.0)],
-        &[("beta", "0.3"), ("gamma", "0.1")],
+        &[("A", 990.0), ("B", 10.0), ("C", 0.0)],
+        &[("k1", "0.3"), ("k2", "0.1")],
         &[],
         &[
-            transition("infection", &["S"], &["I"], "beta * S * I / total", ""),
-            transition("recovery", &["I"], &["R"], "gamma", ""),
+            transition("ab", &["A"], &["B"], "k1 * A * B / total", ""),
+            transition("bc", &["B"], &["C"], "k2", ""),
         ],
         settings,
     )
 }
 
 #[test]
-fn sir_keeps_the_final_size_relation() {
-    // ln(S(t) / S(0)) = -(beta / gamma) R(t) / total holds at every t.
-    let rows = engine(&sir_model(TIGHT)).run(300).unwrap().rows;
+fn abc_keeps_its_first_integral() {
+    // ln(A(t) / A(0)) = -(k1 / k2) C(t) / total holds at every t.
+    let rows = engine(&abc_model(TIGHT)).run(300).unwrap().rows;
     for row in rows.iter().step_by(25) {
         let residual = (row[0] / 990.0).ln() + 3.0 * row[2] / 1000.0;
-        assert!(residual.abs() < 1e-7, "final-size residual {residual}");
+        assert!(residual.abs() < 1e-7, "first-integral residual {residual}");
     }
     let last = rows.last().unwrap();
-    assert!(last[1] < 1e-3, "the epidemic is over: I = {}", last[1]);
+    assert!(last[1] < 1e-3, "B has drained: B = {}", last[1]);
 }
 
 #[test]
-fn sis_reaches_its_endemic_equilibrium() {
+fn ab_cycle_reaches_its_equilibrium() {
     let model = model(
         "DifferentialEquations",
-        &[("S", 990.0), ("I", 10.0)],
-        &[("beta", "0.4"), ("gamma", "0.1")],
+        &[("A", 990.0), ("B", 10.0)],
+        &[("k1", "0.4"), ("k2", "0.1")],
         &[],
         &[
-            transition("infection", &["S"], &["I"], "beta * S * I / total", ""),
-            transition("recovery", &["I"], &["S"], "gamma", ""),
+            transition("ab", &["A"], &["B"], "k1 * A * B / total", ""),
+            transition("ba", &["B"], &["A"], "k2", ""),
         ],
         TIGHT,
     );
     let rows = engine(&model).run(400).unwrap().rows;
-    assert_close(rows[400][1], 1000.0 * (1.0 - 0.1 / 0.4), 1e-7, "I*");
+    assert_close(rows[400][1], 1000.0 * (1.0 - 0.1 / 0.4), 1e-7, "B*");
 }
 
 fn stiff_model(settings: &str) -> Model {
@@ -254,10 +254,10 @@ fn bdf_solves_a_stiff_model_within_the_tolerance() {
         let b = 1000.0 * k1 / (k2 - k1) * ((-k1 * t).exp() - (-k2 * t).exp());
         assert_close(row[1], b, 1e-6, &format!("B({t})"));
     }
-    eprintln!("stiff bdf, 100 time units: {elapsed:?}");
+    eprintln!("stiff bdf, 100 units of the axis: {elapsed:?}");
 }
 
-/// A per-capita rate `p` on step 2 only, as a pulse series.
+/// A proportional rate `p` on step 2 only, as a pulse series.
 fn pulse_model(engine_type: &str) -> Model {
     model(
         engine_type,
@@ -291,7 +291,7 @@ fn a_pulse_rate_is_a_constant_rate_on_its_unit_interval() {
     assert_close(rows[2][0] - rows[3][0], 200.0, 1e-12, "difference pulse");
 }
 
-/// One per-capita transition A → B with `rate`.
+/// One proportional transition A → B with `rate`.
 fn rate_model(rate: &str) -> Model {
     model(
         "DifferentialEquations",
@@ -303,7 +303,7 @@ fn rate_model(rate: &str) -> Model {
     )
 }
 
-/// A → B at the per-capita rate `k`, a series parameter.
+/// A → B at the proportional rate `k`, a series parameter.
 fn series_model(engine_type: &str, series: &str) -> Model {
     model(
         engine_type,
@@ -517,21 +517,21 @@ fn a_difference_impulse_must_act_at_integers() {
 }
 
 #[test]
-fn pulse_vaccination_reaches_the_periodic_orbit() {
-    // S' = mu K - mu S between jumps, S -> (1 - p) S at t = k T.
-    let (mu, k, p, period) = (0.02_f64, 1000.0_f64, 0.3_f64, 5.0_f64);
+fn periodic_impulses_reach_the_periodic_orbit() {
+    // A' = k1 K - k1 A between jumps, A -> (1 - p) A at t = k T.
+    let (k1, k, p, period) = (0.02_f64, 1000.0_f64, 0.3_f64, 5.0_f64);
     let model = model(
         "DifferentialEquations",
-        &[("S", 1000.0), ("V", 0.0)],
-        &[("mu", "0.02"), ("K", "1000.0"), ("p", "0.3")],
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k1", "0.02"), ("K", "1000.0"), ("p", "0.3")],
         &[],
         &[
-            transition("birth", &[], &["S"], "mu * K", ""),
-            transition("death", &["S"], &[], "mu", ""),
+            transition("inflow", &[], &["A"], "k1 * K", ""),
+            transition("outflow", &["A"], &[], "k1", ""),
             transition(
-                "vaccination",
-                &["S"],
-                &["V"],
+                "jump",
+                &["A"],
+                &["B"],
                 "p",
                 r#","impulse_every":[5.0, 5.0]"#,
             ),
@@ -540,10 +540,10 @@ fn pulse_vaccination_reaches_the_periodic_orbit() {
     );
     let positions: Vec<f64> = (1..=200).map(|j| j as f64 * period).collect();
     let rows = engine(&model).run_at(&positions).unwrap();
-    let decay = (-mu * period).exp();
+    let decay = (-k1 * period).exp();
     let before_jump = k * (1.0 - decay) / (1.0 - (1.0 - p) * decay);
     let after_jump = (1.0 - p) * before_jump;
-    assert_close(rows.last().unwrap()[0], after_jump, 1e-7, "S+*");
+    assert_close(rows.last().unwrap()[0], after_jump, 1e-7, "A+*");
 }
 
 #[test]

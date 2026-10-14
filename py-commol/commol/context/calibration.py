@@ -217,7 +217,7 @@ class CalibrationConstraint(BaseModel):
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
         Can reference calibration parameters by their IDs. When `at` is specified,
-        can also reference output values (S, I, R, etc.) at those positions.
+        can also reference output values (A, B, C, etc.) at those positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
@@ -233,18 +233,18 @@ class CalibrationConstraint(BaseModel):
 
     Examples
     --------
-    >>> # R0 = beta/gamma must be <= 5
+    >>> # k1/k2 must be <= 5
     >>> constraint = CalibrationConstraint(
-    ...     id="r0_bound",
-    ...     expression="5.0 - beta/gamma",
-    ...     description="Basic reproduction number R0 <= 5",
+    ...     id="ratio_bound",
+    ...     expression="5.0 - k1/k2",
+    ...     description="Ratio k1/k2 <= 5",
     ... )
 
-    >>> # beta must be >= gamma
+    >>> # k1 must be >= k2
     >>> constraint = CalibrationConstraint(
     ...     id="ordering",
-    ...     expression="beta - gamma",
-    ...     description="Transmission rate >= recovery rate",
+    ...     expression="k1 - k2",
+    ...     description="k1 >= k2",
     ... )
 
     >>> # Sum of parameters <= 1.0
@@ -496,7 +496,7 @@ class PSOTimeVaryingAcceleration(PSOAccelerationStrategy):
 
     TVAC adjusts cognitive and social coefficients over iterations to
     balance exploration and exploitation. Typically, c1 decreases and
-    c2 increases over time.
+    c2 increases over the iterations.
 
     Attributes
     ----------

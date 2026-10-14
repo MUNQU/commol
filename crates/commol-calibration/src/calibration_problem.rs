@@ -28,12 +28,12 @@ use crate::values::{clamp_to_bounds, configure_engine, ValueWriter};
 ///
 /// let engine = DifferenceEquations::from_model(&model);
 /// let observed_data = vec![
-///     ObservedDataPoint::new(10.0, "I".to_string(), 501.0),  // time=10, compartment I, value=501
-///     ObservedDataPoint::new(20.0, "I".to_string(), 823.0),
+///     ObservedDataPoint::new(10.0, "B".to_string(), 501.0),  // position 10, compartment B, value=501
+///     ObservedDataPoint::new(20.0, "B".to_string(), 823.0),
 /// ];
 /// let params = vec![
-///     CalibrationParameter::new("beta".to_string(), 0.0, 1.0),
-///     CalibrationParameter::new("gamma".to_string(), 0.0, 0.5),
+///     CalibrationParameter::new("k1".to_string(), 0.0, 1.0),
+///     CalibrationParameter::new("k2".to_string(), 0.0, 0.5),
 /// ];
 ///
 /// let problem = CalibrationProblem::new(
@@ -54,17 +54,17 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Each observation may sum one or more outputs before comparison.
     observed_output_indices: Vec<Vec<usize>>,
 
-    /// Sorted, deduplicated observation time steps for sparse loss evaluation
+    /// Sorted, deduplicated observation positions for sparse loss evaluation
     observed_positions: Vec<f64>,
 
     /// Row index in `observed_positions` for each observed data point
-    observed_time_indices: Vec<usize>,
+    observed_row_indices: Vec<usize>,
 
     /// Optional previous row index for windowed cumulative-output observations.
-    observed_previous_time_indices: Vec<Option<usize>>,
+    observed_previous_row_indices: Vec<Option<usize>>,
 
-    /// Row indices in `observed_positions` for each time-dependent constraint.
-    constraint_time_indices: Vec<Option<Vec<usize>>>,
+    /// Row indices in `observed_positions` for each constraint at positions.
+    constraint_row_indices: Vec<Option<Vec<usize>>>,
 
     /// Parameters to calibrate with their bounds
     parameters: Vec<CalibrationParameter>,
@@ -104,7 +104,7 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     parameter_constraint_indices: Vec<usize>,
 
     /// Indices of constraints at positions (evaluated at those positions during simulation)
-    time_dependent_constraint_indices: Vec<usize>,
+    position_constraint_indices: Vec<usize>,
 
     /// Named sums of outputs a constraint may read
     /// ([`SimulationEngine::output_sums`]), such as the total of a bin over
@@ -132,9 +132,9 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             observed_data: self.observed_data.clone(),
             observed_output_indices: self.observed_output_indices.clone(),
             observed_positions: self.observed_positions.clone(),
-            observed_time_indices: self.observed_time_indices.clone(),
-            observed_previous_time_indices: self.observed_previous_time_indices.clone(),
-            constraint_time_indices: self.constraint_time_indices.clone(),
+            observed_row_indices: self.observed_row_indices.clone(),
+            observed_previous_row_indices: self.observed_previous_row_indices.clone(),
+            constraint_row_indices: self.constraint_row_indices.clone(),
             parameters: self.parameters.clone(),
             values: self.values.clone(),
             observed_factor_indices: self.observed_factor_indices.clone(),
@@ -145,7 +145,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             compiled_constraints: self.compiled_constraints.clone(),
             evaluations: RwLock::new(Vec::new()), // Each clone gets fresh evaluation history
             parameter_constraint_indices: self.parameter_constraint_indices.clone(),
-            time_dependent_constraint_indices: self.time_dependent_constraint_indices.clone(),
+            position_constraint_indices: self.position_constraint_indices.clone(),
             output_sums: self.output_sums.clone(),
             non_state_outputs: self.non_state_outputs.clone(),
             _phantom: PhantomData,
@@ -246,7 +246,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         // Named sums of outputs, so a constraint can name, for example, a bare
         // bin and get its total across categories. Indices address full output
-        // rows, matching the rows that time-dependent constraints are evaluated
+        // rows, matching the rows that constraints at positions are evaluated
         // against.
         let output_sums = base_engine.output_sums();
         let output_sum_names: std::collections::HashSet<&str> =
@@ -338,7 +338,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             .collect();
 
         let mut parameter_constraint_indices = Vec::new();
-        let mut time_dependent_constraint_indices = Vec::new();
+        let mut position_constraint_indices = Vec::new();
         let mut simulation_positions: Vec<f64> = observed_data
             .iter()
             .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
@@ -378,7 +378,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                     ));
                 }
 
-                // Compartments can only be used in time-dependent constraints
+                // Compartments can only be used in constraints at positions
                 if is_compartment && constraint.at.is_none() {
                     return Err(format!(
                         "Constraint '{}' references output '{}' but has no positions (`at`)",
@@ -387,10 +387,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 }
             }
 
-            // Add sparse constraint time steps to the simulation schedule.
+            // Add sparse constraint positions to the simulation schedule.
             if let Some(ref positions) = constraint.at {
                 simulation_positions.extend(positions.iter().copied());
-                time_dependent_constraint_indices.push(idx);
+                position_constraint_indices.push(idx);
             } else {
                 parameter_constraint_indices.push(idx);
             }
@@ -404,30 +404,28 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .ok()
         };
 
-        let observed_time_indices: Vec<usize> = observed_data
+        let observed_row_indices: Vec<usize> = observed_data
             .iter()
-            .map(|obs| position_index(obs.at).expect("observed time step must be present"))
+            .map(|obs| position_index(obs.at).expect("observed position must be present"))
             .collect();
 
-        let observed_previous_time_indices: Vec<Option<usize>> = observed_data
+        let observed_previous_row_indices: Vec<Option<usize>> = observed_data
             .iter()
             .map(|obs| {
                 obs.window.map(|window| {
-                    position_index(obs.at - window)
-                        .expect("window previous time step must be present")
+                    position_index(obs.at - window).expect("window start must be present")
                 })
             })
             .collect();
 
-        let constraint_time_indices: Vec<Option<Vec<usize>>> = constraints
+        let constraint_row_indices: Vec<Option<Vec<usize>>> = constraints
             .iter()
             .map(|constraint| {
                 constraint.at.as_ref().map(|positions| {
                     positions
                         .iter()
-                        .map(|time_step| {
-                            position_index(*time_step)
-                                .expect("constraint time step must be present")
+                        .map(|position| {
+                            position_index(*position).expect("constraint position must be present")
                         })
                         .collect()
                 })
@@ -452,9 +450,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_data,
             observed_output_indices,
             observed_positions: simulation_positions,
-            observed_time_indices,
-            observed_previous_time_indices,
-            constraint_time_indices,
+            observed_row_indices,
+            observed_previous_row_indices,
+            constraint_row_indices,
             parameters,
             values,
             observed_factor_indices,
@@ -465,7 +463,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             compiled_constraints,
             evaluations: RwLock::new(Vec::new()),
             parameter_constraint_indices,
-            time_dependent_constraint_indices,
+            position_constraint_indices,
             output_sums,
             non_state_outputs,
             _phantom: PhantomData,
@@ -568,20 +566,20 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .iter()
                 .zip(&self.observed_output_indices)
                 .zip(&self.observed_factor_indices)
-                .zip(&self.observed_time_indices)
-                .zip(&self.observed_previous_time_indices)
+                .zip(&self.observed_row_indices)
+                .zip(&self.observed_previous_row_indices)
                 .zip(&self.observed_normalization)
                 .filter_map(
                     |(
-                        ((((obs, output_indices), &factor_idx), &time_idx), &previous_time_idx),
+                        ((((obs, output_indices), &factor_idx), &row_idx), &previous_row_idx),
                         &normalization,
                     )| {
-                        observed_results.get(time_idx).map(|step_data| {
+                        observed_results.get(row_idx).map(|step_data| {
                             let current: f64 =
                                 output_indices.iter().map(|&idx| step_data[idx]).sum();
-                            let predicted = if let Some(previous_time_idx) = previous_time_idx {
+                            let predicted = if let Some(previous_row_idx) = previous_row_idx {
                                 let previous: f64 = observed_results
-                                    .get(previous_time_idx)
+                                    .get(previous_row_idx)
                                     .map(|row| {
                                         output_indices
                                             .iter()
@@ -713,15 +711,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// Evaluate constraints at positions (with `at`)
     ///
     /// These constraints can reference both calibration parameters and compartment values.
-    /// Evaluated at each specified time step after simulation completes.
+    /// Evaluated at each specified position after simulation completes.
     ///
     /// Returns the total penalty from violated constraints, or 0.0 if all are satisfied.
-    fn evaluate_time_dependent_constraints(
+    fn evaluate_position_constraints(
         &self,
         param_values: &[f64],
         simulation_results: &[Vec<f64>],
     ) -> Result<f64, String> {
-        if self.time_dependent_constraint_indices.is_empty() {
+        if self.position_constraint_indices.is_empty() {
             return Ok(0.0);
         }
 
@@ -742,7 +740,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 
         let mut total_penalty = 0.0;
 
-        for &constraint_idx in &self.time_dependent_constraint_indices {
+        for &constraint_idx in &self.position_constraint_indices {
             let constraint = &self.constraints[constraint_idx];
             let expr = &self.compiled_constraints[constraint_idx];
 
@@ -750,14 +748,14 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                 .at
                 .as_ref()
                 .expect("a constraint at positions has positions");
-            let time_indices = self.constraint_time_indices[constraint_idx]
+            let row_indices = self.constraint_row_indices[constraint_idx]
                 .as_ref()
-                .expect("Time-dependent constraint must have row indices");
+                .expect("a constraint at positions has row indices");
 
-            for (&time_step, &time_idx) in positions.iter().zip(time_indices) {
-                // Get compartment values at this time step
-                if let Some(step_data) = simulation_results.get(time_idx) {
-                    // Update context with compartment values at this time step
+            for (&position, &row_idx) in positions.iter().zip(row_indices) {
+                // Get compartment values at this position
+                if let Some(step_data) = simulation_results.get(row_idx) {
+                    // Update context with compartment values at this position
                     context.set_compartments_by_index(step_data);
                     // Outputs after the state are not registered (they must not
                     // count towards `total`), so inject them by name.
@@ -770,12 +768,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                         let total: f64 = indices.iter().map(|&i| step_data[i]).sum();
                         context.set_parameter_str(name, total);
                     }
-                    context.set_step(time_step);
+                    context.set_step(position);
 
                     match expr.evaluate(&mut context) {
                         Ok(value) => {
                             if value < 0.0 {
-                                // Constraint violated at this time step
+                                // Constraint violated at this position
                                 let violation_magnitude = -value;
 
                                 // Linear penalty scaled by weight
@@ -786,15 +784,15 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                         }
                         Err(e) => {
                             return Err(format!(
-                                "Time-dependent constraint '{}' evaluation failed at step {}: {:?}",
-                                constraint.id, time_step, e
+                                "Constraint '{}' evaluation failed at position {}: {:?}",
+                                constraint.id, position, e
                             ));
                         }
                     }
                 } else {
                     return Err(format!(
-                        "Time step {} not found in simulation results for constraint '{}'",
-                        time_step, constraint.id
+                        "Position {} not found in simulation results for constraint '{}'",
+                        position, constraint.id
                     ));
                 }
             }
@@ -868,18 +866,18 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             return Ok(base_penalty);
         }
 
-        let loss = if self.time_dependent_constraint_indices.is_empty() {
+        let loss = if self.position_constraint_indices.is_empty() {
             self.calculate_sparse_loss(&buffer, &clamped_params)
         } else {
-            // Evaluate time-dependent constraints using simulation results
-            let time_constraint_penalty = self
-                .evaluate_time_dependent_constraints(&clamped_params, &buffer)
+            // Evaluate constraints at positions using simulation results
+            let position_constraint_penalty = self
+                .evaluate_position_constraints(&clamped_params, &buffer)
                 .map_err(Error::msg)?;
 
-            if time_constraint_penalty > 0.0 {
+            if position_constraint_penalty > 0.0 {
                 // Compartment value constraints violated - return penalty
                 let base_penalty = self.calculate_base_penalty();
-                return Ok(base_penalty + time_constraint_penalty * base_penalty);
+                return Ok(base_penalty + position_constraint_penalty * base_penalty);
             }
 
             // Calculate and return loss (use corrected params for scale parameters)

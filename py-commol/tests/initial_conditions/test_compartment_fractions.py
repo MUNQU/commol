@@ -126,12 +126,12 @@ class TestOverrideInARun:
     def test_zero_override_keeps_the_other_stratum_empty(self) -> None:
         results = run(conditional_pathway_builder(), 10)
 
-        assert results["IH_y60"] == [0.0] * 11
-        # Only oe60 moves from S to IH. `beta * S` uses the S total, 900, so
-        # each oe60 compartment moves 0.01 * 900 = 9 in the first step.
-        assert results["S_y60"][1] == pytest.approx(450.0)
-        assert results["S_oe60_hosp"][1] == pytest.approx(225.0 - 9.0)
-        assert results["IH_oe60_hosp"][1] == pytest.approx(25.0 + 9.0)
+        assert results["B_g1"] == [0.0] * 11
+        # Only g2 moves from A to B. `k1 * A` uses the A total, 900, so
+        # each g2 compartment moves 0.01 * 900 = 9 in the first step.
+        assert results["A_g1"][1] == pytest.approx(450.0)
+        assert results["A_g2_t2"][1] == pytest.approx(225.0 - 9.0)
+        assert results["B_g2_t2"][1] == pytest.approx(25.0 + 9.0)
 
 
 class TestCompartmentFractionValidation:

@@ -9,11 +9,11 @@ from tests.support import (
     build,
     conditional_pathway_builder,
     initial_state,
-    sir_builder,
+    abc_builder,
 )
 
-AGE = {"y60": 0.8, "oe60": 0.2}
-VACCINATION = {"nv": 0.7, "v": 0.3}
+GROUP = {"g1": 0.8, "g2": 0.2}
+STATUS = {"s1": 0.7, "s2": 0.3}
 
 
 class TestExpansion:
@@ -35,20 +35,20 @@ class TestExpansion:
 
     def test_a_conditional_stratification_splits_only_its_category(self) -> None:
         model = build(
-            sir_builder(
-                fractions={"S": 0.9, "I": 0.1, "R": 0.0},
-                stratifications={"age": AGE, "vaccination": VACCINATION},
-                conditions={"vaccination": {"age": "oe60"}},
+            abc_builder(
+                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+                stratifications={"group": GROUP, "status": STATUS},
+                conditions={"status": {"group": "g2"}},
             )
         )
 
         state = initial_state(model)
 
-        for bin_id, share in (("S", 0.9), ("I", 0.1)):
-            assert state[f"{bin_id}_y60"] == pytest.approx(1000 * share * 0.8)
-            assert state[f"{bin_id}_oe60_nv"] == pytest.approx(1000 * share * 0.2 * 0.7)
-            assert state[f"{bin_id}_oe60_v"] == pytest.approx(1000 * share * 0.2 * 0.3)
-        assert [state[f"R_{suffix}"] for suffix in ("y60", "oe60_nv", "oe60_v")] == [
+        for bin_id, share in (("A", 0.9), ("B", 0.1)):
+            assert state[f"{bin_id}_g1"] == pytest.approx(1000 * share * 0.8)
+            assert state[f"{bin_id}_g2_s1"] == pytest.approx(1000 * share * 0.2 * 0.7)
+            assert state[f"{bin_id}_g2_s2"] == pytest.approx(1000 * share * 0.2 * 0.3)
+        assert [state[f"C_{suffix}"] for suffix in ("g1", "g2_s1", "g2_s2")] == [
             0.0,
             0.0,
             0.0,
@@ -58,28 +58,28 @@ class TestExpansion:
         self,
     ) -> None:
         model = build(
-            sir_builder(
-                fractions={"S": 0.9, "I": 0.1, "R": 0.0},
+            abc_builder(
+                fractions={"A": 0.9, "B": 0.1, "C": 0.0},
                 stratifications={
-                    "age": AGE,
-                    "vaccination": VACCINATION,
-                    "comorbidities": {"nc": 0.8, "c": 0.2},
+                    "group": GROUP,
+                    "status": STATUS,
+                    "level": {"l1": 0.8, "l2": 0.2},
                 },
                 conditions={
-                    "vaccination": {"age": "oe60"},
-                    "comorbidities": {"age": "oe60"},
+                    "status": {"group": "g2"},
+                    "level": {"group": "g2"},
                 },
             )
         )
 
         state = initial_state(model)
 
-        assert state["S_y60"] == pytest.approx(720.0)
-        assert state["I_y60"] == pytest.approx(80.0)
-        assert state["S_oe60_nv_nc"] == pytest.approx(100.8)
-        assert state["S_oe60_nv_c"] == pytest.approx(25.2)
-        assert state["S_oe60_v_nc"] == pytest.approx(43.2)
-        assert state["S_oe60_v_c"] == pytest.approx(10.8)
+        assert state["A_g1"] == pytest.approx(720.0)
+        assert state["B_g1"] == pytest.approx(80.0)
+        assert state["A_g2_s1_l1"] == pytest.approx(100.8)
+        assert state["A_g2_s1_l2"] == pytest.approx(25.2)
+        assert state["A_g2_s2_l1"] == pytest.approx(43.2)
+        assert state["A_g2_s2_l2"] == pytest.approx(10.8)
 
 
 class TestInitialState:
@@ -89,12 +89,14 @@ class TestInitialState:
 
         state = model.structure.initial_state()
 
-        assert [c.name for c in state] == engine.compartments
-        assert [c.amount for c in state] == pytest.approx(engine.state)
-        ih_y60 = next(c for c in state if c.name == "IH_y60")
-        assert ih_y60.bin == "IH"
-        assert ih_y60.categories == {"age": "y60"}
-        assert ih_y60.amount == 0.0
+        assert [compartment.name for compartment in state] == engine.compartments
+        assert [compartment.amount for compartment in state] == pytest.approx(
+            engine.state
+        )
+        b_g1 = next(compartment for compartment in state if compartment.name == "B_g1")
+        assert b_g1.bin == "B"
+        assert b_g1.categories == {"group": "g1"}
+        assert b_g1.amount == 0.0
 
     def test_the_binding_reports_bins_and_categories(self) -> None:
         model = build(conditional_pathway_builder())
@@ -104,7 +106,7 @@ class TestInitialState:
 
         state = commol_rs.model.initial_state(rust_structure)
 
-        assert state[0] == ("S_y60", "S", [("age", "y60")], 450.0)
+        assert state[0] == ("A_g1", "A", [("group", "g1")], 450.0)
         assert [name for name, _, _, _ in state] == Simulation(
             model
         ).engine.compartments

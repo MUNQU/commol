@@ -370,7 +370,7 @@ fn stratification_conditions_met(
 /// A bin or accumulator expanded over the stratifications.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpandedOutput {
-    /// Expanded name, for example `IH_y60` or `S_oe60_home`.
+    /// Expanded name, for example `A_g1` or `B_g2_t1`.
     pub name: String,
     /// Bin or accumulator the output expands from.
     pub source: String,
@@ -483,7 +483,7 @@ pub(crate) fn generate_accumulators(
 /// One expanded compartment of a model and the amount it starts with.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialCompartment {
-    /// Expanded compartment name, for example `IH_y60` or `S_oe60_home`.
+    /// Expanded compartment name, for example `A_g1` or `B_g2_t1`.
     pub name: String,
     /// Bin the compartment expands from.
     pub bin: String,
@@ -677,9 +677,9 @@ enum TotalSource {
 /// compartment: its name, where the name comes from and the compartment index.
 ///
 /// The entries are:
-/// 1. Subgroup totals over categories (`total_young`, `total_young_urban`, ...)
-/// 2. Bin totals (`S`, `I`, `R`): the sum of all stratified versions
-/// 3. Partial bin totals (`S_young` when a second stratification splits it)
+/// 1. Subgroup totals over categories (`total_g1`, `total_g1_t1`, ...)
+/// 2. Bin totals (`A`, `B`, `C`): the sum of all stratified versions
+/// 3. Partial bin totals (`A_g1` when a second stratification splits it)
 ///
 /// Every entry is built from the compartment labels.
 fn subgroup_total_entries(
@@ -794,7 +794,7 @@ pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
 ///   because the engine variable would hide it;
 /// - a name built from a bin (a compartment, a bin total or a partial bin
 ///   total) is also a `total_<categories>` subgroup total, as for a bin
-///   `total_y` stratified by `age = [y, o]` and `sex = [y, o]`: `total_y_y`
+///   `total_y` stratified by `group = [y, o]` and `type = [y, o]`: `total_y_y`
 ///   would name two sums;
 /// - a parameter id is one of those names, because the parameter and the
 ///   engine variable would share one slot;
@@ -1852,7 +1852,7 @@ mod tests {
 
     #[test]
     fn modulo_is_an_operator_in_a_rate() {
-        // `step % 2` is 0 at even steps and 1 at odd steps (per-capita rate).
+        // `step % 2` is 0 at even steps and 1 at odd steps (proportional rate).
         let mut model = CompiledModel::try_from_model(&model_with_rate("step % 2")).unwrap();
         let state = model.initial_state().to_vec();
         let mut rates = vec![0.0; state.len()];
@@ -1912,17 +1912,17 @@ mod tests {
 
     #[test]
     fn a_bin_name_that_reads_as_a_subgroup_total_is_rejected() {
-        let age = Stratification {
-            id: "age".to_string(),
+        let group = Stratification {
+            id: "group".to_string(),
             categories: vec!["y".to_string(), "o".to_string()],
             conditions: None,
         };
-        let sex = Stratification {
-            id: "sex".to_string(),
+        let kind = Stratification {
+            id: "type".to_string(),
             categories: vec!["y".to_string(), "o".to_string()],
             conditions: None,
         };
-        let mut model = make_model(vec![age, sex], vec![], vec![]);
+        let mut model = make_model(vec![group, kind], vec![], vec![]);
         structure_mut(&mut model).bins[0].id = "total_y".to_string();
 
         let error = check_names(&model).expect_err("total_y_y names two sums");

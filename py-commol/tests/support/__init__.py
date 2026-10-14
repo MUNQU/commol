@@ -14,9 +14,9 @@ from .models import (
     build_ode,
     conditional_pathway_builder,
     override_builder,
-    seir_builder,
+    abcd_builder,
     shared_category_builder,
-    sir_builder,
+    abc_builder,
     stratify,
 )
 from .oracles import (
@@ -28,14 +28,14 @@ from .oracles import (
     total_at,
 )
 from .problems import bounded, initial_condition_problem, observed
-from .reference import SIR_START, reference_run, sir_flows, total
+from .reference import ABC_START, reference_run, abc_flows, total
 from .simulation import initial_state, run
 
 __all__ = [
     "ENGINE_REL",
     "Flow",
     "ODE_REL",
-    "SIR_START",
+    "ABC_START",
     "a_to_b_builder",
     "assert_close",
     "assert_total_conserved",
@@ -56,11 +56,11 @@ __all__ = [
     "override_builder",
     "reference_run",
     "run",
-    "seir_builder",
+    "abcd_builder",
     "settled",
     "shared_category_builder",
-    "sir_builder",
-    "sir_flows",
+    "abc_builder",
+    "abc_flows",
     "stratify",
     "total",
     "total_at",

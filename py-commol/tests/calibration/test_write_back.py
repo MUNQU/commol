@@ -42,7 +42,7 @@ def _flat_category() -> ModelBuilder:
 
 def _shared_category_override() -> ModelBuilder:
     return shared_category_builder(
-        compartment_fractions=[{"compartment": "A_y_y", "fraction": 0.0}]
+        compartment_fractions=[{"compartment": "A_c1_c1", "fraction": 0.0}]
     )
 
 
@@ -53,8 +53,8 @@ def _mixed_replay() -> ModelBuilder:
         per_compartment=True,
         fractions={"A": 0.6, "B": 0.4},
         stratifications={
-            "age": {"y": 0.5, "o": 0.5},
-            "sex": {"y": 0.5, "o": 0.5},
+            "group": {"c1": 0.5, "c2": 0.5},
+            "level": {"c1": 0.5, "c2": 0.5},
             "grp": {"g1": 0.5, "g2": 0.5},
         },
     )
@@ -114,22 +114,22 @@ WRITE_BACK_CASES = [
     pytest.param(_two_bins, {"A": 0.6}, "B", id="bin-with-remainder"),
     pytest.param(_two_bins, {"A": 0.4, "B": 0.6}, None, id="complete-bins"),
     pytest.param(_flat_category, {"g1": 0.3}, None, id="flat-category"),
-    pytest.param(shared_category_builder, {"sex:y": 0.6}, None, id="qualified"),
+    pytest.param(shared_category_builder, {"level:c1": 0.6}, None, id="qualified"),
     pytest.param(
         _shared_category_override,
-        {"age:y": 0.6, "sex:o": 0.3},
+        {"group:c1": 0.6, "level:c2": 0.3},
         None,
         id="qualified-over-override",
     ),
     pytest.param(_mixed_replay, {"A": 0.5, "g1": 0.4}, "B", id="mixed"),
     pytest.param(
         conditional_pathway_builder,
-        {"IH_oe60_hosp": 0.07},
-        "S",
+        {"B_g2_t2": 0.07},
+        "A",
         id="composite-state",
     ),
     pytest.param(
-        conditional_pathway_builder, {"home": 0.2}, None, id="conditional-category"
+        conditional_pathway_builder, {"t1": 0.2}, None, id="conditional-category"
     ),
 ]
 
@@ -206,7 +206,7 @@ class TestWriteBackReadability:
         model = build(shared_category_builder())
 
         model.apply_calibration_parameters(
-            {"sex:y": 0.6}, initial_condition_problem("sex:y")
+            {"level:c1": 0.6}, initial_condition_problem("level:c1")
         )
 
         fractions = {
@@ -216,10 +216,10 @@ class TestWriteBackReadability:
         }
         assert fractions == pytest.approx(
             {
-                ("age", "y"): 0.5,
-                ("age", "o"): 0.5,
-                ("sex", "y"): 0.6,
-                ("sex", "o"): 0.4,
+                ("group", "c1"): 0.5,
+                ("group", "c2"): 0.5,
+                ("level", "c1"): 0.6,
+                ("level", "c2"): 0.4,
             }
         )
         assert _overrides(model) == {}
@@ -228,20 +228,20 @@ class TestWriteBackReadability:
         model = build(conditional_pathway_builder())
 
         model.apply_calibration_parameters(
-            {"IH_oe60_hosp": 0.07},
-            initial_condition_problem("IH_oe60_hosp", remainder="S"),
+            {"B_g2_t2": 0.07},
+            initial_condition_problem("B_g2_t2", remainder="A"),
         )
 
-        # IH totals 0 + 25 + 70 = 95, so S takes the remaining 905 and keeps
-        # its split; only the IH compartments need overrides.
+        # B totals 0 + 25 + 70 = 95, so A takes the remaining 905 and keeps
+        # its split; only the B compartments need overrides.
         bins = model.structure.initial_conditions.bin_fractions
         assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
-            {"S": 0.905, "IH": 0.095}
+            {"A": 0.905, "B": 0.095}
         )
-        assert set(_overrides(model)) == {"IH_y60", "IH_oe60_home", "IH_oe60_hosp"}
+        assert set(_overrides(model)) == {"B_g1", "B_g2_t1", "B_g2_t2"}
         rebuilt = initial_state(model)
-        assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0)
-        assert rebuilt["IH_y60"] == 0.0
+        assert rebuilt["B_g2_t2"] == pytest.approx(70.0)
+        assert rebuilt["B_g1"] == 0.0
         assert sum(rebuilt.values()) == pytest.approx(1000.0)
 
     def test_without_remainder_values_are_applied_as_given(self) -> None:
@@ -302,9 +302,9 @@ class TestSharedCategory:
         model = build(factory())
         before = model.model_dump_json()
 
-        with pytest.raises(ValueError, match="'age:y' or 'sex:y'"):
+        with pytest.raises(ValueError, match="'group:c1' or 'level:c1'"):
             model.apply_calibration_parameters(
-                {"y": 0.6}, initial_condition_problem("y")
+                {"c1": 0.6}, initial_condition_problem("c1")
             )
 
         assert model.model_dump_json() == before
@@ -313,7 +313,7 @@ class TestSharedCategory:
         model = build(shared_category_builder())
 
         model.apply_calibration_parameters(
-            {"age:y": 0.6}, initial_condition_problem("age:y")
+            {"group:c1": 0.6}, initial_condition_problem("group:c1")
         )
 
         assert sum(initial_state(model).values()) == pytest.approx(1000.0)
@@ -343,26 +343,26 @@ class TestCompositeStateCalibration:
 
     def test_calibrated_composite_state_is_written_back(self) -> None:
         truth = build(conditional_pathway_builder())
-        truth.structure.update_compartment_fractions({"IH_oe60_hosp": 0.07})
+        truth.structure.update_compartment_fractions({"B_g2_t2": 0.07})
         observed = Simulation(truth).run(10)
         problem = CalibrationProblem(
             observed_data=[
                 ObservedDataPoint(
                     at=step,
-                    output="IH_oe60_hosp",
-                    value=observed["IH_oe60_hosp"][step],
+                    output="B_g2_t2",
+                    value=observed["B_g2_t2"][step],
                 )
                 for step in range(1, 10)
             ],
             parameters=[
                 CalibrationParameter(
-                    id="IH_oe60_hosp",
+                    id="B_g2_t2",
                     parameter_type="initial_condition",
                     min_bound=0.0,
                     max_bound=0.1,
                 ),
             ],
-            initial_condition_remainder="S",
+            initial_condition_remainder="A",
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=500),
         )
@@ -374,10 +374,10 @@ class TestCompositeStateCalibration:
 
         rebuilt = initial_state(model)
         assert rebuilt == pytest.approx(expected)
-        assert rebuilt["IH_y60"] == 0.0
-        assert rebuilt["IH_oe60_hosp"] == pytest.approx(70.0, abs=0.5)
+        assert rebuilt["B_g1"] == 0.0
+        assert rebuilt["B_g2_t2"] == pytest.approx(70.0, abs=0.5)
         assert sum(rebuilt.values()) == pytest.approx(1000.0)
-        assert result.best_parameters["IH_oe60_hosp"] == pytest.approx(0.07, abs=5e-4)
+        assert result.best_parameters["B_g2_t2"] == pytest.approx(0.07, abs=5e-4)
 
 
 def _binary_split(group1_fraction: float = 0.5) -> Model:

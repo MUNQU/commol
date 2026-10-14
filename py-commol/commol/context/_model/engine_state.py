@@ -42,7 +42,7 @@ class InitialCompartment(NamedTuple):
     Attributes
     ----------
     name : str
-        Expanded compartment name, for example ``IH_y60``.
+        Expanded compartment name, for example ``A_g1``.
     bin : str
         Bin the compartment expands from.
     categories : dict[str, str]
@@ -66,7 +66,7 @@ class ExpandedOutput(NamedTuple):
     Attributes
     ----------
     name : str
-        Expanded name, for example ``IH_y60``.
+        Expanded name, for example ``A_g1``.
     source : str
         Bin or accumulator the output expands from.
     categories : dict[str, str]
@@ -185,8 +185,8 @@ class TransitionFlow(NamedTuple):
         Compartment the flow enters, None for a target-less transition.
     rate : str
         Rate expression the engine evaluates.
-    per_capita_of : str | None
-        Compartment a per-capita rate is multiplied by, or None for an absolute
+    proportional_to : str | None
+        Compartment a proportional rate is multiplied by, or None for an absolute
         flow. The pieces of a transition with several sources (``A + B -> C``)
         share the flow of the first source.
     """
@@ -195,14 +195,14 @@ class TransitionFlow(NamedTuple):
     source: str | None
     target: str | None
     rate: str
-    per_capita_of: str | None
+    proportional_to: str | None
 
     @property
     def term(self) -> str:
-        """The flow as an expression: the rate, times its base if per capita."""
-        if self.per_capita_of is None:
+        """The flow as an expression: the rate, times its source if proportional."""
+        if self.proportional_to is None:
             return self.rate
-        return f"{self.rate} * {self.per_capita_of}"
+        return f"{self.rate} * {self.proportional_to}"
 
 
 def transition_flows(structure: "CompartmentalStructure") -> list[TransitionFlow]:

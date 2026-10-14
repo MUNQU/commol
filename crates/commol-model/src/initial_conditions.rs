@@ -18,7 +18,7 @@ use commol_core::{ModelValue, ModelValueType, ValuePlan};
 use crate::engine::CompartmentalEngine;
 use crate::labels::OutputLabels;
 
-/// Separator of a qualified category id, as in `sex:female`.
+/// Separator of a qualified category id, as in `group:g1`.
 const CATEGORY_SEPARATOR: char = ':';
 
 /// Relative tolerance under which the sum of the initial amounts is taken to
@@ -465,10 +465,10 @@ mod tests {
 
     fn shared_category_labels() -> Vec<OutputLabels> {
         labels(&[
-            ("A", &[("age", "y"), ("sex", "y")]),
-            ("A", &[("age", "y"), ("sex", "o")]),
-            ("A", &[("age", "o"), ("sex", "y")]),
-            ("A", &[("age", "o"), ("sex", "o")]),
+            ("A", &[("group", "c1"), ("type", "c1")]),
+            ("A", &[("group", "c1"), ("type", "c2")]),
+            ("A", &[("group", "c2"), ("type", "c1")]),
+            ("A", &[("group", "c2"), ("type", "c2")]),
         ])
     }
 
@@ -479,13 +479,13 @@ mod tests {
     #[test]
     fn binary_category_resolves_to_disjoint_pairs() {
         let labels = labels(&[
-            ("A", &[("age", "y"), ("sex", "m")]),
-            ("A", &[("age", "y"), ("sex", "f")]),
-            ("A", &[("age", "o"), ("sex", "m")]),
-            ("A", &[("age", "o"), ("sex", "f")]),
+            ("A", &[("group", "c1"), ("type", "t1")]),
+            ("A", &[("group", "c1"), ("type", "t2")]),
+            ("A", &[("group", "c2"), ("type", "t1")]),
+            ("A", &[("group", "c2"), ("type", "t2")]),
         ]);
 
-        let target = resolve_target("y", &names(4), &labels, &[0.0; 4]).unwrap();
+        let target = resolve_target("c1", &names(4), &labels, &[0.0; 4]).unwrap();
 
         assert_eq!(
             target,
@@ -498,16 +498,16 @@ mod tests {
     #[test]
     fn category_shared_by_two_stratifications_is_ambiguous() {
         let error =
-            resolve_target("y", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap_err();
+            resolve_target("c1", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap_err();
 
         assert!(error.contains("ambiguous"), "{error}");
-        assert!(error.contains("'age:y' or 'sex:y'"), "{error}");
+        assert!(error.contains("'group:c1' or 'type:c1'"), "{error}");
     }
 
     #[test]
     fn qualified_category_resolves_one_stratification() {
         let target =
-            resolve_target("sex:y", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap();
+            resolve_target("type:c1", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap();
 
         assert_eq!(
             target,
@@ -520,12 +520,12 @@ mod tests {
     #[test]
     fn category_of_a_conditional_stratification_pairs_only_where_it_applies() {
         let labels = labels(&[
-            ("A", &[("age", "y")]),
-            ("A", &[("age", "o"), ("care", "home")]),
-            ("A", &[("age", "o"), ("care", "hosp")]),
+            ("A", &[("group", "c1")]),
+            ("A", &[("group", "c2"), ("status", "s1")]),
+            ("A", &[("group", "c2"), ("status", "s2")]),
         ]);
 
-        let target = resolve_target("home", &names(3), &labels, &[0.0; 3]).unwrap();
+        let target = resolve_target("s1", &names(3), &labels, &[0.0; 3]).unwrap();
 
         assert_eq!(
             target,
@@ -538,9 +538,9 @@ mod tests {
     #[test]
     fn category_of_a_non_binary_stratification_is_rejected() {
         let labels = labels(&[
-            ("A", &[("age", "a")]),
-            ("A", &[("age", "b")]),
-            ("A", &[("age", "c")]),
+            ("A", &[("group", "a")]),
+            ("A", &[("group", "b")]),
+            ("A", &[("group", "c")]),
         ]);
 
         let error = resolve_target("a", &names(3), &labels, &[0.0; 3]).unwrap_err();

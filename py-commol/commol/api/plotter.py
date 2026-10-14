@@ -83,7 +83,7 @@ class SimulationPlotter:
         Plot simulation results with one subplot per series.
 
         Creates a figure with subplots arranged in a grid, where each subplot shows
-        the evolution of one series over time. Optionally overlays observed data
+        the evolution of one series along the axis. Optionally overlays observed data
         points.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -177,7 +177,7 @@ class SimulationPlotter:
         """
         Plot cumulative (accumulated) simulation results with one subplot per series.
 
-        Creates a figure showing the running sum of each series over time.
+        Creates a figure showing the running sum of each series along the axis.
         Useful for tracking totals, losses, or other accumulated quantities.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 

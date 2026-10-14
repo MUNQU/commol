@@ -3,7 +3,7 @@
 import pytest
 
 from commol import ModelBuilder, Simulation
-from tests.support import a_to_b_builder, build, sir_builder
+from tests.support import a_to_b_builder, build, abc_builder
 
 
 def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:
@@ -48,8 +48,8 @@ def test_an_engine_variable_is_not_an_accumulator_id() -> None:
 def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
     builder = ModelBuilder(name="Reserved", version="1.0")
     builder.add_bin(id="total_y", name="total_y").add_bin(id="B", name="B")
-    builder.add_stratification(id="age", categories=["y", "o"])
-    builder.add_stratification(id="sex", categories=["y", "o"])
+    builder.add_stratification(id="group", categories=["y", "o"])
+    builder.add_stratification(id="type", categories=["y", "o"])
     builder.add_parameter(id="k", value=0.1)
     builder.add_transition(id="flow", source=["total_y"], target=["B"], rate="k")
     halves = [{"category": "y", "fraction": 0.5}, {"category": "o", "fraction": 0.5}]
@@ -60,8 +60,8 @@ def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
             {"bin": "B", "fraction": 0.0},
         ],
         stratification_fractions=[
-            {"stratification": "age", "fractions": halves},
-            {"stratification": "sex", "fractions": halves},
+            {"stratification": "group", "fractions": halves},
+            {"stratification": "type", "fractions": halves},
         ],
     )
 
@@ -75,9 +75,9 @@ def test_a_bin_id_is_not_a_parameter_id() -> None:
 
 
 def test_every_conflicting_parameter_id_is_reported() -> None:
-    builder = sir_builder(parameters={"S": 0.5, "I": 0.3, "gamma": 0.1}, infection=None)
+    builder = abc_builder(parameters={"A": 0.5, "B": 0.3, "k2": 0.1}, ab=None)
 
-    with pytest.raises(ValueError, match="reserved compartment names: \\['I', 'S'\\]"):
+    with pytest.raises(ValueError, match="reserved compartment names: \\['A', 'B'\\]"):
         build(builder)
 
 

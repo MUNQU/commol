@@ -87,8 +87,8 @@ Inference looks only at units of time: a unit of dimension `[time]`
 (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in
 `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the
 flow fails. Two names of one unit, such as `d` and
-`day`, are one unit. A flow must have exactly the expected unit: `person/week`
-does not match `person/day`, because the engine would apply a weekly rate
+`day`, are one unit. A flow must have exactly the expected unit: `item/week`
+does not match `item/day`, because the engine would apply a weekly rate
 every day.
 
 ```python
@@ -158,8 +158,8 @@ To pass a quantity to a function, make it dimensionless first, for example
 ## Printing equations
 
 `Model.print_equations(output_file=None, format="text")` prints the flows that
-the engine plans, after it has decided which rates are per-capita (see
-[Transitions](transitions.md#absolute-and-per-capita-rates)). It has three
+the engine plans, after it has decided which rates are proportional (see
+[Transitions](transitions.md#absolute-and-proportional-rates)). It has three
 parts:
 
 | Part | Content |

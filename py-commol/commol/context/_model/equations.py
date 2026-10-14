@@ -18,7 +18,7 @@ class EquationPrinter:
 
     The flows come from the engine, so the printed equations are the ones the
     engine simulates: each flow moves an amount from one compartment to
-    another, and a per-capita rate is shown multiplied by its source. An
+    another, and a proportional rate is shown multiplied by its source. An
     impulse is not part of the equations: it is listed apart, with the
     positions where it moves its amount at once.
     """

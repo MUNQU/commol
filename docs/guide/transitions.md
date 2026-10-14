@@ -55,7 +55,7 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](axis-patterns.md)
 A formula can use parameters, compartments, bin totals, `total`, `step`, constants
 and functions; see [Mathematical Expressions](mathematical-expressions.md).
 
-### Absolute and per-capita rates
+### Absolute and proportional rates
 
 The engine decides for each flow whether its rate is the flow itself or a rate
 per member of the source:
@@ -65,25 +65,25 @@ per member of the source:
 | The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute | `rate` |
 | The transition has no source | Absolute | `rate` |
 | A stratified rate sets `"absolute": True` or `False` | As set | — |
-| Otherwise | Per-capita | `rate × source` |
+| Otherwise | Proportional | `rate × source` |
 
 | Rate | Kind | Flow from `B` to `C` |
 |---|---|---|
-| `"k2"` | Per-capita | `k2 * B` |
+| `"k2"` | Proportional | `k2 * B` |
 | `"k2 * B"` | Absolute | `k2 * B` |
 | `"k1 * A * B / total"` | Absolute | `k1 * A * B / total` |
 | `"0.5"` with `source=[]` | Absolute | `0.5` enters the target |
 
-`print_equations()` prints every flow after this decision, so a per-capita rate
+`print_equations()` prints every flow after this decision, so a proportional rate
 appears multiplied by its source.
 
-### Time-dependent rates
+### Rates that change along the axis
 
 A formula may use `step` (or `t`), the current step:
 
 ```python
-seasonal = (
-    ModelBuilder(name="Seasonal")
+periodic = (
+    ModelBuilder(name="Periodic")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
@@ -106,18 +106,18 @@ For pulses, windows, ramps and schedules per group, use
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow, like a
-reaction: every entry in `source` loses it and every entry in `target` gains it.
+A transition with several sources or targets moves **one** flow: every entry
+in `source` loses it and every entry in `target` gains it.
 A bin listed twice loses or gains it twice. The rate must be absolute.
 
 ```python
-reaction = (
-    ModelBuilder(name="Reaction")
+merge = (
+    ModelBuilder(name="Merge")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
-    .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
+    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
@@ -128,7 +128,7 @@ reaction = (
     )
     .build(engine="DifferenceEquations")
 )
-reaction.print_equations()
+merge.print_equations()
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
 ```
 
@@ -305,7 +305,7 @@ group_rates.print_equations()
 |---|---|---|
 | `conditions` | `list[dict]` | All must match the source compartment (AND). |
 | `rate` | `str` or `float` | The rate for matching compartments. |
-| `absolute` | `bool`, optional | Forces the rate to be absolute or per-capita. |
+| `absolute` | `bool`, optional | Forces the rate to be absolute or proportional. |
 
 | Condition key | Meaning |
 |---|---|
@@ -387,8 +387,8 @@ rate with `if`, as in `"if(step > 30, k, 0)"`, or use a
 
 An impulse moves its amount at once, at given steps, and nothing between them.
 Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The
-rate is then a fraction of the source (per-capita) or an amount (absolute),
-with the same [rules](#absolute-and-per-capita-rates), sources, targets,
+rate is then a fraction of the source (proportional) or an amount (absolute),
+with the same [rules](#absolute-and-proportional-rates), sources, targets,
 stratified rates and accumulators as any transition.
 
 ```python
@@ -423,7 +423,7 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](axis-patterns.md) is a
 rate: a difference model applies it for one step with the other flows, and a
-differential model applies it as a constant rate for one time unit, so it
+differential model applies it as a constant rate for one unit of the axis, so it
 moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in
 both engines.
 
@@ -437,7 +437,7 @@ simulate as written:
 | A source or target that is neither a bin nor a category of one stratification | The transition |
 | A category transition without exactly one source and one target | The transition |
 | A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names |
-| Several sources with a per-capita rate | The transition; use an absolute rate or `$compartment` |
+| Several sources with a proportional rate | The transition; use an absolute rate or `$compartment` |
 | A stratified rate whose `category` conditions match no source compartment | The categories; use `to` to reach another stratification |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
 | `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition |
@@ -447,6 +447,6 @@ simulate as written:
 
 | To learn | Read |
 |---|---|
-| Rates that change over time | [Axis Patterns](axis-patterns.md) |
+| Rates that change along the axis | [Axis Patterns](axis-patterns.md) |
 | Everything a formula can contain | [Mathematical Expressions](mathematical-expressions.md) |
 | Units and equation output | [Units and Equations](units-and-equations.md) |

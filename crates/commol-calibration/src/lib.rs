@@ -26,20 +26,20 @@
 //! use commol_difference::DifferenceEquations;
 //!
 //! // Create your model
-//! let model = create_sir_model();
+//! let model = create_model();
 //! let engine = DifferenceEquations::from_model(&model);
 //!
 //! // Define observed data
 //! let observed_data = vec![
-//!     ObservedDataPoint::new(10.0, 1, 501.0),  // time=10, compartment I, value=501
+//!     ObservedDataPoint::new(10.0, 1, 501.0),  // position 10, compartment B, value=501
 //!     ObservedDataPoint::new(20.0, 1, 823.0),
 //!     ObservedDataPoint::new(30.0, 1, 654.0),
 //! ];
 //!
 //! // Define parameters to calibrate
 //! let params = vec![
-//!     CalibrationParameter::new("beta".to_string(), 0.0, 1.0),
-//!     CalibrationParameter::new("gamma".to_string(), 0.0, 0.5),
+//!     CalibrationParameter::new("k1".to_string(), 0.0, 1.0),
+//!     CalibrationParameter::new("k2".to_string(), 0.0, 0.5),
 //! ];
 //!
 //! // Create calibration problem

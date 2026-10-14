@@ -173,7 +173,7 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
   path; a model with `1/day` rates and no `step_unit` fails the check with a
   message that says to declare it; with `step_unit="day"`, the check rejects
   a rate in `1/quarter` or `1/mo` and names the unit; with `step_unit="day"`,
-  a per-capita rate `k * t` passes when `k` is in `1/day**2`.
+  a proportional rate `k * t` passes when `k` is in `1/day**2`.
 
 ### S5 — Migration and documentation
 

@@ -53,7 +53,7 @@ to step 100.
 | `.add_bin(id="A", name="State A")` | Adds a compartment (a *bin*): a state that holds an amount: a part of the total. |
 | `.add_parameter(id="k1", value=0.3)` | Adds a named constant for rate formulas. `value=None` marks it for calibration. |
 | `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
-| `.add_transition(..., rate="k2")` | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`. |
+| `.add_transition(..., rate="k2")` | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`. |
 | `.set_initial_conditions(...)` | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1. |
 | `.build(engine="DifferenceEquations")` | Validates the definition and returns a `Model`. |
 | `Simulation(model).run(num_steps=100)` | Runs the Rust engine and returns the results. |

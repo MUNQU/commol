@@ -414,7 +414,7 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If observed data contains invalid compartments or negative time steps.
+            If observed data contains invalid compartments or negative positions.
         """
         simulation_output_names = set(self._engine.output_names)
 
@@ -437,7 +437,7 @@ class Calibrator:
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 

@@ -12,26 +12,26 @@ from tests.support import (
     assert_close,
     build,
     build_ode,
-    sir_builder,
+    abc_builder,
 )
 
 
 class TestFormulaParameters:
     def test_a_formula_of_other_parameters_runs_as_its_value(self) -> None:
         model = build(
-            sir_builder(
+            abc_builder(
                 parameters={
-                    "beta_base": 0.3,
-                    "contact_multiplier": 2.0,
-                    "beta": "beta_base * contact_multiplier",
-                    "gamma": 0.1,
+                    "k1_base": 0.3,
+                    "multiplier": 2.0,
+                    "k1": "k1_base * multiplier",
+                    "k2": 0.1,
                 }
             )
         )
-        same_as_number = build(sir_builder(parameters={"beta": 0.6, "gamma": 0.1}))
+        same_as_number = build(abc_builder(parameters={"k1": 0.6, "k2": 0.1}))
 
-        beta = next(p for p in model.parameters if p.id == "beta")
-        assert beta.value == "beta_base * contact_multiplier"
+        k1 = next(p for p in model.parameters if p.id == "k1")
+        assert k1.value == "k1_base * multiplier"
         assert_close(
             Simulation(model).run(20),
             Simulation(same_as_number).run(20),
@@ -40,24 +40,24 @@ class TestFormulaParameters:
 
     def test_a_formula_may_use_subgroup_totals(self) -> None:
         model = build(
-            sir_builder(
+            abc_builder(
                 parameters={
-                    "young_fraction": "total_young / total",
-                    "beta": 0.3,
-                    "gamma": 0.1,
+                    "g1_fraction": "total_g1 / total",
+                    "k1": 0.3,
+                    "k2": 0.1,
                 },
-                infection="beta * young_fraction * S * I / total",
-                stratifications={"age": {"young": 0.3, "old": 0.7}},
+                ab="k1 * g1_fraction * A * B / total",
+                stratifications={"group": {"g1": 0.3, "g2": 0.7}},
             )
         )
         same_as_number = build(
-            sir_builder(
-                parameters={"beta": 0.3 * 0.3, "gamma": 0.1},
-                stratifications={"age": {"young": 0.3, "old": 0.7}},
+            abc_builder(
+                parameters={"k1": 0.3 * 0.3, "k2": 0.1},
+                stratifications={"group": {"g1": 0.3, "g2": 0.7}},
             )
         )
 
-        # total_young / total stays 0.3: no transition moves people between ages.
+        # total_g1 / total stays 0.3: no transition moves amounts between groups.
         assert_close(
             Simulation(model).run(20),
             Simulation(same_as_number).run(20),
@@ -67,33 +67,33 @@ class TestFormulaParameters:
 
 class TestUncalibratedParameters:
     def test_a_parameter_may_have_no_value(self) -> None:
-        parameter = Parameter(id="beta", value=None)
+        parameter = Parameter(id="k1", value=None)
 
         assert parameter.value is None
         assert not parameter.is_calibrated()
 
     def test_a_parameter_with_a_value_is_calibrated(self) -> None:
-        assert Parameter(id="gamma", value=0.05).is_calibrated()
+        assert Parameter(id="k2", value=0.05).is_calibrated()
 
     def test_the_model_lists_the_parameters_without_a_value(self) -> None:
         model = build(
-            sir_builder(
-                parameters={"beta": None, "gamma": 0.05, "delta": None},
+            abc_builder(
+                parameters={"k1": None, "k2": 0.05, "delta": None},
             )
         )
 
-        assert model.get_uncalibrated_parameters() == ["beta", "delta"]
+        assert model.get_uncalibrated_parameters() == ["k1", "delta"]
 
     def test_update_parameters_sets_the_values(self) -> None:
-        model = build(sir_builder(parameters={"beta": None, "gamma": None}))
+        model = build(abc_builder(parameters={"k1": None, "k2": None}))
 
-        model.update_parameters({"beta": 0.1, "gamma": 0.05})
+        model.update_parameters({"k1": 0.1, "k2": 0.05})
 
         assert [p.value for p in model.parameters] == [0.1, 0.05]
         assert model.get_uncalibrated_parameters() == []
 
     def test_update_parameters_rejects_an_unknown_id(self) -> None:
-        model = build(sir_builder(parameters={"beta": None, "gamma": None}))
+        model = build(abc_builder(parameters={"k1": None, "k2": None}))
 
         with pytest.raises(ValueError, match="invalid_param") as error:
             model.update_parameters({"invalid_param": 0.1})

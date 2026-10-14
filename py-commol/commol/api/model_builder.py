@@ -263,8 +263,8 @@ class ModelBuilder:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
                    special variables (total, total_<category>, step, t, pi, e),
-                   or contain mathematical expressions (e.g., "beta * 2",
-                   "total_young / total")
+                   or contain mathematical expressions (e.g., "k1 * 2",
+                   "total_g1 / total")
             - list[tuple[float, float]]: Empirical series as (position, value)
                    points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
@@ -272,7 +272,7 @@ class ModelBuilder:
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
-            Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+            Unit of the parameter (e.g., "1/day", "dimensionless", "item").
             Used for unit consistency checking in equations.
         mode : str | None, default=None
             Required when ``value`` is a list of (position, value) points.
@@ -382,7 +382,7 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per time step, and that value is applied to
+        The rate is evaluated ONCE per step, and that value is applied to
         all source compartments at once.
 
         When you use the $compartment placeholder in the rate formula with multiple
@@ -392,8 +392,8 @@ class ModelBuilder:
         name.
 
         Each transition's rate is evaluated independently, giving per-compartment
-        dynamics. This is ideal for processes like per-capita death rates, where the
-        rate should be proportional to the amount of each compartment.
+        dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+        flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
         - Only valid when len(source) > 1
@@ -414,7 +414,7 @@ class ModelBuilder:
         id : str
             Unique identifier for the transition. When using $compartment expansion,
             the system will append "__<compartment_name>" to create unique IDs for
-            each expanded transition (e.g., "death__S", "death__L").
+            each expanded transition (e.g., "out__A", "out__B").
         source : list[str]
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
@@ -458,7 +458,7 @@ class ModelBuilder:
 
         impulse_at : list[float] | None, default=None
             Make the transition an impulse at these positions on the axis. At
-            each one, ``rate`` is the fraction of the source (per-capita) or the
+            each one, ``rate`` is the fraction of the source (proportional) or the
             amount (absolute) moved at once, before the flows of that step. A
             DifferenceEquations model needs integer positions.
 
@@ -480,7 +480,7 @@ class ModelBuilder:
         """
         # If `rate` is a AxisPattern, extract its rate string and stratified
         # rates and route them into the existing pipeline. A AxisPattern fully
-        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # specifies how the rate changes along the axis, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, AxisPattern):
             if impulse_at is not None or impulse_every is not None:
@@ -772,9 +772,9 @@ class ModelBuilder:
 
             Example:
             [
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0}
             ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
@@ -785,11 +785,11 @@ class ModelBuilder:
             Example:
             [
                 {
-                    "stratification": "age_group",
+                    "stratification": "group",
                     "fractions": [
-                        {"category": "young", "fraction": 0.3},
-                        {"category": "adult", "fraction": 0.5},
-                        {"category": "elderly", "fraction": 0.2}
+                        {"category": "g1", "fraction": 0.3},
+                        {"category": "g2", "fraction": 0.5},
+                        {"category": "g3", "fraction": 0.2}
                     ]
                 }
             ]
@@ -801,7 +801,7 @@ class ModelBuilder:
 
             Example:
             [
-                {"compartment": "IH_y60", "fraction": 0.0}
+                {"compartment": "A_g1", "fraction": 0.0}
             ]
 
             Compartment names and the resulting sum of the amounts are checked

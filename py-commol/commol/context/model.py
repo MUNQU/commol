@@ -323,7 +323,7 @@ class Model(BaseModel, Generic[StructureT]):
         from the parameter
         units: the one unit of time (``day``, ``week``, ``step``, …) that they
         use, or ``step`` when they use none. Every flow must then be exactly
-        ``<bin unit>/<step unit>``, such as ``person/day``.
+        ``<bin unit>/<step unit>``, such as ``item/day``.
 
         Parameters
         ----------
@@ -343,8 +343,8 @@ class Model(BaseModel, Generic[StructureT]):
 
         Notes
         -----
-        - Predefined variables (total, total_young, etc.) have the bin unit
-        - Time step variables (t, step) are dimensionless
+        - Predefined variables (total, total_g1, etc.) have the bin unit
+        - Position variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
         self.structure.check_unit_consistency(self, verbose)

@@ -70,7 +70,7 @@ class Parameter(BaseModel):
     description : str | None
         A human-readable description of the parameter.
     unit : str | None
-        The unit of the parameter (e.g., "1/day", "dimensionless", "person").
+        The unit of the parameter (e.g., "1/day", "dimensionless", "item").
         If None, the parameter has no unit specified.
     """
 
@@ -90,7 +90,7 @@ class Parameter(BaseModel):
     )
     unit: str | None = Field(
         default=None,
-        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'person').",
+        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'item').",
     )
 
     @field_validator("value")

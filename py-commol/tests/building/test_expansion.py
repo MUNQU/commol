@@ -33,8 +33,8 @@ class TestEngineExpansion:
         # the Pydantic validator, so the stratification is built without it.
         model.structure.stratifications.append(
             Stratification.model_construct(
-                id="care",
-                categories=["home", "hosp"],
+                id="type",
+                categories=["t1", "t2"],
                 description=None,
                 conditions=[
                     StratificationCondition.model_construct(
@@ -50,5 +50,7 @@ class TestEngineExpansion:
             for compartment in helper.generate_compartments()
         ]
 
-        assert helper_names == [c.name for c in model.structure.initial_state()]
-        assert "A_g2_hosp" in helper_names
+        assert helper_names == [
+            compartment.name for compartment in model.structure.initial_state()
+        ]
+        assert "A_g2_t2" in helper_names

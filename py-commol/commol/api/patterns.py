@@ -1,9 +1,9 @@
 """
-Time-varying rate patterns for use in model transitions.
+Rate patterns along the axis for use in model transitions.
 
-Provides a composable, Pydantic-validated API for expressing time-dependent
-rate schedules — discrete pulses, periodic events, sliding windows, seasonal
-curves, and arbitrary user formulas — as mathematical expressions that the
+Provides a composable, Pydantic-validated API for expressing rate schedules
+along the axis — discrete pulses, periodic events, sliding windows, sinusoids,
+and arbitrary user formulas — as mathematical expressions that the
 Commol engine can evaluate at each simulation step.
 
 The only public symbol from this module is :class:`AxisPattern`. Multi-group
@@ -261,7 +261,8 @@ class _AddGroupDescriptor:
 
 class AxisPattern(BaseModel):
     """
-    A time-varying expression usable as (or within) a transition rate.
+    An expression that changes along the axis, usable as (or within) a
+    transition rate.
 
     Instances are created exclusively via the factory classmethods (``pulse``,
     ``periodic``, ``window``, etc.). Each instance may carry stratification
@@ -345,7 +346,7 @@ class AxisPattern(BaseModel):
 
         If ``source_compartment`` is set, the rate is multiplied by that
         compartment variable (absolute flow). Otherwise the rate is the
-        formula alone (per-capita flow — the engine multiplies by the source
+        formula alone (proportional flow — the engine multiplies by the source
         compartment automatically).
         """
         if self.source_compartment is not None:
@@ -448,7 +449,7 @@ class AxisPattern(BaseModel):
         return _IntervalAxisPattern(start=start, end=end, value=value)
 
     @classmethod
-    def seasonal(
+    def sinusoid(
         cls,
         amplitude: float | str,
         period: float | str,
@@ -456,7 +457,7 @@ class AxisPattern(BaseModel):
         baseline: float | str = 0,
     ) -> "AxisPattern":
         """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-        return _SeasonalAxisPattern(
+        return _SinusoidAxisPattern(
             amplitude=amplitude,
             period=period,
             phase=phase,
@@ -653,7 +654,7 @@ class _IntervalAxisPattern(AxisPattern):
         return f"(if(t >= {start}, if(t < {end}, {self.value}, 0), 0))"
 
 
-class _SeasonalAxisPattern(AxisPattern):
+class _SinusoidAxisPattern(AxisPattern):
     amplitude: float | str
     period: float | str
     phase: float | str = 0

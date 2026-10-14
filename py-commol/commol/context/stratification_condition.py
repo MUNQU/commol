@@ -9,14 +9,15 @@ class StratificationCondition(BaseModel):
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
-    enables cross-category transitions within the same bin (e.g., aging).
+    enables cross-category transitions within the same bin (e.g., from ``g1``
+    to ``g2``).
 
     Attributes
     ----------
     stratification : str
-        The ID of the stratification (e.g., "age", "location")
+        The ID of the stratification (e.g., "group", "type")
     category : str
-        The category within that stratification (e.g., "young", "urban")
+        The category within that stratification (e.g., "g1", "t1")
     to : str | None
         Target category override. When set, the target compartment will use
         this category instead of the source compartment's category for this

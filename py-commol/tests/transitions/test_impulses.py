@@ -73,29 +73,29 @@ class TestJump:
 
         assert results["A"] == pytest.approx([1000, 750, 750])
 
-    def test_pulse_vaccination_reaches_the_periodic_orbit(self) -> None:
-        # S' = mu K - mu S between jumps, S -> (1 - p) S at t = k T.
-        mu, k, p, period = 0.02, 1000.0, 0.3, 5.0
-        builder = ModelBuilder(name="pulse vaccination", version="1.0")
-        builder.add_bin("S", "S").add_bin("V", "V")
-        for name, value in {"mu": mu, "K": k, "p": p}.items():
+    def test_periodic_impulses_reach_the_periodic_orbit(self) -> None:
+        # A' = k1 K - k1 A between jumps, A -> (1 - p) A at t = k T.
+        k1, k, p, period = 0.02, 1000.0, 0.3, 5.0
+        builder = ModelBuilder(name="periodic impulses", version="1.0")
+        builder.add_bin("A", "A").add_bin("V", "V")
+        for name, value in {"k1": k1, "K": k, "p": p}.items():
             builder.add_parameter(name, value)
-        builder.add_transition("birth", [], ["S"], rate="mu * K")
-        builder.add_transition("death", ["S"], [], rate="mu")
+        builder.add_transition("inflow", [], ["A"], rate="k1 * K")
+        builder.add_transition("outflow", ["A"], [], rate="k1")
         builder.add_transition(
-            "vaccination", ["S"], ["V"], rate="p", impulse_every=(period, period)
+            "av", ["A"], ["V"], rate="p", impulse_every=(period, period)
         )
         builder.set_initial_conditions(
             total=1000,
-            bin_fractions=[{"bin": "S", "fraction": 1.0}, {"bin": "V", "fraction": 0}],
+            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "V", "fraction": 0}],
         )
         steps = [j * period for j in range(1, 201)]
 
         results = Simulation(build_ode(builder, TIGHT)).run_at(steps)
 
-        decay = math.exp(-mu * period)
+        decay = math.exp(-k1 * period)
         before = k * (1 - decay) / (1 - (1 - p) * decay)
-        assert_close(results["S"][-1], (1 - p) * before, rel=1e-7)
+        assert_close(results["A"][-1], (1 - p) * before, rel=1e-7)
 
 
 class TestDefinition:

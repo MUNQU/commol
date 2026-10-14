@@ -61,7 +61,7 @@ compartments at each step. How much it moves depends on its rate:
 | The rate… | Kind | Flow per step | Example |
 |---|---|---|---|
 | names a compartment, a bin total or `total` | **Absolute** | the rate itself | `"k1 * A * B / total"` |
-| names no compartment | **Per-capita** | rate × source | `"k2"` moves `k2 × B` |
+| names no compartment | **Proportional** | rate × source | `"k2"` moves `k2 × B` |
 
 ```python
 builder = (
@@ -72,8 +72,8 @@ builder = (
 ```
 
 The engine decides the kind when the model is built, and
-`model.print_equations()` shows the result: the per-capita rate above prints as
-`k2 * B`. See [Design decisions](../codebase/design-decisions.md#absolute-and-per-capita-rates)
+`model.print_equations()` shows the result: the proportional rate above prints as
+`k2 * B`. See [Design decisions](../codebase/design-decisions.md#absolute-and-proportional-rates)
 for the exact rule.
 
 ## Accumulators
@@ -361,18 +361,18 @@ through these same methods.
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow, like a
-reaction: each source loses it and each target gains it. Its rate must be
-absolute, because a per-capita rate has no single source to multiply.
+A transition with several sources or targets moves **one** flow: each source
+loses it and each target gains it. Its rate must be
+absolute, because a proportional rate has no single source to multiply.
 
 ```python
-reaction = (
-    ModelBuilder(name="Reaction")
+merge = (
+    ModelBuilder(name="Merge")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
-    .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
+    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
@@ -474,5 +474,5 @@ use.
 |---|---|
 | Every builder option | [Building Models](building-models.md) |
 | What rate formulas can contain | [Mathematical Expressions](mathematical-expressions.md) |
-| Rates that change over time | [Axis Patterns](axis-patterns.md) |
+| Rates that change along the axis | [Axis Patterns](axis-patterns.md) |
 | Running and reading simulations | [Running Simulations](simulations.md) |

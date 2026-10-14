@@ -318,26 +318,26 @@ mod tests {
     fn test_collect_variables() {
         let expr = Expr::binary(
             super::super::ast::BinaryOperator::Mul,
-            Expr::Variable("beta".to_string()),
-            Expr::Variable("gamma".to_string()),
+            Expr::Variable("k1".to_string()),
+            Expr::Variable("k2".to_string()),
         );
 
         let vars = collect_variables(&expr);
         assert_eq!(vars.len(), 2);
-        assert!(vars.contains(&"beta".to_string()));
-        assert!(vars.contains(&"gamma".to_string()));
+        assert!(vars.contains(&"k1".to_string()));
+        assert!(vars.contains(&"k2".to_string()));
     }
 
     #[test]
     fn test_collect_variables_deduplicate() {
         let expr = Expr::binary(
             super::super::ast::BinaryOperator::Add,
-            Expr::Variable("beta".to_string()),
-            Expr::Variable("beta".to_string()),
+            Expr::Variable("k1".to_string()),
+            Expr::Variable("k1".to_string()),
         );
 
         let vars = collect_variables(&expr);
         assert_eq!(vars.len(), 1);
-        assert_eq!(vars[0], "beta");
+        assert_eq!(vars[0], "k1");
     }
 }
