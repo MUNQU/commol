@@ -13,7 +13,7 @@ merged or archived.
 | 1 | `odd/archive/tasks/reference-model-tests.md` | merged as `eda0bbc` (PR #103, 2026-10-13) | #102 | No |
 | 2 | `odd/archive/tasks/axis-positions.md` | merged by PR #104 (squash of `729894c`, 2026-10-13) | 1 | Yes |
 | 3 | `odd/archive/tasks/model-type-registry.md` | merged by PR #105 (squash of `131a5ab`, 2026-10-14) | 2 | Yes |
-| 4 | `odd/tasks/model-kind-interface.md` | T0 → T6 | 3 | Yes |
+| 4 | `odd/archive/tasks/model-kind-interface.md` | merged by PR #106 (squash `77aa9fd`, 2026-10-14) | 3 | Yes |
 | 5 | `odd/tasks/axis-scale-refactor.md` | T1 → T6 (T0 done) | 4 | Yes |
 | 6 | Release 0.3.0 (`docs/development/release.md`) | — | 2–5 | — |
 | 7 | `odd/tasks/library-benchmark.md` | T1 → T5 | 6 | No |

@@ -273,6 +273,8 @@ Branch `refactor/model-kind-interface` from `develop` at `e3ed45a`
   have it. Rejected: an engine that calls Python (a new product feature, the
   GIL in calibration) and a test kind that becomes a compartmental model (S1
   cannot be tested).
+- L10 (user, 2026-10-14): PR #106 merged into `develop` as `77aa9fd`; the
+  ODD is archived.
 - L9 (agent, 2026-10-14): implemented T0–T6 (see Evidence). T4 went before
   T2 in the code, because the test engine implements the final trait and the
   Python calibration lost `initial_population_size` with it.
