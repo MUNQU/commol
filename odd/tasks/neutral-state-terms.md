@@ -200,11 +200,12 @@ Found on the way:
 - `test_quadratic_decay.py::test_every_initial_value_gives_one_over_t_plus_c[0.5]`
   was a strict xfail (F1, an integer `population_size`); a real total makes it
   pass, so its mark is gone. `y0 = 0` stays an xfail: D2 rejects a total of 0.
-- A bin id is not checked against `RESERVED_VARIABLE_NAMES`, so a bin named
-  `total`, `t` or `step` is accepted and shadowed by the engine variable. Not
-  changed here (it was so for `N` too).
-- `axis-scale-refactor` D2 still names its argument `steps(amount, unit)`; D5
-  of this ODD asks that it not give "amount" a third meaning.
+- A bin or an accumulator could take an engine variable as id (`total`, `t`,
+  `step`; `N` before), and the variable hid it; and a bin such as `total_y`
+  over `age = [y, o]` and `sex = [y, o]` expanded into `total_y_y`, which the
+  subgroup totals also use, so two sums shared one slot. Fixed in L5.
+- `axis-scale-refactor` D2 named its argument `steps(amount, unit)`, against D5
+  of this ODD. Fixed in L5 (`axis-scale-refactor` L11).
 
 ## Log
 
@@ -222,3 +223,17 @@ Found on the way:
   `get_predefined_variable_units`, so its argument is now the names instead of
   the stratifications. The paper notation `N` of `tests/reference_models/`
   stays, as its prose "population" does; their rates read `total`.
+- L5 (user, 2026-10-14): asked to fix the two findings of Evidence.
+  `check_names` (`crates/commol-model/src/builder.rs`) rejects a parameter, bin
+  or accumulator id in `ENGINE_VARIABLES` (one constant in `commol-core`, also
+  read by the calibration constraints), and a bin whose compartments, bin total
+  or partial bin totals read as a `total_<categories>` name
+  (`subgroup_total_entries` says where each name comes from). Tests:
+  `an_engine_variable_is_not_a_parameter_bin_or_accumulator_id`,
+  `a_bin_name_that_reads_as_a_subgroup_total_is_rejected`,
+  `a_bin_that_starts_with_the_prefix_but_names_no_subgroup_builds`, and in
+  `tests/building/test_reserved_names.py` a bin id per engine variable, an
+  accumulator `total` and a bin `total_y`. `axis-scale-refactor` D2 takes
+  `steps(value, unit)`. Runners after it: Rust 258 passed (+3), test-kind 4,
+  `pytest` 993 passed and 3 xfailed (+7), `pytest -m docs` 62; clippy, fmt,
+  rustdoc, ruff, ty, vulture and `mkdocs build --strict` clean.
