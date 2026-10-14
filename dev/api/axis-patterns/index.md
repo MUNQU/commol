@@ -21,16 +21,16 @@ Examples:
 ```pycon
 >>> from commol import AxisPattern
 >>> # Single pattern
->>> rate = AxisPattern.pulse(at=10, amount=0.05)
+>>> rate = AxisPattern.pulse(at=10, value=0.05)
 >>> str(rate)
 '(if(step == 10, 0.05, 0))'
 >>> # Multi-group schedule
 >>> rate = AxisPattern.add_group(
 ...     conditions=[{"stratification": "group", "category": "cat1"}],
-...     schedule=AxisPattern.pulse(at=10, amount=0.05),
+...     schedule=AxisPattern.pulse(at=10, value=0.05),
 ... ).add_group(
 ...     conditions=[{"stratification": "group", "category": "cat2"}],
-...     schedule=AxisPattern.pulse(at=10, amount=0.02),
+...     schedule=AxisPattern.pulse(at=10, value=0.02),
 ... )
 ```
 
@@ -57,16 +57,16 @@ class AxisPattern(BaseModel):
     --------
     >>> from commol import AxisPattern
     >>> # Single pattern
-    >>> rate = AxisPattern.pulse(at=10, amount=0.05)
+    >>> rate = AxisPattern.pulse(at=10, value=0.05)
     >>> str(rate)
     '(if(step == 10, 0.05, 0))'
     >>> # Multi-group schedule
     >>> rate = AxisPattern.add_group(
     ...     conditions=[{"stratification": "group", "category": "cat1"}],
-    ...     schedule=AxisPattern.pulse(at=10, amount=0.05),
+    ...     schedule=AxisPattern.pulse(at=10, value=0.05),
     ... ).add_group(
     ...     conditions=[{"stratification": "group", "category": "cat2"}],
-    ...     schedule=AxisPattern.pulse(at=10, amount=0.02),
+    ...     schedule=AxisPattern.pulse(at=10, value=0.02),
     ... )
     """
 
@@ -93,7 +93,7 @@ class AxisPattern(BaseModel):
         """Return pulse data as (step, value) points if representable as a series.
 
         Returns None for patterns that cannot be expressed as a numeric
-        series (e.g. formula amounts, mathematical patterns).
+        series (e.g. formula values, mathematical patterns).
         Overridden only by ``_PulseAxisPattern`` and ``_PulsesAxisPattern``.
         """
         return None
@@ -169,16 +169,16 @@ class AxisPattern(BaseModel):
     # ------------------------------------------------------------------
 
     @classmethod
-    def pulse(cls, at: int, amount: float | str) -> "AxisPattern":
-        """Single-step pulse: rate = ``amount`` at step ``at``, else 0."""
-        _validate_amount_string(amount)
-        return _PulseAxisPattern(at=at, amount=amount)
+    def pulse(cls, at: int, value: float | str) -> "AxisPattern":
+        """Single-step pulse: rate = ``value`` at step ``at``, else 0."""
+        _validate_value_string(value)
+        return _PulseAxisPattern(at=at, value=value)
 
     @classmethod
     def pulses(
         cls,
         at: Iterable[int],
-        amount: float | str | Iterable[float | str],
+        value: float | str | Iterable[float | str],
     ) -> "AxisPattern":
         """Multi-step discrete pulses. Steps must be unique and non-negative.
 
@@ -186,44 +186,44 @@ class AxisPattern(BaseModel):
         ----------
         at : Iterable[int]
             Step indices at which the pulse fires. Must be unique and non-negative.
-        amount : float | str | Iterable[float | str]
+        value : float | str | Iterable[float | str]
             Pulse magnitude. Either a single value applied to every step, or an
             iterable of values with the same length as ``at`` — one per step.
         """
-        amount_resolved: float | str | list[float | str] = (
-            list(amount) if not isinstance(amount, (float, int, str)) else amount
+        value_resolved: float | str | list[float | str] = (
+            list(value) if not isinstance(value, (float, int, str)) else value
         )
-        if isinstance(amount_resolved, (float, int, str)):
-            _validate_amount_string(amount_resolved)
-        return _PulsesAxisPattern(steps=list(at), amount=amount_resolved)
+        if isinstance(value_resolved, (float, int, str)):
+            _validate_value_string(value_resolved)
+        return _PulsesAxisPattern(steps=list(at), value=value_resolved)
 
     @classmethod
     def periodic(
         cls,
         period: int,
-        amount: float | str,
+        value: float | str,
         offset: int = 0,
     ) -> "AxisPattern":
         """Periodic pulse every ``period`` steps starting at ``offset``."""
-        _validate_amount_string(amount)
-        return _PeriodicAxisPattern(period=period, amount=amount, offset=offset)
+        _validate_value_string(value)
+        return _PeriodicAxisPattern(period=period, value=value, offset=offset)
 
     @classmethod
     def interval(
         cls,
         start: float,
         end: float,
-        amount: float | str,
+        value: float | str,
     ) -> "AxisPattern":
-        """Constant rate ``amount`` while ``t`` is in ``[start, end)``, else 0.
+        """Constant rate ``value`` while ``t`` is in ``[start, end)``, else 0.
 
         In a DifferenceEquations model ``t`` is the step, so the rate acts on
         the steps ``start <= step < end``. In a DifferentialEquations model the
         interval opens and closes at any position, and the engine restarts its
         integration at both ends.
         """
-        _validate_amount_string(amount)
-        return _IntervalAxisPattern(start=start, end=end, amount=amount)
+        _validate_value_string(value)
+        return _IntervalAxisPattern(start=start, end=end, value=value)
 
     @classmethod
     def seasonal(
@@ -432,35 +432,35 @@ def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
 #### pulse
 
 ```python
-pulse(at: int, amount: float | str) -> AxisPattern
+pulse(at: int, value: float | str) -> AxisPattern
 ```
 
-Single-step pulse: rate = `amount` at step `at`, else 0.
+Single-step pulse: rate = `value` at step `at`, else 0.
 
 Source code in `commol/api/patterns.py`
 
 ```python
 @classmethod
-def pulse(cls, at: int, amount: float | str) -> "AxisPattern":
-    """Single-step pulse: rate = ``amount`` at step ``at``, else 0."""
-    _validate_amount_string(amount)
-    return _PulseAxisPattern(at=at, amount=amount)
+def pulse(cls, at: int, value: float | str) -> "AxisPattern":
+    """Single-step pulse: rate = ``value`` at step ``at``, else 0."""
+    _validate_value_string(value)
+    return _PulseAxisPattern(at=at, value=value)
 ```
 
 #### pulses
 
 ```python
-pulses(at: Iterable[int], amount: float | str | Iterable[float | str]) -> AxisPattern
+pulses(at: Iterable[int], value: float | str | Iterable[float | str]) -> AxisPattern
 ```
 
 Multi-step discrete pulses. Steps must be unique and non-negative.
 
 Parameters:
 
-| Name     | Type            | Description                                                             | Default         |
-| -------- | --------------- | ----------------------------------------------------------------------- | --------------- |
-| `at`     | `Iterable[int]` | Step indices at which the pulse fires. Must be unique and non-negative. | *required*      |
-| `amount` | \`float         | str                                                                     | Iterable\[float |
+| Name    | Type            | Description                                                             | Default         |
+| ------- | --------------- | ----------------------------------------------------------------------- | --------------- |
+| `at`    | `Iterable[int]` | Step indices at which the pulse fires. Must be unique and non-negative. | *required*      |
+| `value` | \`float         | str                                                                     | Iterable\[float |
 
 Source code in `commol/api/patterns.py`
 
@@ -469,7 +469,7 @@ Source code in `commol/api/patterns.py`
 def pulses(
     cls,
     at: Iterable[int],
-    amount: float | str | Iterable[float | str],
+    value: float | str | Iterable[float | str],
 ) -> "AxisPattern":
     """Multi-step discrete pulses. Steps must be unique and non-negative.
 
@@ -477,22 +477,22 @@ def pulses(
     ----------
     at : Iterable[int]
         Step indices at which the pulse fires. Must be unique and non-negative.
-    amount : float | str | Iterable[float | str]
+    value : float | str | Iterable[float | str]
         Pulse magnitude. Either a single value applied to every step, or an
         iterable of values with the same length as ``at`` — one per step.
     """
-    amount_resolved: float | str | list[float | str] = (
-        list(amount) if not isinstance(amount, (float, int, str)) else amount
+    value_resolved: float | str | list[float | str] = (
+        list(value) if not isinstance(value, (float, int, str)) else value
     )
-    if isinstance(amount_resolved, (float, int, str)):
-        _validate_amount_string(amount_resolved)
-    return _PulsesAxisPattern(steps=list(at), amount=amount_resolved)
+    if isinstance(value_resolved, (float, int, str)):
+        _validate_value_string(value_resolved)
+    return _PulsesAxisPattern(steps=list(at), value=value_resolved)
 ```
 
 #### periodic
 
 ```python
-periodic(period: int, amount: float | str, offset: int = 0) -> AxisPattern
+periodic(period: int, value: float | str, offset: int = 0) -> AxisPattern
 ```
 
 Periodic pulse every `period` steps starting at `offset`.
@@ -504,21 +504,21 @@ Source code in `commol/api/patterns.py`
 def periodic(
     cls,
     period: int,
-    amount: float | str,
+    value: float | str,
     offset: int = 0,
 ) -> "AxisPattern":
     """Periodic pulse every ``period`` steps starting at ``offset``."""
-    _validate_amount_string(amount)
-    return _PeriodicAxisPattern(period=period, amount=amount, offset=offset)
+    _validate_value_string(value)
+    return _PeriodicAxisPattern(period=period, value=value, offset=offset)
 ```
 
 #### interval
 
 ```python
-interval(start: float, end: float, amount: float | str) -> AxisPattern
+interval(start: float, end: float, value: float | str) -> AxisPattern
 ```
 
-Constant rate `amount` while `t` is in `[start, end)`, else 0.
+Constant rate `value` while `t` is in `[start, end)`, else 0.
 
 In a DifferenceEquations model `t` is the step, so the rate acts on the steps `start <= step < end`. In a DifferentialEquations model the interval opens and closes at any position, and the engine restarts its integration at both ends.
 
@@ -530,17 +530,17 @@ def interval(
     cls,
     start: float,
     end: float,
-    amount: float | str,
+    value: float | str,
 ) -> "AxisPattern":
-    """Constant rate ``amount`` while ``t`` is in ``[start, end)``, else 0.
+    """Constant rate ``value`` while ``t`` is in ``[start, end)``, else 0.
 
     In a DifferenceEquations model ``t`` is the step, so the rate acts on
     the steps ``start <= step < end``. In a DifferentialEquations model the
     interval opens and closes at any position, and the engine restarts its
     integration at both ends.
     """
-    _validate_amount_string(amount)
-    return _IntervalAxisPattern(start=start, end=end, amount=amount)
+    _validate_value_string(value)
+    return _IntervalAxisPattern(start=start, end=end, value=value)
 ```
 
 #### seasonal

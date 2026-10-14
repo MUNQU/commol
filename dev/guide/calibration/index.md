@@ -35,10 +35,10 @@ def basic_model(k1: float | None, k2: float | None):
         .add_bin(id="C", name="State C")
         .add_parameter(id="k1", value=k1)
         .add_parameter(id="k2", value=k2)
-        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "A", "fraction": 0.99},
                 {"bin": "B", "fraction": 0.01},
@@ -118,11 +118,11 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
 | `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
 
-| `parameter_type`      | `id` names                                            | The value is                                                                                                                                            |
-| --------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                     |
-| `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the population; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                      |
+| `parameter_type`      | `id` names                                            | The value is                                                                                                                                       |
+| --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"parameter"`         | A model parameter, usually declared with `value=None` | The parameter value                                                                                                                                |
+| `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the total; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                 |
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): a compartmental model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 
@@ -168,11 +168,11 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 
 `Model.apply_calibration_parameters(result, problem)` writes every calibrated value into the model, routed by its `parameter_type`:
 
-| `parameter_type`      | Written to                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `"parameter"`         | The model parameter with that id                                                          |
-| `"initial_condition"` | The initial conditions, so the model rebuilds exactly the population the optimizer scored |
-| `"factor"`            | Nothing: it describes the observations, not the model                                     |
+| `parameter_type`      | Written to                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `"parameter"`         | The model parameter with that id                                                     |
+| `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
+| `"factor"`            | Nothing: it describes the observations, not the model                                |
 
 It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then applies the ensemble's `point_parameters`) or a plain `{id: value}` mapping. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
 

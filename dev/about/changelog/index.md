@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `model.dynamics.transitions` (and `model.population.transitions`)                                             | `model.structure.transitions`                                                          |
 | `model.initial_state()`                                                                                       | `model.structure.initial_state()`                                                      |
 | `model.update_initial_conditions(…)`, `update_stratification_fractions(…)`, `update_compartment_fractions(…)` | `model.structure.update_initial_conditions(…)`, …                                      |
-| `model.subgroup_population(…)`, `model.get_conditioning_categories(…)`                                        | `model.structure.subgroup_population(…)`, …                                            |
+| `model.subgroup_population(…)`, `model.get_conditioning_categories(…)`                                        | `model.structure.subgroup_total(…)`, `model.structure.get_conditioning_categories(…)`  |
 | `model.get_outputs_by_source()`                                                                               | `model.structure.outputs_by_source()`                                                  |
 | `model.get_uncalibrated_initial_conditions()`                                                                 | `model.structure.uncalibrated_values()`                                                |
 | `commol.context.dynamics` (`Transition`, `StratifiedRate`)                                                    | `commol.context.transition`                                                            |
@@ -61,7 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `commol_rs.calibration.calibrate(…, initial_population_size, …)` and the other calibration functions          | no `initial_population_size`: the engine knows it                                      |
 
 - `applied_parameters_report` returns `parameters` and the sections of the kind of the model; a compartmental model adds `initial_conditions`, with the same keys as before.
-- The Rust engine trait (`SimulationEngine`) is the same for every model kind: `compartments`, `population`, `set_initial_condition` and `output_labels` moved to `CompartmentalEngine` (`commol-model`), and the engine resolves and writes the values of its kind (`plan_values`, `apply_values`). The initial-condition plan moved from `commol-calibration` to `commol-model`. The crates are not published.
+- The Rust engine trait (`SimulationEngine`) is the same for every model kind: `compartments`, `state` (was `population`), `set_initial_condition` and `output_labels` moved to `CompartmentalEngine` (`commol-model`), and the engine resolves and writes the values of its kind (`plan_values`, `apply_values`). The initial-condition plan moved from `commol-calibration` to `commol-model`. The crates are not published.
 - Names of positions, lengths and counts, and names with more than one meaning. No old name is kept; an old keyword raises an error that names it.
 
 | Before                                                                                                    | Now                                                    |
@@ -83,7 +83,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `simulation_report(…, steps, window_steps, …)`, `series_report`, `accumulators_report`, `observed_report` | `at`, `window`                                         |
 | `SimulationPlotter.plot_series(step_to_label=…)`                                                          | `position_label=…`, which takes a `float`              |
 | `TimePattern` (`commol.api.time_patterns`)                                                                | `AxisPattern` (`commol.api.patterns`)                  |
-| `TimePattern.window(start, end, amount)`                                                                  | `AxisPattern.interval(start, end, amount)`             |
+| `TimePattern.window(start, end, amount)`                                                                  | `AxisPattern.interval(start, end, value)`              |
 | `TimeSeriesValue`, "time-series parameter"                                                                | `SeriesValue`, "series parameter"                      |
 | `EnsembleSolution.windowed_prediction_steps`                                                              | `windowed_prediction_positions`                        |
 | `engine.current_step()`                                                                                   | `engine.current_position()`                            |
@@ -100,6 +100,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Simulation.run` starts from the initial state at every call, so two calls give the same result. Before, a second `run` continued the first one. To continue a run, call `simulation.engine.step()`.
 - `Model.check_unit_consistency` infers one step unit from the parameter units (`day`, `week`, `step`, …; `step` when there is none) and requires every flow to be exactly `<bin unit>/<step unit>`. A model in `"1/step"` now passes. Rates in two units of time, such as `"1/day"` and `"1/week"`, are an error that names each parameter, because the engine converts nothing. Before, the check accepted any convertible unit and defaulted to `day`.
 - Nelder-Mead searches inside the bounds: it optimizes an unbounded coordinate and scores `x = lo + (hi − lo)·(sin u + 1)/2`. Its first simplex is set by `NelderMeadConfig.initial_simplex_size` (a fraction of each bound width, default 0.1), which replaces `simplex_perturbation`; there is no alias. Every Nelder-Mead result can change.
+- The library names what the compartments hold without assuming individuals: the **state** (the amount of every compartment), the **amount** (the value of one compartment), the **total** (their sum, which the initial fractions are taken of) and a **subgroup total** (the sum of the compartments with some categories). The total is a `float`, finite and greater than 0, so a model of a mass or a concentration can be stated; before, it was an `int`. The rate variable `N` is `total` and `N_<cat>…` is `total_<cat>…`, so `N` is a free id (a bin may be named `N`). `AxisPattern` takes a `value`. No old name is kept: a model file with `population_size` does not load, and the error names the field; rename it to `total`, and `N` to `total` in every rate, formula and constraint.
+
+| Before                                                                                                                             | Now                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `set_initial_conditions(population_size=…)`, `InitialConditions.population_size: int`, JSON key `population_size`                  | `set_initial_conditions(total=…)`, `InitialConditions.total: float`, JSON key `total`       |
+| Rate, formula and constraint variables `N`, `N_<cat>…` (`N_g1`, `N_g1_t1`)                                                         | `total`, `total_<cat>…` (`total_g1`, `total_g1_t1`)                                         |
+| `RESERVED_VARIABLE_NAMES = ("N", …)`                                                                                               | `("total", "step", "t", "pi", "e")`                                                         |
+| `InitialConditions.subgroup_population(…)`, `CompartmentalStructure.subgroup_population(…)`                                        | `subgroup_total(…)`                                                                         |
+| `InitialCompartment.population`                                                                                                    | `InitialCompartment.amount`                                                                 |
+| `applied_parameters_report`: row `"N"`, group `"population"`                                                                       | row `"total"`, group `"total"`                                                              |
+| `AxisPattern.pulse(at, amount)`, `pulses(at, amount)`, `periodic(period, amount, offset)`, `interval(start, end, amount)`          | `value` instead of `amount`                                                                 |
+| `get_predefined_variable_units(stratifications, bin_unit)`                                                                         | `get_predefined_variable_units(subgroup_totals, bin_unit)`, with the names the engine gives |
+| `commol_rs.engine.Engine.population`                                                                                               | `Engine.state`                                                                              |
+| `commol_rs.core.InitialConditions(population_size=…)`                                                                              | `InitialConditions(total=…)`                                                                |
+| `commol_rs.calibration.calibrated_initial_population`                                                                              | `calibrated_initial_state`                                                                  |
+| —                                                                                                                                  | `commol_rs.model.subgroup_total_names(structure)`                                           |
+| Rust: `CompartmentalEngine::population`, `population_size`; `DifferenceEquations::population`, `DifferentialEquations::population` | `state`, `total`                                                                            |
 
 ### Removed
 
@@ -121,8 +138,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A `Simulation` follows its model: `run` and `engine` rebuild the engine when the model changed after the `Simulation` was created, for example with `update_parameters` or `apply_calibration_parameters`. Before, it used the old values, or failed with "Parameter index … not found" for a parameter that was `None`.
 - `pi` and `e` work in every transition rate, such as `"pi * k * A"`. Before, outside a function argument, the simulation failed with "Variable 'pi' not found".
 - `%` (remainder) works as the only operator of a rate, as in `"step % 7"`. Before, the rate was read as a parameter name.
-- An `N_…` variable that names no subpopulation, such as `N_t1_g1` when `group` is declared before `type`, is a build error that lists the valid names. Before, a formula parameter or the engine gave it the value 0.
-- A parameter id cannot be `N`, `step`, `t`, `pi`, `e`, an expanded compartment or a subpopulation total. Before, only bin ids were rejected, and the parameter and the engine variable shared one value.
+- A `total_…` variable that names no subgroup total, such as `total_t1_g1` when `group` is declared before `type`, is a build error that lists the valid names. Before, a formula parameter or the engine gave it the value 0.
+- A bin or an accumulator id cannot be `total`, `step`, `t`, `pi` or `e`, and a bin cannot expand into a name that is also a `total_<categories>` subgroup total. Before, the engine variable hid such a bin, and the two sums shared one value.
+- A parameter id cannot be `total`, `step`, `t`, `pi`, `e`, an expanded compartment or a subgroup total. Before, only bin ids were rejected, and the parameter and the engine variable shared one value.
 - `ModelBuilder.reset` removes the accumulators, and `ModelBuilder.clone` copies them and the `bin_unit`. Before, `reset` kept the accumulators and a clone lost them.
 - An `initial_condition` id is resolved by the engine when the `Calibrator` or the `ProbabilisticCalibrator` is created. A category of a non-binary stratification now gives "needs a binary stratification" instead of "not found", and bin prefixes (`"B_g1"`) and qualified categories (`"group:g1"`) are accepted, as documented. Before, both were rejected as "not found".
 

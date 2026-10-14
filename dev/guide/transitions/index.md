@@ -2,7 +2,7 @@
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-A transition moves population at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, impulses, and what `build` checks.
+A transition moves an amount at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, impulses, and what `build` checks.
 
 ## Quick path
 
@@ -16,10 +16,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -48,24 +48,24 @@ model.print_equations()  # shows every flow as the engine computes it
 
 ## Rates
 
-A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md). A formula can use parameters, compartments, bin totals, `N`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
+A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md). A formula can use parameters, compartments, bin totals, `total`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
 
 ### Absolute and per-capita rates
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                          | Kind       | Flow per step   |
-| ------------------------------------------------------------- | ---------- | --------------- |
-| The rate names a compartment, a bin total or an `N…` variable | Absolute   | `rate`          |
-| The transition has no source                                  | Absolute   | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`          | As set     | —               |
-| Otherwise                                                     | Per-capita | `rate × source` |
+| Case                                                                       | Kind       | Flow per step   |
+| -------------------------------------------------------------------------- | ---------- | --------------- |
+| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute   | `rate`          |
+| The transition has no source                                               | Absolute   | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`                       | As set     | —               |
+| Otherwise                                                                  | Per-capita | `rate × source` |
 
 | Rate                     | Kind       | Flow from `B` to `C`    |
 | ------------------------ | ---------- | ----------------------- |
 | `"k2"`                   | Per-capita | `k2 * B`                |
 | `"k2 * B"`               | Absolute   | `k2 * B`                |
-| `"k1 * A * B / N"`       | Absolute   | `k1 * A * B / N`        |
+| `"k1 * A * B / total"`   | Absolute   | `k1 * A * B / total`    |
 | `"0.5"` with `source=[]` | Absolute   | `0.5` enters the target |
 
 `print_equations()` prints every flow after this decision, so a per-capita rate appears multiplied by its source.
@@ -84,10 +84,10 @@ seasonal = (
         id="t_ab",
         source=["A"],
         target=["B"],
-        rate="k1 * (1 + 0.3 * sin(2 * pi * step / 365)) * A * B / N",
+        rate="k1 * (1 + 0.3 * sin(2 * pi * step / 365)) * A * B / total",
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
     .build(engine="DifferenceEquations")
@@ -109,7 +109,7 @@ reaction = (
     .add_parameter(id="k", value=0.001)
     .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.5},
             {"bin": "B", "fraction": 0.5},
@@ -137,10 +137,10 @@ outflow = (
         id="outflow",
         source=["A", "B", "C"],
         target=[],
-        rate="mu * $compartment * (1 + 0.1 * $compartment / N)",
+        rate="mu * $compartment * (1 + 0.1 * $compartment / total)",
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.4},
             {"bin": "B", "fraction": 0.3},
@@ -152,9 +152,9 @@ outflow = (
 
 for transition in outflow.structure.transitions:
     print(transition.id, transition.rate)
-# outflow__A mu * A * (1 + 0.1 * A / N)
-# outflow__B mu * B * (1 + 0.1 * B / N)
-# outflow__C mu * C * (1 + 0.1 * C / N)
+# outflow__A mu * A * (1 + 0.1 * A / total)
+# outflow__B mu * B * (1 + 0.1 * B / total)
+# outflow__C mu * C * (1 + 0.1 * C / total)
 ```
 
 | Rule                                                                            | Otherwise                                        |
@@ -167,7 +167,7 @@ for transition in outflow.structure.transitions:
 
 ## Transitions between categories
 
-When `source` and `target` are categories of one stratification, the transition moves population between them **in every bin**:
+When `source` and `target` are categories of one stratification, the transition moves amounts between them **in every bin**:
 
 ```python
 moving = (
@@ -178,7 +178,7 @@ moving = (
     .add_parameter(id="k", value=0.1)
     .add_transition(id="move", source=["g1"], target=["g2"], rate="k")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
         stratification_fractions=[
             {
@@ -216,7 +216,7 @@ own_compartment = (
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t", source=["A"], target=["B"], rate="k * A", per_compartment=True)
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
         stratification_fractions=[
             {
@@ -260,7 +260,7 @@ group_rates = (
         ],
     )
     .set_initial_conditions(
-        population_size=900,
+        total=900,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         stratification_fractions=[
             {
@@ -322,7 +322,7 @@ redirect = (
         stratified_rates=[{"conditions": [{"stratification": "subtype", "to": "s1"}], "rate": "k"}],
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
         stratification_fractions=[
             {
@@ -366,7 +366,7 @@ impulse_model = (
     .add_transition(id="jump", source=["A"], target=["B"], rate="p", impulse_at=[1], accumulators=["moved"])
     .add_transition(id="flow", source=["A"], target=["B"], rate="k")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
     .build(engine="DifferenceEquations")

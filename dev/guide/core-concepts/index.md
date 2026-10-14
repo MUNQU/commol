@@ -2,24 +2,24 @@
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-A Commol model is a set of **compartments** that hold a population, and **transitions** that move it between them at each step. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
+A Commol model is a set of **compartments** that each hold an **amount**, and **transitions** that move amounts between them at each step. The amounts of every compartment together are the **state** of the model, and their sum is the **total**. An amount can be a count, a mass or a concentration. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
 
 ## The concepts at a glance
 
-| Concept            | What it is                                                       | Builder method           |
-| ------------------ | ---------------------------------------------------------------- | ------------------------ |
-| Compartment (bin)  | A state that holds part of the population                        | `add_bin`                |
-| Stratification     | A dimension that splits every compartment into categories        | `add_stratification`     |
-| Parameter          | A named constant or formula used in rates                        | `add_parameter`          |
-| Transition         | A flow between compartments, with a rate                         | `add_transition`         |
-| Accumulator        | A counter of what a transition moved; not part of the population | `add_accumulator`        |
-| Initial conditions | The population and how it starts out                             | `set_initial_conditions` |
-| Model              | The validated definition                                         | `build`                  |
-| Simulation         | Runs a model for a number of steps                               | `Simulation(model).run`  |
+| Concept            | What it is                                                  | Builder method           |
+| ------------------ | ----------------------------------------------------------- | ------------------------ |
+| Compartment (bin)  | A state that holds an amount                                | `add_bin`                |
+| Stratification     | A dimension that splits every compartment into categories   | `add_stratification`     |
+| Parameter          | A named constant or formula used in rates                   | `add_parameter`          |
+| Transition         | A flow between compartments, with a rate                    | `add_transition`         |
+| Accumulator        | A counter of what a transition moved; not part of the state | `add_accumulator`        |
+| Initial conditions | The total and how it is split at the start                  | `set_initial_conditions` |
+| Model              | The validated definition                                    | `build`                  |
+| Simulation         | Runs a model for a number of steps                          | `Simulation(model).run`  |
 
 ## Compartments
 
-A compartment (a *bin*) is a state that part of the population is in. A model can have any number of them, with any ids.
+A compartment (a *bin*) holds an amount: a part of the total. A model can have any number of them, with any ids.
 
 ```python
 from commol import ModelBuilder, Simulation
@@ -46,17 +46,17 @@ builder = (
 
 ## Transitions
 
-A transition moves population from its `source` compartments to its `target` compartments at each step. How much it moves depends on its rate:
+A transition moves an amount from its `source` compartments to its `target` compartments at each step. How much it moves depends on its rate:
 
-| The rate…                               | Kind           | Flow per step   | Example               |
-| --------------------------------------- | -------------- | --------------- | --------------------- |
-| names a compartment, a bin total or `N` | **Absolute**   | the rate itself | `"k1 * A * B / N"`    |
-| names no compartment                    | **Per-capita** | rate × source   | `"k2"` moves `k2 × B` |
+| The rate…                                   | Kind           | Flow per step   | Example                |
+| ------------------------------------------- | -------------- | --------------- | ---------------------- |
+| names a compartment, a bin total or `total` | **Absolute**   | the rate itself | `"k1 * A * B / total"` |
+| names no compartment                        | **Per-capita** | rate × source   | `"k2"` moves `k2 × B`  |
 
 ```python
 builder = (
     builder
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
 )
 ```
@@ -65,7 +65,7 @@ The engine decides the kind when the model is built, and `model.print_equations(
 
 ## Accumulators
 
-An accumulator counts what a transition has moved since step 0. It is an output of the simulation, not part of the population: nothing is ever taken from it.
+An accumulator counts what a transition has moved since step 0. It is an output of the simulation, not part of the state: nothing is ever taken from it, and it is not part of the total.
 
 ```python
 builder = builder.add_accumulator(id="cum_ab", name="Total moved from A to B")
@@ -82,11 +82,11 @@ With stratifications, an accumulator expands like a bin (`cum_ab_g1`, `cum_ab_g2
 
 ## Initial conditions
 
-The initial conditions give the total population and the fraction that starts in each bin:
+The initial conditions give the total and the fraction of it that starts in each bin. The total is a real number, finite and greater than 0:
 
 ```python
 builder = builder.set_initial_conditions(
-    population_size=1000,
+    total=1000,
     bin_fractions=[
         {"bin": "A", "fraction": 0.9},
         {"bin": "B", "fraction": 0.1},
@@ -97,7 +97,7 @@ builder = builder.set_initial_conditions(
 
 | Rule                                                    | Checked when           |
 | ------------------------------------------------------- | ---------------------- |
-| `population_size` is greater than 0                     | The conditions are set |
+| `total` is finite and greater than 0                    | The conditions are set |
 | Each fraction is between 0.0 and 1.0                    | The conditions are set |
 | The bin fractions sum to 1.0                            | The conditions are set |
 | Every bin has a fraction                                | The model is built     |
@@ -154,7 +154,7 @@ Stratifications group = [g1, g2] and type = [t1, t2]
 A -> A_g1_t1, A_g1_t2, A_g2_t1, A_g2_t2      8 compartments for 2 bins
 ```
 
-The initial population of each compartment is the product of its fractions:
+The initial amount of each compartment is the total times the product of its fractions:
 
 ```python
 stratified = (
@@ -165,7 +165,7 @@ stratified = (
     .add_parameter(id="k1", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -184,17 +184,17 @@ stratified = (
 )
 
 for compartment in stratified.structure.initial_state():
-    print(compartment.name, compartment.population)
+    print(compartment.name, compartment.amount)
 ```
 
-| Compartment | Calculation       | Initial population |
-| ----------- | ----------------- | ------------------ |
-| `A_g1`      | 10000 × 0.9 × 0.6 | 5400               |
-| `A_g2`      | 10000 × 0.9 × 0.4 | 3600               |
-| `B_g1`      | 10000 × 0.1 × 0.6 | 600                |
-| `B_g2`      | 10000 × 0.1 × 0.4 | 400                |
+| Compartment | Calculation       | Initial amount |
+| ----------- | ----------------- | -------------- |
+| `A_g1`      | 10000 × 0.9 × 0.6 | 5400           |
+| `A_g2`      | 10000 × 0.9 × 0.4 | 3600           |
+| `B_g1`      | 10000 × 0.1 × 0.6 | 600            |
+| `B_g2`      | 10000 × 0.1 × 0.4 | 400            |
 
-`CompartmentalStructure.initial_state()` returns this table as the engine builds it: each compartment with its bin, its categories and its population.
+`CompartmentalStructure.initial_state()` returns this table as the engine builds it: each compartment with its bin, its categories and its amount.
 
 Use a stratification when subgroups have different rates, when you need output per subgroup, or when the data you fit is broken down by category.
 
@@ -222,7 +222,7 @@ conditional = (
     .add_parameter(id="k1", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -251,12 +251,12 @@ print([c.name for c in conditional.structure.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
-The fractions of a conditional stratification are fractions of the subgroup it splits, not of the whole population. `subgroup_population` multiplies along the chain, and `get_conditioning_categories` names the subgroup:
+The fractions of a conditional stratification are fractions of the subgroup it splits, not of the total. `subgroup_total` multiplies along the chain to give the total of a subgroup, and `get_conditioning_categories` names the subgroup:
 
 ```python
-print(conditional.structure.subgroup_population())                # 10000
-print(conditional.structure.subgroup_population(["g2"]))          # 10000 x 0.4 = 4000
-print(conditional.structure.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
+print(conditional.structure.subgroup_total())                # 10000
+print(conditional.structure.subgroup_total(["g2"]))          # 10000 x 0.4 = 4000
+print(conditional.structure.subgroup_total(["g2", "s1"]))    # 4000 x 0.5 = 2000
 print(conditional.structure.get_conditioning_categories("subtype"))  # ('g2',)
 ```
 
@@ -264,7 +264,7 @@ See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/bu
 
 ### Per-compartment overrides
 
-When the product of fractions cannot express the starting state, for example a state that is empty in only one category, `compartment_fractions` overrides single expanded compartments. Each fraction is a fraction of the **total** population and replaces the product for that compartment only:
+When the product of fractions cannot express the starting state, for example a state that is empty in only one category, `compartment_fractions` overrides single expanded compartments. Each fraction is a fraction of the **total** and replaces the product for that compartment only:
 
 ```python
 overridden = (
@@ -275,7 +275,7 @@ overridden = (
     .add_parameter(id="k1", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -294,7 +294,7 @@ overridden = (
     .build(engine="DifferenceEquations")
 )
 
-print({c.name: c.population for c in overridden.structure.initial_state()})
+print({c.name: c.amount for c in overridden.structure.initial_state()})
 # B_g1 starts empty; the other compartments keep their product
 ```
 
@@ -302,7 +302,7 @@ print({c.name: c.population for c in overridden.structure.initial_state()})
 | ---------------------------------------------------------------- | ---------------------- |
 | Each name appears once, and each fraction is between 0.0 and 1.0 | The conditions are set |
 | Each name is an expanded compartment                             | The model is built     |
-| The initial population does not exceed `population_size`         | The model is built     |
+| The initial amounts do not sum to more than `total`              | The model is built     |
 
 `model.structure.update_compartment_fractions({"B_g1": 0.05})` changes or adds overrides on a built model.
 
@@ -315,7 +315,7 @@ overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 
 
 | Method                            | Rule                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `update_initial_conditions`       | After the update, the bin fractions sum to 1.0. Move population between bins in one call.                   |
+| `update_initial_conditions`       | After the update, the bin fractions sum to 1.0. Move an amount between bins in one call.                    |
 | `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1.0. Omitting two raises. |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back through these same methods.
@@ -333,7 +333,7 @@ reaction = (
     .add_parameter(id="k", value=0.001)
     .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.5},
             {"bin": "B", "fraction": 0.5},
@@ -355,7 +355,7 @@ outflow = (
     .add_parameter(id="mu", value=0.01)
     .add_transition(id="outflow", source=["A", "B"], target=[], rate="mu * $compartment")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.5},
             {"bin": "B", "fraction": 0.5},

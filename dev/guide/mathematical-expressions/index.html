@@ -855,10 +855,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subpopulation-variables" class="md-nav__link">
+  <a href="#subgroup-totals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Subpopulation variables
+        Subgroup totals
       
     </span>
   </a>
@@ -2251,10 +2251,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subpopulation-variables" class="md-nav__link">
+  <a href="#subgroup-totals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Subpopulation variables
+        Subgroup totals
       
     </span>
   </a>
@@ -2333,7 +2333,7 @@
 <h1 id="mathematical-expressions">Mathematical Expressions<a class="headerlink" href="#mathematical-expressions" title="Permanent link">&para;</a></h1>
 <p><a href="../../">Back to Home</a></p>
 <p>Rates and formula parameters are written as expressions, such as
-<code>"k1 * A * B / N"</code>. This page lists everything an expression can contain:
+<code>"k1 * A * B / total"</code>. This page lists everything an expression can contain:
 operators, variables, functions, and the security limits. The engine compiles
 each expression to machine code (Cranelift) once, and reuses it at every step.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
@@ -2345,10 +2345,10 @@ each expression to machine code (Cranelift) once, and reuses it at every step.</
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1_seasonal&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;k1 * (1 + 0.3 * sin(2 * pi * step / 365))&quot;</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1_seasonal * A * B / N&quot;</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1_seasonal * A * B / total&quot;</span><span class="p">)</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ba&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;if(step &gt; 30, 0.05, 0)&quot;</span><span class="p">)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">}],</span>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="p">)</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
@@ -2367,7 +2367,7 @@ each expression to machine code (Cranelift) once, and reuses it at every step.</
 <tbody>
 <tr>
 <td>Transition <code>rate</code></td>
-<td><code>"k1 * A * B / N"</code></td>
+<td><code>"k1 * A * B / total"</code></td>
 <td>For every flow, at every step</td>
 </tr>
 <tr>
@@ -2410,7 +2410,7 @@ the variables it names; see
 <tr>
 <td><code>*</code>, <code>/</code></td>
 <td>Multiplication, division</td>
-<td><code>"k1 * B / N"</code></td>
+<td><code>"k1 * B / total"</code></td>
 <td></td>
 </tr>
 <tr>
@@ -2468,19 +2468,19 @@ accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls in
 </tr>
 <tr>
 <td>A bin id, without stratifications</td>
-<td>The bin's population</td>
+<td>The bin's amount</td>
 </tr>
 <tr>
 <td>A compartment name, such as <code>A_g1</code></td>
-<td>That compartment's population</td>
+<td>That compartment's amount</td>
 </tr>
 <tr>
 <td>A bin id, with stratifications</td>
 <td>The total of all its compartments</td>
 </tr>
 <tr>
-<td><code>N</code></td>
-<td>The total population</td>
+<td><code>total</code></td>
+<td>The total: the sum of every compartment, accumulators excluded</td>
 </tr>
 <tr>
 <td><code>t</code></td>
@@ -2496,9 +2496,11 @@ accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls in
 </tr>
 </tbody>
 </table>
-<h3 id="subpopulation-variables">Subpopulation variables<a class="headerlink" href="#subpopulation-variables" title="Permanent link">&para;</a></h3>
-<p>With stratifications, the engine also provides sums of compartments. Category
-suffixes must follow the order in which the stratifications were declared.</p>
+<h3 id="subgroup-totals">Subgroup totals<a class="headerlink" href="#subgroup-totals" title="Permanent link">&para;</a></h3>
+<p>With stratifications, the engine also provides sums of compartments, the
+subgroup totals. Category suffixes must follow the order in which the
+stratifications were declared. <code>commol_rs.model.subgroup_total_names</code> (in
+<code>crates/commol-model/src/builder.rs</code>) lists them for a structure.</p>
 <table>
 <thead>
 <tr>
@@ -2509,9 +2511,9 @@ suffixes must follow the order in which the stratifications were declared.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>N_&lt;cat&gt;…</code></td>
+<td><code>total_&lt;cat&gt;…</code></td>
 <td>Every compartment with these categories</td>
-<td><code>N_g1</code>, <code>N_t1</code>, <code>N_g1_t1</code></td>
+<td><code>total_g1</code>, <code>total_t1</code>, <code>total_g1_t1</code></td>
 </tr>
 <tr>
 <td><code>&lt;bin&gt;</code></td>
@@ -2538,7 +2540,7 @@ suffixes must follow the order in which the stratifications were declared.</p>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;probe&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">expression</span><span class="p">)</span>
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;probe_flow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;probe&quot;</span><span class="p">)</span>
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">}],</span>
 </span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">[</span>
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                <span class="p">{</span>
@@ -2563,9 +2565,9 @@ suffixes must follow the order in which the stratifications were declared.</p>
 </span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    <span class="n">inflow</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">series</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">series</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
 </span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>    <span class="k">return</span> <span class="n">inflow</span> <span class="o">/</span> <span class="mi">4</span>  <span class="c1"># the probe flows into each of the 4 B compartments</span>
 </span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>
-</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;N + 0&quot;</span><span class="p">))</span>        <span class="c1"># 1000.0</span>
-</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;N_g1 + 0&quot;</span><span class="p">))</span>     <span class="c1"># 250.0  = 1000 x 0.25</span>
-</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;N_g1_t1 + 0&quot;</span><span class="p">))</span>  <span class="c1"># 125.0  = 1000 x 0.25 x 0.5</span>
+</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;total + 0&quot;</span><span class="p">))</span>        <span class="c1"># 1000.0</span>
+</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;total_g1 + 0&quot;</span><span class="p">))</span>     <span class="c1"># 250.0  = 1000 x 0.25</span>
+</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;total_g1_t1 + 0&quot;</span><span class="p">))</span>  <span class="c1"># 125.0  = 1000 x 0.25 x 0.5</span>
 </span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;A + 0&quot;</span><span class="p">))</span>        <span class="c1"># 600.0</span>
 </span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;A_g1 + 0&quot;</span><span class="p">))</span>     <span class="c1"># 150.0  = 600 x 0.25</span>
 </span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="nb">print</span><span class="p">(</span><span class="n">value_of</span><span class="p">(</span><span class="s2">&quot;A_t1 + 0&quot;</span><span class="p">))</span>     <span class="c1"># 300.0  = 600 x 0.5</span>
@@ -2583,12 +2585,12 @@ suffixes must follow the order in which the stratifications were declared.</p>
 <td>Error: the variable is not found</td>
 </tr>
 <tr>
-<td><code>N_…</code> out of order, as in <code>N_t1_g1</code></td>
-<td><code>build</code> fails and lists the valid <code>N_…</code> names</td>
+<td><code>total_…</code> out of order, as in <code>total_t1_g1</code></td>
+<td><code>build</code> fails and lists the valid <code>total_…</code> names</td>
 </tr>
 <tr>
 <td>A combination that a conditional stratification never creates</td>
-<td><code>build</code> fails for <code>N_…</code>; <code>&lt;bin&gt;_…</code> is not found</td>
+<td><code>build</code> fails for <code>total_…</code>; <code>&lt;bin&gt;_…</code> is not found</td>
 </tr>
 </tbody>
 </table>
@@ -2636,7 +2638,7 @@ expressions for pulses, windows, ramps and seasons.</p>
 <h2 id="common-patterns">Common patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">patterns</span> <span class="o">=</span> <span class="p">{</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="s2">&quot;mass action&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * A * B&quot;</span><span class="p">,</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">&quot;frequency dependent&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">&quot;frequency dependent&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">,</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;saturation&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * B / (1 + B)&quot;</span><span class="p">,</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">&quot;linear growth over time&quot;</span><span class="p">:</span> <span class="s2">&quot;0.1 + 0.001 * step&quot;</span><span class="p">,</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="s2">&quot;exponential decay over time&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * exp(-0.01 * step)&quot;</span><span class="p">,</span>
@@ -2644,12 +2646,12 @@ expressions for pulses, windows, ramps and seasons.</p>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="s2">&quot;never negative&quot;</span><span class="p">:</span> <span class="s2">&quot;max(0, k1 - 0.001 * step)&quot;</span><span class="p">,</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="s2">&quot;capped above a threshold&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * min(1, 100 / max(B, 1))&quot;</span><span class="p">,</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="s2">&quot;only after step 30&quot;</span><span class="p">:</span> <span class="s2">&quot;if(step &gt; 30, k1, 0)&quot;</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="s2">&quot;safe division&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * B / max(N, 1)&quot;</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="s2">&quot;safe division&quot;</span><span class="p">:</span> <span class="s2">&quot;k1 * B / max(total, 1)&quot;</span><span class="p">,</span>
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>To keep a rate readable, move part of it into a formula parameter:
 <code>add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")</code>
-and then <code>rate="k1_seasonal * A * B / N"</code>.</p>
+and then <code>rate="k1_seasonal * A * B / total"</code>.</p>
 <h2 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h2>
 <p>Every rate and constraint expression is checked before it reaches the engine
 (<code>commol.utils.security.validate_expression_security</code>). An expression that is not

@@ -2330,7 +2330,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
-<td>Expansion of bins and accumulators over stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), name checks (<code>check_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
+<td>Expansion of bins and accumulators over stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), name checks (<code>check_names</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
 <td>Flow planning; stepping.</td>
 </tr>
 <tr>
@@ -2345,7 +2345,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/engine.rs</code></td>
-<td><code>CompartmentalEngine</code>: what a compartmental engine gives besides <code>SimulationEngine</code> (compartments, labels, population, population size, <code>set_initial_condition</code>).</td>
+<td><code>CompartmentalEngine</code>: what a compartmental engine gives besides <code>SimulationEngine</code> (compartments, labels, <code>state</code>, <code>total</code>, <code>set_initial_condition</code>).</td>
 <td>Code for one engine.</td>
 </tr>
 <tr>
@@ -2432,7 +2432,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
-<td>The queries of <code>commol_rs.model</code> on a compartmental structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>; and <code>check_names</code> on a model.</td>
+<td>The queries of <code>commol_rs.model</code> on a compartmental structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; and <code>check_names</code> on a model.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>

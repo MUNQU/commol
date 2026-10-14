@@ -2206,21 +2206,21 @@ The structure of the model adds the sections of its kind
 series, are omitted: they are inputs rather than fitted values.
 <code>factor</code> parameters have no place in the model, so they are reported from
 <code>problem</code> when it is given.</p>
-<p>Initial conditions of a compartmental model carry the effective head
+<p>Initial conditions of a compartmental model carry the effective
 <code>value</code> the engine builds
 from the uniform expansion plus the declared compartment overrides, its
-<code>fraction</code> as that head count over the declared population size, and the
-<code>group</code> it belongs to: <code>population</code> for bins and unconditional
+<code>fraction</code> as that value over the declared total, and the
+<code>group</code> it belongs to: <code>total</code> for bins and unconditional
 stratifications, and the conditioning categories for a conditional one.
-<code>N</code> is the declared population size, with fraction 1.0. A bin left
+The <code>total</code> row is the declared total, with fraction 1.0. A bin left
 uncalibrated keeps a <code>None</code> fraction and <code>None</code> value as its "needs
 calibration" marker even when overrides touch some of its compartments.</p>
 <p>For a probabilistic result each entry gains an <code>interval</code> holding the
 ensemble spread. A parameter is in the unit it was calibrated in. An
 initial-condition entry is in the fraction the row reports: a conditional
 stratification's category is calibrated as a group fraction but reported
-over the whole population, so its interval is rescaled by the group's share
-of the population and brackets the reported fraction.</p>
+over the total, so its interval is rescaled by the group's share of the
+total and brackets the reported fraction.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2457,13 +2457,13 @@ is one.</p>
 </span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a><span class="sd">    ``factor`` parameters have no place in the model, so they are reported from</span>
 </span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a><span class="sd">    `problem` when it is given.</span>
 </span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a>
-</span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a><span class="sd">    Initial conditions of a compartmental model carry the effective head</span>
+</span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a><span class="sd">    Initial conditions of a compartmental model carry the effective</span>
 </span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a><span class="sd">    ``value`` the engine builds</span>
 </span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a><span class="sd">    from the uniform expansion plus the declared compartment overrides, its</span>
-</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a><span class="sd">    ``fraction`` as that head count over the declared population size, and the</span>
-</span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">    ``group`` it belongs to: ``population`` for bins and unconditional</span>
+</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a><span class="sd">    ``fraction`` as that value over the declared total, and the</span>
+</span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">    ``group`` it belongs to: ``total`` for bins and unconditional</span>
 </span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">    stratifications, and the conditioning categories for a conditional one.</span>
-</span><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="sd">    ``N`` is the declared population size, with fraction 1.0. A bin left</span>
+</span><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="sd">    The ``total`` row is the declared total, with fraction 1.0. A bin left</span>
 </span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="sd">    uncalibrated keeps a ``None`` fraction and ``None`` value as its &quot;needs</span>
 </span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="sd">    calibration&quot; marker even when overrides touch some of its compartments.</span>
 </span><span id="__span-0-111"><a id="__codelineno-0-111" name="__codelineno-0-111"></a>
@@ -2471,8 +2471,8 @@ is one.</p>
 </span><span id="__span-0-113"><a id="__codelineno-0-113" name="__codelineno-0-113"></a><span class="sd">    ensemble spread. A parameter is in the unit it was calibrated in. An</span>
 </span><span id="__span-0-114"><a id="__codelineno-0-114" name="__codelineno-0-114"></a><span class="sd">    initial-condition entry is in the fraction the row reports: a conditional</span>
 </span><span id="__span-0-115"><a id="__codelineno-0-115" name="__codelineno-0-115"></a><span class="sd">    stratification&#39;s category is calibrated as a group fraction but reported</span>
-</span><span id="__span-0-116"><a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="sd">    over the whole population, so its interval is rescaled by the group&#39;s share</span>
-</span><span id="__span-0-117"><a id="__codelineno-0-117" name="__codelineno-0-117"></a><span class="sd">    of the population and brackets the reported fraction.</span>
+</span><span id="__span-0-116"><a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="sd">    over the total, so its interval is rescaled by the group&#39;s share of the</span>
+</span><span id="__span-0-117"><a id="__codelineno-0-117" name="__codelineno-0-117"></a><span class="sd">    total and brackets the reported fraction.</span>
 </span><span id="__span-0-118"><a id="__codelineno-0-118" name="__codelineno-0-118"></a>
 </span><span id="__span-0-119"><a id="__codelineno-0-119" name="__codelineno-0-119"></a><span class="sd">    Parameters</span>
 </span><span id="__span-0-120"><a id="__codelineno-0-120" name="__codelineno-0-120"></a><span class="sd">    ----------</span>

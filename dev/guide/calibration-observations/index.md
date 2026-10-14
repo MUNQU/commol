@@ -27,11 +27,11 @@ def model(k1: float | None):
         .add_parameter(id="k2", value=0.1)
         .add_accumulator(id="cum_ab", name="Total moved from A to B")
         .add_transition(
-            id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N", accumulators=["cum_ab"]
+            id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "A", "fraction": 0.99},
                 {"bin": "B", "fraction": 0.01},
@@ -186,7 +186,7 @@ def ode_model(k1: float | None):
         .add_parameter(id="k1", value=k1)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
         .build(engine="DifferentialEquations")

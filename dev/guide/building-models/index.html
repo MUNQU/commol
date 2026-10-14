@@ -2460,11 +2460,11 @@ documents every builder method except transitions, which have their own page:</p
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;A to B rate&quot;</span><span class="p">)</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;B to C rate&quot;</span><span class="p">)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k3&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;C to D rate&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / N&quot;</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * A * B / total&quot;</span><span class="p">)</span>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_bc&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">)</span>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_cd&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;D&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k3&quot;</span><span class="p">)</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
@@ -2671,7 +2671,7 @@ in a rate means the total of all its expanded compartments.</p>
 <tr>
 <td><code>"k1 / 2"</code></td>
 <td>Formula</td>
-<td>Evaluated at every step, in declaration order, so it can use earlier formulas, <code>N</code>, <code>step</code> and the other <a href="../mathematical-expressions/">special variables</a>.</td>
+<td>Evaluated at every step, in declaration order, so it can use earlier formulas, <code>total</code>, <code>step</code> and the other <a href="../mathematical-expressions/">special variables</a>.</td>
 </tr>
 <tr>
 <td><code>[(position, value), …]</code></td>
@@ -2687,8 +2687,8 @@ in a rate means the total of all its expanded compartments.</p>
 </table>
 <h3 id="names-the-engine-sets">Names the engine sets<a class="headerlink" href="#names-the-engine-sets" title="Permanent link">&para;</a></h3>
 <p>The engine sets these variables, so <code>build</code> rejects a parameter with one of
-these ids (<code>Model.validate_parameter_names_not_reserved</code> and
-<code>check_names</code> in <code>crates/commol-model/src/builder.rs</code>):</p>
+these ids (<code>CompartmentalStructure.check_model</code> and <code>check_names</code> in
+<code>crates/commol-model/src/builder.rs</code>):</p>
 <table>
 <thead>
 <tr>
@@ -2698,8 +2698,8 @@ these ids (<code>Model.validate_parameter_names_not_reserved</code> and
 </thead>
 <tbody>
 <tr>
-<td><code>N</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code></td>
-<td><code>N</code></td>
+<td><code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code></td>
+<td><code>total</code></td>
 </tr>
 <tr>
 <td>A bin id</td>
@@ -2710,13 +2710,19 @@ these ids (<code>Model.validate_parameter_names_not_reserved</code> and
 <td><code>A_g1</code></td>
 </tr>
 <tr>
-<td>A subpopulation total</td>
-<td><code>N_g1</code>, <code>A_t1</code> (with two stratifications)</td>
+<td>A subgroup total</td>
+<td><code>total_g1</code>, <code>A_t1</code> (with two stratifications)</td>
 </tr>
 </tbody>
 </table>
-<p>An id that starts with <code>N_</code> but names no subpopulation, such as <code>N_max</code>, is
-accepted.</p>
+<p>A bin or an accumulator cannot take an id of the first row either, because the
+engine variable would hide it. A bin whose names read as a subgroup total is
+rejected too: a bin <code>total_y</code> stratified by <code>age = [y, o]</code> and <code>sex = [y, o]</code>
+expands into <code>total_y_y</code>, which is also the total of the <code>y</code> of both
+stratifications.</p>
+<p>An id that starts with <code>total_</code> but names no subgroup total, such as
+<code>total_max</code>, is accepted. <code>N</code> is not reserved, so a bin or a parameter may use
+it.</p>
 <h3 id="series-parameters">Series parameters<a class="headerlink" href="#series-parameters" title="Permanent link">&para;</a></h3>
 <p>A series gives a parameter its value from <code>(position, value)</code> points on the
 axis. <code>mode</code> says how the positions between the points are read, and whether
@@ -2789,7 +2795,7 @@ parameter in its error:</p>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k_in&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="p">[(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)],</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;inflow&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k_in&quot;</span><span class="p">)</span>
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>            <span class="n">population_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}]</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>            <span class="n">total</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}]</span>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="p">)</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="p">)</span>
@@ -2887,7 +2893,7 @@ only name a stratification declared before this one; otherwise the call raises
 category.</p>
 <h2 id="accumulators">Accumulators<a class="headerlink" href="#accumulators" title="Permanent link">&para;</a></h2>
 <p>An accumulator counts what one or more transitions move. It is an output, not
-part of the population.</p>
+part of the state or of the total.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">counted</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Counted&quot;</span><span class="p">)</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
@@ -2902,7 +2908,7 @@ part of the population.</p>
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="p">)</span>
 </span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ac&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">accumulators</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;total_out&quot;</span><span class="p">])</span>
 </span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>        <span class="n">population_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>        <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 </span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
 </span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span>
 </span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>            <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
@@ -2941,7 +2947,7 @@ several transitions can share one accumulator. With stratifications, an
 accumulator expands like a bin.</p>
 <h2 id="initial-conditions">Initial conditions<a class="headerlink" href="#initial-conditions" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">builder</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">population_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">total</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
@@ -2976,16 +2982,16 @@ accumulator expands like a bin.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>population_size</code></td>
-<td><code>int</code></td>
+<td><code>total</code></td>
+<td><code>float</code></td>
 <td>required</td>
-<td>The total population. It must be greater than 0.</td>
+<td>The sum of every compartment at the start: a count, a mass or a concentration. It must be finite and greater than 0.</td>
 </tr>
 <tr>
 <td><code>bin_fractions</code></td>
 <td><code>list[{"bin", "fraction"}]</code></td>
 <td>required</td>
-<td>The fraction of the population in each bin. A fraction may be <code>None</code> when calibration finds it.</td>
+<td>The fraction of the total in each bin. A fraction may be <code>None</code> when calibration finds it.</td>
 </tr>
 <tr>
 <td><code>stratification_fractions</code></td>
@@ -2997,7 +3003,7 @@ accumulator expands like a bin.</p>
 <td><code>compartment_fractions</code></td>
 <td><code>list[{"compartment", "fraction"}] \| None</code></td>
 <td><code>None</code></td>
-<td>Keyword-only. Overrides single expanded compartments with a fraction of the total population.</td>
+<td>Keyword-only. Overrides single expanded compartments with a fraction of the total.</td>
 </tr>
 </tbody>
 </table>
@@ -3010,7 +3016,7 @@ accumulator expands like a bin.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>population_size &gt; 0</code>; each fraction in <code>[0.0, 1.0]</code>; override names unique</td>
+<td><code>total</code> finite and <code>&gt; 0</code>; each fraction in <code>[0.0, 1.0]</code>; override names unique</td>
 <td><code>set_initial_conditions</code></td>
 </tr>
 <tr>
@@ -3026,13 +3032,13 @@ accumulator expands like a bin.</p>
 <td><code>build</code></td>
 </tr>
 <tr>
-<td>Override names are expanded compartments; the initial population does not exceed <code>population_size</code></td>
+<td>Override names are expanded compartments; the initial amounts do not sum to more than <code>total</code></td>
 <td><code>build</code></td>
 </tr>
 </tbody>
 </table>
-<p>The initial population of a compartment is
-<code>population_size × bin fraction × the fraction of each of its categories</code>,
+<p>The initial amount of a compartment is
+<code>total × bin fraction × the fraction of each of its categories</code>,
 unless an override names it. <code>CompartmentalStructure.initial_state()</code> shows the result. To change
 fractions on a built model, see
 <a href="../core-concepts/#updating-fractions-after-building">Core Concepts</a>.</p>
@@ -3071,11 +3077,11 @@ the definition is not valid:</p>
 </tr>
 <tr>
 <td>Parameter ids are unique and are not <a href="#names-the-engine-sets">names the engine sets</a></td>
-<td>A parameter named <code>A</code>, <code>N</code> or <code>A_g1</code></td>
+<td>A parameter named <code>A</code>, <code>total</code> or <code>A_g1</code></td>
 </tr>
 <tr>
-<td>Every <code>N_…</code> variable names a subpopulation</td>
-<td><code>N_t1_g1</code> when <code>group</code> is declared before <code>type</code></td>
+<td>Every <code>total_…</code> variable names a subgroup total</td>
+<td><code>total_t1_g1</code> when <code>group</code> is declared before <code>type</code></td>
 </tr>
 <tr>
 <td>Every rate expression passes the security check</td>

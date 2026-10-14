@@ -2711,7 +2711,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </tr>
 <tr>
 <td><code>model.subgroup_population(…)</code>, <code>model.get_conditioning_categories(…)</code></td>
-<td><code>model.structure.subgroup_population(…)</code>, …</td>
+<td><code>model.structure.subgroup_total(…)</code>, <code>model.structure.get_conditioning_categories(…)</code></td>
 </tr>
 <tr>
 <td><code>model.get_outputs_by_source()</code></td>
@@ -2752,7 +2752,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   kind of the model; a compartmental model adds <code>initial_conditions</code>, with the
   same keys as before.</li>
 <li>The Rust engine trait (<code>SimulationEngine</code>) is the same for every model
-  kind: <code>compartments</code>, <code>population</code>, <code>set_initial_condition</code> and
+  kind: <code>compartments</code>, <code>state</code> (was <code>population</code>), <code>set_initial_condition</code> and
   <code>output_labels</code> moved to <code>CompartmentalEngine</code> (<code>commol-model</code>), and the
   engine resolves and writes the values of its kind (<code>plan_values</code>,
   <code>apply_values</code>). The initial-condition plan moved from <code>commol-calibration</code>
@@ -2838,7 +2838,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </tr>
 <tr>
 <td><code>TimePattern.window(start, end, amount)</code></td>
-<td><code>AxisPattern.interval(start, end, amount)</code></td>
+<td><code>AxisPattern.interval(start, end, value)</code></td>
 </tr>
 <tr>
 <td><code>TimeSeriesValue</code>, "time-series parameter"</td>
@@ -2907,7 +2907,82 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   default 0.1), which replaces <code>simplex_perturbation</code>; there is no alias. Every
   Nelder-Mead result can change.</p>
 </li>
+<li>
+<p>The library names what the compartments hold without assuming individuals:
+  the <strong>state</strong> (the amount of every compartment), the <strong>amount</strong> (the value
+  of one compartment), the <strong>total</strong> (their sum, which the initial fractions
+  are taken of) and a <strong>subgroup total</strong> (the sum of the compartments with some
+  categories). The total is a <code>float</code>, finite and greater than 0, so a model of
+  a mass or a concentration can be stated; before, it was an <code>int</code>. The rate
+  variable <code>N</code> is <code>total</code> and <code>N_&lt;cat&gt;…</code> is <code>total_&lt;cat&gt;…</code>, so <code>N</code> is a free id
+  (a bin may be named <code>N</code>). <code>AxisPattern</code> takes a <code>value</code>. No old name is
+  kept: a model file with <code>population_size</code> does not load, and the error names
+  the field; rename it to <code>total</code>, and <code>N</code> to <code>total</code> in every rate, formula
+  and constraint.</p>
+</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_initial_conditions(population_size=…)</code>, <code>InitialConditions.population_size: int</code>, JSON key <code>population_size</code></td>
+<td><code>set_initial_conditions(total=…)</code>, <code>InitialConditions.total: float</code>, JSON key <code>total</code></td>
+</tr>
+<tr>
+<td>Rate, formula and constraint variables <code>N</code>, <code>N_&lt;cat&gt;…</code> (<code>N_g1</code>, <code>N_g1_t1</code>)</td>
+<td><code>total</code>, <code>total_&lt;cat&gt;…</code> (<code>total_g1</code>, <code>total_g1_t1</code>)</td>
+</tr>
+<tr>
+<td><code>RESERVED_VARIABLE_NAMES = ("N", …)</code></td>
+<td><code>("total", "step", "t", "pi", "e")</code></td>
+</tr>
+<tr>
+<td><code>InitialConditions.subgroup_population(…)</code>, <code>CompartmentalStructure.subgroup_population(…)</code></td>
+<td><code>subgroup_total(…)</code></td>
+</tr>
+<tr>
+<td><code>InitialCompartment.population</code></td>
+<td><code>InitialCompartment.amount</code></td>
+</tr>
+<tr>
+<td><code>applied_parameters_report</code>: row <code>"N"</code>, group <code>"population"</code></td>
+<td>row <code>"total"</code>, group <code>"total"</code></td>
+</tr>
+<tr>
+<td><code>AxisPattern.pulse(at, amount)</code>, <code>pulses(at, amount)</code>, <code>periodic(period, amount, offset)</code>, <code>interval(start, end, amount)</code></td>
+<td><code>value</code> instead of <code>amount</code></td>
+</tr>
+<tr>
+<td><code>get_predefined_variable_units(stratifications, bin_unit)</code></td>
+<td><code>get_predefined_variable_units(subgroup_totals, bin_unit)</code>, with the names the engine gives</td>
+</tr>
+<tr>
+<td><code>commol_rs.engine.Engine.population</code></td>
+<td><code>Engine.state</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.core.InitialConditions(population_size=…)</code></td>
+<td><code>InitialConditions(total=…)</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.calibration.calibrated_initial_population</code></td>
+<td><code>calibrated_initial_state</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>commol_rs.model.subgroup_total_names(structure)</code></td>
+</tr>
+<tr>
+<td>Rust: <code>CompartmentalEngine::population</code>, <code>population_size</code>; <code>DifferenceEquations::population</code>, <code>DifferentialEquations::population</code></td>
+<td><code>state</code>, <code>total</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Transition conditions: <code>Transition.condition</code>, the <code>condition</code> argument of
@@ -2966,11 +3041,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   found".</li>
 <li><code>%</code> (remainder) works as the only operator of a rate, as in <code>"step % 7"</code>.
   Before, the rate was read as a parameter name.</li>
-<li>An <code>N_…</code> variable that names no subpopulation, such as <code>N_t1_g1</code> when
-  <code>group</code> is declared before <code>type</code>, is a build error that lists the valid
+<li>A <code>total_…</code> variable that names no subgroup total, such as <code>total_t1_g1</code>
+  when <code>group</code> is declared before <code>type</code>, is a build error that lists the valid
   names. Before, a formula parameter or the engine gave it the value 0.</li>
-<li>A parameter id cannot be <code>N</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>, an expanded
-  compartment or a subpopulation total. Before, only bin ids were rejected, and
+<li>A bin or an accumulator id cannot be <code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code> or <code>e</code>, and
+  a bin cannot expand into a name that is also a <code>total_&lt;categories&gt;</code> subgroup
+  total. Before, the engine variable hid such a bin, and the two sums shared
+  one value.</li>
+<li>A parameter id cannot be <code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>, an expanded
+  compartment or a subgroup total. Before, only bin ids were rejected, and
   the parameter and the engine variable shared one value.</li>
 <li><code>ModelBuilder.reset</code> removes the accumulators, and <code>ModelBuilder.clone</code>
   copies them and the <code>bin_unit</code>. Before, <code>reset</code> kept the accumulators and a

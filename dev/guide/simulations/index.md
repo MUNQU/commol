@@ -18,11 +18,11 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_accumulator(id="cum_ab", name="Total moved from A to B")
     .add_transition(
-        id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N", accumulators=["cum_ab"]
+        id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
     )
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -61,7 +61,7 @@ again = simulation.run(num_steps=10)
 print(again["A"] == first["A"])  # True: it started again
 
 simulation.engine.step()  # step 11, from where the last run stopped
-print(simulation.engine.population[0] < first["A"][-1])  # True: A keeps falling
+print(simulation.engine.state[0] < first["A"][-1])  # True: A keeps falling
 ```
 
 The engine follows the model. When the model changed after the `Simulation` was created, for example with `update_parameters` or `apply_calibration_parameters`, `run` and `engine` rebuild the engine from the model as it is now (`Simulation._sync_engine` compares `model_dump_json()` with the JSON the engine was built from):
@@ -117,7 +117,7 @@ stratified = (
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         stratification_fractions=[
             {
@@ -155,7 +155,7 @@ print(stratified_simulation.group_outputs(["A", "cum_ab"])["cum_ab"])
 ```python
 total_b = stratified_simulation.total_series(stratified_results, ["B"])
 total_ab = stratified_simulation.total_series(stratified_results, ["A", "B"])
-print(round(total_ab[-1]))  # 1000: A and B hold the whole population
+print(round(total_ab[-1]))  # 1000: A and B hold the whole total
 ```
 
 Do not select outputs by name prefix
@@ -178,7 +178,7 @@ total_g1 = [
     sum(stratified_results[name][step] for name in in_g1)
     for step in range(len(stratified_results[in_g1[0]]))
 ]
-print(round(total_g1[-1]))  # 500: g1 started with half of the population
+print(round(total_g1[-1]))  # 500: g1 started with half of the total
 ```
 
 ## Windowed totals
@@ -234,7 +234,7 @@ ode_model = (
     .add_accumulator(id="moved", name="Moved from A to B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
     .build(
@@ -278,9 +278,9 @@ pulse_model = (
     ModelBuilder(name="Pulse")
     .add_bin(id="A", name="A")
     .add_bin(id="B", name="B")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, amount=0.2))
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, value=0.2))
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
 )

@@ -2399,6 +2399,11 @@
 <li><strong>Status:</strong> Implemented (revised 2026-10-12: Rust is the single source of truth)</li>
 <li><strong>Date:</strong> 2026-09-30</li>
 <li><strong>Scope:</strong> <code>commol-core</code> (types), <code>commol-difference</code> (engine build), <code>py-commol</code> (context, builder, model write-back)</li>
+<li><strong>Names:</strong> this record keeps the names of its date. Today <code>population_size</code>
+  is <code>InitialConditions.total</code> (a real number), the initial population is the
+  initial state, a head count is an amount, and <code>calibrated_initial_population</code>
+  is <code>calibrated_initial_state</code>; see
+  <a href="../../codebase/design-decisions/#state-amount-total-and-subgroup-total">State, amount, total and subgroup total</a>.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
 <p>Model authors cannot express initial conditions for a specific expanded

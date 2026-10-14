@@ -20,10 +20,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -45,22 +45,22 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## What each call does
 
-| Call                                          | What it does                                                                                                               |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder(name=..., version=...)`         | Starts a model definition. Every method returns the builder, so calls chain.                                               |
-| `.add_bin(id="A", name="State A")`            | Adds a compartment (a *bin*): a state that holds part of the population.                                                   |
-| `.add_parameter(id="k1", value=0.3)`          | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                            |
-| `.add_transition(..., rate="k1 * A * B / N")` | Moves population from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
-| `.add_transition(..., rate="k2")`             | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`.                                               |
-| `.set_initial_conditions(...)`                | Sets the total population and the fraction that starts in each bin. The fractions must sum to 1.                           |
-| `.build(engine="DifferenceEquations")`        | Validates the definition and returns a `Model`.                                                                            |
-| `Simulation(model).run(num_steps=100)`        | Runs the Rust engine and returns the results.                                                                              |
+| Call                                              | What it does                                                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                              |
+| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                          |
+| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                           |
+| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
+| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`.                                              |
+| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                               |
+| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                           |
+| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                             |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
 
 ## Check units
 
-Give every bin and parameter a unit, and Commol checks that each rate gives population per unit of time:
+Give every bin and parameter a unit, and Commol checks that each rate gives the bin unit per unit of time:
 
 ```python
 model_with_units = (
@@ -70,10 +70,10 @@ model_with_units = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3, unit="1/day")
     .add_parameter(id="k2", value=0.1, unit="1/day")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -108,10 +108,10 @@ calibration_model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=None)
     .add_parameter(id="k2", value=None)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},

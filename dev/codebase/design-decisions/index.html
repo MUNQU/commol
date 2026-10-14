@@ -1851,6 +1851,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#state-amount-total-and-subgroup-total" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State, amount, total and subgroup total
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stratification-order-is-part-of-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1962,10 +1973,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subgroup-head-counts-compose-down-the-condition-chain" class="md-nav__link">
+  <a href="#subgroup-totals-compose-down-the-condition-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Subgroup head counts compose down the condition chain
+        Subgroup totals compose down the condition chain
       
     </span>
   </a>
@@ -2678,6 +2689,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#state-amount-total-and-subgroup-total" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State, amount, total and subgroup total
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stratification-order-is-part-of-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2789,10 +2811,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subgroup-head-counts-compose-down-the-condition-chain" class="md-nav__link">
+  <a href="#subgroup-totals-compose-down-the-condition-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Subgroup head counts compose down the condition chain
+        Subgroup totals compose down the condition chain
       
     </span>
   </a>
@@ -3148,7 +3170,7 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 <tr>
 <td>Model structure</td>
-<td><a href="#compartments-are-labels-with-a-name">Compartments</a>, <a href="#stratification-order-is-part-of-the-model">stratification order</a>, <a href="#outputs-are-resolved-by-label">outputs</a>, <a href="#the-engine-owns-the-variable-names">variable names</a></td>
+<td><a href="#compartments-are-labels-with-a-name">Compartments</a>, <a href="#state-amount-total-and-subgroup-total">what they hold</a>, <a href="#stratification-order-is-part-of-the-model">stratification order</a>, <a href="#outputs-are-resolved-by-label">outputs</a>, <a href="#the-engine-owns-the-variable-names">variable names</a></td>
 </tr>
 <tr>
 <td>Transitions and rates</td>
@@ -3156,7 +3178,7 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 <tr>
 <td>Initial conditions</td>
-<td><a href="#subgroup-head-counts-compose-down-the-condition-chain">Subgroup head counts</a>, <a href="#calibrated-initial-conditions-are-applied-in-layers">calibrated values</a></td>
+<td><a href="#subgroup-totals-compose-down-the-condition-chain">Subgroup totals</a>, <a href="#calibrated-initial-conditions-are-applied-in-layers">calibrated values</a></td>
 </tr>
 <tr>
 <td>Time</td>
@@ -3223,7 +3245,7 @@ engines in the list; nothing that exists changes.</p>
 </tr>
 <tr>
 <td>Expressions in constraints</td>
-<td>The engine names the values of an output row: <code>output_names</code>, <code>state_outputs</code> (their sum is <code>N</code>) and <code>output_sums</code> (a bin total, for a compartmental engine).</td>
+<td>The engine names the values of an output row: <code>output_names</code>, <code>state_outputs</code> (their sum is <code>total</code>) and <code>output_sums</code> (a bin total, for a compartmental engine).</td>
 <td>The calibration would rebuild bin totals from compartment labels.</td>
 </tr>
 </tbody>
@@ -3267,6 +3289,85 @@ display only. Its identity is its label: <code>OutputLabels</code> in
 stratification gives some compartments fewer suffixes than others. Use
 <code>CompartmentLayout::find</code> or <code>of_bin</code> in Rust, and the labels that the engine
 queries return in Python.</p>
+<h3 id="state-amount-total-and-subgroup-total">State, amount, total and subgroup total<a class="headerlink" href="#state-amount-total-and-subgroup-total" title="Permanent link">&para;</a></h3>
+<p>The library names what the compartments hold without assuming individuals:</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>State</strong></td>
+<td>The vector of the amount of every compartment</td>
+<td><code>CompartmentalEngine::state</code>, <code>Engine.state</code></td>
+</tr>
+<tr>
+<td><strong>Amount</strong></td>
+<td>The value of one compartment</td>
+<td><code>InitialCompartment.amount</code></td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>The sum of every compartment, accumulators excluded; the initial fractions are taken of it</td>
+<td><code>InitialConditions.total</code>, the rate variable <code>total</code> (<code>SPECIAL_VAR_TOTAL</code>)</td>
+</tr>
+<tr>
+<td><strong>Subgroup total</strong></td>
+<td>The sum of the compartments with some categories</td>
+<td><code>subgroup_total</code>, the rate variables <code>total_&lt;cat&gt;…</code> (<code>SUBGROUP_TOTAL_PREFIX</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The total is a real number, finite and greater than 0, so a model of a count, a
+mass or a concentration can be stated. <code>0</code> is rejected: every fraction of it is
+zero, and the report divides by it (<code>initial_state</code> in
+<code>crates/commol-model/src/builder.rs</code>, <code>InitialConditions.validate_total</code>).</p>
+<p><strong>Rule:</strong> use these four terms in code, docs and tests. <code>AxisPattern</code> takes a
+<code>value</code>, so "amount" means only the value of a compartment.</p>
+<p><strong>Why, against the alternatives:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"population", "head count", <code>N</code></td>
+<td>They assume individuals and an epidemiological convention (<code>N = S + I + R</code>). A reserved <code>N</code> takes a letter that other fields use for a bin, such as a nutrient.</td>
+</tr>
+<tr>
+<td>"mass"</td>
+<td>A unit, not a quantity of any unit.</td>
+</tr>
+<tr>
+<td>"stock"</td>
+<td>An economic term, new to the code.</td>
+</tr>
+<tr>
+<td>"content"</td>
+<td>Ambiguous in software.</td>
+</tr>
+<tr>
+<td>"size"</td>
+<td>Reads as a count, and clashes with the NSGA-II <code>population_size</code>.</td>
+</tr>
+<tr>
+<td>A function <code>total(g1, t1)</code></td>
+<td>No reserved names, but the expression language has no text arguments (<code>jit/ast.rs</code>), so the parser, the JIT and the security check would change.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>builder.rs</code> tests
+<code>a_real_total_starts_with_amounts_that_sum_to_it</code> and
+<code>a_total_that_is_not_finite_and_positive_is_a_build_error</code>;
+<code>tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs</code>;
+<code>tests/initial_conditions/test_bin_fractions.py::TestTotal</code>.</p>
 <h3 id="stratification-order-is-part-of-the-model">Stratification order is part of the model<a class="headerlink" href="#stratification-order-is-part-of-the-model" title="Permanent link">&para;</a></h3>
 <p><code>expand</code> in <code>crates/commol-model/src/builder.rs</code> applies the
 stratifications in declaration order. A stratification with <code>conditions</code> only
@@ -3285,17 +3386,27 @@ label, not by name.</p>
 (order) and <code>TestSourceIdSharingAPrefix</code> (a bin and an accumulator that share
 a prefix).</p>
 <h3 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h3>
-<p>The engine sets one variable per expanded compartment and per subpopulation
-total (<code>N_&lt;categories&gt;</code>, bin totals and partial bin totals).
+<p>The engine sets one variable per expanded compartment and per subgroup total
+(<code>total_&lt;categories&gt;</code>, bin totals and partial bin totals).
 <code>check_names</code> in <code>crates/commol-model/src/builder.rs</code> rejects a parameter
-id that is one of those names, and an <code>N_…</code> variable in a rate or a formula
-parameter that names no subpopulation. <code>CompartmentalStructure.check_model</code>
-calls it at <code>build</code>, and <code>CompiledModel::try_from_model</code> calls it again.</p>
+id that is one of those names, a parameter, bin or accumulator id that is an
+engine variable (<code>ENGINE_VARIABLES</code>: <code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>), a bin
+whose compartments or bin totals read as a <code>total_&lt;categories&gt;</code> name (two sums
+would share one slot), and a <code>total_…</code> variable in a rate or a formula
+parameter that names no subgroup total. <code>CompartmentalStructure.check_model</code>
+calls it at <code>build</code>, and <code>CompiledModel::try_from_model</code> calls it again.
+<code>subgroup_total_names</code> lists the names; Python reads them through the binding
+<code>commol_rs.model.subgroup_total_names</code> (<code>engine_state.subgroup_total_names</code>)
+to check rates and give units.</p>
 <p><strong>Rule:</strong> never list these names in Python. Ask the engine.</p>
 <p><strong>Guards:</strong> <code>builder.rs</code> tests
-<code>parameter_id_cannot_be_a_compartment_or_a_subpopulation</code> and
-<code>subpopulation_variable_out_of_declaration_order_is_a_build_error</code>;
-<code>tests/building/test_reserved_names.py</code>.</p>
+<code>parameter_id_cannot_be_a_compartment_or_a_subgroup_total</code>,
+<code>subgroup_total_out_of_declaration_order_is_a_build_error</code> and
+<code>subgroup_total_names_follow_the_declaration_order</code>,
+<code>an_engine_variable_is_not_a_parameter_bin_or_accumulator_id</code> and
+<code>a_bin_name_that_reads_as_a_subgroup_total_is_rejected</code>;
+<code>tests/building/test_reserved_names.py</code>;
+<code>tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate</code>.</p>
 <h2 id="transitions-and-rates">Transitions and rates<a class="headerlink" href="#transitions-and-rates" title="Permanent link">&para;</a></h2>
 <h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
 <p>The flow planner (<code>plan_transition_flows</code> in
@@ -3316,7 +3427,7 @@ is absolute or per-capita:</p>
 <td>—</td>
 </tr>
 <tr>
-<td>The rate references a compartment, a bin total or an <code>N…</code> variable</td>
+<td>The rate references a compartment, a bin total, <code>total</code> or a <code>total_…</code> variable</td>
 <td>Absolute</td>
 <td><code>rate</code></td>
 </tr>
@@ -3352,14 +3463,14 @@ preprocessed formula to one compiled function for the life of the process. The
 same formula always runs the same machine code, so results are reproducible.</p>
 <p><strong>Rule:</strong> do not invalidate or bypass the cache.</p>
 <h2 id="initial-conditions">Initial conditions<a class="headerlink" href="#initial-conditions" title="Permanent link">&para;</a></h2>
-<h3 id="subgroup-head-counts-compose-down-the-condition-chain">Subgroup head counts compose down the condition chain<a class="headerlink" href="#subgroup-head-counts-compose-down-the-condition-chain" title="Permanent link">&para;</a></h3>
+<h3 id="subgroup-totals-compose-down-the-condition-chain">Subgroup totals compose down the condition chain<a class="headerlink" href="#subgroup-totals-compose-down-the-condition-chain" title="Permanent link">&para;</a></h3>
 <p>The fractions of a conditional stratification are relative to the subgroup that
-its conditions select, not to the whole population. Head counts therefore
-multiply along the chain: <code>N × fraction(group1) × fraction(cat1)</code>.
-<code>InitialConditions.subgroup_population</code> owns this; <code>CompartmentalStructure.subgroup_population</code>
+its conditions select, not to the total. Subgroup totals therefore
+multiply along the chain: <code>total × fraction(group1) × fraction(cat1)</code>.
+<code>InitialConditions.subgroup_total</code> owns this; <code>CompartmentalStructure.subgroup_total</code>
 and <code>CompartmentalStructure.get_conditioning_categories</code> delegate to it.</p>
-<p><strong>Guard:</strong> <code>tests/simulation/test_outputs.py::TestSubgroupPopulation</code> compares the
-result with the population the engine starts from.</p>
+<p><strong>Guard:</strong> <code>tests/simulation/test_outputs.py::TestSubgroupTotal</code> compares the
+result with the state the engine starts from.</p>
 <h3 id="calibrated-initial-conditions-are-applied-in-layers">Calibrated initial conditions are applied in layers<a class="headerlink" href="#calibrated-initial-conditions-are-applied-in-layers" title="Permanent link">&para;</a></h3>
 <p><code>InitialConditionPlan</code> in <code>crates/commol-model/src/initial_conditions.rs</code>
 applies calibrated values in a fixed order: bins, category splits, exact
@@ -3370,7 +3481,7 @@ resolve and write initial conditions through it
 writes every value through the engine (<code>ValueWriter</code> in
 <code>crates/commol-calibration/src/values.rs</code>), so the objective, the predictions
 and the write-back (<code>configured_engine</code>, then the binding
-<code>calibrated_initial_population</code>) agree by construction.
+<code>calibrated_initial_state</code>) agree by construction.
 <code>CompartmentalStructure.with_calibrated_values</code>
 (<code>context/_model/calibration_write_back.py</code>) writes the values back as
 fractions, and pins as per-compartment overrides every compartment that the

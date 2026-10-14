@@ -25,11 +25,11 @@ model = (
     .add_parameter(id="k1", value=0.4, description="A to B rate")
     .add_parameter(id="k2", value=0.2, description="B to C rate")
     .add_parameter(id="k3", value=0.1, description="C to D rate")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .add_transition(id="t_cd", source=["C"], target=["D"], rate="k3")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.9},
             {"bin": "B", "fraction": 0.1},
@@ -119,25 +119,27 @@ builder = (
 | `unit`        | `str \| None`                                         | `None`   | The unit, for [unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking). |
 | `mode`        | `str \| None`                                         | `None`   | How a series is read; required for a series and rejected otherwise.                                            |
 
-| `value`                  | Kind         | Behavior                                                                                                                                                                                                     |
-| ------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0.3`                    | Constant     | The same value at every step.                                                                                                                                                                                |
-| `"k1 / 2"`               | Formula      | Evaluated at every step, in declaration order, so it can use earlier formulas, `N`, `step` and the other [special variables](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md). |
-| `[(position, value), …]` | Series       | Values at positions on the axis, read with `mode` (below).                                                                                                                                                   |
-| `None`                   | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                            |
+| `value`                  | Kind         | Behavior                                                                                                                                                                                                         |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0.3`                    | Constant     | The same value at every step.                                                                                                                                                                                    |
+| `"k1 / 2"`               | Formula      | Evaluated at every step, in declaration order, so it can use earlier formulas, `total`, `step` and the other [special variables](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md). |
+| `[(position, value), …]` | Series       | Values at positions on the axis, read with `mode` (below).                                                                                                                                                       |
+| `None`                   | Uncalibrated | Calibration must set it before a simulation runs.                                                                                                                                                                |
 
 ### Names the engine sets
 
-The engine sets these variables, so `build` rejects a parameter with one of these ids (`Model.validate_parameter_names_not_reserved` and `check_names` in `crates/commol-model/src/builder.rs`):
+The engine sets these variables, so `build` rejects a parameter with one of these ids (`CompartmentalStructure.check_model` and `check_names` in `crates/commol-model/src/builder.rs`):
 
-| Name                        | Example                                   |
-| --------------------------- | ----------------------------------------- |
-| `N`, `step`, `t`, `pi`, `e` | `N`                                       |
-| A bin id                    | `A`                                       |
-| An expanded compartment     | `A_g1`                                    |
-| A subpopulation total       | `N_g1`, `A_t1` (with two stratifications) |
+| Name                            | Example                                       |
+| ------------------------------- | --------------------------------------------- |
+| `total`, `step`, `t`, `pi`, `e` | `total`                                       |
+| A bin id                        | `A`                                           |
+| An expanded compartment         | `A_g1`                                        |
+| A subgroup total                | `total_g1`, `A_t1` (with two stratifications) |
 
-An id that starts with `N_` but names no subpopulation, such as `N_max`, is accepted.
+A bin or an accumulator cannot take an id of the first row either, because the engine variable would hide it. A bin whose names read as a subgroup total is rejected too: a bin `total_y` stratified by `age = [y, o]` and `sex = [y, o]` expands into `total_y_y`, which is also the total of the `y` of both stratifications.
+
+An id that starts with `total_` but names no subgroup total, such as `total_max`, is accepted. `N` is not reserved, so a bin or a parameter may use it.
 
 ### Series parameters
 
@@ -166,7 +168,7 @@ def inflow_per_step(mode: str) -> list[float]:
         .add_parameter(id="k_in", value=[(2, 1.0), (5, 4.0)], mode=mode)
         .add_transition(id="inflow", source=[], target=["A"], rate="k_in")
         .set_initial_conditions(
-            population_size=100, bin_fractions=[{"bin": "A", "fraction": 1.0}]
+            total=100, bin_fractions=[{"bin": "A", "fraction": 1.0}]
         )
         .build(engine="DifferenceEquations")
     )
@@ -216,7 +218,7 @@ See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#s
 
 ## Accumulators
 
-An accumulator counts what one or more transitions move. It is an output, not part of the population.
+An accumulator counts what one or more transitions move. It is an output, not part of the state or of the total.
 
 ```python
 counted = (
@@ -233,7 +235,7 @@ counted = (
     )
     .add_transition(id="t_ac", source=["A"], target=["C"], rate="k2", accumulators=["total_out"])
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 1.0},
             {"bin": "B", "fraction": 0.0},
@@ -258,7 +260,7 @@ A transition adds its flow to every accumulator in its `accumulators` list, and 
 
 ```python
 builder = builder.set_initial_conditions(
-    population_size=10000,
+    total=10000,
     bin_fractions=[
         {"bin": "A", "fraction": 0.9},
         {"bin": "B", "fraction": 0.1},
@@ -285,20 +287,20 @@ builder = builder.set_initial_conditions(
 
 | Argument                   | Type                                            | Default  | Meaning                                                                                                                        |
 | -------------------------- | ----------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `population_size`          | `int`                                           | required | The total population. It must be greater than 0.                                                                               |
-| `bin_fractions`            | `list[{"bin", "fraction"}]`                     | required | The fraction of the population in each bin. A fraction may be `None` when calibration finds it.                                |
+| `total`                    | `float`                                         | required | The sum of every compartment at the start: a count, a mass or a concentration. It must be finite and greater than 0.           |
+| `bin_fractions`            | `list[{"bin", "fraction"}]`                     | required | The fraction of the total in each bin. A fraction may be `None` when calibration finds it.                                     |
 | `stratification_fractions` | `list[{"stratification", "fractions"}] \| None` | `None`   | For each stratification, the fraction in each category. For a conditional stratification, fractions of the subgroup it splits. |
-| `compartment_fractions`    | `list[{"compartment", "fraction"}] \| None`     | `None`   | Keyword-only. Overrides single expanded compartments with a fraction of the total population.                                  |
+| `compartment_fractions`    | `list[{"compartment", "fraction"}] \| None`     | `None`   | Keyword-only. Overrides single expanded compartments with a fraction of the total.                                             |
 
-| Rule                                                                                               | Checked when             |
-| -------------------------------------------------------------------------------------------------- | ------------------------ |
-| `population_size > 0`; each fraction in `[0.0, 1.0]`; override names unique                        | `set_initial_conditions` |
-| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0           | `set_initial_conditions` |
-| Every bin has a fraction                                                                           | `build`                  |
-| Every stratification has fractions that sum to 1.0                                                 | `build`                  |
-| Override names are expanded compartments; the initial population does not exceed `population_size` | `build`                  |
+| Rule                                                                                          | Checked when             |
+| --------------------------------------------------------------------------------------------- | ------------------------ |
+| `total` finite and `> 0`; each fraction in `[0.0, 1.0]`; override names unique                | `set_initial_conditions` |
+| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0      | `set_initial_conditions` |
+| Every bin has a fraction                                                                      | `build`                  |
+| Every stratification has fractions that sum to 1.0                                            | `build`                  |
+| Override names are expanded compartments; the initial amounts do not sum to more than `total` | `build`                  |
 
-The initial population of a compartment is `population_size × bin fraction × the fraction of each of its categories`, unless an override names it. `CompartmentalStructure.initial_state()` shows the result. To change fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-fractions-after-building).
+The initial amount of a compartment is `total × bin fraction × the fraction of each of its categories`, unless an override names it. `CompartmentalStructure.initial_state()` shows the result. To change fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-fractions-after-building).
 
 ## Build
 
@@ -321,8 +323,8 @@ print([c.name for c in stratified_model.structure.initial_state()])
 | Initial conditions are set                                                           | `build` called before `set_initial_conditions`                                                   |
 | At least one bin and one transition                                                  | A model with no transition                                                                       |
 | Initial conditions follow the rules above                                            | Bin fractions that sum to 0.9                                                                    |
-| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `N` or `A_g1`                                                             |
-| Every `N_…` variable names a subpopulation                                           | `N_t1_g1` when `group` is declared before `type`                                                 |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1`                                                         |
+| Every `total_…` variable names a subgroup total                                      | `total_t1_g1` when `group` is declared before `type`                                             |
 | Every rate expression passes the security check                                      | A formula with `__import__`                                                                      |
 | Every transition can be planned by the engine                                        | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
 

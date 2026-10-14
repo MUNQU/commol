@@ -4,20 +4,20 @@
 
 Complete models, each runnable on its own, with abstract names. Each example shows one technique:
 
-| Example                          | Technique                                   |
-| -------------------------------- | ------------------------------------------- |
-| 1. Basic three-state model       | Absolute and per-capita rates               |
-| 2. Four-state model              | A chain of states                           |
-| 3. Periodic rates                | `sin` of `step` in a rate                   |
-| 4. Group-specific rates          | Stratified rates                            |
-| 5. Waning effect                 | A cyclic transition back to the first state |
-| 6. Capacity-constrained rate     | `max` in a rate                             |
-| 7. Intersection rates            | Stratified rates with several conditions    |
-| 8. Subpopulation-normalized rate | `N_<category>` variables                    |
-| 9. Conditional stratification    | A stratification that splits one group only |
-| 10. Parameter calibration        | `Calibrator`                                |
-| Time-pattern transition          | `AxisPattern` as a rate                     |
-| Schedules per subgroup           | `AxisPattern.add_group`                     |
+| Example                       | Technique                                   |
+| ----------------------------- | ------------------------------------------- |
+| 1. Basic three-state model    | Absolute and per-capita rates               |
+| 2. Four-state model           | A chain of states                           |
+| 3. Periodic rates             | `sin` of `step` in a rate                   |
+| 4. Group-specific rates       | Stratified rates                            |
+| 5. Waning effect              | A cyclic transition back to the first state |
+| 6. Capacity-constrained rate  | `max` in a rate                             |
+| 7. Intersection rates         | Stratified rates with several conditions    |
+| 8. Subgroup-normalized rate   | `total_<category>` variables                |
+| 9. Conditional stratification | A stratification that splits one group only |
+| 10. Parameter calibration     | `Calibrator`                                |
+| Time-pattern transition       | `AxisPattern` as a rate                     |
+| Schedules per subgroup        | `AxisPattern.add_group`                     |
 
 ## Example 1: Basic Three-State Model
 
@@ -33,10 +33,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -64,11 +64,11 @@ model = (
     .add_parameter(id="k1", value=0.4, description="A to M rate")
     .add_parameter(id="k2", value=0.2, description="M to B rate")
     .add_parameter(id="k3", value=0.1, description="B to C rate")
-    .add_transition(id="flow_AM", source=["A"], target=["M"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AM", source=["A"], target=["M"], rate="k1 * A * B / total")
     .add_transition(id="flow_MB", source=["M"], target=["B"], rate="k2")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.999},
             {"bin": "M", "fraction": 0.0},
@@ -100,11 +100,11 @@ model = (
         id="periodic_flow",
         source=["A"],
         target=["B"],
-        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / N"
+        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / total"
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -159,7 +159,7 @@ model = (
         ]
     )
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -200,11 +200,11 @@ model = (
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
     .add_parameter(id="k3", value=0.01)  # Return rate
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -231,7 +231,7 @@ model = (
     .add_parameter(id="k1", value=0.5)
     .add_parameter(id="k2_max", value=0.15)
     .add_parameter(id="capacity", value=100.0)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(
         id="flow_BC",
         source=["B"],
@@ -239,7 +239,7 @@ model = (
         rate="k2_max * (1 - max(0, (B - capacity) / capacity))"
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.95},
             {"bin": "B", "fraction": 0.05},
@@ -272,17 +272,17 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1_low * A * B / N",
+        rate="k1_low * A * B / total",
         stratified_rates=[
             {
                 "conditions": [{"stratification": "type", "category": "t2"}],
-                "rate": "k1_high * A * B / N"
+                "rate": "k1_high * A * B / total"
             }
         ]
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -312,13 +312,13 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
-## Example 8: Subpopulation-Normalized Rate
+## Example 8: Subgroup-Normalized Rate
 
-Using the automatically computed `N_{category}` variable to normalize a rate by subpopulation size instead of total population:
+The engine computes the subgroup total `total_<category>`. This example divides a rate by the total of its subgroup instead of the total of the model:
 
 ```python
 model = (
-    ModelBuilder(name="Subpopulation-Normalized Model", version="1.0")
+    ModelBuilder(name="Subgroup-Normalized Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -329,17 +329,17 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N",
+        rate="k1 * A * B / total",
         stratified_rates=[
             {
                 "conditions": [{"stratification": "group", "category": "g1"}],
-                "rate": "k1 * A * B / N_g1"  # Normalized by subpopulation
+                "rate": "k1 * A * B / total_g1"  # Divided by the subgroup total
             }
         ]
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -388,7 +388,7 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N"
+        rate="k1 * A * B / total"
     )
     .add_transition(
         id="flow_BC",
@@ -407,7 +407,7 @@ model = (
         ]
     )
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -472,7 +472,7 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N"
+        rate="k1 * A * B / total"
     )
     .add_transition(
         id="flow_BC",
@@ -481,7 +481,7 @@ model = (
         rate="k2 * B"
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -553,8 +553,8 @@ A composed time-varying transition: an opening pulse, a monthly periodic event, 
 from commol import ModelBuilder, Simulation, AxisPattern
 
 rate = AxisPattern.combine(
-    AxisPattern.pulse(at=0, amount=0.3),
-    AxisPattern.periodic(period=30, amount=0.05),
+    AxisPattern.pulse(at=0, value=0.3),
+    AxisPattern.periodic(period=30, value=0.05),
     AxisPattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
 )
 
@@ -564,7 +564,7 @@ model = (
     .add_bin("B", "Sink")
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .set_initial_conditions(
-        population_size=10_000,
+        total=10_000,
         bin_fractions=[
             {"bin": "A", "fraction": 1.0},
             {"bin": "B", "fraction": 0.0},
@@ -586,11 +586,11 @@ from commol import ModelBuilder, Simulation, AxisPattern
 rate = (
     AxisPattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.periodic(period=7, amount=0.05),
+        schedule=AxisPattern.periodic(period=7, value=0.05),
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.periodic(period=30, amount=0.05),
+        schedule=AxisPattern.periodic(period=30, value=0.05),
     )
 )
 
@@ -601,7 +601,7 @@ model = (
     .add_stratification("group", ["cat1", "cat2"])
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 1.0},
             {"bin": "B", "fraction": 0.0},

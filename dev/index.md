@@ -1,6 +1,6 @@
 # Commol
 
-Commol builds, simulates and calibrates compartment models: a population moves between states (compartments) at rates you write as formulas. You describe the model in Python; a Rust engine expands it over your stratifications, compiles every rate to machine code, and runs it or fits it to your data.
+Commol builds, simulates and calibrates compartment models: amounts move between states (compartments) at rates you write as formulas. An amount can be a count, a mass or a concentration. You describe the model in Python; a Rust engine expands it over your stratifications, compiles every rate to machine code, and runs it or fits it to your data.
 
 Before version 1.0
 
@@ -47,10 +47,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},

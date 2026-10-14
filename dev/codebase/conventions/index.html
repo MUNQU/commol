@@ -2951,11 +2951,11 @@ topic inside its package.</p>
 </tr>
 <tr>
 <td>An analytic value</td>
-<td>A death rate <code>d</code> on every bin gives <code>N(t) = N(0) (1 - d)^t</code> (<code>tests/transitions/test_compartment_placeholder.py</code>).</td>
+<td>A death rate <code>d</code> on every bin gives <code>total(t) = total(0) (1 - d)^t</code> (<code>tests/transitions/test_compartment_placeholder.py</code>).</td>
 </tr>
 <tr>
 <td>An invariant</td>
-<td>Conservation of the population (<code>assert_population_conserved</code>); two paths that must agree, such as a bin id and the explicit sum of its compartments.</td>
+<td>A total that the model keeps (<code>assert_total_conserved</code>); two paths that must agree, such as a bin id and the explicit sum of its compartments.</td>
 </tr>
 <tr>
 <td>What a stated result predicts about a run</td>
@@ -3021,7 +3021,7 @@ and cite the papers.</p>
   <code>ci</code>, <code>chore</code>.</li>
 </ul>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>feat(transitions): add time-varying rates
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>fix(simulation): correct population calculation
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>fix(simulation): correct the total of a subgroup
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docs(codebase): add repository map
 </span></code></pre></div>
 <p>See <a href="../../development/workflow/">Development workflow</a> for branches and merge

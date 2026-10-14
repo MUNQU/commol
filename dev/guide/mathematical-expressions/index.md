@@ -2,7 +2,7 @@
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-Rates and formula parameters are written as expressions, such as `"k1 * A * B / N"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine compiles each expression to machine code (Cranelift) once, and reuses it at every step.
+Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine compiles each expression to machine code (Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -15,10 +15,10 @@ model = (
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_seasonal * A * B / N")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_seasonal * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
     .build(engine="DifferenceEquations")
@@ -27,12 +27,12 @@ model = (
 results = Simulation(model).run(num_steps=60)
 ```
 
-| Where                               | Example            | Evaluated                                                                                 |
-| ----------------------------------- | ------------------ | ----------------------------------------------------------------------------------------- |
-| Transition `rate`                   | `"k1 * A * B / N"` | For every flow, at every step                                                             |
-| Formula parameter `value`           | `"k1 * 2"`         | At every step, in declaration order, before the rates                                     |
-| Stratified rate `rate`              | `"k_g1 * A"`       | Like a transition rate                                                                    |
-| Calibration constraint `expression` | `"k1 - k2"`        | See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) |
+| Where                               | Example                | Evaluated                                                                                 |
+| ----------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| Transition `rate`                   | `"k1 * A * B / total"` | For every flow, at every step                                                             |
+| Formula parameter `value`           | `"k1 * 2"`             | At every step, in declaration order, before the rates                                     |
+| Stratified rate `rate`              | `"k_g1 * A"`           | Like a transition rate                                                                    |
+| Calibration constraint `expression` | `"k1 - k2"`            | See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) |
 
 Whether a rate is the flow itself or a rate per member of the source depends on the variables it names; see [Absolute and per-capita rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-per-capita-rates).
 
@@ -41,7 +41,7 @@ Whether a rate is the flow itself or a rate per member of the source depends on 
 | Operator                         | Meaning                         | Example                     | Value  |
 | -------------------------------- | ------------------------------- | --------------------------- | ------ |
 | `+`, `-`                         | Addition, subtraction, negation | `"k1 - k2"`, `"-k1"`        |        |
-| `*`, `/`                         | Multiplication, division        | `"k1 * B / N"`              |        |
+| `*`, `/`                         | Multiplication, division        | `"k1 * B / total"`          |        |
 | `%`                              | Remainder                       | `"step % 7"`                | 0 to 6 |
 | `**` or `^`                      | Power                           | `"2 * 3 ** 4"`              | 162    |
 | `( )`                            | Grouping                        | `"(2 + 3) * 4"`             | 20     |
@@ -62,21 +62,21 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 | Variable                           | Value                                                                                                                                                                                                                                |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A parameter id                     | The parameter's value at this step                                                                                                                                                                                                   |
-| A bin id, without stratifications  | The bin's population                                                                                                                                                                                                                 |
-| A compartment name, such as `A_g1` | That compartment's population                                                                                                                                                                                                        |
+| A bin id, without stratifications  | The bin's amount                                                                                                                                                                                                                     |
+| A compartment name, such as `A_g1` | That compartment's amount                                                                                                                                                                                                            |
 | A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                    |
-| `N`                                | The total population                                                                                                                                                                                                                 |
+| `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                       |
 | `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                        |
 | `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step) |
 | `pi`, `e`                          | π and e                                                                                                                                                                                                                              |
 
-### Subpopulation variables
+### Subgroup totals
 
-With stratifications, the engine also provides sums of compartments. Category suffixes must follow the order in which the stratifications were declared.
+With stratifications, the engine also provides sums of compartments, the subgroup totals. Category suffixes must follow the order in which the stratifications were declared. `commol_rs.model.subgroup_total_names` (in `crates/commol-model/src/builder.rs`) lists them for a structure.
 
 | Variable       | Sum of                                       | Example (`group` then `type`)                                           |
 | -------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
-| `N_<cat>…`     | Every compartment with these categories      | `N_g1`, `N_t1`, `N_g1_t1`                                               |
+| `total_<cat>…` | Every compartment with these categories      | `total_g1`, `total_t1`, `total_g1_t1`                                   |
 | `<bin>`        | Every compartment of the bin                 | `A`                                                                     |
 | `<bin>_<cat>…` | The bin's compartments with these categories | `A_g1`, `A_t1`; with every category, the compartment itself (`A_g1_t1`) |
 
@@ -94,7 +94,7 @@ def value_of(expression: str) -> float:
         .add_parameter(id="probe", value=expression)
         .add_transition(id="probe_flow", source=[], target=["B"], rate="probe")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[{"bin": "A", "fraction": 0.6}, {"bin": "B", "fraction": 0.4}],
             stratification_fractions=[
                 {
@@ -119,19 +119,19 @@ def value_of(expression: str) -> float:
     inflow = sum(series[1] - series[0] for series in results.values())
     return inflow / 4  # the probe flows into each of the 4 B compartments
 
-print(value_of("N + 0"))        # 1000.0
-print(value_of("N_g1 + 0"))     # 250.0  = 1000 x 0.25
-print(value_of("N_g1_t1 + 0"))  # 125.0  = 1000 x 0.25 x 0.5
+print(value_of("total + 0"))        # 1000.0
+print(value_of("total_g1 + 0"))     # 250.0  = 1000 x 0.25
+print(value_of("total_g1_t1 + 0"))  # 125.0  = 1000 x 0.25 x 0.5
 print(value_of("A + 0"))        # 600.0
 print(value_of("A_g1 + 0"))     # 150.0  = 600 x 0.25
 print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 ```
 
-| Pitfall                                                       | Result                                          |
-| ------------------------------------------------------------- | ----------------------------------------------- |
-| Suffixes out of declaration order, as in `A_t1_g1`            | Error: the variable is not found                |
-| `N_…` out of order, as in `N_t1_g1`                           | `build` fails and lists the valid `N_…` names   |
-| A combination that a conditional stratification never creates | `build` fails for `N_…`; `<bin>_…` is not found |
+| Pitfall                                                       | Result                                              |
+| ------------------------------------------------------------- | --------------------------------------------------- |
+| Suffixes out of declaration order, as in `A_t1_g1`            | Error: the variable is not found                    |
+| `total_…` out of order, as in `total_t1_g1`                   | `build` fails and lists the valid `total_…` names   |
+| A combination that a conditional stratification never creates | `build` fails for `total_…`; `<bin>_…` is not found |
 
 ## Functions
 
@@ -152,7 +152,7 @@ For rates that change over time, [`AxisPattern`](https://munqu.github.io/commol/
 ```python
 patterns = {
     "mass action": "k1 * A * B",
-    "frequency dependent": "k1 * A * B / N",
+    "frequency dependent": "k1 * A * B / total",
     "saturation": "k1 * B / (1 + B)",
     "linear growth over time": "0.1 + 0.001 * step",
     "exponential decay over time": "k1 * exp(-0.01 * step)",
@@ -160,11 +160,11 @@ patterns = {
     "never negative": "max(0, k1 - 0.001 * step)",
     "capped above a threshold": "k1 * min(1, 100 / max(B, 1))",
     "only after step 30": "if(step > 30, k1, 0)",
-    "safe division": "k1 * B / max(N, 1)",
+    "safe division": "k1 * B / max(total, 1)",
 }
 ```
 
-To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_seasonal * A * B / N"`.
+To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_seasonal * A * B / total"`.
 
 ## Security
 
