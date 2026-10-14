@@ -4,468 +4,46 @@
 
 A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same structure from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
+A model has a header that every kind of model has, an engine, and a `structure`: the part of its kind, tagged in JSON by `kind`. The only kind is `compartmental`, which `ModelBuilder` builds.
+
 ```text
 Model                      name, description, version, step_unit
-├── population: Population
-│   ├── bins: [Bin]
-│   ├── accumulators: [Accumulator]
-│   ├── stratifications: [Stratification]
-│   │   └── conditions: [StratificationCondition]
-│   ├── transitions: [Transition]          (the engine reads dynamics.transitions)
-│   └── initial_conditions: InitialConditions
-│       ├── bin_fractions: [BinFraction]
-│       ├── stratification_fractions: [StratificationFractions]
-│       │   └── fractions: [StratificationFraction]
-│       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
-├── dynamics: Dynamics
-│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-│       └── stratified_rates: [StratifiedRate]
-│           └── conditions: [StratificationCondition]
-└── engine: ModelEngine
-    ├── type: "DifferenceEquations" or "DifferentialEquations"
-    └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+├── engine: ModelEngine
+│   ├── type: "DifferenceEquations" or "DifferentialEquations"
+│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+└── structure: CompartmentalStructure      (kind: "compartmental")
+    ├── bins: [Bin]
+    ├── accumulators: [Accumulator]
+    ├── stratifications: [Stratification]
+    │   └── conditions: [StratificationCondition]
+    ├── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+    │   └── stratified_rates: [StratifiedRate]
+    │       └── conditions: [StratificationCondition]
+    └── initial_conditions: InitialConditions
+        ├── bin_fractions: [BinFraction]
+        ├── stratification_fractions: [StratificationFractions]
+        │   └── fractions: [StratificationFraction]
+        └── compartment_fractions: [CompartmentFraction]
 ```
 
-`Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
+In JSON the structure is an object with its `kind` and the fields of its class:
 
-## Population
-
-## Population
-
-Bases: `BaseModel`
-
-Defines the compartments, stratifications, and initial conditions of the population.
-
-Attributes:
-
-| Name                 | Type                   | Description                                              |
-| -------------------- | ---------------------- | -------------------------------------------------------- |
-| `bins`               | `list[Bin]`            | A list of compartments or states that make up the model. |
-| `stratifications`    | `list[Stratification]` | A list of categorical subdivisions of the population.    |
-| `initial_conditions` | `Initialization`       | Initial state of the subpopulations and stratifications. |
-
-Source code in `commol/context/population.py`
-
-```python
-class Population(BaseModel):
-    """
-    Defines the compartments, stratifications, and initial conditions of the population.
-
-    Attributes
-    ----------
-    bins : list[Bin]
-        A list of compartments or states that make up the model.
-    stratifications : list[Stratification]
-        A list of categorical subdivisions of the population.
-    initial_conditions: Initialization
-        Initial state of the subpopulations and stratifications.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    bins: list[Bin]
-    accumulators: list[Accumulator] = Field(default_factory=list)
-    stratifications: list[Stratification]
-    transitions: list[Transition]
-    initial_conditions: InitialConditions
-
-    @field_validator("bins")
-    @classmethod
-    def validate_bins_not_empty(cls, v: list[Bin]) -> list[Bin]:
-        """Require at least one bin."""
-        if not v:
-            raise ValueError("At least one bin must be defined.")
-        return v
-
-    @model_validator(mode="after")
-    def validate_unique_ids(self) -> Self:
-        """
-        Validates that bin and stratification IDs are unique.
-        """
-        bin_ids = [ds.id for ds in self.bins]
-        if len(bin_ids) != len(set(bin_ids)):
-            duplicates = [item for item in set(bin_ids) if bin_ids.count(item) > 1]
-            raise ValueError(f"Duplicate bin IDs found: {duplicates}")
-
-        stratification_ids = [s.id for s in self.stratifications]
-        if len(stratification_ids) != len(set(stratification_ids)):
-            duplicates = [
-                item
-                for item in set(stratification_ids)
-                if stratification_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate stratification IDs found: {duplicates}")
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_bin_initial_conditions(self) -> Self:
-        """
-        Validates initial conditions against the defined model bins.
-        """
-        initial_conditions = self.initial_conditions
-
-        bins_map = {bin_item.id: bin_item for bin_item in self.bins}
-
-        bin_fractions_dict = {
-            bf.bin: bf.fraction for bf in initial_conditions.bin_fractions
-        }
-
-        actual_bins = set(bin_fractions_dict.keys())
-        expected_bins = set(bins_map.keys())
-
-        if actual_bins != expected_bins:
-            missing = expected_bins - actual_bins
-            extra = actual_bins - expected_bins
-            raise ValueError(
-                (
-                    f"Initial bin fractions keys must exactly match "
-                    f"bin ids. Missing ids: {missing}, Extra ids: {extra}."
-                )
-            )
-
-        # Only validate sum if all fractions are calibrated (not None)
-        # The InitialConditions validator handles the None case
-        if all(frac is not None for frac in bin_fractions_dict.values()):
-            # Filter out None values before summing (type checker requirement)
-            calibrated_fractions = [
-                f for f in bin_fractions_dict.values() if f is not None
-            ]
-            bins_sum_fractions = sum(calibrated_fractions)
-            if not math.isclose(bins_sum_fractions, 1.0, abs_tol=1e-6):
-                raise ValueError(
-                    f"Bin fractions must sum to 1.0, but got {bins_sum_fractions:.7f}."
-                )
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_stratified_rates(self) -> Self:
-        """
-        Validates that stratified rates reference existing stratifications and
-        categories.
-        """
-        strat_map = {strat.id: strat for strat in self.stratifications}
-
-        for transition in self.transitions:
-            if transition.stratified_rates:
-                for idx, stratified_rate in enumerate(transition.stratified_rates):
-                    for condition in stratified_rate.conditions:
-                        # Validate stratification exists
-                        if condition.stratification not in strat_map:
-                            raise ValueError(
-                                (
-                                    f"In transition '{transition.id}', stratified rate "
-                                    f"{idx}: Stratification "
-                                    f"'{condition.stratification}' not found. "
-                                    f"Available: {list(strat_map.keys())}"
-                                )
-                            )
-
-                        # Validate category exists (None = target-only override, skip)
-                        strat = strat_map[condition.stratification]
-                        if (
-                            condition.category is not None
-                            and condition.category not in strat.categories
-                        ):
-                            raise ValueError(
-                                (
-                                    f"In transition '{transition.id}', stratified rate "
-                                    f"{idx}: Category '{condition.category}' not found "
-                                    f"in stratification '{condition.stratification}'. "
-                                    f"Available: {strat.categories}"
-                                )
-                            )
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_stratification_initial_conditions(self) -> Self:
-        """
-        Validates initial conditions against the defined model Stratification.
-        """
-        initial_conditions = self.initial_conditions
-
-        strat_map = {strat.id: strat for strat in self.stratifications}
-
-        actual_strat = {
-            sf.stratification for sf in initial_conditions.stratification_fractions
-        }
-        expected_strat = set(strat_map.keys())
-
-        if actual_strat != expected_strat:
-            missing = expected_strat - actual_strat
-            extra = actual_strat - expected_strat
-            raise ValueError(
-                (
-                    f"Initial stratification fractions keys must exactly match "
-                    f"stratification ids. Missing ids: {missing}, Extra ids: {extra}."
-                )
-            )
-
-        for strat_fractions in initial_conditions.stratification_fractions:
-            strat_id = strat_fractions.stratification
-            strat_instance = strat_map[strat_id]
-
-            fractions_dict = {
-                sf.category: sf.fraction for sf in strat_fractions.fractions
-            }
-
-            categories_expected = set(strat_instance.categories)
-            categories_actual = set(fractions_dict.keys())
-
-            if categories_actual != categories_expected:
-                missing = categories_expected - categories_actual
-                extra = categories_actual - categories_expected
-                raise ValueError(
-                    (
-                        f"Categories for stratification '{strat_id}' must exactly "
-                        f"match defined categories in instance '{strat_instance.id}'. "
-                        f"Missing categories: {missing}, Extra categories: {extra}."
-                    )
-                )
-
-            strat_sum_fractions = sum(fractions_dict.values())
-            if not math.isclose(strat_sum_fractions, 1.0, abs_tol=1e-6):
-                raise ValueError(
-                    (
-                        f"Stratification fractions for '{strat_id}' must sum to 1.0, "
-                        f"but got {strat_sum_fractions:.7}."
-                    )
-                )
-
-        return self
+```json
+{
+  "name": "Model",
+  "parameters": [],
+  "engine": {"type": "DifferenceEquations", "settings": null},
+  "structure": {"kind": "compartmental", "bins": [], "...": "..."},
+  "step_unit": null
+}
 ```
 
-### Methods:
+`Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine and both kinds.
 
-#### validate_bins_not_empty
+## Compartmental structure
 
-```python
-validate_bins_not_empty(v: list[Bin]) -> list[Bin]
-```
-
-Require at least one bin.
-
-Source code in `commol/context/population.py`
-
-```python
-@field_validator("bins")
-@classmethod
-def validate_bins_not_empty(cls, v: list[Bin]) -> list[Bin]:
-    """Require at least one bin."""
-    if not v:
-        raise ValueError("At least one bin must be defined.")
-    return v
-```
-
-#### validate_unique_ids
-
-```python
-validate_unique_ids() -> Self
-```
-
-Validates that bin and stratification IDs are unique.
-
-Source code in `commol/context/population.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_ids(self) -> Self:
-    """
-    Validates that bin and stratification IDs are unique.
-    """
-    bin_ids = [ds.id for ds in self.bins]
-    if len(bin_ids) != len(set(bin_ids)):
-        duplicates = [item for item in set(bin_ids) if bin_ids.count(item) > 1]
-        raise ValueError(f"Duplicate bin IDs found: {duplicates}")
-
-    stratification_ids = [s.id for s in self.stratifications]
-    if len(stratification_ids) != len(set(stratification_ids)):
-        duplicates = [
-            item
-            for item in set(stratification_ids)
-            if stratification_ids.count(item) > 1
-        ]
-        raise ValueError(f"Duplicate stratification IDs found: {duplicates}")
-
-    return self
-```
-
-#### validate_bin_initial_conditions
-
-```python
-validate_bin_initial_conditions() -> Self
-```
-
-Validates initial conditions against the defined model bins.
-
-Source code in `commol/context/population.py`
-
-```python
-@model_validator(mode="after")
-def validate_bin_initial_conditions(self) -> Self:
-    """
-    Validates initial conditions against the defined model bins.
-    """
-    initial_conditions = self.initial_conditions
-
-    bins_map = {bin_item.id: bin_item for bin_item in self.bins}
-
-    bin_fractions_dict = {
-        bf.bin: bf.fraction for bf in initial_conditions.bin_fractions
-    }
-
-    actual_bins = set(bin_fractions_dict.keys())
-    expected_bins = set(bins_map.keys())
-
-    if actual_bins != expected_bins:
-        missing = expected_bins - actual_bins
-        extra = actual_bins - expected_bins
-        raise ValueError(
-            (
-                f"Initial bin fractions keys must exactly match "
-                f"bin ids. Missing ids: {missing}, Extra ids: {extra}."
-            )
-        )
-
-    # Only validate sum if all fractions are calibrated (not None)
-    # The InitialConditions validator handles the None case
-    if all(frac is not None for frac in bin_fractions_dict.values()):
-        # Filter out None values before summing (type checker requirement)
-        calibrated_fractions = [
-            f for f in bin_fractions_dict.values() if f is not None
-        ]
-        bins_sum_fractions = sum(calibrated_fractions)
-        if not math.isclose(bins_sum_fractions, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                f"Bin fractions must sum to 1.0, but got {bins_sum_fractions:.7f}."
-            )
-
-    return self
-```
-
-#### validate_stratified_rates
-
-```python
-validate_stratified_rates() -> Self
-```
-
-Validates that stratified rates reference existing stratifications and categories.
-
-Source code in `commol/context/population.py`
-
-```python
-@model_validator(mode="after")
-def validate_stratified_rates(self) -> Self:
-    """
-    Validates that stratified rates reference existing stratifications and
-    categories.
-    """
-    strat_map = {strat.id: strat for strat in self.stratifications}
-
-    for transition in self.transitions:
-        if transition.stratified_rates:
-            for idx, stratified_rate in enumerate(transition.stratified_rates):
-                for condition in stratified_rate.conditions:
-                    # Validate stratification exists
-                    if condition.stratification not in strat_map:
-                        raise ValueError(
-                            (
-                                f"In transition '{transition.id}', stratified rate "
-                                f"{idx}: Stratification "
-                                f"'{condition.stratification}' not found. "
-                                f"Available: {list(strat_map.keys())}"
-                            )
-                        )
-
-                    # Validate category exists (None = target-only override, skip)
-                    strat = strat_map[condition.stratification]
-                    if (
-                        condition.category is not None
-                        and condition.category not in strat.categories
-                    ):
-                        raise ValueError(
-                            (
-                                f"In transition '{transition.id}', stratified rate "
-                                f"{idx}: Category '{condition.category}' not found "
-                                f"in stratification '{condition.stratification}'. "
-                                f"Available: {strat.categories}"
-                            )
-                        )
-
-    return self
-```
-
-#### validate_stratification_initial_conditions
-
-```python
-validate_stratification_initial_conditions() -> Self
-```
-
-Validates initial conditions against the defined model Stratification.
-
-Source code in `commol/context/population.py`
-
-```python
-@model_validator(mode="after")
-def validate_stratification_initial_conditions(self) -> Self:
-    """
-    Validates initial conditions against the defined model Stratification.
-    """
-    initial_conditions = self.initial_conditions
-
-    strat_map = {strat.id: strat for strat in self.stratifications}
-
-    actual_strat = {
-        sf.stratification for sf in initial_conditions.stratification_fractions
-    }
-    expected_strat = set(strat_map.keys())
-
-    if actual_strat != expected_strat:
-        missing = expected_strat - actual_strat
-        extra = actual_strat - expected_strat
-        raise ValueError(
-            (
-                f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. Missing ids: {missing}, Extra ids: {extra}."
-            )
-        )
-
-    for strat_fractions in initial_conditions.stratification_fractions:
-        strat_id = strat_fractions.stratification
-        strat_instance = strat_map[strat_id]
-
-        fractions_dict = {
-            sf.category: sf.fraction for sf in strat_fractions.fractions
-        }
-
-        categories_expected = set(strat_instance.categories)
-        categories_actual = set(fractions_dict.keys())
-
-        if categories_actual != categories_expected:
-            missing = categories_expected - categories_actual
-            extra = categories_actual - categories_expected
-            raise ValueError(
-                (
-                    f"Categories for stratification '{strat_id}' must exactly "
-                    f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {missing}, Extra categories: {extra}."
-                )
-            )
-
-        strat_sum_fractions = sum(fractions_dict.values())
-        if not math.isclose(strat_sum_fractions, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                (
-                    f"Stratification fractions for '{strat_id}' must sum to 1.0, "
-                    f"but got {strat_sum_fractions:.7}."
-                )
-            )
-
-    return self
-```
+`CompartmentalStructure` and `ModelStructure`, the interface every kind gives, are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
 
 ## Bin
 
@@ -1052,105 +630,7 @@ def validate_data(
     return value
 ```
 
-## Dynamics
-
-## Dynamics
-
-Bases: `BaseModel`
-
-Defines how the system evolves.
-
-Attributes:
-
-| Name          | Type               | Description                        |
-| ------------- | ------------------ | ---------------------------------- |
-| `transitions` | `List[Transition]` | A list of rules for state changes. |
-
-Source code in `commol/context/dynamics.py`
-
-```python
-class Dynamics(BaseModel):
-    """
-    Defines how the system evolves.
-
-    Attributes
-    ----------
-    transitions : List[Transition]
-        A list of rules for state changes.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    transitions: list[Transition]
-
-    @field_validator("transitions")
-    @classmethod
-    def validate_transitions_not_empty(cls, v: list[Transition]) -> list[Transition]:
-        """Require at least one transition."""
-        if not v:
-            raise ValueError("At least one transition must be defined.")
-        return v
-
-    @model_validator(mode="after")
-    def validate_unique_transition_ids(self) -> Self:
-        """
-        Validates that transition IDs are unique.
-        """
-        transition_ids = [t.id for t in self.transitions]
-        if len(transition_ids) != len(set(transition_ids)):
-            duplicates = [
-                item for item in set(transition_ids) if transition_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate transition IDs found: {duplicates}")
-        return self
-```
-
-### Methods:
-
-#### validate_transitions_not_empty
-
-```python
-validate_transitions_not_empty(v: list[Transition]) -> list[Transition]
-```
-
-Require at least one transition.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@field_validator("transitions")
-@classmethod
-def validate_transitions_not_empty(cls, v: list[Transition]) -> list[Transition]:
-    """Require at least one transition."""
-    if not v:
-        raise ValueError("At least one transition must be defined.")
-    return v
-```
-
-#### validate_unique_transition_ids
-
-```python
-validate_unique_transition_ids() -> Self
-```
-
-Validates that transition IDs are unique.
-
-Source code in `commol/context/dynamics.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_transition_ids(self) -> Self:
-    """
-    Validates that transition IDs are unique.
-    """
-    transition_ids = [t.id for t in self.transitions]
-    if len(transition_ids) != len(set(transition_ids)):
-        duplicates = [
-            item for item in set(transition_ids) if transition_ids.count(item) > 1
-        ]
-        raise ValueError(f"Duplicate transition IDs found: {duplicates}")
-    return self
-```
+## Transitions
 
 ## Transition
 
@@ -1168,7 +648,7 @@ Attributes:
 | `rate`             | \`str                  | None\`                        |
 | `stratified_rates` | \`list[StratifiedRate] | None\`                        |
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 class Transition(BaseModel):
@@ -1328,7 +808,7 @@ validate_impulse() -> Self
 
 Check the impulse schedule: one kind, valid positions and period.
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 @model_validator(mode="after")
@@ -1372,7 +852,7 @@ validate_rate(value: str | None) -> str | None
 
 Convert numeric rates to strings and perform security and syntax validation.
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 @field_validator("rate", mode="before")
@@ -1404,7 +884,7 @@ Attributes:
 | `conditions` | `list[StratificationCondition]` | List of stratification-category pairs that must match      |
 | `rate`       | `str`                           | Rate expression for compartments matching these conditions |
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 class StratifiedRate(BaseModel):
@@ -1484,7 +964,7 @@ validate_not_empty(v: list[StratificationCondition]) -> list[StratificationCondi
 
 Ensure at least one stratification condition is specified.
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 @field_validator("conditions")
@@ -1508,7 +988,7 @@ validate_unique_stratifications() -> Self
 
 Ensure no duplicate stratification IDs.
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 @model_validator(mode="after")
@@ -1534,7 +1014,7 @@ validate_rate(value: str) -> str
 
 Perform security and syntax validation on the rate expression.
 
-Source code in `commol/context/dynamics.py`
+Source code in `commol/context/transition.py`
 
 ```python
 @field_validator("rate", mode="before")
@@ -1561,10 +1041,10 @@ The engine that runs a model, and its settings.
 
 Attributes:
 
-| Name       | Type             | Description                                                                                             |
-| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| `type`     | `EngineType`     | Name of the engine: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). |
-| `settings` | \`EngineSettings | None\`                                                                                                  |
+| Name       | Type             | Description                                                                                                                                                                    |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`     | `str`            | Name of an engine of the engine's list, such as "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). The engine must run the kind of the model. |
+| `settings` | \`EngineSettings | None\`                                                                                                                                                                         |
 
 Source code in `commol/context/engine.py`
 
@@ -1575,9 +1055,11 @@ class ModelEngine(BaseModel):
 
     Attributes
     ----------
-    type : EngineType
-        Name of the engine: ``"DifferenceEquations"`` (discrete time) or
-        ``"DifferentialEquations"`` (continuous time).
+    type : str
+        Name of an engine of the engine's list, such as
+        ``"DifferenceEquations"`` (discrete time) or
+        ``"DifferentialEquations"`` (continuous time). The engine must run the
+        kind of the model.
     settings : EngineSettings | None
         Settings of that engine; None uses its defaults. Only
         ``DifferentialEquations`` takes settings (`OdeSolver`).
@@ -1585,14 +1067,14 @@ class ModelEngine(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: EngineType = Field(..., description="Name of the engine.")
+    type: str = Field(..., description="Name of the engine.")
     settings: EngineSettings | None = Field(
         default=None, description="Settings of the engine; None uses its defaults."
     )
 
     @model_validator(mode="after")
     def check_settings(self) -> Self:
-        """Ask the engine whether the settings are its own."""
+        """Ask the engine's list whether it has the engine and the settings."""
         settings_json = (
             None if self.settings is None else self.settings.model_dump_json()
         )
@@ -1608,14 +1090,14 @@ class ModelEngine(BaseModel):
 check_settings() -> Self
 ```
 
-Ask the engine whether the settings are its own.
+Ask the engine's list whether it has the engine and the settings.
 
 Source code in `commol/context/engine.py`
 
 ```python
 @model_validator(mode="after")
 def check_settings(self) -> Self:
-    """Ask the engine whether the settings are its own."""
+    """Ask the engine's list whether it has the engine and the settings."""
     settings_json = (
         None if self.settings is None else self.settings.model_dump_json()
     )

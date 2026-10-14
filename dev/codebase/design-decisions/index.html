@@ -1789,6 +1789,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#model-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-interface-for-every-model-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One interface for every model kind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-model-is-a-header-an-engine-and-a-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model is a header, an engine and a structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#model-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1850,15 +1889,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamics" class="md-nav__link">
+  <a href="#transitions-and-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamics
+        Transitions and rates
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Dynamics">
+    <nav class="md-nav" aria-label="Transitions and rates">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2577,6 +2616,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#model-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-interface-for-every-model-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One interface for every model kind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-model-is-a-header-an-engine-and-a-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model is a header, an engine and a structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#model-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2638,15 +2716,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamics" class="md-nav__link">
+  <a href="#transitions-and-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamics
+        Transitions and rates
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Dynamics">
+    <nav class="md-nav" aria-label="Transitions and rates">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3065,11 +3143,15 @@ test that guards it. Read the ones of your area before you change it.</p>
 </thead>
 <tbody>
 <tr>
+<td>Model kinds</td>
+<td><a href="#one-interface-for-every-model-kind">One interface for every kind</a>, <a href="#a-model-is-a-header-an-engine-and-a-structure">a model by composition</a></td>
+</tr>
+<tr>
 <td>Model structure</td>
 <td><a href="#compartments-are-labels-with-a-name">Compartments</a>, <a href="#stratification-order-is-part-of-the-model">stratification order</a>, <a href="#outputs-are-resolved-by-label">outputs</a>, <a href="#the-engine-owns-the-variable-names">variable names</a></td>
 </tr>
 <tr>
-<td>Dynamics</td>
+<td>Transitions and rates</td>
 <td><a href="#absolute-and-per-capita-rates">Rate semantics</a>, <a href="#the-most-specific-stratified-rate-wins">stratified rates</a>, <a href="#formula-parameters-are-evaluated-every-step-in-order">formula parameters</a>, <a href="#compiled-expressions-are-cached-globally">JIT cache</a></td>
 </tr>
 <tr>
@@ -3098,12 +3180,87 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="model-kinds">Model kinds<a class="headerlink" href="#model-kinds" title="Permanent link">&para;</a></h2>
+<h3 id="one-interface-for-every-model-kind">One interface for every model kind<a class="headerlink" href="#one-interface-for-every-model-kind" title="Permanent link">&para;</a></h3>
+<p>The layers that do not depend on how a model is built (<code>Simulation</code>,
+<code>Calibrator</code>, <code>ProbabilisticCalibrator</code>, the reports and <code>SimulationPlotter</code>)
+use only <code>Model</code> and the methods of <code>ModelStructure</code>
+(<code>py-commol/commol/context/structure.py</code>), and in Rust only the
+<code>SimulationEngine</code> trait (<code>crates/commol-core/src/simulation_engine.rs</code>). What
+only a compartmental model has (bins, stratifications, initial conditions) is
+behind them: <code>CompartmentalStructure</code> (<code>context/compartmental.py</code>), and in Rust
+<code>CompartmentalEngine</code> and <code>InitialConditionPlan</code> (<code>crates/commol-model/</code>). A
+new kind, such as an agent network, is a new <code>ModelStructure</code> subclass with its
+engines in the list; nothing that exists changes.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Rule</th>
+<th>Why, against the alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelStructure</code></td>
+<td>An abstract base class (Pydantic's metaclass derives from <code>ABCMeta</code>). A missing method fails when the object is made and names it; optional methods have a default.</td>
+<td>A <code>typing.Protocol</code> shows a missing method only under <code>ty</code>, or mid-run as an <code>AttributeError</code>, and gives no defaults.</td>
+</tr>
+<tr>
+<td>Engine kind</td>
+<td>Each entry of <code>EngineType</code> names the kind it runs. <code>Model</code> asks the list (<code>check_kind</code>) when it is made, and <code>Engine::build</code> asks it again; the error names the engine and both kinds.</td>
+<td>Without the check, a model of one kind reaches the engine of another and fails deep in its compilation.</td>
+</tr>
+<tr>
+<td>Values calibration sets</td>
+<td><code>parameter</code> and <code>factor</code> are generic. Each kind declares the types of value of its own it accepts (<code>ModelKind::value_types</code>, which <code>ModelStructure.calibration_value_types</code> asks); the compartmental kind accepts <code>initial_condition</code>. The engine resolves and writes them (<code>SimulationEngine::plan_values</code>, <code>apply_values</code>).</td>
+<td>The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it.</td>
+</tr>
+<tr>
+<td>Report sections</td>
+<td><code>ModelStructure.report_sections</code> adds the sections of a kind to <code>applied_parameters_report</code> (default: none); the compartmental kind adds <code>initial_conditions</code>.</td>
+<td>A check of the kind in <code>reporting.py</code> brings back a branch per kind.</td>
+</tr>
+<tr>
+<td>Expressions in constraints</td>
+<td>The engine names the values of an output row: <code>output_names</code>, <code>state_outputs</code> (their sum is <code>N</code>) and <code>output_sums</code> (a bin total, for a compartmental engine).</td>
+<td>The calibration would rebuild bin totals from compartment labels.</td>
+</tr>
+</tbody>
+</table>
+<p>The test kind (<code>tests/support/kinds.py</code>, engine <code>TestEngine</code> in
+<code>py-commol/src/test_kind.rs</code>) is written only against the interface. The
+extension has it only when it is built with the cargo feature <code>test-kind</code>, as
+the tests and CI build it; a release build does not.</p>
+<p><strong>Guards:</strong> <code>tests/model_kinds/</code> (a test model through a simulation, a
+calibration, a report and a plot; the kind check both ways),
+<code>crates/commol-calibration/tests/test_model_values.rs</code> (the calibration with
+an engine that is not compartmental: values through <code>plan_values</code> and
+<code>apply_values</code>, constraints through <code>output_sums</code> and <code>state_outputs</code>),
+<code>py-commol/src/engine.rs::an_engine_rejects_a_model_of_another_kind</code>,
+<code>crates/commol-core/src/types/engine.rs::an_engine_rejects_a_model_of_another_kind</code>.</p>
+<h3 id="a-model-is-a-header-an-engine-and-a-structure">A model is a header, an engine and a structure<a class="headerlink" href="#a-model-is-a-header-an-engine-and-a-structure" title="Permanent link">&para;</a></h3>
+<p><code>Model</code> (Python <code>context/model.py</code>, Rust <code>crates/commol-core/src/types/model.rs</code>)
+is one class for every kind: <code>name</code>, <code>description</code>, <code>version</code>, <code>step_unit</code>,
+<code>parameters</code>, <code>engine</code> (<code>{type, settings}</code>) and <code>structure</code>, tagged in JSON by
+<code>kind</code>. In Python it is generic in its structure class:
+<code>ModelBuilder.build</code> returns <code>Model[CompartmentalStructure]</code>, so
+<code>model.structure.bins</code> type-checks, and <code>Model.from_json</code> reads the class from
+the <code>kind</code> of the file. The engine is part of the model because it sets what a
+rate means. Transitions are held once, in the structure.</p>
+<p>Inheritance (an abstract <code>Model</code> with a <code>CompartmentalModel</code>) gives direct
+access (<code>model.bins</code>) but two parallel hierarchies, of models and of builders,
+and the header repeated per kind; with composition, <code>Simulation</code> and
+<code>Calibrator</code> take one type.</p>
+<p><strong>Guards:</strong> <code>crates/commol-core/src/types/model.rs</code> (tests),
+<code>tests/building/test_save_and_load.py</code>,
+<code>tests/model_kinds/test_interface.py::TestStructureInterface</code>.</p>
 <h2 id="model-structure">Model structure<a class="headerlink" href="#model-structure" title="Permanent link">&para;</a></h2>
 <h3 id="compartments-are-labels-with-a-name">Compartments are labels with a name<a class="headerlink" href="#compartments-are-labels-with-a-name" title="Permanent link">&para;</a></h3>
 <p>A compartment is a bin plus one category for each stratification that applies
 to it, in declaration order. Its name, <code>{bin}_{category}_{category}…</code>, is for
 display only. Its identity is its label: <code>OutputLabels</code> in
-<code>crates/commol-core/src/simulation_engine.rs</code> and <code>CompartmentLayout</code> in
+<code>crates/commol-model/src/labels.rs</code> and <code>CompartmentLayout</code> in
 <code>crates/commol-model/src/layout.rs</code>.</p>
 <p><strong>Rule:</strong> never parse a compartment name or match it by prefix. Bin <code>A</code> and bin
 <code>A_x</code> both produce names that start with <code>A_</code>, and a conditional
@@ -3120,7 +3277,7 @@ this).</p>
 <p><strong>Rule:</strong> changing the order of <code>add_stratification</code> calls changes which
 compartments exist and what they are named.</p>
 <h3 id="outputs-are-resolved-by-label">Outputs are resolved by label<a class="headerlink" href="#outputs-are-resolved-by-label" title="Permanent link">&para;</a></h3>
-<p><code>Model.get_outputs_by_source()</code> maps each bin or accumulator id to its output
+<p><code>CompartmentalStructure.outputs_by_source()</code> maps each bin or accumulator id to its output
 names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so
 <code>Simulation.outputs_for</code>, <code>group_outputs</code> and <code>total_series</code> group outputs by
 label, not by name.</p>
@@ -3132,14 +3289,14 @@ a prefix).</p>
 total (<code>N_&lt;categories&gt;</code>, bin totals and partial bin totals).
 <code>check_names</code> in <code>crates/commol-model/src/builder.rs</code> rejects a parameter
 id that is one of those names, and an <code>N_…</code> variable in a rate or a formula
-parameter that names no subpopulation. <code>Model.validate_names_with_engine</code>
-calls it at <code>build</code>, and <code>DifferenceEquations::try_from_model</code> calls it again.</p>
+parameter that names no subpopulation. <code>CompartmentalStructure.check_model</code>
+calls it at <code>build</code>, and <code>CompiledModel::try_from_model</code> calls it again.</p>
 <p><strong>Rule:</strong> never list these names in Python. Ask the engine.</p>
 <p><strong>Guards:</strong> <code>builder.rs</code> tests
 <code>parameter_id_cannot_be_a_compartment_or_a_subpopulation</code> and
 <code>subpopulation_variable_out_of_declaration_order_is_a_build_error</code>;
 <code>tests/building/test_reserved_names.py</code>.</p>
-<h2 id="dynamics">Dynamics<a class="headerlink" href="#dynamics" title="Permanent link">&para;</a></h2>
+<h2 id="transitions-and-rates">Transitions and rates<a class="headerlink" href="#transitions-and-rates" title="Permanent link">&para;</a></h2>
 <h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
 <p>The flow planner (<code>plan_transition_flows</code> in
 <code>crates/commol-model/src/flows.rs</code>) decides for each flow whether the rate
@@ -3199,22 +3356,29 @@ same formula always runs the same machine code, so results are reproducible.</p>
 <p>The fractions of a conditional stratification are relative to the subgroup that
 its conditions select, not to the whole population. Head counts therefore
 multiply along the chain: <code>N × fraction(group1) × fraction(cat1)</code>.
-<code>InitialConditions.subgroup_population</code> owns this; <code>Model.subgroup_population</code>
-and <code>Model.get_conditioning_categories</code> delegate to it.</p>
+<code>InitialConditions.subgroup_population</code> owns this; <code>CompartmentalStructure.subgroup_population</code>
+and <code>CompartmentalStructure.get_conditioning_categories</code> delegate to it.</p>
 <p><strong>Guard:</strong> <code>tests/simulation/test_outputs.py::TestSubgroupPopulation</code> compares the
 result with the population the engine starts from.</p>
 <h3 id="calibrated-initial-conditions-are-applied-in-layers">Calibrated initial conditions are applied in layers<a class="headerlink" href="#calibrated-initial-conditions-are-applied-in-layers" title="Permanent link">&para;</a></h3>
-<p><code>InitialConditionPlan</code> in <code>crates/commol-calibration/src/initial_conditions.rs</code>
+<p><code>InitialConditionPlan</code> in <code>crates/commol-model/src/initial_conditions.rs</code>
 applies calibrated values in a fixed order: bins, category splits, exact
 compartments, and then the remainder named by
-<code>CalibrationProblem.initial_condition_remainder</code>. The objective, the predictions
-and the write-back all use <code>calibrated_initial_population</code>, so they agree by
-construction. <code>Model.apply_calibration_parameters</code>
+<code>CalibrationProblem.initial_condition_remainder</code>. Both compartmental engines
+resolve and write initial conditions through it
+(<code>SimulationEngine::plan_values</code> and <code>apply_values</code>), and the calibration
+writes every value through the engine (<code>ValueWriter</code> in
+<code>crates/commol-calibration/src/values.rs</code>), so the objective, the predictions
+and the write-back (<code>configured_engine</code>, then the binding
+<code>calibrated_initial_population</code>) agree by construction.
+<code>CompartmentalStructure.with_calibrated_values</code>
 (<code>context/_model/calibration_write_back.py</code>) writes the values back as
 fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.</p>
-<p><strong>Guard:</strong>
-<code>tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>.
+<p><strong>Guards:</strong>
+<code>tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>;
+<code>crates/commol-model/tests/initial_conditions.rs</code> (the layers, the remainder
+and the targets of an id).
 See also <a href="../../development/design-per-compartment-initial-conditions/">Per-compartment initial conditions</a>.</p>
 <h2 id="time">Time<a class="headerlink" href="#time" title="Permanent link">&para;</a></h2>
 <h3 id="physical-time-is-not-in-the-model">Physical time is not in the model<a class="headerlink" href="#physical-time-is-not-in-the-model" title="Permanent link">&para;</a></h3>
@@ -3354,12 +3518,15 @@ an entry. A model holds its engine and the settings of that engine,
 so a saved model reproduces its runs.</p>
 <p>Python asks the list (<code>commol_rs.engine.EngineType</code>): it builds the engine,
 prints the left-hand side of an equation and checks settings through it, and
-never branches on an engine name. It keeps the names only as the <code>Literal</code>
-<code>EngineType</code> (<code>context/engine.py</code>) for static typing and completion; a test
-checks that it equals the list. Generating the <code>Literal</code> from Rust would need
+never branches on an engine name. It keeps the names of the compartmental
+engines only as the <code>Literal</code> <code>CompartmentalEngineType</code> (<code>context/engine.py</code>),
+for static typing and completion of <code>ModelBuilder.build</code>; a test checks that it
+equals the compartmental entries of the list. <code>ModelEngine.type</code> is a <code>str</code> that
+the list checks, so a model can name an engine of any kind. Generating the <code>Literal</code> from Rust would need
 a code-generation step for two names; the test catches the same drift. The
 entry names its model kind, so another kind (for example an agent network)
-adds entries, not a second meaning of the type.</p>
+adds entries, not a second meaning of the type; see
+<a href="#one-interface-for-every-model-kind">One interface for every model kind</a>.</p>
 <p>The builder takes the engine and its settings where it chooses the engine,
 <code>build(engine, settings=None)</code>, so one builder builds a model for each engine
 with its own settings. Settings of one engine given to another raise an error
@@ -3430,7 +3597,8 @@ members. Taking percentiles first gives a band that describes no member.</p>
 <h3 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h3>
 <p><code>api/reporting.py</code> returns blocks of data, not documents:
 <code>simulation_report</code> (observed values, series, accumulators) and
-<code>applied_parameters_report</code> (calibrated parameters and initial conditions).</p>
+<code>applied_parameters_report</code> (calibrated parameters, and the sections of the
+model kind: <code>initial_conditions</code> for a compartmental model).</p>
 <ul>
 <li>A single run and an ensemble differ only at the leaves (<code>ReportLeaf</code>).</li>
 <li>The key order of each entry is part of the contract, because it changes saved

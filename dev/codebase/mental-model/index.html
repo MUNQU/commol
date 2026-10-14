@@ -1755,6 +1755,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#model-kind-and-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kind and engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-a-model-flows-through-the-layers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2210,6 +2221,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#model-kind-and-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kind and engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-a-model-flows-through-the-layers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2278,7 +2300,8 @@
 <p>Commol builds compartment models from a declarative definition and runs them
 as difference equations or as ordinary differential equations. Python owns the
 user-facing API and validation; Rust owns every rule about how a model becomes
-numbers.</p>
+numbers. A model has a <strong>kind</strong> (today only <code>compartmental</code>) and an <strong>engine</strong>
+that runs that kind; the generic layers work with any kind.</p>
 <h2 id="what-commol-is">What Commol is<a class="headerlink" href="#what-commol-is" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2293,8 +2316,12 @@ numbers.</p>
 <td><code>py-commol/commol/api/model_builder.py</code></td>
 </tr>
 <tr>
-<td>A validated, serializable model definition</td>
-<td><code>py-commol/commol/context/</code> (Pydantic)</td>
+<td>A validated, serializable model definition: a header, an engine and the structure of its kind</td>
+<td><code>py-commol/commol/context/</code> (Pydantic): <code>model.py</code>, <code>structure.py</code>, <code>compartmental.py</code></td>
+</tr>
+<tr>
+<td>Generic layers that work with any model kind</td>
+<td><code>Simulation</code>, <code>Calibrator</code>, reports and plots use only <code>ModelStructure</code>; Rust calibration uses only <code>SimulationEngine</code> (see <a href="../design-decisions/#one-interface-for-every-model-kind">Design decisions</a>)</td>
 </tr>
 <tr>
 <td>One model compiler for both engines: expansion, flows, rates, the right-hand side</td>
@@ -2345,24 +2372,53 @@ numbers.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="model-kind-and-engine">Model kind and engine<a class="headerlink" href="#model-kind-and-engine" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it is</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model kind</td>
+<td>How a model is built: its <code>structure</code>. <code>compartmental</code>: bins expanded over stratifications, joined by transitions.</td>
+<td><code>ModelKind</code> (<code>crates/commol-core/src/types/engine.rs</code>); <code>ModelStructure</code> and its subclasses in Python</td>
+</tr>
+<tr>
+<td>Engine</td>
+<td>How a model of a kind advances along the axis, and what a rate means: <code>DifferenceEquations</code>, <code>DifferentialEquations</code>.</td>
+<td><code>EngineType</code>, the one list (<code>engine.rs</code>); <code>Model.engine</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each engine runs one kind. A model whose engine runs another kind is rejected
+when it is made.</p>
 <h2 id="how-a-model-flows-through-the-layers">How a model flows through the layers<a class="headerlink" href="#how-a-model-flows-through-the-layers" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ModelBuilder ... .build(engine)    -&gt; commol.context.Model (Pydantic validation;
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                                      the engine&#39;s list checks model.engine)
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Simulation(model)                  -&gt; engine_state.build_engine(model JSON)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                                   -&gt; commol_rs.core.Model.from_json(...)
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                   -&gt; commol_rs.engine.Engine(...): the engine
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                      model.engine.type names (EngineType list)
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                   every engine compiles it with commol-model (CompiledModel):
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                        expand bins and stratifications into compartments
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                        build the initial state
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                                        plan the transition flows and compile the rates
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                        derivatives(step, t, X) = Σ flows
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Simulation.run(n) / run_at(at)     -&gt; difference: X += derivatives, once per step
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                      differential: diffsol integrates derivatives
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ModelBuilder ... .build(engine)    -&gt; commol.context.Model[CompartmentalStructure]
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                                      (Pydantic validation; the engine&#39;s list
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                                      checks model.engine and its kind)
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Simulation(model)                  -&gt; engine_state.build_engine(model JSON)
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                   -&gt; commol_rs.core.Model.from_json(...)
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                   -&gt; commol_rs.engine.Engine(...): the engine
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                      model.engine.type names (EngineType list),
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                      after it checks the kind of model.structure
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                   every compartmental engine compiles it with commol-model (CompiledModel):
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                                        expand bins and stratifications into compartments
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                        build the initial state
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                                        plan the transition flows and compile the rates
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                        derivatives(step, t, X) = Σ flows
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Simulation.run(n) / run_at(at)     -&gt; difference: X += derivatives, once per step
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                                      differential: diffsol integrates derivatives
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>Calibrator(simulation, problem)    -&gt; commol_rs.calibration.calibrate(engine, ...):
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                                      parameters by id; values of the kind, such as
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                      initial conditions, through the engine
 </span></code></pre></div>
-<p>The same model functions also answer questions without a simulation:
-<code>Model.initial_state()</code>, <code>print_equations</code> and the unit checker call
+<p>The same model functions also answer questions about a compartmental structure
+without a simulation:
+<code>CompartmentalStructure.initial_state()</code>, <code>print_equations</code> and the unit checker call
 <code>initial_state</code>, <code>transition_flows</code> and <code>expanded_outputs</code> of <code>commol_rs.model</code>
 through <code>py-commol/commol/context/_model/engine_state.py</code>.</p>
 <h2 id="invariants">Invariants<a class="headerlink" href="#invariants" title="Permanent link">&para;</a></h2>

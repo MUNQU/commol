@@ -2310,12 +2310,12 @@
 <tbody>
 <tr>
 <td><code>crates/commol-core/src/types/</code></td>
-<td>The model data types shared by all crates and serialized from Python (<code>Model</code>, <code>Population</code>, <code>Transition</code>, <code>InitialConditions</code>, …).</td>
+<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>structure</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>CompartmentalStructure</code> (<code>compartmental.rs</code>), <code>Transition</code> (<code>transitions.rs</code>), <code>InitialConditions</code>, …; <code>test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
 <td>Engine behavior.</td>
 </tr>
 <tr>
 <td><code>crates/commol-core/src/types/engine.rs</code></td>
-<td><code>EngineType</code>, the one list of engines (model types): per entry, the model kind it runs, its settings and their validation, the form of its equations and the meaning of a rate. <code>ModelEngine</code>, the engine and settings of a model.</td>
+<td><code>EngineType</code>, the one list of engines (model types): per entry, the model kind it runs (<code>ModelKind</code>, with the value types it accepts, <code>ModelValueType</code>), its settings and their validation, the form of its equations and the meaning of a rate. <code>ModelEngine</code>, the engine and settings of a model.</td>
 <td>The engines themselves.</td>
 </tr>
 <tr>
@@ -2325,8 +2325,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait (runs at positions, <code>check_position</code>), <code>Trajectory</code>, <code>check_positions</code> and <code>OutputLabels</code>: what calibration needs from any engine.</td>
-<td>Code for one engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>. What calibration needs from any engine.</td>
+<td>Code for one engine or one kind.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
@@ -2337,6 +2337,21 @@
 <td><code>crates/commol-model/src/layout.rs</code></td>
 <td><code>CompartmentLayout</code>: compartments in engine order with their labels, and lookups by bin and categories.</td>
 <td>Name parsing.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/labels.rs</code></td>
+<td><code>OutputLabels</code> (bin and categories of an output) and <code>output_sums</code> (bin totals and partial totals).</td>
+<td>Name parsing.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/engine.rs</code></td>
+<td><code>CompartmentalEngine</code>: what a compartmental engine gives besides <code>SimulationEngine</code> (compartments, labels, population, population size, <code>set_initial_condition</code>).</td>
+<td>Code for one engine.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/initial_conditions.rs</code></td>
+<td>How initial-condition values reach a compartmental engine (<code>InitialConditionPlan</code>: resolution, layers, remainder); both engines' <code>plan_values</code> and <code>apply_values</code> use it.</td>
+<td>Parameter values.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/flows.rs</code></td>
@@ -2365,12 +2380,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-difference/src/simulation.rs</code></td>
-<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, the positions it accepts (integers), and its <code>SimulationEngine</code> implementation.</td>
+<td><code>DifferenceEquations</code>: the discrete step (<code>state += derivatives</code>), impulses at integer steps, the positions it accepts (integers), and its <code>SimulationEngine</code> and <code>CompartmentalEngine</code> implementations.</td>
 <td>Model compilation.</td>
 </tr>
 <tr>
 <td><code>crates/commol-differential/src/lib.rs</code></td>
-<td><code>DifferentialEquations</code>: state, output positions, impulses, and its <code>SimulationEngine</code> implementation.</td>
+<td><code>DifferentialEquations</code>: state, output positions, impulses, and its <code>SimulationEngine</code> and <code>CompartmentalEngine</code> implementations.</td>
 <td>Numerical methods.</td>
 </tr>
 <tr>
@@ -2380,13 +2395,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td>Loss, constraints, the objective function, and the position check that names an observation or constraint (<code>check_positions</code>).</td>
-<td>Optimizer setup.</td>
+<td>Loss, constraints, the objective function, and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td>Optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
-<td><code>crates/commol-calibration/src/initial_conditions.rs</code></td>
-<td>How calibrated initial-condition values reach the engine (<code>InitialConditionPlan</code>, <code>calibrated_initial_population</code>).</td>
-<td>Parameter values.</td>
+<td><code>crates/commol-calibration/src/values.rs</code></td>
+<td>How calibrated values reach any engine: parameters by id, values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>).</td>
+<td>How a kind resolves its values.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
@@ -2412,18 +2427,23 @@
 <tbody>
 <tr>
 <td><code>py-commol/src/core.rs</code></td>
-<td>Bindings of the model types.</td>
+<td>Bindings of the model types (<code>Model</code>, <code>CompartmentalStructure</code>, …).</td>
 <td>Logic.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
-<td>The model queries of <code>commol_rs.model</code>: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>check_names</code>.</td>
+<td>The queries of <code>commol_rs.model</code> on a compartmental structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>; and <code>check_names</code> on a model.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/engine.rs</code></td>
-<td><code>commol_rs.engine</code>: <code>Engine::build</code>, which builds the engine an <code>EngineType</code> entry names, and the Python classes <code>Engine</code> (any engine, built from a model) and <code>EngineType</code> (the list, for Python to ask).</td>
+<td><code>commol_rs.engine</code>: <code>Engine::build</code>, which checks the kind and builds the engine an <code>EngineType</code> entry names, and the Python classes <code>Engine</code> (any engine, built from a model), <code>EngineType</code> (the list, for Python to ask) and <code>ModelKind</code>.</td>
 <td>Engine logic.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/test_kind.rs</code></td>
+<td><code>TestEngine</code>, the engine of the test model kind; only with the <code>test-kind</code> feature.</td>
+<td>Anything a release needs.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
@@ -2454,8 +2474,8 @@
 </tr>
 <tr>
 <td><code>api/simulation.py</code></td>
-<td><code>Simulation</code>: runs (<code>run</code>, <code>run_at</code>), output grouping.</td>
-<td>Expansion rules; which positions a model type accepts.</td>
+<td><code>Simulation</code>: runs (<code>run</code>, <code>run_at</code>), output grouping through <code>ModelStructure.outputs_by_source</code>.</td>
+<td>Expansion rules; which positions a model type accepts; anything of one model kind.</td>
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
@@ -2474,8 +2494,8 @@
 </tr>
 <tr>
 <td><code>api/reporting.py</code></td>
-<td><code>simulation_report</code> and <code>applied_parameters_report</code>.</td>
-<td>Domain vocabulary.</td>
+<td><code>simulation_report</code> and <code>applied_parameters_report</code>, with the sections the structure adds (<code>ModelStructure.report_sections</code>).</td>
+<td>Domain vocabulary; sections of one model kind.</td>
 </tr>
 <tr>
 <td><code>api/patterns.py</code>, <code>api/time_scale.py</code>, <code>api/windows.py</code></td>
@@ -2493,8 +2513,28 @@
 <td>Engine rules.</td>
 </tr>
 <tr>
+<td><code>context/model.py</code></td>
+<td><code>Model</code>: the header, the engine and the structure of any kind, generic in its structure class (<code>Model[CompartmentalStructure]</code>).</td>
+<td>Anything of one model kind.</td>
+</tr>
+<tr>
+<td><code>context/structure.py</code></td>
+<td><code>ModelStructure</code>, the interface every model kind gives the generic layers, and its registry of kinds.</td>
+<td>Code of one kind.</td>
+</tr>
+<tr>
+<td><code>context/compartmental.py</code></td>
+<td><code>CompartmentalStructure</code>: bins, stratifications, transitions and initial conditions, their validation, and the compartmental side of the interface.</td>
+<td>Generic code.</td>
+</tr>
+<tr>
+<td><code>context/transition.py</code></td>
+<td><code>Transition</code> and <code>StratifiedRate</code>.</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>context/engine.py</code></td>
-<td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings), <code>OdeSolver</code>, and the <code>EngineType</code> names as a <code>Literal</code> for static typing.</td>
+<td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings), <code>OdeSolver</code>, and the names of the compartmental engines as the <code>Literal</code> <code>CompartmentalEngineType</code>.</td>
 <td>Settings validation or engine meanings: ask <code>commol_rs.engine.EngineType</code>.</td>
 </tr>
 <tr>
@@ -2504,8 +2544,13 @@
 </tr>
 <tr>
 <td><code>context/_model/</code> (other files)</td>
-<td>Internals of <code>Model</code>: equation printer, unit checker, calibration write-back, JSON rendering.</td>
+<td>Internals of a compartmental model: equation printer, unit checker, calibration write-back, the <code>initial_conditions</code> report section (<code>report.py</code>); JSON rendering of any model.</td>
 <td>Public API.</td>
+</tr>
+<tr>
+<td><code>context/report_entry.py</code></td>
+<td>The ensemble spread of a report entry (<code>Interval</code>, <code>entry_interval</code>), for every kind.</td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>utils/security.py</code></td>
@@ -2530,7 +2575,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; and <code>support/</code> with the shared model factories, the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -2586,9 +2631,14 @@
 <td><code>py-commol/src/engine.rs</code> (<code>Engine</code>), <code>context/engine.py</code>, <a href="../maintainer-playbook/#model-type-engine">checklist</a></td>
 </tr>
 <tr>
+<td>Add a model kind</td>
+<td><code>context/structure.py</code> (<code>ModelStructure</code>)</td>
+<td><code>commol-core/src/types/structure.rs</code>, <code>engine.rs</code> (<code>ModelKind</code>), <code>py-commol/src/engine.rs</code>, <a href="../maintainer-playbook/#model-kind">checklist</a></td>
+</tr>
+<tr>
 <td>Change impulses</td>
 <td><code>commol-model/src/system.rs</code> (<code>apply_impulses</code>)</td>
-<td><code>types.rs</code> (<code>ImpulseSchedule</code>), both engines, <code>context/dynamics.py</code>, <code>tests/transitions/test_impulses.py</code></td>
+<td><code>types.rs</code> (<code>ImpulseSchedule</code>), both engines, <code>context/transition.py</code>, <code>tests/transitions/test_impulses.py</code></td>
 </tr>
 <tr>
 <td>Add an expression function or variable</td>
@@ -2603,7 +2653,7 @@
 <tr>
 <td>Change calibration</td>
 <td><code>calibration_problem.rs</code></td>
-<td><code>initial_conditions.rs</code>, <code>api/calibrator.py</code>, <code>tests/calibration/</code></td>
+<td><code>values.rs</code>, <code>commol-model/src/initial_conditions.rs</code>, <code>api/calibrator.py</code>, <code>tests/calibration/</code></td>
 </tr>
 <tr>
 <td>Change ensembles</td>

@@ -2335,7 +2335,10 @@ Both work for a single calibration and for an ensemble, with the same layout.</p
 <h2 id="applied_parameters_report"><code>applied_parameters_report</code><a class="headerlink" href="#applied_parameters_report" title="Permanent link">&para;</a></h2>
 <p><code>applied_parameters_report(model, result, problem=None, parameter_statistics=None,
 confidence_level=None)</code> lists every number the calibrated model holds, and
-whether calibration set it:</p>
+whether calibration set it. The <code>parameters</code> section is the same for every
+kind of model; the structure of the model adds the sections of its kind
+(<code>ModelStructure.report_sections</code>). A compartmental model adds
+<code>initial_conditions</code>:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;parameters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">&quot;k1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;calibrated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>

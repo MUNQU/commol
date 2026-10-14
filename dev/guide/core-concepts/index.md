@@ -118,9 +118,17 @@ print(sorted(results))   # ['A', 'B', 'C', 'cum_ab']
 print(len(results["A"]))  # 51: step 0 to step 50
 ```
 
-Two typologies run, with the same model definition:
+A `Model` has a header (its name, parameters and step unit), the `engine` that runs it, and its `structure`: the part of its kind. `ModelBuilder` builds the compartmental kind, so `model.structure` is a `CompartmentalStructure` that holds the bins, stratifications, transitions and initial conditions:
 
-| Typology                | Time                                                                    | Engine                |
+```python
+print(model.engine.type)                    # DifferenceEquations
+print(model.structure.kind)                 # compartmental
+print([b.id for b in model.structure.bins])  # ['A', 'B', 'C']
+```
+
+Two engines run a compartmental model, with the same structure:
+
+| Engine                  | Time                                                                    | Crate                 |
 | ----------------------- | ----------------------------------------------------------------------- | --------------------- |
 | `DifferenceEquations`   | Advances in whole steps; each step applies every flow once.             | `commol-difference`   |
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
@@ -175,7 +183,7 @@ stratified = (
     .build(engine="DifferenceEquations")
 )
 
-for compartment in stratified.initial_state():
+for compartment in stratified.structure.initial_state():
     print(compartment.name, compartment.population)
 ```
 
@@ -186,7 +194,7 @@ for compartment in stratified.initial_state():
 | `B_g1`      | 10000 × 0.1 × 0.6 | 600                |
 | `B_g2`      | 10000 × 0.1 × 0.4 | 400                |
 
-`Model.initial_state()` returns this table as the engine builds it: each compartment with its bin, its categories and its population.
+`CompartmentalStructure.initial_state()` returns this table as the engine builds it: each compartment with its bin, its categories and its population.
 
 Use a stratification when subgroups have different rates, when you need output per subgroup, or when the data you fit is broken down by category.
 
@@ -239,17 +247,17 @@ conditional = (
     .build(engine="DifferenceEquations")
 )
 
-print([c.name for c in conditional.initial_state()])
+print([c.name for c in conditional.structure.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
 The fractions of a conditional stratification are fractions of the subgroup it splits, not of the whole population. `subgroup_population` multiplies along the chain, and `get_conditioning_categories` names the subgroup:
 
 ```python
-print(conditional.subgroup_population())                # 10000
-print(conditional.subgroup_population(["g2"]))          # 10000 x 0.4 = 4000
-print(conditional.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
-print(conditional.get_conditioning_categories("subtype"))  # ('g2',)
+print(conditional.structure.subgroup_population())                # 10000
+print(conditional.structure.subgroup_population(["g2"]))          # 10000 x 0.4 = 4000
+print(conditional.structure.subgroup_population(["g2", "s1"]))    # 4000 x 0.5 = 2000
+print(conditional.structure.get_conditioning_categories("subtype"))  # ('g2',)
 ```
 
 See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/building-models/#stratifications) for the full API.
@@ -286,7 +294,7 @@ overridden = (
     .build(engine="DifferenceEquations")
 )
 
-print({c.name: c.population for c in overridden.initial_state()})
+print({c.name: c.population for c in overridden.structure.initial_state()})
 # B_g1 starts empty; the other compartments keep their product
 ```
 
@@ -296,13 +304,13 @@ print({c.name: c.population for c in overridden.initial_state()})
 | Each name is an expanded compartment                             | The model is built     |
 | The initial population does not exceed `population_size`         | The model is built     |
 
-`Model.update_compartment_fractions({"B_g1": 0.05})` changes or adds overrides on a built model.
+`model.structure.update_compartment_fractions({"B_g1": 0.05})` changes or adds overrides on a built model.
 
 ### Updating fractions after building
 
 ```python
-overridden.update_initial_conditions({"A": 0.85, "B": 0.15})
-overridden.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
+overridden.structure.update_initial_conditions({"A": 0.85, "B": 0.15})
+overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
 | Method                            | Rule                                                                                                        |
@@ -355,7 +363,7 @@ outflow = (
     )
     .build(engine="DifferenceEquations")
 )
-print([t.id for t in outflow.dynamics.transitions])  # ['outflow__A', 'outflow__B']
+print([t.id for t in outflow.structure.transitions])  # ['outflow__A', 'outflow__B']
 ```
 
 ## Steps and physical time

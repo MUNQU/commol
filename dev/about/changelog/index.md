@@ -20,19 +20,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.
 - `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the check infers the unit as before.
 - `TimeScale.from_step_unit(unit)`, which raises for a unit that is not time.
+- One interface for every kind of model: `ModelStructure`, an abstract base class that the structure of each kind inherits. `Simulation`, `Calibrator`, `ProbabilisticCalibrator`, the reports and `SimulationPlotter` use only it, so another kind (for example an agent network) is a new subclass with its engines in the engine's list. `CompartmentalStructure` is the structure of a compartmental model. A subclass that misses a method cannot be made, and the error names the method.
+- An engine runs one model kind, and a model whose engine runs another kind is rejected when it is made, with an error that names the engine and both kinds.
+- Each kind declares the values calibration may set besides `parameter` and `factor` (`ModelStructure.calibration_value_types`); a compartmental model accepts `initial_condition`. A type the kind does not accept raises an error that names the kind.
 
 ### Changed
 
 - A position on the axis is a `float` everywhere, and the engine alone decides which positions its model type accepts: a difference model integer steps, a differential model any non-negative position. Its error names the observation, constraint, impulse transition or series parameter that holds a rejected position. The engine trait runs only at positions (`run_at_positions_into_buffer`); `run(n)` returns the grid it ran on.
-- The engine of a model and its settings are one field, `Model.engine = {type, settings}` (`ModelEngine`), which replaces `Model.dynamics.typology`; `Dynamics` holds only the transitions. The builder takes the engine where it builds, so one builder builds the model for each engine with its own settings. Settings of one engine given to another raise an error from the engine that names both. A model file saved before has `dynamics.typology` and does not load: move it to `"engine": {"type": …, "settings": null}`.
+- The engine of a model and its settings are one field, `Model.engine = {type, settings}` (`ModelEngine`), which replaces `Model.dynamics.typology`. The builder takes the engine where it builds, so one builder builds the model for each engine with its own settings. Settings of one engine given to another raise an error from the engine that names both. A model file saved before has `dynamics.typology` and does not load: move it to `"engine": {"type": …, "settings": null}`.
 
 | Before                                                                                                   | Now                                                          |
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `builder.build(typology="DifferenceEquations")`                                                          | `builder.build(engine="DifferenceEquations")`                |
 | `model.dynamics.typology`                                                                                | `model.engine.type`                                          |
 | `commol_rs.difference.DifferenceEquations(model)`, `commol_rs.differential.DifferentialEquations(model)` | `commol_rs.engine.Engine(model)`, the engine the model names |
-| - Names of positions, lengths and counts, and names with more than one                                   |                                                              |
-| meaning. No old name is kept; an old keyword raises an error that names it.                              |                                                              |
+| - A model is a header, an engine and a `structure`: `Model.structure`, tagged                            |                                                              |
+| in JSON by `kind`, replaces `Model.population` and `Model.dynamics`, and the                             |                                                              |
+| transitions are held once. `Model` is generic in its structure class:                                    |                                                              |
+| `ModelBuilder.build` returns `Model[CompartmentalStructure]`, and                                        |                                                              |
+| `Model.from_json` reads the class from the `kind`. The methods that only a                               |                                                              |
+| compartmental model has moved to its structure. A model file saved before                                |                                                              |
+| has `population` and `dynamics` and does not load: move the fields of                                    |                                                              |
+| `population` and `dynamics.transitions` into                                                             |                                                              |
+| `"structure": {"kind": "compartmental", …}`.                                                             |                                                              |
+
+| Before                                                                                                        | Now                                                                                    |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `model.population.bins`, `.accumulators`, `.stratifications`, `.initial_conditions`                           | `model.structure.bins`, …                                                              |
+| `model.dynamics.transitions` (and `model.population.transitions`)                                             | `model.structure.transitions`                                                          |
+| `model.initial_state()`                                                                                       | `model.structure.initial_state()`                                                      |
+| `model.update_initial_conditions(…)`, `update_stratification_fractions(…)`, `update_compartment_fractions(…)` | `model.structure.update_initial_conditions(…)`, …                                      |
+| `model.subgroup_population(…)`, `model.get_conditioning_categories(…)`                                        | `model.structure.subgroup_population(…)`, …                                            |
+| `model.get_outputs_by_source()`                                                                               | `model.structure.outputs_by_source()`                                                  |
+| `model.get_uncalibrated_initial_conditions()`                                                                 | `model.structure.uncalibrated_values()`                                                |
+| `commol.context.dynamics` (`Transition`, `StratifiedRate`)                                                    | `commol.context.transition`                                                            |
+| `commol.context.engine.EngineType`                                                                            | `CompartmentalEngineType`; `ModelEngine.type` is a `str` that the engine's list checks |
+| `commol_rs.core.Model(population=…, dynamics=…)`                                                              | `commol_rs.core.Model(structure=commol_rs.core.CompartmentalStructure(…))`             |
+| `commol_rs.model.initial_state(model)`, `expanded_outputs`, `transition_flows`                                | they take a `commol_rs.core.CompartmentalStructure`                                    |
+| `commol_rs.calibration.check_initial_conditions`                                                              | `check_model_values`                                                                   |
+| `commol_rs.calibration.calibrate(…, initial_population_size, …)` and the other calibration functions          | no `initial_population_size`: the engine knows it                                      |
+
+- `applied_parameters_report` returns `parameters` and the sections of the kind of the model; a compartmental model adds `initial_conditions`, with the same keys as before.
+- The Rust engine trait (`SimulationEngine`) is the same for every model kind: `compartments`, `population`, `set_initial_condition` and `output_labels` moved to `CompartmentalEngine` (`commol-model`), and the engine resolves and writes the values of its kind (`plan_values`, `apply_values`). The initial-condition plan moved from `commol-calibration` to `commol-model`. The crates are not published.
+- Names of positions, lengths and counts, and names with more than one meaning. No old name is kept; an old keyword raises an error that names it.
 
 | Before                                                                                                    | Now                                                    |
 | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -77,7 +107,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `Simulation.run(..., output_format=...)` and `run_at(..., output_format=...)`: both return `SimulationResults`; use `rows()` for one row per position.
 - `commol_core::integer_steps`, `SimulationEngine::run_into_buffer` and `run_at_steps_into_buffer`; the Python checks that repeated the engine's rules on positions (`check_steps_for_typology`, the impulse check of `Dynamics`, the order check of `Simulation.run_at`).
 - The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`, which uses the weights.
-- `commol.constants.ModelTypes`. The engine names are the `Literal` `commol.context.engine.EngineType`.
+- `commol.constants.ModelTypes`. The names of the compartmental engines are the `Literal` `commol.context.engine.CompartmentalEngineType`.
+- `Population` and `Dynamics`, in Python (`commol.context.population`, `commol.context.dynamics`) and in Rust, and their PyO3 classes; the structure of a model is `CompartmentalStructure`.
+- `Model.get_uncalibrated_initial_conditions`, `Model.initial_state`, and the other methods of a compartmental model on `Model`: they are on `model.structure` (see Changed).
 
 ### Fixed
 

@@ -3033,7 +3033,7 @@ accumulator expands like a bin.</p>
 </table>
 <p>The initial population of a compartment is
 <code>population_size × bin fraction × the fraction of each of its categories</code>,
-unless an override names it. <code>Model.initial_state()</code> shows the result. To change
+unless an override names it. <code>CompartmentalStructure.initial_state()</code> shows the result. To change
 fractions on a built model, see
 <a href="../core-concepts/#updating-fractions-after-building">Core Concepts</a>.</p>
 <h2 id="build">Build<a class="headerlink" href="#build" title="Permanent link">&para;</a></h2>
@@ -3044,7 +3044,7 @@ fractions on a built model, see
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">)</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">stratified_model</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nb">print</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">stratified_model</span><span class="o">.</span><span class="n">initial_state</span><span class="p">()])</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nb">print</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">stratified_model</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">()])</span>
 </span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="c1"># [&#39;A_g1&#39;, &#39;A_g2_s1&#39;, &#39;A_g2_s2&#39;, &#39;B_g1&#39;, &#39;B_g2_s1&#39;, &#39;B_g2_s2&#39;]</span>
 </span></code></pre></div>
 <p><code>build</code> raises <code>ValueError</code> (or Pydantic's <code>ValidationError</code>, a subclass) when

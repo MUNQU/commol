@@ -889,14 +889,16 @@ class ModelBuilder:
         return self
 
     def build(
-        self, engine: EngineType, settings: EngineSettings | None = None
-    ) -> Model:
+        self,
+        engine: CompartmentalEngineType,
+        settings: EngineSettings | None = None,
+    ) -> Model[CompartmentalStructure]:
         """
-        Build and return the final Model instance.
+        Build and return the final compartmental Model.
 
         Parameters
         ----------
-        engine : EngineType
+        engine : CompartmentalEngineType
             The engine that runs the model: ``"DifferenceEquations"``
             (discrete time) or ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
@@ -905,8 +907,8 @@ class ModelBuilder:
 
         Returns
         -------
-        Model
-            The constructed compartment model.
+        Model[CompartmentalStructure]
+            The constructed compartmental model.
 
         Raises
         ------
@@ -919,7 +921,7 @@ class ModelBuilder:
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
 
-        population = Population(
+        structure = CompartmentalStructure(
             bins=self._bins,
             accumulators=self._accumulators,
             stratifications=self._stratifications,
@@ -927,16 +929,13 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(transitions=self._transitions)
-
-        model = Model(
+        model = Model[CompartmentalStructure](
             name=self._name,
             description=self._description,
             version=self._version,
-            population=population,
             parameters=self._parameters,
-            dynamics=dynamics,
             engine=ModelEngine(type=engine, settings=settings),
+            structure=structure,
             step_unit=self._step_unit,
         )
 
@@ -1833,23 +1832,23 @@ def reset(self) -> Self:
 #### build
 
 ```python
-build(engine: EngineType, settings: EngineSettings | None = None) -> Model
+build(engine: CompartmentalEngineType, settings: EngineSettings | None = None) -> Model[CompartmentalStructure]
 ```
 
-Build and return the final Model instance.
+Build and return the final compartmental Model.
 
 Parameters:
 
-| Name       | Type             | Description                                                                                                         | Default                                                                                                   |
-| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `engine`   | `EngineType`     | The engine that runs the model: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
-| `settings` | \`EngineSettings | None\`                                                                                                              | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
+| Name       | Type                      | Description                                                                                                         | Default                                                                                                   |
+| ---------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `engine`   | `CompartmentalEngineType` | The engine that runs the model: "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). | *required*                                                                                                |
+| `settings` | \`EngineSettings          | None\`                                                                                                              | Settings of that engine; None uses its defaults. Only "DifferentialEquations" takes settings (OdeSolver). |
 
 Returns:
 
-| Type    | Description                        |
-| ------- | ---------------------------------- |
-| `Model` | The constructed compartment model. |
+| Type                            | Description                          |
+| ------------------------------- | ------------------------------------ |
+| `Model[CompartmentalStructure]` | The constructed compartmental model. |
 
 Raises:
 
@@ -1861,14 +1860,16 @@ Source code in `commol/api/model_builder.py`
 
 ```python
 def build(
-    self, engine: EngineType, settings: EngineSettings | None = None
-) -> Model:
+    self,
+    engine: CompartmentalEngineType,
+    settings: EngineSettings | None = None,
+) -> Model[CompartmentalStructure]:
     """
-    Build and return the final Model instance.
+    Build and return the final compartmental Model.
 
     Parameters
     ----------
-    engine : EngineType
+    engine : CompartmentalEngineType
         The engine that runs the model: ``"DifferenceEquations"``
         (discrete time) or ``"DifferentialEquations"`` (continuous time).
     settings : EngineSettings | None, default=None
@@ -1877,8 +1878,8 @@ def build(
 
     Returns
     -------
-    Model
-        The constructed compartment model.
+    Model[CompartmentalStructure]
+        The constructed compartmental model.
 
     Raises
     ------
@@ -1891,7 +1892,7 @@ def build(
     if self._initial_conditions is None:
         raise ValueError("Initial conditions must be set")
 
-    population = Population(
+    structure = CompartmentalStructure(
         bins=self._bins,
         accumulators=self._accumulators,
         stratifications=self._stratifications,
@@ -1899,16 +1900,13 @@ def build(
         initial_conditions=self._initial_conditions,
     )
 
-    dynamics = Dynamics(transitions=self._transitions)
-
-    model = Model(
+    model = Model[CompartmentalStructure](
         name=self._name,
         description=self._description,
         version=self._version,
-        population=population,
         parameters=self._parameters,
-        dynamics=dynamics,
         engine=ModelEngine(type=engine, settings=settings),
+        structure=structure,
         step_unit=self._step_unit,
     )
 

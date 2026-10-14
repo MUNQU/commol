@@ -83,7 +83,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 ## `applied_parameters_report`
 
-`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it:
+`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). A compartmental model adds `initial_conditions`:
 
 ```json
 {

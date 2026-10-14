@@ -1945,6 +1945,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#model-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pyo3-bindings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2393,6 +2404,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#model-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model kind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pyo3-bindings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2541,15 +2563,18 @@
 <ul>
 <li>[ ] Change the Pydantic validation in <code>context/initial_conditions.py</code> and the
       engine rule in <code>builder.rs</code> (<code>initial_state</code>).</li>
-<li>[ ] Check that <code>Model.initial_state()</code> reports the new state.</li>
+<li>[ ] Check that <code>CompartmentalStructure.initial_state()</code> reports the new state.</li>
 <li>[ ] If calibration can set it, update <code>initial_conditions.rs</code> in
-      <code>commol-calibration</code> and the write-back.</li>
+      <code>commol-model</code> (<code>InitialConditionPlan</code>) and the write-back
+      (<code>context/_model/calibration_write_back.py</code>).</li>
 <li>[ ] Check that <code>test_applied_model_reproduces_the_loss_the_optimizer_scored</code>
       still passes.</li>
 </ul>
 <h3 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Keep the loss and the constraints in <code>calibration_problem.rs</code>.</li>
+<li>[ ] Keep the loss and the constraints in <code>calibration_problem.rs</code>, and use
+      only <code>SimulationEngine</code> there: a rule of one model kind goes behind
+      <code>plan_values</code>, <code>apply_values</code> or <code>output_sums</code> of its engines.</li>
 <li>[ ] Convert new options in <code>api/calibrator.py</code> and
       <code>api/probabilistic/calibration_runner.py</code>.</li>
 <li>[ ] Check that <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> still
@@ -2565,13 +2590,16 @@
       file: its name, its model kind, its settings (<code>EngineSettings</code>, parsed
       and validated with <code>deny_unknown_fields</code>), the left-hand side of its
       equations and the meaning of a rate.</li>
-<li>[ ] Write the engine in its own crate and implement <code>SimulationEngine</code>;
-      <code>try_from_model</code> rejects a model of another engine.</li>
+<li>[ ] Write the engine in its own crate and implement <code>SimulationEngine</code>
+      (for a compartmental engine, also <code>CompartmentalEngine</code> from
+      <code>commol-model</code>); <code>try_from_model</code> rejects a model of another engine.</li>
 <li>[ ] Add a variant to <code>Engine</code> in <code>py-commol/src/engine.rs</code>: its arm in
-      <code>build</code>, <code>engine_type</code> and <code>dispatch!</code>. Add the crate to
+      <code>build</code>, <code>engine_type</code>, <code>dispatch!</code>, <code>plan_values</code> and <code>apply_values</code>
+      (and <code>compartmental!</code> for a compartmental engine). Add the crate to
       <code>py-commol/Cargo.toml</code>.</li>
-<li>[ ] Add the name to the <code>EngineType</code> <code>Literal</code> in <code>context/engine.py</code>; if the
-      engine has settings, add their Pydantic class to <code>EngineSettings</code>.</li>
+<li>[ ] For a compartmental engine, add the name to the <code>CompartmentalEngineType</code>
+      <code>Literal</code> in <code>context/engine.py</code>; if the engine has settings, add their
+      Pydantic class to <code>EngineSettings</code>.</li>
 <li>[ ] Run the tests of <code>crates/commol-core/src/types/engine.rs</code>,
       <code>py-commol/src/engine.rs</code> and <code>tests/building/test_engine.py</code>; they run
       every entry of the list.</li>
@@ -2579,15 +2607,49 @@
       <a href="../../advanced/model-structure/">Model structure</a> and
       <a href="../../guide/simulations/">Running simulations</a>.</li>
 </ul>
+<h3 id="model-kind">Model kind<a class="headerlink" href="#model-kind" title="Permanent link">&para;</a></h3>
+<p>To add a kind of model, such as an agent network (see
+<a href="../design-decisions/#one-interface-for-every-model-kind">One interface for every model kind</a>):</p>
+<ul>
+<li>[ ] Add the kind to <code>ModelKind</code> in <code>crates/commol-core/src/types/engine.rs</code>
+      and to its <code>ALL</code>: its name and the types of value calibration may set
+      (<code>value_types</code>).</li>
+<li>[ ] Add the structure of the kind to <code>crates/commol-core/src/types/</code> and a
+      variant to <code>ModelStructure</code> (<code>structure.rs</code>). The compiler names every
+      <code>match</code> to complete, such as <code>Model::compartmental</code>.</li>
+<li>[ ] Add its engines to the list, as in
+      <a href="#model-type-engine">Model type (engine)</a>; each names the new kind.
+      Each engine implements <code>SimulationEngine</code>: <code>plan_values</code> and
+      <code>apply_values</code> resolve and write the values of the kind, and
+      <code>state_outputs</code> and <code>output_sums</code> name what an expression reads.</li>
+<li>[ ] Add a variant to <code>EngineValuePlan</code> in <code>py-commol/src/engine.rs</code>.</li>
+<li>[ ] Write a <code>ModelStructure</code> subclass in <code>py-commol/commol/context/</code>, with
+      <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> and
+      <code>outputs_by_source</code>; override <code>series_label</code>, <code>uncalibrated_values</code>,
+      <code>with_calibrated_values</code>, <code>report_sections</code>, <code>print_equations</code> and
+      <code>check_unit_consistency</code> when the kind has them. Import the module in
+      <code>context/__init__.py</code>, so <code>Model.from_json</code> reads the kind.</li>
+<li>[ ] Give the kind a builder in <code>api/</code> that returns <code>Model[YourStructure]</code>.
+      Do not change <code>Simulation</code>, <code>Calibrator</code>, the reports or the plotter:
+      if one of them needs something of the kind, add a method to
+      <code>ModelStructure</code> with a default.</li>
+<li>[ ] Copy the tests of <code>tests/model_kinds/</code> for the new kind, and run the
+      Rust and Python suites.</li>
+<li>[ ] Add the kind to <a href="../../advanced/model-structure/">Model structure</a>, the
+      <a href="../mental-model/#model-kind-and-engine">Mental model</a> and a guide page.</li>
+</ul>
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] Keep logic out of <code>py-commol/src/</code>: convert types and call the crate.</li>
 <li>[ ] Update <code>_commol_rs.pyi</code>.</li>
-<li>[ ] Rebuild with <code>maturin develop --release</code> before you run <code>pytest</code>.</li>
+<li>[ ] Rebuild with <code>maturin develop --release --features test-kind</code> before you
+      run <code>pytest</code>: the tests need the test model kind.</li>
 </ul>
 <h3 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] Keep the key order of existing entries.</li>
+<li>[ ] Put a section that only one model kind has in its
+      <code>ModelStructure.report_sections</code>, not in <code>api/reporting.py</code>.</li>
 <li>[ ] Use <code>member_statistics</code> and <code>ci_percentiles</code> for ensemble values.</li>
 <li>[ ] Update <code>tests/reporting/</code>.</li>
 </ul>

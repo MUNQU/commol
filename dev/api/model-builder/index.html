@@ -2539,7 +2539,7 @@ before building.</p>
           <tr class="doc-section-item">
             <td><code><span title="commol.api.model_builder.ModelBuilder._transitions">_transitions</span></code></td>
             <td>
-                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Transition (commol.context.dynamics.Transition)" href="../../advanced/model-structure/#commol.context.dynamics.Transition">Transition</a>]</code>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Transition (commol.context.transition.Transition)" href="../../advanced/model-structure/#commol.context.transition.Transition">Transition</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3498,8 +3498,7 @@ before building.</p>
 <span class="normal"><a href="#__codelineno-0-980">980</a></span>
 <span class="normal"><a href="#__codelineno-0-981">981</a></span>
 <span class="normal"><a href="#__codelineno-0-982">982</a></span>
-<span class="normal"><a href="#__codelineno-0-983">983</a></span>
-<span class="normal"><a href="#__codelineno-0-984">984</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66"></a><span class="k">class</span><span class="w"> </span><span class="nc">ModelBuilder</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-983">983</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66"></a><span class="k">class</span><span class="w"> </span><span class="nc">ModelBuilder</span><span class="p">:</span>
 </span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68"></a><span class="sd">    A programmatic interface for building compartment models.</span>
 </span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69"></a>
@@ -4362,62 +4361,61 @@ before building.</p>
 </span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a>        <span class="k">return</span> <span class="bp">self</span>
 </span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a>
 </span><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span>
-</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="n">EngineType</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">EngineSettings</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Model</span><span class="p">:</span>
-</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a><span class="sd">        Build and return the final Model instance.</span>
-</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a>
-</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">        Parameters</span>
-</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a><span class="sd">        ----------</span>
-</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">        engine : EngineType</span>
-</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">            The engine that runs the model: ``&quot;DifferenceEquations&quot;``</span>
-</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a><span class="sd">            (discrete time) or ``&quot;DifferentialEquations&quot;`` (continuous time).</span>
-</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a><span class="sd">        settings : EngineSettings | None, default=None</span>
-</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a><span class="sd">            Settings of that engine; None uses its defaults. Only</span>
-</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a><span class="sd">            ``&quot;DifferentialEquations&quot;`` takes settings (`OdeSolver`).</span>
-</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>
-</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a><span class="sd">        Returns</span>
-</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a><span class="sd">        -------</span>
-</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a><span class="sd">        Model</span>
-</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="sd">            The constructed compartment model.</span>
-</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a>
-</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="sd">        Raises</span>
-</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a><span class="sd">        ------</span>
-</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">        ValueError</span>
-</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">            If validation fails, required components are missing, the engine</span>
-</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">            is unknown, the settings are not settings of that engine, or a</span>
-</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">            per-compartment override names an unknown compartment or makes</span>
-</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">            the initial population exceed ``population_size``.</span>
-</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Initial conditions must be set&quot;</span><span class="p">)</span>
-</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>
-</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>        <span class="n">population</span> <span class="o">=</span> <span class="n">Population</span><span class="p">(</span>
-</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>            <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_bins</span><span class="p">,</span>
-</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>            <span class="n">accumulators</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_accumulators</span><span class="p">,</span>
-</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>            <span class="n">stratifications</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_stratifications</span><span class="p">,</span>
-</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>            <span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">,</span>
-</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>            <span class="n">initial_conditions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span><span class="p">,</span>
-</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a>        <span class="p">)</span>
-</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>
-</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>        <span class="n">dynamics</span> <span class="o">=</span> <span class="n">Dynamics</span><span class="p">(</span><span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">)</span>
+</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a>        <span class="n">engine</span><span class="p">:</span> <span class="n">CompartmentalEngineType</span><span class="p">,</span>
+</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a>        <span class="n">settings</span><span class="p">:</span> <span class="n">EngineSettings</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Model</span><span class="p">[</span><span class="n">CompartmentalStructure</span><span class="p">]:</span>
+</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">        Build and return the final compartmental Model.</span>
+</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a>
+</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">        Parameters</span>
+</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">        ----------</span>
+</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a><span class="sd">        engine : CompartmentalEngineType</span>
+</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a><span class="sd">            The engine that runs the model: ``&quot;DifferenceEquations&quot;``</span>
+</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a><span class="sd">            (discrete time) or ``&quot;DifferentialEquations&quot;`` (continuous time).</span>
+</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a><span class="sd">        settings : EngineSettings | None, default=None</span>
+</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a><span class="sd">            Settings of that engine; None uses its defaults. Only</span>
+</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a><span class="sd">            ``&quot;DifferentialEquations&quot;`` takes settings (`OdeSolver`).</span>
+</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a>
+</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a><span class="sd">        Returns</span>
+</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="sd">        -------</span>
+</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a><span class="sd">        Model[CompartmentalStructure]</span>
+</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="sd">            The constructed compartmental model.</span>
+</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a>
+</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">        Raises</span>
+</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">        ------</span>
+</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">        ValueError</span>
+</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">            If validation fails, required components are missing, the engine</span>
+</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">            is unknown, the settings are not settings of that engine, or a</span>
+</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">            per-compartment override names an unknown compartment or makes</span>
+</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a><span class="sd">            the initial population exceed ``population_size``.</span>
+</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Initial conditions must be set&quot;</span><span class="p">)</span>
+</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>
+</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>        <span class="n">structure</span> <span class="o">=</span> <span class="n">CompartmentalStructure</span><span class="p">(</span>
+</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>            <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_bins</span><span class="p">,</span>
+</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>            <span class="n">accumulators</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_accumulators</span><span class="p">,</span>
+</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>            <span class="n">stratifications</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_stratifications</span><span class="p">,</span>
+</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a>            <span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">,</span>
+</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>            <span class="n">initial_conditions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span><span class="p">,</span>
+</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>        <span class="p">)</span>
 </span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a>
-</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span>
+</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">[</span><span class="n">CompartmentalStructure</span><span class="p">](</span>
 </span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a>            <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
 </span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a>            <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_description</span><span class="p">,</span>
 </span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a>            <span class="n">version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_version</span><span class="p">,</span>
-</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>            <span class="n">population</span><span class="o">=</span><span class="n">population</span><span class="p">,</span>
-</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>            <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">,</span>
-</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>            <span class="n">dynamics</span><span class="o">=</span><span class="n">dynamics</span><span class="p">,</span>
-</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>            <span class="n">engine</span><span class="o">=</span><span class="n">ModelEngine</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">),</span>
-</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>            <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_unit</span><span class="p">,</span>
-</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>        <span class="p">)</span>
-</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>
-</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>            <span class="sa">f</span><span class="s2">&quot;Model &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="si">}</span><span class="s2">&#39; successfully built for the </span><span class="si">{</span><span class="n">engine</span><span class="si">}</span><span class="s2"> engine.&quot;</span>
-</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>        <span class="p">)</span>
-</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>
-</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a>        <span class="k">return</span> <span class="n">model</span>
+</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>            <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">,</span>
+</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>            <span class="n">engine</span><span class="o">=</span><span class="n">ModelEngine</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">),</span>
+</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>            <span class="n">structure</span><span class="o">=</span><span class="n">structure</span><span class="p">,</span>
+</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>            <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_unit</span><span class="p">,</span>
+</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>        <span class="p">)</span>
+</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>
+</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>            <span class="sa">f</span><span class="s2">&quot;Model &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="si">}</span><span class="s2">&#39; successfully built for the </span><span class="si">{</span><span class="n">engine</span><span class="si">}</span><span class="s2"> engine.&quot;</span>
+</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>        <span class="p">)</span>
+</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>
+</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>        <span class="k">return</span> <span class="n">model</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -6831,12 +6829,12 @@ conditions are removed.</p>
 
 
 <a href="#commol.api.model_builder.ModelBuilder.build" class="headerlink" title="Permanent link">&para;</a></h4>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build</span><span class="p">(</span><span class="n">engine</span><span class="p">:</span> <span class="n"><span title="commol.context.engine.EngineType">EngineType</span></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><span title="commol.context.engine.EngineSettings">EngineSettings</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Model (commol.context.model.Model)" href="../model/#commol.context.model.Model">Model</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build</span><span class="p">(</span><span class="n">engine</span><span class="p">:</span> <span class="n"><span title="commol.context.engine.CompartmentalEngineType">CompartmentalEngineType</span></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><span title="commol.context.engine.EngineSettings">EngineSettings</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Model (commol.context.model.Model)" href="../model/#commol.context.model.Model">Model</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="CompartmentalStructure (commol.context.compartmental.CompartmentalStructure)" href="../model/#commol.context.compartmental.CompartmentalStructure">CompartmentalStructure</a></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Build and return the final Model instance.</p>
+        <p>Build and return the final compartmental Model.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6855,7 +6853,7 @@ conditions are removed.</p>
                 <code>engine</code>
             </td>
             <td>
-                  <code><span title="commol.context.engine.EngineType">EngineType</span></code>
+                  <code><span title="commol.context.engine.CompartmentalEngineType">CompartmentalEngineType</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6899,11 +6897,11 @@ conditions are removed.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Model (commol.context.model.Model)" href="../model/#commol.context.model.Model">Model</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Model (commol.context.model.Model)" href="../model/#commol.context.model.Model">Model</a>[<a class="autorefs autorefs-internal" title="CompartmentalStructure (commol.context.compartmental.CompartmentalStructure)" href="../model/#commol.context.compartmental.CompartmentalStructure">CompartmentalStructure</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The constructed compartment model.</p>
+                <p>The constructed compartmental model.</p>
               </div>
             </td>
           </tr>
@@ -6994,64 +6992,62 @@ the initial population exceed <code>population_size</code>.</p>
 <span class="normal"><a href="#__codelineno-0-980">980</a></span>
 <span class="normal"><a href="#__codelineno-0-981">981</a></span>
 <span class="normal"><a href="#__codelineno-0-982">982</a></span>
-<span class="normal"><a href="#__codelineno-0-983">983</a></span>
-<span class="normal"><a href="#__codelineno-0-984">984</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a><span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span>
-</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="n">EngineType</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">EngineSettings</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Model</span><span class="p">:</span>
-</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a><span class="sd">    Build and return the final Model instance.</span>
-</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a>
-</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">    engine : EngineType</span>
-</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">        The engine that runs the model: ``&quot;DifferenceEquations&quot;``</span>
-</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a><span class="sd">        (discrete time) or ``&quot;DifferentialEquations&quot;`` (continuous time).</span>
-</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a><span class="sd">    settings : EngineSettings | None, default=None</span>
-</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a><span class="sd">        Settings of that engine; None uses its defaults. Only</span>
-</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a><span class="sd">        ``&quot;DifferentialEquations&quot;`` takes settings (`OdeSolver`).</span>
-</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a>
-</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a><span class="sd">    -------</span>
-</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a><span class="sd">    Model</span>
-</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="sd">        The constructed compartment model.</span>
-</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a>
-</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="sd">    Raises</span>
-</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a><span class="sd">    ------</span>
-</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">    ValueError</span>
-</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">        If validation fails, required components are missing, the engine</span>
-</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">        is unknown, the settings are not settings of that engine, or a</span>
-</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">        per-compartment override names an unknown compartment or makes</span>
-</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">        the initial population exceed ``population_size``.</span>
-</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Initial conditions must be set&quot;</span><span class="p">)</span>
-</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>
-</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>    <span class="n">population</span> <span class="o">=</span> <span class="n">Population</span><span class="p">(</span>
-</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>        <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_bins</span><span class="p">,</span>
-</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>        <span class="n">accumulators</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_accumulators</span><span class="p">,</span>
-</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>        <span class="n">stratifications</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_stratifications</span><span class="p">,</span>
-</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>        <span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">,</span>
-</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>        <span class="n">initial_conditions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span><span class="p">,</span>
-</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a>    <span class="p">)</span>
-</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>
-</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>    <span class="n">dynamics</span> <span class="o">=</span> <span class="n">Dynamics</span><span class="p">(</span><span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-983">983</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-928"><a id="__codelineno-0-928" name="__codelineno-0-928"></a><span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span>
+</span><span id="__span-0-929"><a id="__codelineno-0-929" name="__codelineno-0-929"></a>    <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-930"><a id="__codelineno-0-930" name="__codelineno-0-930"></a>    <span class="n">engine</span><span class="p">:</span> <span class="n">CompartmentalEngineType</span><span class="p">,</span>
+</span><span id="__span-0-931"><a id="__codelineno-0-931" name="__codelineno-0-931"></a>    <span class="n">settings</span><span class="p">:</span> <span class="n">EngineSettings</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-932"><a id="__codelineno-0-932" name="__codelineno-0-932"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Model</span><span class="p">[</span><span class="n">CompartmentalStructure</span><span class="p">]:</span>
+</span><span id="__span-0-933"><a id="__codelineno-0-933" name="__codelineno-0-933"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-934"><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="sd">    Build and return the final compartmental Model.</span>
+</span><span id="__span-0-935"><a id="__codelineno-0-935" name="__codelineno-0-935"></a>
+</span><span id="__span-0-936"><a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-937"><a id="__codelineno-0-937" name="__codelineno-0-937"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-938"><a id="__codelineno-0-938" name="__codelineno-0-938"></a><span class="sd">    engine : CompartmentalEngineType</span>
+</span><span id="__span-0-939"><a id="__codelineno-0-939" name="__codelineno-0-939"></a><span class="sd">        The engine that runs the model: ``&quot;DifferenceEquations&quot;``</span>
+</span><span id="__span-0-940"><a id="__codelineno-0-940" name="__codelineno-0-940"></a><span class="sd">        (discrete time) or ``&quot;DifferentialEquations&quot;`` (continuous time).</span>
+</span><span id="__span-0-941"><a id="__codelineno-0-941" name="__codelineno-0-941"></a><span class="sd">    settings : EngineSettings | None, default=None</span>
+</span><span id="__span-0-942"><a id="__codelineno-0-942" name="__codelineno-0-942"></a><span class="sd">        Settings of that engine; None uses its defaults. Only</span>
+</span><span id="__span-0-943"><a id="__codelineno-0-943" name="__codelineno-0-943"></a><span class="sd">        ``&quot;DifferentialEquations&quot;`` takes settings (`OdeSolver`).</span>
+</span><span id="__span-0-944"><a id="__codelineno-0-944" name="__codelineno-0-944"></a>
+</span><span id="__span-0-945"><a id="__codelineno-0-945" name="__codelineno-0-945"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-946"><a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="sd">    -------</span>
+</span><span id="__span-0-947"><a id="__codelineno-0-947" name="__codelineno-0-947"></a><span class="sd">    Model[CompartmentalStructure]</span>
+</span><span id="__span-0-948"><a id="__codelineno-0-948" name="__codelineno-0-948"></a><span class="sd">        The constructed compartmental model.</span>
+</span><span id="__span-0-949"><a id="__codelineno-0-949" name="__codelineno-0-949"></a>
+</span><span id="__span-0-950"><a id="__codelineno-0-950" name="__codelineno-0-950"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-951"><a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">    ------</span>
+</span><span id="__span-0-952"><a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-953"><a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">        If validation fails, required components are missing, the engine</span>
+</span><span id="__span-0-954"><a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">        is unknown, the settings are not settings of that engine, or a</span>
+</span><span id="__span-0-955"><a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">        per-compartment override names an unknown compartment or makes</span>
+</span><span id="__span-0-956"><a id="__codelineno-0-956" name="__codelineno-0-956"></a><span class="sd">        the initial population exceed ``population_size``.</span>
+</span><span id="__span-0-957"><a id="__codelineno-0-957" name="__codelineno-0-957"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-958"><a id="__codelineno-0-958" name="__codelineno-0-958"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-959"><a id="__codelineno-0-959" name="__codelineno-0-959"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Initial conditions must be set&quot;</span><span class="p">)</span>
+</span><span id="__span-0-960"><a id="__codelineno-0-960" name="__codelineno-0-960"></a>
+</span><span id="__span-0-961"><a id="__codelineno-0-961" name="__codelineno-0-961"></a>    <span class="n">structure</span> <span class="o">=</span> <span class="n">CompartmentalStructure</span><span class="p">(</span>
+</span><span id="__span-0-962"><a id="__codelineno-0-962" name="__codelineno-0-962"></a>        <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_bins</span><span class="p">,</span>
+</span><span id="__span-0-963"><a id="__codelineno-0-963" name="__codelineno-0-963"></a>        <span class="n">accumulators</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_accumulators</span><span class="p">,</span>
+</span><span id="__span-0-964"><a id="__codelineno-0-964" name="__codelineno-0-964"></a>        <span class="n">stratifications</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_stratifications</span><span class="p">,</span>
+</span><span id="__span-0-965"><a id="__codelineno-0-965" name="__codelineno-0-965"></a>        <span class="n">transitions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_transitions</span><span class="p">,</span>
+</span><span id="__span-0-966"><a id="__codelineno-0-966" name="__codelineno-0-966"></a>        <span class="n">initial_conditions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_initial_conditions</span><span class="p">,</span>
+</span><span id="__span-0-967"><a id="__codelineno-0-967" name="__codelineno-0-967"></a>    <span class="p">)</span>
 </span><span id="__span-0-968"><a id="__codelineno-0-968" name="__codelineno-0-968"></a>
-</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span>
+</span><span id="__span-0-969"><a id="__codelineno-0-969" name="__codelineno-0-969"></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">[</span><span class="n">CompartmentalStructure</span><span class="p">](</span>
 </span><span id="__span-0-970"><a id="__codelineno-0-970" name="__codelineno-0-970"></a>        <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
 </span><span id="__span-0-971"><a id="__codelineno-0-971" name="__codelineno-0-971"></a>        <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_description</span><span class="p">,</span>
 </span><span id="__span-0-972"><a id="__codelineno-0-972" name="__codelineno-0-972"></a>        <span class="n">version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_version</span><span class="p">,</span>
-</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>        <span class="n">population</span><span class="o">=</span><span class="n">population</span><span class="p">,</span>
-</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>        <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">,</span>
-</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>        <span class="n">dynamics</span><span class="o">=</span><span class="n">dynamics</span><span class="p">,</span>
-</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>        <span class="n">engine</span><span class="o">=</span><span class="n">ModelEngine</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">),</span>
-</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>        <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_unit</span><span class="p">,</span>
-</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>    <span class="p">)</span>
-</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>
-</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>        <span class="sa">f</span><span class="s2">&quot;Model &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="si">}</span><span class="s2">&#39; successfully built for the </span><span class="si">{</span><span class="n">engine</span><span class="si">}</span><span class="s2"> engine.&quot;</span>
-</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>    <span class="p">)</span>
-</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>
-</span><span id="__span-0-984"><a id="__codelineno-0-984" name="__codelineno-0-984"></a>    <span class="k">return</span> <span class="n">model</span>
+</span><span id="__span-0-973"><a id="__codelineno-0-973" name="__codelineno-0-973"></a>        <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">,</span>
+</span><span id="__span-0-974"><a id="__codelineno-0-974" name="__codelineno-0-974"></a>        <span class="n">engine</span><span class="o">=</span><span class="n">ModelEngine</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">),</span>
+</span><span id="__span-0-975"><a id="__codelineno-0-975" name="__codelineno-0-975"></a>        <span class="n">structure</span><span class="o">=</span><span class="n">structure</span><span class="p">,</span>
+</span><span id="__span-0-976"><a id="__codelineno-0-976" name="__codelineno-0-976"></a>        <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_unit</span><span class="p">,</span>
+</span><span id="__span-0-977"><a id="__codelineno-0-977" name="__codelineno-0-977"></a>    <span class="p">)</span>
+</span><span id="__span-0-978"><a id="__codelineno-0-978" name="__codelineno-0-978"></a>
+</span><span id="__span-0-979"><a id="__codelineno-0-979" name="__codelineno-0-979"></a>    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="__span-0-980"><a id="__codelineno-0-980" name="__codelineno-0-980"></a>        <span class="sa">f</span><span class="s2">&quot;Model &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="si">}</span><span class="s2">&#39; successfully built for the </span><span class="si">{</span><span class="n">engine</span><span class="si">}</span><span class="s2"> engine.&quot;</span>
+</span><span id="__span-0-981"><a id="__codelineno-0-981" name="__codelineno-0-981"></a>    <span class="p">)</span>
+</span><span id="__span-0-982"><a id="__codelineno-0-982" name="__codelineno-0-982"></a>
+</span><span id="__span-0-983"><a id="__codelineno-0-983" name="__codelineno-0-983"></a>    <span class="k">return</span> <span class="n">model</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>

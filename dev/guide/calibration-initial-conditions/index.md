@@ -61,7 +61,7 @@ result = Calibrator(Simulation(model), problem).run()
 print(round(result.best_parameters["B"], 4))  # 0.02
 
 model.apply_calibration_parameters(result, problem)
-print({c.name: round(c.population, 1) for c in model.initial_state()})
+print({c.name: round(c.population, 1) for c in model.structure.initial_state()})
 # {'A': 980.0, 'B': 20.0, 'C': 0.0}
 ```
 
@@ -78,7 +78,7 @@ Here `B` is calibrated, and `A`, the remainder, takes what is left of the popula
 
 A category name that two stratifications declare must be qualified with its stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
 
-The engine resolves every id when you create the `Calibrator` or the `ProbabilisticCalibrator` (`check_initial_conditions` in `crates/commol-calibration/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
+The engine resolves every id when you create the `Calibrator` or the `ProbabilisticCalibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
 | `id`                                                                                             | Error                                                              |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
@@ -172,7 +172,7 @@ result = Calibrator(Simulation(composite), problem).run()
 print(round(result.best_parameters["B_g1"], 4))  # 0.01
 
 composite.apply_calibration_parameters(result, problem)
-print({c.name: round(c.population, 1) for c in composite.initial_state()})
+print({c.name: round(c.population, 1) for c in composite.structure.initial_state()})
 # {'A_g1': 490.0, 'A_g2': 450.0, 'B_g1': 10.0, 'B_g2': 50.0}
 ```
 

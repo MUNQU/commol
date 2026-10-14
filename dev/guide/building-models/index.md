@@ -298,7 +298,7 @@ builder = builder.set_initial_conditions(
 | Every stratification has fractions that sum to 1.0                                                 | `build`                  |
 | Override names are expanded compartments; the initial population does not exceed `population_size` | `build`                  |
 
-The initial population of a compartment is `population_size × bin fraction × the fraction of each of its categories`, unless an override names it. `Model.initial_state()` shows the result. To change fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-fractions-after-building).
+The initial population of a compartment is `population_size × bin fraction × the fraction of each of its categories`, unless an override names it. `CompartmentalStructure.initial_state()` shows the result. To change fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-fractions-after-building).
 
 ## Build
 
@@ -310,7 +310,7 @@ builder = (
 )
 stratified_model = builder.build(engine="DifferenceEquations")
 
-print([c.name for c in stratified_model.initial_state()])
+print([c.name for c in stratified_model.structure.initial_state()])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 

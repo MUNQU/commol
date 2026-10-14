@@ -2826,9 +2826,10 @@ The tests live in <code>py-commol/tests/</code>.</p>
 <p>A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scale.py</code>,
-<code>api/probabilistic/</code>) goes in the package of its feature. The one exception is
-<code>reference_models/</code>: it checks published models across features (see
-<a href="#reference-models">Reference models</a>).</p>
+<code>api/probabilistic/</code>) goes in the package of its feature. The exceptions are
+<code>reference_models/</code>, which checks published models across features (see
+<a href="#reference-models">Reference models</a>), and <code>model_kinds/</code>, which runs a model
+kind that is not compartmental through every generic layer.</p>
 <table>
 <thead>
 <tr>
@@ -2902,6 +2903,11 @@ of X". A pure-Python helper (<code>utils/security.py</code>, <code>api/time_scal
 <td><code>reference_models/</code></td>
 <td>Published models against their stated results, one module per model family</td>
 <td>— (across features)</td>
+</tr>
+<tr>
+<td><code>model_kinds/</code></td>
+<td>The test model kind (<code>support/kinds.py</code>) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind. It needs the extension built with <code>--features test-kind</code>.</td>
+<td>— (across features; <a href="../design-decisions/#one-interface-for-every-model-kind">Design decisions</a>)</td>
 </tr>
 <tr>
 <td><code>support/</code></td>

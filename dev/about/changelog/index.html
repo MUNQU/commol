@@ -2596,6 +2596,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   for the unit check, of any single dimension: the axis is the independent
   variable of the model, which need not be time (for example <code>"meter"</code>). Without it, the check infers the unit as before.</li>
 <li><code>TimeScale.from_step_unit(unit)</code>, which raises for a unit that is not time.</li>
+<li>One interface for every kind of model: <code>ModelStructure</code>, an abstract base
+  class that the structure of each kind inherits. <code>Simulation</code>, <code>Calibrator</code>,
+  <code>ProbabilisticCalibrator</code>, the reports and <code>SimulationPlotter</code> use only it,
+  so another kind (for example an agent network) is a new subclass with its
+  engines in the engine's list. <code>CompartmentalStructure</code> is the structure of a
+  compartmental model. A subclass that misses a method cannot be made, and the
+  error names the method.</li>
+<li>An engine runs one model kind, and a model whose engine runs another kind is
+  rejected when it is made, with an error that names the engine and both kinds.</li>
+<li>Each kind declares the values calibration may set besides <code>parameter</code> and
+  <code>factor</code> (<code>ModelStructure.calibration_value_types</code>); a compartmental model
+  accepts <code>initial_condition</code>. A type the kind does not accept raises an error
+  that names the kind.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -2607,7 +2620,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   (<code>run_at_positions_into_buffer</code>); <code>run(n)</code> returns the grid it ran on.</li>
 <li>The engine of a model and its settings are one field,
   <code>Model.engine = {type, settings}</code> (<code>ModelEngine</code>), which replaces
-  <code>Model.dynamics.typology</code>; <code>Dynamics</code> holds only the transitions. The
+  <code>Model.dynamics.typology</code>. The
   builder takes the engine where it builds, so one builder builds the model
   for each engine with its own settings. Settings of one engine given to
   another raise an error from the engine that names both. A model file
@@ -2635,15 +2648,118 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <td><code>commol_rs.engine.Engine(model)</code>, the engine the model names</td>
 </tr>
 <tr>
-<td>- Names of positions, lengths and counts, and names with more than one</td>
+<td>- A model is a header, an engine and a <code>structure</code>: <code>Model.structure</code>, tagged</td>
 <td></td>
 </tr>
 <tr>
-<td>meaning. No old name is kept; an old keyword raises an error that names it.</td>
+<td>in JSON by <code>kind</code>, replaces <code>Model.population</code> and <code>Model.dynamics</code>, and the</td>
+<td></td>
+</tr>
+<tr>
+<td>transitions are held once. <code>Model</code> is generic in its structure class:</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ModelBuilder.build</code> returns <code>Model[CompartmentalStructure]</code>, and</td>
+<td></td>
+</tr>
+<tr>
+<td><code>Model.from_json</code> reads the class from the <code>kind</code>. The methods that only a</td>
+<td></td>
+</tr>
+<tr>
+<td>compartmental model has moved to its structure. A model file saved before</td>
+<td></td>
+</tr>
+<tr>
+<td>has <code>population</code> and <code>dynamics</code> and does not load: move the fields of</td>
+<td></td>
+</tr>
+<tr>
+<td><code>population</code> and <code>dynamics.transitions</code> into</td>
+<td></td>
+</tr>
+<tr>
+<td><code>"structure": {"kind": "compartmental", …}</code>.</td>
 <td></td>
 </tr>
 </tbody>
 </table>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model.population.bins</code>, <code>.accumulators</code>, <code>.stratifications</code>, <code>.initial_conditions</code></td>
+<td><code>model.structure.bins</code>, …</td>
+</tr>
+<tr>
+<td><code>model.dynamics.transitions</code> (and <code>model.population.transitions</code>)</td>
+<td><code>model.structure.transitions</code></td>
+</tr>
+<tr>
+<td><code>model.initial_state()</code></td>
+<td><code>model.structure.initial_state()</code></td>
+</tr>
+<tr>
+<td><code>model.update_initial_conditions(…)</code>, <code>update_stratification_fractions(…)</code>, <code>update_compartment_fractions(…)</code></td>
+<td><code>model.structure.update_initial_conditions(…)</code>, …</td>
+</tr>
+<tr>
+<td><code>model.subgroup_population(…)</code>, <code>model.get_conditioning_categories(…)</code></td>
+<td><code>model.structure.subgroup_population(…)</code>, …</td>
+</tr>
+<tr>
+<td><code>model.get_outputs_by_source()</code></td>
+<td><code>model.structure.outputs_by_source()</code></td>
+</tr>
+<tr>
+<td><code>model.get_uncalibrated_initial_conditions()</code></td>
+<td><code>model.structure.uncalibrated_values()</code></td>
+</tr>
+<tr>
+<td><code>commol.context.dynamics</code> (<code>Transition</code>, <code>StratifiedRate</code>)</td>
+<td><code>commol.context.transition</code></td>
+</tr>
+<tr>
+<td><code>commol.context.engine.EngineType</code></td>
+<td><code>CompartmentalEngineType</code>; <code>ModelEngine.type</code> is a <code>str</code> that the engine's list checks</td>
+</tr>
+<tr>
+<td><code>commol_rs.core.Model(population=…, dynamics=…)</code></td>
+<td><code>commol_rs.core.Model(structure=commol_rs.core.CompartmentalStructure(…))</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.model.initial_state(model)</code>, <code>expanded_outputs</code>, <code>transition_flows</code></td>
+<td>they take a <code>commol_rs.core.CompartmentalStructure</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.calibration.check_initial_conditions</code></td>
+<td><code>check_model_values</code></td>
+</tr>
+<tr>
+<td><code>commol_rs.calibration.calibrate(…, initial_population_size, …)</code> and the other calibration functions</td>
+<td>no <code>initial_population_size</code>: the engine knows it</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>applied_parameters_report</code> returns <code>parameters</code> and the sections of the
+  kind of the model; a compartmental model adds <code>initial_conditions</code>, with the
+  same keys as before.</li>
+<li>The Rust engine trait (<code>SimulationEngine</code>) is the same for every model
+  kind: <code>compartments</code>, <code>population</code>, <code>set_initial_condition</code> and
+  <code>output_labels</code> moved to <code>CompartmentalEngine</code> (<code>commol-model</code>), and the
+  engine resolves and writes the values of its kind (<code>plan_values</code>,
+  <code>apply_values</code>). The initial-condition plan moved from <code>commol-calibration</code>
+  to <code>commol-model</code>. The crates are not published.</li>
+<li>Names of positions, lengths and counts, and names with more than one
+  meaning. No old name is kept; an old keyword raises an error that names it.</li>
+</ul>
 <table>
 <thead>
 <tr>
@@ -2810,8 +2926,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Dynamics</code>, the order check of <code>Simulation.run_at</code>).</li>
 <li>The <code>"weighted_sse"</code> loss and <code>LossConfig.weighted_sse()</code>. Use <code>"sse"</code>,
   which uses the weights.</li>
-<li><code>commol.constants.ModelTypes</code>. The engine names are the <code>Literal</code>
-  <code>commol.context.engine.EngineType</code>.</li>
+<li><code>commol.constants.ModelTypes</code>. The names of the compartmental engines are
+  the <code>Literal</code> <code>commol.context.engine.CompartmentalEngineType</code>.</li>
+<li><code>Population</code> and <code>Dynamics</code>, in Python (<code>commol.context.population</code>,
+  <code>commol.context.dynamics</code>) and in Rust, and their PyO3 classes; the
+  structure of a model is <code>CompartmentalStructure</code>.</li>
+<li><code>Model.get_uncalibrated_initial_conditions</code>, <code>Model.initial_state</code>, and the
+  other methods of a compartmental model on <code>Model</code>: they are on
+  <code>model.structure</code> (see Changed).</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>

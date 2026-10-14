@@ -10,13 +10,13 @@ Plain-dictionary reports of a calibrated model and of a run. Guide: [Reports](ht
 applied_parameters_report(model: Model, result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
-Report every parameter and initial condition of a calibrated model.
+Report every parameter of a calibrated model, and the values of its kind.
 
-Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones.
+Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); a compartmental model adds `initial_conditions`.
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-Initial conditions carry the effective head `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that head count over the declared population size, and the `group` it belongs to: `population` for bins and unconditional stratifications, and the conditioning categories for a conditional one. `N` is the declared population size, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
+Initial conditions of a compartmental model carry the effective head `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that head count over the declared population size, and the `group` it belongs to: `population` for bins and unconditional stratifications, and the conditioning categories for a conditional one. `N` is the declared population size, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
 
 For a probabilistic result each entry gains an `interval` holding the ensemble spread. A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the whole population, so its interval is rescaled by the group's share of the population and brackets the reported fraction.
 
@@ -32,9 +32,9 @@ Parameters:
 
 Returns:
 
-| Type                      | Description                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `AppliedParametersReport` | Keys parameters and initial_conditions, preceded by confidence_level when there is one. |
+| Type                      | Description                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for a compartmental model), preceded by confidence_level when there is one. |
 
 Source code in `commol/api/reporting.py`
 
@@ -47,17 +47,21 @@ def applied_parameters_report(
     confidence_level: float | None = None,
 ) -> AppliedParametersReport:
     """
-    Report every parameter and initial condition of a calibrated model.
+    Report every parameter of a calibrated model, and the values of its kind.
 
     Each entry carries the value the model holds and whether calibration set
     it, so entries the calibration left alone appear alongside the fitted ones.
+    The structure of the model adds the sections of its kind
+    (`ModelStructure.report_sections`); a compartmental model adds
+    ``initial_conditions``.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions carry the effective head ``value`` the engine builds
+    Initial conditions of a compartmental model carry the effective head
+    ``value`` the engine builds
     from the uniform expansion plus the declared compartment overrides, its
     ``fraction`` as that head count over the declared population size, and the
     ``group`` it belongs to: ``population`` for bins and unconditional
@@ -92,8 +96,9 @@ def applied_parameters_report(
     Returns
     -------
     AppliedParametersReport
-        Keys ``parameters`` and ``initial_conditions``, preceded by
-        ``confidence_level`` when there is one.
+        Key ``parameters`` and the sections of the kind (``initial_conditions``
+        for a compartmental model), preceded by ``confidence_level`` when there
+        is one.
     """
     calibrated = calibrated_values(result)
     parameter_statistics, confidence_level = _ensemble_details(
@@ -114,20 +119,15 @@ def applied_parameters_report(
                 factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
             )
 
-    initial_conditions = _initial_conditions_report(
-        model, calibrated_ids, parameter_statistics
-    )
-    if confidence_level is None:
-        return {
-            "parameters": parameters,
-            "initial_conditions": initial_conditions,
-        }
+    report: dict[str, object] = {}
     # `confidence_level` leads the report, so it is written first.
-    return {
-        "confidence_level": confidence_level,
-        "parameters": parameters,
-        "initial_conditions": initial_conditions,
-    }
+    if confidence_level is not None:
+        report["confidence_level"] = confidence_level
+    report["parameters"] = parameters
+    report.update(
+        model.structure.report_sections(model, calibrated_ids, parameter_statistics)
+    )
+    return cast(AppliedParametersReport, report)
 ```
 
 ## simulation_report

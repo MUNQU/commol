@@ -2693,10 +2693,10 @@ fewer suffixes than their siblings. <code>outputs_for</code>, <code>group_output
 </div>
 <h3 id="totals-by-category">Totals by category<a class="headerlink" href="#totals-by-category" title="Permanent link">&para;</a></h3>
 <p>To select compartments by category, use their labels from
-<code>Model.initial_state()</code>: each entry has <code>name</code>, <code>bin</code> and <code>categories</code>.</p>
+<code>CompartmentalStructure.initial_state()</code>: each entry has <code>name</code>, <code>bin</code> and <code>categories</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">in_g1</span> <span class="o">=</span> <span class="p">[</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">compartment</span><span class="o">.</span><span class="n">name</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">for</span> <span class="n">compartment</span> <span class="ow">in</span> <span class="n">stratified</span><span class="o">.</span><span class="n">initial_state</span><span class="p">()</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">for</span> <span class="n">compartment</span> <span class="ow">in</span> <span class="n">stratified</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">initial_state</span><span class="p">()</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="k">if</span> <span class="n">compartment</span><span class="o">.</span><span class="n">categories</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;g1&quot;</span>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">]</span>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">in_g1</span><span class="p">)</span>  <span class="c1"># [&#39;A_g1_t1&#39;, &#39;A_g1_t2&#39;, &#39;B_g1_t1&#39;, &#39;B_g1_t2&#39;]</span>

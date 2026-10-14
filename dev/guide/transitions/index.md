@@ -150,7 +150,7 @@ outflow = (
     .build(engine="DifferenceEquations")
 )
 
-for transition in outflow.dynamics.transitions:
+for transition in outflow.structure.transitions:
     print(transition.id, transition.rate)
 # outflow__A mu * A * (1 + 0.1 * A / N)
 # outflow__B mu * B * (1 + 0.1 * B / N)
