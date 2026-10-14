@@ -85,7 +85,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) for commi
 
 git add .
 git commit -m "feat(transitions): add support for time-varying rates"
-git commit -m "fix(simulation): correct population calculation"
+git commit -m "fix(simulation): correct the total of a subgroup"
 git commit -m "docs(readme): update installation instructions"
 git commit -m "test(models): add tests for stratified models"
 ```

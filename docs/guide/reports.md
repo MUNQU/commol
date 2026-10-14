@@ -35,11 +35,11 @@ def model(k1: float | None):
         .add_parameter(id="k2", value=0.1)
         .add_accumulator(id="cum_ab", name="Total moved from A to B")
         .add_transition(
-            id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / N", accumulators=["cum_ab"]
+            id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
         .set_initial_conditions(
-            population_size=1000,
+            total=1000,
             bin_fractions=[
                 {"bin": "A", "fraction": 0.99},
                 {"bin": "B", "fraction": 0.01},
@@ -100,10 +100,10 @@ kind of model; the structure of the model adds the sections of its kind
     "k2": {"value": 0.1, "calibrated": false}
   },
   "initial_conditions": {
-    "N": {"group": "population", "fraction": 1.0, "value": 1000.0, "calibrated": false},
-    "A": {"group": "population", "fraction": 0.99, "value": 990.0, "calibrated": false},
-    "B": {"group": "population", "fraction": 0.01, "value": 10.0, "calibrated": false},
-    "C": {"group": "population", "fraction": 0.0, "value": 0.0, "calibrated": false}
+    "total": {"group": "total", "fraction": 1.0, "value": 1000.0, "calibrated": false},
+    "A": {"group": "total", "fraction": 0.99, "value": 990.0, "calibrated": false},
+    "B": {"group": "total", "fraction": 0.01, "value": 10.0, "calibrated": false},
+    "C": {"group": "total", "fraction": 0.0, "value": 0.0, "calibrated": false}
   }
 }
 ```
@@ -118,10 +118,10 @@ kind of model; the structure of the model adds the sections of its kind
 | Entry | Rule |
 |---|---|
 | Parameters | Only numeric parameters: formulas and series are inputs, not fitted values. |
-| `N` | The declared `population_size`, with fraction 1.0. |
-| Initial-condition `value` | The head count the engine builds, overrides included. |
-| Initial-condition `fraction` | That head count over `population_size`, so every row shares one denominator. |
-| `group` | `"population"`, or the conditioning categories for a conditional stratification. |
+| `total` | The declared `total`, with fraction 1.0. |
+| Initial-condition `value` | The amount the engine builds, overrides included. |
+| Initial-condition `fraction` | That amount over `total`, so every row shares one denominator. |
+| `group` | `"total"`, or the conditioning categories for a conditional stratification. |
 | An uncalibrated bin (`None` fraction) | `fraction` and `value` are `null`. |
 | A probabilistic result | Each entry gains an `interval` block, and the report starts with `confidence_level`. |
 

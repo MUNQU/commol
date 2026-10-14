@@ -171,10 +171,10 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="a_to_b", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="a_to_b", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="b_to_c", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},

@@ -12,10 +12,10 @@ Use this page when you know what to change but not where it belongs.
 | `crates/commol-core/src/types/engine.rs` | `EngineType`, the one list of engines (model types): per entry, the model kind it runs (`ModelKind`, with the value types it accepts, `ModelValueType`), its settings and their validation, the form of its equations and the meaning of a rate. `ModelEngine`, the engine and settings of a model. | The engines themselves. |
 | `crates/commol-core/src/math_expression/` | Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (`jit/`). | Model-specific variables. |
 | `crates/commol-core/src/simulation_engine.rs` | The `SimulationEngine` trait, for an engine of any kind: runs at positions (`check_position`), outputs (`output_names`, `state_outputs`, `output_sums`), parameters, reset, and the values of its kind (`plan_values`, `apply_values`, `ValuePlan`); `Trajectory`, `check_positions`. What calibration needs from any engine. | Code for one engine or one kind. |
-| `crates/commol-model/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), name checks (`check_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
+| `crates/commol-model/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), name checks (`check_names`), the subgroup total names (`subgroup_total_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
 | `crates/commol-model/src/layout.rs` | `CompartmentLayout`: compartments in engine order with their labels, and lookups by bin and categories. | Name parsing. |
 | `crates/commol-model/src/labels.rs` | `OutputLabels` (bin and categories of an output) and `output_sums` (bin totals and partial totals). | Name parsing. |
-| `crates/commol-model/src/engine.rs` | `CompartmentalEngine`: what a compartmental engine gives besides `SimulationEngine` (compartments, labels, population, population size, `set_initial_condition`). | Code for one engine. |
+| `crates/commol-model/src/engine.rs` | `CompartmentalEngine`: what a compartmental engine gives besides `SimulationEngine` (compartments, labels, `state`, `total`, `set_initial_condition`). | Code for one engine. |
 | `crates/commol-model/src/initial_conditions.rs` | How initial-condition values reach a compartmental engine (`InitialConditionPlan`: resolution, layers, remainder); both engines' `plan_values` and `apply_values` use it. | Parameter values. |
 | `crates/commol-model/src/flows.rs` | Transition flow planning (`plan_transition_flows`) and its description for Python (`describe_flows`). | Rate evaluation at run time. |
 | `crates/commol-model/src/helpers.rs` | Stratified-rate resolution and rate rewriting helpers. | New public API. |
@@ -35,7 +35,7 @@ Use this page when you know what to change but not where it belongs.
 | Path | Owns | Do not put here |
 |---|---|---|
 | `py-commol/src/core.rs` | Bindings of the model types (`Model`, `CompartmentalStructure`, …). | Logic. |
-| `py-commol/src/model.rs` | The queries of `commol_rs.model` on a compartmental structure: `initial_state`, `expanded_outputs`, `transition_flows`; and `check_names` on a model. | Logic beyond type conversion. |
+| `py-commol/src/model.rs` | The queries of `commol_rs.model` on a compartmental structure: `initial_state`, `expanded_outputs`, `transition_flows`, `subgroup_total_names`; and `check_names` on a model. | Logic beyond type conversion. |
 | `py-commol/src/engine.rs` | `commol_rs.engine`: `Engine::build`, which checks the kind and builds the engine an `EngineType` entry names, and the Python classes `Engine` (any engine, built from a model), `EngineType` (the list, for Python to ask) and `ModelKind`. | Engine logic. |
 | `py-commol/src/test_kind.rs` | `TestEngine`, the engine of the test model kind; only with the `test-kind` feature. | Anything a release needs. |
 | `py-commol/src/calibration.rs` | Calibration types and functions; each takes an `Engine`. | Logic beyond type conversion. |

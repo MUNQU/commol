@@ -9,9 +9,9 @@ test that guards it. Read the ones of your area before you change it.
 | Area | Decisions |
 |---|---|
 | Model kinds | [One interface for every kind](#one-interface-for-every-model-kind), [a model by composition](#a-model-is-a-header-an-engine-and-a-structure) |
-| Model structure | [Compartments](#compartments-are-labels-with-a-name), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
+| Model structure | [Compartments](#compartments-are-labels-with-a-name), [what they hold](#state-amount-total-and-subgroup-total), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Transitions and rates | [Rate semantics](#absolute-and-per-capita-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
-| Initial conditions | [Subgroup head counts](#subgroup-head-counts-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
+| Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
@@ -39,7 +39,7 @@ engines in the list; nothing that exists changes.
 | Engine kind | Each entry of `EngineType` names the kind it runs. `Model` asks the list (`check_kind`) when it is made, and `Engine::build` asks it again; the error names the engine and both kinds. | Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. |
 | Values calibration sets | `parameter` and `factor` are generic. Each kind declares the types of value of its own it accepts (`ModelKind::value_types`, which `ModelStructure.calibration_value_types` asks); the compartmental kind accepts `initial_condition`. The engine resolves and writes them (`SimulationEngine::plan_values`, `apply_values`). | The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it. |
 | Report sections | `ModelStructure.report_sections` adds the sections of a kind to `applied_parameters_report` (default: none); the compartmental kind adds `initial_conditions`. | A check of the kind in `reporting.py` brings back a branch per kind. |
-| Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `N`) and `output_sums` (a bin total, for a compartmental engine). | The calibration would rebuild bin totals from compartment labels. |
+| Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `total`) and `output_sums` (a bin total, for a compartmental engine). | The calibration would rebuild bin totals from compartment labels. |
 
 The test kind (`tests/support/kinds.py`, engine `TestEngine` in
 `py-commol/src/test_kind.rs`) is written only against the interface. The
@@ -90,6 +90,42 @@ stratification gives some compartments fewer suffixes than others. Use
 `CompartmentLayout::find` or `of_bin` in Rust, and the labels that the engine
 queries return in Python.
 
+### State, amount, total and subgroup total
+
+The library names what the compartments hold without assuming individuals:
+
+| Term | Meaning | Where |
+|---|---|---|
+| **State** | The vector of the amount of every compartment | `CompartmentalEngine::state`, `Engine.state` |
+| **Amount** | The value of one compartment | `InitialCompartment.amount` |
+| **Total** | The sum of every compartment, accumulators excluded; the initial fractions are taken of it | `InitialConditions.total`, the rate variable `total` (`SPECIAL_VAR_TOTAL`) |
+| **Subgroup total** | The sum of the compartments with some categories | `subgroup_total`, the rate variables `total_<cat>…` (`SUBGROUP_TOTAL_PREFIX`) |
+
+The total is a real number, finite and greater than 0, so a model of a count, a
+mass or a concentration can be stated. `0` is rejected: every fraction of it is
+zero, and the report divides by it (`initial_state` in
+`crates/commol-model/src/builder.rs`, `InitialConditions.validate_total`).
+
+**Rule:** use these four terms in code, docs and tests. `AxisPattern` takes a
+`value`, so "amount" means only the value of a compartment.
+
+**Why, against the alternatives:**
+
+| Alternative | Why not |
+|---|---|
+| "population", "head count", `N` | They assume individuals and an epidemiological convention (`N = S + I + R`). A reserved `N` takes a letter that other fields use for a bin, such as a nutrient. |
+| "mass" | A unit, not a quantity of any unit. |
+| "stock" | An economic term, new to the code. |
+| "content" | Ambiguous in software. |
+| "size" | Reads as a count, and clashes with the NSGA-II `population_size`. |
+| A function `total(g1, t1)` | No reserved names, but the expression language has no text arguments (`jit/ast.rs`), so the parser, the JIT and the security check would change. |
+
+**Guards:** `builder.rs` tests
+`a_real_total_starts_with_amounts_that_sum_to_it` and
+`a_total_that_is_not_finite_and_positive_is_a_build_error`;
+`tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs`;
+`tests/initial_conditions/test_bin_fractions.py::TestTotal`.
+
 ### Stratification order is part of the model
 
 `expand` in `crates/commol-model/src/builder.rs` applies the
@@ -115,19 +151,24 @@ a prefix).
 
 ### The engine owns the variable names
 
-The engine sets one variable per expanded compartment and per subpopulation
-total (`N_<categories>`, bin totals and partial bin totals).
+The engine sets one variable per expanded compartment and per subgroup total
+(`total_<categories>`, bin totals and partial bin totals).
 `check_names` in `crates/commol-model/src/builder.rs` rejects a parameter
-id that is one of those names, and an `N_…` variable in a rate or a formula
-parameter that names no subpopulation. `CompartmentalStructure.check_model`
+id that is one of those names, and a `total_…` variable in a rate or a formula
+parameter that names no subgroup total. `CompartmentalStructure.check_model`
 calls it at `build`, and `CompiledModel::try_from_model` calls it again.
+`subgroup_total_names` lists the names; Python reads them through the binding
+`commol_rs.model.subgroup_total_names` (`engine_state.subgroup_total_names`)
+to check rates and give units.
 
 **Rule:** never list these names in Python. Ask the engine.
 
 **Guards:** `builder.rs` tests
-`parameter_id_cannot_be_a_compartment_or_a_subpopulation` and
-`subpopulation_variable_out_of_declaration_order_is_a_build_error`;
-`tests/building/test_reserved_names.py`.
+`parameter_id_cannot_be_a_compartment_or_a_subgroup_total`,
+`subgroup_total_out_of_declaration_order_is_a_build_error` and
+`subgroup_total_names_follow_the_declaration_order`;
+`tests/building/test_reserved_names.py`;
+`tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate`.
 
 ## Transitions and rates
 
@@ -140,7 +181,7 @@ is absolute or per-capita:
 | Case | Rate is | Flow per step |
 |---|---|---|
 | A stratified rate sets `absolute` | As set | — |
-| The rate references a compartment, a bin total or an `N…` variable | Absolute | `rate` |
+| The rate references a compartment, a bin total, `total` or a `total_…` variable | Absolute | `rate` |
 | The transition has no source | Absolute | `rate` |
 | Otherwise | Per-capita | `rate × source` |
 
@@ -174,16 +215,16 @@ same formula always runs the same machine code, so results are reproducible.
 
 ## Initial conditions
 
-### Subgroup head counts compose down the condition chain
+### Subgroup totals compose down the condition chain
 
 The fractions of a conditional stratification are relative to the subgroup that
-its conditions select, not to the whole population. Head counts therefore
-multiply along the chain: `N × fraction(group1) × fraction(cat1)`.
-`InitialConditions.subgroup_population` owns this; `CompartmentalStructure.subgroup_population`
+its conditions select, not to the total. Subgroup totals therefore
+multiply along the chain: `total × fraction(group1) × fraction(cat1)`.
+`InitialConditions.subgroup_total` owns this; `CompartmentalStructure.subgroup_total`
 and `CompartmentalStructure.get_conditioning_categories` delegate to it.
 
-**Guard:** `tests/simulation/test_outputs.py::TestSubgroupPopulation` compares the
-result with the population the engine starts from.
+**Guard:** `tests/simulation/test_outputs.py::TestSubgroupTotal` compares the
+result with the state the engine starts from.
 
 ### Calibrated initial conditions are applied in layers
 
@@ -196,7 +237,7 @@ resolve and write initial conditions through it
 writes every value through the engine (`ValueWriter` in
 `crates/commol-calibration/src/values.rs`), so the objective, the predictions
 and the write-back (`configured_engine`, then the binding
-`calibrated_initial_population`) agree by construction.
+`calibrated_initial_state`) agree by construction.
 `CompartmentalStructure.with_calibrated_values`
 (`context/_model/calibration_write_back.py`) writes the values back as
 fractions, and pins as per-compartment overrides every compartment that the

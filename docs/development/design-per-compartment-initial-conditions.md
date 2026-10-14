@@ -5,6 +5,11 @@
 - **Status:** Implemented (revised 2026-10-12: Rust is the single source of truth)
 - **Date:** 2026-09-30
 - **Scope:** `commol-core` (types), `commol-difference` (engine build), `py-commol` (context, builder, model write-back)
+- **Names:** this record keeps the names of its date. Today `population_size`
+  is `InitialConditions.total` (a real number), the initial population is the
+  initial state, a head count is an amount, and `calibrated_initial_population`
+  is `calibrated_initial_state`; see
+  [State, amount, total and subgroup total](../codebase/design-decisions.md#state-amount-total-and-subgroup-total).
 
 ## Problem
 
