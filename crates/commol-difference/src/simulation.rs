@@ -713,4 +713,35 @@ mod tests {
         let error = engine.run_at(&[2.0]).unwrap_err();
         assert!(error.contains("before the current position 4"), "{error}");
     }
+
+    #[test]
+    fn the_engine_writes_initial_conditions_that_reset_keeps() {
+        use commol_core::{ModelValue, ModelValueType};
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let plan = engine
+            .plan_values(
+                &[ModelValue {
+                    value_type: ModelValueType::InitialCondition,
+                    id: "B".to_string(),
+                }],
+                Some("A"),
+            )
+            .unwrap();
+
+        assert_eq!(engine.apply_values(&plan, &[0.25]).unwrap(), 0.0);
+        engine.step().unwrap();
+        engine.reset();
+
+        assert_eq!(engine.population(), vec![750.0, 250.0, 0.0]);
+        assert_eq!(engine.population_size(), 1000.0);
+    }
+
+    #[test]
+    fn the_state_is_the_compartments_and_a_bin_total_is_a_sum() {
+        let engine = DifferenceEquations::from_model(&make_three_bin_model());
+
+        assert_eq!(engine.state_outputs(), 3);
+        // Without stratifications no name sums several outputs.
+        assert!(engine.output_sums().is_empty());
+    }
 }

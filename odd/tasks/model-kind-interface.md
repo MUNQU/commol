@@ -219,6 +219,17 @@ Branch `refactor/model-kind-interface` from `develop` at `e3ed45a`
   outside its tests. D4 says "one trait method": the engine needs two, one to
   resolve the values once (`plan_values`) and one to write them per
   evaluation (`apply_values`), so ids are not resolved at every evaluation.
+- Tests (S4 check, user request 2026-10-14): the tests of the
+  initial-condition plan moved from `commol-calibration` to
+  `crates/commol-model/tests/initial_conditions.rs`, on a fake compartmental
+  engine; `crates/commol-calibration/tests/test_model_values.rs` checks the
+  calibration with an engine of a kind that is not compartmental, so the crate
+  has no `commol-model` dependency, not even in its tests. Each engine has a
+  test of `plan_values`, `apply_values`, `reset`, `state_outputs` and
+  `output_sums`. Python: the factories of `tests/support/` return
+  `Model[CompartmentalStructure]` (no `ty` diagnostic on `model.structure` in
+  the tests); new tests of the saved format, of `commol_rs.engine.ModelKind`
+  and of the compartmental queries of a test engine.
 - T5 (S5): `mental-model.md` ("Model kind and engine"), `repository-map.md`,
   `design-decisions.md` ("Model kinds"), `maintainer-playbook.md` ("Model
   kind"), `conventions.md` (`model_kinds/`), `advanced/model-structure.md`,

@@ -33,4 +33,3 @@ thiserror = "2.0"
 [dev-dependencies]
 commol-difference = { path = "../commol-difference" }
 commol-differential = { path = "../commol-differential" }
-commol-model = { path = "../commol-model" }

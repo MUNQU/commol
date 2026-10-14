@@ -48,6 +48,9 @@ the tests and CI build it; a release build does not.
 
 **Guards:** `tests/model_kinds/` (a test model through a simulation, a
 calibration, a report and a plot; the kind check both ways),
+`crates/commol-calibration/tests/test_model_values.rs` (the calibration with
+an engine that is not compartmental: values through `plan_values` and
+`apply_values`, constraints through `output_sums` and `state_outputs`),
 `py-commol/src/engine.rs::an_engine_rejects_a_model_of_another_kind`,
 `crates/commol-core/src/types/engine.rs::an_engine_rejects_a_model_of_another_kind`.
 
@@ -199,8 +202,10 @@ and the write-back (`configured_engine`, then the binding
 fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.
 
-**Guard:**
-`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`.
+**Guards:**
+`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`;
+`crates/commol-model/tests/initial_conditions.rs` (the layers, the remainder
+and the targets of an id).
 See also [Per-compartment initial conditions](../development/design-per-compartment-initial-conditions.md).
 
 ## Time

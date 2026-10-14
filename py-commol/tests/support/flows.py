@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from commol import ModelBuilder, OdeSolver, Simulation
+from commol.context.compartmental import CompartmentalStructure
 from commol.context.model import Model
 
 from .models import TIGHT, build, build_ode
@@ -47,7 +48,7 @@ def flow_model(
     ode: bool = True,
     settings: OdeSolver = FINE,
     accumulators: Sequence[str] = (),
-) -> Model:
+) -> Model[CompartmentalStructure]:
     """
     Build a model from the initial value of each bin and its flows.
 
@@ -70,7 +71,7 @@ def flow_model(
 
     Returns
     -------
-    Model
+    Model[CompartmentalStructure]
         The built model.
     """
     builder = ModelBuilder(name="reference", version="1.0")

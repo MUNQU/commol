@@ -791,3 +791,27 @@ fn benchmark_run_against_run_at() {
         );
     }
 }
+
+#[test]
+fn the_engine_writes_initial_conditions_and_its_state_excludes_accumulators() {
+    use commol_core::{ModelValue, ModelValueType};
+    use commol_model::CompartmentalEngine;
+
+    let mut engine = engine(&decay_model(TIGHT));
+    assert_eq!(engine.output_names(), ["A", "B", "moved"]);
+    assert_eq!(engine.state_outputs(), 2);
+
+    let plan = engine
+        .plan_values(
+            &[ModelValue {
+                value_type: ModelValueType::InitialCondition,
+                id: "A".to_string(),
+            }],
+            Some("B"),
+        )
+        .unwrap();
+    assert_eq!(engine.apply_values(&plan, &[0.4]).unwrap(), 0.0);
+    engine.reset();
+
+    assert_eq!(CompartmentalEngine::population(&engine), vec![400.0, 600.0]);
+}

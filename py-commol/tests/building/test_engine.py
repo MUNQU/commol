@@ -37,6 +37,24 @@ class TestEngineList:
         with pytest.raises(ValueError, match="DifferentialEquations"):
             commol_rs.engine.EngineType("Stochastic")
 
+    def test_every_engine_runs_a_kind_of_the_list(self) -> None:
+        kinds = commol_rs.engine.ModelKind.names()
+
+        assert "compartmental" in kinds
+        for name in commol_rs.engine.EngineType.names():
+            assert commol_rs.engine.EngineType(name).kind in kinds
+
+    def test_a_compartmental_model_accepts_initial_conditions(self) -> None:
+        kind = commol_rs.engine.ModelKind("compartmental")
+
+        assert kind.value_types() == ["initial_condition"]
+
+    def test_an_unknown_kind_lists_the_kinds(self) -> None:
+        engine = commol_rs.engine.EngineType("DifferenceEquations")
+
+        with pytest.raises(ValueError, match="compartmental"):
+            engine.check_kind("network")
+
 
 class TestBuild:
     @pytest.mark.parametrize("name", get_args(CompartmentalEngineType))

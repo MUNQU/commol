@@ -86,6 +86,14 @@ class TestStructureInterface:
         assert compartmental.calibration_value_types() == {"initial_condition"}
         assert decay_model().structure.calibration_value_types() == frozenset()
 
+    def test_the_compartmental_queries_of_an_engine_name_its_kind(self) -> None:
+        engine = Simulation(decay_model()).engine
+
+        with pytest.raises(ValueError, match="TestEngine engine runs test models"):
+            engine.compartments
+        with pytest.raises(ValueError, match="not compartmental"):
+            engine.population
+
     def test_a_kind_without_equations_says_so(self) -> None:
         with pytest.raises(NotImplementedError, match="test model"):
             decay_model().print_equations()
