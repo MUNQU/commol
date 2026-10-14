@@ -1,7 +1,5 @@
 from typing import ClassVar, Protocol
 
-from commol.constants import ModelTypes
-
 class BinProtocol(Protocol):
     id: str
     name: str
@@ -58,7 +56,6 @@ class PopulationProtocol(Protocol):
     initial_conditions: InitialConditionsProtocol
 
 class DynamicsProtocol(Protocol):
-    typology: ModelTypes
     transitions: list[TransitionProtocol]
 
 class RustModelProtocol(Protocol):
@@ -72,9 +69,11 @@ class RustModelProtocol(Protocol):
     def from_json(json_string: str) -> RustModelProtocol: ...
 
 class EngineProtocol(Protocol):
-    """A DifferenceEquations or a DifferentialEquations engine."""
+    """The engine a model names, built from the model."""
 
     def __init__(self, model: RustModelProtocol) -> None: ...
+    @property
+    def engine_type(self) -> str: ...
     def run(self, num_steps: int) -> tuple[list[float], list[list[float]]]: ...
     def run_at(self, positions: list[float]) -> list[list[float]]: ...
     def check_position(self, position: float) -> None: ...
@@ -91,11 +90,24 @@ class EngineProtocol(Protocol):
     @property
     def output_names(self) -> list[str]: ...
 
-class DifferenceModule(Protocol):
-    DifferenceEquations: type[EngineProtocol]
+class EngineTypeProtocol(Protocol):
+    """One entry of the engine's list of engines."""
 
-class DifferentialModule(Protocol):
-    DifferentialEquations: type[EngineProtocol]
+    def __init__(self, name: str) -> None: ...
+    @staticmethod
+    def names() -> list[str]: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def kind(self) -> str: ...
+    @property
+    def rate_meaning(self) -> str: ...
+    def equation_lhs(self, variable: str, latex: bool) -> str: ...
+    def check_settings(self, settings_json: str | None = None) -> None: ...
+
+class EngineModule(Protocol):
+    Engine: type[EngineProtocol]
+    EngineType: type[EngineTypeProtocol]
 
 class ModelModule(Protocol):
     def initial_state(
@@ -535,7 +547,6 @@ class CoreModule(Protocol):
     InitialConditions: type[InitialConditionsProtocol]
     StratificationFraction: type[StratificationFractionProtocol]
     StratificationFractions: type[StratificationFractionsProtocol]
-    ModelTypes: type[ModelTypes]
     Dynamics: type[DynamicsProtocol]
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]
@@ -543,13 +554,11 @@ class CoreModule(Protocol):
 class RustCommolModule(Protocol):
     core: CoreModule
     model: ModelModule
-    difference: DifferenceModule
-    differential: DifferentialModule
+    engine: EngineModule
     calibration: CalibrationModule
 
 core: CoreModule
 model: ModelModule
-difference: DifferenceModule
-differential: DifferentialModule
+engine: EngineModule
 calibration: CalibrationModule
 rust_commol: RustCommolModule

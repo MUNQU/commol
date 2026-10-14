@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from commol.constants import ModelTypes
 from commol.context.model import Model
 from tests.support import build, seir_builder, sir_builder
 
@@ -192,9 +191,7 @@ class TestLatex:
         assert output == expected
 
     def test_print_equations_latex_to_file(self, tmp_path: Path) -> None:
-        model = sir_builder(name="SIR Model").build(
-            typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value
-        )
+        model = sir_builder(name="SIR Model").build(engine="DifferentialEquations")
         output_file = tmp_path / "equations_latex.txt"
 
         model.print_equations(output_file=str(output_file), format="latex")

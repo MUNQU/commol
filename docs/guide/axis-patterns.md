@@ -23,7 +23,7 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
             population_size=100,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=num_steps)["B"]
     return [round(series[i + 1] - series[i], 4) for i in range(num_steps)]
@@ -139,7 +139,7 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
                 }
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=num_steps)
     return {
@@ -249,7 +249,7 @@ routing = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 routed = Simulation(routing).run(num_steps=2)
 print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
@@ -278,7 +278,7 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
             population_size=1000,
             bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
         )
-        .build(typology="DifferentialEquations")
+        .build(engine="DifferentialEquations")
     )
     return Simulation(model).run_at([at])["A"][0]
 

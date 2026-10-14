@@ -1,6 +1,11 @@
 import re
 
-from commol.constants import ModelTypes, PrintEquationsOutputFormat
+try:
+    from commol.commol_rs import _commol_rs as commol_rs
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
+
+from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.context._model.engine_state import TransitionFlow
 from commol.context._model.helpers import ModelCompartmentHelper
@@ -63,7 +68,7 @@ class EquationPrinter:
         lines.append("MODEL INFORMATION")
         lines.append("=" * 40)
         lines.append(f"Model: {self._model.name}")
-        lines.append(f"Model Type: {self._model.dynamics.typology}")
+        lines.append(f"Model Type: {self._model.engine.type}")
         lines.append(f"Number of Bins: {len(self._model.population.bins)}")
         lines.append(
             f"Number of Stratifications: {len(self._model.population.stratifications)}"
@@ -231,7 +236,7 @@ class EquationPrinter:
             lhs = _get_equation_lhs(
                 self._display_name(compartment.name, format),
                 format,
-                self._model.dynamics.typology,
+                self._model.engine.type,
             )
             if format == PrintEquationsOutputFormat.LATEX:
                 lines.append(f"\\[{lhs} = {equation}\\]")
@@ -312,21 +317,11 @@ def _write_output(output: str, output_file: str | None) -> None:
         print(output)
 
 
-def _get_equation_lhs(variable_name: str, format: str, typology: str) -> str:
-    """Get the left-hand side of an equation based on model type."""
-    if format == PrintEquationsOutputFormat.LATEX:
-        if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
-            return f"\\frac{{d{variable_name}}}{{dt}}"
-        else:
-            return (
-                f"\\frac{{{variable_name}(t+\\Delta t) - "
-                f"{variable_name}(t)}}{{\\Delta t}}"
-            )
-    else:
-        if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
-            return f"d{variable_name}/dt"
-        else:
-            return f"[{variable_name}(t+Dt) - {variable_name}(t)] / Dt"
+def _get_equation_lhs(variable_name: str, format: str, engine_type: str) -> str:
+    """The left-hand side of an equation, as the engine of the model writes it."""
+    return commol_rs.engine.EngineType(engine_type).equation_lhs(
+        variable_name, format == PrintEquationsOutputFormat.LATEX
+    )
 
 
 def _latex_transition_arrow(source: str, target: str) -> str:

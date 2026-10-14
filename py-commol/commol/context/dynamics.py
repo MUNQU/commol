@@ -1,7 +1,7 @@
 """Transitions, stratified rates and the dynamics of a model."""
 
 import math
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
@@ -9,7 +9,6 @@ try:
     from commol.commol_rs import _commol_rs as commol_rs
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
-from commol.constants import ModelTypes
 from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
@@ -218,65 +217,19 @@ class Transition(BaseModel):
         return value
 
 
-class OdeSolver(BaseModel):
-    """
-    Solver settings of a differential-equations model.
-
-    Attributes
-    ----------
-    method : Literal["tsit45", "bdf"]
-        ``"tsit45"``: explicit Tsitouras 5(4) Runge-Kutta, for non-stiff
-        models. ``"bdf"``: backward differentiation formulas, for stiff models.
-    rtol : float
-        Relative tolerance of each state component.
-    atol : float
-        Absolute tolerance of each state component, in the unit of the bins.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    method: Literal["tsit45", "bdf"] = Field(
-        default="tsit45", description="Integration method."
-    )
-    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
-    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
-
-
 class Dynamics(BaseModel):
     """
     Defines how the system evolves.
 
     Attributes
     ----------
-    typology : Literal["DifferenceEquations", "DifferentialEquations"]
-        The type of model.
     transitions : List[Transition]
         A list of rules for state changes.
-    solver : OdeSolver | None
-        Solver settings of a differential-equations model; None uses the
-        defaults of `OdeSolver`. A difference-equations model has none.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    typology: Literal[
-        ModelTypes.DIFFERENCE_EQUATIONS, ModelTypes.DIFFERENTIAL_EQUATIONS
-    ]
     transitions: list[Transition]
-    solver: OdeSolver | None = Field(
-        default=None,
-        description="Solver settings of a differential-equations model.",
-    )
-
-    @model_validator(mode="after")
-    def validate_typology_settings(self) -> Self:
-        """A solver needs a differential model."""
-        if self.typology == ModelTypes.DIFFERENCE_EQUATIONS and self.solver is not None:
-            raise ValueError(
-                "Solver settings apply only to a DifferentialEquations model; "
-                "a DifferenceEquations model has no solver."
-            )
-        return self
 
     @field_validator("transitions")
     @classmethod

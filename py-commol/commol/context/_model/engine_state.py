@@ -6,7 +6,6 @@ overrides apply, and how calibrated values reach the initial population.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
-import json
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -15,7 +14,6 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.constants import ModelTypes
 from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
@@ -84,7 +82,7 @@ def _rust_model(model: "Model") -> "RustModelProtocol":
 
 def build_engine(model: "Model | str") -> "EngineProtocol":
     """
-    Build the engine that the typology of a model names.
+    Build the engine that a model names.
 
     Parameters
     ----------
@@ -94,24 +92,15 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
     Returns
     -------
     EngineProtocol
-        A ``DifferenceEquations`` engine for a difference-equations model, a
-        ``DifferentialEquations`` engine for a differential-equations model.
+        The engine of ``model.engine.type``, with its settings.
 
     Raises
     ------
     RuntimeError
         If the engine cannot compile the model.
     """
-    if isinstance(model, str):
-        model_json = model
-        typology = json.loads(model_json)["dynamics"]["typology"]
-    else:
-        model_json = model.model_dump_json()
-        typology = model.dynamics.typology
-    rust_model = commol_rs.core.Model.from_json(model_json)
-    if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
-        return commol_rs.differential.DifferentialEquations(rust_model)
-    return commol_rs.difference.DifferenceEquations(rust_model)
+    model_json = model if isinstance(model, str) else model.model_dump_json()
+    return commol_rs.engine.Engine(commol_rs.core.Model.from_json(model_json))
 
 
 def initial_state(model: "Model") -> list[InitialCompartment]:
@@ -213,7 +202,7 @@ def transition_flows(model: "Model") -> list[TransitionFlow]:
     Parameters
     ----------
     model : Model
-        The model definition, of any typology.
+        The model definition, whatever its engine.
 
     Returns
     -------

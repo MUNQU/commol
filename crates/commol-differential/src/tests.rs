@@ -12,12 +12,12 @@ use super::DifferentialEquations;
 /// `bins` holds `(id, initial population)`, `parameters` `(id, JSON value)`,
 /// `transitions` the JSON objects of the transitions.
 fn model(
-    typology: &str,
+    engine_type: &str,
     bins: &[(&str, f64)],
     parameters: &[(&str, &str)],
     accumulators: &[&str],
     transitions: &[String],
-    solver: &str,
+    settings: &str,
 ) -> Model {
     let size: f64 = bins.iter().map(|(_, population)| population).sum();
     let bin_json: Vec<String> = bins
@@ -41,7 +41,7 @@ fn model(
         "stratifications":[],"transitions":[],
         "initial_conditions":{{"population_size":{size},"bin_fractions":[{}],
         "stratification_fractions":[]}}}},"parameters":[{}],
-        "dynamics":{{"typology":"{typology}","transitions":[{}]{solver}}}}}"#,
+        "dynamics":{{"transitions":[{}]}},"engine":{{"type":"{engine_type}"{settings}}}}}"#,
         bin_json.join(","),
         accumulator_json.join(","),
         fractions.join(","),
@@ -66,8 +66,8 @@ fn transition(id: &str, source: &[&str], target: &[&str], rate: &str, extra: &st
     )
 }
 
-const TIGHT: &str = r#","solver":{"method":"tsit45","rtol":1e-10,"atol":1e-8}"#;
-const TIGHT_BDF: &str = r#","solver":{"method":"bdf","rtol":1e-10,"atol":1e-8}"#;
+const TIGHT: &str = r#","settings":{"method":"tsit45","rtol":1e-10,"atol":1e-8}"#;
+const TIGHT_BDF: &str = r#","settings":{"method":"bdf","rtol":1e-10,"atol":1e-8}"#;
 
 fn engine(model: &Model) -> DifferentialEquations {
     DifferentialEquations::try_from_model(model).expect("the model compiles")
@@ -81,7 +81,7 @@ fn assert_close(actual: f64, expected: f64, tolerance: f64, what: &str) {
     );
 }
 
-fn decay_model(solver: &str) -> Model {
+fn decay_model(settings: &str) -> Model {
     model(
         "DifferentialEquations",
         &[("A", 1000.0), ("B", 0.0)],
@@ -94,17 +94,17 @@ fn decay_model(solver: &str) -> Model {
             "k",
             r#","accumulators":["moved"]"#,
         )],
-        solver,
+        settings,
     )
 }
 
 #[test]
 fn exponential_decay_matches_the_closed_form_with_both_methods() {
-    for solver in [TIGHT, TIGHT_BDF] {
-        let rows = engine(&decay_model(solver)).run(10).unwrap().rows;
+    for settings in [TIGHT, TIGHT_BDF] {
+        let rows = engine(&decay_model(settings)).run(10).unwrap().rows;
         for (t, row) in rows.iter().enumerate() {
             let expected = 1000.0 * (-0.3 * t as f64).exp();
-            assert_close(row[0], expected, 1e-7, &format!("A({t}) {solver}"));
+            assert_close(row[0], expected, 1e-7, &format!("A({t}) {settings}"));
             assert_close(row[0] + row[1], 1000.0, 1e-9, "conservation");
         }
     }
@@ -183,7 +183,7 @@ fn a_linear_two_by_two_system_matches_the_closed_form() {
     }
 }
 
-fn sir_model(solver: &str) -> Model {
+fn sir_model(settings: &str) -> Model {
     model(
         "DifferentialEquations",
         &[("S", 990.0), ("I", 10.0), ("R", 0.0)],
@@ -193,7 +193,7 @@ fn sir_model(solver: &str) -> Model {
             transition("infection", &["S"], &["I"], "beta * S * I / N", ""),
             transition("recovery", &["I"], &["R"], "gamma", ""),
         ],
-        solver,
+        settings,
     )
 }
 
@@ -226,7 +226,7 @@ fn sis_reaches_its_endemic_equilibrium() {
     assert_close(rows[400][1], 1000.0 * (1.0 - 0.1 / 0.4), 1e-7, "I*");
 }
 
-fn stiff_model(solver: &str) -> Model {
+fn stiff_model(settings: &str) -> Model {
     // Rates 1e3 and 1e-2: a stiffness ratio of 1e5.
     model(
         "DifferentialEquations",
@@ -237,13 +237,13 @@ fn stiff_model(solver: &str) -> Model {
             transition("ab", &["A"], &["B"], "fast", ""),
             transition("bc", &["B"], &["C"], "slow", ""),
         ],
-        solver,
+        settings,
     )
 }
 
 #[test]
 fn bdf_solves_a_stiff_model_within_the_tolerance() {
-    let model = stiff_model(r#","solver":{"method":"bdf","rtol":1e-8,"atol":1e-8}"#);
+    let model = stiff_model(r#","settings":{"method":"bdf","rtol":1e-8,"atol":1e-8}"#);
     let started = Instant::now();
     let rows = engine(&model).run(100).unwrap().rows;
     let elapsed = started.elapsed();
@@ -257,14 +257,14 @@ fn bdf_solves_a_stiff_model_within_the_tolerance() {
 }
 
 /// A per-capita rate `p` on step 2 only, as a pulse series.
-fn pulse_model(typology: &str) -> Model {
+fn pulse_model(engine_type: &str) -> Model {
     model(
-        typology,
+        engine_type,
         &[("A", 1000.0), ("B", 0.0)],
         &[("p", r#"{"data":[[2,0.2]],"mode":"pulse"}"#)],
         &[],
         &[transition("pulse", &["A"], &["B"], "p", "")],
-        if typology == "DifferentialEquations" {
+        if engine_type == "DifferentialEquations" {
             TIGHT
         } else {
             ""
@@ -303,14 +303,14 @@ fn rate_model(rate: &str) -> Model {
 }
 
 /// A → B at the per-capita rate `k`, a series parameter.
-fn series_model(typology: &str, series: &str) -> Model {
+fn series_model(engine_type: &str, series: &str) -> Model {
     model(
-        typology,
+        engine_type,
         &[("A", 1000.0), ("B", 0.0)],
         &[("k", series)],
         &[],
         &[transition("move", &["A"], &["B"], "k", "")],
-        if typology == "DifferentialEquations" {
+        if engine_type == "DifferentialEquations" {
             TIGHT
         } else {
             ""
@@ -450,9 +450,9 @@ fn a_time_threshold_reads_the_current_parameter_values() {
     assert_close(rows[40][0], 1000.0 * (-0.15_f64).exp(), 1e-7, "A(40)");
 }
 
-fn impulse_model(typology: &str, extra: &str) -> Model {
+fn impulse_model(engine_type: &str, extra: &str) -> Model {
     model(
-        typology,
+        engine_type,
         &[("A", 1000.0), ("B", 0.0)],
         &[("p", "0.25")],
         &["jumped"],
@@ -463,7 +463,7 @@ fn impulse_model(typology: &str, extra: &str) -> Model {
             "p",
             &format!(r#","accumulators":["jumped"]{extra}"#),
         )],
-        if typology == "DifferentialEquations" {
+        if engine_type == "DifferentialEquations" {
             TIGHT
         } else {
             ""
@@ -551,11 +551,14 @@ fn the_engine_rejects_a_difference_model_and_bad_tolerances() {
         .err()
         .unwrap();
     assert!(error.contains("DifferenceEquations"), "{error}");
-    let error = DifferentialEquations::try_from_model(&decay_model(
-        r#","solver":{"method":"tsit45","rtol":0.0,"atol":1e-8}"#,
-    ))
-    .err()
-    .unwrap();
+    let compiled = commol_model::CompiledModel::try_from_model(&decay_model(TIGHT)).unwrap();
+    let settings = commol_core::OdeSolver {
+        rtol: 0.0,
+        ..commol_core::OdeSolver::default()
+    };
+    let error = DifferentialEquations::from_compiled(compiled, settings)
+        .err()
+        .unwrap();
     assert!(error.contains("rtol"), "{error}");
 }
 
@@ -611,7 +614,7 @@ fn a_large_stiff_model_uses_the_sparse_path() {
         &[("k", "100.0")],
         &[],
         &transitions,
-        r#","solver":{"method":"bdf","rtol":1e-6,"atol":1e-6}"#,
+        r#","settings":{"method":"bdf","rtol":1e-6,"atol":1e-6}"#,
     );
     let rows = engine(&model).run(5).unwrap().rows;
     let total: f64 = rows[5].iter().sum();
@@ -637,7 +640,7 @@ fn stiff_chain(n: usize) -> Model {
         &[("fast", "100.0"), ("slow", "0.01")],
         &[],
         &transitions,
-        r#","solver":{"method":"bdf","rtol":1e-6,"atol":1e-6}"#,
+        r#","settings":{"method":"bdf","rtol":1e-6,"atol":1e-6}"#,
     )
 }
 
@@ -662,8 +665,8 @@ fn coupled_groups(groups: usize, method: &str) -> Model {
         {{"bin":"A","fraction":0.99}},{{"bin":"B","fraction":0.01}},{{"bin":"C","fraction":0.0}}],
         "stratification_fractions":[{{"stratification":"group","fractions":[{}]}}]}}}},
         "parameters":[{{"id":"k1","value":0.3}},{{"id":"k2","value":0.1}}],
-        "dynamics":{{"typology":"DifferentialEquations","transitions":[{},{}],
-        "solver":{{"method":"{method}","rtol":1e-6,"atol":1e-6}}}}}}"#,
+        "dynamics":{{"transitions":[{},{}]}},"engine":{{"type":"DifferentialEquations",
+        "settings":{{"method":"{method}","rtol":1e-6,"atol":1e-6}}}}}}"#,
         categories.join(","),
         fractions.join(","),
         transition("ab", &["A"], &["B"], "k1 * B / N", ""),
@@ -734,8 +737,8 @@ fn benchmark_dense_against_sparse_bdf() {
     println!("|---|---|---|---|---|");
     for groups in [1, 10, 100] {
         let mut difference_model = coupled_groups(groups, "bdf");
-        difference_model.dynamics.typology = commol_core::ModelTypes::DifferenceEquations;
-        difference_model.dynamics.solver = None;
+        difference_model.engine =
+            commol_core::ModelEngine::new(commol_core::EngineType::DifferenceEquations);
         let difference = DifferenceEquations::try_from_model(&difference_model).unwrap();
         let tsit45 = engine(&coupled_groups(groups, "tsit45"));
         let bdf = engine(&coupled_groups(groups, "bdf"));
@@ -764,8 +767,7 @@ fn benchmark_dense_against_sparse_bdf() {
 #[ignore = "benchmark: run on demand in release mode"]
 fn benchmark_run_against_run_at() {
     let mut model = coupled_groups(50, "bdf");
-    model.dynamics.typology = commol_core::ModelTypes::DifferenceEquations;
-    model.dynamics.solver = None;
+    model.engine = commol_core::ModelEngine::new(commol_core::EngineType::DifferenceEquations);
     let difference = DifferenceEquations::try_from_model(&model).unwrap();
     println!("| steps | run(n) (ms) | run_at, full grid (ms) | run_at, every 50 (ms) |");
     println!("|---|---|---|---|");

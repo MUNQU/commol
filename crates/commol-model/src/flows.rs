@@ -318,7 +318,7 @@ pub struct FlowDescription {
 
 /// Every transition flow of a model, exactly as the engine simulates it.
 ///
-/// It does not depend on the model typology, so any model definition can be
+/// It does not depend on the engine of the model, so any model definition can be
 /// described.
 ///
 /// # Errors
@@ -379,8 +379,8 @@ mod tests {
             r#"{{"name":"m","population":{{"bins":[{}],"stratifications":[{}],
             "transitions":[],"initial_conditions":{{"population_size":100,
             "bin_fractions":[{}],"stratification_fractions":[]}}}},
-            "parameters":[],"dynamics":{{"typology":"DifferenceEquations",
-            "transitions":[{}]}}}}"#,
+            "parameters":[],"dynamics":{{"transitions":[{}]}},
+            "engine":{{"type":"DifferenceEquations"}}}}"#,
             bins.join(","),
             stratifications,
             fractions.join(","),

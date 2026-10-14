@@ -21,12 +21,13 @@ Model                      name, description, version, step_unit
 │       │   └── fractions: [StratificationFraction]
 │       └── compartment_fractions: [CompartmentFraction]
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
-└── dynamics: Dynamics
-    ├── typology: "DifferenceEquations" or "DifferentialEquations"
-    ├── solver: OdeSolver | None            (differential models only)
-    └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-        └── stratified_rates: [StratifiedRate]
-            └── conditions: [StratificationCondition]
+├── dynamics: Dynamics
+│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+│       └── stratified_rates: [StratifiedRate]
+│           └── conditions: [StratificationCondition]
+└── engine: ModelEngine
+    ├── type: "DifferenceEquations" or "DifferentialEquations"
+    └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
 ```
 
 `Model` itself is documented in [Model API](../api/model.md).
@@ -57,9 +58,15 @@ Model                      name, description, version, step_unit
 
 ::: commol.context.dynamics.Transition
 
-`OdeSolver` is documented in [Simulation API](../api/simulation.md).
-
 ::: commol.context.dynamics.StratifiedRate
+
+## Engine
+
+The engine's list of engines (`crates/commol-core/src/types/engine.rs`)
+validates the settings: settings of another engine raise an error that names
+both. `OdeSolver` is documented in [Simulation API](../api/simulation.md).
+
+::: commol.context.engine.ModelEngine
 
 ## Initial conditions
 

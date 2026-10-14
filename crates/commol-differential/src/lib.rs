@@ -35,7 +35,7 @@ pub use solve::SPARSE_THRESHOLD;
 
 use std::collections::HashMap;
 
-use commol_core::{OdeSolver, OutputLabels};
+use commol_core::{EngineSettings, OdeSolver, OutputLabels};
 use commol_model::CompiledModel;
 
 /// Differential equations simulation engine.
@@ -62,30 +62,23 @@ impl DifferentialEquations {
     /// model, when a tolerance is not positive, or when
     /// [`CompiledModel::try_from_model`] fails.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
-        if model.dynamics.typology != commol_core::ModelTypes::DifferentialEquations {
+        let EngineSettings::DifferentialEquations(settings) = *model.engine.settings() else {
             return Err(format!(
-                "The DifferentialEquations engine cannot solve a {:?} model",
-                model.dynamics.typology
+                "The DifferentialEquations engine cannot solve a {} model",
+                model.engine.engine_type().name()
             ));
-        }
-        let settings = model.dynamics.solver.unwrap_or_default();
+        };
         Self::from_compiled(CompiledModel::try_from_model(model)?, settings)
     }
 
     /// Integrate a compiled model with the given solver settings, whatever
-    /// its typology.
+    /// its engine.
     ///
     /// # Errors
     ///
     /// Returns a message when `rtol` or `atol` is not a positive number.
     pub fn from_compiled(model: CompiledModel, settings: OdeSolver) -> Result<Self, String> {
-        for (name, value) in [("rtol", settings.rtol), ("atol", settings.atol)] {
-            if !(value.is_finite() && value > 0.0) {
-                return Err(format!(
-                    "The solver tolerance {name} must be a positive number, got {value}"
-                ));
-            }
-        }
+        settings.validate()?;
         let state = model.initial_state().to_vec();
         Ok(Self {
             model,

@@ -33,7 +33,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -55,7 +55,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
 | `total_series(results, ids)` | `list[float]` | The sum of all outputs of the given ids, at each position of the results. |
 | `windowed_totals(results, ids, window, at=None)` | `list[float]` | What the given accumulators gained in each window. |
-| `engine` | engine | The underlying Rust engine, for the model as it is now: `DifferenceEquations` or `DifferentialEquations`, as the typology names. `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
+| `engine` | engine | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
 Every `run` starts again from the initial state, so two calls with the same
 model give the same result (`Simulation.run` resets the engine first). To
@@ -154,7 +154,7 @@ stratified = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 stratified_simulation = Simulation(stratified)
@@ -245,7 +245,7 @@ A window need not be a whole number of steps: see
 
 ## Differential equations
 
-A model built with `typology="DifferentialEquations"` runs in continuous time.
+A model built with `engine="DifferentialEquations"` runs in continuous time.
 The engine (`crates/commol-differential/`) integrates
 `dX/dt = Σ flows(t, X)` with the ODE solver
 [diffsol](https://github.com/martinjrobins/diffsol). The flows are the same as
@@ -258,7 +258,7 @@ import math
 from commol import OdeSolver
 
 ode_model = (
-    ModelBuilder(name="Decay", solver=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8))
+    ModelBuilder(name="Decay")
     .add_bin(id="A", name="A")
     .add_bin(id="B", name="B")
     .add_parameter(id="k1", value=0.1)
@@ -268,7 +268,10 @@ ode_model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferentialEquations")
+    .build(
+        engine="DifferentialEquations",
+        settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
+    )
 )
 
 ode = Simulation(ode_model)
@@ -279,10 +282,14 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Solver settings
 
-`OdeSolver` holds the settings. They are part of the model
-(`Dynamics.solver`), so a saved model reproduces its runs. Pass them to
-`ModelBuilder(..., solver=...)`; without them the defaults apply. A
-`DifferenceEquations` model has no solver settings (`ValidationError`).
+`OdeSolver` holds the settings of the `DifferentialEquations` engine. They
+are part of the model (`Model.engine.settings`), so a saved model reproduces
+its runs. Pass them where you choose the engine,
+`build(engine="DifferentialEquations", settings=...)`, so one builder can
+build the model for each engine with its own settings; without them the
+defaults apply. The `DifferenceEquations` engine takes no settings: the
+engine rejects settings of another engine with an error that names both
+(`ValidationError`).
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -334,7 +341,7 @@ pulse_model = (
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
 )
-ode_pulse = Simulation(pulse_model.build(typology="DifferentialEquations")).run(num_steps=3)
+ode_pulse = Simulation(pulse_model.build(engine="DifferentialEquations")).run(num_steps=3)
 print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^−0.2)
 ```
 

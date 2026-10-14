@@ -11,16 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- An ODE engine: a model built with `typology="DifferentialEquations"` runs in
+- An ODE engine: a model built with `engine="DifferentialEquations"` runs in
   continuous time, `dX/dt = Σ flows`, integrated by `diffsol`
-  (`commol_rs.differential.DifferentialEquations`). It has the same flows,
+  (`commol-differential`). It has the same flows,
   outputs, accumulators, calibration, ensembles, reports and plots as a
   difference model. On `[n, n + 1)` a rate sees `step = n` and the continuous
   `t`. The engine restarts its integration at each integer when a rate reads
   `step`, and where `t` reaches a value a rate compares it with
   (`t >= t_on`), so the solver cannot step over a jump.
-- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), stored in the
-  model as `Dynamics.solver` and set with `ModelBuilder(..., solver=...)`.
+- `OdeSolver` (`method` `"tsit45"` or `"bdf"`, `rtol`, `atol`), the settings
+  of the `DifferentialEquations` engine, stored in the model as
+  `Model.engine.settings` and set with
+  `build(engine="DifferentialEquations", settings=...)`.
+- One list of engines in the Rust engine (`EngineType`): each entry names the
+  model kind it runs, validates its settings, and says the form of its
+  equations and what a rate means (`per_step` or `continuous`). Python asks it
+  through `commol_rs.engine.EngineType` instead of branching on engine names.
 - `Simulation.run_at(at)`: the outputs at the given sorted positions. A
   differential model takes any position, such as `0.5`.
 - `SimulationResults`: what `Simulation.run` and `run_at` return. A `dict`
@@ -48,6 +54,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   observation, constraint, impulse transition or series parameter that holds
   a rejected position. The engine trait runs only at positions
   (`run_at_positions_into_buffer`); `run(n)` returns the grid it ran on.
+- The engine of a model and its settings are one field,
+  `Model.engine = {type, settings}` (`ModelEngine`), which replaces
+  `Model.dynamics.typology`; `Dynamics` holds only the transitions. The
+  builder takes the engine where it builds, so one builder builds the model
+  for each engine with its own settings. Settings of one engine given to
+  another raise an error from the engine that names both. A model file
+  saved before has `dynamics.typology` and does not load: move it to
+  `"engine": {"type": …, "settings": null}`.
+
+  | Before | Now |
+  |---|---|
+  | `builder.build(typology="DifferenceEquations")` | `builder.build(engine="DifferenceEquations")` |
+  | `model.dynamics.typology` | `model.engine.type` |
+  | `commol_rs.difference.DifferenceEquations(model)`, `commol_rs.differential.DifferentialEquations(model)` | `commol_rs.engine.Engine(model)`, the engine the model names |
 - Names of positions, lengths and counts, and names with more than one
   meaning. No old name is kept; an old keyword raises an error that names it.
 
@@ -140,6 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Dynamics`, the order check of `Simulation.run_at`).
 - The `"weighted_sse"` loss and `LossConfig.weighted_sse()`. Use `"sse"`,
   which uses the weights.
+- `commol.constants.ModelTypes`. The engine names are the `Literal`
+  `commol.context.engine.EngineType`.
 
 ### Fixed
 

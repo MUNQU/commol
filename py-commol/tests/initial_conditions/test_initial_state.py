@@ -134,11 +134,12 @@ class TestInitialConditionsBinding:
                 ],
                 initial_conditions=initial_conditions,
             ),
-            dynamics=core.Dynamics(typology="DifferenceEquations", transitions=[]),
+            dynamics=core.Dynamics(transitions=[]),
             parameters=[],
+            engine="DifferenceEquations",
         )
 
-        engine = commol_rs.difference.DifferenceEquations(model)
+        engine = commol_rs.engine.Engine(model)
 
         assert initial_conditions.compartment_fractions == [("A_g1", 0.2)]
         assert engine.compartments == ["A_g1", "A_g2"]

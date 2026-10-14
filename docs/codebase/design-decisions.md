@@ -300,6 +300,36 @@ every observation position and window start.
 
 ## Engines
 
+### One list of engines
+
+`EngineType` (`crates/commol-core/src/types/engine.rs`) is the one list of
+model types. An entry is an engine, named by its type
+(`DifferenceEquations`, `DifferentialEquations`), and it names the model kind
+it runs (today only `compartmental`). Each entry validates its settings and
+says the form of its equations and the meaning of a rate (`per_step` or
+`continuous`). `Engine::build` (`py-commol/src/engine.rs`) builds the engine of
+an entry. A model holds its engine and the settings of that engine,
+`Model.engine = {type, settings}`, because the engine sets what a rate means,
+so a saved model reproduces its runs.
+
+Python asks the list (`commol_rs.engine.EngineType`): it builds the engine,
+prints the left-hand side of an equation and checks settings through it, and
+never branches on an engine name. It keeps the names only as the `Literal`
+`EngineType` (`context/engine.py`) for static typing and completion; a test
+checks that it equals the list. Generating the `Literal` from Rust would need
+a code-generation step for two names; the test catches the same drift. The
+entry names its model kind, so another kind (for example an agent network)
+adds entries, not a second meaning of the type.
+
+The builder takes the engine and its settings where it chooses the engine,
+`build(engine, settings=None)`, so one builder builds a model for each engine
+with its own settings. Settings of one engine given to another raise an error
+from the engine that names both.
+
+**Guards:** `crates/commol-core/src/types/engine.rs` (tests),
+`py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs`,
+`tests/building/test_engine.py`.
+
 ### One right-hand side, two engines
 
 `CompiledModel::derivatives` (`crates/commol-model/src/system.rs`) computes
@@ -322,8 +352,8 @@ The differential engine keeps no numerical method of its own: `diffsol`
 symbolic derivative of every rate would be new numerical code. The matrix is
 dense (`nalgebra`) below `SPARSE_THRESHOLD` state components and sparse
 (`faer`) from there; `diffsol` finds the sparse pattern by passing NaN through
-`J·v`. Solver settings live in the model (`Dynamics.solver`), so a saved model
-reproduces a run.
+`J·v`. Solver settings live in the model (`Model.engine.settings`), so a saved
+model reproduces a run.
 
 **Guards:** `crates/commol-differential/src/tests.rs`
 (`bdf_solves_a_stiff_model_within_the_tolerance`,
