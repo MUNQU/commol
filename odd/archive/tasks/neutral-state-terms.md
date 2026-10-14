@@ -9,7 +9,7 @@ with some categories is a **subgroup total**. The total becomes a real
 number, so a model of a mass or a concentration can be stated. The rate
 variable `N` and its subgroup totals `N_<cat>…` become `total` and
 `total_<cat>…` (D6).
-Motivation: `odd/tasks/domain-agnostic-audit.md`, findings C1 and D1, and its
+Motivation: `odd/archive/tasks/domain-agnostic-audit.md`, findings C1 and D1, and its
 section "Decisions" (agreed 2026-10-14).
 Branch: `refactor/neutral-state-terms` from `develop`.
 Engram mirror: topic `odd/neutral-state-terms/tasks` (project `commol`).
@@ -142,7 +142,7 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Spec | Question | Recommendation | Why, against each alternative | Status |
 |---|---|---|---|---|---|
-| D0 | all | Which terms replace "population"? | state, amount, total, subgroup total; `AxisPattern` takes `value` | See `odd/tasks/domain-agnostic-audit.md`, "Decisions": "mass" is a unit, "stock" is economic and new to the code, "content" is ambiguous in software, "size" clashes with NSGA-II. | approved (L1) |
+| D0 | all | Which terms replace "population"? | state, amount, total, subgroup total; `AxisPattern` takes `value` | See `docs/codebase/design-decisions.md`, "State, amount, total and subgroup total": "mass" is a unit, "stock" is economic and new to the code, "content" is ambiguous in software, "size" clashes with NSGA-II. | approved (L1) |
 | D1 | S1, S3 | Name of the field and of the builder argument | `total`, in JSON, in `InitialConditions` and in `set_initial_conditions(total=…)` | `initial_total`: longer, and the field already lives in `initial_conditions`. `size`: reads as a count and clashes with NSGA-II. `n` or `N`: an epidemiological convention (N = S + I + R) and a reserved letter (D6). With D6 the field is the value of the rate variable `total` at the start; `initial_conditions` tells the two apart. (The first reason given against `N`, that the variable and the field differ, was weak for this reason; corrected in L3.) | approved (L2) |
 | D2 | S1, S3 | Type of the total | `f64` / `float`, finite and greater than 0 | `u64` / `int` (today): a model of a mass or a concentration cannot be stated (audit D1). Allow `0`: every fraction of a zero total is zero, and the report divides by the total. | approved (audit "Decisions") |
 | D3 | S3 | Label of the whole-model group in reports | `"total"` | With D6 the group names the total a fraction is taken of, as a subgroup's label names its categories (`total_<cat>`): the row of `total` is `1.0` of `total`. `"all"`: says which compartments, not what the value is. `"N"`: the name D6 removes. Keep `"population"`: the term this task removes. | approved (L2) |
