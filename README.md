@@ -1,26 +1,35 @@
 # Commol
 
-Build, simulate and calibrate compartment models in Python, with a fast Rust
-engine. You describe the states, the flows between them and the amount each
-state starts with; Commol expands the model over your stratifications, compiles every rate
-formula to machine code, and fits unknown values to your data.
+[![PyPI](https://img.shields.io/pypi/v/commol)](https://pypi.org/project/commol/)
+[![Python](https://img.shields.io/pypi/pyversions/commol)](https://pypi.org/project/commol/)
+[![Build](https://github.com/MUNQU/commol/actions/workflows/build.yaml/badge.svg)](https://github.com/MUNQU/commol/actions/workflows/build.yaml)
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://munqu.github.io/commol/latest/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/MUNQU/commol/blob/main/LICENSE)
 
-> **Before version 1.0**: the API can change between minor versions
-> (`0.2` → `0.3`). The [changelog](https://munqu.github.io/commol/latest/about/changelog/)
-> lists every change that breaks code.
+**Declarative dynamical modelling in Python.**
 
-## Features
+In Commol, a model is a description of a system rather than a set of
+equations. You state what the system is made of and how it changes: its
+states, the flows between them and the rates that drive them. Commol turns
+that description into equations, solves them, and fits them to your data.
 
-| Feature | What you get |
-|---|---|
-| Fluent model building | `ModelBuilder` with validation of every input |
-| Stratifications | Subgroups with their own rates, including conditional stratifications and per-compartment initial conditions |
-| Rate formulas | Parameters, compartments, totals, `step`, math functions and `if`, compiled with Cranelift |
-| Axis patterns | Pulses, windows, ramps, sinusoids and schedules per subgroup |
-| Unit checking | Dimensional analysis of every rate |
-| Calibration | Nelder-Mead and particle swarm, with initial conditions, scale factors, windows and constraints |
-| Probabilistic calibration | Ensembles, prediction intervals and parameter spreads |
-| Reports and plots | JSON-ready reports and seaborn plots |
+Writing the description instead of the equations keeps a model small as the
+system grows: splitting every state into subgroups takes a few lines, not
+dozens of new equations. And since the description says nothing about how it
+is solved, the same model runs in discrete steps or continuously, and can be
+calibrated against observations without extra code.
+
+## What you can model
+
+Commol supports compartmental models: quantities that flow between states at
+rates written as formulas. A quantity can be a count, a mass or a
+concentration, and each state can be split into as many subgroups as the
+problem needs. This structure is common in epidemiology, pharmacokinetics,
+ecology and chemical kinetics, and Commol assumes none of them.
+
+Models are deterministic and evolve along a single variable, usually time.
+Calibration is based on optimization, with ensembles of good fits to measure
+uncertainty; Commol has no stochastic engine and no Bayesian inference.
 
 ## Installation
 
@@ -28,87 +37,124 @@ formula to machine code, and fits unknown values to your data.
 pip install commol
 ```
 
-Commol needs Python 3.12 or later. Wheels are published for Linux and macOS
-(x86_64 and arm64) and Windows (x86_64). To build from source, see
-[Installation](https://munqu.github.io/commol/latest/getting-started/installation/).
+Commol requires Python 3.12 or later. Prebuilt wheels are available for Linux
+and macOS (x86_64 and arm64) and for Windows (x86_64); on other platforms pip
+builds Commol from source, which needs a Rust toolchain (see
+[Installation](https://munqu.github.io/commol/latest/getting-started/installation/)).
 
-## Quick start
+Commol is under active development. Until version 1.0, a minor release
+(`0.2` → `0.3`) may break the API; the
+[changelog](https://munqu.github.io/commol/latest/about/changelog/) lists
+every such change.
+
+## Example
+
+A model of three states with one unknown rate. Commol derives its equations,
+fits the rate to five observations, and simulates the result:
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import (
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Simulation,
+)
 
+# 1. Describe the system: the states, the flows between them, and the start.
 model = (
-    ModelBuilder(name="Basic Model")
+    ModelBuilder(name="Three states")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
-    .add_parameter(id="k1", value=0.3)
+    .add_parameter(id="k1", value=None)  # unknown: calibration finds it
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(engine="DifferenceEquations")
+    .build(engine="DifferentialEquations")  # or "DifferenceEquations"
 )
+model.print_equations()  # the equations Commol derived from the description
 
-results = Simulation(model).run(num_steps=100)
-print(f"C at step 100: {results['C'][-1]:.0f}")
+# 2. Fit the unknown to the observations of B.
+observed = [
+    ObservedDataPoint(at=at, output="B", value=value)
+    for at, value in [(10, 150.8), (20, 404.7), (30, 239.0), (40, 104.0), (50, 42.6)]
+]
+problem = CalibrationProblem(
+    observed_data=observed,
+    parameters=[
+        CalibrationParameter(
+            id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0
+        )
+    ],
+    optimization_config=NelderMeadConfig(max_iterations=500),
+)
+result = Calibrator(Simulation(model), problem).run()
+model.apply_calibration_parameters(result, problem)
+
+# 3. Simulate the calibrated model.
+results = Simulation(model).run(num_steps=60)
+print(f"k1 = {result.best_parameters['k1']:.2f}")  # k1 = 0.40
+print(f"B at 60: {results['B'][-1]:.1f}")
 ```
+
+## Features
+
+- **[Subgroups](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications).**
+  Split every state by any number of categories, nest a split inside one
+  subgroup, and give each subgroup its own rates.
+- **[Two engines](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).**
+  Run the same model as difference equations or as ordinary differential
+  equations, with solvers for stiff systems.
+- **[Rates that change](https://munqu.github.io/commol/latest/guide/axis-patterns/).**
+  Write rates as formulas of the state and the axis, or build them from data
+  series, pulses, intervals, ramps and impulses.
+- **[Calibration](https://munqu.github.io/commol/latest/guide/calibration/).**
+  Fit parameters and initial conditions to observations of single outputs,
+  sums or counts per window, under constraints.
+- **[Uncertainty](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/).**
+  Build ensembles of good fits and read prediction intervals and parameter
+  spreads from them.
+- **[Checks and output](https://munqu.github.io/commol/latest/guide/units-and-equations/).**
+  Check units, print the equations as text or LaTeX, and save models and
+  reports as JSON.
 
 ## Documentation
 
-| Where to go | What you will find |
-|---|---|
-| **[Quick Start](https://munqu.github.io/commol/latest/getting-started/quickstart/)** | Build, run, check and calibrate a first model. Start here. |
-| [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/) | Bins, stratifications, transitions, rates and initial conditions |
-| [Building Models](https://munqu.github.io/commol/latest/guide/building-models/) | Every builder option, transitions, expressions, axis patterns and units |
-| [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/) | Outputs, totals, windows and plots |
-| [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/) | Fitting parameters and initial conditions, and probabilistic calibration |
-| [API Reference](https://munqu.github.io/commol/latest/api/) | Every public class and function |
-| [Codebase Guide](https://munqu.github.io/commol/latest/codebase/) | How Commol is built, for contributors |
-| [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md) | The entry point for AI agents working on this repository |
+The [documentation](https://munqu.github.io/commol/latest/) begins with a
+[Quick Start](https://munqu.github.io/commol/latest/getting-started/quickstart/)
+that builds, runs and calibrates a first model. The
+[User Guide](https://munqu.github.io/commol/latest/guide/core-concepts/)
+explains every concept and option, and the
+[API Reference](https://munqu.github.io/commol/latest/api/) documents every
+public class and function.
 
-The site has two versions: `latest` (the released code) and `dev` (the
-`develop` branch).
+## Contributing
 
-## Development
-
-```bash
-git clone https://github.com/MUNQU/commol.git
-cd commol/py-commol
-uv sync --extra dev
-source .venv/bin/activate
-maturin develop --release
-pytest
-```
-
-Every change ships with its documentation; see
-[Contributing](https://munqu.github.io/commol/latest/development/contributing/)
-and the [Development Workflow](https://munqu.github.io/commol/latest/development/workflow/).
-
-## License
-
-Commol is licensed under the MIT License. See [LICENSE](https://github.com/MUNQU/commol/blob/main/LICENSE).
-
-## Authors
-
-- Rafael J. Villanueva Micó - [rjvillan@imm.upv.es](mailto:rjvillan@imm.upv.es)
-- Carlos Andreu Vilarroig - [caranvi1@upv.es](mailto:caranvi1@upv.es)
-- David Martínez Rodríguez - [damarro3@upv.es](mailto:damarro3@upv.es)
+Bug reports, questions and suggestions are welcome in the
+[issue tracker](https://github.com/MUNQU/commol/issues). Contributors to the
+code should first read the
+[contributing guide](https://munqu.github.io/commol/latest/development/contributing/),
+which explains how to set up the project and open a pull request. AI agents
+should begin with [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md).
 
 ## Citation
 
-If you use Commol in your research, please cite:
+If you use Commol in your research, please cite it as follows:
 
 ```bibtex
 @software{commol2025,
-  title = {Commol: A High-Performance Compartment Modelling Library},
+  title = {Commol: High-Performance Declarative Dynamical Modelling in Python},
   author = {
     Villanueva Micó, Rafael J.
     and Andreu Vilarroig, Carlos
@@ -119,7 +165,11 @@ If you use Commol in your research, please cite:
 }
 ```
 
-## Support
+## License and authors
 
-- Documentation: <https://munqu.github.io/commol/latest/>
-- Questions and bugs: <https://github.com/MUNQU/commol/issues>
+Commol is licensed under the [MIT License](https://github.com/MUNQU/commol/blob/main/LICENSE).
+It is developed by the MUNQU team:
+
+- Rafael J. Villanueva Micó - [rjvillan@imm.upv.es](mailto:rjvillan@imm.upv.es)
+- Carlos Andreu Vilarroig - [caranvi1@upv.es](mailto:caranvi1@upv.es)
+- David Martínez Rodríguez - [damarro3@upv.es](mailto:damarro3@upv.es)

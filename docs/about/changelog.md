@@ -319,7 +319,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports have their own pages.
 - The site publishes `llms.txt` and `llms-full.txt` for AI agents, and marks
   the pages of the `dev` version.
-- `README.md` is a short landing page with links to the documentation.
+- `README.md` presents Commol as a library for declarative dynamical
+  modelling: the idea behind it, what it can model and its limits, an example
+  that derives, calibrates and simulates a model, and links to the guides. The
+  citation title is "Commol: High-Performance Declarative Dynamical Modelling
+  in Python".
+- The package metadata on PyPI has the same description, and keywords and
+  classifiers (Python versions, audience, topic, development status).
 
 ## [0.2.0] - 2026-10-12
 
