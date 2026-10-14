@@ -49,7 +49,7 @@ def model(k1: float | None, k2: float | None):
                 {"bin": "C", "fraction": 0.0},
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model(0.4, 0.1)).run(num_steps=50)

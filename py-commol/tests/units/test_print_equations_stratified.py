@@ -3,7 +3,6 @@
 import pytest
 
 from commol import ModelBuilder
-from commol.constants import ModelTypes
 from commol.context.model import Model
 from tests.support import build, sir_builder
 
@@ -427,9 +426,7 @@ class TestText:
 
 class TestLatex:
     def test_print_equations_latex_with_stratification(self, capsys) -> None:
-        model = _aging("Age-Stratified SIR Model").build(
-            typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value
-        )
+        model = _aging("Age-Stratified SIR Model").build(engine="DifferentialEquations")
 
         output = _printed(model, capsys, format="latex")
 

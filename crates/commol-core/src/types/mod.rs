@@ -5,11 +5,14 @@
 //!
 //! - `parameters`: Model parameters
 //! - `population`: Bins, accumulators, stratifications and initial conditions
-//! - `dynamics`: Model dynamics, transitions, and rates
+//! - `dynamics`: Transitions and their rates
+//! - `engine`: The list of engines, their settings and what they mean
 //! - `model`: Top-level model structure
 
-/// Dynamics: typologies, transitions and stratified rates.
+/// Transitions and stratified rates.
 pub mod dynamics;
+/// The list of engines a model can name.
+pub mod engine;
 /// The top-level model definition.
 pub mod model;
 /// Parameters and their values.
@@ -18,8 +21,9 @@ pub mod parameters;
 pub mod population;
 
 // Re-export all public types for convenient access
-pub use dynamics::{
-    Dynamics, ModelTypes, OdeMethod, OdeSolver, StratificationCondition, StratifiedRate, Transition,
+pub use dynamics::{Dynamics, StratificationCondition, StratifiedRate, Transition};
+pub use engine::{
+    EngineSettings, EngineType, ModelEngine, ModelKind, OdeMethod, OdeSolver, RateMeaning,
 };
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};

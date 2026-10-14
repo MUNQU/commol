@@ -3,7 +3,6 @@
 import pytest
 
 from commol import ModelBuilder
-from commol.constants import ModelTypes
 from commol.context.model import Model
 from tests.support import build, sir_builder
 
@@ -33,7 +32,7 @@ class TestUnits:
     def test_print_equations_latex_with_units(self, capsys) -> None:
         model = sir_builder(
             name="SIR Model with Units", bin_unit="person", units=DAILY
-        ).build(typology=ModelTypes.DIFFERENTIAL_EQUATIONS.value)
+        ).build(engine="DifferentialEquations")
 
         output = _printed(model, capsys, format="latex")
 

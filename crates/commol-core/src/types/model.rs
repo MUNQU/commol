@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::dynamics::Dynamics;
+use super::engine::ModelEngine;
 use super::parameters::Parameter;
 use super::population::Population;
 
@@ -17,6 +18,8 @@ pub struct Model {
     pub population: Population,
     /// Parameters, in declaration order.
     pub parameters: Vec<Parameter>,
-    /// Typology and transitions.
+    /// Transitions.
     pub dynamics: Dynamics,
+    /// The engine that runs the model, and its settings.
+    pub engine: ModelEngine,
 }

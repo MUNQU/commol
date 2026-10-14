@@ -18,16 +18,19 @@ pub struct PyModel {
 #[pymethods]
 impl PyModel {
     #[new]
-    #[pyo3(signature = (name, population, dynamics, parameters, description=None, version=None))]
+    #[pyo3(signature = (name, population, dynamics, parameters, engine, description=None, version=None))]
     fn new(
         name: String,
         population: PyPopulation,
         dynamics: PyDynamics,
         parameters: Vec<PyParameter>,
+        engine: &str,
         description: Option<String>,
         version: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        let engine_type = commol_core::EngineType::from_name(engine)
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+        Ok(Self {
             inner: commol_core::Model {
                 name,
                 description,
@@ -35,8 +38,9 @@ impl PyModel {
                 population: population.inner,
                 parameters: parameters.into_iter().map(|p| p.inner).collect(),
                 dynamics: dynamics.inner,
+                engine: commol_core::ModelEngine::new(engine_type),
             },
-        }
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -301,30 +305,13 @@ pub struct PyDynamics {
 #[pymethods]
 impl PyDynamics {
     #[new]
-    #[pyo3(signature = (typology, transitions))]
-    fn new(typology: &str, transitions: Vec<PyTransition>) -> PyResult<Self> {
-        let typology = match typology.to_lowercase().as_str() {
-            "differenceequations" | "difference_equations" | "difference" => {
-                commol_core::ModelTypes::DifferenceEquations
-            }
-            "differentialequations" | "differential_equations" | "differential" => {
-                commol_core::ModelTypes::DifferentialEquations
-            }
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid typology '{}'. Must be 'DifferenceEquations' or 'DifferentialEquations'",
-                    typology
-                )));
-            }
-        };
-
-        Ok(Self {
+    #[pyo3(signature = (transitions))]
+    fn new(transitions: Vec<PyTransition>) -> Self {
+        Self {
             inner: commol_core::Dynamics {
-                typology,
                 transitions: transitions.into_iter().map(|t| t.inner).collect(),
-                solver: None,
             },
-        })
+        }
     }
 }
 

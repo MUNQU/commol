@@ -12,6 +12,7 @@
 //! - [`MathExpression`]: Parse and evaluate mathematical expressions
 //! - [`SimulationEngine`]: Trait for implementing simulation engines
 //! - [`Model`]: Complete model specification including population and dynamics
+//! - [`EngineType`]: The list of engines a model can name
 //! - [`types`]: All data structures for defining compartment models
 
 #![warn(missing_docs)]
@@ -31,8 +32,8 @@ pub use simulation_engine::{OutputLabels, SimulationEngine, Trajectory, check_po
 
 // Re-export all public types from the types module for convenient access
 pub use types::{
-    Bin, BinFraction, CompartmentFraction, Dynamics, InitialConditions, Model, ModelTypes,
-    OdeMethod, OdeSolver, Parameter, ParameterValue, Population, SeriesMode, Stratification,
-    StratificationCondition, StratificationFraction, StratificationFractions, StratifiedRate,
-    Transition,
+    Bin, BinFraction, CompartmentFraction, Dynamics, EngineSettings, EngineType, InitialConditions,
+    Model, ModelEngine, ModelKind, OdeMethod, OdeSolver, Parameter, ParameterValue, Population,
+    RateMeaning, SeriesMode, Stratification, StratificationCondition, StratificationFraction,
+    StratificationFractions, StratifiedRate, Transition,
 };

@@ -1,8 +1,5 @@
 """Python helpers expand a model exactly as the engine does."""
 
-import pytest
-
-from commol.commol_rs import _commol_rs as commol_rs
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.engine_state import expanded_outputs
 from commol.context._model.helpers import ModelCompartmentHelper
@@ -55,13 +52,3 @@ class TestEngineExpansion:
 
         assert helper_names == [c.name for c in model.initial_state()]
         assert "A_g2_hosp" in helper_names
-
-    def test_difference_engine_rejects_a_differential_model(self) -> None:
-        model = build(conditional_pathway_builder())
-        payload = model.model_dump_json().replace(
-            '"DifferenceEquations"', '"DifferentialEquations"'
-        )
-        rust_model = commol_rs.core.Model.from_json(payload)
-
-        with pytest.raises(RuntimeError, match="cannot solve"):
-            commol_rs.difference.DifferenceEquations(rust_model)

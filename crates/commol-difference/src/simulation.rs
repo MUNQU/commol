@@ -39,16 +39,17 @@ impl DifferenceEquations {
     /// Returns a message when the model is not a difference-equations model,
     /// or when [`CompiledModel::try_from_model`] fails.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
-        if model.dynamics.typology != commol_core::ModelTypes::DifferenceEquations {
+        let engine_type = model.engine.engine_type();
+        if engine_type != commol_core::EngineType::DifferenceEquations {
             return Err(format!(
-                "The DifferenceEquations engine cannot solve a {:?} model",
-                model.dynamics.typology
+                "The DifferenceEquations engine cannot solve a {} model",
+                engine_type.name()
             ));
         }
         Self::from_compiled(CompiledModel::try_from_model(model)?)
     }
 
-    /// Step a compiled model in discrete time, whatever its typology.
+    /// Step a compiled model in discrete time, whatever its engine.
     ///
     /// # Errors
     ///
@@ -268,7 +269,7 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 mod tests {
     use super::*;
     use commol_core::{
-        Bin, BinFraction, Dynamics, InitialConditions, Model, ModelTypes, Population,
+        Bin, BinFraction, Dynamics, EngineType, InitialConditions, Model, ModelEngine, Population,
         RateMathExpression, SimulationEngine, Transition,
     };
 
@@ -333,7 +334,6 @@ mod tests {
                 },
             },
             dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -347,8 +347,8 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
-                solver: None,
             },
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 
@@ -389,7 +389,6 @@ mod tests {
                 },
             },
             dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -401,8 +400,8 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
-                solver: None,
             },
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 
@@ -527,7 +526,6 @@ mod tests {
                 },
             },
             dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
                 transitions: vec![
                     Transition {
                         id: "a_to_b".to_string(),
@@ -554,8 +552,8 @@ mod tests {
                         impulse_every: None,
                     },
                 ],
-                solver: None,
             },
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 

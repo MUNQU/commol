@@ -61,7 +61,7 @@ vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 # Rust, from the repository root
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration
+cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol
 ```
 
 The pre-commit hooks run most of them on every commit; see

@@ -34,7 +34,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
 | Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
-| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration` |
+| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
 | Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration` |
@@ -62,7 +62,8 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change how a model expands into compartments | `crates/commol-model/src/builder.rs` (`expand`) | `layout.rs`, `py-commol/commol/context/_model/engine_state.py` |
 | Change how transitions become flows | `crates/commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`derivatives`), `context/_model/equations.py` (`print_equations`) |
 | Change the difference step | `crates/commol-difference/src/simulation.rs` | `crates/commol-core/src/simulation_engine.rs` |
-| Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/dynamics.rs` (`OdeSolver`), `py-commol/commol/context/dynamics.py` |
+| Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/engine.rs` (`OdeSolver`), `py-commol/commol/context/engine.py` |
+| Add a model type (engine) | `crates/commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `py-commol/commol/context/engine.py`, the [checklist](docs/codebase/maintainer-playbook.md#model-type-engine) |
 | Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/dynamics.py` |
 | Change which positions a model type accepts | `crates/commol-core/src/simulation_engine.rs` (`check_position`) | each engine's `check_position`, `crates/commol-calibration/src/calibration_problem.rs` (`check_positions`) |
 | Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/probabilistic/statistics_calculator.py` |
@@ -71,7 +72,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |
 | Change probabilistic calibration | `py-commol/commol/api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
-| Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes either engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
+| Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
 | Change reports | `py-commol/commol/api/reporting.py` | [Design decisions](docs/codebase/design-decisions.md#reports) |
 
 ## Documentation map

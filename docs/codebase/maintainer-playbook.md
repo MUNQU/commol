@@ -76,6 +76,29 @@ Use this page before you make or review a change. It turns the
 - [ ] Update [Calibration](../guide/calibration.md) and, for ensembles,
       [Probabilistic calibration](../guide/probabilistic-calibration.md).
 
+### Model type (engine)
+
+To add an engine to the list:
+
+- [ ] Add the entry to `EngineType` in `crates/commol-core/src/types/engine.rs`
+      and to `ALL`. The compiler then names every `match` to complete in that
+      file: its name, its model kind, its settings (`EngineSettings`, parsed
+      and validated with `deny_unknown_fields`), the left-hand side of its
+      equations and the meaning of a rate.
+- [ ] Write the engine in its own crate and implement `SimulationEngine`;
+      `try_from_model` rejects a model of another engine.
+- [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: its arm in
+      `build`, `engine_type` and `dispatch!`. Add the crate to
+      `py-commol/Cargo.toml`.
+- [ ] Add the name to the `EngineType` `Literal` in `context/engine.py`; if the
+      engine has settings, add their Pydantic class to `EngineSettings`.
+- [ ] Run the tests of `crates/commol-core/src/types/engine.rs`,
+      `py-commol/src/engine.rs` and `tests/building/test_engine.py`; they run
+      every entry of the list.
+- [ ] Say what a rate means for it in the guides, and add it to
+      [Model structure](../advanced/model-structure.md) and
+      [Running simulations](../guide/simulations.md).
+
 ### PyO3 bindings
 
 - [ ] Keep logic out of `py-commol/src/`: convert types and call the crate.

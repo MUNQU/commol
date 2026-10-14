@@ -9,11 +9,11 @@ is a new class that meets the interface, with its engines in the registry,
 and nothing that exists breaks.
 Motivation: the user wants the axis refactors to leave commol generic for the
 next step, such as agent networks (L1). After `odd/archive/tasks/axis-positions.md`,
-`odd/tasks/model-type-registry.md` and `odd/tasks/axis-scale-refactor.md`, the
+`odd/archive/tasks/model-type-registry.md` and `odd/tasks/axis-scale-refactor.md`, the
 axis and the engine are generic, but `typology` names a model kind and an
 engine at once, and the generic layers read compartmental fields.
 Branch: `refactor/model-kind-interface` from `develop`, after
-`odd/tasks/model-type-registry.md` is merged, and before
+`odd/archive/tasks/model-type-registry.md` is merged, and before
 `odd/tasks/axis-scale-refactor.md`, whose converter reads `step_unit` and the
 engine from the new `Model`.
 Engram mirror: topic `odd/model-kind-interface/tasks` (project `commol`).

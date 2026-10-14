@@ -74,7 +74,7 @@ fn expanded_outputs(
 /// Every transition flow of a model, exactly as the engine simulates it
 ///
 /// Args:
-///     model: The compartment model, of any typology
+///     model: The compartment model, whatever its engine
 ///
 /// Returns:
 ///     One `(transition, source, target, rate, per_capita_of)` tuple per flow

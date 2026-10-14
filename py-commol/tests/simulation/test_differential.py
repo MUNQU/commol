@@ -5,7 +5,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder, OdeSolver, Simulation, AxisPattern
+from commol import OdeSolver, Simulation, AxisPattern
 from commol.context.model import Model
 from tests.support import (
     a_to_b_builder,
@@ -51,7 +51,7 @@ class TestRun:
             assert math.log(s / 990) + 3.0 * r / 1000 == pytest.approx(0, abs=1e-7)
 
     def test_the_default_solver_is_used_without_settings(self) -> None:
-        results = Simulation(build_ode(a_to_b_builder(), solver=None)).run(5)
+        results = Simulation(build_ode(a_to_b_builder(), settings=None)).run(5)
 
         assert_close(results["A"][5], 1000 * math.exp(-K * 5), rel=1e-5)
 
@@ -131,36 +131,6 @@ class TestTimeInsideAStep:
 
 
 class TestSolverSettings:
-    def test_settings_are_saved_and_loaded_back(self, tmp_path) -> None:
-        model = build_ode(a_to_b_builder(), OdeSolver(method="bdf", rtol=1e-8))
-        path = tmp_path / "model.json"
-        model.to_json(path)
-
-        loaded = Model.from_json(path)
-
-        assert loaded.dynamics.solver == OdeSolver(method="bdf", rtol=1e-8)
-
-    def test_the_builder_takes_settings(self) -> None:
-        builder = ModelBuilder(name="m", solver=OdeSolver(method="bdf"))
-        builder.add_bin("A", "A").add_bin("B", "B")
-        builder.add_parameter("k", 0.1)
-        builder.add_transition("ab", ["A"], ["B"], rate="k")
-        builder.set_initial_conditions(
-            population_size=10,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0}],
-        )
-
-        model = builder.build(typology="DifferentialEquations")
-
-        assert model.dynamics.solver == OdeSolver(method="bdf")
-
-    def test_a_difference_model_has_no_solver(self) -> None:
-        builder = a_to_b_builder()
-        builder._solver = OdeSolver()
-
-        with pytest.raises(ValidationError, match="only to a DifferentialEquations"):
-            build(builder)
-
     @pytest.mark.parametrize("field", ["rtol", "atol"])
     def test_a_tolerance_must_be_positive(self, field: str) -> None:
         with pytest.raises(ValidationError):

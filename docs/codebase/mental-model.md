@@ -31,13 +31,13 @@ numbers.
 ## How a model flows through the layers
 
 ```text
-ModelBuilder ... .build()          -> commol.context.Model (Pydantic validation)
+ModelBuilder ... .build(engine)    -> commol.context.Model (Pydantic validation;
+                                      the engine's list checks model.engine)
 Simulation(model)                  -> engine_state.build_engine(model JSON)
                                    -> commol_rs.core.Model.from_json(...)
-                                   -> by typology:
-                                        commol_rs.difference.DifferenceEquations(...)
-                                        commol_rs.differential.DifferentialEquations(...)
-                                   both compile it with commol-model (CompiledModel):
+                                   -> commol_rs.engine.Engine(...): the engine
+                                      model.engine.type names (EngineType list)
+                                   every engine compiles it with commol-model (CompiledModel):
                                         expand bins and stratifications into compartments
                                         build the initial state
                                         plan the transition flows and compile the rates

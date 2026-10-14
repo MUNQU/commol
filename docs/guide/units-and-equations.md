@@ -28,7 +28,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
@@ -102,7 +102,7 @@ along_a_line = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferentialEquations")
+    .build(engine="DifferentialEquations")
 )
 along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
 ```
@@ -133,7 +133,7 @@ wrong_units = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 try:
@@ -164,7 +164,7 @@ parts:
 
 | Part | Content |
 |---|---|
-| Model information | Name, typology, and the number of bins, stratifications, parameters and transitions |
+| Model information | Name, engine, and the number of bins, stratifications, parameters and transitions |
 | Compact form | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit. |
 | Expanded form | One difference equation per compartment: `[A(t+Dt) - A(t)] / Dt = …` |
 

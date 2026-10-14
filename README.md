@@ -54,7 +54,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=100)

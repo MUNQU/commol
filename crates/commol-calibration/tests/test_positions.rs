@@ -8,8 +8,8 @@ use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 
-/// A → B at the per-capita rate `k`, in the given typology.
-fn decay_model(typology: &str) -> Model {
+/// A → B at the per-capita rate `k`, run by the given engine.
+fn decay_model(engine: &str) -> Model {
     let json = format!(
         r#"{{"name":"m","population":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
         "accumulators":[],"stratifications":[],"transitions":[],
@@ -17,8 +17,9 @@ fn decay_model(typology: &str) -> Model {
         {{"bin":"A","fraction":1.0}},{{"bin":"B","fraction":0.0}}],
         "stratification_fractions":[]}}}},
         "parameters":[{{"id":"k","value":0.1}}],
-        "dynamics":{{"typology":"{typology}","transitions":[{{"id":"ab","source":["A"],
-        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}]}}}}"#
+        "dynamics":{{"transitions":[{{"id":"ab","source":["A"],
+        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}]}},
+        "engine":{{"type":"{engine}"}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }

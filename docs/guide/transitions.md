@@ -29,7 +29,7 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 model.print_equations()  # shows every flow as the engine computes it
@@ -97,7 +97,7 @@ seasonal = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 ```
 
@@ -126,7 +126,7 @@ reaction = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 reaction.print_equations()
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
@@ -159,7 +159,7 @@ outflow = (
             {"bin": "C", "fraction": 0.3},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 for transition in outflow.dynamics.transitions:
@@ -204,7 +204,7 @@ moving = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 moving.print_equations()
 # move (g1 -> g2):  A_g1 -> A_g2: k * A_g1   and   B_g1 -> B_g2: k * B_g1
@@ -248,7 +248,7 @@ own_compartment = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 own_compartment.print_equations()
 # A_g1 -> B_g1: k * A_g1   and   A_g2 -> B_g2: k * A_g2
@@ -295,7 +295,7 @@ group_rates = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 group_rates.print_equations()
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
@@ -368,7 +368,7 @@ redirect = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 redirect.print_equations()
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
@@ -405,7 +405,7 @@ impulse_model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 jumped = Simulation(impulse_model).run(num_steps=2)

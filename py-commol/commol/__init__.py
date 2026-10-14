@@ -22,7 +22,7 @@ from commol.api import (
     windowed_totals,
 )
 from commol.context import Model
-from commol.context.dynamics import OdeSolver
+from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
     CalibrationParameter,

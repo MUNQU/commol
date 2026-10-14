@@ -24,7 +24,7 @@ model = (
         population_size=1000,
         bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=60)
@@ -122,7 +122,7 @@ def value_of(expression: str) -> float:
                 },
             ],
         )
-        .build(typology="DifferenceEquations")
+        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=1)
     inflow = sum(series[1] - series[0] for series in results.values())

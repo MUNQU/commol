@@ -126,7 +126,7 @@ A fraction may be `None` when calibration will find it; see
 the Rust engine:
 
 ```python
-model = builder.build(typology="DifferenceEquations")
+model = builder.build(engine="DifferenceEquations")
 
 results = Simulation(model).run(num_steps=50)
 
@@ -191,7 +191,7 @@ stratified = (
             }
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 for compartment in stratified.initial_state():
@@ -259,7 +259,7 @@ conditional = (
             },
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 print([c.name for c in conditional.initial_state()])
@@ -312,7 +312,7 @@ overridden = (
         ],
         compartment_fractions=[{"compartment": "B_g1", "fraction": 0.0}],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 print({c.name: c.population for c in overridden.initial_state()})
@@ -366,7 +366,7 @@ reaction = (
             {"bin": "C", "fraction": 0.0},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 # Each step: A loses k*A*B, B loses k*A*B, C gains 2*k*A*B
 ```
@@ -389,7 +389,7 @@ outflow = (
             {"bin": "B", "fraction": 0.5},
         ],
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 print([t.id for t in outflow.dynamics.transitions])  # ['outflow__A', 'outflow__B']
 ```

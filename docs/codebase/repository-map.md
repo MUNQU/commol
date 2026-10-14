@@ -9,6 +9,7 @@ Use this page when you know what to change but not where it belongs.
 | Path | Owns | Do not put here |
 |---|---|---|
 | `crates/commol-core/src/types/` | The model data types shared by all crates and serialized from Python (`Model`, `Population`, `Transition`, `InitialConditions`, …). | Engine behavior. |
+| `crates/commol-core/src/types/engine.rs` | `EngineType`, the one list of engines (model types): per entry, the model kind it runs, its settings and their validation, the form of its equations and the meaning of a rate. `ModelEngine`, the engine and settings of a model. | The engines themselves. |
 | `crates/commol-core/src/math_expression/` | Parsing, preprocessing and evaluation of rate expressions; the Cranelift JIT and its global cache (`jit/`). | Model-specific variables. |
 | `crates/commol-core/src/simulation_engine.rs` | The `SimulationEngine` trait (runs at positions, `check_position`), `Trajectory`, `check_positions` and `OutputLabels`: what calibration needs from any engine. | Code for one engine. |
 | `crates/commol-model/src/builder.rs` | Expansion of bins and accumulators over stratifications (`expand`, `expand_compartments`, `expand_accumulators`), the initial state (`initial_state`), name checks (`check_names`), impulse schedules and the compilation into `CompiledModel` (`try_from_model`). | Flow planning; stepping. |
@@ -32,9 +33,8 @@ Use this page when you know what to change but not where it belongs.
 |---|---|---|
 | `py-commol/src/core.rs` | Bindings of the model types. | Logic. |
 | `py-commol/src/model.rs` | The model queries of `commol_rs.model`: `initial_state`, `expanded_outputs`, `transition_flows`, `check_names`. | Logic beyond type conversion. |
-| `py-commol/src/engine.rs` | `Engine` (either engine, for calibration), `EngineArg` (either Python engine object) and `engine_class!`, which defines the methods both Python engine classes share. | Engine logic. |
-| `py-commol/src/difference.rs`, `py-commol/src/differential.rs` | The Python classes `DifferenceEquations` and `DifferentialEquations`. | Logic beyond type conversion. |
-| `py-commol/src/calibration.rs` | Calibration types and functions; each takes either engine (`EngineArg`). | Logic beyond type conversion. |
+| `py-commol/src/engine.rs` | `commol_rs.engine`: `Engine::build`, which builds the engine an `EngineType` entry names, and the Python classes `Engine` (any engine, built from a model) and `EngineType` (the list, for Python to ask). | Engine logic. |
+| `py-commol/src/calibration.rs` | Calibration types and functions; each takes an `Engine`. | Logic beyond type conversion. |
 | `py-commol/commol/commol_rs/_commol_rs.pyi` | The type stub of the extension. Update it with every binding change. | — |
 
 ## Python package (`py-commol/commol/`)
@@ -50,7 +50,8 @@ Use this page when you know what to change but not where it belongs.
 | `api/patterns.py`, `api/time_scale.py`, `api/windows.py` | Rates that change along the axis (`AxisPattern`), step/physical-time conversion, the window grid and windowed totals. | Physical time inside the model. |
 | `api/plotter.py` | Plots of results. | Computation of results. |
 | `context/` | The Pydantic model: fields, validation, JSON I/O, update methods. | Engine rules. |
-| `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the typology names. | Python re-implementations of them. |
+| `context/engine.py` | `ModelEngine` (`Model.engine`: the engine type and its settings), `OdeSolver`, and the `EngineType` names as a `Literal` for static typing. | Settings validation or engine meanings: ask `commol_rs.engine.EngineType`. |
+| `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the model names. | Python re-implementations of them. |
 | `context/_model/` (other files) | Internals of `Model`: equation printer, unit checker, calibration write-back, JSON rendering. | Public API. |
 | `utils/security.py` | Validation of every user expression (`SecurityConfig` limits). | Expression evaluation. |
 | `utils/equations.py` | Dimensional analysis with `pint`. | — |
@@ -72,7 +73,8 @@ Use this page when you know what to change but not where it belongs.
 | Change how a model expands | `commol-model/src/builder.rs` (`expand`) | `layout.rs`, `engine_state.py`, `tests/building/`, `tests/simulation/test_outputs.py` |
 | Change how transitions become flows | `commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`derivatives`), `context/_model/equations.py`, `tests/transitions/` |
 | Change the difference step | `commol-difference/src/simulation.rs` | `simulation_engine.rs` |
-| Change the ODE integration or the solver settings | `commol-differential/src/solve.rs` | `commol-differential/src/lib.rs`, `commol-core/src/types/dynamics.rs` (`OdeSolver`), `context/dynamics.py` |
+| Change the ODE integration or the solver settings | `commol-differential/src/solve.rs` | `commol-differential/src/lib.rs`, `commol-core/src/types/engine.rs` (`OdeSolver`), `context/engine.py` |
+| Add a model type (engine) | `commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `context/engine.py`, [checklist](maintainer-playbook.md#model-type-engine) |
 | Change impulses | `commol-model/src/system.rs` (`apply_impulses`) | `types.rs` (`ImpulseSchedule`), both engines, `context/dynamics.py`, `tests/transitions/test_impulses.py` |
 | Add an expression function or variable | `math_expression/` | `utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `context/initial_conditions.py` | `builder.rs` (`initial_state`), `tests/initial_conditions/` |

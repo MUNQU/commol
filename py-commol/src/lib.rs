@@ -10,23 +10,22 @@
 //!
 //! - `core`: Core data structures (Model, Population, etc.)
 //! - `model`: What a model expands into (compartments, flows, initial state)
-//! - `difference`: Discrete-time difference equation solver
-//! - `differential`: Continuous-time ordinary differential equation solver
+//! - `engine`: The list of engines, and the engine a model names
 //! - `calibration`: Parameter calibration and optimization
 //!
 //! ## Example
 //!
 //! ```python
-//! from commol_rs import core, difference
+//! from commol_rs import core, engine
 //!
 //! # Load a model
 //! model = core.Model.from_json_file("sir_model.json")
 //!
-//! # Create solver
-//! solver = difference.DifferenceEquations(model)
+//! # Build the engine the model names
+//! simulation = engine.Engine(model)
 //!
 //! # Run simulation
-//! results = solver.run(100)
+//! positions, rows = simulation.run(100)
 //! ```
 
 #![warn(missing_docs)]
@@ -36,8 +35,6 @@ use pyo3::prelude::*;
 // Module declarations
 mod calibration;
 mod core;
-mod difference;
-mod differential;
 mod engine;
 mod model;
 pub(crate) mod python_observer;
@@ -69,27 +66,16 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     model::register(&model_module)?;
     m.add_submodule(&model_module)?;
 
-    // Difference module: discrete-time solver
-    let difference_module = PyModule::new(py, "difference")?;
-    difference_module.add(
+    // Engine module: the list of engines and the engine a model names
+    let engine_module = PyModule::new(py, "engine")?;
+    engine_module.add(
         "__doc__",
-        "Discrete-time difference equation solver.\n\n\
-         Provides the DifferenceEquations class for simulating compartment\n\
-         models using difference equations (discrete time steps).",
+        "The engines a model can name.\n\n\
+         Provides EngineType, the list of engines and what each one means,\n\
+         and Engine, the engine a model names, built from the model.",
     )?;
-    difference::register(&difference_module)?;
-    m.add_submodule(&difference_module)?;
-
-    // Differential module: continuous-time solver
-    let differential_module = PyModule::new(py, "differential")?;
-    differential_module.add(
-        "__doc__",
-        "Continuous-time ordinary differential equation solver.\n\n\
-         Provides the DifferentialEquations class for simulating compartment\n\
-         models in continuous time with diffsol.",
-    )?;
-    differential::register(&differential_module)?;
-    m.add_submodule(&differential_module)?;
+    engine::register(&engine_module)?;
+    m.add_submodule(&engine_module)?;
 
     // Calibration module: parameter optimization
     let calibration_module = PyModule::new(py, "calibration")?;

@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
-use crate::engine::EngineArg;
+use crate::engine::PyEngine;
 
 /// Type of value being calibrated
 #[pyclass(name = "CalibrationParameterType", from_py_object)]
@@ -1059,7 +1059,7 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 /// Calibrate a model against observed data
 ///
 /// Args:
-///     engine: The simulation engine (DifferenceEquations or DifferentialEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points
 ///     parameters: List of parameters to calibrate
 ///     constraints: List of calibration constraints
@@ -1075,7 +1075,7 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
 fn calibrate(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
@@ -1133,7 +1133,7 @@ fn calibrate(
 /// not just the final best result.
 ///
 /// Args:
-///     engine: The simulation engine (DifferenceEquations or DifferentialEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points to fit
 ///     parameters: List of parameters to calibrate with bounds
 ///     constraints: List of constraints on parameters/compartments
@@ -1149,7 +1149,7 @@ fn calibrate(
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
 fn calibrate_with_history(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
@@ -1193,7 +1193,7 @@ fn calibrate_with_history(
 /// Runs N calibration runs in parallel using Rayon, each with a different seed.
 ///
 /// Args:
-///     engine: The simulation engine (DifferenceEquations or DifferentialEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points
 ///     parameters: List of parameters to calibrate
 ///     constraints: List of constraints on parameters/compartments
@@ -1211,7 +1211,7 @@ fn calibrate_with_history(
 #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_multiple_calibrations(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
@@ -1315,7 +1315,7 @@ fn deduplicate_evaluations(
 /// which is much faster than sequential execution in Python.
 ///
 /// Args:
-///     engine: Simulation engine (DifferenceEquations or DifferentialEquations)
+///     engine: Simulation engine built from the model
 ///     parameter_sets: List of parameter value lists (one per parameter set)
 ///     parameter_names: List of parameter names (must match model parameter IDs)
 ///     positions: Sorted, unique positions on the axis to report at
@@ -1325,7 +1325,7 @@ fn deduplicate_evaluations(
 ///     [position_idx][output_idx], aligned with `positions`
 #[pyfunction]
 fn generate_predictions_parallel(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
     positions: Vec<f64>,
@@ -1349,7 +1349,7 @@ fn generate_predictions_parallel(
 #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, positions, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_parallel(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
@@ -1410,7 +1410,7 @@ fn generate_calibrated_predictions_parallel(
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, values, initial_population_size, initial_condition_remainder=None))]
 fn calibrated_initial_population(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     values: Vec<f64>,
     initial_population_size: u64,
@@ -1443,7 +1443,7 @@ fn calibrated_initial_population(
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
 fn check_initial_conditions(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<()> {
@@ -1468,7 +1468,7 @@ fn check_initial_conditions(
 ///         names the observation or constraint that holds it
 #[pyfunction]
 fn check_positions(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     constraints: Vec<PyCalibrationConstraint>,
 ) -> PyResult<()> {
@@ -1481,7 +1481,7 @@ fn check_positions(
 /// Generate compact predictions for selected metric points.
 #[pyfunction]
 fn generate_predictions_at_points_parallel(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
     metric_points: Vec<(f64, usize)>,
@@ -1503,7 +1503,7 @@ fn generate_predictions_at_points_parallel(
 #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, metric_points, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_at_points_parallel(
-    engine: EngineArg<'_>,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,

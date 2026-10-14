@@ -26,7 +26,7 @@ struct SeriesPayload {
 }
 
 impl CompiledModel {
-    /// Compile a model, whatever its typology.
+    /// Compile a model, whatever its engine.
     ///
     /// This constructor performs several pre-computation steps for efficiency:
     /// 1. Generates all stratified compartment combinations
@@ -1304,8 +1304,8 @@ mod tests {
     }
     use commol_core::types::population::CompartmentFraction;
     use commol_core::{
-        Bin, BinFraction, Dynamics, InitialConditions, ModelTypes, Population, Stratification,
-        StratificationCondition, StratificationFraction, StratificationFractions,
+        Bin, BinFraction, Dynamics, EngineType, InitialConditions, ModelEngine, Population,
+        Stratification, StratificationCondition, StratificationFraction, StratificationFractions,
     };
 
     /// Initial population of each compartment, in the order of `compartments`.
@@ -1400,10 +1400,9 @@ mod tests {
             },
             parameters: vec![],
             dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
                 transitions: vec![],
-                solver: None,
             },
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 

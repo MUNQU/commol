@@ -45,7 +45,7 @@ def flow_model(
     parameters: Mapping[str, float | str] | None = None,
     *,
     ode: bool = True,
-    solver: OdeSolver = FINE,
+    settings: OdeSolver = FINE,
     accumulators: Sequence[str] = (),
 ) -> Model:
     """
@@ -61,10 +61,10 @@ def flow_model(
     parameters : Mapping[str, float | str] | None
         Parameter id to its value or formula.
     ode : bool
-        Build for differential equations with ``solver``; otherwise for
+        Build for differential equations with ``settings``; otherwise for
         difference equations.
-    solver : OdeSolver
-        The solver settings of a differential model.
+    settings : OdeSolver
+        The settings of the differential engine.
     accumulators : Sequence[str]
         Accumulator ids that the flows may name.
 
@@ -100,7 +100,7 @@ def flow_model(
             for bin_id, value in values.items()
         ],
     )
-    return build_ode(builder, solver) if ode else build(builder)
+    return build_ode(builder, settings) if ode else build(builder)
 
 
 def increments(

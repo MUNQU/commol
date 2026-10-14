@@ -8,7 +8,7 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.api.results.SimulationResults
 
-::: commol.context.dynamics.OdeSolver
+::: commol.context.engine.OdeSolver
 
 ## Windows
 
