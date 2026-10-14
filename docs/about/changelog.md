@@ -276,6 +276,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `total_…` variable that names no subgroup total, such as `total_t1_g1`
   when `group` is declared before `type`, is a build error that lists the valid
   names. Before, a formula parameter or the engine gave it the value 0.
+- A bin or an accumulator id cannot be `total`, `step`, `t`, `pi` or `e`, and
+  a bin cannot expand into a name that is also a `total_<categories>` subgroup
+  total. Before, the engine variable hid such a bin, and the two sums shared
+  one value.
 - A parameter id cannot be `total`, `step`, `t`, `pi`, `e`, an expanded
   compartment or a subgroup total. Before, only bin ids were rejected, and
   the parameter and the engine variable shared one value.

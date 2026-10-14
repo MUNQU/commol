@@ -12,8 +12,8 @@ use crate::types::{
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr, UnaryOperator};
 use commol_core::math_expression::jit::parser::parse_expression;
 use commol_core::math_expression::preprocessing::{
-    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
-    SUBGROUP_TOTAL_PREFIX,
+    ENGINE_VARIABLES, SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
+    SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
     CompartmentalStructure, MathExpression, MathExpressionContext, Model, RateMathExpression,
@@ -664,23 +664,32 @@ fn compile_transition_flows(
         .collect()
 }
 
-/// Build pre-computed subgroup total mappings for stratifications.
+/// Where the name of a subgroup total comes from.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TotalSource {
+    /// `total_<categories>`: the compartments of every bin with these categories.
+    Categories,
+    /// A bin total or a partial bin total: the bin id, then some categories.
+    Bin,
+}
+
+/// Every subgroup total of a structure, one entry per contributing
+/// compartment: its name, where the name comes from and the compartment index.
 ///
-/// This function creates mappings for:
+/// The entries are:
 /// 1. Subgroup totals over categories (`total_young`, `total_young_urban`, ...)
 /// 2. Bin totals (`S`, `I`, `R`): the sum of all stratified versions
 /// 3. Partial bin totals (`S_young` when a second stratification splits it)
 ///
-/// Every mapping is built from the compartment labels.
-fn build_subgroup_total_mappings(
+/// Every entry is built from the compartment labels.
+fn subgroup_total_entries(
     layout: &CompartmentLayout,
     structure: &CompartmentalStructure,
-) -> Vec<SubgroupTotalLayout> {
+) -> Vec<(String, TotalSource, usize)> {
+    let mut entries = Vec::new();
     if structure.stratifications.is_empty() {
-        return Vec::new();
+        return entries;
     }
-
-    let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
     let partial_bin_totals = structure.stratifications.len() >= 2;
 
     for (compartment_index, label) in layout.labels().iter().enumerate() {
@@ -693,11 +702,7 @@ fn build_subgroup_total_mappings(
             continue;
         }
 
-        // Bin total
-        totals
-            .entry(label.source.clone())
-            .or_default()
-            .push(compartment_index);
+        entries.push((label.source.clone(), TotalSource::Bin, compartment_index));
 
         let full_mask: u32 = (1 << categories.len()) - 1;
         for subset_mask in 1..=full_mask {
@@ -709,23 +714,36 @@ fn build_subgroup_total_mappings(
                 .collect();
             let combination = subset.join("_");
 
-            // Subgroup total over every bin
-            totals
-                .entry(format!("{SUBGROUP_TOTAL_PREFIX}{combination}"))
-                .or_default()
-                .push(compartment_index);
+            entries.push((
+                format!("{SUBGROUP_TOTAL_PREFIX}{combination}"),
+                TotalSource::Categories,
+                compartment_index,
+            ));
 
             // Partial bin total. With one stratification a partial sum would
             // duplicate either the compartment or the bin total.
             if partial_bin_totals && subset_mask != full_mask {
-                totals
-                    .entry(format!("{}_{}", label.source, combination))
-                    .or_default()
-                    .push(compartment_index);
+                entries.push((
+                    format!("{}_{}", label.source, combination),
+                    TotalSource::Bin,
+                    compartment_index,
+                ));
             }
         }
     }
+    entries
+}
 
+/// Build pre-computed subgroup total mappings for stratifications, one per
+/// name of [`subgroup_total_entries`].
+fn build_subgroup_total_mappings(
+    layout: &CompartmentLayout,
+    structure: &CompartmentalStructure,
+) -> Vec<SubgroupTotalLayout> {
+    let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
+    for (name, _, compartment_index) in subgroup_total_entries(layout, structure) {
+        totals.entry(name).or_default().push(compartment_index);
+    }
     totals
         .into_iter()
         .map(
@@ -771,6 +789,13 @@ pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
 /// subgroup total: `total_<categories>`, bin totals and partial bin totals.
 /// This function returns an error when:
 ///
+/// - a parameter, bin or accumulator id is a variable the engine provides in
+///   every expression ([`ENGINE_VARIABLES`]: `total`, `step`, `t`, `pi`, `e`),
+///   because the engine variable would hide it;
+/// - a name built from a bin (a compartment, a bin total or a partial bin
+///   total) is also a `total_<categories>` subgroup total, as for a bin
+///   `total_y` stratified by `age = [y, o]` and `sex = [y, o]`: `total_y_y`
+///   would name two sums;
 /// - a parameter id is one of those names, because the parameter and the
 ///   engine variable would share one slot;
 /// - a transition rate or a formula parameter uses a `total_…` name that is
@@ -785,7 +810,9 @@ pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
 /// names each conflict and lists the valid subgroup total names.
 pub fn check_names(model: &Model) -> Result<(), String> {
     let structure = model.compartmental()?;
+    check_engine_variable_ids(model, structure)?;
     let layout = CompartmentLayout::new(structure);
+    check_bin_names_against_subgroup_totals(&layout, structure)?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
     let subgroup_totals = subgroup_total_name_set(&layout, structure);
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
@@ -855,6 +882,72 @@ pub fn check_names(model: &Model) -> Result<(), String> {
         "Unknown subgroup total(s) {}. Category suffixes follow the \
          declaration order of the stratifications. Valid names: {valid}",
         unknown
+            .iter()
+            .map(|name| format!("'{name}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
+}
+
+/// Reject a parameter, bin or accumulator id that is a variable the engine
+/// provides in every expression.
+fn check_engine_variable_ids(
+    model: &Model,
+    structure: &CompartmentalStructure,
+) -> Result<(), String> {
+    let ids = model
+        .parameters
+        .iter()
+        .map(|parameter| ("parameter", parameter.id.as_str()))
+        .chain(structure.bins.iter().map(|bin| ("bin", bin.id.as_str())))
+        .chain(
+            structure
+                .accumulators
+                .iter()
+                .map(|accumulator| ("accumulator", accumulator.id.as_str())),
+        );
+    let conflicts: Vec<String> = ids
+        .filter(|(_, id)| ENGINE_VARIABLES.contains(id))
+        .map(|(kind, id)| format!("{kind} '{id}'"))
+        .collect();
+    if conflicts.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "Ids cannot be variables the engine provides ({}): {}. Rename them.",
+        ENGINE_VARIABLES.join(", "),
+        conflicts.join(", ")
+    ))
+}
+
+/// Reject a compartment, bin total or partial bin total whose name is also a
+/// `total_<categories>` subgroup total.
+fn check_bin_names_against_subgroup_totals(
+    layout: &CompartmentLayout,
+    structure: &CompartmentalStructure,
+) -> Result<(), String> {
+    let entries = subgroup_total_entries(layout, structure);
+    let by_categories: HashSet<&str> = entries
+        .iter()
+        .filter(|(_, source, _)| *source == TotalSource::Categories)
+        .map(|(name, _, _)| name.as_str())
+        .collect();
+    let mut conflicts: Vec<&str> = entries
+        .iter()
+        .filter(|(_, source, _)| *source == TotalSource::Bin)
+        .map(|(name, _, _)| name.as_str())
+        .chain(layout.names().iter().map(String::as_str))
+        .filter(|name| by_categories.contains(name))
+        .collect();
+    if conflicts.is_empty() {
+        return Ok(());
+    }
+    conflicts.sort_unstable();
+    conflicts.dedup();
+    Err(format!(
+        "Names built from a bin are also subgroup totals: {}. Rename the bin \
+         so that its compartments do not read as `{SUBGROUP_TOTAL_PREFIX}<categories>`.",
+        conflicts
             .iter()
             .map(|name| format!("'{name}'"))
             .collect::<Vec<_>>()
@@ -1794,6 +1887,54 @@ mod tests {
             assert!(error.contains(&format!("'{id}' ({kind})")), "{error}");
         }
         assert!(check_names(&model_with_parameter("total_max")).is_ok());
+    }
+
+    #[test]
+    fn an_engine_variable_is_not_a_parameter_bin_or_accumulator_id() {
+        let parameter = model_with_parameter("step");
+        let mut bin = model_with_rate("k");
+        structure_mut(&mut bin).bins[1].id = "t".to_string();
+        let mut accumulator = model_with_rate("k");
+        structure_mut(&mut accumulator).accumulators = vec![commol_core::Accumulator {
+            id: "total".to_string(),
+            name: "total".to_string(),
+        }];
+
+        for (model, conflict) in [
+            (parameter, "parameter 'step'"),
+            (bin, "bin 't'"),
+            (accumulator, "accumulator 'total'"),
+        ] {
+            let error = check_names(&model).expect_err("an engine variable must be rejected");
+            assert!(error.contains(conflict), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_bin_name_that_reads_as_a_subgroup_total_is_rejected() {
+        let age = Stratification {
+            id: "age".to_string(),
+            categories: vec!["y".to_string(), "o".to_string()],
+            conditions: None,
+        };
+        let sex = Stratification {
+            id: "sex".to_string(),
+            categories: vec!["y".to_string(), "o".to_string()],
+            conditions: None,
+        };
+        let mut model = make_model(vec![age, sex], vec![], vec![]);
+        structure_mut(&mut model).bins[0].id = "total_y".to_string();
+
+        let error = check_names(&model).expect_err("total_y_y names two sums");
+        assert!(error.contains("'total_y_y'"), "{error}");
+    }
+
+    #[test]
+    fn a_bin_that_starts_with_the_prefix_but_names_no_subgroup_builds() {
+        let mut model = make_model(vec![group_stratification()], vec![], vec![]);
+        structure_mut(&mut model).bins[0].id = "total_x".to_string();
+
+        assert!(check_names(&model).is_ok());
     }
 
     #[test]

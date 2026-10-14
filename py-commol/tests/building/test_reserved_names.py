@@ -1,4 +1,4 @@
-"""Parameter ids cannot be names the engine provides."""
+"""Parameter, bin and accumulator ids cannot be names the engine provides."""
 
 import pytest
 
@@ -21,6 +21,52 @@ def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:
 def test_an_engine_variable_is_not_a_parameter_id(name: str) -> None:
     with pytest.raises(ValueError, match=f"engine variables: \\['{name}'\\]"):
         build(_builder(name))
+
+
+@pytest.mark.parametrize("name", ["total", "step", "t", "pi", "e"])
+def test_an_engine_variable_is_not_a_bin_id(name: str) -> None:
+    builder = ModelBuilder(name="Reserved", version="1.0")
+    builder.add_bin(id=name, name=name).add_bin(id="B", name="B")
+    builder.add_parameter(id="k", value=0.1)
+    builder.add_transition(id="flow", source=[name], target=["B"], rate="k")
+    builder.set_initial_conditions(
+        total=1000,
+        bin_fractions=[{"bin": name, "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+
+    with pytest.raises(ValueError, match=f"bin '{name}'"):
+        build(builder)
+
+
+def test_an_engine_variable_is_not_an_accumulator_id() -> None:
+    builder = a_to_b_builder(accumulator="total")
+
+    with pytest.raises(ValueError, match="accumulator 'total'"):
+        build(builder)
+
+
+def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
+    builder = ModelBuilder(name="Reserved", version="1.0")
+    builder.add_bin(id="total_y", name="total_y").add_bin(id="B", name="B")
+    builder.add_stratification(id="age", categories=["y", "o"])
+    builder.add_stratification(id="sex", categories=["y", "o"])
+    builder.add_parameter(id="k", value=0.1)
+    builder.add_transition(id="flow", source=["total_y"], target=["B"], rate="k")
+    halves = [{"category": "y", "fraction": 0.5}, {"category": "o", "fraction": 0.5}]
+    builder.set_initial_conditions(
+        total=1000,
+        bin_fractions=[
+            {"bin": "total_y", "fraction": 1.0},
+            {"bin": "B", "fraction": 0.0},
+        ],
+        stratification_fractions=[
+            {"stratification": "age", "fractions": halves},
+            {"stratification": "sex", "fractions": halves},
+        ],
+    )
+
+    with pytest.raises(ValueError, match="'total_y_y'"):
+        build(builder)
 
 
 def test_a_bin_id_is_not_a_parameter_id() -> None:

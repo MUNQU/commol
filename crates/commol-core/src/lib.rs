@@ -25,8 +25,8 @@ pub mod types;
 
 // Re-export commonly used types from math_expression
 pub use math_expression::{
-    MathExpression, MathExpressionContext, MathExpressionError, RateMathExpression,
-    SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
+    ENGINE_VARIABLES, MathExpression, MathExpressionContext, MathExpressionError,
+    RateMathExpression, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 
 // Re-export simulation engine trait

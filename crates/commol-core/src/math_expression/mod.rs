@@ -90,7 +90,7 @@ pub mod preprocessing;
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
 pub use jit::{JITCompiler, JITFunction};
-pub use preprocessing::{SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
+pub use preprocessing::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 
 use preprocessing::{get_variables, preprocess_formula, reads_variable};
 

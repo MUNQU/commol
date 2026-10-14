@@ -1,7 +1,7 @@
 //! Calibration problem definition and implementation
 
 use argmin::core::{CostFunction, Error};
-use commol_core::{MathExpression, MathExpressionContext, SimulationEngine, SPECIAL_VAR_TOTAL};
+use commol_core::{MathExpression, MathExpressionContext, SimulationEngine, ENGINE_VARIABLES};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
@@ -360,12 +360,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             // Validate that all variables are either parameters, compartments, or special constants
             for var in &variables {
                 // Skip special variables
-                if var == SPECIAL_VAR_TOTAL
-                    || var == "step"
-                    || var == "t"
-                    || var == "pi"
-                    || var == "e"
-                {
+                if ENGINE_VARIABLES.contains(&var.as_str()) {
                     continue;
                 }
 

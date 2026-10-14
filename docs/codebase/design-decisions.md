@@ -154,7 +154,10 @@ a prefix).
 The engine sets one variable per expanded compartment and per subgroup total
 (`total_<categories>`, bin totals and partial bin totals).
 `check_names` in `crates/commol-model/src/builder.rs` rejects a parameter
-id that is one of those names, and a `total_…` variable in a rate or a formula
+id that is one of those names, a parameter, bin or accumulator id that is an
+engine variable (`ENGINE_VARIABLES`: `total`, `step`, `t`, `pi`, `e`), a bin
+whose compartments or bin totals read as a `total_<categories>` name (two sums
+would share one slot), and a `total_…` variable in a rate or a formula
 parameter that names no subgroup total. `CompartmentalStructure.check_model`
 calls it at `build`, and `CompiledModel::try_from_model` calls it again.
 `subgroup_total_names` lists the names; Python reads them through the binding
@@ -166,7 +169,9 @@ to check rates and give units.
 **Guards:** `builder.rs` tests
 `parameter_id_cannot_be_a_compartment_or_a_subgroup_total`,
 `subgroup_total_out_of_declaration_order_is_a_build_error` and
-`subgroup_total_names_follow_the_declaration_order`;
+`subgroup_total_names_follow_the_declaration_order`,
+`an_engine_variable_is_not_a_parameter_bin_or_accumulator_id` and
+`a_bin_name_that_reads_as_a_subgroup_total_is_rejected`;
 `tests/building/test_reserved_names.py`;
 `tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate`.
 

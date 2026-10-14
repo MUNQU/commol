@@ -133,8 +133,8 @@ builder = (
 ### Names the engine sets
 
 The engine sets these variables, so `build` rejects a parameter with one of
-these ids (`Model.validate_parameter_names_not_reserved` and
-`check_names` in `crates/commol-model/src/builder.rs`):
+these ids (`CompartmentalStructure.check_model` and `check_names` in
+`crates/commol-model/src/builder.rs`):
 
 | Name | Example |
 |---|---|
@@ -142,6 +142,12 @@ these ids (`Model.validate_parameter_names_not_reserved` and
 | A bin id | `A` |
 | An expanded compartment | `A_g1` |
 | A subgroup total | `total_g1`, `A_t1` (with two stratifications) |
+
+A bin or an accumulator cannot take an id of the first row either, because the
+engine variable would hide it. A bin whose names read as a subgroup total is
+rejected too: a bin `total_y` stratified by `age = [y, o]` and `sex = [y, o]`
+expands into `total_y_y`, which is also the total of the `y` of both
+stratifications.
 
 An id that starts with `total_` but names no subgroup total, such as
 `total_max`, is accepted. `N` is not reserved, so a bin or a parameter may use
