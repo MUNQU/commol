@@ -17,8 +17,15 @@ merged or archived.
 | 5 | `odd/archive/tasks/neutral-state-terms.md` | delivered by PR #108 | 4 | Yes |
 | 6 | `odd/archive/tasks/domain-agnostic-audit.md` | delivered by PR #109 | 5 | Yes |
 | 7 | `odd/tasks/axis-scale-refactor.md` | T1 → T6 (T0 done) | 6 | Yes |
-| 8 | Release 0.3.0 (`docs/development/release.md`) | — | 2–7 | — |
-| 9 | `odd/tasks/library-benchmark.md` | T1 → T5 | 8 | No |
+| 8 | `odd/tasks/difference-negative-amounts.md` | T1 → T5 | 7 | Yes |
+| 9 | Release 0.3.0 (`docs/development/release.md`) | — | 2–8 | — |
+| 10 | `odd/tasks/library-benchmark.md` | T1 → T5 | 9 | No |
+| 11 | `odd/tasks/model-kind-foundation.md` | T0 → T8 | 9 | Yes |
+| 12 | `odd/tasks/stochastic-compartmental.md` | T1 → T8 | 11 | No |
+| 13 | `odd/tasks/markov-chains.md` | T1 → T8 | 11 (S1–S4), 12 (S5) | No |
+| 14 | `odd/tasks/integral-outputs.md` | T1 → T7 | 12, 13 | No |
+| 15 | `odd/tasks/network-models.md` | T1 → T8 | 11, 12, 14 | No |
+| 16 | `odd/tasks/agent-based-models.md` | T1 → T8 | 15 | No |
 
 ## Why this order
 
@@ -51,14 +58,44 @@ merged or archived.
 - **`axis-scale-refactor` last of the refactors.** `AxisUnits` reads
   `step_unit` and the engine of the new `Model`, and its rate conversions ask
   the registry what a rate means.
-- **One release for every break.** Steps 2–7 all break the API; commol is
+- **Negative amounts after the refactors, before the release.** Seven
+  difference runs of the suite go negative today, four of them in published
+  examples. The fix is a bug fix that breaks such models, so it ships in
+  0.3.0 with the other breaks; it touches `tests/support/` and the guide,
+  which steps 2–7 change, so it runs after them. The stochastic and Markov
+  ODDs reuse its error.
+- **One release for every break.** Steps 2–8 all break the API; commol is
   alpha, so the break is no cost, and one 0.3.0 release with one changelog
   mapping is easier to read than four.
 - **Benchmark last.** It compares commol with other libraries on the API and
   performance users will get, so it runs on 0.3.0.
+- **Foundation before any new kind or engine.** `model-kind-foundation` gives
+  the description (`describe`, which replaces `print_equations`), seeds,
+  replicates and calibration with common random numbers. Every later ODD
+  builds on them; it changes no package code the benchmark measures, so the
+  two can run in parallel.
+- **Stochastic engine first of the new work.** It reuses the whole
+  compartmental description, so it costs least, and it gives the event
+  engines and the test oracles that Markov chain trajectories, networks and
+  agents need.
+- **Markov chains next.** Most of a chain fits the aggregate kind already;
+  its builder, matrix and analysis (S1–S4) need only the foundation and may go
+  before the stochastic engine if the user wants them earlier.
+- **Integral outputs right after Markov chains.** Rewards are the main use of
+  Markov chains, so they follow the chains with no gap (Markov D4).
+  They come before networks and agents, so those kinds add integrals of their
+  counts with the declaration already in place.
+- **Networks before agents.** Both deliver one structure, `Agents`
+  (`agent-based-models.md` D6). The network ODD delivers it first, with a
+  graph and no attributes, and the variant `Network`: the first real second
+  kind, which tests the generic layers with less to build. The agent ODD then
+  adds attributes, `Complete`, `Groups` and Python rules on the same
+  structure and engines.
 
 ## Not in parallel
 
-Steps 1–7 change the same tests and modules (`tests/support/`,
+Steps 1–8 change the same tests and modules (`tests/support/`,
 `api/reporting.py`, `context/`), so they run one after the other. Each starts
-from `develop` after the previous PR merges.
+from `develop` after the previous PR merges. Steps 11–16 also run one after
+the other, in the order of the table: each builds on the interfaces the one
+before adds.
