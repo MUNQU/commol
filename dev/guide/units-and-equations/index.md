@@ -67,7 +67,7 @@ The axis of a model is its independent variable: the quantity the model steps al
 | No unit of time                                        | `step`    | Flows must be `<bin unit>/step`              |
 | `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"`  | —         | Error that names each parameter and its unit |
 
-Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `person/week` does not match `person/day`, because the engine would apply a weekly rate every day.
+Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `item/week` does not match `item/day`, because the engine would apply a weekly rate every day.
 
 ```python
 along_a_line = (
@@ -130,7 +130,7 @@ To pass a quantity to a function, make it dimensionless first, for example `sin(
 
 ## Printing equations
 
-`Model.print_equations(output_file=None, format="text")` prints the flows that the engine plans, after it has decided which rates are per-capita (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-per-capita-rates)). It has three parts:
+`Model.print_equations(output_file=None, format="text")` prints the flows that the engine plans, after it has decided which rates are proportional (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates)). It has three parts:
 
 | Part              | Content                                                                                                                           |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |

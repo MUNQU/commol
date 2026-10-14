@@ -79,7 +79,7 @@ results = Simulation(model).run(num_steps=100)
 | Fluent, validated model building                                                 | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                                                                |
 | Stratifications, conditional stratifications, per-compartment initial conditions | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications)                                                            |
 | Rate formulas compiled with Cranelift                                            | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md)                                              |
-| Pulses, windows, ramps, seasons and schedules per subgroup                       | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
+| Pulses, windows, ramps, sinusoids and schedules per subgroup                     | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                                                                    |
 | Unit checking and equation output (text, LaTeX)                                  | [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                                                        |
 | Calibration of parameters, initial conditions and scale factors                  | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                                                                  |
 | Ensembles and prediction intervals                                               | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md)                                            |
@@ -207,7 +207,7 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                          |
 | `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                           |
 | `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
-| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *per-capita*: the flow is `k2 × B`.                                              |
+| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                            |
 | `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                               |
 | `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                           |
 | `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                             |
@@ -389,10 +389,10 @@ builder = (
 
 A transition moves an amount from its `source` compartments to its `target` compartments at each step. How much it moves depends on its rate:
 
-| The rate…                                   | Kind           | Flow per step   | Example                |
-| ------------------------------------------- | -------------- | --------------- | ---------------------- |
-| names a compartment, a bin total or `total` | **Absolute**   | the rate itself | `"k1 * A * B / total"` |
-| names no compartment                        | **Per-capita** | rate × source   | `"k2"` moves `k2 × B`  |
+| The rate…                                   | Kind             | Flow per step   | Example                |
+| ------------------------------------------- | ---------------- | --------------- | ---------------------- |
+| names a compartment, a bin total or `total` | **Absolute**     | the rate itself | `"k1 * A * B / total"` |
+| names no compartment                        | **Proportional** | rate × source   | `"k2"` moves `k2 × B`  |
 
 ```python
 builder = (
@@ -402,7 +402,7 @@ builder = (
 )
 ```
 
-The engine decides the kind when the model is built, and `model.print_equations()` shows the result: the per-capita rate above prints as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#absolute-and-per-capita-rates) for the exact rule.
+The engine decides the kind when the model is built, and `model.print_equations()` shows the result: the proportional rate above prints as `k2 * B`. See [Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#absolute-and-proportional-rates) for the exact rule.
 
 ## Accumulators
 
@@ -663,16 +663,16 @@ A category name that two stratifications declare must be qualified with its stra
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow, like a reaction: each source loses it and each target gains it. Its rate must be absolute, because a per-capita rate has no single source to multiply.
+A transition with several sources or targets moves **one** flow: each source loses it and each target gains it. Its rate must be absolute, because a proportional rate has no single source to multiply.
 
 ```python
-reaction = (
-    ModelBuilder(name="Reaction")
+merge = (
+    ModelBuilder(name="Merge")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
-    .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
+    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
@@ -757,12 +757,12 @@ A window covers the positions `(start, end]`, the same interval that [windowed o
 
 ## Next steps
 
-| To learn                        | Read                                                                                                      |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Every builder option            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
-| What rate formulas can contain  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Rates that change over time     | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
-| Running and reading simulations | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
+| To learn                         | Read                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Every builder option             | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
+| What rate formulas can contain   | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
+| Rates that change along the axis | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
+| Running and reading simulations  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
 
 # Building Models
 
@@ -903,7 +903,7 @@ The engine sets these variables, so `build` rejects a parameter with one of thes
 | An expanded compartment         | `A_g1`                                        |
 | A subgroup total                | `total_g1`, `A_t1` (with two stratifications) |
 
-A bin or an accumulator cannot take an id of the first row either, because the engine variable would hide it. A bin whose names read as a subgroup total is rejected too: a bin `total_y` stratified by `age = [y, o]` and `sex = [y, o]` expands into `total_y_y`, which is also the total of the `y` of both stratifications.
+A bin or an accumulator cannot take an id of the first row either, because the engine variable would hide it. A bin whose names read as a subgroup total is rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]` expands into `total_y_y`, which is also the total of the `y` of both stratifications.
 
 An id that starts with `total_` but names no subgroup total, such as `total_max`, is accepted. `N` is not reserved, so a bin or a parameter may use it.
 
@@ -1168,33 +1168,33 @@ model.print_equations()  # shows every flow as the engine computes it
 
 A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md). A formula can use parameters, compartments, bin totals, `total`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
 
-### Absolute and per-capita rates
+### Absolute and proportional rates
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                                       | Kind       | Flow per step   |
-| -------------------------------------------------------------------------- | ---------- | --------------- |
-| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute   | `rate`          |
-| The transition has no source                                               | Absolute   | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`                       | As set     | —               |
-| Otherwise                                                                  | Per-capita | `rate × source` |
+| Case                                                                       | Kind         | Flow per step   |
+| -------------------------------------------------------------------------- | ------------ | --------------- |
+| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute     | `rate`          |
+| The transition has no source                                               | Absolute     | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`                       | As set       | —               |
+| Otherwise                                                                  | Proportional | `rate × source` |
 
-| Rate                     | Kind       | Flow from `B` to `C`    |
-| ------------------------ | ---------- | ----------------------- |
-| `"k2"`                   | Per-capita | `k2 * B`                |
-| `"k2 * B"`               | Absolute   | `k2 * B`                |
-| `"k1 * A * B / total"`   | Absolute   | `k1 * A * B / total`    |
-| `"0.5"` with `source=[]` | Absolute   | `0.5` enters the target |
+| Rate                     | Kind         | Flow from `B` to `C`    |
+| ------------------------ | ------------ | ----------------------- |
+| `"k2"`                   | Proportional | `k2 * B`                |
+| `"k2 * B"`               | Absolute     | `k2 * B`                |
+| `"k1 * A * B / total"`   | Absolute     | `k1 * A * B / total`    |
+| `"0.5"` with `source=[]` | Absolute     | `0.5` enters the target |
 
-`print_equations()` prints every flow after this decision, so a per-capita rate appears multiplied by its source.
+`print_equations()` prints every flow after this decision, so a proportional rate appears multiplied by its source.
 
-### Time-dependent rates
+### Rates that change along the axis
 
 A formula may use `step` (or `t`), the current step:
 
 ```python
-seasonal = (
-    ModelBuilder(name="Seasonal")
+periodic = (
+    ModelBuilder(name="Periodic")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
@@ -1216,16 +1216,16 @@ For pulses, windows, ramps and schedules per group, use [Axis Patterns](https://
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow, like a reaction: every entry in `source` loses it and every entry in `target` gains it. A bin listed twice loses or gains it twice. The rate must be absolute.
+A transition with several sources or targets moves **one** flow: every entry in `source` loses it and every entry in `target` gains it. A bin listed twice loses or gains it twice. The rate must be absolute.
 
 ```python
-reaction = (
-    ModelBuilder(name="Reaction")
+merge = (
+    ModelBuilder(name="Merge")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
-    .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
+    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
@@ -1236,7 +1236,7 @@ reaction = (
     )
     .build(engine="DifferenceEquations")
 )
-reaction.print_equations()
+merge.print_equations()
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
 ```
 
@@ -1397,11 +1397,11 @@ group_rates.print_equations()
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
 ```
 
-| Entry key    | Type             | Meaning                                       |
-| ------------ | ---------------- | --------------------------------------------- |
-| `conditions` | `list[dict]`     | All must match the source compartment (AND).  |
-| `rate`       | `str` or `float` | The rate for matching compartments.           |
-| `absolute`   | `bool`, optional | Forces the rate to be absolute or per-capita. |
+| Entry key    | Type             | Meaning                                         |
+| ------------ | ---------------- | ----------------------------------------------- |
+| `conditions` | `list[dict]`     | All must match the source compartment (AND).    |
+| `rate`       | `str` or `float` | The rate for matching compartments.             |
+| `absolute`   | `bool`, optional | Forces the rate to be absolute or proportional. |
 
 | Condition key    | Meaning                                                        |
 | ---------------- | -------------------------------------------------------------- |
@@ -1471,7 +1471,7 @@ A transition runs at every step. To limit a flow, write the condition in the rat
 
 ## Impulses
 
-An impulse moves its amount at once, at given steps, and nothing between them. Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The rate is then a fraction of the source (per-capita) or an amount (absolute), with the same [rules](#absolute-and-per-capita-rates), sources, targets, stratified rates and accumulators as any transition.
+An impulse moves its amount at once, at given steps, and nothing between them. Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The rate is then a fraction of the source (proportional) or an amount (absolute), with the same [rules](#absolute-and-proportional-rates), sources, targets, stratified rates and accumulators as any transition.
 
 ```python
 impulse_model = (
@@ -1503,7 +1503,7 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                         |
 | `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
 
-An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one time unit, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
 ## What building checks
 
@@ -1514,7 +1514,7 @@ An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/
 | A source or target that is neither a bin nor a category of one stratification                | The transition                                           |
 | A category transition without exactly one source and one target                              | The transition                                           |
 | A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                     |
-| Several sources with a per-capita rate                                                       | The transition; use an absolute rate or `$compartment`   |
+| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`   |
 | A stratified rate whose `category` conditions match no source compartment                    | The categories; use `to` to reach another stratification |
 | A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                     |
 | `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                           |
@@ -1524,7 +1524,7 @@ An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/
 
 | To learn                         | Read                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Rates that change over time      | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
+| Rates that change along the axis | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
 | Everything a formula can contain | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
 | Units and equation output        | [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)           |
 
@@ -1544,8 +1544,8 @@ model = (
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
-    .add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
-    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_seasonal * A * B / total")
+    .add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_periodic * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
     .set_initial_conditions(
         total=1000,
@@ -1564,7 +1564,7 @@ results = Simulation(model).run(num_steps=60)
 | Stratified rate `rate`              | `"k_g1 * A"`           | Like a transition rate                                                                    |
 | Calibration constraint `expression` | `"k1 - k2"`            | See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) |
 
-Whether a rate is the flow itself or a rate per member of the source depends on the variables it names; see [Absolute and per-capita rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-per-capita-rates).
+Whether a rate is the flow itself or a rate per member of the source depends on the variables it names; see [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates).
 
 ## Operators
 
@@ -1675,18 +1675,18 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Rounding                  | `floor`, `ceil`, `round` (halves round up: `round(2.5)` is 3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                |
 
-For rates that change over time, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and seasons.
+For rates that change along the axis, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and sinusoids.
 
 ## Common patterns
 
 ```python
 patterns = {
-    "mass action": "k1 * A * B",
+    "product of two amounts": "k1 * A * B",
     "frequency dependent": "k1 * A * B / total",
     "saturation": "k1 * B / (1 + B)",
-    "linear growth over time": "0.1 + 0.001 * step",
-    "exponential decay over time": "k1 * exp(-0.01 * step)",
-    "annual cycle": "k1 * (1 + 0.3 * sin(2 * pi * step / 365))",
+    "linear growth along the axis": "0.1 + 0.001 * step",
+    "exponential decay along the axis": "k1 * exp(-0.01 * step)",
+    "cycle of 365 steps": "k1 * (1 + 0.3 * sin(2 * pi * step / 365))",
     "never negative": "max(0, k1 - 0.001 * step)",
     "capped above a threshold": "k1 * min(1, 100 / max(B, 1))",
     "only after step 30": "if(step > 30, k1, 0)",
@@ -1694,7 +1694,7 @@ patterns = {
 }
 ```
 
-To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_seasonal", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_seasonal * A * B / total"`.
+To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_periodic * A * B / total"`.
 
 ## Security
 
@@ -1720,17 +1720,17 @@ except ValueError as error:
 
 ## Next steps
 
-| To learn                      | Read                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| Ready-made time-varying rates | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)     |
-| How rates become flows        | [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md)         |
-| Running a model               | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md) |
+| To learn                                    | Read                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Ready-made rates that change along the axis | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)     |
+| How rates become flows                      | [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md)         |
+| Running a model                             | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md) |
 
 # Axis Patterns
 
 [Back to Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md)
 
-`AxisPattern` builds rates that change along the axis: pulses, periodic events, intervals, seasons, ramps and bell curves, and schedules that give each subgroup its own pattern. Pass a pattern as `rate=` to `add_transition`. Every pattern is a tested, parenthesised expression, so patterns combine safely.
+`AxisPattern` builds rates that change along the axis: pulses, periodic events, intervals, sinusoids, ramps and bell curves, and schedules that give each subgroup its own pattern. Pass a pattern as `rate=` to `add_transition`. Every pattern is a tested, parenthesised expression, so patterns combine safely.
 
 ## Quick path
 
@@ -1757,7 +1757,7 @@ print(flow_per_step(AxisPattern.interval(start=3, end=6, value=1.0)))
 # [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-A transition with no source uses the pattern as the flow. With a source, a pattern that names no compartment is per-capita: `value=0.1` moves 10% of the source. See [Absolute and per-capita rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-per-capita-rates).
+A transition with no source uses the pattern as the flow. With a source, a pattern that names no compartment is proportional: `value=0.1` moves 10% of the source. See [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates).
 
 ## Single patterns
 
@@ -1770,11 +1770,11 @@ Each pattern reads `step` or `t` (see [Patterns in a differential model](#patter
 | `periodic(period, value, offset=0)`                | `step`                                 | `value` when `step = offset, offset + period, …`, else 0                          | integer `period > 0`, `0 <= offset < period`                       |
 | `interval(start, end, value)`                      | `t`                                    | `value` for `start <= t < end`, else 0                                            | `start < end`, any finite positions                                |
 | `linear_ramp(start, end, start_value, end_value)`  | `t`                                    | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions                                |
-| `seasonal(amplitude, period, phase=0, baseline=0)` | `t`                                    | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
+| `sinusoid(amplitude, period, phase=0, baseline=0)` | `t`                                    | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
 | `gaussian_pulse(center, width, peak)`              | `t`                                    | `peak × exp(−(t − center)² / (2 width²))`                                         | `width > 0`                                                        |
 | `from_formula(expr)`                               | Any expression, wrapped in parentheses | not empty; passes the security check                                              |                                                                    |
 
-An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These arguments also accept a parameter name, so calibration can fit them: `value` of `pulse`, `pulses`, `periodic` and `interval`; every argument of `seasonal`; and `peak` of `gaussian_pulse`.
+An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These arguments also accept a parameter name, so calibration can fit them: `value` of `pulse`, `pulses`, `periodic` and `interval`; every argument of `sinusoid`; and `peak` of `gaussian_pulse`.
 
 ```python
 print(flow_per_step(AxisPattern.pulse(at=3, value=1.0)))
@@ -1785,7 +1785,7 @@ print(flow_per_step(AxisPattern.periodic(period=4, value=1.0, offset=1)))
 # [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 print(flow_per_step(AxisPattern.linear_ramp(start=2, end=6, start_value=0.0, end_value=1.0)))
 # [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]
-print(flow_per_step(AxisPattern.seasonal(amplitude=1.0, period=8, baseline=1.0)))
+print(flow_per_step(AxisPattern.sinusoid(amplitude=1.0, period=8, baseline=1.0)))
 # [1.0, 1.7071, 2.0, 1.7071, 1.0, 0.2929, 0.0, 0.2929, 1.0, 1.7071]
 print(flow_per_step(AxisPattern.gaussian_pulse(center=5.0, width=1.0, peak=1.0)))
 # [0.0, 0.0003, 0.0111, 0.1353, 0.6065, 1.0, 0.6065, 0.1353, 0.0111, 0.0003]
@@ -1907,12 +1907,12 @@ print(stratified_flows(AxisPattern.pulse(at=1, value=0.1).for_group(
 
 ### Absolute flows and `source_compartment`
 
-| Argument of `add_group`       | Effect                                                                         |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `absolute=None` (default)     | Inferred: a pattern that names a compartment is absolute, otherwise per-capita |
-| `absolute=False`              | Per-capita: `value=0.1` moves 10% of each matching source compartment          |
-| `absolute=True`               | Absolute: `value=100.0` moves exactly 100                                      |
-| `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute            |
+| Argument of `add_group`       | Effect                                                                           |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `absolute=None` (default)     | Inferred: a pattern that names a compartment is absolute, otherwise proportional |
+| `absolute=False`              | Proportional: `value=0.1` moves 10% of each matching source compartment          |
+| `absolute=True`               | Absolute: `value=100.0` moves exactly 100                                        |
+| `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute              |
 
 ```python
 mixed = (
@@ -1972,15 +1972,15 @@ print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 75
 
 In a `DifferentialEquations` model `step` is constant on each unit interval `[n, n + 1)` and `t` moves continuously.
 
-| Pattern                                     | In a differential model                                                                                                                                                                                                                                                   |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a per-capita `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses). |
-| `interval`, `linear_ramp` (read `t`)        | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds.                                                                                                                      |
-| `seasonal`, `gaussian_pulse` (read `t`)     | Continuous in `t`.                                                                                                                                                                                                                                                        |
+| Pattern                                     | In a differential model                                                                                                                                                                                                                                                     |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pulse`, `pulses`, `periodic` (read `step`) | A rate that holds for one unit: a proportional `pulse` of `value` moves `1 − e^(−value)` of its source, and `value` in a difference model. To move a fraction at once in both engines, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses). |
+| `interval`, `linear_ramp` (read `t`)        | Open and close at any position, such as `interval(start=2.5, end=4, …)`; the ramp is continuous. The engine restarts its integration at both bounds.                                                                                                                        |
+| `sinusoid`, `gaussian_pulse` (read `t`)     | Continuous in `t`.                                                                                                                                                                                                                                                          |
 
 ```python
 def remaining_a(rate: AxisPattern, at: float) -> float:
-    """A of a per-capita A -> B transition, in a differential model."""
+    """A of a proportional A -> B transition, in a differential model."""
     model = (
         ModelBuilder(name="Pattern ODE")
         .add_bin(id="A", name="State A")
@@ -2089,7 +2089,7 @@ The axis of a model is its independent variable: the quantity the model steps al
 | No unit of time                                        | `step`    | Flows must be `<bin unit>/step`              |
 | `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"`  | —         | Error that names each parameter and its unit |
 
-Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `person/week` does not match `person/day`, because the engine would apply a weekly rate every day.
+Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `item/week` does not match `item/day`, because the engine would apply a weekly rate every day.
 
 ```python
 along_a_line = (
@@ -2152,7 +2152,7 @@ To pass a quantity to a function, make it dimensionless first, for example `sin(
 
 ## Printing equations
 
-`Model.print_equations(output_file=None, format="text")` prints the flows that the engine plans, after it has decided which rates are per-capita (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-per-capita-rates)). It has three parts:
+`Model.print_equations(output_file=None, format="text")` prints the flows that the engine plans, after it has decided which rates are proportional (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates)). It has three parts:
 
 | Part              | Content                                                                                                                           |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -2460,11 +2460,11 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 
 ### Time inside a step
 
-On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern (`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A per-capita pulse `p` on step `n` acts as the constant rate `p` for one unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).
+On `[n, n + 1)` a rate sees `step = n` and the position `t`, which moves continuously. A rate that reads `step`, a `"pulse"` series or a pulse pattern (`AxisPattern.pulse`, `pulses`, `periodic`) is constant on its unit interval, and the engine restarts the integration at each integer where such a rate can jump. A proportional pulse `p` on step `n` acts as the constant rate `p` for one unit: it moves `1 − e^(−p)` of its source, not `p` as in a difference model. To move a fraction at once, use an [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses).
 
 A `"step_function"` or `"linear"` [series](https://munqu.github.io/commol/latest/guide/building-models/#series-parameters) and the patterns `AxisPattern.interval` and `linear_ramp` read `t`, so they change at any position, and the engine restarts the integration at their points and bounds. In a difference model `t` equals `step`, so they give the same results as a rate that reads `step`.
 
-A rate can also jump where `t` reaches a value that it compares `t` with, such as `if(t >= t_on, beta, 0)`. The engine restarts the integration there too, so the solver cannot step over a short window. This works when the value reads only numbers, `pi`, `e` and parameters with a constant or calibrated value, and `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump that depends on the state, such as `if(t >= A, ...)`, is not found.
+A rate can also jump where `t` reaches a value that it compares `t` with, such as `if(t >= t_on, k1, 0)`. The engine restarts the integration there too, so the solver cannot step over a short window. This works when the value reads only numbers, `pi`, `e` and parameters with a constant or calibrated value, and `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump that depends on the state, such as `if(t >= A, ...)`, is not found.
 
 `TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step probabilities for difference models. A differential model needs the continuous rate; see [Steps and physical time](https://munqu.github.io/commol/latest/guide/core-concepts/#steps-and-physical-time).
 
@@ -2838,11 +2838,11 @@ A category name that two stratifications declare must be qualified with its stra
 
 The engine resolves every id when you create the `Calibrator` or the `ProbabilisticCalibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
-| `id`                                                                                             | Error                                                              |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| Names nothing in the model                                                                       | `Invalid bin, compartment or category 'X'`, with the compartments  |
-| A category of a stratification with three or more categories, such as `"y"` of `age = [y, m, o]` | `Initial condition category 'age:y' needs a binary stratification` |
-| A category name that two stratifications declare                                                 | `… is ambiguous`, with the qualified names                         |
+| `id`                                                                                                   | Error                                                                 |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments     |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
+| A category name that two stratifications declare                                                       | `… is ambiguous`, with the qualified names                            |
 
 ## The remainder
 
@@ -3105,7 +3105,7 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 
 ## Counts per period: windows
 
-Data often counts what happened **in** each period, such as new arrivals per week. Observe a cumulative output (an accumulator) with `window`, and the model's prediction becomes the gain over the window:
+Data often counts what happened **in** each period, such as the amount that entered a bin in each interval of 7 steps. Observe a cumulative output (an accumulator) with `window`, and the model's prediction becomes the gain over the window:
 
 ```text
 predicted(at) = output(at) - output(at - window)
@@ -3114,14 +3114,14 @@ predicted(at) = output(at) - output(at - window)
 ```python
 from commol import window_ends, windowed_totals
 
-weekly_ends = window_ends(window=7, end=70)
-weekly_counts = windowed_totals(truth["cum_ab"], truth.positions, 7, weekly_ends)
+ends = window_ends(window=7, end=70)
+counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
 
-weekly = [
+windowed = [
     ObservedDataPoint(at=end, output="cum_ab", value=count, window=7)
-    for end, count in zip(weekly_ends, weekly_counts)
+    for end, count in zip(ends, counts)
 ]
-print(calibrate_k1(weekly))  # 0.4
+print(calibrate_k1(windowed))  # 0.4
 ```
 
 | Rule           | Detail                                                                                     |
@@ -3940,7 +3940,7 @@ Complete models, each runnable on its own, with abstract names. Each example sho
 
 | Example                       | Technique                                   |
 | ----------------------------- | ------------------------------------------- |
-| 1. Basic three-state model    | Absolute and per-capita rates               |
+| 1. Basic three-state model    | Absolute and proportional rates             |
 | 2. Four-state model           | A chain of states                           |
 | 3. Periodic rates             | `sin` of `step` in a rate                   |
 | 4. Group-specific rates       | Stratified rates                            |
@@ -3950,7 +3950,7 @@ Complete models, each runnable on its own, with abstract names. Each example sho
 | 8. Subgroup-normalized rate   | `total_<category>` variables                |
 | 9. Conditional stratification | A stratification that splits one group only |
 | 10. Parameter calibration     | `Calibrator`                                |
-| Time-pattern transition       | `AxisPattern` as a rate                     |
+| Axis-pattern transition       | `AxisPattern` as a rate                     |
 | Schedules per subgroup        | `AxisPattern.add_group`                     |
 
 ## Example 1: Basic Three-State Model
@@ -4017,7 +4017,7 @@ simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
-## Example 3: Periodic (Time-Dependent) Rates
+## Example 3: Periodic Rates
 
 Modelling periodic variation in a transition rate:
 
@@ -4479,9 +4479,9 @@ calibrated_sim = Simulation(model)
 results = calibrated_sim.run(num_steps=100)
 ```
 
-## Example: Time-Pattern Driven Transition
+## Example: Axis-Pattern Driven Transition
 
-A composed time-varying transition: an opening pulse, a monthly periodic event, and a continuous seasonal baseline.
+A composed transition that changes along the axis: an opening pulse, a periodic event every 30 steps, and a continuous sinusoid baseline.
 
 ```python
 from commol import ModelBuilder, Simulation, AxisPattern
@@ -4489,11 +4489,11 @@ from commol import ModelBuilder, Simulation, AxisPattern
 rate = AxisPattern.combine(
     AxisPattern.pulse(at=0, value=0.3),
     AxisPattern.periodic(period=30, value=0.05),
-    AxisPattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+    AxisPattern.sinusoid(amplitude=0.005, period=365, baseline=0.01),
 )
 
 model = (
-    ModelBuilder("AB-time-varying")
+    ModelBuilder("AB-axis-pattern")
     .add_bin("A", "Source")
     .add_bin("B", "Sink")
     .add_transition("flow", ["A"], ["B"], rate=rate)
@@ -4561,7 +4561,7 @@ results = Simulation(model).run(num_steps=60)
 - [API Reference](https://munqu.github.io/commol/latest/api/model-builder/index.md) - Complete API documentation
 - [Calibration Guide](https://munqu.github.io/commol/latest/guide/calibration/index.md) - Comprehensive calibration documentation
 - [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) - Advanced formulas
-- [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) - Time-varying rate helpers
+- [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) - Rates that change along the axis
 - [Contributing](https://munqu.github.io/commol/latest/development/contributing/index.md) - Build your own examples
 # API reference
 
@@ -4589,13 +4589,13 @@ Import every name from the package root, as in `from commol import Simulation`. 
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Time-varying rates and schedules per subgroup. Guide: [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md).
+Rates that change along the axis, and schedules per subgroup. Guide: [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md).
 
 ## AxisPattern
 
 Bases: `BaseModel`
 
-A time-varying expression usable as (or within) a transition rate.
+An expression that changes along the axis, usable as (or within) a transition rate.
 
 Instances are created exclusively via the factory classmethods (`pulse`, `periodic`, `window`, etc.). Each instance may carry stratification conditions that restrict it to a specific sub-group via `for_group`.
 
@@ -4626,7 +4626,8 @@ Source code in `commol/api/patterns.py`
 ```python
 class AxisPattern(BaseModel):
     """
-    A time-varying expression usable as (or within) a transition rate.
+    An expression that changes along the axis, usable as (or within) a
+    transition rate.
 
     Instances are created exclusively via the factory classmethods (``pulse``,
     ``periodic``, ``window``, etc.). Each instance may carry stratification
@@ -4710,7 +4711,7 @@ class AxisPattern(BaseModel):
 
         If ``source_compartment`` is set, the rate is multiplied by that
         compartment variable (absolute flow). Otherwise the rate is the
-        formula alone (per-capita flow — the engine multiplies by the source
+        formula alone (proportional flow — the engine multiplies by the source
         compartment automatically).
         """
         if self.source_compartment is not None:
@@ -4813,7 +4814,7 @@ class AxisPattern(BaseModel):
         return _IntervalAxisPattern(start=start, end=end, value=value)
 
     @classmethod
-    def seasonal(
+    def sinusoid(
         cls,
         amplitude: float | str,
         period: float | str,
@@ -4821,7 +4822,7 @@ class AxisPattern(BaseModel):
         baseline: float | str = 0,
     ) -> "AxisPattern":
         """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-        return _SeasonalAxisPattern(
+        return _SinusoidAxisPattern(
             amplitude=amplitude,
             period=period,
             phase=phase,
@@ -4973,7 +4974,7 @@ to_stratified_rate() -> StratifiedRateDict
 
 Convert this pattern to a stratified-rate dict.
 
-If `source_compartment` is set, the rate is multiplied by that compartment variable (absolute flow). Otherwise the rate is the formula alone (per-capita flow — the engine multiplies by the source compartment automatically).
+If `source_compartment` is set, the rate is multiplied by that compartment variable (absolute flow). Otherwise the rate is the formula alone (proportional flow — the engine multiplies by the source compartment automatically).
 
 Source code in `commol/api/patterns.py`
 
@@ -4984,7 +4985,7 @@ def to_stratified_rate(self) -> StratifiedRateDict:
 
     If ``source_compartment`` is set, the rate is multiplied by that
     compartment variable (absolute flow). Otherwise the rate is the
-    formula alone (per-capita flow — the engine multiplies by the source
+    formula alone (proportional flow — the engine multiplies by the source
     compartment automatically).
     """
     if self.source_compartment is not None:
@@ -5130,10 +5131,10 @@ def interval(
     return _IntervalAxisPattern(start=start, end=end, value=value)
 ```
 
-#### seasonal
+#### sinusoid
 
 ```python
-seasonal(amplitude: float | str, period: float | str, phase: float | str = 0, baseline: float | str = 0) -> AxisPattern
+sinusoid(amplitude: float | str, period: float | str, phase: float | str = 0, baseline: float | str = 0) -> AxisPattern
 ```
 
 `baseline + amplitude * sin(2*pi*(t - phase) / period)`.
@@ -5142,7 +5143,7 @@ Source code in `commol/api/patterns.py`
 
 ```python
 @classmethod
-def seasonal(
+def sinusoid(
     cls,
     amplitude: float | str,
     period: float | str,
@@ -5150,7 +5151,7 @@ def seasonal(
     baseline: float | str = 0,
 ) -> "AxisPattern":
     """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-    return _SeasonalAxisPattern(
+    return _SinusoidAxisPattern(
         amplitude=amplitude,
         period=period,
         phase=phase,
@@ -5680,7 +5681,7 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If observed data contains invalid compartments or negative time steps.
+            If observed data contains invalid compartments or negative positions.
         """
         simulation_output_names = set(self._engine.output_names)
 
@@ -5703,7 +5704,7 @@ class Calibrator:
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
@@ -6552,7 +6553,7 @@ Attributes:
 | Name          | Type          | Description                                                                                                                                                                                                                |
 | ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
-| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (S, I, R, etc.) at those positions. |
+| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
 | `description` | \`str         | None\`                                                                                                                                                                                                                     |
 | `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                         |
 | `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
@@ -6560,20 +6561,20 @@ Attributes:
 Examples:
 
 ```pycon
->>> # R0 = beta/gamma must be <= 5
+>>> # k1/k2 must be <= 5
 >>> constraint = CalibrationConstraint(
-...     id="r0_bound",
-...     expression="5.0 - beta/gamma",
-...     description="Basic reproduction number R0 <= 5",
+...     id="ratio_bound",
+...     expression="5.0 - k1/k2",
+...     description="Ratio k1/k2 <= 5",
 ... )
 ```
 
 ```pycon
->>> # beta must be >= gamma
+>>> # k1 must be >= k2
 >>> constraint = CalibrationConstraint(
 ...     id="ordering",
-...     expression="beta - gamma",
-...     description="Transmission rate >= recovery rate",
+...     expression="k1 - k2",
+...     description="k1 >= k2",
 ... )
 ```
 
@@ -6614,7 +6615,7 @@ class CalibrationConstraint(BaseModel):
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
         Can reference calibration parameters by their IDs. When `at` is specified,
-        can also reference output values (S, I, R, etc.) at those positions.
+        can also reference output values (A, B, C, etc.) at those positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
@@ -6630,18 +6631,18 @@ class CalibrationConstraint(BaseModel):
 
     Examples
     --------
-    >>> # R0 = beta/gamma must be <= 5
+    >>> # k1/k2 must be <= 5
     >>> constraint = CalibrationConstraint(
-    ...     id="r0_bound",
-    ...     expression="5.0 - beta/gamma",
-    ...     description="Basic reproduction number R0 <= 5",
+    ...     id="ratio_bound",
+    ...     expression="5.0 - k1/k2",
+    ...     description="Ratio k1/k2 <= 5",
     ... )
 
-    >>> # beta must be >= gamma
+    >>> # k1 must be >= k2
     >>> constraint = CalibrationConstraint(
     ...     id="ordering",
-    ...     expression="beta - gamma",
-    ...     description="Transmission rate >= recovery rate",
+    ...     expression="k1 - k2",
+    ...     description="k1 >= k2",
     ... )
 
     >>> # Sum of parameters <= 1.0
@@ -7933,8 +7934,8 @@ class ModelBuilder:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
                    special variables (total, total_<category>, step, t, pi, e),
-                   or contain mathematical expressions (e.g., "beta * 2",
-                   "total_young / total")
+                   or contain mathematical expressions (e.g., "k1 * 2",
+                   "total_g1 / total")
             - list[tuple[float, float]]: Empirical series as (position, value)
                    points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
@@ -7942,7 +7943,7 @@ class ModelBuilder:
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
-            Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+            Unit of the parameter (e.g., "1/day", "dimensionless", "item").
             Used for unit consistency checking in equations.
         mode : str | None, default=None
             Required when ``value`` is a list of (position, value) points.
@@ -8052,7 +8053,7 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per time step, and that value is applied to
+        The rate is evaluated ONCE per step, and that value is applied to
         all source compartments at once.
 
         When you use the $compartment placeholder in the rate formula with multiple
@@ -8062,8 +8063,8 @@ class ModelBuilder:
         name.
 
         Each transition's rate is evaluated independently, giving per-compartment
-        dynamics. This is ideal for processes like per-capita death rates, where the
-        rate should be proportional to the amount of each compartment.
+        dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+        flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
         - Only valid when len(source) > 1
@@ -8084,7 +8085,7 @@ class ModelBuilder:
         id : str
             Unique identifier for the transition. When using $compartment expansion,
             the system will append "__<compartment_name>" to create unique IDs for
-            each expanded transition (e.g., "death__S", "death__L").
+            each expanded transition (e.g., "out__A", "out__B").
         source : list[str]
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
@@ -8128,7 +8129,7 @@ class ModelBuilder:
 
         impulse_at : list[float] | None, default=None
             Make the transition an impulse at these positions on the axis. At
-            each one, ``rate`` is the fraction of the source (per-capita) or the
+            each one, ``rate`` is the fraction of the source (proportional) or the
             amount (absolute) moved at once, before the flows of that step. A
             DifferenceEquations model needs integer positions.
 
@@ -8150,7 +8151,7 @@ class ModelBuilder:
         """
         # If `rate` is a AxisPattern, extract its rate string and stratified
         # rates and route them into the existing pipeline. A AxisPattern fully
-        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # specifies how the rate changes along the axis, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, AxisPattern):
             if impulse_at is not None or impulse_every is not None:
@@ -8442,9 +8443,9 @@ class ModelBuilder:
 
             Example:
             [
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0}
             ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
@@ -8455,11 +8456,11 @@ class ModelBuilder:
             Example:
             [
                 {
-                    "stratification": "age_group",
+                    "stratification": "group",
                     "fractions": [
-                        {"category": "young", "fraction": 0.3},
-                        {"category": "adult", "fraction": 0.5},
-                        {"category": "elderly", "fraction": 0.2}
+                        {"category": "g1", "fraction": 0.3},
+                        {"category": "g2", "fraction": 0.5},
+                        {"category": "g3", "fraction": 0.2}
                     ]
                 }
             ]
@@ -8471,7 +8472,7 @@ class ModelBuilder:
 
             Example:
             [
-                {"compartment": "IH_y60", "fraction": 0.0}
+                {"compartment": "A_g1", "fraction": 0.0}
             ]
 
             Compartment names and the resulting sum of the amounts are checked
@@ -8914,7 +8915,7 @@ Parameters:
 | `id`          | `str`   | Unique identifier for the parameter. | *required*                                                                                                                                                                                                                                                                                   |
 | `value`       | \`float | str                                  | list\[tuple[float, float]\]                                                                                                                                                                                                                                                                  |
 | `description` | \`str   | None\`                               | Human-readable description of the parameter.                                                                                                                                                                                                                                                 |
-| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "person"). Used for unit consistency checking in equations.                                                                                                                                                                           |
+| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "item"). Used for unit consistency checking in equations.                                                                                                                                                                             |
 | `mode`        | \`str   | None\`                               | Required when value is a list of (position, value) points. Selects how the series is read: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). |
 
 Returns:
@@ -8952,8 +8953,8 @@ def add_parameter(
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
                special variables (total, total_<category>, step, t, pi, e),
-               or contain mathematical expressions (e.g., "beta * 2",
-               "total_young / total")
+               or contain mathematical expressions (e.g., "k1 * 2",
+               "total_g1 / total")
         - list[tuple[float, float]]: Empirical series as (position, value)
                points; requires ``mode`` to be set.
         - None: Indicates that the parameter needs to be calibrated before use
@@ -8961,7 +8962,7 @@ def add_parameter(
     description : str | None, default=None
         Human-readable description of the parameter.
     unit : str | None, default=None
-        Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+        Unit of the parameter (e.g., "1/day", "dimensionless", "item").
         Used for unit consistency checking in equations.
     mode : str | None, default=None
         Required when ``value`` is a list of (position, value) points.
@@ -9015,11 +9016,11 @@ Add a transition between states to the model.
 
 This method supports two distinct behaviors:
 
-When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per time step, and that value is applied to all source compartments at once.
+When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per step, and that value is applied to all source compartments at once.
 
 When you use the $compartment placeholder in the rate formula with multiple sources, the system automatically expands this into multiple independent transitions - one for each source compartment. Each transition has its own rate calculation where $compartment is replaced with the actual compartment name.
 
-Each transition's rate is evaluated independently, giving per-compartment dynamics. This is ideal for processes like per-capita death rates, where the rate should be proportional to the amount of each compartment.
+Each transition's rate is evaluated independently, giving per-compartment dynamics. This suits an outflow such as `k1 * $compartment`, where the flow of each compartment is proportional to its own amount.
 
 **$compartment Usage Rules**:
 
@@ -9035,17 +9036,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type                  | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                    |
-| ------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                 |
-| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                 |
-| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                 |
-| `rate`             | \`str                 | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                     |
-| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                    |
-| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subgroup transitions based on its own compartment value rather than the total across all subgroups. |
-| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                               |
-| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                       | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (per-capita) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                    |
-| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                       | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                      |
+| Name               | Type                  | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                    |
+| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                 |
+| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                 |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                 | *required*                                                                                                                                                                                                                                                                                 |
+| `rate`             | \`str                 | float                                                                                                                                                                                    | None\`                                                                                                                                                                                                                                                                                     |
+| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                    |
+| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subgroup transitions based on its own compartment value rather than the total across all subgroups. |
+| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                               |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                  |
+| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                      |
 
 Returns:
 
@@ -9081,7 +9082,7 @@ def add_transition(
 
     When you specify multiple sources without the $compartment placeholder,
     a single transition is created that affects all sources simultaneously.
-    The rate is evaluated ONCE per time step, and that value is applied to
+    The rate is evaluated ONCE per step, and that value is applied to
     all source compartments at once.
 
     When you use the $compartment placeholder in the rate formula with multiple
@@ -9091,8 +9092,8 @@ def add_transition(
     name.
 
     Each transition's rate is evaluated independently, giving per-compartment
-    dynamics. This is ideal for processes like per-capita death rates, where the
-    rate should be proportional to the amount of each compartment.
+    dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+    flow of each compartment is proportional to its own amount.
 
     **$compartment Usage Rules**:
     - Only valid when len(source) > 1
@@ -9113,7 +9114,7 @@ def add_transition(
     id : str
         Unique identifier for the transition. When using $compartment expansion,
         the system will append "__<compartment_name>" to create unique IDs for
-        each expanded transition (e.g., "death__S", "death__L").
+        each expanded transition (e.g., "out__A", "out__B").
     source : list[str]
         List of source state/category identifiers. When using $compartment in
         the rate, each source will generate a separate transition.
@@ -9157,7 +9158,7 @@ def add_transition(
 
     impulse_at : list[float] | None, default=None
         Make the transition an impulse at these positions on the axis. At
-        each one, ``rate`` is the fraction of the source (per-capita) or the
+        each one, ``rate`` is the fraction of the source (proportional) or the
         amount (absolute) moved at once, before the flows of that step. A
         DifferenceEquations model needs integer positions.
 
@@ -9179,7 +9180,7 @@ def add_transition(
     """
     # If `rate` is a AxisPattern, extract its rate string and stratified
     # rates and route them into the existing pipeline. A AxisPattern fully
-    # specifies the time-varying behaviour, so passing `stratified_rates=`
+    # specifies how the rate changes along the axis, so passing `stratified_rates=`
     # alongside it is a conflict.
     if isinstance(rate, AxisPattern):
         if impulse_at is not None or impulse_every is not None:
@@ -9281,12 +9282,12 @@ Set the initial conditions for the model.
 
 Parameters:
 
-| Name                       | Type                                 | Description                                                                                                                                                                                                                   | Default                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total`                    | `float`                              | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                                                                                           | *required*                                                                                                                                                                                                                                                                                                                                                                               |
-| `bin_fractions`            | `list[BinFractionDict]`              | List of bin fractions. Each item is a dictionary with: - "bin": str (bin id) - "fraction": float (fractional size) Example: [ {"bin": "S", "fraction": 0.99}, {"bin": "I", "fraction": 0.01}, {"bin": "R", "fraction": 0.0} ] | *required*                                                                                                                                                                                                                                                                                                                                                                               |
-| `stratification_fractions` | \`(list[StratificationFractionsDict] | None,)\`                                                                                                                                                                                                                      | default=None List of stratification fractions. Each item is a dictionary with: - "stratification": str (stratification id) - "fractions": list of dicts, each with "category" and "fraction" Example: \[ { "stratification": "age_group", "fractions": [ {"category": "young", "fraction": 0.3}, {"category": "adult", "fraction": 0.5}, {"category": "elderly", "fraction": 0.2} ] } \] |
-| `compartment_fractions`    | \`list[CompartmentFractionDict]      | None\`                                                                                                                                                                                                                        | List of per-compartment overrides applied after the uniform expansion. Each item is a dictionary with: - "compartment": str (expanded compartment name) - "fraction": float (fraction of the total) Example: [ {"compartment": "IH_y60", "fraction": 0.0} ] Compartment names and the resulting sum of the amounts are checked against the engine expansion when the model is built.     |
+| Name                       | Type                                 | Description                                                                                                                                                                                                                   | Default                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total`                    | `float`                              | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                                                                                           | *required*                                                                                                                                                                                                                                                                                                                                                                         |
+| `bin_fractions`            | `list[BinFractionDict]`              | List of bin fractions. Each item is a dictionary with: - "bin": str (bin id) - "fraction": float (fractional size) Example: [ {"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}, {"bin": "C", "fraction": 0.0} ] | *required*                                                                                                                                                                                                                                                                                                                                                                         |
+| `stratification_fractions` | \`(list[StratificationFractionsDict] | None,)\`                                                                                                                                                                                                                      | default=None List of stratification fractions. Each item is a dictionary with: - "stratification": str (stratification id) - "fractions": list of dicts, each with "category" and "fraction" Example: \[ { "stratification": "group", "fractions": [ {"category": "g1", "fraction": 0.3}, {"category": "g2", "fraction": 0.5}, {"category": "g3", "fraction": 0.2} ] } \]          |
+| `compartment_fractions`    | \`list[CompartmentFractionDict]      | None\`                                                                                                                                                                                                                        | List of per-compartment overrides applied after the uniform expansion. Each item is a dictionary with: - "compartment": str (expanded compartment name) - "fraction": float (fraction of the total) Example: [ {"compartment": "A_g1", "fraction": 0.0} ] Compartment names and the resulting sum of the amounts are checked against the engine expansion when the model is built. |
 
 Returns:
 
@@ -9326,9 +9327,9 @@ def set_initial_conditions(
 
         Example:
         [
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     stratification_fractions : list[StratificationFractionsDict] | None,
         default=None
@@ -9339,11 +9340,11 @@ def set_initial_conditions(
         Example:
         [
             {
-                "stratification": "age_group",
+                "stratification": "group",
                 "fractions": [
-                    {"category": "young", "fraction": 0.3},
-                    {"category": "adult", "fraction": 0.5},
-                    {"category": "elderly", "fraction": 0.2}
+                    {"category": "g1", "fraction": 0.3},
+                    {"category": "g2", "fraction": 0.5},
+                    {"category": "g3", "fraction": 0.2}
                 ]
             }
         ]
@@ -9355,7 +9356,7 @@ def set_initial_conditions(
 
         Example:
         [
-            {"compartment": "IH_y60", "fraction": 0.0}
+            {"compartment": "A_g1", "fraction": 0.0}
         ]
 
         Compartment names and the resulting sum of the amounts are checked
@@ -9941,7 +9942,7 @@ class Model(BaseModel, Generic[StructureT]):
         from the parameter
         units: the one unit of time (``day``, ``week``, ``step``, …) that they
         use, or ``step`` when they use none. Every flow must then be exactly
-        ``<bin unit>/<step unit>``, such as ``person/day``.
+        ``<bin unit>/<step unit>``, such as ``item/day``.
 
         Parameters
         ----------
@@ -9961,8 +9962,8 @@ class Model(BaseModel, Generic[StructureT]):
 
         Notes
         -----
-        - Predefined variables (total, total_young, etc.) have the bin unit
-        - Time step variables (t, step) are dimensionless
+        - Predefined variables (total, total_g1, etc.) have the bin unit
+        - Position variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
         self.structure.check_unit_consistency(self, verbose)
@@ -10420,7 +10421,7 @@ check_unit_consistency(verbose: bool = False) -> None
 
 Check unit consistency of all equations in the model.
 
-The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `person/day`.
+The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `item/day`.
 
 Parameters:
 
@@ -10438,8 +10439,8 @@ Raises:
 
 Notes
 
-- Predefined variables (total, total_young, etc.) have the bin unit
-- Time step variables (t, step) are dimensionless
+- Predefined variables (total, total_g1, etc.) have the bin unit
+- Position variables (t, step) are dimensionless
 - Mathematical constants (pi, e) are dimensionless
 
 Source code in `commol/context/model.py`
@@ -10455,7 +10456,7 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     from the parameter
     units: the one unit of time (``day``, ``week``, ``step``, …) that they
     use, or ``step`` when they use none. Every flow must then be exactly
-    ``<bin unit>/<step unit>``, such as ``person/day``.
+    ``<bin unit>/<step unit>``, such as ``item/day``.
 
     Parameters
     ----------
@@ -10475,8 +10476,8 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
 
     Notes
     -----
-    - Predefined variables (total, total_young, etc.) have the bin unit
-    - Time step variables (t, step) are dimensionless
+    - Predefined variables (total, total_g1, etc.) have the bin unit
+    - Position variables (t, step) are dimensionless
     - Mathematical constants (pi, e) are dimensionless
     """
     self.structure.check_unit_consistency(self, verbose)
@@ -11599,7 +11600,7 @@ class CompartmentalStructure(ModelStructure):
             Ids of the categories selecting the subgroup this stratification
             subdivides, empty for an unconditional stratification. A category
             name another stratification also declares is qualified, as in
-            ``sex:female``.
+            ``group:g1``.
 
         Raises
         ------
@@ -11634,7 +11635,7 @@ class CompartmentalStructure(ModelStructure):
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category ids, bare or qualified (``sex:female``), forming a chain
+            Category ids, bare or qualified (``group:g1``), forming a chain
             from the whole model down to the subgroup, outermost first.
 
         Returns
@@ -12565,9 +12566,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in sex:female. |
+| Type              | Description                                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in group:g1. |
 
 Raises:
 
@@ -12598,7 +12599,7 @@ def get_conditioning_categories(self, stratification_id: str) -> tuple[str, ...]
         Ids of the categories selecting the subgroup this stratification
         subdivides, empty for an unconditional stratification. A category
         name another stratification also declares is qualified, as in
-        ``sex:female``.
+        ``group:g1``.
 
     Raises
     ------
@@ -12634,9 +12635,9 @@ Per-compartment overrides are folded into the sum for every compartment the cate
 
 Parameters:
 
-| Name         | Type            | Description                                                                                                               | Default |
-| ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `categories` | `Iterable[str]` | Category ids, bare or qualified (sex:female), forming a chain from the whole model down to the subgroup, outermost first. | `()`    |
+| Name         | Type            | Description                                                                                                             | Default |
+| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------- | ------- |
+| `categories` | `Iterable[str]` | Category ids, bare or qualified (group:g1), forming a chain from the whole model down to the subgroup, outermost first. | `()`    |
 
 Returns:
 
@@ -12667,7 +12668,7 @@ def subgroup_total(self, categories: Iterable[str] = ()) -> float:
     Parameters
     ----------
     categories : Iterable[str], optional
-        Category ids, bare or qualified (``sex:female``), forming a chain
+        Category ids, bare or qualified (``group:g1``), forming a chain
         from the whole model down to the subgroup, outermost first.
 
     Returns
@@ -12705,7 +12706,7 @@ Attributes:
 
 | Name         | Type             | Description                                                                                                                                             |
 | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`       | `str`            | Expanded compartment name, for example IH_y60.                                                                                                          |
+| `name`       | `str`            | Expanded compartment name, for example A_g1.                                                                                                            |
 | `bin`        | `str`            | Bin the compartment expands from.                                                                                                                       |
 | `categories` | `dict[str, str]` | Category applied to the compartment, keyed by stratification id. A conditional stratification whose conditions the compartment does not meet is absent. |
 | `amount`     | `float`          | Initial amount, including per-compartment overrides.                                                                                                    |
@@ -12720,7 +12721,7 @@ class InitialCompartment(NamedTuple):
     Attributes
     ----------
     name : str
-        Expanded compartment name, for example ``IH_y60``.
+        Expanded compartment name, for example ``A_g1``.
     bin : str
         Bin the compartment expands from.
     categories : dict[str, str]
@@ -12833,7 +12834,7 @@ class SimulationPlotter:
         Plot simulation results with one subplot per series.
 
         Creates a figure with subplots arranged in a grid, where each subplot shows
-        the evolution of one series over time. Optionally overlays observed data
+        the evolution of one series along the axis. Optionally overlays observed data
         points.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -12927,7 +12928,7 @@ class SimulationPlotter:
         """
         Plot cumulative (accumulated) simulation results with one subplot per series.
 
-        Creates a figure showing the running sum of each series over time.
+        Creates a figure showing the running sum of each series along the axis.
         Useful for tracking totals, losses, or other accumulated quantities.
         If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -13824,7 +13825,7 @@ plot_series(output_file: str | None = None, observed_data: list[ObservedDataPoin
 
 Plot simulation results with one subplot per series.
 
-Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one series over time. Optionally overlays observed data points. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure with subplots arranged in a grid, where each subplot shows the evolution of one series along the axis. Optionally overlays observed data points. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
 Parameters:
 
@@ -13875,7 +13876,7 @@ def plot_series(
     Plot simulation results with one subplot per series.
 
     Creates a figure with subplots arranged in a grid, where each subplot shows
-    the evolution of one series over time. Optionally overlays observed data
+    the evolution of one series along the axis. Optionally overlays observed data
     points.
     If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -13964,7 +13965,7 @@ plot_cumulative(output_file: str | None = None, observed_data: list[ObservedData
 
 Plot cumulative (accumulated) simulation results with one subplot per series.
 
-Creates a figure showing the running sum of each series over time. Useful for tracking totals, losses, or other accumulated quantities. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
+Creates a figure showing the running sum of each series along the axis. Useful for tracking totals, losses, or other accumulated quantities. If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
 Parameters:
 
@@ -14006,7 +14007,7 @@ def plot_cumulative(
     """
     Plot cumulative (accumulated) simulation results with one subplot per series.
 
-    Creates a figure showing the running sum of each series over time.
+    Creates a figure showing the running sum of each series along the axis.
     Useful for tracking totals, losses, or other accumulated quantities.
     If a ProbabilisticCalibrationResult is provided, plots confidence intervals.
 
@@ -18114,15 +18115,15 @@ Bases: `BaseModel`
 
 Specifies a category within a stratification for rate matching.
 
-When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., aging).
+When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
 
 Attributes:
 
-| Name             | Type  | Description                                                      |
-| ---------------- | ----- | ---------------------------------------------------------------- |
-| `stratification` | `str` | The ID of the stratification (e.g., "age", "location")           |
-| `category`       | `str` | The category within that stratification (e.g., "young", "urban") |
-| `to`             | \`str | None\`                                                           |
+| Name             | Type  | Description                                                |
+| ---------------- | ----- | ---------------------------------------------------------- |
+| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
+| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
+| `to`             | \`str | None\`                                                     |
 
 Source code in `commol/context/stratification_condition.py`
 
@@ -18133,14 +18134,15 @@ class StratificationCondition(BaseModel):
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
-    enables cross-category transitions within the same bin (e.g., aging).
+    enables cross-category transitions within the same bin (e.g., from ``g1``
+    to ``g2``).
 
     Attributes
     ----------
     stratification : str
-        The ID of the stratification (e.g., "age", "location")
+        The ID of the stratification (e.g., "group", "type")
     category : str
-        The category within that stratification (e.g., "young", "urban")
+        The category within that stratification (e.g., "g1", "t1")
     to : str | None
         Target category override. When set, the target compartment will use
         this category instead of the source compartment's category for this
@@ -18206,7 +18208,7 @@ class Parameter(BaseModel):
     description : str | None
         A human-readable description of the parameter.
     unit : str | None
-        The unit of the parameter (e.g., "1/day", "dimensionless", "person").
+        The unit of the parameter (e.g., "1/day", "dimensionless", "item").
         If None, the parameter has no unit specified.
     """
 
@@ -18226,7 +18228,7 @@ class Parameter(BaseModel):
     )
     unit: str | None = Field(
         default=None,
-        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'person').",
+        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'item').",
     )
 
     @field_validator("value")
@@ -18455,10 +18457,10 @@ class Transition(BaseModel):
         Note: Both ^ and ** are supported for exponentiation (** is converted to ^).
 
         Examples:
-        - "beta" (parameter reference)
+        - "k1" (parameter reference)
         - "0.5" (constant, can also be passed as float 0.5)
-        - "beta * S * I / total" (mathematical formula)
-        - "0.3 * sin(2 * pi * t / 365)" (time-dependent formula)
+        - "k1 * A * B / total" (mathematical formula)
+        - "0.3 * sin(2 * pi * t / 365)" (formula that changes along the axis)
         - "2^10" or "2**10" (power: both syntaxes work)
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
@@ -18479,8 +18481,8 @@ class Transition(BaseModel):
         None,
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
-            "Can be a parameter reference (e.g., 'beta'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'beta * S * I / total'). "
+            "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
+            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
             "Numeric values are automatically converted to strings during validation."
         ),
     )
@@ -18502,7 +18504,7 @@ class Transition(BaseModel):
         default=None,
         description=(
             "Positions on the axis where the transition is an impulse: at each "
-            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "one, the rate is a fraction (proportional) or an amount (absolute) "
             "moved at once. Between them the transition moves nothing."
         ),
     )
@@ -19073,7 +19075,7 @@ class InitialConditions(BaseModel):
         """
         Resolve a category id to its stratification and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
 
         Parameters
@@ -19126,7 +19128,7 @@ class InitialConditions(BaseModel):
         Parameters
         ----------
         category : str
-            A category id, bare or qualified (``sex:female``).
+            A category id, bare or qualified (``group:g1``).
 
         Returns
         -------
@@ -19181,7 +19183,7 @@ class InitialConditions(BaseModel):
         """
         Return the stratification that declares a category, and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
         """
         stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
@@ -19250,7 +19252,7 @@ class InitialConditions(BaseModel):
 
         Categories belonging to several stratifications may be given in one
         call. A category name declared by more than one stratification must be
-        qualified with its stratification, as in ``sex:female``. Within each
+        qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
         category receives the remaining fraction so that the stratification
         sums to 1.0. When every category is given, the values
@@ -19528,7 +19530,7 @@ resolve_category(category: str) -> tuple[str, str]
 
 Resolve a category id to its stratification and its bare name.
 
-A qualified id (`sex:female`) names the stratification. A bare name must be declared by exactly one stratification.
+A qualified id (`group:g1`) names the stratification. A bare name must be declared by exactly one stratification.
 
 Parameters:
 
@@ -19555,7 +19557,7 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     """
     Resolve a category id to its stratification and its bare name.
 
-    A qualified id (``sex:female``) names the stratification. A bare name
+    A qualified id (``group:g1``) names the stratification. A bare name
     must be declared by exactly one stratification.
 
     Parameters
@@ -19637,9 +19639,9 @@ Get the fraction of a category within the group it subdivides.
 
 Parameters:
 
-| Name       | Type  | Description                                    | Default    |
-| ---------- | ----- | ---------------------------------------------- | ---------- |
-| `category` | `str` | A category id, bare or qualified (sex:female). | *required* |
+| Name       | Type  | Description                                  | Default    |
+| ---------- | ----- | -------------------------------------------- | ---------- |
+| `category` | `str` | A category id, bare or qualified (group:g1). | *required* |
 
 Returns:
 
@@ -19663,7 +19665,7 @@ def get_category_fraction(self, category: str) -> float:
     Parameters
     ----------
     category : str
-        A category id, bare or qualified (``sex:female``).
+        A category id, bare or qualified (``group:g1``).
 
     Returns
     -------
@@ -19753,7 +19755,7 @@ update_stratification_fractions(fractions: Mapping[str, float]) -> None
 
 Update stratification category fractions by category name.
 
-Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `sex:female`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
+Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
 
 Parameters:
 
@@ -19776,7 +19778,7 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
 
     Categories belonging to several stratifications may be given in one
     call. A category name declared by more than one stratification must be
-    qualified with its stratification, as in ``sex:female``. Within each
+    qualified with its stratification, as in ``group:g1``. Within each
     stratification, at most one category may be omitted; the omitted
     category receives the remaining fraction so that the stratification
     sums to 1.0. When every category is given, the values
@@ -20088,7 +20090,7 @@ Attributes:
 
 | Name          | Type    | Description                                                         |
 | ------------- | ------- | ------------------------------------------------------------------- |
-| `compartment` | `str`   | The expanded compartment name, for example IH_y60 or S_oe60_v_c.    |
+| `compartment` | `str`   | The expanded compartment name, for example A_g1 or B_g2_t1.         |
 | `fraction`    | `float` | The fraction of the total in this compartment, between 0.0 and 1.0. |
 
 Source code in `commol/context/initial_conditions.py`
@@ -20101,7 +20103,7 @@ class CompartmentFraction(BaseModel):
     Attributes
     ----------
     compartment : str
-        The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.
+        The expanded compartment name, for example ``A_g1`` or ``B_g2_t1``.
     fraction : float
         The fraction of the total in this compartment, between 0.0 and 1.0.
     """
@@ -20265,6 +20267,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | `commol_rs.calibration.calibrated_initial_population`                                                                              | `calibrated_initial_state`                                                                  |
 | —                                                                                                                                  | `commol_rs.model.subgroup_total_names(structure)`                                           |
 | Rust: `CompartmentalEngine::population`, `population_size`; `DifferenceEquations::population`, `DifferentialEquations::population` | `state`, `total`                                                                            |
+
+- The library and its documentation assume no application and no axis: text says "along the axis" or "position", not "over time", and examples use abstract names. A rate that names no compartment is **proportional** (was "per-capita"), because a source can hold a mass or a concentration. The errors of a constraint at positions say "Constraint '…' evaluation failed at position …" and "Position … not found …" (were "Time-dependent constraint" and "Time step").
+
+| Before                                                                | Now                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `AxisPattern.seasonal(amplitude, period, phase, baseline)`            | `AxisPattern.sinusoid(amplitude, period, phase, baseline)` |
+| `TransitionFlow.per_capita_of` (`commol.context._model.engine_state`) | `TransitionFlow.proportional_to`                           |
+| Guide anchor `#absolute-and-per-capita-rates`                         | `#absolute-and-proportional-rates`                         |
+| Guide anchor `#time-dependent-rates`                                  | `#rates-that-change-along-the-axis`                        |
 
 ### Removed
 

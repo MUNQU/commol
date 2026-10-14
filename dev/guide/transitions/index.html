@@ -827,10 +827,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#absolute-and-per-capita-rates" class="md-nav__link">
+  <a href="#absolute-and-proportional-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Absolute and per-capita rates
+        Absolute and proportional rates
       
     </span>
   </a>
@@ -838,10 +838,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#time-dependent-rates" class="md-nav__link">
+  <a href="#rates-that-change-along-the-axis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Time-dependent rates
+        Rates that change along the axis
       
     </span>
   </a>
@@ -2340,10 +2340,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#absolute-and-per-capita-rates" class="md-nav__link">
+  <a href="#absolute-and-proportional-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Absolute and per-capita rates
+        Absolute and proportional rates
       
     </span>
   </a>
@@ -2351,10 +2351,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#time-dependent-rates" class="md-nav__link">
+  <a href="#rates-that-change-along-the-axis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Time-dependent rates
+        Rates that change along the axis
       
     </span>
   </a>
@@ -2610,7 +2610,7 @@ between categories, stratified rates, impulses, and what <code>build</code> chec
 <p>A rate is a formula (a string), a number, or a <a href="../axis-patterns/"><code>AxisPattern</code></a>.
 A formula can use parameters, compartments, bin totals, <code>total</code>, <code>step</code>, constants
 and functions; see <a href="../mathematical-expressions/">Mathematical Expressions</a>.</p>
-<h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
+<h3 id="absolute-and-proportional-rates">Absolute and proportional rates<a class="headerlink" href="#absolute-and-proportional-rates" title="Permanent link">&para;</a></h3>
 <p>The engine decides for each flow whether its rate is the flow itself or a rate
 per member of the source:</p>
 <table>
@@ -2639,7 +2639,7 @@ per member of the source:</p>
 </tr>
 <tr>
 <td>Otherwise</td>
-<td>Per-capita</td>
+<td>Proportional</td>
 <td><code>rate × source</code></td>
 </tr>
 </tbody>
@@ -2655,7 +2655,7 @@ per member of the source:</p>
 <tbody>
 <tr>
 <td><code>"k2"</code></td>
-<td>Per-capita</td>
+<td>Proportional</td>
 <td><code>k2 * B</code></td>
 </tr>
 <tr>
@@ -2675,12 +2675,12 @@ per member of the source:</p>
 </tr>
 </tbody>
 </table>
-<p><code>print_equations()</code> prints every flow after this decision, so a per-capita rate
+<p><code>print_equations()</code> prints every flow after this decision, so a proportional rate
 appears multiplied by its source.</p>
-<h3 id="time-dependent-rates">Time-dependent rates<a class="headerlink" href="#time-dependent-rates" title="Permanent link">&para;</a></h3>
+<h3 id="rates-that-change-along-the-axis">Rates that change along the axis<a class="headerlink" href="#rates-that-change-along-the-axis" title="Permanent link">&para;</a></h3>
 <p>A formula may use <code>step</code> (or <code>t</code>), the current step:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">seasonal</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Seasonal&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">periodic</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Periodic&quot;</span><span class="p">)</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
@@ -2700,16 +2700,16 @@ appears multiplied by its source.</p>
 <p>For pulses, windows, ramps and schedules per group, use
 <a href="../axis-patterns/">Axis Patterns</a>.</p>
 <h2 id="several-sources-or-targets">Several sources or targets<a class="headerlink" href="#several-sources-or-targets" title="Permanent link">&para;</a></h2>
-<p>A transition with several sources or targets moves <strong>one</strong> flow, like a
-reaction: every entry in <code>source</code> loses it and every entry in <code>target</code> gains it.
+<p>A transition with several sources or targets moves <strong>one</strong> flow: every entry
+in <code>source</code> loses it and every entry in <code>target</code> gains it.
 A bin listed twice loses or gains it twice. The rate must be absolute.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">reaction</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Reaction&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">merge</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Merge&quot;</span><span class="p">)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;reaction&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k * A * B&quot;</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t1&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k * A * B&quot;</span><span class="p">)</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[</span>
@@ -2720,7 +2720,7 @@ A bin listed twice loses or gains it twice. The rate must be absolute.</p>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="p">)</span>
 </span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">)</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">reaction</span><span class="o">.</span><span class="n">print_equations</span><span class="p">()</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">merge</span><span class="o">.</span><span class="n">print_equations</span><span class="p">()</span>
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)</span>
 </span></code></pre></div>
 <h3 id="the-compartment-placeholder">The <code>$compartment</code> placeholder<a class="headerlink" href="#the-compartment-placeholder" title="Permanent link">&para;</a></h3>
@@ -2927,7 +2927,7 @@ transitions between bins.</p>
 <tr>
 <td><code>absolute</code></td>
 <td><code>bool</code>, optional</td>
-<td>Forces the rate to be absolute or per-capita.</td>
+<td>Forces the rate to be absolute or proportional.</td>
 </tr>
 </tbody>
 </table>
@@ -3039,8 +3039,8 @@ rate with <code>if</code>, as in <code>"if(step &gt; 30, k, 0)"</code>, or use a
 <h2 id="impulses">Impulses<a class="headerlink" href="#impulses" title="Permanent link">&para;</a></h2>
 <p>An impulse moves its amount at once, at given steps, and nothing between them.
 Give the steps with <code>impulse_at=[…]</code> or <code>impulse_every=(period, offset)</code>. The
-rate is then a fraction of the source (per-capita) or an amount (absolute),
-with the same <a href="#absolute-and-per-capita-rates">rules</a>, sources, targets,
+rate is then a fraction of the source (proportional) or an amount (absolute),
+with the same <a href="#absolute-and-proportional-rates">rules</a>, sources, targets,
 stratified rates and accumulators as any transition.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">impulse_model</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Impulses&quot;</span><span class="p">)</span>
@@ -3094,7 +3094,7 @@ stratified rates and accumulators as any transition.</p>
 </table>
 <p>An impulse is not a pulse rate. A <a href="../axis-patterns/"><code>AxisPattern.pulse</code></a> is a
 rate: a difference model applies it for one step with the other flows, and a
-differential model applies it as a constant rate for one time unit, so it
+differential model applies it as a constant rate for one unit of the axis, so it
 moves <code>1 − e^(−p)</code> of its source. An impulse moves exactly <code>p</code> of its source in
 both engines.</p>
 <h2 id="what-building-checks">What building checks<a class="headerlink" href="#what-building-checks" title="Permanent link">&para;</a></h2>
@@ -3121,7 +3121,7 @@ simulate as written:</p>
 <td>The variable and the available names</td>
 </tr>
 <tr>
-<td>Several sources with a per-capita rate</td>
+<td>Several sources with a proportional rate</td>
 <td>The transition; use an absolute rate or <code>$compartment</code></td>
 </tr>
 <tr>
@@ -3152,7 +3152,7 @@ simulate as written:</p>
 </thead>
 <tbody>
 <tr>
-<td>Rates that change over time</td>
+<td>Rates that change along the axis</td>
 <td><a href="../axis-patterns/">Axis Patterns</a></td>
 </tr>
 <tr>

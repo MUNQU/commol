@@ -4124,7 +4124,7 @@
 </span><span id="__span-0-414"><a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        Raises</span>
 </span><span id="__span-0-415"><a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        ------</span>
 </span><span id="__span-0-416"><a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        ValueError</span>
-</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            If observed data contains invalid compartments or negative time steps.</span>
+</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            If observed data contains invalid compartments or negative positions.</span>
 </span><span id="__span-0-418"><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-419"><a id="__codelineno-0-419" name="__codelineno-0-419"></a>        <span class="n">simulation_output_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">output_names</span><span class="p">)</span>
 </span><span id="__span-0-420"><a id="__codelineno-0-420" name="__codelineno-0-420"></a>
@@ -4147,7 +4147,7 @@
 </span><span id="__span-0-437"><a id="__codelineno-0-437" name="__codelineno-0-437"></a>        <span class="p">)</span>
 </span><span id="__span-0-438"><a id="__codelineno-0-438" name="__codelineno-0-438"></a>
 </span><span id="__span-0-439"><a id="__codelineno-0-439" name="__codelineno-0-439"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_warn_constraint_positions_beyond_observations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-440"><a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Warn when time-dependent constraints extend beyond observed data.&quot;&quot;&quot;</span>
+</span><span id="__span-0-440"><a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Warn when constraints at positions extend beyond observed data.&quot;&quot;&quot;</span>
 </span><span id="__span-0-441"><a id="__codelineno-0-441" name="__codelineno-0-441"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">observed_data</span><span class="p">:</span>
 </span><span id="__span-0-442"><a id="__codelineno-0-442" name="__codelineno-0-442"></a>            <span class="k">return</span>
 </span><span id="__span-0-443"><a id="__codelineno-0-443" name="__codelineno-0-443"></a>
@@ -6293,7 +6293,7 @@ is violated and a penalty is applied during optimization.</p>
               <div class="doc-md-description">
                 <p>Mathematical expression that must evaluate &gt;= 0 for constraint satisfaction.
 Can reference calibration parameters by their IDs. When <code>at</code> is specified,
-can also reference output values (S, I, R, etc.) at those positions.</p>
+can also reference output values (A, B, C, etc.) at those positions.</p>
               </div>
             </td>
           </tr>
@@ -6341,18 +6341,18 @@ given, it is evaluated at each position and can reference output values.</p>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># R0 = beta/gamma must be &lt;= 5</span>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># k1/k2 must be &lt;= 5</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">constraint</span> <span class="o">=</span> <span class="n">CalibrationConstraint</span><span class="p">(</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">... </span>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;r0_bound&quot;</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">... </span>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - beta/gamma&quot;</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">... </span>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Basic reproduction number R0 &lt;= 5&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">... </span>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ratio_bound&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">... </span>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;5.0 - k1/k2&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">... </span>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Ratio k1/k2 &lt;= 5&quot;</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">... </span><span class="p">)</span>
 </span></code></pre></div>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># beta must be &gt;= gamma</span>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># k1 must be &gt;= k2</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">constraint</span> <span class="o">=</span> <span class="n">CalibrationConstraint</span><span class="p">(</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">... </span>    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ordering&quot;</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">... </span>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;beta - gamma&quot;</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">... </span>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Transmission rate &gt;= recovery rate&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">... </span>    <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;k1 - k2&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">... </span>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;k1 &gt;= k2&quot;</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">... </span><span class="p">)</span>
 </span></code></pre></div>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Sum of parameters &lt;= 1.0</span>
@@ -6506,7 +6506,7 @@ given, it is evaluated at each position and can reference output values.</p>
 </span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a><span class="sd">    expression : str</span>
 </span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a><span class="sd">        Mathematical expression that must evaluate &gt;= 0 for constraint satisfaction.</span>
 </span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a><span class="sd">        Can reference calibration parameters by their IDs. When `at` is specified,</span>
-</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a><span class="sd">        can also reference output values (S, I, R, etc.) at those positions.</span>
+</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a><span class="sd">        can also reference output values (A, B, C, etc.) at those positions.</span>
 </span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a><span class="sd">    description : str | None</span>
 </span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a><span class="sd">        Human-readable description of the constraint (optional)</span>
 </span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a><span class="sd">    weight : float</span>
@@ -6522,18 +6522,18 @@ given, it is evaluated at each position and can reference output values.</p>
 </span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a>
 </span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a><span class="sd">    Examples</span>
 </span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a><span class="sd">    --------</span>
-</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">    &gt;&gt;&gt; # R0 = beta/gamma must be &lt;= 5</span>
+</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">    &gt;&gt;&gt; # k1/k2 must be &lt;= 5</span>
 </span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a><span class="sd">    &gt;&gt;&gt; constraint = CalibrationConstraint(</span>
-</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">    ...     id=&quot;r0_bound&quot;,</span>
-</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">    ...     expression=&quot;5.0 - beta/gamma&quot;,</span>
-</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">    ...     description=&quot;Basic reproduction number R0 &lt;= 5&quot;,</span>
+</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">    ...     id=&quot;ratio_bound&quot;,</span>
+</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">    ...     expression=&quot;5.0 - k1/k2&quot;,</span>
+</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">    ...     description=&quot;Ratio k1/k2 &lt;= 5&quot;,</span>
 </span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a><span class="sd">    ... )</span>
 </span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>
-</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">    &gt;&gt;&gt; # beta must be &gt;= gamma</span>
+</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">    &gt;&gt;&gt; # k1 must be &gt;= k2</span>
 </span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">    &gt;&gt;&gt; constraint = CalibrationConstraint(</span>
 </span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a><span class="sd">    ...     id=&quot;ordering&quot;,</span>
-</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">    ...     expression=&quot;beta - gamma&quot;,</span>
-</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">    ...     description=&quot;Transmission rate &gt;= recovery rate&quot;,</span>
+</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">    ...     expression=&quot;k1 - k2&quot;,</span>
+</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">    ...     description=&quot;k1 &gt;= k2&quot;,</span>
 </span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a><span class="sd">    ... )</span>
 </span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a>
 </span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a><span class="sd">    &gt;&gt;&gt; # Sum of parameters &lt;= 1.0</span>

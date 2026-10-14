@@ -315,7 +315,7 @@ class Model(BaseModel, Generic[StructureT]):
         from the parameter
         units: the one unit of time (``day``, ``week``, ``step``, …) that they
         use, or ``step`` when they use none. Every flow must then be exactly
-        ``<bin unit>/<step unit>``, such as ``person/day``.
+        ``<bin unit>/<step unit>``, such as ``item/day``.
 
         Parameters
         ----------
@@ -335,8 +335,8 @@ class Model(BaseModel, Generic[StructureT]):
 
         Notes
         -----
-        - Predefined variables (total, total_young, etc.) have the bin unit
-        - Time step variables (t, step) are dimensionless
+        - Predefined variables (total, total_g1, etc.) have the bin unit
+        - Position variables (t, step) are dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
         self.structure.check_unit_consistency(self, verbose)
@@ -794,7 +794,7 @@ check_unit_consistency(verbose: bool = False) -> None
 
 Check unit consistency of all equations in the model.
 
-The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `person/day`.
+The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `item/day`.
 
 Parameters:
 
@@ -812,8 +812,8 @@ Raises:
 
 Notes
 
-- Predefined variables (total, total_young, etc.) have the bin unit
-- Time step variables (t, step) are dimensionless
+- Predefined variables (total, total_g1, etc.) have the bin unit
+- Position variables (t, step) are dimensionless
 - Mathematical constants (pi, e) are dimensionless
 
 Source code in `commol/context/model.py`
@@ -829,7 +829,7 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     from the parameter
     units: the one unit of time (``day``, ``week``, ``step``, …) that they
     use, or ``step`` when they use none. Every flow must then be exactly
-    ``<bin unit>/<step unit>``, such as ``person/day``.
+    ``<bin unit>/<step unit>``, such as ``item/day``.
 
     Parameters
     ----------
@@ -849,8 +849,8 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
 
     Notes
     -----
-    - Predefined variables (total, total_young, etc.) have the bin unit
-    - Time step variables (t, step) are dimensionless
+    - Predefined variables (total, total_g1, etc.) have the bin unit
+    - Position variables (t, step) are dimensionless
     - Mathematical constants (pi, e) are dimensionless
     """
     self.structure.check_unit_consistency(self, verbose)
@@ -1973,7 +1973,7 @@ class CompartmentalStructure(ModelStructure):
             Ids of the categories selecting the subgroup this stratification
             subdivides, empty for an unconditional stratification. A category
             name another stratification also declares is qualified, as in
-            ``sex:female``.
+            ``group:g1``.
 
         Raises
         ------
@@ -2008,7 +2008,7 @@ class CompartmentalStructure(ModelStructure):
         Parameters
         ----------
         categories : Iterable[str], optional
-            Category ids, bare or qualified (``sex:female``), forming a chain
+            Category ids, bare or qualified (``group:g1``), forming a chain
             from the whole model down to the subgroup, outermost first.
 
         Returns
@@ -2939,9 +2939,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in sex:female. |
+| Type              | Description                                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in group:g1. |
 
 Raises:
 
@@ -2972,7 +2972,7 @@ def get_conditioning_categories(self, stratification_id: str) -> tuple[str, ...]
         Ids of the categories selecting the subgroup this stratification
         subdivides, empty for an unconditional stratification. A category
         name another stratification also declares is qualified, as in
-        ``sex:female``.
+        ``group:g1``.
 
     Raises
     ------
@@ -3008,9 +3008,9 @@ Per-compartment overrides are folded into the sum for every compartment the cate
 
 Parameters:
 
-| Name         | Type            | Description                                                                                                               | Default |
-| ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `categories` | `Iterable[str]` | Category ids, bare or qualified (sex:female), forming a chain from the whole model down to the subgroup, outermost first. | `()`    |
+| Name         | Type            | Description                                                                                                             | Default |
+| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------- | ------- |
+| `categories` | `Iterable[str]` | Category ids, bare or qualified (group:g1), forming a chain from the whole model down to the subgroup, outermost first. | `()`    |
 
 Returns:
 
@@ -3041,7 +3041,7 @@ def subgroup_total(self, categories: Iterable[str] = ()) -> float:
     Parameters
     ----------
     categories : Iterable[str], optional
-        Category ids, bare or qualified (``sex:female``), forming a chain
+        Category ids, bare or qualified (``group:g1``), forming a chain
         from the whole model down to the subgroup, outermost first.
 
     Returns
@@ -3079,7 +3079,7 @@ Attributes:
 
 | Name         | Type             | Description                                                                                                                                             |
 | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`       | `str`            | Expanded compartment name, for example IH_y60.                                                                                                          |
+| `name`       | `str`            | Expanded compartment name, for example A_g1.                                                                                                            |
 | `bin`        | `str`            | Bin the compartment expands from.                                                                                                                       |
 | `categories` | `dict[str, str]` | Category applied to the compartment, keyed by stratification id. A conditional stratification whose conditions the compartment does not meet is absent. |
 | `amount`     | `float`          | Initial amount, including per-compartment overrides.                                                                                                    |
@@ -3094,7 +3094,7 @@ class InitialCompartment(NamedTuple):
     Attributes
     ----------
     name : str
-        Expanded compartment name, for example ``IH_y60``.
+        Expanded compartment name, for example ``A_g1``.
     bin : str
         Bin the compartment expands from.
     categories : dict[str, str]

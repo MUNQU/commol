@@ -2407,8 +2407,8 @@
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
 <p>Model authors cannot express initial conditions for a specific expanded
-compartment (for example <code>IH_y60 = 0</code> when the hospital pathway only exists
-for the <code>oe60</code> age stratum). The current definition only supports:</p>
+compartment (for example <code>B_g1 = 0</code> when the stratification <code>type</code> only
+applies to group <code>g2</code>). The current definition only supports:</p>
 <ul>
 <li><code>bin_fractions</code>: fraction of the total population per bin, expanded
   uniformly across every stratification category combination.</li>
@@ -2425,7 +2425,7 @@ layer is missing:</p>
    (<code>commol-difference/simulation.rs</code>).</li>
 <li>The Rust calibration layer already resolves <code>InitialCondition</code>
    parameters to targets by id (<code>calibration_problem.rs</code>):</li>
-<li>exact expanded compartment name (<code>IH_y60</code>) → <code>InitialConditionTarget::exact</code>,</li>
+<li>exact expanded compartment name (<code>B_g1</code>) → <code>InitialConditionTarget::exact</code>,</li>
 <li>bin id or bin prefix → <code>aggregate</code>,</li>
 <li>binary stratification category → <code>paired_category</code>.
    Values are fractions of the total population, converted to absolute
@@ -2444,7 +2444,7 @@ initial conditions.</p>
 <h3 id="data-model">Data model<a class="headerlink" href="#data-model" title="Permanent link">&para;</a></h3>
 <!-- doc-test: skip: shows the shape of the types, not a runnable example -->
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">CompartmentFraction</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">compartment</span><span class="p">:</span> <span class="nb">str</span>   <span class="c1"># expanded compartment name: &quot;IH_y60&quot;, &quot;S_oe60_v_c&quot;, ...</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">compartment</span><span class="p">:</span> <span class="nb">str</span>   <span class="c1"># expanded compartment name: &quot;B_g1&quot;, &quot;A_g2_t1&quot;, ...</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">fraction</span><span class="p">:</span> <span class="nb">float</span>    <span class="c1"># fraction of the TOTAL population, 0.0 &lt;= fraction &lt;= 1.0</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">InitialConditions</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
@@ -2465,7 +2465,7 @@ initial conditions.</p>
   conditional-stratification logic that keeps some compartments unsplit —
   is unchanged. Overrides are applied afterwards, keyed by final
   compartment name. This works uniformly for fully suffixed
-  compartments (<code>IH_oe60_v_c</code>) and truncated conditional ones (<code>IH_y60</code>)
+  compartments (<code>B_g2_t1</code>) and truncated conditional ones (<code>B_g1</code>)
   without special cases.</li>
 <li><strong>Precedence:</strong> definition override wins over the uniform expansion;
   calibration wins over the definition at runtime (engine <code>reset()</code> +
@@ -2509,7 +2509,7 @@ reach the engine. <code>cost()</code>, <code>configured_engine()</code> and the 
 <code>calibrated_initial_population</code> share it.</p>
 <ul>
 <li><strong>Targets.</strong> An id resolves, in order, to an exact compartment, a qualified
-  category (<code>sex:female</code>), a bin or bin prefix (its bin followed by its leading
+  category (<code>group:g1</code>), a bin or bin prefix (its bin followed by its leading
   categories, matched on the labels), or the category of exactly one binary
   stratification. Category pairs come from the engine's
   <code>compartment_labels()</code> (bin and applied categories), not from compartment
@@ -2544,7 +2544,7 @@ engine.</p>
 <li><strong>Pydantic:</strong> validator coverage (duplicates, range, unknown compartment).</li>
 <li><strong>Rust (<code>commol-difference</code> tests):</strong> override application, truncated
    conditional compartment, unknown-name error, population conservation.</li>
-<li><strong>Integration:</strong> end-to-end <code>IH_y60 = 0</code> scenario (build → simulate →
+<li><strong>Integration:</strong> end-to-end <code>B_g1 = 0</code> scenario (build → simulate →
    series stay zero); calibration round-trip (exact-compartment IC parameter
    → calibrate → apply parameters → rebuild engine → identical initial state).</li>
 <li><strong>Write-back parity:</strong> for each mix of bin, category and exact-compartment

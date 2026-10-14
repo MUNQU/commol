@@ -2,13 +2,13 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Time-varying rates and schedules per subgroup. Guide: [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md).
+Rates that change along the axis, and schedules per subgroup. Guide: [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md).
 
 ## AxisPattern
 
 Bases: `BaseModel`
 
-A time-varying expression usable as (or within) a transition rate.
+An expression that changes along the axis, usable as (or within) a transition rate.
 
 Instances are created exclusively via the factory classmethods (`pulse`, `periodic`, `window`, etc.). Each instance may carry stratification conditions that restrict it to a specific sub-group via `for_group`.
 
@@ -39,7 +39,8 @@ Source code in `commol/api/patterns.py`
 ```python
 class AxisPattern(BaseModel):
     """
-    A time-varying expression usable as (or within) a transition rate.
+    An expression that changes along the axis, usable as (or within) a
+    transition rate.
 
     Instances are created exclusively via the factory classmethods (``pulse``,
     ``periodic``, ``window``, etc.). Each instance may carry stratification
@@ -123,7 +124,7 @@ class AxisPattern(BaseModel):
 
         If ``source_compartment`` is set, the rate is multiplied by that
         compartment variable (absolute flow). Otherwise the rate is the
-        formula alone (per-capita flow — the engine multiplies by the source
+        formula alone (proportional flow — the engine multiplies by the source
         compartment automatically).
         """
         if self.source_compartment is not None:
@@ -226,7 +227,7 @@ class AxisPattern(BaseModel):
         return _IntervalAxisPattern(start=start, end=end, value=value)
 
     @classmethod
-    def seasonal(
+    def sinusoid(
         cls,
         amplitude: float | str,
         period: float | str,
@@ -234,7 +235,7 @@ class AxisPattern(BaseModel):
         baseline: float | str = 0,
     ) -> "AxisPattern":
         """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-        return _SeasonalAxisPattern(
+        return _SinusoidAxisPattern(
             amplitude=amplitude,
             period=period,
             phase=phase,
@@ -386,7 +387,7 @@ to_stratified_rate() -> StratifiedRateDict
 
 Convert this pattern to a stratified-rate dict.
 
-If `source_compartment` is set, the rate is multiplied by that compartment variable (absolute flow). Otherwise the rate is the formula alone (per-capita flow — the engine multiplies by the source compartment automatically).
+If `source_compartment` is set, the rate is multiplied by that compartment variable (absolute flow). Otherwise the rate is the formula alone (proportional flow — the engine multiplies by the source compartment automatically).
 
 Source code in `commol/api/patterns.py`
 
@@ -397,7 +398,7 @@ def to_stratified_rate(self) -> StratifiedRateDict:
 
     If ``source_compartment`` is set, the rate is multiplied by that
     compartment variable (absolute flow). Otherwise the rate is the
-    formula alone (per-capita flow — the engine multiplies by the source
+    formula alone (proportional flow — the engine multiplies by the source
     compartment automatically).
     """
     if self.source_compartment is not None:
@@ -543,10 +544,10 @@ def interval(
     return _IntervalAxisPattern(start=start, end=end, value=value)
 ```
 
-#### seasonal
+#### sinusoid
 
 ```python
-seasonal(amplitude: float | str, period: float | str, phase: float | str = 0, baseline: float | str = 0) -> AxisPattern
+sinusoid(amplitude: float | str, period: float | str, phase: float | str = 0, baseline: float | str = 0) -> AxisPattern
 ```
 
 `baseline + amplitude * sin(2*pi*(t - phase) / period)`.
@@ -555,7 +556,7 @@ Source code in `commol/api/patterns.py`
 
 ```python
 @classmethod
-def seasonal(
+def sinusoid(
     cls,
     amplitude: float | str,
     period: float | str,
@@ -563,7 +564,7 @@ def seasonal(
     baseline: float | str = 0,
 ) -> "AxisPattern":
     """``baseline + amplitude * sin(2*pi*(t - phase) / period)``."""
-    return _SeasonalAxisPattern(
+    return _SinusoidAxisPattern(
         amplitude=amplitude,
         period=period,
         phase=phase,

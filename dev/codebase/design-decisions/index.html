@@ -1912,10 +1912,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#absolute-and-per-capita-rates" class="md-nav__link">
+  <a href="#absolute-and-proportional-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Absolute and per-capita rates
+        Absolute and proportional rates
       
     </span>
   </a>
@@ -2750,10 +2750,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#absolute-and-per-capita-rates" class="md-nav__link">
+  <a href="#absolute-and-proportional-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Absolute and per-capita rates
+        Absolute and proportional rates
       
     </span>
   </a>
@@ -3174,7 +3174,7 @@ test that guards it. Read the ones of your area before you change it.</p>
 </tr>
 <tr>
 <td>Transitions and rates</td>
-<td><a href="#absolute-and-per-capita-rates">Rate semantics</a>, <a href="#the-most-specific-stratified-rate-wins">stratified rates</a>, <a href="#formula-parameters-are-evaluated-every-step-in-order">formula parameters</a>, <a href="#compiled-expressions-are-cached-globally">JIT cache</a></td>
+<td><a href="#absolute-and-proportional-rates">Rate semantics</a>, <a href="#the-most-specific-stratified-rate-wins">stratified rates</a>, <a href="#formula-parameters-are-evaluated-every-step-in-order">formula parameters</a>, <a href="#compiled-expressions-are-cached-globally">JIT cache</a></td>
 </tr>
 <tr>
 <td>Initial conditions</td>
@@ -3408,10 +3408,10 @@ to check rates and give units.</p>
 <code>tests/building/test_reserved_names.py</code>;
 <code>tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate</code>.</p>
 <h2 id="transitions-and-rates">Transitions and rates<a class="headerlink" href="#transitions-and-rates" title="Permanent link">&para;</a></h2>
-<h3 id="absolute-and-per-capita-rates">Absolute and per-capita rates<a class="headerlink" href="#absolute-and-per-capita-rates" title="Permanent link">&para;</a></h3>
+<h3 id="absolute-and-proportional-rates">Absolute and proportional rates<a class="headerlink" href="#absolute-and-proportional-rates" title="Permanent link">&para;</a></h3>
 <p>The flow planner (<code>plan_transition_flows</code> in
 <code>crates/commol-model/src/flows.rs</code>) decides for each flow whether the rate
-is absolute or per-capita:</p>
+is absolute or proportional:</p>
 <table>
 <thead>
 <tr>
@@ -3438,14 +3438,19 @@ is absolute or per-capita:</p>
 </tr>
 <tr>
 <td>Otherwise</td>
-<td>Per-capita</td>
+<td>Proportional</td>
 <td><code>rate × source</code></td>
 </tr>
 </tbody>
 </table>
-<p>A transition with several sources and a per-capita rate is rejected, because
+<p>A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. <code>print_equations</code> shows the planned flows,
-so a per-capita rate prints as <code>k1 * A</code>.</p>
+so a proportional rate prints as <code>k1 * A</code>.</p>
+<p>The name says what the flow is: proportional to its source. The name
+"per-capita" counts heads, which assumes the source holds individuals; a
+source can hold a mass or a concentration. "Relative" would clash with the
+relative tolerance <code>rtol</code> of the ODE solver, and "per-unit" with units of
+measure.</p>
 <p><strong>Guard:</strong> <code>tests/transitions/test_flows.py</code>.</p>
 <h3 id="the-most-specific-stratified-rate-wins">The most specific stratified rate wins<a class="headerlink" href="#the-most-specific-stratified-rate-wins" title="Permanent link">&para;</a></h3>
 <p>For each compartment, the stratified rate whose conditions match it with the
@@ -3548,7 +3553,7 @@ jumps at <code>end</code> would already act on the last step of the piece.</p>
 <p>Whether an expression reads <code>step</code> comes from <code>reads_variable</code>, not from
 <code>get_variables</code>: <code>get_variables</code> leaves out the special variables, because it
 lists the variables a model must define.</p>
-<p><strong>Consequence:</strong> a per-capita pulse <code>p</code> moves <code>p</code> of its source in a difference
+<p><strong>Consequence:</strong> a proportional pulse <code>p</code> moves <code>p</code> of its source in a difference
 model and <code>1 − e^(−p)</code> in a differential model. An impulse moves <code>p</code> in both.
 The alternative, <code>step = t</code>, makes a pulse <code>step == n</code> true on a set of zero
 length, so it would never act.</p>

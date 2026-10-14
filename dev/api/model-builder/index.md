@@ -226,8 +226,8 @@ class ModelBuilder:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
                    special variables (total, total_<category>, step, t, pi, e),
-                   or contain mathematical expressions (e.g., "beta * 2",
-                   "total_young / total")
+                   or contain mathematical expressions (e.g., "k1 * 2",
+                   "total_g1 / total")
             - list[tuple[float, float]]: Empirical series as (position, value)
                    points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
@@ -235,7 +235,7 @@ class ModelBuilder:
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
-            Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+            Unit of the parameter (e.g., "1/day", "dimensionless", "item").
             Used for unit consistency checking in equations.
         mode : str | None, default=None
             Required when ``value`` is a list of (position, value) points.
@@ -345,7 +345,7 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per time step, and that value is applied to
+        The rate is evaluated ONCE per step, and that value is applied to
         all source compartments at once.
 
         When you use the $compartment placeholder in the rate formula with multiple
@@ -355,8 +355,8 @@ class ModelBuilder:
         name.
 
         Each transition's rate is evaluated independently, giving per-compartment
-        dynamics. This is ideal for processes like per-capita death rates, where the
-        rate should be proportional to the amount of each compartment.
+        dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+        flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
         - Only valid when len(source) > 1
@@ -377,7 +377,7 @@ class ModelBuilder:
         id : str
             Unique identifier for the transition. When using $compartment expansion,
             the system will append "__<compartment_name>" to create unique IDs for
-            each expanded transition (e.g., "death__S", "death__L").
+            each expanded transition (e.g., "out__A", "out__B").
         source : list[str]
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
@@ -421,7 +421,7 @@ class ModelBuilder:
 
         impulse_at : list[float] | None, default=None
             Make the transition an impulse at these positions on the axis. At
-            each one, ``rate`` is the fraction of the source (per-capita) or the
+            each one, ``rate`` is the fraction of the source (proportional) or the
             amount (absolute) moved at once, before the flows of that step. A
             DifferenceEquations model needs integer positions.
 
@@ -443,7 +443,7 @@ class ModelBuilder:
         """
         # If `rate` is a AxisPattern, extract its rate string and stratified
         # rates and route them into the existing pipeline. A AxisPattern fully
-        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # specifies how the rate changes along the axis, so passing `stratified_rates=`
         # alongside it is a conflict.
         if isinstance(rate, AxisPattern):
             if impulse_at is not None or impulse_every is not None:
@@ -735,9 +735,9 @@ class ModelBuilder:
 
             Example:
             [
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0}
             ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
@@ -748,11 +748,11 @@ class ModelBuilder:
             Example:
             [
                 {
-                    "stratification": "age_group",
+                    "stratification": "group",
                     "fractions": [
-                        {"category": "young", "fraction": 0.3},
-                        {"category": "adult", "fraction": 0.5},
-                        {"category": "elderly", "fraction": 0.2}
+                        {"category": "g1", "fraction": 0.3},
+                        {"category": "g2", "fraction": 0.5},
+                        {"category": "g3", "fraction": 0.2}
                     ]
                 }
             ]
@@ -764,7 +764,7 @@ class ModelBuilder:
 
             Example:
             [
-                {"compartment": "IH_y60", "fraction": 0.0}
+                {"compartment": "A_g1", "fraction": 0.0}
             ]
 
             Compartment names and the resulting sum of the amounts are checked
@@ -1207,7 +1207,7 @@ Parameters:
 | `id`          | `str`   | Unique identifier for the parameter. | *required*                                                                                                                                                                                                                                                                                   |
 | `value`       | \`float | str                                  | list\[tuple[float, float]\]                                                                                                                                                                                                                                                                  |
 | `description` | \`str   | None\`                               | Human-readable description of the parameter.                                                                                                                                                                                                                                                 |
-| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "person"). Used for unit consistency checking in equations.                                                                                                                                                                           |
+| `unit`        | \`str   | None\`                               | Unit of the parameter (e.g., "1/day", "dimensionless", "item"). Used for unit consistency checking in equations.                                                                                                                                                                             |
 | `mode`        | \`str   | None\`                               | Required when value is a list of (position, value) points. Selects how the series is read: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). |
 
 Returns:
@@ -1245,8 +1245,8 @@ def add_parameter(
         - float: A numerical constant value
         - str: A mathematical formula that can reference other parameters,
                special variables (total, total_<category>, step, t, pi, e),
-               or contain mathematical expressions (e.g., "beta * 2",
-               "total_young / total")
+               or contain mathematical expressions (e.g., "k1 * 2",
+               "total_g1 / total")
         - list[tuple[float, float]]: Empirical series as (position, value)
                points; requires ``mode`` to be set.
         - None: Indicates that the parameter needs to be calibrated before use
@@ -1254,7 +1254,7 @@ def add_parameter(
     description : str | None, default=None
         Human-readable description of the parameter.
     unit : str | None, default=None
-        Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+        Unit of the parameter (e.g., "1/day", "dimensionless", "item").
         Used for unit consistency checking in equations.
     mode : str | None, default=None
         Required when ``value`` is a list of (position, value) points.
@@ -1308,11 +1308,11 @@ Add a transition between states to the model.
 
 This method supports two distinct behaviors:
 
-When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per time step, and that value is applied to all source compartments at once.
+When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per step, and that value is applied to all source compartments at once.
 
 When you use the $compartment placeholder in the rate formula with multiple sources, the system automatically expands this into multiple independent transitions - one for each source compartment. Each transition has its own rate calculation where $compartment is replaced with the actual compartment name.
 
-Each transition's rate is evaluated independently, giving per-compartment dynamics. This is ideal for processes like per-capita death rates, where the rate should be proportional to the amount of each compartment.
+Each transition's rate is evaluated independently, giving per-compartment dynamics. This suits an outflow such as `k1 * $compartment`, where the flow of each compartment is proportional to its own amount.
 
 **$compartment Usage Rules**:
 
@@ -1328,17 +1328,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type                  | Description                                                                                                                                                                                  | Default                                                                                                                                                                                                                                                                                    |
-| ------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "death\_\_S", "death\_\_L"). | *required*                                                                                                                                                                                                                                                                                 |
-| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                             | *required*                                                                                                                                                                                                                                                                                 |
-| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                     | *required*                                                                                                                                                                                                                                                                                 |
-| `rate`             | \`str                 | float                                                                                                                                                                                        | None\`                                                                                                                                                                                                                                                                                     |
-| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                       | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                    |
-| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                       | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subgroup transitions based on its own compartment value rather than the total across all subgroups. |
-| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                       | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                               |
-| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                       | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (per-capita) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                    |
-| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                       | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                      |
+| Name               | Type                  | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                    |
+| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                 |
+| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                 |
+| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment, target must be empty [] or have exactly one element.                                                                 | *required*                                                                                                                                                                                                                                                                                 |
+| `rate`             | \`str                 | float                                                                                                                                                                                    | None\`                                                                                                                                                                                                                                                                                     |
+| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                    |
+| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, base compartment names in the rate expression are automatically replaced with the specific stratified compartment name for each expanded transition flow. This ensures each subgroup transitions based on its own compartment value rather than the total across all subgroups. |
+| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                               |
+| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations model needs integer positions.                                  |
+| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                      |
 
 Returns:
 
@@ -1374,7 +1374,7 @@ def add_transition(
 
     When you specify multiple sources without the $compartment placeholder,
     a single transition is created that affects all sources simultaneously.
-    The rate is evaluated ONCE per time step, and that value is applied to
+    The rate is evaluated ONCE per step, and that value is applied to
     all source compartments at once.
 
     When you use the $compartment placeholder in the rate formula with multiple
@@ -1384,8 +1384,8 @@ def add_transition(
     name.
 
     Each transition's rate is evaluated independently, giving per-compartment
-    dynamics. This is ideal for processes like per-capita death rates, where the
-    rate should be proportional to the amount of each compartment.
+    dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+    flow of each compartment is proportional to its own amount.
 
     **$compartment Usage Rules**:
     - Only valid when len(source) > 1
@@ -1406,7 +1406,7 @@ def add_transition(
     id : str
         Unique identifier for the transition. When using $compartment expansion,
         the system will append "__<compartment_name>" to create unique IDs for
-        each expanded transition (e.g., "death__S", "death__L").
+        each expanded transition (e.g., "out__A", "out__B").
     source : list[str]
         List of source state/category identifiers. When using $compartment in
         the rate, each source will generate a separate transition.
@@ -1450,7 +1450,7 @@ def add_transition(
 
     impulse_at : list[float] | None, default=None
         Make the transition an impulse at these positions on the axis. At
-        each one, ``rate`` is the fraction of the source (per-capita) or the
+        each one, ``rate`` is the fraction of the source (proportional) or the
         amount (absolute) moved at once, before the flows of that step. A
         DifferenceEquations model needs integer positions.
 
@@ -1472,7 +1472,7 @@ def add_transition(
     """
     # If `rate` is a AxisPattern, extract its rate string and stratified
     # rates and route them into the existing pipeline. A AxisPattern fully
-    # specifies the time-varying behaviour, so passing `stratified_rates=`
+    # specifies how the rate changes along the axis, so passing `stratified_rates=`
     # alongside it is a conflict.
     if isinstance(rate, AxisPattern):
         if impulse_at is not None or impulse_every is not None:
@@ -1574,12 +1574,12 @@ Set the initial conditions for the model.
 
 Parameters:
 
-| Name                       | Type                                 | Description                                                                                                                                                                                                                   | Default                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total`                    | `float`                              | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                                                                                           | *required*                                                                                                                                                                                                                                                                                                                                                                               |
-| `bin_fractions`            | `list[BinFractionDict]`              | List of bin fractions. Each item is a dictionary with: - "bin": str (bin id) - "fraction": float (fractional size) Example: [ {"bin": "S", "fraction": 0.99}, {"bin": "I", "fraction": 0.01}, {"bin": "R", "fraction": 0.0} ] | *required*                                                                                                                                                                                                                                                                                                                                                                               |
-| `stratification_fractions` | \`(list[StratificationFractionsDict] | None,)\`                                                                                                                                                                                                                      | default=None List of stratification fractions. Each item is a dictionary with: - "stratification": str (stratification id) - "fractions": list of dicts, each with "category" and "fraction" Example: \[ { "stratification": "age_group", "fractions": [ {"category": "young", "fraction": 0.3}, {"category": "adult", "fraction": 0.5}, {"category": "elderly", "fraction": 0.2} ] } \] |
-| `compartment_fractions`    | \`list[CompartmentFractionDict]      | None\`                                                                                                                                                                                                                        | List of per-compartment overrides applied after the uniform expansion. Each item is a dictionary with: - "compartment": str (expanded compartment name) - "fraction": float (fraction of the total) Example: [ {"compartment": "IH_y60", "fraction": 0.0} ] Compartment names and the resulting sum of the amounts are checked against the engine expansion when the model is built.     |
+| Name                       | Type                                 | Description                                                                                                                                                                                                                   | Default                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total`                    | `float`                              | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                                                                                           | *required*                                                                                                                                                                                                                                                                                                                                                                         |
+| `bin_fractions`            | `list[BinFractionDict]`              | List of bin fractions. Each item is a dictionary with: - "bin": str (bin id) - "fraction": float (fractional size) Example: [ {"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}, {"bin": "C", "fraction": 0.0} ] | *required*                                                                                                                                                                                                                                                                                                                                                                         |
+| `stratification_fractions` | \`(list[StratificationFractionsDict] | None,)\`                                                                                                                                                                                                                      | default=None List of stratification fractions. Each item is a dictionary with: - "stratification": str (stratification id) - "fractions": list of dicts, each with "category" and "fraction" Example: \[ { "stratification": "group", "fractions": [ {"category": "g1", "fraction": 0.3}, {"category": "g2", "fraction": 0.5}, {"category": "g3", "fraction": 0.2} ] } \]          |
+| `compartment_fractions`    | \`list[CompartmentFractionDict]      | None\`                                                                                                                                                                                                                        | List of per-compartment overrides applied after the uniform expansion. Each item is a dictionary with: - "compartment": str (expanded compartment name) - "fraction": float (fraction of the total) Example: [ {"compartment": "A_g1", "fraction": 0.0} ] Compartment names and the resulting sum of the amounts are checked against the engine expansion when the model is built. |
 
 Returns:
 
@@ -1619,9 +1619,9 @@ def set_initial_conditions(
 
         Example:
         [
-            {"bin": "S", "fraction": 0.99},
-            {"bin": "I", "fraction": 0.01},
-            {"bin": "R", "fraction": 0.0}
+            {"bin": "A", "fraction": 0.99},
+            {"bin": "B", "fraction": 0.01},
+            {"bin": "C", "fraction": 0.0}
         ]
     stratification_fractions : list[StratificationFractionsDict] | None,
         default=None
@@ -1632,11 +1632,11 @@ def set_initial_conditions(
         Example:
         [
             {
-                "stratification": "age_group",
+                "stratification": "group",
                 "fractions": [
-                    {"category": "young", "fraction": 0.3},
-                    {"category": "adult", "fraction": 0.5},
-                    {"category": "elderly", "fraction": 0.2}
+                    {"category": "g1", "fraction": 0.3},
+                    {"category": "g2", "fraction": 0.5},
+                    {"category": "g3", "fraction": 0.2}
                 ]
             }
         ]
@@ -1648,7 +1648,7 @@ def set_initial_conditions(
 
         Example:
         [
-            {"compartment": "IH_y60", "fraction": 0.0}
+            {"compartment": "A_g1", "fraction": 0.0}
         ]
 
         Compartment names and the resulting sum of the amounts are checked

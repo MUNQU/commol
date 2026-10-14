@@ -4036,7 +4036,7 @@ from the parameter units of dimension time (or uses <code>step</code>).</p>
 </span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a><span class="sd">        from the parameter</span>
 </span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a><span class="sd">        units: the one unit of time (``day``, ``week``, ``step``, …) that they</span>
 </span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a><span class="sd">        use, or ``step`` when they use none. Every flow must then be exactly</span>
-</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a><span class="sd">        ``&lt;bin unit&gt;/&lt;step unit&gt;``, such as ``person/day``.</span>
+</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a><span class="sd">        ``&lt;bin unit&gt;/&lt;step unit&gt;``, such as ``item/day``.</span>
 </span><span id="__span-0-327"><a id="__codelineno-0-327" name="__codelineno-0-327"></a>
 </span><span id="__span-0-328"><a id="__codelineno-0-328" name="__codelineno-0-328"></a><span class="sd">        Parameters</span>
 </span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="sd">        ----------</span>
@@ -4056,8 +4056,8 @@ from the parameter units of dimension time (or uses <code>step</code>).</p>
 </span><span id="__span-0-343"><a id="__codelineno-0-343" name="__codelineno-0-343"></a>
 </span><span id="__span-0-344"><a id="__codelineno-0-344" name="__codelineno-0-344"></a><span class="sd">        Notes</span>
 </span><span id="__span-0-345"><a id="__codelineno-0-345" name="__codelineno-0-345"></a><span class="sd">        -----</span>
-</span><span id="__span-0-346"><a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">        - Predefined variables (total, total_young, etc.) have the bin unit</span>
-</span><span id="__span-0-347"><a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">        - Time step variables (t, step) are dimensionless</span>
+</span><span id="__span-0-346"><a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">        - Predefined variables (total, total_g1, etc.) have the bin unit</span>
+</span><span id="__span-0-347"><a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">        - Position variables (t, step) are dimensionless</span>
 </span><span id="__span-0-348"><a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">        - Mathematical constants (pi, e) are dimensionless</span>
 </span><span id="__span-0-349"><a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-350"><a id="__codelineno-0-350" name="__codelineno-0-350"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">check_unit_consistency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
@@ -5168,7 +5168,7 @@ and converts no value between units. So the check infers one step unit
 from the parameter
 units: the one unit of time (<code>day</code>, <code>week</code>, <code>step</code>, …) that they
 use, or <code>step</code> when they use none. Every flow must then be exactly
-<code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, such as <code>person/day</code>.</p>
+<code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, such as <code>item/day</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5250,8 +5250,8 @@ does not have the unit <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>.</p>
 <details class="note" open>
   <summary>Notes</summary>
   <ul>
-<li>Predefined variables (total, total_young, etc.) have the bin unit</li>
-<li>Time step variables (t, step) are dimensionless</li>
+<li>Predefined variables (total, total_g1, etc.) have the bin unit</li>
+<li>Position variables (t, step) are dimensionless</li>
 <li>Mathematical constants (pi, e) are dimensionless</li>
 </ul>
 </details>
@@ -5302,7 +5302,7 @@ does not have the unit <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>.</p>
 </span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a><span class="sd">    from the parameter</span>
 </span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a><span class="sd">    units: the one unit of time (``day``, ``week``, ``step``, …) that they</span>
 </span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a><span class="sd">    use, or ``step`` when they use none. Every flow must then be exactly</span>
-</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a><span class="sd">    ``&lt;bin unit&gt;/&lt;step unit&gt;``, such as ``person/day``.</span>
+</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a><span class="sd">    ``&lt;bin unit&gt;/&lt;step unit&gt;``, such as ``item/day``.</span>
 </span><span id="__span-0-327"><a id="__codelineno-0-327" name="__codelineno-0-327"></a>
 </span><span id="__span-0-328"><a id="__codelineno-0-328" name="__codelineno-0-328"></a><span class="sd">    Parameters</span>
 </span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="sd">    ----------</span>
@@ -5322,8 +5322,8 @@ does not have the unit <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>.</p>
 </span><span id="__span-0-343"><a id="__codelineno-0-343" name="__codelineno-0-343"></a>
 </span><span id="__span-0-344"><a id="__codelineno-0-344" name="__codelineno-0-344"></a><span class="sd">    Notes</span>
 </span><span id="__span-0-345"><a id="__codelineno-0-345" name="__codelineno-0-345"></a><span class="sd">    -----</span>
-</span><span id="__span-0-346"><a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">    - Predefined variables (total, total_young, etc.) have the bin unit</span>
-</span><span id="__span-0-347"><a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">    - Time step variables (t, step) are dimensionless</span>
+</span><span id="__span-0-346"><a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">    - Predefined variables (total, total_g1, etc.) have the bin unit</span>
+</span><span id="__span-0-347"><a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">    - Position variables (t, step) are dimensionless</span>
 </span><span id="__span-0-348"><a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">    - Mathematical constants (pi, e) are dimensionless</span>
 </span><span id="__span-0-349"><a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-350"><a id="__codelineno-0-350" name="__codelineno-0-350"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">check_unit_consistency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
@@ -8144,7 +8144,7 @@ compartments.</p>
 </span><span id="__span-0-465"><a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">            Ids of the categories selecting the subgroup this stratification</span>
 </span><span id="__span-0-466"><a id="__codelineno-0-466" name="__codelineno-0-466"></a><span class="sd">            subdivides, empty for an unconditional stratification. A category</span>
 </span><span id="__span-0-467"><a id="__codelineno-0-467" name="__codelineno-0-467"></a><span class="sd">            name another stratification also declares is qualified, as in</span>
-</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">            ``sex:female``.</span>
+</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">            ``group:g1``.</span>
 </span><span id="__span-0-469"><a id="__codelineno-0-469" name="__codelineno-0-469"></a>
 </span><span id="__span-0-470"><a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">        Raises</span>
 </span><span id="__span-0-471"><a id="__codelineno-0-471" name="__codelineno-0-471"></a><span class="sd">        ------</span>
@@ -8179,7 +8179,7 @@ compartments.</p>
 </span><span id="__span-0-500"><a id="__codelineno-0-500" name="__codelineno-0-500"></a><span class="sd">        Parameters</span>
 </span><span id="__span-0-501"><a id="__codelineno-0-501" name="__codelineno-0-501"></a><span class="sd">        ----------</span>
 </span><span id="__span-0-502"><a id="__codelineno-0-502" name="__codelineno-0-502"></a><span class="sd">        categories : Iterable[str], optional</span>
-</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a><span class="sd">            Category ids, bare or qualified (``sex:female``), forming a chain</span>
+</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a><span class="sd">            Category ids, bare or qualified (``group:g1``), forming a chain</span>
 </span><span id="__span-0-504"><a id="__codelineno-0-504" name="__codelineno-0-504"></a><span class="sd">            from the whole model down to the subgroup, outermost first.</span>
 </span><span id="__span-0-505"><a id="__codelineno-0-505" name="__codelineno-0-505"></a>
 </span><span id="__span-0-506"><a id="__codelineno-0-506" name="__codelineno-0-506"></a><span class="sd">        Returns</span>
@@ -10176,7 +10176,7 @@ subgroup rather than to the whole model.</p>
                 <p>Ids of the categories selecting the subgroup this stratification
 subdivides, empty for an unconditional stratification. A category
 name another stratification also declares is qualified, as in
-<code>sex:female</code>.</p>
+<code>group:g1</code>.</p>
               </div>
             </td>
           </tr>
@@ -10268,7 +10268,7 @@ name another stratification also declares is qualified, as in
 </span><span id="__span-0-465"><a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">        Ids of the categories selecting the subgroup this stratification</span>
 </span><span id="__span-0-466"><a id="__codelineno-0-466" name="__codelineno-0-466"></a><span class="sd">        subdivides, empty for an unconditional stratification. A category</span>
 </span><span id="__span-0-467"><a id="__codelineno-0-467" name="__codelineno-0-467"></a><span class="sd">        name another stratification also declares is qualified, as in</span>
-</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">        ``sex:female``.</span>
+</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">        ``group:g1``.</span>
 </span><span id="__span-0-469"><a id="__codelineno-0-469" name="__codelineno-0-469"></a>
 </span><span id="__span-0-470"><a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">    Raises</span>
 </span><span id="__span-0-471"><a id="__codelineno-0-471" name="__codelineno-0-471"></a><span class="sd">    ------</span>
@@ -10335,7 +10335,7 @@ builds. Without overrides the declared fractions are multiplied.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Category ids, bare or qualified (<code>sex:female</code>), forming a chain
+                <p>Category ids, bare or qualified (<code>group:g1</code>), forming a chain
 from the whole model down to the subgroup, outermost first.</p>
               </div>
             </td>
@@ -10448,7 +10448,7 @@ from the whole model down to the subgroup, outermost first.</p>
 </span><span id="__span-0-500"><a id="__codelineno-0-500" name="__codelineno-0-500"></a><span class="sd">    Parameters</span>
 </span><span id="__span-0-501"><a id="__codelineno-0-501" name="__codelineno-0-501"></a><span class="sd">    ----------</span>
 </span><span id="__span-0-502"><a id="__codelineno-0-502" name="__codelineno-0-502"></a><span class="sd">    categories : Iterable[str], optional</span>
-</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a><span class="sd">        Category ids, bare or qualified (``sex:female``), forming a chain</span>
+</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a><span class="sd">        Category ids, bare or qualified (``group:g1``), forming a chain</span>
 </span><span id="__span-0-504"><a id="__codelineno-0-504" name="__codelineno-0-504"></a><span class="sd">        from the whole model down to the subgroup, outermost first.</span>
 </span><span id="__span-0-505"><a id="__codelineno-0-505" name="__codelineno-0-505"></a>
 </span><span id="__span-0-506"><a id="__codelineno-0-506" name="__codelineno-0-506"></a><span class="sd">    Returns</span>
@@ -10525,7 +10525,7 @@ from the whole model down to the subgroup, outermost first.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Expanded compartment name, for example <code>IH_y60</code>.</p>
+                <p>Expanded compartment name, for example <code>A_g1</code>.</p>
               </div>
             </td>
           </tr>
@@ -10604,7 +10604,7 @@ meet is absent.</p>
 </span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">    Attributes</span>
 </span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">    ----------</span>
 </span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    name : str</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">        Expanded compartment name, for example ``IH_y60``.</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">        Expanded compartment name, for example ``A_g1``.</span>
 </span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">    bin : str</span>
 </span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">        Bin the compartment expands from.</span>
 </span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">    categories : dict[str, str]</span>

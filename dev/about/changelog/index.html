@@ -2983,6 +2983,41 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </tr>
 </tbody>
 </table>
+<ul>
+<li>The library and its documentation assume no application and no axis: text
+  says "along the axis" or "position", not "over time", and examples use
+  abstract names. A rate that names no compartment is <strong>proportional</strong> (was
+  "per-capita"), because a source can hold a mass or a concentration. The
+  errors of a constraint at positions say "Constraint '…' evaluation failed at
+  position …" and "Position … not found …" (were "Time-dependent constraint"
+  and "Time step").</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AxisPattern.seasonal(amplitude, period, phase, baseline)</code></td>
+<td><code>AxisPattern.sinusoid(amplitude, period, phase, baseline)</code></td>
+</tr>
+<tr>
+<td><code>TransitionFlow.per_capita_of</code> (<code>commol.context._model.engine_state</code>)</td>
+<td><code>TransitionFlow.proportional_to</code></td>
+</tr>
+<tr>
+<td>Guide anchor <code>#absolute-and-per-capita-rates</code></td>
+<td><code>#absolute-and-proportional-rates</code></td>
+</tr>
+<tr>
+<td>Guide anchor <code>#time-dependent-rates</code></td>
+<td><code>#rates-that-change-along-the-axis</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Transition conditions: <code>Transition.condition</code>, the <code>condition</code> argument of

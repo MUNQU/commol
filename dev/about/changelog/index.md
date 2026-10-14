@@ -118,6 +118,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | —                                                                                                                                  | `commol_rs.model.subgroup_total_names(structure)`                                           |
 | Rust: `CompartmentalEngine::population`, `population_size`; `DifferenceEquations::population`, `DifferentialEquations::population` | `state`, `total`                                                                            |
 
+- The library and its documentation assume no application and no axis: text says "along the axis" or "position", not "over time", and examples use abstract names. A rate that names no compartment is **proportional** (was "per-capita"), because a source can hold a mass or a concentration. The errors of a constraint at positions say "Constraint '…' evaluation failed at position …" and "Position … not found …" (were "Time-dependent constraint" and "Time step").
+
+| Before                                                                | Now                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `AxisPattern.seasonal(amplitude, period, phase, baseline)`            | `AxisPattern.sinusoid(amplitude, period, phase, baseline)` |
+| `TransitionFlow.per_capita_of` (`commol.context._model.engine_state`) | `TransitionFlow.proportional_to`                           |
+| Guide anchor `#absolute-and-per-capita-rates`                         | `#absolute-and-proportional-rates`                         |
+| Guide anchor `#time-dependent-rates`                                  | `#rates-that-change-along-the-axis`                        |
+
 ### Removed
 
 - Transition conditions: `Transition.condition`, the `condition` argument of `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the `Condition` and `Rule` types, and the `LogicOperators` and `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated them, so a condition that was never true still moved population. Write the condition in the rate (`"if(step > 30, k, 0)"`), or use an `AxisPattern` or a stratified rate. A model file with a `condition` key raises an error that names it.

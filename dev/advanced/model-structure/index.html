@@ -4393,7 +4393,8 @@ appending this stratification's categories.</p>
         <p>Specifies a category within a stratification for rate matching.</p>
 <p>When <code>to</code> is set, the matched category in the source compartment is
 replaced with the <code>to</code> category in the target compartment name. This
-enables cross-category transitions within the same bin (e.g., aging).</p>
+enables cross-category transitions within the same bin (e.g., from <code>g1</code>
+to <code>g2</code>).</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4413,7 +4414,7 @@ enables cross-category transitions within the same bin (e.g., aging).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The ID of the stratification (e.g., "age", "location")</p>
+                <p>The ID of the stratification (e.g., "group", "type")</p>
               </div>
             </td>
           </tr>
@@ -4424,7 +4425,7 @@ enables cross-category transitions within the same bin (e.g., aging).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The category within that stratification (e.g., "young", "urban")</p>
+                <p>The category within that stratification (e.g., "g1", "t1")</p>
               </div>
             </td>
           </tr>
@@ -4490,44 +4491,46 @@ stratification.</p>
 <span class="normal"><a href="#__codelineno-0-40">40</a></span>
 <span class="normal"><a href="#__codelineno-0-41">41</a></span>
 <span class="normal"><a href="#__codelineno-0-42">42</a></span>
-<span class="normal"><a href="#__codelineno-0-43">43</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">StratificationCondition</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="normal"><a href="#__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#__codelineno-0-44">44</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">StratificationCondition</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="sd">    Specifies a category within a stratification for rate matching.</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="sd">    When ``to`` is set, the matched category in the source compartment is</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="sd">    replaced with the ``to`` category in the target compartment name. This</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    enables cross-category transitions within the same bin (e.g., aging).</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="sd">    stratification : str</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="sd">        The ID of the stratification (e.g., &quot;age&quot;, &quot;location&quot;)</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">    category : str</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">        The category within that stratification (e.g., &quot;young&quot;, &quot;urban&quot;)</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">    to : str | None</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">        Target category override. When set, the target compartment will use</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">        this category instead of the source compartment&#39;s category for this</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">        stratification.</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a>    <span class="n">stratification</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=...</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;ID of the stratification&quot;</span><span class="p">)</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a>    <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a>            <span class="s2">&quot;Category within the stratification. When None, the condition acts as a &quot;</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a>            <span class="s2">&quot;target-only override: it does not filter source compartments but still &quot;</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a>            <span class="s2">&quot;contributes a &#39;to&#39; category to the computed target compartment name.&quot;</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a>        <span class="p">),</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a>    <span class="p">)</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a>    <span class="n">to</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a>            <span class="s2">&quot;Target category override. When set, the target compartment uses &quot;</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a>            <span class="s2">&quot;this category instead of the source&#39;s for this stratification.&quot;</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a>        <span class="p">),</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a>    <span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    enables cross-category transitions within the same bin (e.g., from ``g1``</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="sd">    to ``g2``).</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="sd">    stratification : str</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">        The ID of the stratification (e.g., &quot;group&quot;, &quot;type&quot;)</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">    category : str</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">        The category within that stratification (e.g., &quot;g1&quot;, &quot;t1&quot;)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">    to : str | None</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">        Target category override. When set, the target compartment will use</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">        this category instead of the source compartment&#39;s category for this</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">        stratification.</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a>    <span class="n">stratification</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=...</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;ID of the stratification&quot;</span><span class="p">)</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>    <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a>            <span class="s2">&quot;Category within the stratification. When None, the condition acts as a &quot;</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a>            <span class="s2">&quot;target-only override: it does not filter source compartments but still &quot;</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a>            <span class="s2">&quot;contributes a &#39;to&#39; category to the computed target compartment name.&quot;</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a>        <span class="p">),</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a>    <span class="p">)</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a>    <span class="n">to</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a>            <span class="s2">&quot;Target category override. When set, the target compartment uses &quot;</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a>            <span class="s2">&quot;this category instead of the source&#39;s for this stratification.&quot;</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a>        <span class="p">),</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -4629,7 +4632,7 @@ stratification.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The unit of the parameter (e.g., "1/day", "dimensionless", "person").
+                <p>The unit of the parameter (e.g., "1/day", "dimensionless", "item").
 If None, the parameter has no unit specified.</p>
               </div>
             </td>
@@ -4730,7 +4733,7 @@ If None, the parameter has no unit specified.</p>
 </span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70"></a><span class="sd">    description : str | None</span>
 </span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71"></a><span class="sd">        A human-readable description of the parameter.</span>
 </span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a><span class="sd">    unit : str | None</span>
-</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="sd">        The unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;person&quot;).</span>
+</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="sd">        The unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;item&quot;).</span>
 </span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74"></a><span class="sd">        If None, the parameter has no unit specified.</span>
 </span><span id="__span-0-75"><a id="__codelineno-0-75" name="__codelineno-0-75"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a>
@@ -4750,7 +4753,7 @@ If None, the parameter has no unit specified.</p>
 </span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a>    <span class="p">)</span>
 </span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a>    <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
 </span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Unit of the parameter (e.g., &#39;1/day&#39;, &#39;dimensionless&#39;, &#39;person&#39;).&quot;</span><span class="p">,</span>
+</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Unit of the parameter (e.g., &#39;1/day&#39;, &#39;dimensionless&#39;, &#39;item&#39;).&quot;</span><span class="p">,</span>
 </span><span id="__span-0-94"><a id="__codelineno-0-94" name="__codelineno-0-94"></a>    <span class="p">)</span>
 </span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a>
 </span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">)</span>
@@ -5249,10 +5252,10 @@ Functions: sin, cos, tan, exp, ln, sqrt, abs, min, max, if, etc.
 Constants: pi, e</p>
 <p>Note: Both ^ and ** are supported for exponentiation (** is converted to ^).</p>
 <p>Examples:
-- "beta" (parameter reference)
+- "k1" (parameter reference)
 - "0.5" (constant, can also be passed as float 0.5)
-- "beta * S * I / total" (mathematical formula)
-- "0.3 * sin(2 * pi * t / 365)" (time-dependent formula)
+- "k1 * A * B / total" (mathematical formula)
+- "0.3 * sin(2 * pi * t / 365)" (formula that changes along the axis)
 - "2^10" or "2**10" (power: both syntaxes work)</p>
               </div>
             </td>
@@ -5439,10 +5442,10 @@ all specified stratification conditions.</p>
 </span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a><span class="sd">        Note: Both ^ and ** are supported for exponentiation (** is converted to ^).</span>
 </span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a>
 </span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">        Examples:</span>
-</span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">        - &quot;beta&quot; (parameter reference)</span>
+</span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">        - &quot;k1&quot; (parameter reference)</span>
 </span><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="sd">        - &quot;0.5&quot; (constant, can also be passed as float 0.5)</span>
-</span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="sd">        - &quot;beta * S * I / total&quot; (mathematical formula)</span>
-</span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="sd">        - &quot;0.3 * sin(2 * pi * t / 365)&quot; (time-dependent formula)</span>
+</span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="sd">        - &quot;k1 * A * B / total&quot; (mathematical formula)</span>
+</span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="sd">        - &quot;0.3 * sin(2 * pi * t / 365)&quot; (formula that changes along the axis)</span>
 </span><span id="__span-0-111"><a id="__codelineno-0-111" name="__codelineno-0-111"></a><span class="sd">        - &quot;2^10&quot; or &quot;2**10&quot; (power: both syntaxes work)</span>
 </span><span id="__span-0-112"><a id="__codelineno-0-112" name="__codelineno-0-112"></a><span class="sd">    stratified_rates : list[StratifiedRate] | None</span>
 </span><span id="__span-0-113"><a id="__codelineno-0-113" name="__codelineno-0-113"></a><span class="sd">        Stratification-specific rates. Each rate applies to compartments that match</span>
@@ -5463,8 +5466,8 @@ all specified stratification conditions.</p>
 </span><span id="__span-0-128"><a id="__codelineno-0-128" name="__codelineno-0-128"></a>        <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-129"><a id="__codelineno-0-129" name="__codelineno-0-129"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
 </span><span id="__span-0-130"><a id="__codelineno-0-130" name="__codelineno-0-130"></a>            <span class="s2">&quot;Default rate expression (fallback when no stratified rate matches). &quot;</span>
-</span><span id="__span-0-131"><a id="__codelineno-0-131" name="__codelineno-0-131"></a>            <span class="s2">&quot;Can be a parameter reference (e.g., &#39;beta&#39;), a constant (e.g., &#39;0.5&#39;), &quot;</span>
-</span><span id="__span-0-132"><a id="__codelineno-0-132" name="__codelineno-0-132"></a>            <span class="s2">&quot;or a mathematical expression (e.g., &#39;beta * S * I / total&#39;). &quot;</span>
+</span><span id="__span-0-131"><a id="__codelineno-0-131" name="__codelineno-0-131"></a>            <span class="s2">&quot;Can be a parameter reference (e.g., &#39;k1&#39;), a constant (e.g., &#39;0.5&#39;), &quot;</span>
+</span><span id="__span-0-132"><a id="__codelineno-0-132" name="__codelineno-0-132"></a>            <span class="s2">&quot;or a mathematical expression (e.g., &#39;k1 * A * B / total&#39;). &quot;</span>
 </span><span id="__span-0-133"><a id="__codelineno-0-133" name="__codelineno-0-133"></a>            <span class="s2">&quot;Numeric values are automatically converted to strings during validation.&quot;</span>
 </span><span id="__span-0-134"><a id="__codelineno-0-134" name="__codelineno-0-134"></a>        <span class="p">),</span>
 </span><span id="__span-0-135"><a id="__codelineno-0-135" name="__codelineno-0-135"></a>    <span class="p">)</span>
@@ -5486,7 +5489,7 @@ all specified stratification conditions.</p>
 </span><span id="__span-0-151"><a id="__codelineno-0-151" name="__codelineno-0-151"></a>        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-152"><a id="__codelineno-0-152" name="__codelineno-0-152"></a>        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
 </span><span id="__span-0-153"><a id="__codelineno-0-153" name="__codelineno-0-153"></a>            <span class="s2">&quot;Positions on the axis where the transition is an impulse: at each &quot;</span>
-</span><span id="__span-0-154"><a id="__codelineno-0-154" name="__codelineno-0-154"></a>            <span class="s2">&quot;one, the rate is a fraction (per-capita) or an amount (absolute) &quot;</span>
+</span><span id="__span-0-154"><a id="__codelineno-0-154" name="__codelineno-0-154"></a>            <span class="s2">&quot;one, the rate is a fraction (proportional) or an amount (absolute) &quot;</span>
 </span><span id="__span-0-155"><a id="__codelineno-0-155" name="__codelineno-0-155"></a>            <span class="s2">&quot;moved at once. Between them the transition moves nothing.&quot;</span>
 </span><span id="__span-0-156"><a id="__codelineno-0-156" name="__codelineno-0-156"></a>        <span class="p">),</span>
 </span><span id="__span-0-157"><a id="__codelineno-0-157" name="__codelineno-0-157"></a>    <span class="p">)</span>
@@ -7013,7 +7016,7 @@ it holds.</p>
 </span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">        Resolve a category id to its stratification and its bare name.</span>
 </span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>
-</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">        A qualified id (``sex:female``) names the stratification. A bare name</span>
+</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">        A qualified id (``group:g1``) names the stratification. A bare name</span>
 </span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="sd">        must be declared by exactly one stratification.</span>
 </span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>
 </span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a><span class="sd">        Parameters</span>
@@ -7066,7 +7069,7 @@ it holds.</p>
 </span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="sd">        Parameters</span>
 </span><span id="__span-0-330"><a id="__codelineno-0-330" name="__codelineno-0-330"></a><span class="sd">        ----------</span>
 </span><span id="__span-0-331"><a id="__codelineno-0-331" name="__codelineno-0-331"></a><span class="sd">        category : str</span>
-</span><span id="__span-0-332"><a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">            A category id, bare or qualified (``sex:female``).</span>
+</span><span id="__span-0-332"><a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">            A category id, bare or qualified (``group:g1``).</span>
 </span><span id="__span-0-333"><a id="__codelineno-0-333" name="__codelineno-0-333"></a>
 </span><span id="__span-0-334"><a id="__codelineno-0-334" name="__codelineno-0-334"></a><span class="sd">        Returns</span>
 </span><span id="__span-0-335"><a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">        -------</span>
@@ -7121,7 +7124,7 @@ it holds.</p>
 </span><span id="__span-0-384"><a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-385"><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">        Return the stratification that declares a category, and its bare name.</span>
 </span><span id="__span-0-386"><a id="__codelineno-0-386" name="__codelineno-0-386"></a>
-</span><span id="__span-0-387"><a id="__codelineno-0-387" name="__codelineno-0-387"></a><span class="sd">        A qualified id (``sex:female``) names the stratification. A bare name</span>
+</span><span id="__span-0-387"><a id="__codelineno-0-387" name="__codelineno-0-387"></a><span class="sd">        A qualified id (``group:g1``) names the stratification. A bare name</span>
 </span><span id="__span-0-388"><a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">        must be declared by exactly one stratification.</span>
 </span><span id="__span-0-389"><a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-390"><a id="__codelineno-0-390" name="__codelineno-0-390"></a>        <span class="n">stratification_id</span><span class="p">,</span> <span class="n">separator</span><span class="p">,</span> <span class="n">name</span> <span class="o">=</span> <span class="n">category</span><span class="o">.</span><span class="n">rpartition</span><span class="p">(</span><span class="n">CATEGORY_SEPARATOR</span><span class="p">)</span>
@@ -7190,7 +7193,7 @@ it holds.</p>
 </span><span id="__span-0-453"><a id="__codelineno-0-453" name="__codelineno-0-453"></a>
 </span><span id="__span-0-454"><a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="sd">        Categories belonging to several stratifications may be given in one</span>
 </span><span id="__span-0-455"><a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">        call. A category name declared by more than one stratification must be</span>
-</span><span id="__span-0-456"><a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        qualified with its stratification, as in ``sex:female``. Within each</span>
+</span><span id="__span-0-456"><a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        qualified with its stratification, as in ``group:g1``. Within each</span>
 </span><span id="__span-0-457"><a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">        stratification, at most one category may be omitted; the omitted</span>
 </span><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a><span class="sd">        category receives the remaining fraction so that the stratification</span>
 </span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="sd">        sums to 1.0. When every category is given, the values</span>
@@ -7644,7 +7647,7 @@ conditions is not included.</p>
     <div class="doc doc-contents ">
 
         <p>Resolve a category id to its stratification and its bare name.</p>
-<p>A qualified id (<code>sex:female</code>) names the stratification. A bare name
+<p>A qualified id (<code>group:g1</code>) names the stratification. A bare name
 must be declared by exactly one stratification.</p>
 
 
@@ -7754,7 +7757,7 @@ must be declared by exactly one stratification.</p>
 </span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">    Resolve a category id to its stratification and its bare name.</span>
 </span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>
-</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">    A qualified id (``sex:female``) names the stratification. A bare name</span>
+</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">    A qualified id (``group:g1``) names the stratification. A bare name</span>
 </span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="sd">    must be declared by exactly one stratification.</span>
 </span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>
 </span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a><span class="sd">    Parameters</span>
@@ -7958,7 +7961,7 @@ stratification declares a category of the same name.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A category id, bare or qualified (<code>sex:female</code>).</p>
+                <p>A category id, bare or qualified (<code>group:g1</code>).</p>
               </div>
             </td>
             <td>
@@ -8050,7 +8053,7 @@ stratification applies to rather than to the whole model.</p>
 </span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="sd">    Parameters</span>
 </span><span id="__span-0-330"><a id="__codelineno-0-330" name="__codelineno-0-330"></a><span class="sd">    ----------</span>
 </span><span id="__span-0-331"><a id="__codelineno-0-331" name="__codelineno-0-331"></a><span class="sd">    category : str</span>
-</span><span id="__span-0-332"><a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">        A category id, bare or qualified (``sex:female``).</span>
+</span><span id="__span-0-332"><a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">        A category id, bare or qualified (``group:g1``).</span>
 </span><span id="__span-0-333"><a id="__codelineno-0-333" name="__codelineno-0-333"></a>
 </span><span id="__span-0-334"><a id="__codelineno-0-334" name="__codelineno-0-334"></a><span class="sd">    Returns</span>
 </span><span id="__span-0-335"><a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">    -------</span>
@@ -8251,7 +8254,7 @@ model down to the subgroup, outermost first.</p>
         <p>Update stratification category fractions by category name.</p>
 <p>Categories belonging to several stratifications may be given in one
 call. A category name declared by more than one stratification must be
-qualified with its stratification, as in <code>sex:female</code>. Within each
+qualified with its stratification, as in <code>group:g1</code>. Within each
 stratification, at most one category may be omitted; the omitted
 category receives the remaining fraction so that the stratification
 sums to 1.0. When every category is given, the values
@@ -8365,7 +8368,7 @@ values do not sum to 1.0, or the given values exceed 1.0.</p>
 </span><span id="__span-0-453"><a id="__codelineno-0-453" name="__codelineno-0-453"></a>
 </span><span id="__span-0-454"><a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="sd">    Categories belonging to several stratifications may be given in one</span>
 </span><span id="__span-0-455"><a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">    call. A category name declared by more than one stratification must be</span>
-</span><span id="__span-0-456"><a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    qualified with its stratification, as in ``sex:female``. Within each</span>
+</span><span id="__span-0-456"><a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    qualified with its stratification, as in ``group:g1``. Within each</span>
 </span><span id="__span-0-457"><a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">    stratification, at most one category may be omitted; the omitted</span>
 </span><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a><span class="sd">    category receives the remaining fraction so that the stratification</span>
 </span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="sd">    sums to 1.0. When every category is given, the values</span>
@@ -9188,7 +9191,7 @@ needs to be calibrated.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The expanded compartment name, for example <code>IH_y60</code> or <code>S_oe60_v_c</code>.</p>
+                <p>The expanded compartment name, for example <code>A_g1</code> or <code>B_g2_t1</code>.</p>
               </div>
             </td>
           </tr>
@@ -9248,7 +9251,7 @@ needs to be calibrated.</p>
 </span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a><span class="sd">    Attributes</span>
 </span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a><span class="sd">    ----------</span>
 </span><span id="__span-0-88"><a id="__codelineno-0-88" name="__codelineno-0-88"></a><span class="sd">    compartment : str</span>
-</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="sd">        The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.</span>
+</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="sd">        The expanded compartment name, for example ``A_g1`` or ``B_g2_t1``.</span>
 </span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a><span class="sd">    fraction : float</span>
 </span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">        The fraction of the total in this compartment, between 0.0 and 1.0.</span>
 </span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a><span class="sd">    &quot;&quot;&quot;</span>

@@ -2355,7 +2355,7 @@
 <h1 id="axis-patterns">Axis Patterns<a class="headerlink" href="#axis-patterns" title="Permanent link">&para;</a></h1>
 <p><a href="../transitions/">Back to Transitions</a></p>
 <p><code>AxisPattern</code> builds rates that change along the axis: pulses, periodic
-events, intervals, seasons, ramps and bell curves, and schedules that give each
+events, intervals, sinusoids, ramps and bell curves, and schedules that give each
 subgroup its own pattern. Pass a pattern as <code>rate=</code> to <code>add_transition</code>. Every pattern is
 a tested, parenthesised expression, so patterns combine safely.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
@@ -2381,8 +2381,8 @@ a tested, parenthesised expression, so patterns combine safely.</p>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]</span>
 </span></code></pre></div>
 <p>A transition with no source uses the pattern as the flow. With a source, a
-pattern that names no compartment is per-capita: <code>value=0.1</code> moves 10% of the
-source. See <a href="../transitions/#absolute-and-per-capita-rates">Absolute and per-capita rates</a>.</p>
+pattern that names no compartment is proportional: <code>value=0.1</code> moves 10% of the
+source. See <a href="../transitions/#absolute-and-proportional-rates">Absolute and proportional rates</a>.</p>
 <h2 id="single-patterns">Single patterns<a class="headerlink" href="#single-patterns" title="Permanent link">&para;</a></h2>
 <p>Each pattern reads <code>step</code> or <code>t</code> (see
 <a href="#patterns-in-a-differential-model">Patterns in a differential model</a>). In a
@@ -2428,7 +2428,7 @@ difference model both are the step <code>s</code>.</p>
 <td><code>start &lt; end</code>, any finite positions</td>
 </tr>
 <tr>
-<td><code>seasonal(amplitude, period, phase=0, baseline=0)</code></td>
+<td><code>sinusoid(amplitude, period, phase=0, baseline=0)</code></td>
 <td><code>t</code></td>
 <td><code>baseline + amplitude × sin(2π (t − phase) / period)</code></td>
 <td>numeric <code>period != 0</code></td>
@@ -2449,7 +2449,7 @@ difference model both are the step <code>s</code>.</p>
 </table>
 <p>An invalid argument raises <code>pydantic.ValidationError</code> (a <code>ValueError</code>). These
 arguments also accept a parameter name, so calibration can fit them: <code>value</code>
-of <code>pulse</code>, <code>pulses</code>, <code>periodic</code> and <code>interval</code>; every argument of <code>seasonal</code>; and
+of <code>pulse</code>, <code>pulses</code>, <code>periodic</code> and <code>interval</code>; every argument of <code>sinusoid</code>; and
 <code>peak</code> of <code>gaussian_pulse</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</span>
@@ -2459,7 +2459,7 @@ of <code>pulse</code>, <code>pulses</code>, <code>periodic</code> and <code>inte
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">linear_ramp</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">start_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">end_value</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># [0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 0.0, 0.0, 0.0, 0.0]</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">seasonal</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">sinusoid</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># [1.0, 1.7071, 2.0, 1.7071, 1.0, 0.2929, 0.0, 0.2929, 1.0, 1.7071]</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">flow_per_step</span><span class="p">(</span><span class="n">AxisPattern</span><span class="o">.</span><span class="n">gaussian_pulse</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">peak</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)))</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># [0.0, 0.0003, 0.0111, 0.1353, 0.6065, 1.0, 0.6065, 0.1353, 0.0111, 0.0003]</span>
@@ -2641,11 +2641,11 @@ result:</p>
 <tbody>
 <tr>
 <td><code>absolute=None</code> (default)</td>
-<td>Inferred: a pattern that names a compartment is absolute, otherwise per-capita</td>
+<td>Inferred: a pattern that names a compartment is absolute, otherwise proportional</td>
 </tr>
 <tr>
 <td><code>absolute=False</code></td>
-<td>Per-capita: <code>value=0.1</code> moves 10% of each matching source compartment</td>
+<td>Proportional: <code>value=0.1</code> moves 10% of each matching source compartment</td>
 </tr>
 <tr>
 <td><code>absolute=True</code></td>
@@ -2720,20 +2720,20 @@ the same:</p>
 <tbody>
 <tr>
 <td><code>pulse</code>, <code>pulses</code>, <code>periodic</code> (read <code>step</code>)</td>
-<td>A rate that holds for one unit: a per-capita <code>pulse</code> of <code>value</code> moves <code>1 − e^(−value)</code> of its source, and <code>value</code> in a difference model. To move a fraction at once in both engines, use an <a href="../transitions/#impulses">impulse</a>.</td>
+<td>A rate that holds for one unit: a proportional <code>pulse</code> of <code>value</code> moves <code>1 − e^(−value)</code> of its source, and <code>value</code> in a difference model. To move a fraction at once in both engines, use an <a href="../transitions/#impulses">impulse</a>.</td>
 </tr>
 <tr>
 <td><code>interval</code>, <code>linear_ramp</code> (read <code>t</code>)</td>
 <td>Open and close at any position, such as <code>interval(start=2.5, end=4, …)</code>; the ramp is continuous. The engine restarts its integration at both bounds.</td>
 </tr>
 <tr>
-<td><code>seasonal</code>, <code>gaussian_pulse</code> (read <code>t</code>)</td>
+<td><code>sinusoid</code>, <code>gaussian_pulse</code> (read <code>t</code>)</td>
 <td>Continuous in <code>t</code>.</td>
 </tr>
 </tbody>
 </table>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">remaining_a</span><span class="p">(</span><span class="n">rate</span><span class="p">:</span> <span class="n">AxisPattern</span><span class="p">,</span> <span class="n">at</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;A of a per-capita A -&gt; B transition, in a differential model.&quot;&quot;&quot;</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;A of a proportional A -&gt; B transition, in a differential model.&quot;&quot;&quot;</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pattern ODE&quot;</span><span class="p">)</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>

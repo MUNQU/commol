@@ -50,33 +50,33 @@ model.print_equations()  # shows every flow as the engine computes it
 
 A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md). A formula can use parameters, compartments, bin totals, `total`, `step`, constants and functions; see [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md).
 
-### Absolute and per-capita rates
+### Absolute and proportional rates
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                                       | Kind       | Flow per step   |
-| -------------------------------------------------------------------------- | ---------- | --------------- |
-| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute   | `rate`          |
-| The transition has no source                                               | Absolute   | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`                       | As set     | —               |
-| Otherwise                                                                  | Per-capita | `rate × source` |
+| Case                                                                       | Kind         | Flow per step   |
+| -------------------------------------------------------------------------- | ------------ | --------------- |
+| The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute     | `rate`          |
+| The transition has no source                                               | Absolute     | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`                       | As set       | —               |
+| Otherwise                                                                  | Proportional | `rate × source` |
 
-| Rate                     | Kind       | Flow from `B` to `C`    |
-| ------------------------ | ---------- | ----------------------- |
-| `"k2"`                   | Per-capita | `k2 * B`                |
-| `"k2 * B"`               | Absolute   | `k2 * B`                |
-| `"k1 * A * B / total"`   | Absolute   | `k1 * A * B / total`    |
-| `"0.5"` with `source=[]` | Absolute   | `0.5` enters the target |
+| Rate                     | Kind         | Flow from `B` to `C`    |
+| ------------------------ | ------------ | ----------------------- |
+| `"k2"`                   | Proportional | `k2 * B`                |
+| `"k2 * B"`               | Absolute     | `k2 * B`                |
+| `"k1 * A * B / total"`   | Absolute     | `k1 * A * B / total`    |
+| `"0.5"` with `source=[]` | Absolute     | `0.5` enters the target |
 
-`print_equations()` prints every flow after this decision, so a per-capita rate appears multiplied by its source.
+`print_equations()` prints every flow after this decision, so a proportional rate appears multiplied by its source.
 
-### Time-dependent rates
+### Rates that change along the axis
 
 A formula may use `step` (or `t`), the current step:
 
 ```python
-seasonal = (
-    ModelBuilder(name="Seasonal")
+periodic = (
+    ModelBuilder(name="Periodic")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.3)
@@ -98,16 +98,16 @@ For pulses, windows, ramps and schedules per group, use [Axis Patterns](https://
 
 ## Several sources or targets
 
-A transition with several sources or targets moves **one** flow, like a reaction: every entry in `source` loses it and every entry in `target` gains it. A bin listed twice loses or gains it twice. The rate must be absolute.
+A transition with several sources or targets moves **one** flow: every entry in `source` loses it and every entry in `target` gains it. A bin listed twice loses or gains it twice. The rate must be absolute.
 
 ```python
-reaction = (
-    ModelBuilder(name="Reaction")
+merge = (
+    ModelBuilder(name="Merge")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
-    .add_transition(id="reaction", source=["A", "B"], target=["C", "C"], rate="k * A * B")
+    .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
     .set_initial_conditions(
         total=1000,
         bin_fractions=[
@@ -118,7 +118,7 @@ reaction = (
     )
     .build(engine="DifferenceEquations")
 )
-reaction.print_equations()
+merge.print_equations()
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
 ```
 
@@ -279,11 +279,11 @@ group_rates.print_equations()
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
 ```
 
-| Entry key    | Type             | Meaning                                       |
-| ------------ | ---------------- | --------------------------------------------- |
-| `conditions` | `list[dict]`     | All must match the source compartment (AND).  |
-| `rate`       | `str` or `float` | The rate for matching compartments.           |
-| `absolute`   | `bool`, optional | Forces the rate to be absolute or per-capita. |
+| Entry key    | Type             | Meaning                                         |
+| ------------ | ---------------- | ----------------------------------------------- |
+| `conditions` | `list[dict]`     | All must match the source compartment (AND).    |
+| `rate`       | `str` or `float` | The rate for matching compartments.             |
+| `absolute`   | `bool`, optional | Forces the rate to be absolute or proportional. |
 
 | Condition key    | Meaning                                                        |
 | ---------------- | -------------------------------------------------------------- |
@@ -353,7 +353,7 @@ A transition runs at every step. To limit a flow, write the condition in the rat
 
 ## Impulses
 
-An impulse moves its amount at once, at given steps, and nothing between them. Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The rate is then a fraction of the source (per-capita) or an amount (absolute), with the same [rules](#absolute-and-per-capita-rates), sources, targets, stratified rates and accumulators as any transition.
+An impulse moves its amount at once, at given steps, and nothing between them. Give the steps with `impulse_at=[…]` or `impulse_every=(period, offset)`. The rate is then a fraction of the source (proportional) or an amount (absolute), with the same [rules](#absolute-and-proportional-rates), sources, targets, stratified rates and accumulators as any transition.
 
 ```python
 impulse_model = (
@@ -385,7 +385,7 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                         |
 | `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
 
-An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one time unit, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
 ## What building checks
 
@@ -396,7 +396,7 @@ An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/
 | A source or target that is neither a bin nor a category of one stratification                | The transition                                           |
 | A category transition without exactly one source and one target                              | The transition                                           |
 | A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                     |
-| Several sources with a per-capita rate                                                       | The transition; use an absolute rate or `$compartment`   |
+| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`   |
 | A stratified rate whose `category` conditions match no source compartment                    | The categories; use `to` to reach another stratification |
 | A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                     |
 | `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                           |
@@ -406,6 +406,6 @@ An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/
 
 | To learn                         | Read                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Rates that change over time      | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
+| Rates that change along the axis | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
 | Everything a formula can contain | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
 | Units and equation output        | [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)           |

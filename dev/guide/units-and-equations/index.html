@@ -2473,8 +2473,8 @@ it is not declared, the check infers it from the parameters:</p>
 (<code>second</code>, <code>hour</code>, <code>day</code>, <code>week</code>, <code>month</code>, <code>year</code>, …) or <code>step</code>. A rate in
 <code>1/meter</code> needs <code>step_unit="meter"</code>; without it the step unit is <code>step</code> and the
 flow fails. Two names of one unit, such as <code>d</code> and
-<code>day</code>, are one unit. A flow must have exactly the expected unit: <code>person/week</code>
-does not match <code>person/day</code>, because the engine would apply a weekly rate
+<code>day</code>, are one unit. A flow must have exactly the expected unit: <code>item/week</code>
+does not match <code>item/day</code>, because the engine would apply a weekly rate
 every day.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">along_a_line</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Along a line&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;meter&quot;</span><span class="p">)</span>
@@ -2558,8 +2558,8 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 <code>"dimensionless"</code>.</p>
 <h2 id="printing-equations">Printing equations<a class="headerlink" href="#printing-equations" title="Permanent link">&para;</a></h2>
 <p><code>Model.print_equations(output_file=None, format="text")</code> prints the flows that
-the engine plans, after it has decided which rates are per-capita (see
-<a href="../transitions/#absolute-and-per-capita-rates">Transitions</a>). It has three
+the engine plans, after it has decided which rates are proportional (see
+<a href="../transitions/#absolute-and-proportional-rates">Transitions</a>). It has three
 parts:</p>
 <table>
 <thead>

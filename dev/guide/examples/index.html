@@ -1220,10 +1220,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-3-periodic-time-dependent-rates" class="md-nav__link">
+  <a href="#example-3-periodic-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 3: Periodic (Time-Dependent) Rates
+        Example 3: Periodic Rates
       
     </span>
   </a>
@@ -1308,10 +1308,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-time-pattern-driven-transition" class="md-nav__link">
+  <a href="#example-axis-pattern-driven-transition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example: Time-Pattern Driven Transition
+        Example: Axis-Pattern Driven Transition
       
     </span>
   </a>
@@ -2286,10 +2286,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-3-periodic-time-dependent-rates" class="md-nav__link">
+  <a href="#example-3-periodic-rates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 3: Periodic (Time-Dependent) Rates
+        Example 3: Periodic Rates
       
     </span>
   </a>
@@ -2374,10 +2374,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-time-pattern-driven-transition" class="md-nav__link">
+  <a href="#example-axis-pattern-driven-transition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example: Time-Pattern Driven Transition
+        Example: Axis-Pattern Driven Transition
       
     </span>
   </a>
@@ -2440,7 +2440,7 @@ shows one technique:</p>
 <tbody>
 <tr>
 <td>1. Basic three-state model</td>
-<td>Absolute and per-capita rates</td>
+<td>Absolute and proportional rates</td>
 </tr>
 <tr>
 <td>2. Four-state model</td>
@@ -2479,7 +2479,7 @@ shows one technique:</p>
 <td><code>Calibrator</code></td>
 </tr>
 <tr>
-<td>Time-pattern transition</td>
+<td>Axis-pattern transition</td>
 <td><code>AxisPattern</code> as a rate</td>
 </tr>
 <tr>
@@ -2544,7 +2544,7 @@ shows one technique:</p>
 </span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="n">simulation</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="n">results</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="example-3-periodic-time-dependent-rates">Example 3: Periodic (Time-Dependent) Rates<a class="headerlink" href="#example-3-periodic-time-dependent-rates" title="Permanent link">&para;</a></h2>
+<h2 id="example-3-periodic-rates">Example 3: Periodic Rates<a class="headerlink" href="#example-3-periodic-rates" title="Permanent link">&para;</a></h2>
 <p>Modelling periodic variation in a transition rate:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Periodic Model&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.0&quot;</span><span class="p">)</span>
@@ -2975,19 +2975,19 @@ divides a rate by the total of its subgroup instead of the total of the model:</
 </span><span id="__span-9-91"><a id="__codelineno-9-91" name="__codelineno-9-91" href="#__codelineno-9-91"></a><span class="n">calibrated_sim</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </span><span id="__span-9-92"><a id="__codelineno-9-92" name="__codelineno-9-92" href="#__codelineno-9-92"></a><span class="n">results</span> <span class="o">=</span> <span class="n">calibrated_sim</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="example-time-pattern-driven-transition">Example: Time-Pattern Driven Transition<a class="headerlink" href="#example-time-pattern-driven-transition" title="Permanent link">&para;</a></h2>
-<p>A composed time-varying transition: an opening pulse, a monthly periodic
-event, and a continuous seasonal baseline.</p>
+<h2 id="example-axis-pattern-driven-transition">Example: Axis-Pattern Driven Transition<a class="headerlink" href="#example-axis-pattern-driven-transition" title="Permanent link">&para;</a></h2>
+<p>A composed transition that changes along the axis: an opening pulse, a
+periodic event every 30 steps, and a continuous sinusoid baseline.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">AxisPattern</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">rate</span> <span class="o">=</span> <span class="n">AxisPattern</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span>
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">pulse</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.3</span><span class="p">),</span>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">periodic</span><span class="p">(</span><span class="n">period</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">seasonal</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">365</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">AxisPattern</span><span class="o">.</span><span class="n">sinusoid</span><span class="p">(</span><span class="n">amplitude</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">365</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
 </span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="s2">&quot;AB-time-varying&quot;</span><span class="p">)</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="s2">&quot;AB-axis-pattern&quot;</span><span class="p">)</span>
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;Source&quot;</span><span class="p">)</span>
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;Sink&quot;</span><span class="p">)</span>
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="s2">&quot;flow&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="n">rate</span><span class="p">)</span>
@@ -3052,7 +3052,7 @@ on the class itself, subsequent calls on the returned instance:</p>
 <li><a href="../../api/model-builder/">API Reference</a> - Complete API documentation</li>
 <li><a href="../calibration/">Calibration Guide</a> - Comprehensive calibration documentation</li>
 <li><a href="../mathematical-expressions/">Mathematical Expressions</a> - Advanced formulas</li>
-<li><a href="../axis-patterns/">Axis Patterns</a> - Time-varying rate helpers</li>
+<li><a href="../axis-patterns/">Axis Patterns</a> - Rates that change along the axis</li>
 <li><a href="../../development/contributing/">Contributing</a> - Build your own examples</li>
 </ul>
 

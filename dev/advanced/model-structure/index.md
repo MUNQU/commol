@@ -334,15 +334,15 @@ Bases: `BaseModel`
 
 Specifies a category within a stratification for rate matching.
 
-When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., aging).
+When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
 
 Attributes:
 
-| Name             | Type  | Description                                                      |
-| ---------------- | ----- | ---------------------------------------------------------------- |
-| `stratification` | `str` | The ID of the stratification (e.g., "age", "location")           |
-| `category`       | `str` | The category within that stratification (e.g., "young", "urban") |
-| `to`             | \`str | None\`                                                           |
+| Name             | Type  | Description                                                |
+| ---------------- | ----- | ---------------------------------------------------------- |
+| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
+| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
+| `to`             | \`str | None\`                                                     |
 
 Source code in `commol/context/stratification_condition.py`
 
@@ -353,14 +353,15 @@ class StratificationCondition(BaseModel):
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
-    enables cross-category transitions within the same bin (e.g., aging).
+    enables cross-category transitions within the same bin (e.g., from ``g1``
+    to ``g2``).
 
     Attributes
     ----------
     stratification : str
-        The ID of the stratification (e.g., "age", "location")
+        The ID of the stratification (e.g., "group", "type")
     category : str
-        The category within that stratification (e.g., "young", "urban")
+        The category within that stratification (e.g., "g1", "t1")
     to : str | None
         Target category override. When set, the target compartment will use
         this category instead of the source compartment's category for this
@@ -426,7 +427,7 @@ class Parameter(BaseModel):
     description : str | None
         A human-readable description of the parameter.
     unit : str | None
-        The unit of the parameter (e.g., "1/day", "dimensionless", "person").
+        The unit of the parameter (e.g., "1/day", "dimensionless", "item").
         If None, the parameter has no unit specified.
     """
 
@@ -446,7 +447,7 @@ class Parameter(BaseModel):
     )
     unit: str | None = Field(
         default=None,
-        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'person').",
+        description="Unit of the parameter (e.g., '1/day', 'dimensionless', 'item').",
     )
 
     @field_validator("value")
@@ -675,10 +676,10 @@ class Transition(BaseModel):
         Note: Both ^ and ** are supported for exponentiation (** is converted to ^).
 
         Examples:
-        - "beta" (parameter reference)
+        - "k1" (parameter reference)
         - "0.5" (constant, can also be passed as float 0.5)
-        - "beta * S * I / total" (mathematical formula)
-        - "0.3 * sin(2 * pi * t / 365)" (time-dependent formula)
+        - "k1 * A * B / total" (mathematical formula)
+        - "0.3 * sin(2 * pi * t / 365)" (formula that changes along the axis)
         - "2^10" or "2**10" (power: both syntaxes work)
     stratified_rates : list[StratifiedRate] | None
         Stratification-specific rates. Each rate applies to compartments that match
@@ -699,8 +700,8 @@ class Transition(BaseModel):
         None,
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
-            "Can be a parameter reference (e.g., 'beta'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'beta * S * I / total'). "
+            "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
+            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
             "Numeric values are automatically converted to strings during validation."
         ),
     )
@@ -722,7 +723,7 @@ class Transition(BaseModel):
         default=None,
         description=(
             "Positions on the axis where the transition is an impulse: at each "
-            "one, the rate is a fraction (per-capita) or an amount (absolute) "
+            "one, the rate is a fraction (proportional) or an amount (absolute) "
             "moved at once. Between them the transition moves nothing."
         ),
     )
@@ -1293,7 +1294,7 @@ class InitialConditions(BaseModel):
         """
         Resolve a category id to its stratification and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
 
         Parameters
@@ -1346,7 +1347,7 @@ class InitialConditions(BaseModel):
         Parameters
         ----------
         category : str
-            A category id, bare or qualified (``sex:female``).
+            A category id, bare or qualified (``group:g1``).
 
         Returns
         -------
@@ -1401,7 +1402,7 @@ class InitialConditions(BaseModel):
         """
         Return the stratification that declares a category, and its bare name.
 
-        A qualified id (``sex:female``) names the stratification. A bare name
+        A qualified id (``group:g1``) names the stratification. A bare name
         must be declared by exactly one stratification.
         """
         stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
@@ -1470,7 +1471,7 @@ class InitialConditions(BaseModel):
 
         Categories belonging to several stratifications may be given in one
         call. A category name declared by more than one stratification must be
-        qualified with its stratification, as in ``sex:female``. Within each
+        qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
         category receives the remaining fraction so that the stratification
         sums to 1.0. When every category is given, the values
@@ -1748,7 +1749,7 @@ resolve_category(category: str) -> tuple[str, str]
 
 Resolve a category id to its stratification and its bare name.
 
-A qualified id (`sex:female`) names the stratification. A bare name must be declared by exactly one stratification.
+A qualified id (`group:g1`) names the stratification. A bare name must be declared by exactly one stratification.
 
 Parameters:
 
@@ -1775,7 +1776,7 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     """
     Resolve a category id to its stratification and its bare name.
 
-    A qualified id (``sex:female``) names the stratification. A bare name
+    A qualified id (``group:g1``) names the stratification. A bare name
     must be declared by exactly one stratification.
 
     Parameters
@@ -1857,9 +1858,9 @@ Get the fraction of a category within the group it subdivides.
 
 Parameters:
 
-| Name       | Type  | Description                                    | Default    |
-| ---------- | ----- | ---------------------------------------------- | ---------- |
-| `category` | `str` | A category id, bare or qualified (sex:female). | *required* |
+| Name       | Type  | Description                                  | Default    |
+| ---------- | ----- | -------------------------------------------- | ---------- |
+| `category` | `str` | A category id, bare or qualified (group:g1). | *required* |
 
 Returns:
 
@@ -1883,7 +1884,7 @@ def get_category_fraction(self, category: str) -> float:
     Parameters
     ----------
     category : str
-        A category id, bare or qualified (``sex:female``).
+        A category id, bare or qualified (``group:g1``).
 
     Returns
     -------
@@ -1973,7 +1974,7 @@ update_stratification_fractions(fractions: Mapping[str, float]) -> None
 
 Update stratification category fractions by category name.
 
-Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `sex:female`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
+Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
 
 Parameters:
 
@@ -1996,7 +1997,7 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
 
     Categories belonging to several stratifications may be given in one
     call. A category name declared by more than one stratification must be
-    qualified with its stratification, as in ``sex:female``. Within each
+    qualified with its stratification, as in ``group:g1``. Within each
     stratification, at most one category may be omitted; the omitted
     category receives the remaining fraction so that the stratification
     sums to 1.0. When every category is given, the values
@@ -2308,7 +2309,7 @@ Attributes:
 
 | Name          | Type    | Description                                                         |
 | ------------- | ------- | ------------------------------------------------------------------- |
-| `compartment` | `str`   | The expanded compartment name, for example IH_y60 or S_oe60_v_c.    |
+| `compartment` | `str`   | The expanded compartment name, for example A_g1 or B_g2_t1.         |
 | `fraction`    | `float` | The fraction of the total in this compartment, between 0.0 and 1.0. |
 
 Source code in `commol/context/initial_conditions.py`
@@ -2321,7 +2322,7 @@ class CompartmentFraction(BaseModel):
     Attributes
     ----------
     compartment : str
-        The expanded compartment name, for example ``IH_y60`` or ``S_oe60_v_c``.
+        The expanded compartment name, for example ``A_g1`` or ``B_g2_t1``.
     fraction : float
         The fraction of the total in this compartment, between 0.0 and 1.0.
     """

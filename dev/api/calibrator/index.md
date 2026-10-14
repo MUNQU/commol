@@ -383,7 +383,7 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If observed data contains invalid compartments or negative time steps.
+            If observed data contains invalid compartments or negative positions.
         """
         simulation_output_names = set(self._engine.output_names)
 
@@ -406,7 +406,7 @@ class Calibrator:
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
@@ -1255,7 +1255,7 @@ Attributes:
 | Name          | Type          | Description                                                                                                                                                                                                                |
 | ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
-| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (S, I, R, etc.) at those positions. |
+| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
 | `description` | \`str         | None\`                                                                                                                                                                                                                     |
 | `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The penalty for violating this constraint is: weight * violation^2                                         |
 | `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
@@ -1263,20 +1263,20 @@ Attributes:
 Examples:
 
 ```pycon
->>> # R0 = beta/gamma must be <= 5
+>>> # k1/k2 must be <= 5
 >>> constraint = CalibrationConstraint(
-...     id="r0_bound",
-...     expression="5.0 - beta/gamma",
-...     description="Basic reproduction number R0 <= 5",
+...     id="ratio_bound",
+...     expression="5.0 - k1/k2",
+...     description="Ratio k1/k2 <= 5",
 ... )
 ```
 
 ```pycon
->>> # beta must be >= gamma
+>>> # k1 must be >= k2
 >>> constraint = CalibrationConstraint(
 ...     id="ordering",
-...     expression="beta - gamma",
-...     description="Transmission rate >= recovery rate",
+...     expression="k1 - k2",
+...     description="k1 >= k2",
 ... )
 ```
 
@@ -1317,7 +1317,7 @@ class CalibrationConstraint(BaseModel):
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
         Can reference calibration parameters by their IDs. When `at` is specified,
-        can also reference output values (S, I, R, etc.) at those positions.
+        can also reference output values (A, B, C, etc.) at those positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
@@ -1333,18 +1333,18 @@ class CalibrationConstraint(BaseModel):
 
     Examples
     --------
-    >>> # R0 = beta/gamma must be <= 5
+    >>> # k1/k2 must be <= 5
     >>> constraint = CalibrationConstraint(
-    ...     id="r0_bound",
-    ...     expression="5.0 - beta/gamma",
-    ...     description="Basic reproduction number R0 <= 5",
+    ...     id="ratio_bound",
+    ...     expression="5.0 - k1/k2",
+    ...     description="Ratio k1/k2 <= 5",
     ... )
 
-    >>> # beta must be >= gamma
+    >>> # k1 must be >= k2
     >>> constraint = CalibrationConstraint(
     ...     id="ordering",
-    ...     expression="beta - gamma",
-    ...     description="Transmission rate >= recovery rate",
+    ...     expression="k1 - k2",
+    ...     description="k1 >= k2",
     ... )
 
     >>> # Sum of parameters <= 1.0

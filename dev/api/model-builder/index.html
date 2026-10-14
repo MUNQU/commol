@@ -3698,8 +3698,8 @@ before building.</p>
 </span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a><span class="sd">            - float: A numerical constant value</span>
 </span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">            - str: A mathematical formula that can reference other parameters,</span>
 </span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">                   special variables (total, total_&lt;category&gt;, step, t, pi, e),</span>
-</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">                   or contain mathematical expressions (e.g., &quot;beta * 2&quot;,</span>
-</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">                   &quot;total_young / total&quot;)</span>
+</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">                   or contain mathematical expressions (e.g., &quot;k1 * 2&quot;,</span>
+</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">                   &quot;total_g1 / total&quot;)</span>
 </span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="sd">            - list[tuple[float, float]]: Empirical series as (position, value)</span>
 </span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a><span class="sd">                   points; requires ``mode`` to be set.</span>
 </span><span id="__span-0-270"><a id="__codelineno-0-270" name="__codelineno-0-270"></a><span class="sd">            - None: Indicates that the parameter needs to be calibrated before use</span>
@@ -3707,7 +3707,7 @@ before building.</p>
 </span><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">        description : str | None, default=None</span>
 </span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a><span class="sd">            Human-readable description of the parameter.</span>
 </span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a><span class="sd">        unit : str | None, default=None</span>
-</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">            Unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;person&quot;).</span>
+</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">            Unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;item&quot;).</span>
 </span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="sd">            Used for unit consistency checking in equations.</span>
 </span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">        mode : str | None, default=None</span>
 </span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a><span class="sd">            Required when ``value`` is a list of (position, value) points.</span>
@@ -3817,7 +3817,7 @@ before building.</p>
 </span><span id="__span-0-382"><a id="__codelineno-0-382" name="__codelineno-0-382"></a>
 </span><span id="__span-0-383"><a id="__codelineno-0-383" name="__codelineno-0-383"></a><span class="sd">        When you specify multiple sources without the $compartment placeholder,</span>
 </span><span id="__span-0-384"><a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="sd">        a single transition is created that affects all sources simultaneously.</span>
-</span><span id="__span-0-385"><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">        The rate is evaluated ONCE per time step, and that value is applied to</span>
+</span><span id="__span-0-385"><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">        The rate is evaluated ONCE per step, and that value is applied to</span>
 </span><span id="__span-0-386"><a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="sd">        all source compartments at once.</span>
 </span><span id="__span-0-387"><a id="__codelineno-0-387" name="__codelineno-0-387"></a>
 </span><span id="__span-0-388"><a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">        When you use the $compartment placeholder in the rate formula with multiple</span>
@@ -3827,8 +3827,8 @@ before building.</p>
 </span><span id="__span-0-392"><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="sd">        name.</span>
 </span><span id="__span-0-393"><a id="__codelineno-0-393" name="__codelineno-0-393"></a>
 </span><span id="__span-0-394"><a id="__codelineno-0-394" name="__codelineno-0-394"></a><span class="sd">        Each transition&#39;s rate is evaluated independently, giving per-compartment</span>
-</span><span id="__span-0-395"><a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">        dynamics. This is ideal for processes like per-capita death rates, where the</span>
-</span><span id="__span-0-396"><a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">        rate should be proportional to the amount of each compartment.</span>
+</span><span id="__span-0-395"><a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">        dynamics. This suits an outflow such as ``k1 * $compartment``, where the</span>
+</span><span id="__span-0-396"><a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">        flow of each compartment is proportional to its own amount.</span>
 </span><span id="__span-0-397"><a id="__codelineno-0-397" name="__codelineno-0-397"></a>
 </span><span id="__span-0-398"><a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">        **$compartment Usage Rules**:</span>
 </span><span id="__span-0-399"><a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">        - Only valid when len(source) &gt; 1</span>
@@ -3849,7 +3849,7 @@ before building.</p>
 </span><span id="__span-0-414"><a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        id : str</span>
 </span><span id="__span-0-415"><a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">            Unique identifier for the transition. When using $compartment expansion,</span>
 </span><span id="__span-0-416"><a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">            the system will append &quot;__&lt;compartment_name&gt;&quot; to create unique IDs for</span>
-</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            each expanded transition (e.g., &quot;death__S&quot;, &quot;death__L&quot;).</span>
+</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            each expanded transition (e.g., &quot;out__A&quot;, &quot;out__B&quot;).</span>
 </span><span id="__span-0-418"><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        source : list[str]</span>
 </span><span id="__span-0-419"><a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">            List of source state/category identifiers. When using $compartment in</span>
 </span><span id="__span-0-420"><a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">            the rate, each source will generate a separate transition.</span>
@@ -3893,7 +3893,7 @@ before building.</p>
 </span><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a>
 </span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="sd">        impulse_at : list[float] | None, default=None</span>
 </span><span id="__span-0-460"><a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="sd">            Make the transition an impulse at these positions on the axis. At</span>
-</span><span id="__span-0-461"><a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="sd">            each one, ``rate`` is the fraction of the source (per-capita) or the</span>
+</span><span id="__span-0-461"><a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="sd">            each one, ``rate`` is the fraction of the source (proportional) or the</span>
 </span><span id="__span-0-462"><a id="__codelineno-0-462" name="__codelineno-0-462"></a><span class="sd">            amount (absolute) moved at once, before the flows of that step. A</span>
 </span><span id="__span-0-463"><a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="sd">            DifferenceEquations model needs integer positions.</span>
 </span><span id="__span-0-464"><a id="__codelineno-0-464" name="__codelineno-0-464"></a>
@@ -3915,7 +3915,7 @@ before building.</p>
 </span><span id="__span-0-480"><a id="__codelineno-0-480" name="__codelineno-0-480"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-481"><a id="__codelineno-0-481" name="__codelineno-0-481"></a>        <span class="c1"># If `rate` is a AxisPattern, extract its rate string and stratified</span>
 </span><span id="__span-0-482"><a id="__codelineno-0-482" name="__codelineno-0-482"></a>        <span class="c1"># rates and route them into the existing pipeline. A AxisPattern fully</span>
-</span><span id="__span-0-483"><a id="__codelineno-0-483" name="__codelineno-0-483"></a>        <span class="c1"># specifies the time-varying behaviour, so passing `stratified_rates=`</span>
+</span><span id="__span-0-483"><a id="__codelineno-0-483" name="__codelineno-0-483"></a>        <span class="c1"># specifies how the rate changes along the axis, so passing `stratified_rates=`</span>
 </span><span id="__span-0-484"><a id="__codelineno-0-484" name="__codelineno-0-484"></a>        <span class="c1"># alongside it is a conflict.</span>
 </span><span id="__span-0-485"><a id="__codelineno-0-485" name="__codelineno-0-485"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rate</span><span class="p">,</span> <span class="n">AxisPattern</span><span class="p">):</span>
 </span><span id="__span-0-486"><a id="__codelineno-0-486" name="__codelineno-0-486"></a>            <span class="k">if</span> <span class="n">impulse_at</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">impulse_every</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -4207,9 +4207,9 @@ before building.</p>
 </span><span id="__span-0-772"><a id="__codelineno-0-772" name="__codelineno-0-772"></a>
 </span><span id="__span-0-773"><a id="__codelineno-0-773" name="__codelineno-0-773"></a><span class="sd">            Example:</span>
 </span><span id="__span-0-774"><a id="__codelineno-0-774" name="__codelineno-0-774"></a><span class="sd">            [</span>
-</span><span id="__span-0-775"><a id="__codelineno-0-775" name="__codelineno-0-775"></a><span class="sd">                {&quot;bin&quot;: &quot;S&quot;, &quot;fraction&quot;: 0.99},</span>
-</span><span id="__span-0-776"><a id="__codelineno-0-776" name="__codelineno-0-776"></a><span class="sd">                {&quot;bin&quot;: &quot;I&quot;, &quot;fraction&quot;: 0.01},</span>
-</span><span id="__span-0-777"><a id="__codelineno-0-777" name="__codelineno-0-777"></a><span class="sd">                {&quot;bin&quot;: &quot;R&quot;, &quot;fraction&quot;: 0.0}</span>
+</span><span id="__span-0-775"><a id="__codelineno-0-775" name="__codelineno-0-775"></a><span class="sd">                {&quot;bin&quot;: &quot;A&quot;, &quot;fraction&quot;: 0.99},</span>
+</span><span id="__span-0-776"><a id="__codelineno-0-776" name="__codelineno-0-776"></a><span class="sd">                {&quot;bin&quot;: &quot;B&quot;, &quot;fraction&quot;: 0.01},</span>
+</span><span id="__span-0-777"><a id="__codelineno-0-777" name="__codelineno-0-777"></a><span class="sd">                {&quot;bin&quot;: &quot;C&quot;, &quot;fraction&quot;: 0.0}</span>
 </span><span id="__span-0-778"><a id="__codelineno-0-778" name="__codelineno-0-778"></a><span class="sd">            ]</span>
 </span><span id="__span-0-779"><a id="__codelineno-0-779" name="__codelineno-0-779"></a><span class="sd">        stratification_fractions : list[StratificationFractionsDict] | None,</span>
 </span><span id="__span-0-780"><a id="__codelineno-0-780" name="__codelineno-0-780"></a><span class="sd">            default=None</span>
@@ -4220,11 +4220,11 @@ before building.</p>
 </span><span id="__span-0-785"><a id="__codelineno-0-785" name="__codelineno-0-785"></a><span class="sd">            Example:</span>
 </span><span id="__span-0-786"><a id="__codelineno-0-786" name="__codelineno-0-786"></a><span class="sd">            [</span>
 </span><span id="__span-0-787"><a id="__codelineno-0-787" name="__codelineno-0-787"></a><span class="sd">                {</span>
-</span><span id="__span-0-788"><a id="__codelineno-0-788" name="__codelineno-0-788"></a><span class="sd">                    &quot;stratification&quot;: &quot;age_group&quot;,</span>
+</span><span id="__span-0-788"><a id="__codelineno-0-788" name="__codelineno-0-788"></a><span class="sd">                    &quot;stratification&quot;: &quot;group&quot;,</span>
 </span><span id="__span-0-789"><a id="__codelineno-0-789" name="__codelineno-0-789"></a><span class="sd">                    &quot;fractions&quot;: [</span>
-</span><span id="__span-0-790"><a id="__codelineno-0-790" name="__codelineno-0-790"></a><span class="sd">                        {&quot;category&quot;: &quot;young&quot;, &quot;fraction&quot;: 0.3},</span>
-</span><span id="__span-0-791"><a id="__codelineno-0-791" name="__codelineno-0-791"></a><span class="sd">                        {&quot;category&quot;: &quot;adult&quot;, &quot;fraction&quot;: 0.5},</span>
-</span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">                        {&quot;category&quot;: &quot;elderly&quot;, &quot;fraction&quot;: 0.2}</span>
+</span><span id="__span-0-790"><a id="__codelineno-0-790" name="__codelineno-0-790"></a><span class="sd">                        {&quot;category&quot;: &quot;g1&quot;, &quot;fraction&quot;: 0.3},</span>
+</span><span id="__span-0-791"><a id="__codelineno-0-791" name="__codelineno-0-791"></a><span class="sd">                        {&quot;category&quot;: &quot;g2&quot;, &quot;fraction&quot;: 0.5},</span>
+</span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">                        {&quot;category&quot;: &quot;g3&quot;, &quot;fraction&quot;: 0.2}</span>
 </span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="sd">                    ]</span>
 </span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a><span class="sd">                }</span>
 </span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">            ]</span>
@@ -4236,7 +4236,7 @@ before building.</p>
 </span><span id="__span-0-801"><a id="__codelineno-0-801" name="__codelineno-0-801"></a>
 </span><span id="__span-0-802"><a id="__codelineno-0-802" name="__codelineno-0-802"></a><span class="sd">            Example:</span>
 </span><span id="__span-0-803"><a id="__codelineno-0-803" name="__codelineno-0-803"></a><span class="sd">            [</span>
-</span><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="sd">                {&quot;compartment&quot;: &quot;IH_y60&quot;, &quot;fraction&quot;: 0.0}</span>
+</span><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="sd">                {&quot;compartment&quot;: &quot;A_g1&quot;, &quot;fraction&quot;: 0.0}</span>
 </span><span id="__span-0-805"><a id="__codelineno-0-805" name="__codelineno-0-805"></a><span class="sd">            ]</span>
 </span><span id="__span-0-806"><a id="__codelineno-0-806" name="__codelineno-0-806"></a>
 </span><span id="__span-0-807"><a id="__codelineno-0-807" name="__codelineno-0-807"></a><span class="sd">            Compartment names and the resulting sum of the amounts are checked</span>
@@ -5192,8 +5192,8 @@ stratification declared before this one.</p>
 - float: A numerical constant value
 - str: A mathematical formula that can reference other parameters,
        special variables (total, total_<category>, step, t, pi, e),
-       or contain mathematical expressions (e.g., "beta * 2",
-       "total_young / total")
+       or contain mathematical expressions (e.g., "k1 * 2",
+       "total_g1 / total")
 - list[tuple[float, float]]: Empirical series as (position, value)
        points; requires <code>mode</code> to be set.
 - None: Indicates that the parameter needs to be calibrated before use</p>
@@ -5228,7 +5228,7 @@ stratification declared before this one.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+                <p>Unit of the parameter (e.g., "1/day", "dimensionless", "item").
 Used for unit consistency checking in equations.</p>
               </div>
             </td>
@@ -5399,8 +5399,8 @@ of a point, 0 on every other step; integer positions only),
 </span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a><span class="sd">        - float: A numerical constant value</span>
 </span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">        - str: A mathematical formula that can reference other parameters,</span>
 </span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">               special variables (total, total_&lt;category&gt;, step, t, pi, e),</span>
-</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">               or contain mathematical expressions (e.g., &quot;beta * 2&quot;,</span>
-</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">               &quot;total_young / total&quot;)</span>
+</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">               or contain mathematical expressions (e.g., &quot;k1 * 2&quot;,</span>
+</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="sd">               &quot;total_g1 / total&quot;)</span>
 </span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="sd">        - list[tuple[float, float]]: Empirical series as (position, value)</span>
 </span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a><span class="sd">               points; requires ``mode`` to be set.</span>
 </span><span id="__span-0-270"><a id="__codelineno-0-270" name="__codelineno-0-270"></a><span class="sd">        - None: Indicates that the parameter needs to be calibrated before use</span>
@@ -5408,7 +5408,7 @@ of a point, 0 on every other step; integer positions only),
 </span><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">    description : str | None, default=None</span>
 </span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a><span class="sd">        Human-readable description of the parameter.</span>
 </span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a><span class="sd">    unit : str | None, default=None</span>
-</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">        Unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;person&quot;).</span>
+</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">        Unit of the parameter (e.g., &quot;1/day&quot;, &quot;dimensionless&quot;, &quot;item&quot;).</span>
 </span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="sd">        Used for unit consistency checking in equations.</span>
 </span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">    mode : str | None, default=None</span>
 </span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a><span class="sd">        Required when ``value`` is a list of (position, value) points.</span>
@@ -5473,7 +5473,7 @@ of a point, 0 on every other step; integer positions only),
 <p>This method supports two distinct behaviors:</p>
 <p>When you specify multiple sources without the $compartment placeholder,
 a single transition is created that affects all sources simultaneously.
-The rate is evaluated ONCE per time step, and that value is applied to
+The rate is evaluated ONCE per step, and that value is applied to
 all source compartments at once.</p>
 <p>When you use the $compartment placeholder in the rate formula with multiple
 sources, the system automatically expands this into multiple independent
@@ -5481,8 +5481,8 @@ transitions - one for each source compartment. Each transition has its own
 rate calculation where $compartment is replaced with the actual compartment
 name.</p>
 <p>Each transition's rate is evaluated independently, giving per-compartment
-dynamics. This is ideal for processes like per-capita death rates, where the
-rate should be proportional to the amount of each compartment.</p>
+dynamics. This suits an outflow such as <code>k1 * $compartment</code>, where the
+flow of each compartment is proportional to its own amount.</p>
 <p><strong>$compartment Usage Rules</strong>:
 - Only valid when len(source) &gt; 1
 - Target must be empty [] or have exactly one element
@@ -5519,7 +5519,7 @@ rate should be proportional to the amount of each compartment.</p>
               <div class="doc-md-description">
                 <p>Unique identifier for the transition. When using $compartment expansion,
 the system will append "__<compartment_name>" to create unique IDs for
-each expanded transition (e.g., "death__S", "death__L").</p>
+each expanded transition (e.g., "out__A", "out__B").</p>
               </div>
             </td>
             <td>
@@ -5656,7 +5656,7 @@ rather than the total across all subgroups.</p>
             <td>
               <div class="doc-md-description">
                 <p>Make the transition an impulse at these positions on the axis. At
-each one, <code>rate</code> is the fraction of the source (per-capita) or the
+each one, <code>rate</code> is the fraction of the source (proportional) or the
 amount (absolute) moved at once, before the flows of that step. A
 DifferenceEquations model needs integer positions.</p>
               </div>
@@ -5963,7 +5963,7 @@ DifferenceEquations model needs integer positions.</p>
 </span><span id="__span-0-382"><a id="__codelineno-0-382" name="__codelineno-0-382"></a>
 </span><span id="__span-0-383"><a id="__codelineno-0-383" name="__codelineno-0-383"></a><span class="sd">    When you specify multiple sources without the $compartment placeholder,</span>
 </span><span id="__span-0-384"><a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="sd">    a single transition is created that affects all sources simultaneously.</span>
-</span><span id="__span-0-385"><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">    The rate is evaluated ONCE per time step, and that value is applied to</span>
+</span><span id="__span-0-385"><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">    The rate is evaluated ONCE per step, and that value is applied to</span>
 </span><span id="__span-0-386"><a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="sd">    all source compartments at once.</span>
 </span><span id="__span-0-387"><a id="__codelineno-0-387" name="__codelineno-0-387"></a>
 </span><span id="__span-0-388"><a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">    When you use the $compartment placeholder in the rate formula with multiple</span>
@@ -5973,8 +5973,8 @@ DifferenceEquations model needs integer positions.</p>
 </span><span id="__span-0-392"><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="sd">    name.</span>
 </span><span id="__span-0-393"><a id="__codelineno-0-393" name="__codelineno-0-393"></a>
 </span><span id="__span-0-394"><a id="__codelineno-0-394" name="__codelineno-0-394"></a><span class="sd">    Each transition&#39;s rate is evaluated independently, giving per-compartment</span>
-</span><span id="__span-0-395"><a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">    dynamics. This is ideal for processes like per-capita death rates, where the</span>
-</span><span id="__span-0-396"><a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">    rate should be proportional to the amount of each compartment.</span>
+</span><span id="__span-0-395"><a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">    dynamics. This suits an outflow such as ``k1 * $compartment``, where the</span>
+</span><span id="__span-0-396"><a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">    flow of each compartment is proportional to its own amount.</span>
 </span><span id="__span-0-397"><a id="__codelineno-0-397" name="__codelineno-0-397"></a>
 </span><span id="__span-0-398"><a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">    **$compartment Usage Rules**:</span>
 </span><span id="__span-0-399"><a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">    - Only valid when len(source) &gt; 1</span>
@@ -5995,7 +5995,7 @@ DifferenceEquations model needs integer positions.</p>
 </span><span id="__span-0-414"><a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">    id : str</span>
 </span><span id="__span-0-415"><a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        Unique identifier for the transition. When using $compartment expansion,</span>
 </span><span id="__span-0-416"><a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        the system will append &quot;__&lt;compartment_name&gt;&quot; to create unique IDs for</span>
-</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        each expanded transition (e.g., &quot;death__S&quot;, &quot;death__L&quot;).</span>
+</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        each expanded transition (e.g., &quot;out__A&quot;, &quot;out__B&quot;).</span>
 </span><span id="__span-0-418"><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">    source : list[str]</span>
 </span><span id="__span-0-419"><a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">        List of source state/category identifiers. When using $compartment in</span>
 </span><span id="__span-0-420"><a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        the rate, each source will generate a separate transition.</span>
@@ -6039,7 +6039,7 @@ DifferenceEquations model needs integer positions.</p>
 </span><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a>
 </span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="sd">    impulse_at : list[float] | None, default=None</span>
 </span><span id="__span-0-460"><a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="sd">        Make the transition an impulse at these positions on the axis. At</span>
-</span><span id="__span-0-461"><a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="sd">        each one, ``rate`` is the fraction of the source (per-capita) or the</span>
+</span><span id="__span-0-461"><a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="sd">        each one, ``rate`` is the fraction of the source (proportional) or the</span>
 </span><span id="__span-0-462"><a id="__codelineno-0-462" name="__codelineno-0-462"></a><span class="sd">        amount (absolute) moved at once, before the flows of that step. A</span>
 </span><span id="__span-0-463"><a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="sd">        DifferenceEquations model needs integer positions.</span>
 </span><span id="__span-0-464"><a id="__codelineno-0-464" name="__codelineno-0-464"></a>
@@ -6061,7 +6061,7 @@ DifferenceEquations model needs integer positions.</p>
 </span><span id="__span-0-480"><a id="__codelineno-0-480" name="__codelineno-0-480"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-481"><a id="__codelineno-0-481" name="__codelineno-0-481"></a>    <span class="c1"># If `rate` is a AxisPattern, extract its rate string and stratified</span>
 </span><span id="__span-0-482"><a id="__codelineno-0-482" name="__codelineno-0-482"></a>    <span class="c1"># rates and route them into the existing pipeline. A AxisPattern fully</span>
-</span><span id="__span-0-483"><a id="__codelineno-0-483" name="__codelineno-0-483"></a>    <span class="c1"># specifies the time-varying behaviour, so passing `stratified_rates=`</span>
+</span><span id="__span-0-483"><a id="__codelineno-0-483" name="__codelineno-0-483"></a>    <span class="c1"># specifies how the rate changes along the axis, so passing `stratified_rates=`</span>
 </span><span id="__span-0-484"><a id="__codelineno-0-484" name="__codelineno-0-484"></a>    <span class="c1"># alongside it is a conflict.</span>
 </span><span id="__span-0-485"><a id="__codelineno-0-485" name="__codelineno-0-485"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rate</span><span class="p">,</span> <span class="n">AxisPattern</span><span class="p">):</span>
 </span><span id="__span-0-486"><a id="__codelineno-0-486" name="__codelineno-0-486"></a>        <span class="k">if</span> <span class="n">impulse_at</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">impulse_every</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -6215,9 +6215,9 @@ DifferenceEquations model needs integer positions.</p>
 - "fraction": float (fractional size)</p>
 <p>Example:
 [
-    {"bin": "S", "fraction": 0.99},
-    {"bin": "I", "fraction": 0.01},
-    {"bin": "R", "fraction": 0.0}
+    {"bin": "A", "fraction": 0.99},
+    {"bin": "B", "fraction": 0.01},
+    {"bin": "C", "fraction": 0.0}
 ]</p>
               </div>
             </td>
@@ -6241,11 +6241,11 @@ List of stratification fractions. Each item is a dictionary with:
 <p>Example:
 [
     {
-        "stratification": "age_group",
+        "stratification": "group",
         "fractions": [
-            {"category": "young", "fraction": 0.3},
-            {"category": "adult", "fraction": 0.5},
-            {"category": "elderly", "fraction": 0.2}
+            {"category": "g1", "fraction": 0.3},
+            {"category": "g2", "fraction": 0.5},
+            {"category": "g3", "fraction": 0.2}
         ]
     }
 ]</p>
@@ -6270,7 +6270,7 @@ expansion. Each item is a dictionary with:
 - "fraction": float (fraction of the total)</p>
 <p>Example:
 [
-    {"compartment": "IH_y60", "fraction": 0.0}
+    {"compartment": "A_g1", "fraction": 0.0}
 ]</p>
 <p>Compartment names and the resulting sum of the amounts are checked
 against the engine expansion when the model is built.</p>
@@ -6472,9 +6472,9 @@ fraction lies outside <code>[0.0, 1.0]</code>.</p>
 </span><span id="__span-0-772"><a id="__codelineno-0-772" name="__codelineno-0-772"></a>
 </span><span id="__span-0-773"><a id="__codelineno-0-773" name="__codelineno-0-773"></a><span class="sd">        Example:</span>
 </span><span id="__span-0-774"><a id="__codelineno-0-774" name="__codelineno-0-774"></a><span class="sd">        [</span>
-</span><span id="__span-0-775"><a id="__codelineno-0-775" name="__codelineno-0-775"></a><span class="sd">            {&quot;bin&quot;: &quot;S&quot;, &quot;fraction&quot;: 0.99},</span>
-</span><span id="__span-0-776"><a id="__codelineno-0-776" name="__codelineno-0-776"></a><span class="sd">            {&quot;bin&quot;: &quot;I&quot;, &quot;fraction&quot;: 0.01},</span>
-</span><span id="__span-0-777"><a id="__codelineno-0-777" name="__codelineno-0-777"></a><span class="sd">            {&quot;bin&quot;: &quot;R&quot;, &quot;fraction&quot;: 0.0}</span>
+</span><span id="__span-0-775"><a id="__codelineno-0-775" name="__codelineno-0-775"></a><span class="sd">            {&quot;bin&quot;: &quot;A&quot;, &quot;fraction&quot;: 0.99},</span>
+</span><span id="__span-0-776"><a id="__codelineno-0-776" name="__codelineno-0-776"></a><span class="sd">            {&quot;bin&quot;: &quot;B&quot;, &quot;fraction&quot;: 0.01},</span>
+</span><span id="__span-0-777"><a id="__codelineno-0-777" name="__codelineno-0-777"></a><span class="sd">            {&quot;bin&quot;: &quot;C&quot;, &quot;fraction&quot;: 0.0}</span>
 </span><span id="__span-0-778"><a id="__codelineno-0-778" name="__codelineno-0-778"></a><span class="sd">        ]</span>
 </span><span id="__span-0-779"><a id="__codelineno-0-779" name="__codelineno-0-779"></a><span class="sd">    stratification_fractions : list[StratificationFractionsDict] | None,</span>
 </span><span id="__span-0-780"><a id="__codelineno-0-780" name="__codelineno-0-780"></a><span class="sd">        default=None</span>
@@ -6485,11 +6485,11 @@ fraction lies outside <code>[0.0, 1.0]</code>.</p>
 </span><span id="__span-0-785"><a id="__codelineno-0-785" name="__codelineno-0-785"></a><span class="sd">        Example:</span>
 </span><span id="__span-0-786"><a id="__codelineno-0-786" name="__codelineno-0-786"></a><span class="sd">        [</span>
 </span><span id="__span-0-787"><a id="__codelineno-0-787" name="__codelineno-0-787"></a><span class="sd">            {</span>
-</span><span id="__span-0-788"><a id="__codelineno-0-788" name="__codelineno-0-788"></a><span class="sd">                &quot;stratification&quot;: &quot;age_group&quot;,</span>
+</span><span id="__span-0-788"><a id="__codelineno-0-788" name="__codelineno-0-788"></a><span class="sd">                &quot;stratification&quot;: &quot;group&quot;,</span>
 </span><span id="__span-0-789"><a id="__codelineno-0-789" name="__codelineno-0-789"></a><span class="sd">                &quot;fractions&quot;: [</span>
-</span><span id="__span-0-790"><a id="__codelineno-0-790" name="__codelineno-0-790"></a><span class="sd">                    {&quot;category&quot;: &quot;young&quot;, &quot;fraction&quot;: 0.3},</span>
-</span><span id="__span-0-791"><a id="__codelineno-0-791" name="__codelineno-0-791"></a><span class="sd">                    {&quot;category&quot;: &quot;adult&quot;, &quot;fraction&quot;: 0.5},</span>
-</span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">                    {&quot;category&quot;: &quot;elderly&quot;, &quot;fraction&quot;: 0.2}</span>
+</span><span id="__span-0-790"><a id="__codelineno-0-790" name="__codelineno-0-790"></a><span class="sd">                    {&quot;category&quot;: &quot;g1&quot;, &quot;fraction&quot;: 0.3},</span>
+</span><span id="__span-0-791"><a id="__codelineno-0-791" name="__codelineno-0-791"></a><span class="sd">                    {&quot;category&quot;: &quot;g2&quot;, &quot;fraction&quot;: 0.5},</span>
+</span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="sd">                    {&quot;category&quot;: &quot;g3&quot;, &quot;fraction&quot;: 0.2}</span>
 </span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="sd">                ]</span>
 </span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a><span class="sd">            }</span>
 </span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">        ]</span>
@@ -6501,7 +6501,7 @@ fraction lies outside <code>[0.0, 1.0]</code>.</p>
 </span><span id="__span-0-801"><a id="__codelineno-0-801" name="__codelineno-0-801"></a>
 </span><span id="__span-0-802"><a id="__codelineno-0-802" name="__codelineno-0-802"></a><span class="sd">        Example:</span>
 </span><span id="__span-0-803"><a id="__codelineno-0-803" name="__codelineno-0-803"></a><span class="sd">        [</span>
-</span><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="sd">            {&quot;compartment&quot;: &quot;IH_y60&quot;, &quot;fraction&quot;: 0.0}</span>
+</span><span id="__span-0-804"><a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="sd">            {&quot;compartment&quot;: &quot;A_g1&quot;, &quot;fraction&quot;: 0.0}</span>
 </span><span id="__span-0-805"><a id="__codelineno-0-805" name="__codelineno-0-805"></a><span class="sd">        ]</span>
 </span><span id="__span-0-806"><a id="__codelineno-0-806" name="__codelineno-0-806"></a>
 </span><span id="__span-0-807"><a id="__codelineno-0-807" name="__codelineno-0-807"></a><span class="sd">        Compartment names and the resulting sum of the amounts are checked</span>

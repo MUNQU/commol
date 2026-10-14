@@ -2851,7 +2851,7 @@ from there (<code>crates/commol-differential/src/solve.rs</code>).</p>
 continuously. A rate that reads <code>step</code>, a <code>"pulse"</code> series or a pulse pattern
 (<code>AxisPattern.pulse</code>, <code>pulses</code>, <code>periodic</code>) is constant on its unit interval,
 and the engine restarts the integration at each integer where such a rate can
-jump. A per-capita pulse <code>p</code> on step <code>n</code> acts as the constant rate <code>p</code> for one
+jump. A proportional pulse <code>p</code> on step <code>n</code> acts as the constant rate <code>p</code> for one
 unit: it moves <code>1 − e^(−p)</code> of its source, not <code>p</code> as in a difference model. To
 move a fraction at once, use an <a href="../transitions/#impulses">impulse</a>.</p>
 <p>A <code>"step_function"</code> or <code>"linear"</code> <a href="../building-models/#series-parameters">series</a>
@@ -2860,7 +2860,7 @@ change at any position, and the engine restarts the integration at their
 points and bounds. In a difference model <code>t</code> equals <code>step</code>, so they give the
 same results as a rate that reads <code>step</code>.</p>
 <p>A rate can also jump where <code>t</code> reaches a value that it compares <code>t</code> with, such
-as <code>if(t &gt;= t_on, beta, 0)</code>. The engine restarts the integration there too, so
+as <code>if(t &gt;= t_on, k1, 0)</code>. The engine restarts the integration there too, so
 the solver cannot step over a short window. This works when the value reads
 only numbers, <code>pi</code>, <code>e</code> and parameters with a constant or calibrated value, and
 <code>t</code> is one side of the comparison: write <code>t &gt;= 10</code>, not <code>t - 10 &gt;= 0</code>. A jump

@@ -2921,7 +2921,8 @@ topic inside its package.</p>
 <h3 id="models-use-the-factories">Models: use the factories<a class="headerlink" href="#models-use-the-factories" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Build models with the factories of <code>tests/support/models.py</code>:
-  <code>sir_builder</code>, <code>seir_builder</code> and <code>a_to_b_builder</code>, and the special models
+  <code>abc_builder</code> (A → B → C), <code>abcd_builder</code> (A → B → C → D) and
+  <code>a_to_b_builder</code>, and the special models
   <code>override_builder</code>, <code>shared_category_builder</code> and
   <code>conditional_pathway_builder</code>. A keyword overrides one part of the default
   model, so a test names only what it changes. <code>build</code> builds for difference
@@ -2929,7 +2930,11 @@ topic inside its package.</p>
   solver settings <code>TIGHT</code> by default; <code>run</code> builds and simulates.</li>
 <li>Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to <code>support/</code>.</li>
-<li>Fixtures: <code>sir_model</code> and <code>sir_simulation</code> (<code>tests/conftest.py</code>); <code>truth</code>
+<li>Test models use abstract names, as examples do: bins <code>A</code>, <code>B</code>, <code>C</code>,
+  parameters <code>k1</code>, <code>k2</code>, categories <code>g1</code>, <code>t1</code>. Only <code>tests/reference_models/</code>
+  and the support code that only it uses (<code>support/oracles.py</code>,
+  <code>support/flows.py</code>) keep the names of their published source.</li>
+<li>Fixtures: <code>abc_model</code> and <code>abc_simulation</code> (<code>tests/conftest.py</code>); <code>truth</code>
   and <code>truth_run</code> (<code>tests/calibration/conftest.py</code>). A fixture is
   function-scoped unless its cost is measured; a wider scope never holds an
   object a test can change. A class-scoped fixture is never an instance
@@ -2951,7 +2956,7 @@ topic inside its package.</p>
 </tr>
 <tr>
 <td>An analytic value</td>
-<td>A death rate <code>d</code> on every bin gives <code>total(t) = total(0) (1 - d)^t</code> (<code>tests/transitions/test_compartment_placeholder.py</code>).</td>
+<td>An outflow rate <code>d</code> on every bin gives <code>total(t) = total(0) (1 - d)^t</code> (<code>tests/transitions/test_compartment_placeholder.py</code>).</td>
 </tr>
 <tr>
 <td>An invariant</td>
@@ -2959,7 +2964,7 @@ topic inside its package.</p>
 </tr>
 <tr>
 <td>What a stated result predicts about a run</td>
-<td><code>tests/support/oracles.py</code>: <code>final_size</code> solves the final size relation, <code>assert_threshold</code> checks that an infection grows at a reproduction number of <code>1.05</code> and dies out at <code>0.95</code>, <code>settled</code> reads a limit once doubling the horizon no longer moves it.</td>
+<td><code>tests/support/oracles.py</code>, for the reference models: <code>final_size</code> solves the final size relation, <code>assert_threshold</code> checks that a model grows at a reproduction number of <code>1.05</code> and decays at <code>0.95</code>, <code>settled</code> reads a limit once doubling the horizon no longer moves it.</td>
 </tr>
 </tbody>
 </table>
@@ -2984,7 +2989,7 @@ that accepts a valid input.</p>
 <h3 id="reference-models">Reference models<a class="headerlink" href="#reference-models" title="Permanent link">&para;</a></h3>
 <p><code>tests/reference_models/</code> shows that commol can state published models and
 computes their stated results. A module holds one model family and is named
-after its epidemiology (<code>test_pulse_vaccination.py</code>); a test checks one stated
+after the published model (<code>test_pulse_vaccination.py</code>); a test checks one stated
 result (<code>test_the_fixed_point_starts_the_periodic_orbit</code>).</p>
 <ul>
 <li><strong>Attribution.</strong> The module docstring has a <code>References</code> section in the NumPy
@@ -3020,7 +3025,7 @@ and cite the papers.</p>
 <li>Types: <code>feat</code>, <code>fix</code>, <code>docs</code>, <code>style</code>, <code>refactor</code>, <code>perf</code>, <code>test</code>, <code>build</code>,
   <code>ci</code>, <code>chore</code>.</li>
 </ul>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>feat(transitions): add time-varying rates
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>feat(transitions): add rate patterns
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>fix(simulation): correct the total of a subgroup
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docs(codebase): add repository map
 </span></code></pre></div>
