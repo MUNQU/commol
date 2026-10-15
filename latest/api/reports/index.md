@@ -1,0 +1,250 @@
+# Reports API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+Plain-dictionary reports of a calibrated model and of a run. Guide: [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md).
+
+## applied_parameters_report
+
+```python
+applied_parameters_report(model: Model, result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+```
+
+Report every parameter of a calibrated model, and the values of its kind.
+
+Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); a compartmental model adds `initial_conditions`.
+
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
+
+Initial conditions of a compartmental model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
+
+For a probabilistic result each entry gains an `interval` holding the ensemble spread. A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
+
+Parameters:
+
+| Name                   | Type                                   | Description                            | Default                                                                                                             |
+| ---------------------- | -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `model`                | `Model`                                | The model carrying the applied values. | *required*                                                                                                          |
+| `result`               | \`CalibrationResult                    | ProbabilisticCalibrationResult         | Mapping\`                                                                                                           |
+| `problem`              | \`CalibrationProblem                   | None\`                                 | The problem the result came from, used to report factor parameters.                                                 |
+| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                 | Ensemble spread per entry. Taken from result when it is a probabilistic result and this is not given.               |
+| `confidence_level`     | \`float                                | None\`                                 | Confidence level the intervals describe. Taken from result when it is a probabilistic result and this is not given. |
+
+Returns:
+
+| Type                      | Description                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for a compartmental model), preceded by confidence_level when there is one. |
+
+Source code in `commol/api/reporting.py`
+
+```python
+def applied_parameters_report(
+    model: Model,
+    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
+    problem: CalibrationProblem | None = None,
+    parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None,
+    confidence_level: float | None = None,
+) -> AppliedParametersReport:
+    """
+    Report every parameter of a calibrated model, and the values of its kind.
+
+    Each entry carries the value the model holds and whether calibration set
+    it, so entries the calibration left alone appear alongside the fitted ones.
+    The structure of the model adds the sections of its kind
+    (`ModelStructure.report_sections`); a compartmental model adds
+    ``initial_conditions``.
+
+    Parameters that are not a single number, such as a formula or a
+    series, are omitted: they are inputs rather than fitted values.
+    ``factor`` parameters have no place in the model, so they are reported from
+    `problem` when it is given.
+
+    Initial conditions of a compartmental model carry the effective
+    ``value`` the engine builds
+    from the uniform expansion plus the declared compartment overrides, its
+    ``fraction`` as that value over the declared total, and the
+    ``group`` it belongs to: ``total`` for bins and unconditional
+    stratifications, and the conditioning categories for a conditional one.
+    The ``total`` row is the declared total, with fraction 1.0. A bin left
+    uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
+    calibration" marker even when overrides touch some of its compartments.
+
+    For a probabilistic result each entry gains an ``interval`` holding the
+    ensemble spread. A parameter is in the unit it was calibrated in. An
+    initial-condition entry is in the fraction the row reports: a conditional
+    stratification's category is calibrated as a group fraction but reported
+    over the total, so its interval is rescaled by the group's share of the
+    total and brackets the reported fraction.
+
+    Parameters
+    ----------
+    model : Model
+        The model carrying the applied values.
+    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
+        The calibration outcome, or a mapping of parameter id to value such as
+        one ensemble member's parameters.
+    problem : CalibrationProblem | None, optional
+        The problem the result came from, used to report factor parameters.
+    parameter_statistics : Mapping[str, ParameterSetStatistics] | None, optional
+        Ensemble spread per entry. Taken from `result` when it is a
+        probabilistic result and this is not given.
+    confidence_level : float | None, optional
+        Confidence level the intervals describe. Taken from `result` when it is
+        a probabilistic result and this is not given.
+
+    Returns
+    -------
+    AppliedParametersReport
+        Key ``parameters`` and the sections of the kind (``initial_conditions``
+        for a compartmental model), preceded by ``confidence_level`` when there
+        is one.
+    """
+    calibrated = calibrated_values(result)
+    parameter_statistics, confidence_level = _ensemble_details(
+        result, parameter_statistics, confidence_level
+    )
+    calibrated_ids = set(calibrated)
+
+    parameters: dict[str, ParameterEntry] = {
+        parameter.id: _parameter_entry(
+            parameter.id, parameter.value, calibrated_ids, parameter_statistics
+        )
+        for parameter in model.parameters
+        if isinstance(parameter.value, (int, float))
+    }
+    for factor_id in _factor_ids(problem):
+        if factor_id in calibrated:
+            parameters[factor_id] = _parameter_entry(
+                factor_id, calibrated[factor_id], calibrated_ids, parameter_statistics
+            )
+
+    report: dict[str, object] = {}
+    # `confidence_level` leads the report, so it is written first.
+    if confidence_level is not None:
+        report["confidence_level"] = confidence_level
+    report["parameters"] = parameters
+    report.update(
+        model.structure.report_sections(model, calibrated_ids, parameter_statistics)
+    )
+    return cast(AppliedParametersReport, report)
+```
+
+## simulation_report
+
+```python
+simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | None = None, confidence_level: float | None = None) -> SimulationReport
+```
+
+Report the observed data, compartment series and accumulators of a run.
+
+The three blocks share one window axis, so the observed values, the windowed accumulator increments and the sampled series can be read against each other. With `ensemble_runs` every leaf becomes a `{mean, median, ci_lower, ci_upper, min, max}` block computed across members, and the layout is otherwise unchanged.
+
+Callers add whatever envelope they need around these blocks, such as a run label, axis labels or domain-specific summary figures.
+
+Parameters:
+
+| Name               | Type                          | Description                                                      | Default                                     |
+| ------------------ | ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
+| `simulation`       | `Simulation`                  | The simulation the results came from.                            | *required*                                  |
+| `results`          | `SimulationResults`           | Results of a run, with their positions.                          | *required*                                  |
+| `at`               | `Sequence[float]`             | Positions the series and cumulative accumulators are sampled at. | *required*                                  |
+| `window`           | `float`                       | Length of one window on the axis.                                | *required*                                  |
+| `num_windows`      | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                  |
+| `observed_data`    | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                        |
+| `accumulators`     | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                        |
+| `ensemble_runs`    | \`Sequence[SimulationResults] | None\`                                                           | One results mapping per ensemble member.    |
+| `confidence_level` | \`float                       | None\`                                                           | Confidence level of the reported intervals. |
+
+Returns:
+
+| Type               | Description                             |
+| ------------------ | --------------------------------------- |
+| `SimulationReport` | Keys observed, series and accumulators. |
+
+Raises:
+
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `ValueError` | If the results have no value at a position the report reads. |
+
+Source code in `commol/api/reporting.py`
+
+```python
+def simulation_report(
+    simulation: Simulation,
+    results: SimulationResults,
+    at: Sequence[float],
+    window: float,
+    num_windows: int,
+    observed_data: Iterable[ObservedDataPoint] = (),
+    accumulators: Iterable[str] = (),
+    ensemble_runs: Sequence[SimulationResults] | None = None,
+    confidence_level: float | None = None,
+) -> SimulationReport:
+    """
+    Report the observed data, compartment series and accumulators of a run.
+
+    The three blocks share one window axis, so the observed values, the
+    windowed accumulator increments and the sampled series can be read against
+    each other. With `ensemble_runs` every leaf becomes a
+    ``{mean, median, ci_lower, ci_upper, min, max}`` block computed across
+    members, and the layout is otherwise unchanged.
+
+    Callers add whatever envelope they need around these blocks, such as a run
+    label, axis labels or domain-specific summary figures.
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The simulation the results came from.
+    results : SimulationResults
+        Results of a run, with their positions.
+    at : Sequence[float]
+        Positions the series and cumulative accumulators are sampled at.
+    window : float
+        Length of one window on the axis.
+    num_windows : int
+        Number of windows on the observed and windowed axes.
+    observed_data : Iterable[ObservedDataPoint], optional
+        The calibration targets to report alongside the run.
+    accumulators : Iterable[str], optional
+        Accumulator ids to report.
+    ensemble_runs : Sequence[SimulationResults] | None, optional
+        One results mapping per ensemble member.
+    confidence_level : float | None, optional
+        Confidence level of the reported intervals.
+
+    Returns
+    -------
+    SimulationReport
+        Keys ``observed``, ``series`` and ``accumulators``.
+
+    Raises
+    ------
+    ValueError
+        If the results have no value at a position the report reads.
+    """
+    accumulator_ids = list(accumulators)
+    return {
+        "observed": observed_report(observed_data, window, num_windows),
+        "series": series_report(
+            simulation,
+            results,
+            at,
+            accumulator_ids,
+            ensemble_runs,
+            confidence_level,
+        ),
+        "accumulators": accumulators_report(
+            simulation,
+            results,
+            accumulator_ids,
+            at,
+            window,
+            num_windows,
+            ensemble_runs,
+            confidence_level,
+        ),
+    }
+```
