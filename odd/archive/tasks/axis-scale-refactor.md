@@ -221,7 +221,7 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-Runners on `refactor/axis-scale` (2026-10-15), before commit:
+Runners on `refactor/axis-scale` (2026-10-15), before commit; delivered by PR #112:
 
 | Runner | Result |
 |---|---|
