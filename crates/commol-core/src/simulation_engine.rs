@@ -2,7 +2,7 @@
 //! model.
 
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Display};
 
 use crate::types::ModelValueType;
 
@@ -13,6 +13,37 @@ pub struct Trajectory {
     pub positions: Vec<f64>,
     /// One output row per position, in the order of `output_names()`.
     pub rows: Vec<Vec<f64>>,
+}
+
+/// Why a run stopped.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimulationError {
+    /// The state left the values the model allows, such as an amount below
+    /// zero. Calibration treats such a run as infeasible, not as a failure.
+    Infeasible {
+        /// The position on the axis where the state left them.
+        position: f64,
+        /// What left them, for the user.
+        message: String,
+    },
+    /// Any other error, such as a rate that cannot be evaluated.
+    Failed(String),
+}
+
+impl Display for SimulationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Infeasible { message, .. } | Self::Failed(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for SimulationError {}
+
+impl From<String> for SimulationError {
+    fn from(message: String) -> Self {
+        Self::Failed(message)
+    }
 }
 
 /// Check that positions are sorted, unique, not before `from`, and each one
@@ -120,15 +151,16 @@ pub trait SimulationEngine: Clone {
     ///
     /// # Errors
     ///
-    /// Returns a message when a position is rejected by
-    /// [`Self::check_position`], when the positions are not sorted and unique
-    /// or one is before the current position (see [`check_positions`]), or
-    /// when the simulation fails.
+    /// Returns [`SimulationError::Infeasible`] when the state leaves the
+    /// values the model allows, and [`SimulationError::Failed`] when a
+    /// position is rejected by [`Self::check_position`], when the positions
+    /// are not sorted and unique or one is before the current position (see
+    /// [`check_positions`]), or when the simulation fails for another reason.
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String>;
+    ) -> Result<(), SimulationError>;
 
     /// Run through the last of `positions` and return the outputs at each of
     /// them. See [`Self::run_at_positions_into_buffer`].
@@ -136,7 +168,7 @@ pub trait SimulationEngine: Clone {
     /// # Errors
     ///
     /// See [`Self::run_at_positions_into_buffer`].
-    fn run_at(&mut self, positions: &[f64]) -> Result<Vec<Vec<f64>>, String> {
+    fn run_at(&mut self, positions: &[f64]) -> Result<Vec<Vec<f64>>, SimulationError> {
         let mut buffer = Vec::with_capacity(positions.len());
         self.run_at_positions_into_buffer(positions, &mut buffer)?;
         Ok(buffer)
@@ -153,9 +185,8 @@ pub trait SimulationEngine: Clone {
     ///
     /// # Errors
     ///
-    /// Returns an error string if the simulation fails (e.g., invalid parameters,
-    /// numerical instability, etc.)
-    fn run(&mut self, num_steps: u32) -> Result<Trajectory, String> {
+    /// See [`Self::run_at_positions_into_buffer`].
+    fn run(&mut self, num_steps: u32) -> Result<Trajectory, SimulationError> {
         let positions = self.grid(num_steps);
         let rows = self.run_at(&positions)?;
         Ok(Trajectory { positions, rows })
@@ -165,8 +196,8 @@ pub trait SimulationEngine: Clone {
     ///
     /// # Errors
     ///
-    /// Returns an error string if the step fails
-    fn step(&mut self) -> Result<(), String>;
+    /// See [`Self::run_at_positions_into_buffer`].
+    fn step(&mut self) -> Result<(), SimulationError>;
 
     /// Names of the outputs, in the order of each row a run returns.
     fn output_names(&self) -> Vec<String>;

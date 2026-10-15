@@ -116,6 +116,12 @@ Every loss works (`"sse"`, `"rmse"`, `"mae"`): the ensemble is
 scored with the same loss as the runs. Use `normalize_observations=True` when
 series differ in size.
 
+A run that leaves an amount below zero gets a penalty, as in
+[Calibration](calibration.md#losses), and is not kept, so it is never a member.
+The predictions of the members run one step past the last observation; if a
+member leaves an amount below zero there, `run_probabilistic()` raises
+`InfeasibleStateError`.
+
 ## Configuration
 
 ### `ProbabilisticCalibrationConfig`

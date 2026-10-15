@@ -30,6 +30,11 @@ pub enum CalibrationError {
         reason: String,
     },
 
+    /// A prediction left the values the model allows, such as an amount
+    /// below zero.
+    #[error("{0}")]
+    Infeasible(String),
+
     /// Simulation failed during prediction generation.
     #[error("Simulation failed: {0}")]
     SimulationFailed(String),

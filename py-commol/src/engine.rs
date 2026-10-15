@@ -6,7 +6,9 @@
 
 use std::collections::HashMap;
 
-use commol_core::{EngineType, ModelKind, ModelValue, SimulationEngine, ValuePlan};
+use commol_core::{
+    EngineType, ModelKind, ModelValue, SimulationEngine, SimulationError, ValuePlan,
+};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_model::{CompartmentalEngine, InitialConditionPlan};
@@ -15,6 +17,22 @@ use pyo3::prelude::*;
 
 #[cfg(feature = "test-kind")]
 use crate::test_kind::{TestEngine, TestValuePlan};
+
+pyo3::create_exception!(
+    commol,
+    InfeasibleStateError,
+    PyValueError,
+    "A run left the values its model allows, such as an amount below zero."
+);
+
+/// The Python error for a run that stopped: [`InfeasibleStateError`] for an
+/// infeasible state, `RuntimeError` for any other error.
+pub(crate) fn simulation_error(error: SimulationError) -> PyErr {
+    match error {
+        SimulationError::Infeasible { message, .. } => InfeasibleStateError::new_err(message),
+        SimulationError::Failed(message) => PyRuntimeError::new_err(message),
+    }
+}
 
 /// The engine of one entry of [`EngineType`].
 #[derive(Clone)]
@@ -138,11 +156,11 @@ impl SimulationEngine for Engine {
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimulationError> {
         dispatch!(self, engine => engine.run_at_positions_into_buffer(positions, buffer))
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         dispatch!(self, engine => SimulationEngine::step(engine))
     }
 
@@ -250,9 +268,14 @@ impl PyEngine {
     /// Returns:
     ///     The positions of the grid, from the current one (included)
     ///     one unit apart, and one output row per position
+    ///
+    /// Raises:
+    ///     InfeasibleStateError: If the state leaves the values the model
+    ///         allows, such as an amount below zero
+    ///     RuntimeError: If the simulation fails for another reason
     fn run(&mut self, num_steps: u32) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
         let trajectory =
-            SimulationEngine::run(&mut self.inner, num_steps).map_err(PyRuntimeError::new_err)?;
+            SimulationEngine::run(&mut self.inner, num_steps).map_err(simulation_error)?;
         Ok((trajectory.positions, trajectory.rows))
     }
 
@@ -269,14 +292,16 @@ impl PyEngine {
     ///     ValueError: If a position is not valid for the engine (a
     ///         difference engine reports only at integer steps), or the
     ///         positions are not sorted and unique
-    ///     RuntimeError: If the simulation fails
+    ///     InfeasibleStateError: If the state leaves the values the model
+    ///         allows, such as an amount below zero
+    ///     RuntimeError: If the simulation fails for another reason
     fn run_at(&mut self, positions: Vec<f64>) -> PyResult<Vec<Vec<f64>>> {
         let engine = &mut self.inner;
         commol_core::check_positions(&positions, engine.current_position(), |position| {
             engine.check_position(position)
         })
         .map_err(PyValueError::new_err)?;
-        engine.run_at(&positions).map_err(PyRuntimeError::new_err)
+        engine.run_at(&positions).map_err(simulation_error)
     }
 
     /// Check that the engine can report at a position on the axis
@@ -293,8 +318,13 @@ impl PyEngine {
     }
 
     /// Advance one step
+    ///
+    /// Raises:
+    ///     InfeasibleStateError: If the state leaves the values the model
+    ///         allows, such as an amount below zero
+    ///     RuntimeError: If the step fails for another reason
     fn step(&mut self) -> PyResult<()> {
-        SimulationEngine::step(&mut self.inner).map_err(PyRuntimeError::new_err)
+        SimulationEngine::step(&mut self.inner).map_err(simulation_error)
     }
 
     /// Current amount of each compartment of a compartmental model
@@ -564,6 +594,10 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngine>()?;
     m.add_class::<PyEngineType>()?;
     m.add_class::<PyModelKind>()?;
+    m.add(
+        "InfeasibleStateError",
+        m.py().get_type::<InfeasibleStateError>(),
+    )?;
     Ok(())
 }
 

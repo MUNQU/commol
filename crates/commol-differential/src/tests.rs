@@ -137,12 +137,12 @@ fn outputs_at_any_positions_come_from_the_dense_output() {
 #[test]
 fn positions_must_be_sorted_and_not_in_the_past() {
     let mut engine = engine(&decay_model(TIGHT));
-    let error = engine.run_at(&[1.0, 0.5]).unwrap_err();
+    let error = engine.run_at(&[1.0, 0.5]).unwrap_err().to_string();
     assert!(error.contains("sorted"), "{error}");
-    let error = engine.run_at(&[-1.0]).unwrap_err();
+    let error = engine.run_at(&[-1.0]).unwrap_err().to_string();
     assert!(error.contains("-1 is not one"), "{error}");
     engine.run_at(&[2.0]).unwrap();
-    let error = engine.run_at(&[1.0]).unwrap_err();
+    let error = engine.run_at(&[1.0]).unwrap_err().to_string();
     assert!(error.contains("before the current position"), "{error}");
 }
 
@@ -573,7 +573,7 @@ fn a_missing_parameter_is_an_error_not_a_nan() {
         &[transition("ab", &["A"], &["B"], "missing * A", "")],
         "",
     );
-    let error = engine(&model).run(2).unwrap_err();
+    let error = engine(&model).run(2).unwrap_err().to_string();
     assert!(error.contains("missing"), "{error}");
 }
 

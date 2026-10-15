@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use commol_core::{ModelValue, ModelValueType, SimulationEngine, ValuePlan};
+use commol_core::{ModelValue, ModelValueType, SimulationEngine, SimulationError, ValuePlan};
 use commol_model::{CompartmentalEngine, InitialConditionPlan, OutputLabels};
 
 /// A compartmental engine that holds its state and does not move it.
@@ -64,13 +64,13 @@ impl SimulationEngine for FrozenEngine {
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimulationError> {
         buffer.clear();
         buffer.extend(positions.iter().map(|_| self.state.clone()));
         Ok(())
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         Ok(())
     }
 

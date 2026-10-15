@@ -125,6 +125,9 @@ class Simulation:
 
         Raises
         ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
         ValueError
             If a parameter or initial condition has no value.
         """
@@ -159,6 +162,9 @@ class Simulation:
 
         Raises
         ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
         ValueError
             If a parameter or initial condition has no value, the positions are
             not sorted and unique, or the engine does not report at one of them;

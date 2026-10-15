@@ -9,7 +9,7 @@ use commol_calibration::{
     check_model_values, configured_engine, CalibrationConstraint, CalibrationParameter,
     CalibrationParameterType, CalibrationProblem, LossConfig, ObservedDataPoint,
 };
-use commol_core::{ModelValue, SimulationEngine, ValuePlan};
+use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
 /// An engine with two outputs: `x = start * k`, its state, and `y = 2`,
 /// which is not. Its kind has one value, `start`, which is feasible up to 1.
@@ -52,14 +52,14 @@ impl SimulationEngine for StartEngine {
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimulationError> {
         let row = vec![self.start * self.parameters["k"], 2.0];
         buffer.clear();
         buffer.extend(positions.iter().map(|_| row.clone()));
         Ok(())
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         Ok(())
     }
 

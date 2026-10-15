@@ -482,6 +482,53 @@ differential engine integrates them.
 **Guard:**
 `crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`.
 
+### A difference step never leaves an amount below zero
+
+`DifferenceEquations` checks every compartment after the impulses of a step and
+after its flows (`DifferenceEquations::step`, `settle` in
+`crates/commol-difference/src/simulation.rs`). An amount below
+`−10⁻¹² × total`, the total at the start of the step, stops the run with
+`SimulationError::Infeasible` (`crates/commol-core/src/simulation_engine.rs`).
+The message names the compartment, the step, its amount before the step and
+the flows that drain it (`CompiledModel::outflows`, `impulse_outflows`). The
+check reads the state and the right-hand side once, with no allocation, and the
+state stays as it was before the step. Accumulators are not checked: a net flow
+may count negative.
+
+An error, for every cause, and not:
+
+| Alternative | Why not |
+|---|---|
+| A check only of proportional rates that sum above 1 | None of the seven negative runs the test suite had broke that rule: they came from absolute rates on a bin total and from rates that turn negative. |
+| A warning | A negative amount is never a correct state, and a warning inside a loop of calibrations is lost. |
+| Clamp the amount to zero | The total is no longer kept, and the flows are no longer those of the model, without notice. |
+| Scale the outflows down to what the compartment holds | A different model, chosen by the library; modelling choices belong to the user. |
+
+Calibration tells such a run from a failure by its type, not by its message.
+`SimulationEngine` returns `SimulationError`: `Infeasible { position, message }`
+for a state outside the values the model allows, and `Failed(String)` for every
+other error. `CalibrationProblem::cost` gives an infeasible run the base
+penalty, as it does for values that are not finite, and records nothing in the
+history; a failed run still stops the calibration, so a rate that cannot be
+evaluated does not hide behind a poor fit. An optimizer that explores the
+bounds of a rate would otherwise stop on the first infeasible point, though the
+fit lies elsewhere. The predictions of an ensemble return the type as
+`CalibrationError::Infeasible`. Python receives `InfeasibleStateError`, a
+`ValueError` (`simulation_error` in `py-commol/src/engine.rs`); a failed run
+stays a `RuntimeError`.
+
+The differential engine is not checked: a solver may step below zero by its
+tolerance, and a model whose exact solution goes negative is a modelling choice
+there.
+
+**Guards:** `crates/commol-difference/src/simulation.rs`
+(`flows_that_move_more_than_a_compartment_holds_stop_the_first_step`,
+`a_rate_that_turns_negative_stops_the_step_where_an_amount_drops_below_zero`,
+`proportional_rates_that_sum_to_one_empty_a_compartment`,
+`an_impulse_that_moves_more_than_its_source_holds_stops_its_step`,
+`an_accumulator_may_count_a_negative_net_flow`),
+`crates/commol-calibration/tests/test_infeasible_runs.rs`.
+
 ### The solver is `diffsol`
 
 The differential engine keeps no numerical method of its own: `diffsol`

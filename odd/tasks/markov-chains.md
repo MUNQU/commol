@@ -39,7 +39,7 @@ Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
 
 - **Probabilities out of a compartment.** If the proportional rates out of
   one compartment sum to more than 1, its amount goes negative.
-  `odd/tasks/difference-negative-amounts.md` makes every difference step that
+  `odd/archive/tasks/difference-negative-amounts.md` makes every difference step that
   leaves an amount below zero an error, whatever its cause, before this ODD
   runs; a chain needs no check of its own.
 - **No analysis.** Commol plans every flow (`transition_flows`,

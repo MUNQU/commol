@@ -10,6 +10,8 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.context.engine.OdeSolver
 
+::: commol.InfeasibleStateError
+
 ## Windows
 
 ::: commol.api.windows.window_start

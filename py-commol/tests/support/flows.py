@@ -8,7 +8,7 @@ one state, so a test can compare it with the equations of its source.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from commol import ModelBuilder, OdeSolver, Simulation
 from commol.context.compartmental import CompartmentalStructure
@@ -101,6 +101,14 @@ def flow_model(
     return build_ode(builder, settings) if ode else build(builder)
 
 
+STEP_FRACTION = 2.0**-6
+"""
+The fraction of every rate that ``increments`` steps by. A power of two scales
+a float exactly, so dividing the step by it gives the right-hand side, and a
+small step keeps every amount above zero.
+"""
+
+
 def increments(
     values: Mapping[str, float],
     flows: Sequence[Flow],
@@ -110,8 +118,14 @@ def increments(
     The right-hand side of the flows at the state ``values``.
 
     A difference-equation step adds the flows of the state it starts from, and
-    both engines compile the same flows, so one step gives the derivatives of
-    the differential model at that state.
+    both engines compile the same flows, so one step with every rate times
+    ``STEP_FRACTION``, divided by it, gives the derivatives of the differential
+    model at that state. The factor names no variable, so each rate keeps its
+    kind, and the step does not move more than a compartment holds.
     """
-    results = Simulation(flow_model(values, flows, parameters, ode=False)).run(1)
-    return {name: series[1] - series[0] for name, series in results.items()}
+    scaled = [replace(flow, rate=f"({flow.rate}) * {STEP_FRACTION}") for flow in flows]
+    results = Simulation(flow_model(values, scaled, parameters, ode=False)).run(1)
+    return {
+        name: (series[1] - series[0]) / STEP_FRACTION
+        for name, series in results.items()
+    }

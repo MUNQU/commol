@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
-use crate::engine::PyEngine;
+use crate::engine::{InfeasibleStateError, PyEngine};
 
 /// Type of value being calibrated
 #[pyclass(name = "CalibrationParameterType", from_py_object)]
@@ -1300,6 +1300,18 @@ fn deduplicate_evaluations(
         .collect())
 }
 
+/// The Python error for predictions that stopped: [`InfeasibleStateError`]
+/// for a run that left the values its model allows, `RuntimeError` for any
+/// other error.
+fn prediction_error(error: commol_calibration::CalibrationError) -> PyErr {
+    match error {
+        commol_calibration::CalibrationError::Infeasible(message) => {
+            InfeasibleStateError::new_err(message)
+        }
+        error => PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string()),
+    }
+}
+
 /// Generate predictions for multiple parameter sets in parallel
 ///
 /// This function runs simulations for each parameter set in parallel using Rust/Rayon,
@@ -1329,7 +1341,7 @@ fn generate_predictions_parallel(
         parameter_names,
         positions,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
@@ -1368,7 +1380,7 @@ fn generate_calibrated_predictions_parallel(
         parameter_sets,
         positions,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
@@ -1484,7 +1496,7 @@ fn generate_predictions_at_points_parallel(
         parameter_names,
         metric_points,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
@@ -1523,7 +1535,7 @@ fn generate_calibrated_predictions_at_points_parallel(
         parameter_sets,
         metric_points,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
