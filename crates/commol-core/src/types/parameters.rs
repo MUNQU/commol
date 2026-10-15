@@ -1,29 +1,20 @@
 use serde::{Deserialize, Serialize};
 
-/// Prefixes used to identify variable types in expressions
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum VariablePrefixes {
-    #[serde(rename = "state")]
-    State,
-    #[serde(rename = "strat")]
-    Strat,
-}
-
-/// How a [`ParameterValue::TimeSeries`] is interpolated between listed steps.
+/// How a [`ParameterValue::Series`] is read between its points.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SeriesMode {
-    /// Non-zero only at the listed steps; returns 0.0 at all other steps.
-    /// Use for discrete events such as vaccination campaigns or intervention pulses.
+    /// Non-zero only on the step of a listed point, read at `step`; 0.0 at
+    /// every other step. Its points must be integers. Use for discrete
+    /// events.
     #[serde(rename = "pulse")]
     Pulse,
-    /// Returns the value of the most recent listed step at or before the current
-    /// step (zero-order hold); returns 0.0 before the first listed step.
-    /// Use for step-changes such as time-varying transmission rates or policy shifts.
+    /// Returns the value of the last point at or before `t` (zero-order
+    /// hold); returns 0.0 before the first point. Use for values that change
+    /// at given positions.
     #[serde(rename = "step_function")]
     StepFunction,
-    /// Linearly interpolates between adjacent listed steps; returns 0.0 outside
-    /// the listed range.
-    /// Use for smooth empirical schedules such as seasonally adjusted parameters.
+    /// Interpolates linearly in `t` between adjacent points; returns 0.0
+    /// outside the listed range. Use for smooth empirical schedules.
     #[serde(rename = "linear")]
     Linear,
 }
@@ -36,13 +27,14 @@ pub enum ParameterValue {
     Constant(f64),
     /// Formula expression that can reference other parameters or special variables
     Formula(String),
-    /// Empirical time series: a sorted list of (step, value) pairs evaluated
+    /// Empirical series: a list of (position, value) points evaluated
     /// according to the chosen [`SeriesMode`].  Efficient O(log N) lookup —
     /// avoids embedding large lookup tables as formula strings.
-    TimeSeries {
-        /// (step, value) pairs.  Need not be pre-sorted; the engine sorts them
-        /// at build time.
-        data: Vec<(u64, f64)>,
+    Series {
+        /// (position, value) points.  Need not be pre-sorted; the engine sorts
+        /// them at build time.
+        data: Vec<(f64, f64)>,
+        /// How the positions between the points are read.
         mode: SeriesMode,
     },
 }
@@ -58,9 +50,9 @@ impl ParameterValue {
         matches!(self, ParameterValue::Formula(_))
     }
 
-    /// Check if this is a time series
-    pub fn is_time_series(&self) -> bool {
-        matches!(self, ParameterValue::TimeSeries { .. })
+    /// Check if this is a series
+    pub fn is_series(&self) -> bool {
+        matches!(self, ParameterValue::Series { .. })
     }
 
     /// Get the constant value if this is a constant, otherwise None
@@ -101,9 +93,11 @@ impl From<&str> for ParameterValue {
 /// A parameter definition with its value and optional description
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Parameter {
+    /// Identifier used in expressions.
     pub id: String,
     /// Parameter value - None indicates the parameter needs calibration
     pub value: Option<ParameterValue>,
+    /// Free-text description.
     pub description: Option<String>,
 }
 

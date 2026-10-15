@@ -1,6 +1,11 @@
 import re
 
-from commol.constants import ModelTypes, PrintEquationsOutputFormat
+try:
+    from commol.commol_rs import _commol_rs as commol_rs
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
+
+from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.context._model.engine_state import TransitionFlow
 from commol.context._model.helpers import ModelCompartmentHelper
@@ -12,8 +17,10 @@ class EquationPrinter:
     Formats and prints model equations in text or LaTeX.
 
     The flows come from the engine, so the printed equations are the ones the
-    engine simulates: each flow moves population from one compartment to
-    another, and a per-capita rate is shown multiplied by its source.
+    engine simulates: each flow moves an amount from one compartment to
+    another, and a proportional rate is shown multiplied by its source. An
+    impulse is not part of the equations: it is listed apart, with the
+    positions where it moves its amount at once.
     """
 
     def __init__(self, model) -> None:
@@ -23,7 +30,7 @@ class EquationPrinter:
 
     def _transition_flows(self) -> list[TransitionFlow]:
         if self._flows is None:
-            self._flows = engine_state.transition_flows(self._model)
+            self._flows = engine_state.transition_flows(self._model.structure)
         return self._flows
 
     def print_equations(
@@ -42,6 +49,10 @@ class EquationPrinter:
         lines.extend(self._generate_compact_form(format=format))
         lines.append("")
         lines.extend(self._generate_expanded_form(format=format))
+        impulses = self._generate_impulses(format=format)
+        if impulses:
+            lines.append("")
+            lines.extend(impulses)
 
         output = "\n".join(lines)
         _write_output(output, output_file)
@@ -57,20 +68,20 @@ class EquationPrinter:
         lines.append("MODEL INFORMATION")
         lines.append("=" * 40)
         lines.append(f"Model: {self._model.name}")
-        lines.append(f"Model Type: {self._model.dynamics.typology}")
-        lines.append(f"Number of Bins: {len(self._model.population.bins)}")
+        lines.append(f"Model Type: {self._model.engine.type}")
+        lines.append(f"Number of Bins: {len(self._model.structure.bins)}")
         lines.append(
-            f"Number of Stratifications: {len(self._model.population.stratifications)}"
+            f"Number of Stratifications: {len(self._model.structure.stratifications)}"
         )
         lines.append(f"Number of Parameters: {len(self._model.parameters)}")
-        lines.append(f"Number of Transitions: {len(self._model.dynamics.transitions)}")
+        lines.append(f"Number of Transitions: {len(self._model.structure.transitions)}")
 
-        bin_ids = [bin_item.id for bin_item in self._model.population.bins]
+        bin_ids = [bin_item.id for bin_item in self._model.structure.bins]
         lines.append(f"Bins: {', '.join(bin_ids)}")
 
-        if self._model.population.stratifications:
+        if self._model.structure.stratifications:
             lines.append("Stratifications:")
-            for strat in self._model.population.stratifications:
+            for strat in self._model.structure.stratifications:
                 categories = ", ".join(strat.categories)
                 lines.append(f"  - {strat.id}: [{categories}]")
 
@@ -98,15 +109,15 @@ class EquationPrinter:
 
         # Transitions are grouped as the definition declares them: between
         # bins, or between the categories of one stratification.
-        bin_ids = {bin_item.id for bin_item in self._model.population.bins}
+        bin_ids = {bin_item.id for bin_item in self._model.structure.bins}
         groups: list[tuple[str, list]] = [("Bin Transitions:", [])]
         by_stratification: dict[str, list] = {}
-        for transition in self._model.dynamics.transitions:
+        for transition in self._model.structure.transitions:
             states = set(transition.source) | set(transition.target)
             if states <= bin_ids:
                 groups[0][1].append(transition)
                 continue
-            for strat in self._model.population.stratifications:
+            for strat in self._model.structure.stratifications:
                 if states <= set(strat.categories):
                     by_stratification.setdefault(strat.id, []).append(transition)
                     break
@@ -133,7 +144,7 @@ class EquationPrinter:
         num_compartments = len(self._helper.generate_compartments())
         lines.extend(
             self._format_total_system_size(
-                [bin_item.id for bin_item in self._model.population.bins],
+                [bin_item.id for bin_item in self._model.structure.bins],
                 num_compartments,
             )
         )
@@ -150,7 +161,8 @@ class EquationPrinter:
     ) -> list[str]:
         source_str = ", ".join(sorted(set(transition.source))) or "none"
         target_str = ", ".join(sorted(set(transition.target))) or "none"
-        lines = [f"{transition.id} ({source_str} -> {target_str}):"]
+        schedule = f", {_impulse_schedule(transition)}" if transition.is_impulse else ""
+        lines = [f"{transition.id} ({source_str} -> {target_str}{schedule}):"]
         if not flows:
             # The engine creates no flow, for example when the rate is missing.
             lines.append("  (no flows)")
@@ -172,12 +184,12 @@ class EquationPrinter:
         self, bin_ids: list[str], num_compartments: int
     ) -> list[str]:
         num_bins = len(bin_ids)
-        if not self._model.population.stratifications:
+        if not self._model.structure.stratifications:
             return [f"Total System: {num_bins} coupled equations ({num_bins} bins)"]
 
         strat_details = [
             f"{len(strat.categories)} {strat.id}"
-            for strat in self._model.population.stratifications
+            for strat in self._model.structure.stratifications
         ]
         return [
             f"Total System: {num_compartments} coupled equations "
@@ -195,14 +207,17 @@ class EquationPrinter:
         lines.append("EXPANDED FORM")
         lines.append("=" * 40)
 
-        compartments, _ = engine_state.expanded_outputs(self._model)
+        compartments, _ = engine_state.expanded_outputs(self._model.structure)
         # Net coefficient of each flow term per compartment, in first-seen
         # order: a piece that leaves and enters the same compartment cancels,
         # and a compartment a flow enters twice gains it twice.
         net: dict[str, dict[str, int]] = {
             compartment.name: {} for compartment in compartments
         }
+        impulse_ids = {t.id for t in self._model.structure.transitions if t.is_impulse}
         for flow in self._transition_flows():
+            if flow.transition in impulse_ids:
+                continue
             for name, sign in ((flow.source, -1), (flow.target, 1)):
                 if name is not None:
                     terms = net[name]
@@ -221,13 +236,34 @@ class EquationPrinter:
             lhs = _get_equation_lhs(
                 self._display_name(compartment.name, format),
                 format,
-                self._model.dynamics.typology,
+                self._model.engine.type,
             )
             if format == PrintEquationsOutputFormat.LATEX:
                 lines.append(f"\\[{lhs} = {equation}\\]")
             else:
                 lines.append(f"{lhs} = {equation}")
 
+        return lines
+
+    def _generate_impulses(self, format: str) -> list[str]:
+        """Each impulse transition: where it acts and the amounts it moves."""
+        transitions = [t for t in self._model.structure.transitions if t.is_impulse]
+        if not transitions:
+            return []
+        lines = ["=" * 40, "IMPULSES", "=" * 40]
+        for transition in transitions:
+            lines.append(f"{transition.id}, {_impulse_schedule(transition)}:")
+            for flow in self._transition_flows():
+                if flow.transition != transition.id:
+                    continue
+                source = self._display_name(flow.source, format)
+                target = self._display_name(flow.target, format)
+                amount = self._format_rate_expr(flow.term, format)
+                if format == PrintEquationsOutputFormat.LATEX:
+                    arrow = _latex_transition_arrow(source, target)
+                    lines.append(f"  ${arrow}: {amount}$")
+                else:
+                    lines.append(f"  {source} -> {target}: {amount}")
         return lines
 
     def _format_equation(self, raw_terms: list[tuple[int, str]], format: str) -> str:
@@ -264,6 +300,14 @@ class EquationPrinter:
 # ======================================================================
 
 
+def _impulse_schedule(transition) -> str:
+    """Where an impulse acts, in words: ``impulse at 1, 3`` or ``every 7 from 0``."""
+    if transition.impulse_at is not None:
+        return "impulse at " + ", ".join(f"{p:g}" for p in transition.impulse_at)
+    period, offset = transition.impulse_every
+    return f"impulse every {period:g} from {offset:g}"
+
+
 def _write_output(output: str, output_file: str | None) -> None:
     """Write output to file or console."""
     if output_file:
@@ -273,21 +317,11 @@ def _write_output(output: str, output_file: str | None) -> None:
         print(output)
 
 
-def _get_equation_lhs(variable_name: str, format: str, typology: str) -> str:
-    """Get the left-hand side of an equation based on model type."""
-    if format == PrintEquationsOutputFormat.LATEX:
-        if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
-            return f"\\frac{{d{variable_name}}}{{dt}}"
-        else:
-            return (
-                f"\\frac{{{variable_name}(t+\\Delta t) - "
-                f"{variable_name}(t)}}{{\\Delta t}}"
-            )
-    else:
-        if typology == ModelTypes.DIFFERENTIAL_EQUATIONS:
-            return f"d{variable_name}/dt"
-        else:
-            return f"[{variable_name}(t+Dt) - {variable_name}(t)] / Dt"
+def _get_equation_lhs(variable_name: str, format: str, engine_type: str) -> str:
+    """The left-hand side of an equation, as the engine of the model writes it."""
+    return commol_rs.engine.EngineType(engine_type).equation_lhs(
+        variable_name, format == PrintEquationsOutputFormat.LATEX
+    )
 
 
 def _latex_transition_arrow(source: str, target: str) -> str:

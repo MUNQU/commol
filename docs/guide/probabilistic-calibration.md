@@ -1,47 +1,209 @@
 # Probabilistic Calibration
 
-Probabilistic calibration estimates uncertainty from an ensemble of calibrated
-parameter sets. Both selection backends use compact, observation-aware
-predictions that include the configured aggregates, windows, and scales.
+[Back to Model Calibration](calibration.md)
 
-Any configured `loss_function` (`sse`, `weighted_sse`, `rmse`, or `mae`) works
-end-to-end. The fit-gated selection scores the ensemble median prediction with
-the same loss the members were optimized with — the central loss and the
-member losses it is compared against are always measured the same way. As with
-the optimizer, `sse`/`weighted_sse` apply observation weights while `rmse`/`mae`
-do not. Use `normalize_observations=True` on the problem to keep series of very
-different magnitudes comparable within whichever loss you choose.
+A single calibration gives one parameter set. A probabilistic calibration gives
+an **ensemble**: many parameter sets that all fit the data, and from them,
+prediction intervals and parameter spreads. Add a `probabilistic_config` to the
+problem and call `Calibrator.run_probabilistic()`.
 
-## Workflow
-
-1. Run multiple independent calibrations.
-2. Deduplicate optimizer evaluations and retain a core near-optimal loss pool.
-   When configured, keep a controlled wider-loss tail for candidates that add
-   new observed-prediction shapes.
-3. Cluster candidates in parameter space or in transformed observed-prediction
-   space.
-4. Select diverse representatives from each cluster.
-5. Select the final ensemble. NSGA-II is the default and returns a Pareto front
-   balancing interval width and observed-data coverage. The
-   `greedy_local_search` backend uses a fit-gated beam search with temporary
-   bridges and preserves the central fit under the configured loss.
-6. Calculate member-consistent prediction intervals. Aggregates, observation
-   windows, and scale parameters are applied per member before percentiles are
-   calculated.
-
-## Recommended configuration
+## Quick path
 
 ```python
-from commol.context.probabilistic_calibration import (
+import random
+
+from commol import (
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    ProbabilisticCalibrationConfig,
+    ProbNsga2Config,
+    Simulation,
+)
+
+def model(k1: float | None, k2: float | None):
+    return (
+        ModelBuilder(name="Ensemble")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_bin(id="C", name="State C")
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="k2", value=k2)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
+        .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
+        .set_initial_conditions(
+            total=1000,
+            bin_fractions=[
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0},
+            ],
+        )
+        .build(engine="DifferenceEquations")
+    )
+
+# Noisy observations of a model with k1 = 0.4, k2 = 0.1
+truth = Simulation(model(0.4, 0.1)).run(num_steps=50)
+noise = random.Random(1)
+observed_data = [
+    ObservedDataPoint(at=step, output="B", value=truth["B"][step] * (1 + noise.gauss(0, 0.05)))
+    for step in range(5, 51, 5)
+]
+
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.01, max_bound=1.0),
+    ],
+    optimization_config=ParticleSwarmConfig(num_particles=20, max_iterations=100),
+    probabilistic_config=ProbabilisticCalibrationConfig(
+        n_runs=8,
+        ensemble_selection=ProbNsga2Config(
+            ensemble_size_mode="bounded",
+            ensemble_size_min=5,
+            ensemble_size_max=10,
+            population_size=40,
+            generations=30,
+        ),
+    ),
+    seed=11,
+)
+
+result = Calibrator(Simulation(model(None, None)), problem).run_probabilistic()
+ensemble = result.selected_ensemble
+
+print(ensemble.ensemble_size)                            # 10
+print({k: round(v, 2) for k, v in sorted(ensemble.point_parameters.items())})
+# {'k1': 0.4, 'k2': 0.1}
+print(ensemble.coverage_percentage)                      # 100.0: every observation inside the band
+k1 = ensemble.parameter_statistics["k1"]
+print(round(k1.percentile_lower, 2), round(k1.percentile_upper, 2))  # the 95% interval of k1
+```
+
+The settings above are small so the example is fast. For real work, see
+[A recommended configuration](#a-recommended-configuration).
+
+## How the ensemble is built
+
+```mermaid
+flowchart LR
+    A[n_runs calibrations] --> B[Filter and deduplicate evaluations]
+    B --> C[Cluster candidates]
+    C --> D[Pick diverse representatives]
+    D --> E[Select the ensemble]
+    E --> F[Intervals per member]
+```
+
+1. **Runs.** The optimizer runs `n_runs` times, from different random starts,
+   and every evaluation it makes is kept.
+2. **Filter.** Duplicate parameter sets are removed, and only near-optimal ones
+   are kept (`evaluation_processing`).
+3. **Cluster.** Candidates are grouped in parameter space or in the space of the
+   predictions that are compared with data (`clustering`).
+4. **Representatives.** Diverse candidates are taken from each cluster
+   (`representative_selection`).
+5. **Selection.** NSGA-II (default) or a fit-gated greedy search picks the final
+   members, balancing narrow intervals and coverage of the observations
+   (`ensemble_selection`).
+6. **Intervals.** Each member's predictions are computed with the observation's
+   aggregates, windows and scale factors, and then reduced across members.
+
+Every loss works (`"sse"`, `"rmse"`, `"mae"`): the ensemble is
+scored with the same loss as the runs. Use `normalize_observations=True` when
+series differ in size.
+
+A run that leaves an amount below zero gets a penalty, as in
+[Calibration](calibration.md#losses), and is not kept, so it is never a member.
+The predictions of the members run one step past the last observation; if a
+member leaves an amount below zero there, `run_probabilistic()` raises
+`InfeasibleStateError`.
+
+## Configuration
+
+### `ProbabilisticCalibrationConfig`
+
+| Field | Default | Meaning |
+|---|---|---|
+| `n_runs` | `10` | Independent calibrations. |
+| `evaluation_processing` | `ProbEvaluationFilterConfig()` | Which evaluations become candidates. |
+| `clustering` | `ProbClusteringConfig()` | How candidates are grouped. |
+| `representative_selection` | `ProbRepresentativeConfig()` | How many candidates reach the selection, and which. |
+| `ensemble_selection` | `ProbNsga2Config()` | The selection backend: `ProbNsga2Config` or `ProbGreedyLocalSearchConfig`. |
+| `confidence_level` | `0.95` | The level of every interval. |
+| `include_ensemble_candidates` | `False` | Adds the candidates and their losses to the result. |
+
+### `ProbEvaluationFilterConfig`
+
+| Field | Default | Meaning |
+|---|---|---|
+| `evaluation_retention` | `"all"` | `"all"`, `"best_per_run"` or `"top_k_per_run"` evaluations of each run. |
+| `top_k_per_run` | `None` | How many, with `"top_k_per_run"`. |
+| `max_loss_ratio` | `None` | Keeps only evaluations whose loss is at most this times the best one: the core pool. |
+| `tail_max_loss_ratio`, `tail_max_representatives` | `None`, `0` | A wider loss band from which up to that many candidates are added, only if their predictions are new. |
+| `loss_percentile_filter` | `1.0` | Keeps this best fraction, by loss. |
+| `deduplication_tolerance` | `1e-6` | Parameter sets closer than this are duplicates. |
+| `min_evaluations_required` | `5` | The minimum number of unique evaluations the analysis needs. |
+
+### `ProbClusteringConfig`
+
+| Field | Default | Meaning |
+|---|---|---|
+| `feature_space` | `"parameters"` | `"parameters"`, or `"observed_predictions"` to cluster what is compared with data (windows, aggregates and scale factors included). |
+| `n_clusters` | `None` | `None` chooses it by silhouette score, up to `max_k` (`10`). |
+| `min_evaluations_for_clustering` | `100` | Below it, no clustering. |
+| `silhouette_threshold`, `silhouette_excellent_threshold` | `0.2`, `0.8` | When clustering helps, and when to stop searching. |
+| `kmeans_algorithm`, `kmeans_max_iter` | `"elkan"`, `100` | K-means settings. |
+| `silhouette_sample_size`, `minibatch_kmeans_threshold` | `None` | Speed settings for many evaluations. |
+| `identical_solutions_atol` | `1e-10` | Tolerance for identical solutions. |
+
+### `ProbRepresentativeConfig`
+
+| Field | Default | Meaning |
+|---|---|---|
+| `max_representatives` | `1000` | Candidates passed to the selection. |
+| `percentage_elite_cluster_selection` | `0.1` | Share of each cluster's best solutions always included. |
+| `cluster_representative_strategy` | `"proportional"` | `"proportional"` or `"equal"` representatives per cluster. |
+| `cluster_selection_method` | `"latin_hypercube"` | `"latin_hypercube"`, `"crowding_distance"` or `"maximin_distance"`. |
+| `quality_temperature`, `sparsity_weight` | `1.0`, `2.0` | `"maximin_distance"` weighting. |
+| `k_neighbors_min`, `k_neighbors_max` | `5`, `10` | Density estimate. |
+| `stratum_fit_weight` | `10.0` | `"latin_hypercube"` weighting. |
+
+### Ensemble selection
+
+Both backends share the size settings:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `ensemble_size_mode` | `"automatic"` | `"fixed"`, `"bounded"` or `"automatic"`. |
+| `ensemble_size` | `None` | The size, with `"fixed"`. |
+| `ensemble_size_min`, `ensemble_size_max` | `None` | The range, with `"bounded"`. |
+
+| `ProbNsga2Config` field | Default | Meaning |
+|---|---|---|
+| `population_size`, `generations` | `100`, `100` | NSGA-II effort. |
+| `crossover_probability` | `0.9` | NSGA-II crossover. |
+| `pareto_preference` | `0.5` | Which Pareto solution is reported: towards narrow intervals or towards coverage. |
+
+| `ProbGreedyLocalSearchConfig` field | Default | Meaning |
+|---|---|---|
+| `central_fit_max_loss_ratio` | `1.25` | Rejects an ensemble whose median prediction loses more than this times the best member. |
+| `search_beam_width` | `32` | Partial ensembles kept per size; more is wider and slower. |
+
+### A recommended configuration
+
+```python
+from commol import (
     ProbClusteringConfig,
     ProbEvaluationFilterConfig,
     ProbGreedyLocalSearchConfig,
-    ProbNsga2Config,
-    ProbabilisticCalibrationConfig,
     ProbRepresentativeConfig,
 )
 
-problem.probabilistic_config = ProbabilisticCalibrationConfig(
+recommended = ProbabilisticCalibrationConfig(
     n_runs=75,
     evaluation_processing=ProbEvaluationFilterConfig(
         evaluation_retention="top_k_per_run",
@@ -50,9 +212,7 @@ problem.probabilistic_config = ProbabilisticCalibrationConfig(
         tail_max_loss_ratio=2.0,
         tail_max_representatives=50,
     ),
-    clustering=ProbClusteringConfig(
-        feature_space="observed_predictions",
-    ),
+    clustering=ProbClusteringConfig(feature_space="observed_predictions"),
     representative_selection=ProbRepresentativeConfig(
         max_representatives=1000,
         percentage_elite_cluster_selection=0.5,
@@ -67,14 +227,9 @@ problem.probabilistic_config = ProbabilisticCalibrationConfig(
         pareto_preference=0.5,
     ),
 )
-```
 
-The default is `ProbNsga2Config`. To use the fit-gated greedy backend, replace
-it with `ProbGreedyLocalSearchConfig` and configure
-`central_fit_max_loss_ratio` and `search_beam_width`:
-
-```python
-ensemble_selection=ProbGreedyLocalSearchConfig(
+# The fit-gated alternative to NSGA-II
+greedy = ProbGreedyLocalSearchConfig(
     ensemble_size_mode="bounded",
     ensemble_size_min=15,
     ensemble_size_max=30,
@@ -83,75 +238,77 @@ ensemble_selection=ProbGreedyLocalSearchConfig(
 )
 ```
 
-Increase `n_runs`, particles, and optimizer iterations before relaxing the loss
-gates. If the final intervals are narrow because all near-optimal candidates
-have almost identical predictions, prefer a small prediction-novel tail over
-raising `max_loss_ratio` globally. A broader interval is only useful when it is
-produced by candidates that still fit the data. With the greedy backend, if the
-requested ensemble size cannot satisfy the central fit gate, reduce the size or
-improve the calibration runs; increasing the gate is an explicit decision to
-permit a worse central fit.
+Raise `n_runs`, particles and iterations before you relax the loss gates. If
+the intervals are narrow because every near-optimal candidate predicts the same,
+prefer a small prediction-novel tail (`tail_max_*`) over a larger
+`max_loss_ratio`: a wider band only helps when its members still fit the data.
 
 ## Reading the result
 
-```python
-result = Calibrator(simulation, problem).run_probabilistic()
-ensemble = result.selected_ensemble
+| `ProbabilisticCalibrationResult` field | Meaning |
+|---|---|
+| `selected_ensemble` | The `EnsembleSolution` below. |
+| `selection_algorithm` | `"nsga2"` or `"greedy_local_search"`. |
+| `pareto_front`, `selected_pareto_index` | NSGA-II only: the Pareto summaries (`EnsembleSelectionSummary`) and the reported one. |
+| `n_runs_performed`, `n_unique_evaluations`, `n_clusters_used` | What the pipeline did. |
+| `confidence_level` | The interval level. |
+| `stage_timings`, `stage_counts` | Seconds and counts per stage. |
+| `ensemble_candidates` | With `include_ensemble_candidates=True`. |
 
-print(ensemble.point_loss)
-print(ensemble.central_loss)
-print(ensemble.observation_diagnostics)
-print(ensemble.selection_diagnostics)
+| `EnsembleSolution` field | Meaning |
+|---|---|
+| `point_parameters`, `point_loss` | The lowest-loss member: the only parameter set that describes one calibrated model. |
+| `ensemble_parameters`, `ensemble_size` | Every member. |
+| `parameter_statistics` | Per parameter: `mean`, `median`, `std`, `percentile_lower`, `percentile_upper`, `min`, `max`. |
+| `prediction_positions` | The positions of the prediction series: the unit grid up to one past the last observation, and every observation position and window start. |
+| `prediction_median`, `prediction_ci_lower`, `prediction_ci_upper` | Per output, one value per position of `prediction_positions`. |
+| `windowed_prediction_*` | The same for windowed observations, at the positions in `windowed_prediction_positions`. |
+| `coverage_percentage`, `average_ci_width` | Share of observations inside the band, and the band's mean width. |
+| `central_loss` | The loss of the member-wise median prediction. |
+| `observation_diagnostics` | Coverage and width **per observed series**. |
+| `selection_diagnostics` | Why the selection stopped where it did. |
+
+```python
+print(ensemble.observation_diagnostics["B"]["coverage_percentage"])  # 100.0
 ```
 
-`point_parameters` is the only parameter dictionary suitable for building a
-single model. It comes from the lowest-loss selected member. The contents of
-`parameter_statistics` describe the ensemble and must not be combined into a
-parameter-wise median model, because that combination may never have been
-calibrated.
+!!! warning "Use `point_parameters` to build a model"
+    `apply_calibration_parameters` applies `point_parameters`. Do not combine
+    the parameter medians into a model: that parameter set may never have been
+    calibrated and need not fit the data.
 
-Use `observation_diagnostics` to check every observed series. Aggregate coverage
-can hide a poor fit for a small but important series.
+Check `observation_diagnostics` for every series: a good overall coverage can
+hide a poor fit of a small series.
 
-Use `selection_algorithm`, `pareto_front`, and `selected_pareto_index` to inspect
-NSGA-II's compact trade-off summaries. For greedy selection,
-`selection_diagnostics` distinguishes a weak candidate pool from a tight
-central-fit gate; it reports the candidate count, evaluated subsets, maximum
-feasible size, rejected singleton additions, and the best coverage encountered
-during the beam search.
+## Your own ensemble statistics
 
-## Computing your own ensemble statistics
-
-`ci_percentiles` maps a confidence level to the pair of percentile points used
-for every interval in the result:
+Simulate each member, reduce each run to the quantity you need, **then** take
+statistics across members with `member_statistics`:
 
 ```python
 from commol import ci_percentiles, member_statistics
 
-lower_point, upper_point = ci_percentiles(0.95)  # (2.5, 97.5)
+final_c = [
+    Simulation(model(member["k1"], member["k2"])).run(num_steps=50)["C"][-1]
+    for member in ensemble.ensemble_parameters
+]
+stats = member_statistics(final_c, result.confidence_level)
+print(sorted(stats))  # ['ci_lower', 'ci_upper', 'max', 'mean', 'median', 'min']
+
+print(ci_percentiles(0.95))  # the percentile points of a 95% interval: about (2.5, 97.5)
 ```
 
-`member_statistics` reduces one quantity across the ensemble members and returns
-`mean`, `median`, `ci_lower`, `ci_upper`, `min` and `max`:
-
-```python
-final_values = [run["A"][-1] for run in ensemble_runs]
-stats = member_statistics(final_values, result.confidence_level)
-```
-
-Members may be scalars, as above, or equal-length series, in which case every
-statistic is a series reduced across members position by position.
+`member_statistics` also accepts equal-length series and reduces them position
+by position.
 
 !!! warning "Reduce each member first"
+    Bands of raw trajectories, reduced afterwards, give a difference of
+    percentiles: an interval that no member realizes, and usually a wider one.
+    `windowed_prediction_*` already follow this rule.
 
-    Compute the quantity you care about for each member, then pass those values
-    to `member_statistics`. Taking percentile bands of the raw trajectories and
-    reducing the bands afterwards gives a difference of percentiles rather than
-    a percentile of members: an interval that no member of the ensemble
-    realizes, and generally a wider one.
+## Next steps
 
-    Windowed quantities follow the same rule and are available directly as
-    `windowed_prediction_median`, `windowed_prediction_ci_lower` and
-    `windowed_prediction_ci_upper`. Each value is taken at the step of a
-    windowed observation, using that observation's own `window_steps`;
-    `windowed_prediction_steps` lists those steps.
+| To learn | Read |
+|---|---|
+| Reporting an ensemble | [Reports](reports.md) |
+| Plotting the band | [Plotting](simulations.md#plotting) with `calibration_result=` |

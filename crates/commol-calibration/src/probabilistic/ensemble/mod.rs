@@ -28,9 +28,17 @@ pub enum EnsembleAlgorithm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EnsembleSizeMode {
     /// Select exactly `size` candidates.
-    Fixed { size: usize },
+    Fixed {
+        /// The ensemble size.
+        size: usize,
+    },
     /// Select between `min` and `max` candidates.
-    Bounded { min: usize, max: usize },
+    Bounded {
+        /// Smallest ensemble size.
+        min: usize,
+        /// Largest ensemble size.
+        max: usize,
+    },
     /// Let the selected algorithm choose a size between two and all candidates.
     Automatic,
 }
@@ -38,54 +46,85 @@ pub enum EnsembleSizeMode {
 /// Loss metric used to score the ensemble median prediction (`central_loss`).
 ///
 /// It mirrors the optimizer's loss so the central-fit gate compares two numbers
-/// measured the same way. Each variant reproduces the corresponding
-/// `LossConfig` formula from the calibration problem: the sum-of-squares
-/// variants weight residuals, while RMSE and MAE ignore observation weights,
-/// exactly as the optimizer does.
+/// measured the same way: each variant computes the corresponding
+/// [`LossConfig`](crate::LossConfig), observation weights included.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CentralLossMetric {
-    /// Weighted sum of squared residuals (matches `SumSquaredError`/`WeightedSSE`).
+    /// Weighted sum of squared residuals (`SumSquaredError`).
     WeightedSumOfSquares,
-    /// Root mean squared residual, ignoring weights (matches `RootMeanSquaredError`).
+    /// Weighted root mean squared residual (`RootMeanSquaredError`).
     RootMeanSquared,
-    /// Mean absolute residual, ignoring weights (matches `MeanAbsoluteError`).
+    /// Weighted mean absolute residual (`MeanAbsoluteError`).
     MeanAbsolute,
+}
+
+impl CentralLossMetric {
+    /// The optimizer loss this metric computes.
+    pub fn loss_config(self) -> crate::LossConfig {
+        match self {
+            CentralLossMetric::WeightedSumOfSquares => crate::LossConfig::SumSquaredError,
+            CentralLossMetric::RootMeanSquared => crate::LossConfig::RootMeanSquaredError,
+            CentralLossMetric::MeanAbsolute => crate::LossConfig::MeanAbsoluteError,
+        }
+    }
 }
 
 /// Configuration shared by the Rust selection backends.
 #[derive(Debug, Clone)]
 pub struct EnsembleSelectionConfig {
+    /// The selection backend.
     pub algorithm: EnsembleAlgorithm,
+    /// Level of the prediction intervals, such as 0.95.
     pub confidence_level: f64,
+    /// Random seed.
     pub seed: u64,
+    /// Allowed ensemble sizes.
     pub size_mode: EnsembleSizeMode,
+    /// Loss used to score the ensemble median prediction.
     pub central_loss_metric: CentralLossMetric,
+    /// Greedy search: maximum central loss relative to the best member.
     pub central_fit_max_loss_ratio: f64,
+    /// Greedy search: partial ensembles kept per size.
     pub search_beam_width: usize,
+    /// NSGA-II population size.
     pub population_size: usize,
+    /// NSGA-II generations.
     pub generations: usize,
+    /// NSGA-II crossover probability.
     pub crossover_probability: f64,
+    /// NSGA-II preference between narrow intervals and coverage.
     pub pareto_preference: f64,
 }
 
 /// A compact Pareto-front solution.
 #[derive(Debug, Clone)]
 pub struct ParetoSolution {
+    /// Number of members.
     pub ensemble_size: usize,
+    /// Mean interval width at the observations, relative to their magnitude.
     pub ci_width: f64,
+    /// Coverage objective, in `[0, 1]`.
     pub coverage: f64,
+    /// Loss of the member-wise median prediction.
     pub central_loss: f64,
+    /// Indices of the members among the candidates.
     pub selected_indices: Vec<usize>,
 }
 
 /// Result returned by either selection backend.
 #[derive(Debug, Clone)]
 pub struct EnsembleSelectionResult {
+    /// Indices of the selected members among the candidates.
     pub selected_ensemble: Vec<usize>,
+    /// NSGA-II Pareto front; empty for the greedy search.
     pub pareto_front: Vec<ParetoSolution>,
+    /// Index of the reported solution in `pareto_front`, for NSGA-II.
     pub selected_pareto_index: Option<usize>,
+    /// Interval width of the selected ensemble.
     pub ci_width: f64,
+    /// Coverage objective of the selected ensemble.
     pub coverage: f64,
+    /// Named diagnostics of the selection.
     pub diagnostics: Vec<(String, f64)>,
 }
 
@@ -255,10 +294,11 @@ impl CompactSelectionProblem {
         let mut covered = 0usize;
         let mut covered_by_series = vec![0usize; self.series_counts.len()];
         let mut total_width = 0.0;
-        // Accumulator interpreted by `central_loss_metric`: a running sum of
-        // squared residuals for the SSE/RMSE metrics, or of absolute residuals
-        // for MAE. It is reduced to a scalar loss after the loop.
+        // Running sums of `LossConfig::term` and of the weights, reduced to the
+        // central loss by `LossConfig::finish` after the loop.
+        let loss = self.central_loss_metric.loss_config();
         let mut central_accumulator = 0.0;
+        let mut weight_sum = 0.0;
 
         for observation_index in 0..self.observed_values.len() {
             let values: Vec<f64> = selected_indices
@@ -279,25 +319,13 @@ impl CompactSelectionProblem {
 
             let normalization = self.normalization[observation_index];
             let residual = median - observed;
-            central_accumulator += match self.central_loss_metric {
-                CentralLossMetric::WeightedSumOfSquares => {
-                    let error = self.weights[observation_index] * normalization * residual;
-                    error * error
-                }
-                CentralLossMetric::RootMeanSquared => {
-                    let error = normalization * residual;
-                    error * error
-                }
-                CentralLossMetric::MeanAbsolute => (normalization * residual).abs(),
-            };
+            let weight = self.weights[observation_index];
+            central_accumulator += loss.term(normalization * residual, weight);
+            weight_sum += weight;
         }
 
         let n_observations = self.observed_values.len() as f64;
-        let central_loss = match self.central_loss_metric {
-            CentralLossMetric::WeightedSumOfSquares => central_accumulator,
-            CentralLossMetric::RootMeanSquared => (central_accumulator / n_observations).sqrt(),
-            CentralLossMetric::MeanAbsolute => central_accumulator / n_observations,
-        };
+        let central_loss = loss.finish(central_accumulator, weight_sum);
 
         let coverage = covered as f64 / n_observations;
         let minimum_series_coverage = covered_by_series
@@ -560,5 +588,33 @@ mod tests {
         assert!((sse - 18.0).abs() < 1e-9); // 3^2 + 3^2
         assert!((rmse - 3.0).abs() < 1e-9); // sqrt((9 + 9) / 2)
         assert!((mae - 3.0).abs() < 1e-9); // (3 + 3) / 2
+    }
+
+    #[test]
+    fn central_loss_uses_observation_weights_in_every_metric() {
+        let make = || vec![candidate(1.0, &[8.0, 8.0]), candidate(1.0, &[12.0, 12.0])];
+        let problem = |metric| {
+            CompactSelectionProblem::new(
+                make(),
+                vec![7.0, 9.0],
+                vec![2.0, 0.5],
+                vec![1.0, 1.0],
+                vec!["s".to_string(), "s".to_string()],
+                0.95,
+                metric,
+            )
+            .expect("problem construction should succeed")
+        };
+        let indices = [0usize, 1usize];
+        // Median prediction 10: residuals 3 and 1, weights 2 and 0.5.
+        let central = |metric| problem(metric).metrics(&indices).central_loss;
+
+        let sse = central(CentralLossMetric::WeightedSumOfSquares);
+        let rmse = central(CentralLossMetric::RootMeanSquared);
+        let mae = central(CentralLossMetric::MeanAbsolute);
+
+        assert!((sse - 18.5).abs() < 1e-9);
+        assert!((rmse - (18.5_f64 / 2.5).sqrt()).abs() < 1e-9);
+        assert!((mae - 6.5 / 2.5).abs() < 1e-9);
     }
 }

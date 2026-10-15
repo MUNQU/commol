@@ -1,11 +1,14 @@
+"""Calibration of a model against observed data."""
+
 import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
+        CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
         CalibrationResultWithHistoryProtocol,
-        DifferenceEquationsProtocol,
+        EngineProtocol,
         LossConfigProtocol,
         OptimizationConfigProtocol,
     )
@@ -14,12 +17,12 @@ try:
     from commol.commol_rs import _commol_rs as commol_rs
 
     rust_core = commol_rs.core
-    rust_difference = commol_rs.difference
     rust_calibration = commol_rs.calibration
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
 from commol.api.simulation import Simulation
+from commol.context._model import engine_state
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -64,7 +67,7 @@ class Calibrator:
         )
         self.simulation: Simulation = simulation
         self.problem: CalibrationProblem = problem
-        self._engine: "DifferenceEquationsProtocol" = simulation.engine
+        self._engine: "EngineProtocol" = simulation.engine
 
         logger.info(
             (
@@ -76,7 +79,7 @@ class Calibrator:
         # Validate calibration parameters against model
         self._validate_calibration_parameters()
         self._validate_observed_data()
-        self._warn_constraint_time_steps_beyond_observations()
+        self._warn_constraint_positions_beyond_observations()
 
     def run(self) -> CalibrationResult:
         """
@@ -111,43 +114,12 @@ class Calibrator:
             )
         )
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
@@ -158,9 +130,6 @@ class Calibrator:
         logger.info("Converted problem definition to Rust types.")
         logger.info("Running optimization...")
 
-        # Get initial population size for initial condition fraction conversion
-        initial_population_size = self._get_initial_population_size()
-
         # Call the Rust calibrate function
         rust_result = rust_calibration.calibrate(
             self._engine,
@@ -169,7 +138,6 @@ class Calibrator:
             rust_constraints,
             rust_loss_config,
             rust_optimization_config,
-            initial_population_size,
             initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
@@ -215,52 +183,18 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
 
-        # Convert observed data to Rust types
-        rust_observed_data = [
-            rust_calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        rust_observed_data = engine_state.rust_observed_data(self.problem.observed_data)
 
         # Convert parameters to Rust types
-        rust_parameters = [
-            rust_calibration.CalibrationParameter(
-                id=param.id,
-                parameter_type=self._to_rust_parameter_type(param.parameter_type),
-                min_bound=param.min_bound,
-                max_bound=param.max_bound,
-                initial_guess=param.initial_guess,
-            )
-            for param in self.problem.parameters
-        ]
+        rust_parameters = self._rust_parameters()
 
-        # Convert constraints to Rust types
-        rust_constraints = [
-            rust_calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        rust_constraints = engine_state.rust_constraints(self.problem.constraints)
 
         # Convert loss config to Rust type
         rust_loss_config = self._build_loss_config()
 
         # Convert optimization config to Rust type
         rust_optimization_config = self._build_optimization_config()
-
-        # Get initial population size for initial condition fraction conversion
-        initial_population_size = self._get_initial_population_size()
 
         # Call the Rust calibrate_with_history function
         rust_result = rust_calibration.calibrate_with_history(
@@ -270,7 +204,6 @@ class Calibrator:
             rust_constraints,
             rust_loss_config,
             rust_optimization_config,
-            initial_population_size,
             initial_condition_remainder=self.problem.initial_condition_remainder,
         )
 
@@ -290,8 +223,8 @@ class Calibrator:
             return rust_calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return rust_calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
-            return rust_calibration.CalibrationParameterType.Scale
+        elif param_type == CalibrationParameterType.FACTOR:
+            return rust_calibration.CalibrationParameterType.Factor
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -305,8 +238,6 @@ class Calibrator:
             loss_config = rust_calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = rust_calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = rust_calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}.")
 
@@ -321,7 +252,7 @@ class Calibrator:
             nm_config = rust_calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
-                simplex_perturbation=opt_config.simplex_perturbation,
+                initial_simplex_size=opt_config.initial_simplex_size,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -428,6 +359,19 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
+    def _rust_parameters(self) -> list["CalibrationParameterProtocol"]:
+        """Calibration parameters as engine types, in problem order."""
+        return [
+            rust_calibration.CalibrationParameter(
+                id=param.id,
+                parameter_type=self._to_rust_parameter_type(param.parameter_type),
+                min_bound=param.min_bound,
+                max_bound=param.max_bound,
+                initial_guess=param.initial_guess,
+            )
+            for param in self.problem.parameters
+        ]
+
     def _validate_calibration_parameters(self) -> None:
         """
         Validate that all calibration parameters exist in the model.
@@ -439,14 +383,6 @@ class Calibrator:
         """
         model = self.simulation.model_definition
         model_param_ids = {p.id for p in model.parameters}
-        model_bin_ids = {b.id for b in model.population.bins}
-        model_binary_stratification_categories = {
-            category
-            for stratification in model.population.stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self._engine.compartments)
 
         for param in self.problem.parameters:
             if param.parameter_type == CalibrationParameterType.PARAMETER:
@@ -456,63 +392,21 @@ class Calibrator:
                         f"parameters. Available parameters: "
                         f"{sorted(model_param_ids)}"
                     )
-            elif param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Calibration initial condition '{param.id}' not found in "
-                        f"model bins, stratification categories, or expanded "
-                        f"compartments. Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: "
-                        f"{sorted(engine_compartment_ids)}"
-                    )
-            elif param.parameter_type == CalibrationParameterType.SCALE:
+            elif param.parameter_type == CalibrationParameterType.FACTOR:
                 if param.min_bound <= 0 or param.max_bound <= 0:
                     raise ValueError(
-                        f"Scale parameter '{param.id}' must have positive bounds "
+                        f"Factor parameter '{param.id}' must have positive bounds "
                         f"(got min={param.min_bound}, max={param.max_bound})"
                     )
-            else:
-                raise ValueError(
-                    f"Unknown calibration parameter type: {param.parameter_type}"
-                )
 
-    def _get_compartment_index(self, bin_id: str) -> int:
-        """
-        Get the index of a bin/compartment by its ID.
-
-        Parameters
-        ----------
-        bin_id : str
-            The bin identifier
-
-        Returns
-        -------
-        int
-            The index of the compartment in the population vector
-
-        Raises
-        ------
-        ValueError
-            If the bin_id is not found
-        """
-        bins = self.simulation.model_definition.population.bins
-        for idx, bin_obj in enumerate(bins):
-            if bin_obj.id == bin_id:
-                return idx
-        raise ValueError(f"Bin '{bin_id}' not found in model")
-
-    def _get_initial_population_size(self) -> int:
-        """Get the initial population size from the model."""
-        initial_conditions = (
-            self.simulation.model_definition.population.initial_conditions
+        # The structure and the engine check the values of the model kind,
+        # such as initial conditions.
+        engine_state.check_model_values(
+            model,
+            self._engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
         )
-        return initial_conditions.population_size
 
     def _validate_observed_data(self) -> None:
         """Validate that observed data compartments exist and have valid steps.
@@ -520,12 +414,12 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If observed data contains invalid compartments or negative time steps.
+            If observed data contains invalid compartments or negative positions.
         """
         simulation_output_names = set(self._engine.output_names)
 
         for obs in self.problem.observed_data:
-            observed_outputs = obs.compartments or [obs.compartment]
+            observed_outputs = obs.observed_outputs
             missing_outputs = [
                 output
                 for output in observed_outputs
@@ -534,31 +428,27 @@ class Calibrator:
             if missing_outputs:
                 raise ValueError(
                     f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"'{obs.label}' not found in model simulation outputs. "
                     f"Available outputs: {sorted(simulation_output_names)}"
                 )
 
-        if self.problem.observed_data:
-            min_step = min(obs.step for obs in self.problem.observed_data)
-            if min_step < 0:
-                raise ValueError(
-                    f"Observed data contains negative time step: {min_step}. "
-                    "Time steps must be non-negative."
-                )
+        engine_state.check_positions(
+            self._engine, self.problem.observed_data, self.problem.constraints
+        )
 
-    def _warn_constraint_time_steps_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+    def _warn_constraint_positions_beyond_observations(self) -> None:
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
-        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
-            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+            if constraint.at and max(constraint.at) > max_observed_position:
                 logger.warning(
-                    "Constraint '%s' has time_steps beyond the maximum observed "
-                    "step (%s); simulation will be extended to evaluate them.",
+                    "Constraint '%s' has positions beyond the maximum observed "
+                    "position (%s); simulation will be extended to evaluate them.",
                     constraint.id,
-                    max_observed_step,
+                    max_observed_position,
                 )
 
     def run_probabilistic(self):

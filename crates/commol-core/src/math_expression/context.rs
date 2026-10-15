@@ -7,7 +7,7 @@ use evalexpr::{ContextWithMutableVariables, HashMapContext, Value};
 use std::collections::HashMap;
 
 use super::preprocessing::{
-    SPECIAL_VAR_E, SPECIAL_VAR_N, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T,
+    SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
 };
 
 /// Context for evaluating mathematical expressions
@@ -19,6 +19,9 @@ pub struct MathExpressionContext {
     parameter_values: Vec<Option<f64>>,
     pub(crate) compartments: HashMap<String, f64>,
     pub(crate) step: f64,
+    /// Continuous time `t`. Equal to `step` in a difference model; inside a
+    /// step of a differential model `step` stays at the step that holds `t`.
+    pub(crate) time: f64,
     /// Cached compartment names for index-based updates
     compartment_names: Vec<String>,
     /// Cached evalexpr context to avoid rebuilding
@@ -37,6 +40,7 @@ impl MathExpressionContext {
             parameter_values: Vec::new(),
             compartments: HashMap::new(),
             step: 0.0,
+            time: 0.0,
             compartment_names: Vec::new(),
             cached_evalexpr_context: None,
             cache_dirty: true,
@@ -72,12 +76,12 @@ impl MathExpressionContext {
                         .ok();
                 }
             }
-            // Update N (total population). Callers may pass a wider row than the
+            // Update the total. Callers may pass a wider row than the
             // registered compartments (simulation outputs append accumulators after
-            // the population), so only the registered compartments count towards N
-            // — matching the assignment loop above.
-            let total_pop: f64 = values.iter().take(self.compartment_names.len()).sum();
-            ctx.set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
+            // the state), so only the registered compartments count towards the
+            // total — matching the assignment loop above.
+            let total: f64 = values.iter().take(self.compartment_names.len()).sum();
+            ctx.set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
                 .ok();
         } else {
             self.cache_dirty = true;
@@ -129,21 +133,37 @@ impl MathExpressionContext {
         self.cache_dirty = true;
     }
 
-    /// Set a compartment population value
+    /// Set the amount of a compartment
     pub fn set_compartment(&mut self, name: String, value: f64) {
         self.compartments.insert(name, value);
         self.cache_dirty = true;
     }
 
-    /// Set the current step
+    /// Set the current step, and the time `t` to the same value.
     pub fn set_step(&mut self, step: f64) {
         self.step = step;
+        self.time = step;
 
         // Update cached context directly if it exists
         if let Some(ref mut ctx) = self.cached_evalexpr_context {
             ctx.set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(step))
                 .ok();
             ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(step))
+                .ok();
+        } else {
+            self.cache_dirty = true;
+        }
+    }
+
+    /// Set the time `t` and leave `step` as it is.
+    ///
+    /// A differential engine calls it after [`Self::set_step`], so `step` is
+    /// the step that holds `t`.
+    pub fn set_time(&mut self, time: f64) {
+        self.time = time;
+
+        if let Some(ref mut ctx) = self.cached_evalexpr_context {
+            ctx.set_value(SPECIAL_VAR_T.to_string(), Value::Float(time))
                 .ok();
         } else {
             self.cache_dirty = true;
@@ -243,15 +263,15 @@ impl MathExpressionContext {
             // is not associative, so summing in different orders produces different results.
             let mut sorted_values: Vec<f64> = self.compartments.values().copied().collect();
             sorted_values.sort_by(|a, b| a.total_cmp(b));
-            let total_pop: f64 = sorted_values.iter().sum();
+            let total: f64 = sorted_values.iter().sum();
             context
-                .set_value(SPECIAL_VAR_N.to_string(), Value::Float(total_pop))
+                .set_value(SPECIAL_VAR_TOTAL.to_string(), Value::Float(total))
                 .ok();
             context
                 .set_value(SPECIAL_VAR_STEP.to_string(), Value::Float(self.step))
                 .ok();
             context
-                .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.step))
+                .set_value(SPECIAL_VAR_T.to_string(), Value::Float(self.time))
                 .ok();
             context
                 .set_value(

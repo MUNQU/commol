@@ -7,6 +7,7 @@ repo_name: MUNQU/commol
 
 theme:
   name: material
+  custom_dir: overrides # the banner on non-default versions (overrides/main.html)
   palette:
     # Palette toggle for light mode
     - scheme: default
@@ -52,12 +53,58 @@ plugins:
             filters:
               - "!^_[^_]"
 
+  # llms.txt (an index for AI agents) and llms-full.txt (every page in one file)
+  - llmstxt:
+      base_url: https://munqu.github.io/commol/latest/
+      full_output: llms-full.txt
+      markdown_description: >
+        Commol is a Python library, with a Rust engine, to build, simulate and
+        calibrate compartment models. Models are built with ModelBuilder,
+        simulated with Simulation and fitted with Calibrator. Examples use
+        abstract names (bins A, B, C; parameters k1, k2).
+      sections:
+        Getting started:
+          - index.md: Overview and where to go
+          - getting-started/*.md
+        User guide:
+          - guide/core-concepts.md: Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
+          - guide/building-models.md: Every ModelBuilder method and argument, series parameters, validation rules, save and load
+          - guide/transitions.md: Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
+          - guide/mathematical-expressions.md: Operators, variables, subgroup totals, functions and security limits of rate formulas
+          - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
+          - guide/units-and-equations.md: Unit checking and print_equations (text and LaTeX)
+          - guide/simulations.md: Simulation.run, output formats, totals by bin and category, windowed totals, plotting
+          - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, results and writing results back
+          - guide/calibration-initial-conditions.md: Calibrating bins, categories and compartments, the remainder and the order of application
+          - guide/calibration-observations.md: Several outputs, sums of outputs, weights, scale factors and windowed observations
+          - guide/calibration-optimizers.md: Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
+          - guide/calibration-constraints.md: Constraints on unknowns and outputs, and how violations count
+          - guide/probabilistic-calibration.md: Ensembles, every configuration field, reading results, member statistics
+          - guide/reports.md: applied_parameters_report and simulation_report
+          - guide/examples.md: Complete models
+        API reference:
+          - api/*.md
+          - advanced/model-structure.md: The data model of a Model
+        Changelog:
+          - about/changelog.md: Every change, breaking ones marked
+
+# Broken links and anchors fail `mkdocs build --strict`.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 markdown_extensions:
   - pymdownx.highlight: # Code highlighting
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.superfences # Fenced code blocks
+  - pymdownx.superfences: # Fenced code blocks, and mermaid diagrams
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   # Admonitions (note/warning/tip boxes)
   - admonition # Basic admonitions
   - pymdownx.details # Collapsible admonitions
@@ -78,23 +125,42 @@ nav:
       - Quick Start: getting-started/quickstart.md
   - User Guide:
       - Core Concepts: guide/core-concepts.md
-      - Building Models: guide/building-models.md
-      - Mathematical Expressions: guide/mathematical-expressions.md
-      - Time Patterns: guide/time-patterns.md
+      - Building Models:
+          - Model Builder: guide/building-models.md
+          - Transitions: guide/transitions.md
+          - Mathematical Expressions: guide/mathematical-expressions.md
+          - Axis Patterns: guide/axis-patterns.md
+          - Units and Equations: guide/units-and-equations.md
       - Running Simulations: guide/simulations.md
-      - Model Calibration: guide/calibration.md
-      - Probabilistic Calibration: guide/probabilistic-calibration.md
+      - Calibration:
+          - Calibration Basics: guide/calibration.md
+          - Initial Conditions: guide/calibration-initial-conditions.md
+          - Observations: guide/calibration-observations.md
+          - Optimizers: guide/calibration-optimizers.md
+          - Constraints: guide/calibration-constraints.md
+          - Probabilistic Calibration: guide/probabilistic-calibration.md
+          - Reports: guide/reports.md
       - Examples: guide/examples.md
   - API Reference:
-      - Model Builder: api/model-builder.md
+      - API Overview: api/index.md
+      - ModelBuilder: api/model-builder.md
+      - Model: api/model.md
       - Simulation: api/simulation.md
-      - Time Patterns: api/time-patterns.md
-      - Time Scale: api/time-scale.md
-      - Calibrator: api/calibrator.md
-      - Probabilistic Calibrator: api/probabilistic-calibrator.md
-  - Advanced:
+      - Plotting: api/plotting.md
+      - AxisPattern: api/axis-patterns.md
+      - AxisUnits: api/axis-units.md
+      - Calibration: api/calibrator.md
+      - Probabilistic Calibration: api/probabilistic-calibrator.md
+      - Reports: api/reports.md
       - Model Structure: advanced/model-structure.md
   - Development:
+      - Codebase Guide:
+          - Codebase Guide: codebase/index.md
+          - Mental Model: codebase/mental-model.md
+          - Repository Map: codebase/repository-map.md
+          - Design Decisions: codebase/design-decisions.md
+          - Conventions: codebase/conventions.md
+          - Maintainer Playbook: codebase/maintainer-playbook.md
       - Development Workflow: development/workflow.md
       - Contributing: development/contributing.md
       - Release Process: development/release.md
@@ -112,6 +178,7 @@ extra:
       name: MUNQU Research Team
   version:
     provider: mike
+    default: latest
   team:
     name: MUNQU Research Team
     url: https://munqu.webs.upv.es

@@ -1,19 +1,50 @@
+"""Dimensional analysis of model equations with pint."""
+
+import ast
 import math
-from collections.abc import Callable
-from typing import cast
+import re
+from collections.abc import Iterable
+from typing import Any
 
 import pint
 
 from commol.context.parameter import Parameter
-from commol.context.stratification import Stratification
+from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
+
+DEFAULT_STEP_UNIT = "step"
+"""Step unit of a model that declares none: the default increment of any axis."""
 
 ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
+ureg.define(f"{DEFAULT_STEP_UNIT} = [{DEFAULT_STEP_UNIT}]")
 
 
 class UnitConsistencyError(Exception):
     """Raised when unit consistency check fails."""
 
     pass
+
+
+def define_units(expression: str) -> None:
+    """
+    Define every unit name in `expression` that `pint` does not know.
+
+    A unit means what `pint` defines. A name that `pint` does not define
+    (``item``) becomes the one unit of its own dimension
+    (``[item_dimension]``), for time as for any other quantity.
+
+    Parameters
+    ----------
+    expression : str
+        A unit expression, such as ``"item/day"`` or ``"1/km**2"``.
+    """
+    for part in re.split(r"[*/\s()]+", expression):
+        part = part.strip()
+        if not part or part.replace(".", "").replace("-", "").isdigit():
+            continue
+        try:
+            ureg(part)
+        except pint.UndefinedUnitError:
+            ureg.define(f"{part} = [{part}_dimension]")
 
 
 def check_equation_units(
@@ -27,12 +58,12 @@ def check_equation_units(
     Parameters
     ----------
     equation : str
-        The mathematical equation to check (e.g., "beta * S * I / N").
+        The mathematical equation to check (e.g., "k1 * A * B / total").
     variable_units : dict[str, str]
         Mapping of variable names to their units
-        (e.g., {"beta": "1/day", "S": "person"}).
+        (e.g., {"k1": "1/day", "A": "item"}).
     expected_unit : str
-        The expected unit of the equation result (e.g., "person/day").
+        The expected unit of the equation result (e.g., "item/day").
 
     Returns
     -------
@@ -40,15 +71,18 @@ def check_equation_units(
         A tuple of (is_consistent, error_message).
         If consistent, returns (True, None).
         If inconsistent, returns (False, error_message).
+
+    Notes
+    -----
+    The unit must be equal to ``expected_unit``, not only convertible to it:
+    ``item/week`` does not match ``item/day``, because the engine never
+    converts values between units.
     """
     try:
         # Parse the equation to build a pint Quantity
         equation_unit = parse_equation_unit(equation, variable_units)
 
-        # Check if result matches expected unit
-        expected_quantity = ureg(expected_unit)
-
-        if not equation_unit.is_compatible_with(expected_quantity):
+        if not same_unit(str(equation_unit.units), expected_unit):
             return (
                 False,
                 (
@@ -65,12 +99,131 @@ def check_equation_units(
         return (False, f"Error checking units for equation '{equation}': {str(e)}")
 
 
+def same_unit(unit: str, other: str) -> bool:
+    """
+    Whether two units are equal: convertible, with a conversion factor of 1.
+
+    Parameters
+    ----------
+    unit, other : str
+        Unit expressions, such as ``"1/day"`` and ``"1/d"``.
+
+    Returns
+    -------
+    bool
+        True for ``"1/day"`` and ``"1/d"``; False for ``"1/day"`` and
+        ``"1/week"``, which are convertible but not equal.
+    """
+    quantity = ureg.Quantity(1.0, ureg.parse_units(unit))
+    target = ureg.parse_units(other)
+    if not quantity.is_compatible_with(target):
+        return False
+    return math.isclose(float(quantity.to(target).magnitude), 1.0, rel_tol=1e-9)
+
+
+class _Literal(float):
+    """A number written in an equation, whose unit the check may read."""
+
+
+def _match_units(*operands: Any) -> list[Any]:
+    """
+    Give each written number the unit of the first quantity among `operands`.
+
+    The engine reads a number added to, subtracted from or compared with a
+    value in the unit of that value: ``t >= 10`` with ``t`` in days compares
+    with 10 days. The check reads it the same way. A number that a function
+    or an operation computed stays dimensionless.
+
+    Raises
+    ------
+    pint.DimensionalityError
+        If two quantities among `operands` have different dimensions.
+    """
+    quantities = [operand for operand in operands if isinstance(operand, pint.Quantity)]
+    if not quantities:
+        return list(operands)
+    units = quantities[0].units
+    matched: list[Any] = []
+    for operand in operands:
+        if isinstance(operand, _Literal):
+            operand = ureg.Quantity(float(operand), units)
+        if not isinstance(operand, pint.Quantity):
+            operand = ureg.Quantity(float(operand), ureg.dimensionless)
+        if not operand.is_compatible_with(units):
+            raise pint.DimensionalityError(operand.units, units)
+        matched.append(operand)
+    return matched
+
+
+def _add(left: Any, right: Any) -> Any:
+    a, b = _match_units(left, right)
+    return a + b
+
+
+def _subtract(left: Any, right: Any) -> Any:
+    a, b = _match_units(left, right)
+    return a - b
+
+
+def _compare(*operands: Any) -> float:
+    """A comparison: its operands share a unit, and its value is a number."""
+    _match_units(*operands)
+    return 1.0
+
+
+def _if(_condition: Any, then: Any, otherwise: Any) -> Any:
+    """``if(condition, then, otherwise)``: both branches share a unit."""
+    return _match_units(then, otherwise)[0]
+
+
+def _min(*operands: Any) -> Any:
+    return _match_units(*operands)[0]
+
+
+class _ReadWrittenNumbers(ast.NodeTransformer):
+    """Mark written numbers, and route sums, differences and comparisons."""
+
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+            return _call("_literal", [node])
+        return node
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> ast.AST:
+        if isinstance(node.op, (ast.USub, ast.UAdd)) and isinstance(
+            node.operand, ast.Constant
+        ):
+            return _call("_literal", [node])
+        return self.generic_visit(node)
+
+    def visit_BinOp(self, node: ast.BinOp) -> ast.AST:
+        self.generic_visit(node)
+        if isinstance(node.op, ast.Add):
+            return _call("_add", [node.left, node.right])
+        if isinstance(node.op, ast.Sub):
+            return _call("_subtract", [node.left, node.right])
+        return node
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        self.generic_visit(node)
+        return _call("_compare", [node.left, *node.comparators])
+
+
+def _call(name: str, arguments: list) -> ast.Call:
+    return ast.Call(func=ast.Name(id=name, ctx=ast.Load()), args=arguments, keywords=[])
+
+
+_IF_CALL = re.compile(r"\bif\s*\(")
+
+
 def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
     """
     Parse an equation and compute its resulting unit.
 
-    This function evaluates the equation symbolically using pint quantities
-    to determine the final unit.
+    The equation is evaluated with every variable as a `pint` quantity of
+    value 1 in its unit. A number written in the equation and added to,
+    subtracted from or compared with a quantity is read in that quantity's
+    unit, as the engine reads it; the two branches of ``if(c, a, b)`` and
+    the arguments of ``min`` and ``max`` share one unit.
 
     Parameters
     ----------
@@ -84,131 +237,86 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     pint.Quantity
         A pint Quantity representing the unit of the equation.
     """
-    # Create a namespace with all variables as pint quantities with value 1
-    # The namespace also includes math functions which are callables
-    namespace: dict[
-        str,
-        pint.Quantity[float]
-        | float
-        | Callable[[float], float]
-        | Callable[[float, float], float]
-        | Callable[..., float]
-        | type[int]
-        | type[float],
-    ] = {}
+    namespace: dict[str, object] = {}
 
-    # Add variables with their units
     for var, unit_str in variable_units.items():
         unit_obj = ureg(unit_str)
         if isinstance(unit_obj, pint.Quantity):
             namespace[var] = unit_obj
         else:
-            # Handle cases where ureg() returns Unit instead of Quantity
             namespace[var] = 1.0 * unit_obj
 
-    # Add mathematical constants (dimensionless)
-    namespace["pi"] = math.pi
-    namespace["e"] = math.e
+    namespace.update(
+        {
+            "pi": math.pi,
+            "e": math.e,
+            "sin": math.sin,
+            "cos": math.cos,
+            "tan": math.tan,
+            "asin": math.asin,
+            "acos": math.acos,
+            "atan": math.atan,
+            "atan2": math.atan2,
+            "sinh": math.sinh,
+            "cosh": math.cosh,
+            "tanh": math.tanh,
+            "asinh": math.asinh,
+            "acosh": math.acosh,
+            "atanh": math.atanh,
+            "exp": math.exp,
+            "log": math.log,
+            "log10": math.log10,
+            "log2": math.log2,
+            "ln": math.log,
+            "sqrt": math.sqrt,
+            "pow": math.pow,
+            "hypot": math.hypot,
+            "abs": abs,
+            "floor": math.floor,
+            "ceil": math.ceil,
+            "round": round,
+            "min": _min,
+            "max": _min,
+            "_literal": _Literal,
+            "_add": _add,
+            "_subtract": _subtract,
+            "_compare": _compare,
+            "_if": _if,
+        }
+    )
 
-    # Add mathematical functions
-    # Pint automatically handles dimensionless quantities for these functions
-    # by extracting magnitudes when needed. Functions return plain floats which
-    # are then treated as dimensionless quantities.
-
-    # Trigonometric functions
-    namespace["sin"] = math.sin
-    namespace["cos"] = math.cos
-    namespace["tan"] = math.tan
-    namespace["asin"] = math.asin
-    namespace["acos"] = math.acos
-    namespace["atan"] = math.atan
-    namespace["atan2"] = math.atan2
-    namespace["sinh"] = math.sinh
-    namespace["cosh"] = math.cosh
-    namespace["tanh"] = math.tanh
-    namespace["asinh"] = math.asinh
-    namespace["acosh"] = math.acosh
-    namespace["atanh"] = math.atanh
-
-    # Exponential and logarithmic functions
-    namespace["exp"] = math.exp
-    namespace["log"] = math.log
-    namespace["log10"] = math.log10
-    namespace["log2"] = math.log2
-    namespace["ln"] = math.log  # alias for natural log
-
-    # Power and root functions
-    namespace["sqrt"] = math.sqrt
-    namespace["pow"] = math.pow
-    namespace["hypot"] = math.hypot
-
-    # Rounding and absolute value functions
-    namespace["abs"] = abs
-    namespace["floor"] = math.floor
-    namespace["ceil"] = math.ceil
-    namespace["round"] = round
-
-    # Min/max functions
-    namespace["min"] = min
-    namespace["max"] = max
-
-    # Evaluate the equation
     try:
-        eval_result: object = cast(
-            object, eval(equation, {"__builtins__": {}}, namespace)
+        tree = ast.parse(_IF_CALL.sub("_if(", equation), mode="eval")
+        tree = ast.fix_missing_locations(_ReadWrittenNumbers().visit(tree))
+        eval_result: object = eval(
+            compile(tree, "<equation>", "eval"), {"__builtins__": {}}, namespace
         )
-
-        if isinstance(eval_result, pint.Quantity):
-            return eval_result
-        elif isinstance(eval_result, (int, float)):
-            # If result is a number, it's dimensionless
-            numeric_value = float(eval_result)
-            unit_result = ureg.dimensionless
-
-            if isinstance(unit_result, pint.Unit):
-                # Multiply numeric value by Unit to get Quantity
-                quantity_result: object = cast(object, numeric_value * unit_result)
-                # The result should be a Quantity
-                if isinstance(quantity_result, pint.Quantity):
-                    return quantity_result
-                else:
-                    raise ValueError(
-                        (
-                            f"Multiplying float by Unit did not produce "
-                            f"Quantity: {type(quantity_result)}"
-                        )
-                    )
-            else:
-                # ureg.dimensionless might be a Quantity itself
-                quantity_result = cast(object, numeric_value * unit_result)
-                if isinstance(quantity_result, pint.Quantity):
-                    return quantity_result
-                else:
-                    raise ValueError(
-                        (
-                            f"Multiplying float by dimensionless did not "
-                            f"produce Quantity: {type(quantity_result)}"
-                        )
-                    )
-        else:
-            raise ValueError(
-                f"Unexpected result type {type(eval_result)} from equation '{equation}'"
-            )
     except Exception as e:
         raise ValueError(f"Failed to evaluate equation '{equation}': {str(e)}")
 
+    if isinstance(eval_result, pint.Quantity):
+        return eval_result
+    if isinstance(eval_result, (int, float)):
+        return ureg.Quantity(float(eval_result), ureg.dimensionless)
+    raise ValueError(
+        f"Unexpected result type {type(eval_result)} from equation '{equation}'"
+    )
+
 
 def get_predefined_variable_units(
-    stratifications: list[Stratification],
+    subgroup_totals: Iterable[str],
     bin_unit: str | None = None,
 ) -> dict[str, str]:
     """
-    Get units for predefined variables like N, N_young, etc.
+    Get units for the predefined variables ``total`` and ``total_<cat>…``.
 
     Parameters
     ----------
-    stratifications : list
-        List of stratification objects with categories.
+    subgroup_totals : Iterable[str]
+        Names of the subgroup totals of the model, as the engine provides them
+        (``engine_state.subgroup_total_names``). Names without the
+        ``total_`` prefix, such as bin totals, are skipped: they take the unit
+        of their bin.
     bin_unit : str | None
         The unit for bins. If None, predefined variables will not be added to the
         units mapping.
@@ -218,38 +326,10 @@ def get_predefined_variable_units(
     dict[str, str]
         Mapping of predefined variable names to their units.
     """
-    predefined_units: dict[str, str] = {}
-
-    # Only add predefined variables if bin_unit is specified
     if bin_unit is None:
-        return predefined_units
-
-    # Total population N
-    predefined_units["N"] = bin_unit
-
-    # Add N_{category} for each category in stratifications
-    for strat in stratifications:
-        for category in strat.categories:
-            predefined_units[f"N_{category}"] = bin_unit
-
-    # Add N_{category1}_{category2} for combinations
-    # This handles cases like N_young_urban, etc.
-    if len(stratifications) > 1:
-        from itertools import combinations, product
-
-        category_groups = [s.categories for s in stratifications]
-
-        # All possible combinations of categories across different stratifications
-        full_category_combos = product(*category_groups)
-
-        for combo_tuple in full_category_combos:
-            # For each combo, find all non-empty subsets
-            for i in range(1, len(combo_tuple) + 1):
-                for subset in combinations(combo_tuple, i):
-                    var_name = f"N_{'_'.join(subset)}"
-                    predefined_units[var_name] = bin_unit
-
-    return predefined_units
+        return {}
+    names = [name for name in subgroup_totals if name.startswith(SUBGROUP_TOTAL_PREFIX)]
+    return {name: bin_unit for name in (TOTAL_VARIABLE, *names)}
 
 
 def check_all_parameters_have_units(parameters: list[Parameter]) -> bool:

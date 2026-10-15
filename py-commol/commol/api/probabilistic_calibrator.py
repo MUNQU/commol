@@ -26,6 +26,7 @@ from commol.api.probabilistic.ensemble_selector import (
 )
 from commol.api.probabilistic.evaluation_processor import EvaluationProcessor
 from commol.api.probabilistic.statistics_calculator import StatisticsCalculator
+from commol.context._model import engine_state
 from commol.context.constants import CalibrationParameterType
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
@@ -132,66 +133,34 @@ class ProbabilisticCalibrator:
             If validation fails due to incompatible inputs.
         """
         model_param_ids = {p.id for p in self.simulation.model_definition.parameters}
-        model_bin_ids = {b.id for b in self.simulation.model_definition.population.bins}
-        stratifications = self.simulation.model_definition.population.stratifications
-        model_binary_stratification_categories = {
-            category
-            for stratification in stratifications
-            if len(stratification.categories) == 2
-            for category in stratification.categories
-        }
-        engine_compartment_ids = set(self.simulation.engine.compartments)
         simulation_output_ids = set(self.simulation.simulation_outputs)
 
-        self._validate_calibration_parameters(
-            model_param_ids,
-            model_bin_ids,
-            model_binary_stratification_categories,
-            engine_compartment_ids,
-        )
+        self._validate_calibration_parameters(model_param_ids)
         self._validate_observed_data(simulation_output_ids)
-        self._warn_constraint_time_steps_beyond_observations()
+        self._warn_constraint_positions_beyond_observations()
 
         logger.debug("Input validation passed")
 
-    def _validate_calibration_parameters(
-        self,
-        model_param_ids: set[str],
-        model_bin_ids: set[str],
-        model_binary_stratification_categories: set[str],
-        engine_compartment_ids: set[str],
-    ) -> None:
+    def _validate_calibration_parameters(self, model_param_ids: set[str]) -> None:
         """Validate that calibration parameters exist in the model."""
         for param in self.problem.parameters:
-            if param.parameter_type == CalibrationParameterType.SCALE:
-                continue
-
             if param.parameter_type == CalibrationParameterType.PARAMETER:
                 if param.id not in model_param_ids:
                     raise ValueError(
                         f"Calibration parameter '{param.id}' not found in model. "
                         f"Available parameters: {sorted(model_param_ids)}"
                     )
-
-            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION:
-                if (
-                    param.id not in model_bin_ids
-                    and param.id not in model_binary_stratification_categories
-                    and param.id not in engine_compartment_ids
-                ):
-                    raise ValueError(
-                        f"Initial condition parameter '{param.id}' not found in model "
-                        f"bins, stratification categories, or expanded compartments. "
-                        f"Available bins: {sorted(model_bin_ids)}. "
-                        f"Available binary stratification categories: "
-                        f"{sorted(model_binary_stratification_categories)}. "
-                        f"Available compartments: {sorted(engine_compartment_ids)}"
-                    )
+        engine_state.check_model_values(
+            self.simulation.model_definition,
+            self.simulation.engine,
+            self.problem.parameters,
+            self.problem.initial_condition_remainder,
+        )
 
     def _validate_observed_data(self, simulation_output_ids: set[str]) -> None:
         """Validate that observed data targets exist and have valid steps."""
         for obs in self.problem.observed_data:
-            observed_outputs = obs.compartments or [obs.compartment]
+            observed_outputs = obs.observed_outputs
             missing_outputs = [
                 output
                 for output in observed_outputs
@@ -200,31 +169,29 @@ class ProbabilisticCalibrator:
             if missing_outputs:
                 raise ValueError(
                     f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.compartment}' not found in model simulation outputs. "
+                    f"'{obs.label}' not found in model simulation outputs. "
                     f"Available outputs: {sorted(simulation_output_ids)}"
                 )
 
-        if self.problem.observed_data:
-            min_step = min(obs.step for obs in self.problem.observed_data)
-            if min_step < 0:
-                raise ValueError(
-                    f"Observed data contains negative time step: {min_step}. "
-                    "Time steps must be non-negative."
-                )
+        engine_state.check_positions(
+            self.simulation.engine,
+            self.problem.observed_data,
+            self.problem.constraints,
+        )
 
-    def _warn_constraint_time_steps_beyond_observations(self) -> None:
-        """Warn when time-dependent constraints extend beyond observed data."""
+    def _warn_constraint_positions_beyond_observations(self) -> None:
+        """Warn when constraints at positions extend beyond observed data."""
         if not self.problem.observed_data:
             return
 
-        max_observed_step = max(obs.step for obs in self.problem.observed_data)
+        max_observed_position = max(obs.at for obs in self.problem.observed_data)
         for constraint in self.problem.constraints:
-            if constraint.time_steps and max(constraint.time_steps) > max_observed_step:
+            if constraint.at and max(constraint.at) > max_observed_position:
                 logger.warning(
-                    "Constraint '%s' has time_steps beyond the maximum observed "
-                    "step (%s); simulation will be extended to evaluate them.",
+                    "Constraint '%s' has positions beyond the maximum observed "
+                    "position (%s); simulation will be extended to evaluate them.",
                     constraint.id,
-                    max_observed_step,
+                    max_observed_position,
                 )
 
     def run(self) -> ProbabilisticCalibrationResult:
@@ -713,15 +680,12 @@ class ProbabilisticCalibrator:
         total_start: float | None = None,
     ) -> ProbabilisticCalibrationResult:
         """Calculate statistics and build final result."""
-        max_time_step = max(obs.step for obs in self.problem.observed_data)
-        time_steps = max_time_step + 1
         simulation_output_ids = list(self.simulation.simulation_outputs)
 
         selected_solution = self._build_ensemble_solution(
             selection=selection,
             representatives=representatives,
             simulation_output_ids=simulation_output_ids,
-            time_steps=time_steps,
         )
 
         logger.info(
@@ -756,7 +720,6 @@ class ProbabilisticCalibrator:
         selection: FitGatedSelection,
         representatives: list[CalibrationEvaluation],
         simulation_output_ids: list[str],
-        time_steps: int,
     ) -> EnsembleSolution:
         """Build the selected solution with parameter and prediction statistics."""
         solution_params = [representatives[i] for i in selection.selected_indices]
@@ -764,14 +727,14 @@ class ProbabilisticCalibrator:
             solution_params
         )
         all_preds = self._statistics_calculator.generate_ensemble_predictions(
-            solution_params, simulation_output_ids, time_steps
+            solution_params, simulation_output_ids
         )
         pred_median, pred_ci_lower, pred_ci_upper = (
             self._statistics_calculator.calculate_prediction_intervals(
                 all_preds, simulation_output_ids
             )
         )
-        win_median, win_ci_lower, win_ci_upper, win_steps = (
+        win_median, win_ci_lower, win_ci_upper, win_positions = (
             self._statistics_calculator.calculate_windowed_prediction_intervals(
                 all_preds,
                 solution_params,
@@ -800,10 +763,11 @@ class ProbabilisticCalibrator:
             selected_indices=selection.selected_indices,
             ensemble_parameters=[ep.to_dict() for ep in solution_params],
             parameter_statistics=param_stats,
+            prediction_positions=self._statistics_calculator.positions,
             prediction_median=pred_median,
             prediction_ci_lower=pred_ci_lower,
             prediction_ci_upper=pred_ci_upper,
-            windowed_prediction_steps=win_steps,
+            windowed_prediction_positions=win_positions,
             windowed_prediction_median=win_median,
             windowed_prediction_ci_lower=win_ci_lower,
             windowed_prediction_ci_upper=win_ci_upper,

@@ -1,16 +1,5 @@
 from typing import ClassVar, Protocol
 
-from commol.constants import LogicOperators, ModelTypes, VariablePrefixes
-
-class RuleProtocol(Protocol):
-    variable: str
-    operator: LogicOperators
-    value: str | int | float | bool
-
-class ConditionProtocol(Protocol):
-    logic: LogicOperators
-    rules: list[RuleProtocol]
-
 class BinProtocol(Protocol):
     id: str
     name: str
@@ -33,7 +22,6 @@ class TransitionProtocol(Protocol):
     target: list[str]
     rate: RateMathExpressionProtocol | None
     stratified_rates: list[StratifiedRateProtocol] | None
-    condition: ConditionProtocol | None
 
 class ParameterProtocol(Protocol):
     id: str
@@ -51,57 +39,117 @@ class StratificationFractionsProtocol(Protocol):
 class InitialConditionsProtocol(Protocol):
     def __init__(
         self,
-        population_size: int,
+        total: float,
         bin_fractions: list[tuple[str, float | None]],
         stratification_fractions: dict[str, dict[str, float]] | None = None,
         compartment_fractions: list[tuple[str, float]] | None = None,
     ) -> None: ...
-    population_size: int
+    total: float
     bin_fractions: list[tuple[str, float | None]]
     stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
     compartment_fractions: list[tuple[str, float]]
 
-class PopulationProtocol(Protocol):
-    bins: list[BinProtocol]
-    stratifications: list[StratificationProtocol]
-    transitions: list[TransitionProtocol]
-    initial_conditions: InitialConditionsProtocol
+class RustCompartmentalStructureProtocol(Protocol):
+    """The structure of a compartmental model."""
 
-class DynamicsProtocol(Protocol):
-    typology: ModelTypes
-    transitions: list[TransitionProtocol]
+    def __init__(
+        self,
+        bins: list[BinProtocol],
+        stratifications: list[StratificationProtocol],
+        initial_conditions: InitialConditionsProtocol,
+        transitions: list[TransitionProtocol] | None = None,
+        accumulators: list[object] | None = None,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json_str: str) -> RustCompartmentalStructureProtocol: ...
 
 class RustModelProtocol(Protocol):
-    name: str
-    description: str | None
-    version: str | None
-    population: PopulationProtocol
-    parameters: list[ParameterProtocol]
-    dynamics: DynamicsProtocol
-    @staticmethod
-    def from_json(json_string: str) -> RustModelProtocol: ...
+    """A model of any kind: its header, engine and structure."""
 
-class DifferenceEquationsProtocol(Protocol):
+    def __init__(
+        self,
+        name: str,
+        structure: RustCompartmentalStructureProtocol,
+        parameters: list[ParameterProtocol],
+        engine: str,
+        description: str | None = None,
+        version: str | None = None,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json_str: str) -> RustModelProtocol: ...
+
+class EngineProtocol(Protocol):
+    """The engine a model names, built from the model."""
+
     def __init__(self, model: RustModelProtocol) -> None: ...
-    def run(self, num_steps: int) -> list[list[float]]: ...
-    def step(self) -> None: ...
     @property
-    def population(self) -> list[float]: ...
+    def engine_type(self) -> str: ...
+    def run(self, num_steps: int) -> tuple[list[float], list[list[float]]]: ...
+    def run_at(self, positions: list[float]) -> list[list[float]]: ...
+    def check_position(self, position: float) -> None: ...
+    def step(self) -> None: ...
+    def reset(self) -> None: ...
+    def set_parameter(self, parameter_id: str, value: float) -> None: ...
+    def get_parameters(self) -> dict[str, float]: ...
+    def current_position(self) -> float: ...
+    def set_initial_condition(self, compartment_index: int, value: float) -> None: ...
+    @property
+    def state(self) -> list[float]: ...
     @property
     def compartments(self) -> list[str]: ...
     @property
     def output_names(self) -> list[str]: ...
 
-class DifferenceModule(Protocol):
-    DifferenceEquations: type[DifferenceEquationsProtocol]
+class EngineTypeProtocol(Protocol):
+    """One entry of the engine's list of engines."""
+
+    def __init__(self, name: str) -> None: ...
+    @staticmethod
+    def names() -> list[str]: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def kind(self) -> str: ...
+    @property
+    def rate_meaning(self) -> str: ...
+    def rate_from_mean_span(self, span: float) -> float: ...
+    def rate_from_probability(self, probability: float, period: float) -> float: ...
+    def equation_lhs(self, variable: str, latex: bool) -> str: ...
+    def check_settings(self, settings_json: str | None = None) -> None: ...
+    def check_kind(self, kind: str) -> None: ...
+
+class ModelKindProtocol(Protocol):
+    """One kind of model of the engine's list."""
+
+    def __init__(self, name: str) -> None: ...
+    @staticmethod
+    def names() -> list[str]: ...
+    @property
+    def name(self) -> str: ...
+    def value_types(self) -> list[str]: ...
+
+class InfeasibleStateError(ValueError):
+    """A run left the values its model allows, such as an amount below zero."""
+
+class EngineModule(Protocol):
+    Engine: type[EngineProtocol]
+    InfeasibleStateError: type[InfeasibleStateError]
+    EngineType: type[EngineTypeProtocol]
+    ModelKind: type[ModelKindProtocol]
+
+class ModelModule(Protocol):
     def initial_state(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
     def transition_flows(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
+    def check_names(self, model: RustModelProtocol) -> None: ...
+    def subgroup_total_names(
+        self, structure: RustCompartmentalStructureProtocol
+    ) -> list[str]: ...
     def expanded_outputs(
-        self, model: RustModelProtocol
+        self, structure: RustCompartmentalStructureProtocol
     ) -> tuple[
         list[tuple[str, str, list[tuple[str, str]]]],
         list[tuple[str, str, list[tuple[str, str]]]],
@@ -110,27 +158,21 @@ class DifferenceModule(Protocol):
 class ObservedDataPointProtocol(Protocol):
     def __init__(
         self,
-        step: int,
-        compartment: str,
+        at: float,
+        label: str,
+        outputs: list[str],
         value: float,
         weight: float | None = None,
-        scale_id: str | None = None,
-        window_steps: int | None = None,
-        compartments: list[str] | None = None,
+        factor_id: str | None = None,
+        window: float | None = None,
     ) -> None: ...
     @property
-    def time_step(self) -> int: ...
-    @property
-    def compartment(self) -> str: ...
-    @property
-    def value(self) -> float: ...
-    @property
-    def scale_id(self) -> str | None: ...
+    def at(self) -> float: ...
 
 class CalibrationParameterTypeProtocol(Protocol):
     Parameter: ClassVar["CalibrationParameterTypeProtocol"]
     InitialCondition: ClassVar["CalibrationParameterTypeProtocol"]
-    Scale: ClassVar["CalibrationParameterTypeProtocol"]
+    Factor: ClassVar["CalibrationParameterTypeProtocol"]
 
 class CalibrationParameterProtocol(Protocol):
     def __init__(
@@ -157,7 +199,7 @@ class CalibrationConstraintProtocol(Protocol):
         expression: str,
         description: str | None = None,
         weight: float = 1.0,
-        time_steps: list[int] | None = None,
+        at: list[float] | None = None,
     ) -> None: ...
     @property
     def id(self) -> str: ...
@@ -168,7 +210,7 @@ class CalibrationConstraintProtocol(Protocol):
     @property
     def weight(self) -> float: ...
     @property
-    def time_steps(self) -> list[int] | None: ...
+    def at(self) -> list[float] | None: ...
 
 class LossConfigProtocol(Protocol):
     @staticmethod
@@ -177,9 +219,8 @@ class LossConfigProtocol(Protocol):
     def rmse() -> LossConfigProtocol: ...
     @staticmethod
     def mae() -> LossConfigProtocol: ...
-    @staticmethod
-    def weighted_sse() -> LossConfigProtocol: ...
     def normalized(self, enabled: bool = True) -> LossConfigProtocol: ...
+    def aggregate(self, residuals: list[float], weights: list[float]) -> float: ...
     @property
     def normalize_observations(self) -> bool: ...
 
@@ -188,7 +229,7 @@ class NelderMeadConfigProtocol(Protocol):
         self,
         max_iterations: int = 1000,
         sd_tolerance: float = 1e-6,
-        simplex_perturbation: float = 1.1,
+        initial_simplex_size: float = 0.1,
         alpha: float | None = None,
         gamma: float | None = None,
         rho: float | None = None,
@@ -374,43 +415,51 @@ class CalibrationModule(Protocol):
     EnsembleSelectionResult: type[EnsembleSelectionResultProtocol]
     def calibrate(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultProtocol: ...
-    def calibrated_initial_population(
+    def check_positions(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
+        observed_data: list[ObservedDataPointProtocol],
+        constraints: list[CalibrationConstraintProtocol],
+    ) -> None: ...
+    def check_model_values(
+        self,
+        engine: EngineProtocol,
+        parameters: list[CalibrationParameterProtocol],
+        initial_condition_remainder: str | None = None,
+    ) -> None: ...
+    def calibrated_initial_state(
+        self,
+        engine: EngineProtocol,
         parameters: list[CalibrationParameterProtocol],
         values: list[float],
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> tuple[list[float], list[float], list[int]]: ...
     def calibrate_with_history(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         initial_condition_remainder: str | None = None,
     ) -> CalibrationResultWithHistoryProtocol: ...
     def run_multiple_calibrations(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
         optimization_config: OptimizationConfigProtocol,
-        initial_population_size: int,
         n_runs: int,
         seed: int,
         evaluation_retention: str = "all",
@@ -424,40 +473,38 @@ class CalibrationModule(Protocol):
     ) -> list[CalibrationEvaluationProtocol]: ...
     def generate_predictions_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
-        time_steps: int,
+        positions: list[float],
     ) -> list[list[list[float]]]: ...
     def generate_calibrated_predictions_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
-        initial_population_size: int,
         parameter_sets: list[list[float]],
-        time_steps: int,
+        positions: list[float],
         initial_condition_remainder: str | None = None,
     ) -> list[list[list[float]]]: ...
     def generate_predictions_at_points_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         parameter_sets: list[list[float]],
         parameter_names: list[str],
-        metric_points: list[tuple[int, int]],
+        metric_points: list[tuple[float, int]],
     ) -> list[list[float]]: ...
     def generate_calibrated_predictions_at_points_parallel(
         self,
-        engine: DifferenceEquationsProtocol,
+        engine: EngineProtocol,
         observed_data: list[ObservedDataPointProtocol],
         parameters: list[CalibrationParameterProtocol],
         constraints: list[CalibrationConstraintProtocol],
         loss_config: LossConfigProtocol,
-        initial_population_size: int,
         parameter_sets: list[list[float]],
-        metric_points: list[tuple[int, int]],
+        metric_points: list[tuple[float, int]],
         initial_condition_remainder: str | None = None,
     ) -> list[list[float]]: ...
     def select_compact_ensemble(
@@ -469,7 +516,7 @@ class CalibrationModule(Protocol):
         series_ids: list[str],
         confidence_level: float,
         seed: int,
-        central_loss_metric: str = "weighted_sse",
+        central_loss_metric: str = "sse",
         ensemble_algorithm: str = "nsga2",
         ensemble_size_mode: str = "automatic",
         ensemble_size: int | None = None,
@@ -515,7 +562,7 @@ class RateMathExpressionProtocol(Protocol):
 
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
-    Population: type[PopulationProtocol]
+    CompartmentalStructure: type[RustCompartmentalStructureProtocol]
     Bin: type[BinProtocol]
     Stratification: type[StratificationProtocol]
     StratificationCondition: type[StratificationConditionProtocol]
@@ -525,21 +572,17 @@ class CoreModule(Protocol):
     InitialConditions: type[InitialConditionsProtocol]
     StratificationFraction: type[StratificationFractionProtocol]
     StratificationFractions: type[StratificationFractionsProtocol]
-    Condition: type[ConditionProtocol]
-    Rule: type[RuleProtocol]
-    LogicOperator: type[LogicOperators]
-    ModelTypes: type[ModelTypes]
-    VariablePrefixes: type[VariablePrefixes]
-    Dynamics: type[DynamicsProtocol]
     MathExpression: type[MathExpressionProtocol]
     RateMathExpression: type[RateMathExpressionProtocol]
 
 class RustCommolModule(Protocol):
     core: CoreModule
-    difference: DifferenceModule
+    model: ModelModule
+    engine: EngineModule
     calibration: CalibrationModule
 
 core: CoreModule
-difference: DifferenceModule
+model: ModelModule
+engine: EngineModule
 calibration: CalibrationModule
 rust_commol: RustCommolModule

@@ -1,6 +1,8 @@
+"""Plot configuration."""
+
 from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 
 class PlotConfig(BaseModel):
@@ -39,6 +41,8 @@ class PlotConfig(BaseModel):
     >>> config = PlotConfig.presentation()
     >>> config = PlotConfig.publication()
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     figsize: tuple[float, float] = Field(
         default=(12, 8),

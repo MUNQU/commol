@@ -10,6 +10,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
 from commol.context.constants import LossFunction
 
@@ -28,15 +29,15 @@ def series_normalization_factors(
     When ``enabled`` is ``False`` every factor is ``1.0``, so callers can multiply
     unconditionally and leave the loss unchanged.
     """
-    series = {observation.compartment for observation in observed_data}
+    series = {observation.label for observation in observed_data}
     if not enabled:
         return {name: 1.0 for name in series}
 
     sum_squares: dict[str, float] = {name: 0.0 for name in series}
     counts: dict[str, int] = {name: 0 for name in series}
     for observation in observed_data:
-        sum_squares[observation.compartment] += observation.value**2
-        counts[observation.compartment] += 1
+        sum_squares[observation.label] += observation.value**2
+        counts[observation.label] += 1
 
     factors: dict[str, float] = {}
     for name in series:
@@ -54,18 +55,26 @@ def central_fit_loss(
 ) -> float:
     """Aggregate ensemble-median residuals with the optimizer's loss function.
 
-    Each residual is scaled by its per-series normalization factor. The
-    sum-of-squares family then also applies the observation weights; RMSE and
-    MAE ignore them.
-    """
-    if not residuals:
-        return 0.0
+    Each residual is scaled by its per-series normalization factor, then the
+    engine's ``LossConfig`` applies the observation weights, as it does for
+    the optimizer.
 
-    scaled = [factor * residual for residual, factor in zip(residuals, normalization)]
-    if loss_function in (LossFunction.SSE, LossFunction.WEIGHTED_SSE):
-        return sum((weight * value) ** 2 for value, weight in zip(scaled, weights))
-    if loss_function == LossFunction.RMSE:
-        return (sum(value * value for value in scaled) / len(scaled)) ** 0.5
-    if loss_function == LossFunction.MAE:
-        return sum(abs(value) for value in scaled) / len(scaled)
-    raise ValueError(f"Unsupported loss function for central loss: '{loss_function}'")
+    Raises
+    ------
+    ValueError
+        If ``loss_function`` is not a ``LossFunction``.
+    """
+    loss_configs = {
+        LossFunction.SSE: commol_rs.calibration.LossConfig.sse,
+        LossFunction.RMSE: commol_rs.calibration.LossConfig.rmse,
+        LossFunction.MAE: commol_rs.calibration.LossConfig.mae,
+    }
+    if loss_function not in loss_configs:
+        raise ValueError(
+            f"Unsupported loss function for central loss: '{loss_function}'"
+        )
+    scaled = [
+        factor * residual
+        for residual, factor in zip(residuals, normalization, strict=True)
+    ]
+    return loss_configs[LossFunction(loss_function)]().aggregate(scaled, list(weights))

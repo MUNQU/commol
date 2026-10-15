@@ -1,6 +1,8 @@
+"""Bins and accumulators of a compartmental model."""
+
 from typing import override
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 
 class Bin(BaseModel):
@@ -21,6 +23,8 @@ class Bin(BaseModel):
         If None, the bin will use the model-level bin_unit when specified.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(..., description="Identifier of the bin.")
     name: str = Field(..., description="Descriptive, human-readable name for the bin.")
     unit: str | None = Field(
@@ -38,7 +42,9 @@ class Bin(BaseModel):
 
 
 class Accumulator(BaseModel):
-    """A cumulative event counter tracked as output but not as population state."""
+    """A cumulative event counter tracked as output but not as part of the state."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Identifier of the accumulator.")
     name: str = Field(..., description="Descriptive, human-readable name.")

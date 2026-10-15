@@ -3,24 +3,37 @@
 //! This module contains all the data structures used to define and configure
 //! compartment models, organized into logical submodules:
 //!
-//! - `conditions`: Logic operators, rules, and conditional expressions
-//! - `parameters`: Model parameters and variable prefixes
-//! - `population`: Disease states, stratifications, and population structure
-//! - `dynamics`: Model dynamics, transitions, and rates
-//! - `model`: Top-level model structure
+//! - `parameters`: Model parameters
+//! - `engine`: The list of engines, their settings and what they mean
+//! - `structure`: The part of a model that depends on its kind
+//! - `compartmental`: The structure of a compartmental model
+//! - `transitions`: Transitions of a compartmental model and their rates
+//! - `model`: Top-level model definition
 
-pub mod conditions;
-pub mod dynamics;
+pub mod compartmental;
+/// The list of engines a model can name.
+pub mod engine;
+/// The top-level model definition.
 pub mod model;
+/// Parameters and their values.
 pub mod parameters;
-pub mod population;
+pub mod structure;
+#[cfg(feature = "test-kind")]
+pub mod test_kind;
+pub mod transitions;
 
 // Re-export all public types for convenient access
-pub use conditions::{Condition, LogicOperator, Rule, RuleValue};
-pub use dynamics::{Dynamics, ModelTypes, StratificationCondition, StratifiedRate, Transition};
-pub use model::Model;
-pub use parameters::{Parameter, ParameterValue, SeriesMode, VariablePrefixes};
-pub use population::{
-    Accumulator, Bin, BinFraction, CompartmentFraction, InitialConditions, Population,
+pub use compartmental::{
+    Accumulator, Bin, BinFraction, CompartmentFraction, CompartmentalStructure, InitialConditions,
     Stratification, StratificationFraction, StratificationFractions,
 };
+pub use engine::{
+    EngineSettings, EngineType, ModelEngine, ModelKind, ModelValueType, OdeMethod, OdeSolver,
+    RateMeaning,
+};
+pub use model::Model;
+pub use parameters::{Parameter, ParameterValue, SeriesMode};
+pub use structure::ModelStructure;
+#[cfg(feature = "test-kind")]
+pub use test_kind::{DecayOutput, TestStructure};
+pub use transitions::{StratificationCondition, StratifiedRate, Transition};

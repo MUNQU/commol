@@ -1,13 +1,12 @@
 import re
 
-import pint
-
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.utils.equations import (
+    DEFAULT_STEP_UNIT,
     UnitConsistencyError,
+    define_units,
     get_predefined_variable_units,
-    ureg,
 )
 from commol.utils.security import get_expression_variables
 
@@ -31,7 +30,9 @@ class ModelCompartmentHelper:
     ) -> tuple[list[tuple[str, dict[str, str]]], list[tuple[str, dict[str, str]]]]:
         """Compartments and accumulator outputs, as the engine expands them."""
         if self._expanded is None:
-            compartments, accumulators = engine_state.expanded_outputs(self._model)
+            compartments, accumulators = engine_state.expanded_outputs(
+                self._model.structure
+            )
             self._expanded = (
                 [(output.source, output.categories) for output in compartments],
                 [(output.source, output.categories) for output in accumulators],
@@ -63,7 +64,7 @@ class ModelCompartmentHelper:
         bin_id, applied = compartment
         parts = [bin_id] + [
             applied[s.id]
-            for s in self._model.population.stratifications
+            for s in self._model.structure.stratifications
             if s.id in applied
         ]
         name = "_".join(parts)
@@ -80,7 +81,7 @@ class ModelCompartmentHelper:
 
     def has_all_units(self) -> bool:
         """Check if all units are defined. Raises error if partial units."""
-        has_any_bin_unit = any(b.unit for b in self._model.population.bins)
+        has_any_bin_unit = any(b.unit for b in self._model.structure.bins)
         has_any_param_unit = any(
             p.unit for p in self._model.parameters if not isinstance(p.value, str)
         )
@@ -88,7 +89,7 @@ class ModelCompartmentHelper:
         if not has_any_bin_unit and not has_any_param_unit:
             return False
 
-        if not all(b.unit for b in self._model.population.bins):
+        if not all(b.unit for b in self._model.structure.bins):
             raise ValueError("Some bins have units but not all")
         if any(
             p.unit is None
@@ -120,22 +121,22 @@ class ModelCompartmentHelper:
                 variable_units[param.id] = param.unit
 
     def _add_bin_units(self, variable_units: dict[str, str]) -> None:
-        for state in self._model.population.bins:
+        for state in self._model.structure.bins:
             if state.unit:
                 variable_units[state.id] = state.unit
 
     def _add_stratification_category_units(
         self, variable_units: dict[str, str]
     ) -> None:
-        if not self._model.population.bins or not self._model.population.bins[0].unit:
+        if not self._model.structure.bins or not self._model.structure.bins[0].unit:
             return
-        bin_unit = self._model.population.bins[0].unit
-        for strat in self._model.population.stratifications:
+        bin_unit = self._model.structure.bins[0].unit
+        for strat in self._model.structure.stratifications:
             for category in strat.categories:
                 variable_units[category] = bin_unit
 
     def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
-        if not self._model.population.stratifications:
+        if not self._model.structure.stratifications:
             return
         compartments = self.generate_compartments()
         for compartment in compartments:
@@ -144,24 +145,24 @@ class ModelCompartmentHelper:
             )
             bin_id = compartment[0]
             bin_obj = next(
-                (b for b in self._model.population.bins if b.id == bin_id), None
+                (b for b in self._model.structure.bins if b.id == bin_id), None
             )
             if bin_obj and bin_obj.unit:
                 variable_units[compartment_str] = bin_obj.unit
 
     def _add_predefined_variable_units(self, variable_units: dict[str, str]) -> None:
         bin_unit = (
-            self._model.population.bins[0].unit if self._model.population.bins else None
+            self._model.structure.bins[0].unit if self._model.structure.bins else None
         )
         predefined_units = get_predefined_variable_units(
-            self._model.population.stratifications, bin_unit
+            engine_state.subgroup_total_names(self._model.structure), bin_unit
         )
         variable_units.update(predefined_units)
 
-    @staticmethod
-    def _add_special_variable_units(variable_units: dict[str, str]) -> None:
+    def _add_special_variable_units(self, variable_units: dict[str, str]) -> None:
+        # `t` is a position on the axis; `step` counts increments.
         variable_units["step"] = "dimensionless"
-        variable_units["t"] = "dimensionless"
+        variable_units["t"] = self._model.step_unit or DEFAULT_STEP_UNIT
         variable_units["pi"] = "dimensionless"
         variable_units["e"] = "dimensionless"
 
@@ -273,53 +274,13 @@ class ModelCompartmentHelper:
         return f"{annotated_rate}{unit_suffix}"
 
     def register_custom_units(self) -> None:
-        """Register custom units in the pint registry."""
-        units_to_register: set[str] = set()
-        for bin_item in self._model.population.bins:
-            if bin_item.unit:
-                units_to_register.add(bin_item.unit)
-        for param in self._model.parameters:
-            if param.unit:
-                unit_parts = re.split(r"[*/\s\(\)]+", param.unit)
-                for part in unit_parts:
-                    part = part.strip()
-                    if part and not part.replace(".", "").replace("-", "").isdigit():
-                        units_to_register.add(part)
-
-        known_time_aliases = {
-            "decade": "10 * year",
-            "century": "100 * year",
-            "millennium": "1000 * year",
-            "fortnight": "14 * day",
-            "biweek": "14 * day",
-            "semester": "6 * month",
-            "trimester": "3 * month",
-            "quarter": "3 * month",
-            "bimester": "2 * month",
-            "wk": "week",
-            "mo": "month",
-            "mon": "month",
-            "yr": "year",
-            "hr": "hour",
-            "min": "minute",
-            "sec": "second",
-            "secs": "second",
-            "mins": "minute",
-            "hrs": "hour",
-            "wks": "week",
-            "mons": "month",
-            "yrs": "year",
-        }
-
-        for unit_name in units_to_register:
-            try:
-                ureg(unit_name)
-            except pint.UndefinedUnitError:
-                if unit_name in known_time_aliases:
-                    ureg.define(f"{unit_name} = {known_time_aliases[unit_name]}")
-                else:
-                    dimension_name = f"{unit_name}_dimension"
-                    ureg.define(f"{unit_name} = [{dimension_name}]")
+        """Define the units of the bins, parameters and step that pint lacks."""
+        units = [b.unit for b in self._model.structure.bins if b.unit]
+        units += [p.unit for p in self._model.parameters if p.unit]
+        if self._model.step_unit:
+            units.append(self._model.step_unit)
+        for unit in units:
+            define_units(unit)
 
 
 # ------------------------------------------------------------------

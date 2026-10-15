@@ -20,12 +20,19 @@ use crate::types::CalibrationEvaluation;
 
 /// Configuration for cluster representative selection.
 pub struct ClusterRepresentativeConfig<'a> {
+    /// Maximum number of representatives across all clusters.
     pub max_representatives: usize,
+    /// Fraction of each cluster's best evaluations always selected.
     pub elite_fraction: f64,
+    /// How representatives are shared among clusters: `"proportional"` or `"equal"`.
     pub strategy: &'a str,
+    /// Diversity method: `"latin_hypercube"`, `"crowding_distance"` or `"maximin_distance"`.
     pub selection_method: &'a str,
+    /// Quality weighting temperature of `"maximin_distance"`.
     pub quality_temperature: f64,
+    /// Random seed.
     pub seed: u64,
+    /// Tuning of the selection methods.
     pub representative_config: &'a RepresentativeSelectionConfig,
 }
 

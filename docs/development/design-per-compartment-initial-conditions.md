@@ -1,14 +1,21 @@
 # Design: Per-compartment initial conditions
 
+[Back to Design decisions](../codebase/design-decisions.md)
+
 - **Status:** Implemented (revised 2026-10-12: Rust is the single source of truth)
 - **Date:** 2026-09-30
 - **Scope:** `commol-core` (types), `commol-difference` (engine build), `py-commol` (context, builder, model write-back)
+- **Names:** this record keeps the names of its date. Today `population_size`
+  is `InitialConditions.total` (a real number), the initial population is the
+  initial state, a head count is an amount, and `calibrated_initial_population`
+  is `calibrated_initial_state`; see
+  [State, amount, total and subgroup total](../codebase/design-decisions.md#state-amount-total-and-subgroup-total).
 
 ## Problem
 
 Model authors cannot express initial conditions for a specific expanded
-compartment (for example `IH_y60 = 0` when the hospital pathway only exists
-for the `oe60` age stratum). The current definition only supports:
+compartment (for example `B_g1 = 0` when the stratification `type` only
+applies to group `g2`). The current definition only supports:
 
 - `bin_fractions`: fraction of the total population per bin, expanded
   uniformly across every stratification category combination.
@@ -27,7 +34,7 @@ layer is missing:
    (`commol-difference/simulation.rs`).
 2. The Rust calibration layer already resolves `InitialCondition`
    parameters to targets by id (`calibration_problem.rs`):
-   - exact expanded compartment name (`IH_y60`) → `InitialConditionTarget::exact`,
+   - exact expanded compartment name (`B_g1`) → `InitialConditionTarget::exact`,
    - bin id or bin prefix → `aggregate`,
    - binary stratification category → `paired_category`.
    Values are fractions of the total population, converted to absolute
@@ -47,9 +54,10 @@ initial conditions.
 
 ### Data model
 
+<!-- doc-test: skip: shows the shape of the types, not a runnable example -->
 ```python
 class CompartmentFraction(BaseModel):
-    compartment: str   # expanded compartment name: "IH_y60", "S_oe60_v_c", ...
+    compartment: str   # expanded compartment name: "B_g1", "A_g2_t1", ...
     fraction: float    # fraction of the TOTAL population, 0.0 <= fraction <= 1.0
 
 class InitialConditions(BaseModel):
@@ -72,7 +80,7 @@ Mirrored in Rust (`commol-core/src/types/population.rs`) with
   conditional-stratification logic that keeps some compartments unsplit —
   is unchanged. Overrides are applied afterwards, keyed by final
   compartment name. This works uniformly for fully suffixed
-  compartments (`IH_oe60_v_c`) and truncated conditional ones (`IH_y60`)
+  compartments (`B_g2_t1`) and truncated conditional ones (`B_g1`)
   without special cases.
 - **Precedence:** definition override wins over the uniform expansion;
   calibration wins over the definition at runtime (engine `reset()` +
@@ -122,7 +130,7 @@ reach the engine. `cost()`, `configured_engine()` and the public
 `calibrated_initial_population` share it.
 
 - **Targets.** An id resolves, in order, to an exact compartment, a qualified
-  category (`sex:female`), a bin or bin prefix (its bin followed by its leading
+  category (`group:g1`), a bin or bin prefix (its bin followed by its leading
   categories, matched on the labels), or the category of exactly one binary
   stratification. Category pairs come from the engine's
   `compartment_labels()` (bin and applied categories), not from compartment
@@ -159,7 +167,7 @@ engine.
 1. **Pydantic:** validator coverage (duplicates, range, unknown compartment).
 2. **Rust (`commol-difference` tests):** override application, truncated
    conditional compartment, unknown-name error, population conservation.
-3. **Integration:** end-to-end `IH_y60 = 0` scenario (build → simulate →
+3. **Integration:** end-to-end `B_g1 = 0` scenario (build → simulate →
    series stay zero); calibration round-trip (exact-compartment IC parameter
    → calibrate → apply parameters → rebuild engine → identical initial state).
 4. **Write-back parity:** for each mix of bin, category and exact-compartment

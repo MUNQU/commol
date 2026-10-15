@@ -1,3 +1,5 @@
+"""Enumerations of calibration settings."""
+
 from enum import StrEnum, unique
 
 
@@ -11,14 +13,14 @@ class CalibrationParameterType(StrEnum):
     PARAMETER
         Model parameter
     INITIAL_CONDITION
-        Initial population in a compartment
-    SCALE
-        Scaling factor for observed data
+        Initial amount of a compartment, bin or category
+    FACTOR
+        Factor that multiplies the model output of an observation
     """
 
     PARAMETER = "parameter"
     INITIAL_CONDITION = "initial_condition"
-    SCALE = "scale"
+    FACTOR = "factor"
 
 
 @unique
@@ -34,14 +36,11 @@ class LossFunction(StrEnum):
         Root Mean Squared Error
     MAE
         Mean Absolute Error
-    WEIGHTED_SSE
-        Weighted Sum of Squared Errors
     """
 
     SSE = "sse"
     RMSE = "rmse"
     MAE = "mae"
-    WEIGHTED_SSE = "weighted_sse"
 
 
 @unique

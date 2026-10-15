@@ -1,8 +1,7 @@
 # ModelBuilder API
 
+[Back to API Reference](index.md)
+
+Builds a `Model`. Guide: [Building Models](../guide/building-models.md), [Transitions](../guide/transitions.md).
+
 ::: commol.api.model_builder.ModelBuilder
-options:
-show_root_heading: true
-show_source: true
-heading_level: 2
-show_docstring_attributes: false

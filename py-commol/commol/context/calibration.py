@@ -1,7 +1,17 @@
+"""Calibration problems, observations, unknowns, constraints, optimizers and results."""
+
+import math
 from collections.abc import Mapping
 from typing import Self, overload, override
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from commol.context.constants import (
     CalibrationParameterType,
@@ -19,6 +29,7 @@ from commol.context.probabilistic_calibration import (
 )
 from commol.utils.security import validate_expression_security
 
+
 # Re-export for documentation
 __all__ = ["OptimizationAlgorithm", "calibrated_values"]
 
@@ -27,30 +38,54 @@ class ObservedDataPoint(BaseModel):
     """
     Represents a single observed data point for calibration.
 
+    An observation compares one output, or the sum of several outputs, with an
+    observed value at a position on the axis.
+
     Attributes
     ----------
-    step : int
-        Time step of the observation
-    compartment : str
-        Name of the compartment being observed, or a display name for aggregate
-        observations when compartments is set
-    compartments : list[str] | None
-        Optional output names to sum before comparing with this observation
+    at : float
+        Position of the observation on the axis. The engine decides which
+        positions its model type accepts: a DifferentialEquations model any
+        non-negative position, a DifferenceEquations model only an integer
+        step.
+    output : str | None
+        The output being observed. Give either `output` or `outputs`.
+    outputs : list[str] | None
+        Outputs summed before comparing with this observation. Needs a
+        `label`.
+    label : str
+        Name of the observed series, used by reports, plots and the
+        per-series normalization. Defaults to `output`.
     value : float
         Observed value
     weight : float
-        Weight for this observation in the loss function (default: 1.0)
-    scale_id : str | None
-        Optional scale parameter ID to apply to model output before comparison
+        How much this observation counts in the loss (default: 1.0). Every
+        loss multiplies the squared or absolute residual by it: ``sse`` is
+        ``Σ w·r²``, ``rmse`` is ``√(Σ w·r² / Σ w)``, ``mae`` is
+        ``Σ w·|r| / Σ w``.
+    factor_id : str | None
+        Optional factor parameter ID that multiplies the model output before
+        comparison
+    window : float | None
+        Optional window length for a cumulative output: the prediction is the
+        output at `at` minus the output at ``at - window``.
     """
 
-    step: int = Field(default=..., ge=0, description="Time step of the observation")
-    compartment: str = Field(
-        default=..., min_length=1, description="Name of the compartment being observed"
+    model_config = ConfigDict(extra="forbid")
+
+    at: float = Field(
+        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
     )
-    compartments: list[str] | None = Field(
+    output: str | None = Field(
+        default=None, min_length=1, description="The output being observed"
+    )
+    outputs: list[str] | None = Field(
         default=None,
-        description="Optional output names to sum before comparison",
+        description="Outputs summed before comparison",
+    )
+    label: str = Field(
+        default="",
+        description="Name of the observed series; defaults to `output`",
     )
     value: float = Field(default=..., ge=0.0, description="Observed value")
     weight: float = Field(
@@ -58,32 +93,48 @@ class ObservedDataPoint(BaseModel):
         gt=0.0,
         description="Weight for this observation in the loss function",
     )
-    scale_id: str | None = Field(
+    factor_id: str | None = Field(
         default=None,
-        description="Optional scale parameter ID to apply to model output",
+        description="Optional factor parameter ID that multiplies the model output",
     )
-    window_steps: int | None = Field(
+    window: float | None = Field(
         default=None,
         gt=0,
+        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
-            "When set, prediction is value(step) - value(step - window_steps)."
+            "When set, prediction is value(at) - value(at - window)."
         ),
     )
 
     @model_validator(mode="after")
-    def validate_window_steps(self) -> Self:
-        if self.window_steps is not None and self.window_steps > self.step:
-            raise ValueError(
-                f"window_steps ({self.window_steps}) must be <= step ({self.step})"
-            )
+    def validate_observed_outputs(self) -> Self:
+        """Require one of `output` and `outputs`; name the series."""
+        if (self.output is None) == (self.outputs is None):
+            raise ValueError("Give exactly one of 'output' and 'outputs'.")
+        if self.outputs is not None:
+            if not self.outputs:
+                raise ValueError("outputs must be non-empty when provided")
+            if not self.label:
+                raise ValueError(
+                    "An observation of several outputs needs a 'label' that names "
+                    "their sum."
+                )
+        elif not self.label:
+            self.label = self.output or ""
         return self
 
-    @field_validator("compartments")
-    def validate_compartments(cls, v: list[str] | None) -> list[str] | None:
-        if v is not None and not v:
-            raise ValueError("compartments must be non-empty when provided")
-        return v
+    @model_validator(mode="after")
+    def validate_window(self) -> Self:
+        """A window must not start before position 0."""
+        if self.window is not None and self.window > self.at:
+            raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+        return self
+
+    @property
+    def observed_outputs(self) -> list[str]:
+        """The outputs whose sum is compared: `outputs`, or `output` alone."""
+        return list(self.outputs) if self.outputs is not None else [self.output or ""]
 
 
 class CalibrationParameter(BaseModel):
@@ -103,6 +154,8 @@ class CalibrationParameter(BaseModel):
     initial_guess : float | None
         Optional starting value for optimization (if None, midpoint is used)
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(
         default=..., min_length=1, description="Parameter or bin identifier"
@@ -163,33 +216,35 @@ class CalibrationConstraint(BaseModel):
         Unique identifier for this constraint
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
-        Can reference calibration parameters by their IDs. When time_steps is specified,
-        can also reference compartment values (S, I, R, etc.) at those time steps.
+        Can reference calibration parameters by their IDs. When `at` is specified,
+        can also reference output values (A, B, C, etc.) at those positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
         Penalty weight multiplier (default: 1.0). Higher values make this constraint
         more important relative to others. The penalty for violating this constraint
         is: weight * violation^2
-    time_steps : list[int] | None
-        Optional time steps at which to evaluate this constraint. If None, constraint
-        is evaluated once before simulation using parameter values only. If specified,
-        constraint is evaluated at each time step and can reference compartment values.
+    at : list[float] | None
+        Optional positions on the axis at which to evaluate this constraint.
+        The engine decides which positions its model type accepts: a
+        DifferenceEquations model only integer steps. If None, the constraint
+        is evaluated once before simulation using parameter values only. If
+        given, it is evaluated at each position and can reference output values.
 
     Examples
     --------
-    >>> # R0 = beta/gamma must be <= 5
+    >>> # k1/k2 must be <= 5
     >>> constraint = CalibrationConstraint(
-    ...     id="r0_bound",
-    ...     expression="5.0 - beta/gamma",
-    ...     description="Basic reproduction number R0 <= 5",
+    ...     id="ratio_bound",
+    ...     expression="5.0 - k1/k2",
+    ...     description="Ratio k1/k2 <= 5",
     ... )
 
-    >>> # beta must be >= gamma
+    >>> # k1 must be >= k2
     >>> constraint = CalibrationConstraint(
     ...     id="ordering",
-    ...     expression="beta - gamma",
-    ...     description="Transmission rate >= recovery rate",
+    ...     expression="k1 - k2",
+    ...     description="k1 >= k2",
     ... )
 
     >>> # Sum of parameters <= 1.0
@@ -199,14 +254,16 @@ class CalibrationConstraint(BaseModel):
     ...     description="Sum of rates <= 1.0",
     ... )
 
-    >>> # Time-dependent: bin B stays at or below 500 at specific time steps
+    >>> # At positions: bin B stays at or below 500 at specific positions
     >>> constraint = CalibrationConstraint(
     ...     id="peak_b",
     ...     expression="500.0 - B",
     ...     description="Peak B never exceeds 500",
-    ...     time_steps=[10, 20, 30, 40, 50],
+    ...     at=[10, 20, 30, 40, 50],
     ... )
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(
         default=..., min_length=1, description="Unique identifier for this constraint"
@@ -224,10 +281,11 @@ class CalibrationConstraint(BaseModel):
         gt=0.0,
         description="Penalty weight multiplier for violations",
     )
-    time_steps: list[int] | None = Field(
+    at: list[float] | None = Field(
         default=None,
         description=(
-            "Optional time steps at which to evaluate (for time-dependent constraints)"
+            "Optional positions on the axis at which to evaluate the constraint; "
+            "it can then reference output values."
         ),
     )
 
@@ -244,17 +302,16 @@ class CalibrationConstraint(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_time_steps(self) -> Self:
-        """Validate that time steps are non-negative and sorted."""
-        if self.time_steps is not None:
-            if len(self.time_steps) == 0:
+    def validate_positions(self) -> Self:
+        """Validate that the positions are finite and non-negative."""
+        if self.at is not None:
+            if len(self.at) == 0:
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must not be empty if "
-                    "specified"
+                    f"at for constraint '{self.id}' must not be empty if specified"
                 )
-            if any(ts < 0 for ts in self.time_steps):
+            if any(position < 0 or not math.isfinite(position) for position in self.at):
                 raise ValueError(
-                    f"time_steps for constraint '{self.id}' must all be non-negative"
+                    f"at for constraint '{self.id}' must all be finite and non-negative"
                 )
         return self
 
@@ -272,9 +329,11 @@ class NelderMeadConfig(BaseModel):
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
         Convergence tolerance for standard deviation (default: 1e-6)
-    simplex_perturbation : float
-        Multiplier for creating initial simplex vertices by perturbing each
-        parameter dimension. A value of 1.1 means 10% perturbation. (default: 1.1)
+    initial_simplex_size : float
+        Size of the initial simplex, as a fraction of each parameter's bound
+        width, in (0, 1] (default: 0.1). Nelder-Mead searches an unbounded
+        coordinate ``u`` and scores ``x = lo + (hi - lo)(sin u + 1)/2``, so
+        every point it tries is inside the bounds.
     alpha : float | None
         Reflection coefficient (default: None, uses argmin's default)
     gamma : float | None
@@ -290,18 +349,20 @@ class NelderMeadConfig(BaseModel):
         (default: 100)
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     max_iterations: int = Field(
         default=1000, gt=0, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
         default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
     )
-    simplex_perturbation: float = Field(
-        default=1.1,
-        gt=1.0,
+    initial_simplex_size: float = Field(
+        default=0.1,
+        gt=0.0,
+        le=1.0,
         description=(
-            "Multiplier for creating initial simplex vertices (e.g., 1.1 = 10% "
-            "perturbation)"
+            "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
@@ -344,6 +405,8 @@ class PSOInertiaStrategy(BaseModel):
 
     Use either `PSOConstantInertia` or `PSOChaoticInertia`.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     pass
 
@@ -404,6 +467,8 @@ class PSOAccelerationStrategy(BaseModel):
     Use either `PSOConstantAcceleration` or `PSOTimeVaryingAcceleration`.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     pass
 
 
@@ -431,7 +496,7 @@ class PSOTimeVaryingAcceleration(PSOAccelerationStrategy):
 
     TVAC adjusts cognitive and social coefficients over iterations to
     balance exploration and exploitation. Typically, c1 decreases and
-    c2 increases over time.
+    c2 increases over the iterations.
 
     Attributes
     ----------
@@ -487,6 +552,8 @@ class PSOMutationConfig(BaseModel):
     optimization with mutation. In Proceedings of the 2003 Congress
     on Evolutionary Computation (CEC 2003) (Vol. 2, pp. 1425-1430).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     strategy: str = Field(
         default=...,
@@ -548,6 +615,8 @@ class PSOVelocityConfig(BaseModel):
       Self-organizing hierarchical particle swarm optimizer.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     clamp_factor: float | None = Field(
         default=None,
         gt=0.0,
@@ -587,6 +656,8 @@ class ParticleSwarmConfig(BaseModel):
     velocity(clamp_factor, mutation_threshold)
         Configure velocity control
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     # Core parameters
     num_particles: int = Field(
@@ -638,6 +709,8 @@ class ParticleSwarmConfig(BaseModel):
         ----------
         type : str
             Inertia strategy type: "constant" or "chaotic"
+        **kwargs : float
+            The settings of the strategy, listed under Other Parameters.
 
         Other Parameters
         ----------------
@@ -698,6 +771,8 @@ class ParticleSwarmConfig(BaseModel):
         ----------
         type : str
             Acceleration strategy type: "constant" or "time_varying"
+        **kwargs : float
+            The settings of the strategy, listed under Other Parameters.
 
         Other Parameters
         ----------------
@@ -869,6 +944,8 @@ class CalibrationResult(BaseModel):
         Explanation of why optimization terminated
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     best_parameters: dict[str, float] = Field(
         default=..., description="Calibrated parameter values"
     )
@@ -912,7 +989,8 @@ class CalibrationProblem(BaseModel):
     constraints : list[CalibrationConstraint]
         List of constraints on calibration parameters (optional, default: empty list)
     loss_function : str
-        Loss function to use for measuring fit quality (default: "sse")
+        Loss function to use for measuring fit quality: "sse" (default),
+        "rmse" or "mae". Every loss uses the observation weights.
     normalize_observations : bool
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False).
@@ -920,11 +998,11 @@ class CalibrationProblem(BaseModel):
         Configuration for the optimization algorithm
     initial_condition_remainder : str | None
         Expanded compartment or bin that absorbs the difference to the
-        population size once the calibrated initial conditions are applied
+        total once the calibrated initial conditions are applied
         (default: None). It is not calibrated itself. With a remainder, the
-        initial population always equals ``population_size``; without one,
-        calibrated initial conditions are applied as given and only a total
-        above ``population_size`` is penalized.
+        sum of the initial amounts always equals ``total``; without one,
+        calibrated initial conditions are applied as given and only a sum
+        above ``total`` is penalized.
     probabilistic_config : ProbabilisticCalibrationConfig | None
         Optional configuration for probabilistic calibration (default: None).
         When provided, enables ensemble-based parameter estimation with
@@ -939,6 +1017,8 @@ class CalibrationProblem(BaseModel):
         - Ensemble selection
         When set, all random operations become deterministic and reproducible.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     observed_data: list[ObservedDataPoint] = Field(
         default=..., min_length=1, description="Observed data points"
@@ -970,7 +1050,7 @@ class CalibrationProblem(BaseModel):
         default=None,
         description=(
             "Expanded compartment or bin that absorbs the difference to the "
-            "population size once the calibrated initial conditions are applied."
+            "total once the calibrated initial conditions are applied."
         ),
     )
     probabilistic_config: ProbabilisticCalibrationConfig | None = Field(

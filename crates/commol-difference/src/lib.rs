@@ -1,15 +1,8 @@
 //! Difference equations simulation engine for compartment models.
 //!
-//! This crate provides a discrete-time simulation engine for compartment models
-//! using difference equations. It is designed for efficient simulation of compartmental
-//! models with support for stratifications and complex rate expressions.
-//!
-//! ## Module Organization
-//!
-//! - `types` - Core data structures and types
-//! - `builder` - Model compilation and construction
-//! - `helpers` - Utility functions for stratification and rate resolution
-//! - `simulation` - Simulation execution methods
+//! This crate provides a discrete-step simulation engine for compartment models
+//! using difference equations. The model is compiled by `commol-model`; this
+//! crate only steps it: `X(n + 1) = X(n) + derivatives(n, X(n))`.
 //!
 //! ## Example Usage
 //!
@@ -18,28 +11,21 @@
 //! use commol_difference::DifferenceEquations;
 //!
 //! // Load a model from JSON
-//! let model = Model::from_json_file("sir_model.json")?;
+//! let model = Model::from_json_file("model.json")?;
 //!
 //! // Create the simulation engine
 //! let mut engine = DifferenceEquations::from_model(&model);
 //!
-//! // Run for 100 time steps
+//! // Run for 100 steps
 //! let results = engine.run(100)?;
 //!
-//! // Access compartment names and final populations
+//! // Access compartment names and the final state
 //! let compartments = engine.compartments();
-//! let final_state = engine.population();
+//! let final_state = engine.state();
 //! ```
 
-mod builder;
-mod flows;
-mod helpers;
-mod layout;
-mod simulation;
-mod types;
+#![warn(missing_docs)]
 
-pub use builder::{
-    ExpandedOutput, InitialCompartment, expand_accumulators, expand_compartments, initial_state,
-};
-pub use flows::{FlowDescription, describe_flows};
-pub use types::DifferenceEquations;
+mod simulation;
+
+pub use simulation::DifferenceEquations;

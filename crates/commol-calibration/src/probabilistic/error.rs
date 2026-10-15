@@ -14,11 +14,26 @@ pub enum CalibrationError {
 
     /// Mismatch between evaluations count and cluster labels count.
     #[error("Evaluations count ({evaluations}) doesn't match labels count ({labels})")]
-    EvaluationLabelMismatch { evaluations: usize, labels: usize },
+    EvaluationLabelMismatch {
+        /// Number of evaluations.
+        evaluations: usize,
+        /// Number of cluster labels.
+        labels: usize,
+    },
 
     /// Failed to set a parameter value.
     #[error("Failed to set parameter '{name}': {reason}")]
-    ParameterSetFailed { name: String, reason: String },
+    ParameterSetFailed {
+        /// Parameter id.
+        name: String,
+        /// Why the engine refused it.
+        reason: String,
+    },
+
+    /// A prediction left the values the model allows, such as an amount
+    /// below zero.
+    #[error("{0}")]
+    Infeasible(String),
 
     /// Simulation failed during prediction generation.
     #[error("Simulation failed: {0}")]

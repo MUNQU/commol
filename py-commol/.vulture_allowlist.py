@@ -4,9 +4,14 @@
 # Type annotations and Protocol imports used in string form
 Axes
 Figure
-DifferenceEquationsProtocol
+EngineProtocol
 RustModelProtocol
+RustCompartmentalStructureProtocol
+CalibrationParameterProtocol
 CalibrationParameterTypeProtocol
+CalibrationConstraintProtocol
+ObservedDataPointProtocol
 CalibrationResultWithHistoryProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
+EngineTypeProtocol

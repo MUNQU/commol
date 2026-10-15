@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
-use crate::difference::PyDifferenceEquations;
+use crate::engine::{InfeasibleStateError, PyEngine};
 
 /// Type of value being calibrated
 #[pyclass(name = "CalibrationParameterType", from_py_object)]
@@ -12,7 +12,7 @@ use crate::difference::PyDifferenceEquations;
 pub enum PyCalibrationParameterType {
     Parameter,
     InitialCondition,
-    Scale,
+    Factor,
 }
 
 impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParameterType {
@@ -24,8 +24,8 @@ impl From<PyCalibrationParameterType> for commol_calibration::CalibrationParamet
             PyCalibrationParameterType::InitialCondition => {
                 commol_calibration::CalibrationParameterType::InitialCondition
             }
-            PyCalibrationParameterType::Scale => {
-                commol_calibration::CalibrationParameterType::Scale
+            PyCalibrationParameterType::Factor => {
+                commol_calibration::CalibrationParameterType::Factor
             }
         }
     }
@@ -43,48 +43,42 @@ impl PyObservedDataPoint {
     /// Create a new observed data point
     ///
     /// Args:
-    ///     step: Step of observation
-    ///     compartment: Name of the compartment being observed
+    ///     at: Position of the observation on the axis
+    ///     label: Name of the observed series
+    ///     outputs: Outputs summed before comparison; at least one
     ///     value: Observed value
     ///     weight: Optional weight for this observation (default: 1.0)
-    ///     scale_id: Optional scale parameter ID to apply to model output
+    ///     factor_id: Optional factor parameter ID that multiplies the model output
+    ///     window: Optional window length for a cumulative output
     #[new]
-    #[pyo3(signature = (step, compartment, value, weight=None, scale_id=None, window_steps=None, compartments=None))]
+    #[pyo3(signature = (at, label, outputs, value, weight=None, factor_id=None, window=None))]
     fn new(
-        step: u32,
-        compartment: String,
+        at: f64,
+        label: String,
+        outputs: Vec<String>,
         value: f64,
         weight: Option<f64>,
-        scale_id: Option<String>,
-        window_steps: Option<u32>,
-        compartments: Option<Vec<String>>,
+        factor_id: Option<String>,
+        window: Option<f64>,
     ) -> Self {
-        let mut inner = match (weight, scale_id) {
-            (Some(w), Some(s)) => commol_calibration::ObservedDataPoint::with_weight_and_scale(
-                step,
-                compartment,
-                value,
-                w,
-                s,
-            ),
-            (Some(w), None) => {
-                commol_calibration::ObservedDataPoint::with_weight(step, compartment, value, w)
-            }
-            (None, Some(s)) => {
-                commol_calibration::ObservedDataPoint::with_scale(step, compartment, value, s)
-            }
-            (None, None) => commol_calibration::ObservedDataPoint::new(step, compartment, value),
-        };
-        inner.window_steps = window_steps;
-        inner.compartments = compartments;
+        let mut inner = commol_calibration::ObservedDataPoint::of_sum(at, label, outputs, value);
+        inner.weight = weight.unwrap_or(1.0);
+        inner.factor_id = factor_id;
+        inner.window = window;
         Self { inner }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ObservedDataPoint(time_step={}, compartment='{}', value={})",
-            self.inner.time_step, self.inner.compartment, self.inner.value
+            "ObservedDataPoint(at={}, label='{}', value={})",
+            self.inner.at, self.inner.label, self.inner.value
         )
+    }
+
+    /// Position of the observation on the axis
+    #[getter]
+    fn at(&self) -> f64 {
+        self.inner.at
     }
 }
 
@@ -158,15 +152,16 @@ impl PyCalibrationConstraint {
     ///     expression: Mathematical expression that must evaluate >= 0
     ///     description: Optional human-readable description
     ///     weight: Penalty weight multiplier (default: 1.0)
-    ///     time_steps: Optional time steps at which to evaluate (for time-dependent constraints)
+    ///     at: Optional positions on the axis at which to evaluate the
+    ///         constraint; it can then read output values
     #[new]
-    #[pyo3(signature = (id, expression, description=None, weight=1.0, time_steps=None))]
+    #[pyo3(signature = (id, expression, description=None, weight=1.0, at=None))]
     fn new(
         id: String,
         expression: String,
         description: Option<String>,
         weight: f64,
-        time_steps: Option<Vec<u32>>,
+        at: Option<Vec<f64>>,
     ) -> Self {
         let mut constraint = commol_calibration::CalibrationConstraint::new(id, expression);
 
@@ -176,8 +171,8 @@ impl PyCalibrationConstraint {
 
         constraint = constraint.with_weight(weight);
 
-        if let Some(steps) = time_steps {
-            constraint = constraint.with_time_steps(steps);
+        if let Some(positions) = at {
+            constraint = constraint.with_positions(positions);
         }
 
         Self { inner: constraint }
@@ -236,15 +231,6 @@ impl PyLossConfig {
         }
     }
 
-    /// Weighted sum of squared errors
-    #[staticmethod]
-    fn weighted_sse() -> Self {
-        Self {
-            inner: commol_calibration::LossConfig::WeightedSSE,
-            normalize_observations: false,
-        }
-    }
-
     /// Return a copy with per-series observation normalization enabled or disabled.
     ///
     /// Normalization is orthogonal to the metric: each residual is divided by the
@@ -263,6 +249,24 @@ impl PyLossConfig {
     fn normalize_observations(&self) -> bool {
         self.normalize_observations
     }
+
+    /// Loss of residuals with their observation weights
+    ///
+    /// The residuals are used as given: scale them by their normalization
+    /// factor first when normalization applies.
+    ///
+    /// Raises:
+    ///     ValueError: If `residuals` and `weights` differ in length
+    fn aggregate(&self, residuals: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
+        if residuals.len() != weights.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "{} residuals but {} weights",
+                residuals.len(),
+                weights.len()
+            )));
+        }
+        Ok(self.inner.aggregate(residuals.into_iter().zip(weights)))
+    }
 }
 
 /// Nelder-Mead optimization configuration
@@ -280,7 +284,7 @@ impl PyNelderMeadConfig {
     /// Args:
     ///     max_iterations: Maximum number of iterations (default: 1000)
     ///     sd_tolerance: Convergence tolerance (default: 1e-6)
-    ///     simplex_perturbation: Multiplier for initial simplex vertices (default: 1.1 = 10% perturbation)
+    ///     initial_simplex_size: Size of the initial simplex, as a fraction of each bound width (default: 0.1)
     ///     alpha: Reflection coefficient (default: None, uses argmin's default)
     ///     gamma: Expansion coefficient (default: None, uses argmin's default)
     ///     rho: Contraction coefficient (default: None, uses argmin's default)
@@ -288,12 +292,12 @@ impl PyNelderMeadConfig {
     ///     verbose: Enable verbose output (default: false)
     ///     header_interval: Number of iterations between table header repeats (default: 100)
     #[new]
-    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, simplex_perturbation=1.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
+    #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_simplex_size=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         max_iterations: u64,
         sd_tolerance: f64,
-        simplex_perturbation: f64,
+        initial_simplex_size: f64,
         alpha: Option<f64>,
         gamma: Option<f64>,
         rho: Option<f64>,
@@ -305,7 +309,7 @@ impl PyNelderMeadConfig {
             inner: commol_calibration::NelderMeadConfig {
                 max_iterations,
                 sd_tolerance,
-                simplex_perturbation,
+                initial_simplex_size,
                 alpha,
                 gamma,
                 rho,
@@ -1055,29 +1059,27 @@ fn with_remainder<E: commol_core::SimulationEngine>(
 /// Calibrate a model against observed data
 ///
 /// Args:
-///     engine: The simulation engine (e.g., DifferenceEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points
 ///     parameters: List of parameters to calibrate
 ///     constraints: List of calibration constraints
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population size from the model
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
 ///     CalibrationResult with best parameters and optimization statistics
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
 fn calibrate(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<PyCalibrationResult> {
     // Extract inner Rust types
@@ -1086,7 +1088,7 @@ fn calibrate(
     let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
 
     // Clone the engine since CalibrationProblem takes ownership
-    let engine_clone = engine.inner().clone();
+    let engine_clone = engine.engine();
 
     // Create calibration problem
     let problem = commol_calibration::CalibrationProblem::new(
@@ -1095,7 +1097,6 @@ fn calibrate(
         parameters,
         constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1129,29 +1130,27 @@ fn calibrate(
 /// not just the final best result.
 ///
 /// Args:
-///     engine: The simulation engine (DifferenceEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points to fit
 ///     parameters: List of parameters to calibrate with bounds
 ///     constraints: List of constraints on parameters/compartments
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population for fraction calculations
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
 ///     CalibrationResultWithHistory containing best parameters and all evaluations
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_condition_remainder=None))]
 fn calibrate_with_history(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<PyCalibrationResultWithHistory> {
     // Extract inner Rust types
@@ -1160,7 +1159,7 @@ fn calibrate_with_history(
     let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
 
     // Clone the engine since CalibrationProblem takes ownership
-    let engine_clone = engine.inner().clone();
+    let engine_clone = engine.engine();
 
     // Create calibration problem
     let problem = commol_calibration::CalibrationProblem::new(
@@ -1169,7 +1168,6 @@ fn calibrate_with_history(
         parameters,
         constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1189,31 +1187,29 @@ fn calibrate_with_history(
 /// Runs N calibration runs in parallel using Rayon, each with a different seed.
 ///
 /// Args:
-///     engine: The simulation engine (DifferenceEquations)
+///     engine: The simulation engine built from the model
 ///     observed_data: List of observed data points
 ///     parameters: List of parameters to calibrate
 ///     constraints: List of constraints on parameters/compartments
 ///     loss_config: Loss function configuration
 ///     optimization_config: Optimization algorithm configuration
-///     initial_population_size: Initial population for fraction calculations
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///     n_runs: Number of calibration runs to perform
 ///     seed: Base random seed (each run gets seed + run_index)
 ///
 /// Returns:
 ///     List of CalibrationResultWithHistory for each successful run
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, initial_population_size, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, optimization_config, n_runs, seed, evaluation_retention="all", top_k_per_run=None, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_multiple_calibrations(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
     optimization_config: &PyOptimizationConfig,
-    initial_population_size: u64,
     n_runs: usize,
     seed: u64,
     evaluation_retention: &str,
@@ -1226,14 +1222,13 @@ fn run_multiple_calibrations(
     let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
 
     // Create the base calibration problem
-    let engine_clone = engine.inner().clone();
+    let engine_clone = engine.engine();
     let base_problem = commol_calibration::CalibrationProblem::new(
         engine_clone,
         rust_observed_data,
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1305,65 +1300,76 @@ fn deduplicate_evaluations(
         .collect())
 }
 
+/// The Python error for predictions that stopped: [`InfeasibleStateError`]
+/// for a run that left the values its model allows, `RuntimeError` for any
+/// other error.
+fn prediction_error(error: commol_calibration::CalibrationError) -> PyErr {
+    match error {
+        commol_calibration::CalibrationError::Infeasible(message) => {
+            InfeasibleStateError::new_err(message)
+        }
+        error => PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(error.to_string()),
+    }
+}
+
 /// Generate predictions for multiple parameter sets in parallel
 ///
 /// This function runs simulations for each parameter set in parallel using Rust/Rayon,
 /// which is much faster than sequential execution in Python.
 ///
 /// Args:
-///     engine: DifferenceEquations simulation engine
+///     engine: Simulation engine built from the model
 ///     parameter_sets: List of parameter value lists (one per parameter set)
 ///     parameter_names: List of parameter names (must match model parameter IDs)
-///     time_steps: Number of time steps to simulate
+///     positions: Sorted, unique positions on the axis to report at
 ///
 /// Returns:
-///     List of predictions, where each prediction is a 2D list [time_step][compartment_idx]
+///     List of predictions, where each prediction is a 2D list
+///     [position_idx][output_idx], aligned with `positions`
 #[pyfunction]
 fn generate_predictions_parallel(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
-    time_steps: u32,
+    positions: Vec<f64>,
 ) -> PyResult<Vec<Vec<Vec<f64>>>> {
-    let base_engine = engine.inner();
+    let base_engine = &engine.engine();
 
     let predictions = commol_calibration::generate_predictions_parallel(
         base_engine,
         parameter_sets,
         parameter_names,
-        time_steps,
+        positions,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
 
 /// Generate predictions for calibration parameter sets, including calibrated
-/// initial conditions.
+/// initial conditions, with one row per position, aligned with `positions`.
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, time_steps, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, positions, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_parallel(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
-    initial_population_size: u64,
     parameter_sets: Vec<Vec<f64>>,
-    time_steps: u32,
+    positions: Vec<f64>,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<Vec<Vec<Vec<f64>>>> {
     let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
     let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
     let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
     let problem = commol_calibration::CalibrationProblem::new(
-        engine.inner().clone(),
+        engine.engine(),
         rust_observed_data,
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1372,72 +1378,125 @@ fn generate_calibrated_predictions_parallel(
     let predictions = commol_calibration::generate_calibrated_predictions_parallel(
         &problem,
         parameter_sets,
-        time_steps,
+        positions,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
 
-/// Initial population an engine starts from once calibration values are applied
+/// Initial state a compartmental engine starts from once calibration
+/// values are applied
 ///
 /// The values are applied exactly as the calibration objective scores them:
 /// clamped to their bounds, with the remainder initial condition
 /// auto-calculated, and written in parameter order.
 ///
 /// Args:
-///     engine: Engine built from the model definition, before calibration
+///     engine: Engine built from a compartmental model, before calibration
 ///     parameters: Calibration parameters, in problem order
 ///     values: Value of each parameter, parallel to `parameters`
-///     initial_population_size: Population the fractions are taken of
 ///     initial_condition_remainder: Compartment or bin that absorbs the
-///         difference to the population size, if any
+///         difference to the total, if any
 ///
 /// Returns:
-///     A `(values, population, covered)` tuple: the values the engine applied,
-///     parallel to `parameters`; the initial population of each compartment,
+///     A `(values, state, covered)` tuple: the values the engine applied,
+///     parallel to `parameters`; the initial amount of each compartment,
 ///     in engine order; and the indices of the compartments a calibrated bin
 ///     or compartment value, or the remainder, sets
 ///
 /// Raises:
-///     ValueError: If an initial-condition id cannot be resolved, the number of
-///         values is wrong, or the initial-condition fractions exceed 1.0
+///     ValueError: If the engine is not compartmental, an initial-condition id
+///         cannot be resolved, the number of values is wrong, or the
+///         initial-condition fractions exceed 1.0
 #[pyfunction]
-#[pyo3(signature = (engine, parameters, values, initial_population_size, initial_condition_remainder=None))]
-fn calibrated_initial_population(
-    engine: &PyDifferenceEquations,
+#[pyo3(signature = (engine, parameters, values, initial_condition_remainder=None))]
+fn calibrated_initial_state(
+    engine: PyRef<'_, PyEngine>,
     parameters: Vec<PyCalibrationParameter>,
     values: Vec<f64>,
-    initial_population_size: u64,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<usize>)> {
     let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
-    let state = commol_calibration::calibrated_initial_population(
-        engine.inner(),
+    let (configured, applied, plan) = commol_calibration::configured_engine(
+        &engine.engine(),
         &parameters,
         initial_condition_remainder.as_deref(),
         &values,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    Ok((state.values, state.population, state.covered))
+    let (state, covered) = crate::engine::compartmental_state(&configured, &plan)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    Ok((applied, state, covered))
+}
+
+/// Check that the engine resolves every value of its model kind, such as an
+/// initial condition, and the remainder
+///
+/// Args:
+///     engine: The simulation engine
+///     parameters: Calibration parameters, in problem order
+///     initial_condition_remainder: The id that takes what the values leave
+///         of the total the model kind keeps (a compartment or bin of a
+///         compartmental model), if any
+///
+/// Raises:
+///     ValueError: If the kind does not accept a type of value, or a value
+///         or the remainder cannot be resolved; for example a category of a
+///         stratification that is not binary
+#[pyfunction]
+#[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
+fn check_model_values(
+    engine: PyRef<'_, PyEngine>,
+    parameters: Vec<PyCalibrationParameter>,
+    initial_condition_remainder: Option<String>,
+) -> PyResult<()> {
+    let parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
+    commol_calibration::check_model_values(
+        &engine.engine(),
+        &parameters,
+        initial_condition_remainder.as_deref(),
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+}
+
+/// Check every position of a calibration problem with the engine
+///
+/// Args:
+///     engine: Engine built from the model definition
+///     observed_data: Observations, at their positions and windows
+///     constraints: Constraints, at their positions
+///
+/// Raises:
+///     ValueError: If the engine does not report at a position; the message
+///         names the observation or constraint that holds it
+#[pyfunction]
+fn check_positions(
+    engine: PyRef<'_, PyEngine>,
+    observed_data: Vec<PyObservedDataPoint>,
+    constraints: Vec<PyCalibrationConstraint>,
+) -> PyResult<()> {
+    let observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
+    let constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
+    commol_calibration::check_positions(&engine.engine(), &observed_data, &constraints)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
 /// Generate compact predictions for selected metric points.
 #[pyfunction]
 fn generate_predictions_at_points_parallel(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     parameter_sets: Vec<Vec<f64>>,
     parameter_names: Vec<String>,
-    metric_points: Vec<(u32, usize)>,
+    metric_points: Vec<(f64, usize)>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let predictions = commol_calibration::generate_predictions_at_points_parallel(
-        engine.inner(),
+        &engine.engine(),
         parameter_sets,
         parameter_names,
         metric_points,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
@@ -1445,29 +1504,27 @@ fn generate_predictions_at_points_parallel(
 /// Generate compact predictions for calibration parameter sets, including
 /// calibrated initial conditions.
 #[pyfunction]
-#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, initial_population_size, parameter_sets, metric_points, initial_condition_remainder=None))]
+#[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config, parameter_sets, metric_points, initial_condition_remainder=None))]
 #[allow(clippy::too_many_arguments)]
 fn generate_calibrated_predictions_at_points_parallel(
-    engine: &PyDifferenceEquations,
+    engine: PyRef<'_, PyEngine>,
     observed_data: Vec<PyObservedDataPoint>,
     parameters: Vec<PyCalibrationParameter>,
     constraints: Vec<PyCalibrationConstraint>,
     loss_config: &PyLossConfig,
-    initial_population_size: u64,
     parameter_sets: Vec<Vec<f64>>,
-    metric_points: Vec<(u32, usize)>,
+    metric_points: Vec<(f64, usize)>,
     initial_condition_remainder: Option<String>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let rust_observed_data: Vec<_> = observed_data.into_iter().map(|d| d.inner).collect();
     let rust_parameters: Vec<_> = parameters.into_iter().map(|p| p.inner).collect();
     let rust_constraints: Vec<_> = constraints.into_iter().map(|c| c.inner).collect();
     let problem = commol_calibration::CalibrationProblem::new(
-        engine.inner().clone(),
+        engine.engine(),
         rust_observed_data,
         rust_parameters,
         rust_constraints,
         loss_config.inner,
-        initial_population_size,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
     .with_observation_normalization(loss_config.normalize_observations);
@@ -1478,14 +1535,14 @@ fn generate_calibrated_predictions_at_points_parallel(
         parameter_sets,
         metric_points,
     )
-    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    .map_err(prediction_error)?;
 
     Ok(predictions)
 }
 
 /// Select an ensemble from compact observation-space predictions.
 #[pyfunction]
-#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="weighted_sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
+#[pyo3(signature = (candidates, observed_values, weights, normalization, series_ids, confidence_level, seed, central_loss_metric="sse", ensemble_algorithm="nsga2", ensemble_size_mode="automatic", ensemble_size=None, ensemble_size_min=None, ensemble_size_max=None, central_fit_max_loss_ratio=1.25, search_beam_width=32, population_size=100, generations=100, crossover_probability=0.9, pareto_preference=0.5))]
 #[allow(clippy::too_many_arguments)]
 fn select_compact_ensemble(
     candidates: Vec<PyCalibrationEvaluation>,
@@ -1524,13 +1581,12 @@ fn select_compact_ensemble(
     // Keep the gate's central loss coherent with the optimizer's member loss:
     // the same loss family is used on both sides of the fit gate.
     let central_loss_metric = match central_loss_metric {
-        "sse" | "weighted_sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
+        "sse" => commol_calibration::CentralLossMetric::WeightedSumOfSquares,
         "rmse" => commol_calibration::CentralLossMetric::RootMeanSquared,
         "mae" => commol_calibration::CentralLossMetric::MeanAbsolute,
         _ => {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid central_loss_metric: '{}'. Must be 'sse', 'weighted_sse', \
-                 'rmse', or 'mae'",
+                "Invalid central_loss_metric: '{}'. Must be 'sse', 'rmse', or 'mae'",
                 central_loss_metric
             )));
         }
@@ -1685,11 +1741,13 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyParetoSolution>()?;
     m.add_class::<PyEnsembleSelectionResult>()?;
     m.add_function(wrap_pyfunction!(calibrate, m)?)?;
-    m.add_function(wrap_pyfunction!(calibrated_initial_population, m)?)?;
+    m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
+    m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(calibrate_with_history, m)?)?;
     m.add_function(wrap_pyfunction!(run_multiple_calibrations, m)?)?;
     m.add_function(wrap_pyfunction!(deduplicate_evaluations, m)?)?;
     m.add_function(wrap_pyfunction!(generate_predictions_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(check_positions, m)?)?;
     m.add_function(wrap_pyfunction!(
         generate_calibrated_predictions_parallel,
         m

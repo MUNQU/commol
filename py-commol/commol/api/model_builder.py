@@ -1,24 +1,23 @@
+"""Fluent builder that assembles and validates a `Model`."""
+
 import copy
 import logging
-from typing import Literal, Self, TypedDict, cast
+from typing import Self, TypedDict
 
-from commol.api.time_patterns import (
+from commol.api.patterns import (
     ConditionDict as StratificationConditionDict,
     StratifiedRateDict,
-    TimePattern,
-    _ComputedTimePattern,
+    AxisPattern,
+    _ComputedAxisPattern,
     _GroupEntry,
-    _ScheduleTimePattern,
+    _ScheduleAxisPattern,
 )
-from commol.constants import LogicOperators, ModelTypes
 from commol.context.bin import Accumulator, Bin
-from commol.context.dynamics import (
-    Condition,
-    Dynamics,
-    Rule,
-    StratificationCondition,
-    StratifiedRate,
-    Transition,
+from commol.context.compartmental import CompartmentalStructure
+from commol.context.engine import (
+    CompartmentalEngineType,
+    EngineSettings,
+    ModelEngine,
 )
 from commol.context.initial_conditions import (
     BinFraction,
@@ -28,26 +27,12 @@ from commol.context.initial_conditions import (
     StratificationFractions,
 )
 from commol.context.model import Model
-from commol.context.parameter import Parameter, TimeSeriesValue
-from commol.context.population import Population
+from commol.context.parameter import Parameter, SeriesValue
 from commol.context.stratification import Stratification
+from commol.context.stratification_condition import StratificationCondition
+from commol.context.transition import StratifiedRate, Transition
 
 logger = logging.getLogger(__name__)
-
-
-class RuleDict(TypedDict):
-    """Type definition for rule dictionary used in create_condition method."""
-
-    variable: str
-    operator: Literal[
-        LogicOperators.EQ,
-        LogicOperators.NEQ,
-        LogicOperators.GT,
-        LogicOperators.GET,
-        LogicOperators.LT,
-        LogicOperators.LET,
-    ]
-    value: str | int | float | bool
 
 
 class BinFractionDict(TypedDict):
@@ -98,13 +83,13 @@ class ModelBuilder:
     _bins : list[Bin]
         List of bins (compartments) in the model.
     _stratifications : list[Stratification]
-        List of population stratifications.
+        List of stratifications.
     _transitions : list[Transition]
         List of transitions between states.
     _parameters : list[Parameter]
         List of model parameters.
     _initial_conditions : InitialConditions | None
-        Initial population conditions.
+        Initial conditions.
     """
 
     def __init__(
@@ -113,6 +98,7 @@ class ModelBuilder:
         description: str | None = None,
         version: str | None = None,
         bin_unit: str | None = None,
+        step_unit: str | None = None,
     ):
         """
         Initialize the ModelBuilder.
@@ -130,11 +116,18 @@ class ModelBuilder:
             Individual bins can override this with their own unit parameter.
             Units are optional but required for model.print_equations() and
             model.check_unit_consistency().
+        step_unit : str | None, default=None
+            Unit of one step on the axis, of any single dimension (for example
+            ``"day"`` or ``"meter"``). The unit check requires every flow to be
+            ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+            values to steps of it. None means ``step``, the default increment
+            of any axis.
         """
         self._name: str = name
         self._description: str | None = description
         self._version: str | None = version
         self._bin_unit: str | None = bin_unit
+        self._step_unit: str | None = step_unit
 
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
@@ -142,7 +135,7 @@ class ModelBuilder:
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._initial_conditions: InitialConditions | None = None
-        self._ts_counter: int = 0
+        self._series_counter: int = 0
 
         logging.info(
             (
@@ -189,7 +182,7 @@ class ModelBuilder:
         conditions: list[StratificationConditionDict] | None = None,
     ) -> Self:
         """
-        Add a population stratification to the model.
+        Add a stratification to the model.
 
         Parameters
         ----------
@@ -254,7 +247,7 @@ class ModelBuilder:
     def add_parameter(
         self,
         id: str,
-        value: float | str | list[tuple[int, float]] | None,
+        value: float | str | list[tuple[float, float]] | None,
         description: str | None = None,
         unit: str | None = None,
         mode: str | None = None,
@@ -266,26 +259,28 @@ class ModelBuilder:
         ----------
         id : str
             Unique identifier for the parameter.
-        value : float | str | list[tuple[int, float]] | None
+        value : float | str | list[tuple[float, float]] | None
             Value of the parameter. Can be:
             - float: A numerical constant value
             - str: A mathematical formula that can reference other parameters,
-                   special variables (N, N_category, step/t, pi, e), or contain
-                   mathematical expressions (e.g., "beta * 2", "N_young / N")
-            - list[tuple[int, float]]: Empirical time series as (step, value) pairs;
-                   requires ``mode`` to be set.
+                   special variables (total, total_<category>, step, t, pi, e),
+                   or contain mathematical expressions (e.g., "k1 * 2",
+                   "total_g1 / total")
+            - list[tuple[float, float]]: Empirical series as (position, value)
+                   points; requires ``mode`` to be set.
             - None: Indicates that the parameter needs to be calibrated before use
 
         description : str | None, default=None
             Human-readable description of the parameter.
         unit : str | None, default=None
-            Unit of the parameter (e.g., "1/day", "dimensionless", "person").
+            Unit of the parameter (e.g., "1/day", "dimensionless", "item").
             Used for unit consistency checking in equations.
         mode : str | None, default=None
-            Required when ``value`` is a list of (step, value) pairs. Selects the
-            interpolation mode: ``"pulse"`` (non-zero only at listed steps),
-            ``"step_function"`` (zero-order hold from last listed step), or
-            ``"linear"`` (interpolation between adjacent listed steps).
+            Required when ``value`` is a list of (position, value) points.
+            Selects how the series is read: ``"pulse"`` (the value on the step
+            of a point, 0 on every other step; integer positions only),
+            ``"step_function"`` (the value of the last point at or before
+            ``t``), or ``"linear"`` (linear interpolation in ``t``).
 
         Returns
         -------
@@ -302,16 +297,16 @@ class ModelBuilder:
             if mode is None:
                 raise ValueError(
                     f"Parameter '{id}': 'mode' is required when 'value' is a "
-                    "time-series list. Use mode='pulse', 'step_function', or 'linear'."
+                    "series list. Use mode='pulse', 'step_function', or 'linear'."
                 )
-            param_value: float | str | TimeSeriesValue | None = TimeSeriesValue(
+            param_value: float | str | SeriesValue | None = SeriesValue(
                 data=value, mode=mode
             )
         else:
             if mode is not None:
                 raise ValueError(
                     f"Parameter '{id}': 'mode' is only valid when 'value' is a "
-                    "time-series list."
+                    "series list."
                 )
             param_value = value
         self._ensure_parameter_id_available(id)
@@ -325,21 +320,21 @@ class ModelBuilder:
         if any(parameter.id == id for parameter in self._parameters):
             raise ValueError(f"Parameter id '{id}' already exists")
 
-    def _register_ts_pattern(
+    def _register_series_pattern(
         self,
-        pattern: TimePattern,
+        pattern: AxisPattern,
         *,
         transition_id: str = "",
         source_bin: str = "",
         target_bin: str = "",
-    ) -> TimePattern:
-        """Auto-register a TimeSeries parameter for pulse-type patterns.
+    ) -> AxisPattern:
+        """Auto-register a series parameter for pulse-type patterns.
 
-        If ``pattern`` has numeric pulse data, registers a ``TimeSeries``
-        parameter and returns a ``_ComputedTimePattern`` whose formula is the
+        If ``pattern`` has numeric pulse data, registers a ``"pulse"`` series
+        parameter and returns a ``_ComputedAxisPattern`` whose formula is the
         generated parameter name. Otherwise returns ``pattern`` unchanged.
         """
-        data = pattern._as_time_series_data()
+        data = pattern._as_series_data()
         if data is None:
             return pattern
         conditions = pattern.conditions
@@ -354,16 +349,16 @@ class ModelBuilder:
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
             param_name = f"{transition_id}_{src}_to_{tgt}"
         else:
-            param_name = f"_ts_{self._ts_counter}"
-            self._ts_counter += 1
+            param_name = f"_series_{self._series_counter}"
+            self._series_counter += 1
         self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,
-                value=TimeSeriesValue(data=data, mode="pulse"),
+                value=SeriesValue(data=data, mode="pulse"),
             )
         )
-        return _ComputedTimePattern(
+        return _ComputedAxisPattern(
             computed_formula=param_name,
             conditions=conditions,
             source_compartment=pattern.source_compartment,
@@ -374,11 +369,12 @@ class ModelBuilder:
         id: str,
         source: list[str],
         target: list[str],
-        rate: "str | float | TimePattern | None" = None,
+        rate: "str | float | AxisPattern | None" = None,
         stratified_rates: list[StratifiedRateDict] | None = None,
-        condition: Condition | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> Self:
         """
         Add a transition between states to the model.
@@ -387,8 +383,10 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per time step, and that value is applied to
-        all source compartments at once.
+        The rate is evaluated once, at each position the engine reads it, and
+        that value applies to all source compartments at once. What the value
+        means (an amount moved in one step or an instantaneous rate) is the
+        engine's; see "What a rate means" in the Core Concepts guide.
 
         When you use the $compartment placeholder in the rate formula with multiple
         sources, the system automatically expands this into multiple independent
@@ -397,8 +395,8 @@ class ModelBuilder:
         name.
 
         Each transition's rate is evaluated independently, giving per-compartment
-        dynamics. This is ideal for processes like per-capita death rates, where the
-        rate should be proportional to each compartment's population.
+        dynamics. This suits an outflow such as ``k1 * $compartment``, where the
+        flow of each compartment is proportional to its own amount.
 
         **$compartment Usage Rules**:
         - Only valid when len(source) > 1
@@ -419,7 +417,7 @@ class ModelBuilder:
         id : str
             Unique identifier for the transition. When using $compartment expansion,
             the system will append "__<compartment_name>" to create unique IDs for
-            each expanded transition (e.g., "death__S", "death__L").
+            each expanded transition (e.g., "out__A", "out__B").
         source : list[str]
             List of source state/category identifiers. When using $compartment in
             the rate, each source will generate a separate transition.
@@ -436,8 +434,12 @@ class ModelBuilder:
             - A formula with $compartment placeholder
 
             Special variables available in formulas:
-            - N: Total population (automatically calculated)
-            - step or t: Current simulation step (both are equivalent)
+            - total: The sum of every compartment, accumulators excluded
+            - total_<category>…: The sum of the compartments with these
+              categories, in the declaration order of the stratifications
+            - t: The current position on the axis
+            - step: The step that holds it, ``floor(t)``; in a
+              DifferenceEquations model ``t`` and ``step`` are equal
             - pi, e: Mathematical constants
             - $compartment: Expands to each source compartment name (only with
               multiple sources)
@@ -447,15 +449,25 @@ class ModelBuilder:
             - "conditions": List of dicts with "stratification" and "category" keys
             - "rate": Rate expression string
 
-        condition : Condition| None, default=None
-            Logical conditions that must be met for the transition.
-
         per_compartment : bool | None, default=None
             When True, base compartment names in the rate
             expression are automatically replaced with the specific stratified
             compartment name for each expanded transition flow. This ensures
-            each subpopulation transitions based on its own compartment value
-            rather than the total across all subpopulations.
+            each subgroup transitions based on its own compartment value
+            rather than the total across all subgroups.
+
+        accumulators : list[str] | None, default=None
+            Ids of accumulators that add up the flow of this transition.
+
+        impulse_at : list[float] | None, default=None
+            Make the transition an impulse at these positions on the axis. At
+            each one, ``rate`` is the fraction of the source (proportional) or the
+            amount (absolute) moved at once, before the flows of that step. A
+            DifferenceEquations model needs integer positions.
+
+        impulse_every : tuple[float, float] | None, default=None
+            ``(period, offset)``: make the transition an impulse at ``offset``,
+            ``offset + period``, ``offset + 2 * period``, ...
 
         Returns
         -------
@@ -469,24 +481,29 @@ class ModelBuilder:
             - If $compartment is used with multiple targets
             - If rate is None when using $compartment
         """
-        # If `rate` is a TimePattern, extract its rate string and stratified
-        # rates and route them into the existing pipeline. A TimePattern fully
-        # specifies the time-varying behaviour, so passing `stratified_rates=`
+        # If `rate` is a AxisPattern, extract its rate string and stratified
+        # rates and route them into the existing pipeline. A AxisPattern fully
+        # specifies how the rate changes along the axis, so passing `stratified_rates=`
         # alongside it is a conflict.
-        if isinstance(rate, TimePattern):
+        if isinstance(rate, AxisPattern):
+            if impulse_at is not None or impulse_every is not None:
+                raise ValueError(
+                    f"Transition '{id}': an impulse moves its rate at once; pass "
+                    "a fraction or an amount as `rate=`, not a AxisPattern."
+                )
             if stratified_rates is not None:
                 raise ValueError(
-                    f"Transition '{id}': pass either a TimePattern as `rate=` "
+                    f"Transition '{id}': pass either a AxisPattern as `rate=` "
                     "or `stratified_rates=`, not both."
                 )
             src_bin = source[0] if source else ""
             tgt_bin = target[0] if target else ""
-            if isinstance(rate, _ScheduleTimePattern):
+            if isinstance(rate, _ScheduleAxisPattern):
                 resolved = rate.model_copy(
                     update={
                         "patterns": [
                             _GroupEntry(
-                                pattern=self._register_ts_pattern(
+                                pattern=self._register_series_pattern(
                                     entry.pattern,
                                     transition_id=id,
                                     source_bin=src_bin,
@@ -500,7 +517,7 @@ class ModelBuilder:
                 )
                 rate = resolved
             else:
-                rate = self._register_ts_pattern(
+                rate = self._register_series_pattern(
                     rate, transition_id=id, source_bin=src_bin, target_bin=tgt_bin
                 )
             stratified_rates = rate._builder_stratified_rates()
@@ -514,7 +531,7 @@ class ModelBuilder:
         if rate and "$compartment" in rate:
             self._validate_compartment_placeholder(id, source, target)
             self._expand_compartment_transition(
-                id, source, target, rate, stratified_rates, condition
+                id, source, target, rate, stratified_rates, impulse_at, impulse_every
             )
             return self
 
@@ -542,8 +559,9 @@ class ModelBuilder:
                 accumulators=accumulators or [],
                 rate=rate,
                 stratified_rates=stratified_rates_objects,
-                condition=condition,
                 per_compartment=per_compartment,
+                impulse_at=impulse_at,
+                impulse_every=impulse_every,
             )
         )
         logging.info(
@@ -617,7 +635,8 @@ class ModelBuilder:
         target: list[str],
         rate: str,
         stratified_rates: list[StratifiedRateDict] | None,
-        condition: Condition | None,
+        impulse_at: list[float] | None = None,
+        impulse_every: tuple[float, float] | None = None,
     ) -> None:
         """
         Expand a transition with $compartment placeholder into multiple transitions.
@@ -636,8 +655,8 @@ class ModelBuilder:
             Rate formula containing $compartment
         stratified_rates : list[StratifiedRateDict] | None
             Stratified rates (can contain $compartment which will be expanded)
-        condition : Condition | None
-            Transition condition
+        impulse_at, impulse_every : optional
+            Impulse schedule of every expanded transition
         """
         # Determine if we're expanding over sources or targets
         has_multiple_sources = len(source) > 1
@@ -711,7 +730,8 @@ class ModelBuilder:
                     target=expanded_target,
                     rate=expanded_rate,
                     stratified_rates=expanded_stratified_rates,
-                    condition=condition,
+                    impulse_at=impulse_at,
+                    impulse_every=impulse_every,
                 )
             )
 
@@ -732,60 +752,9 @@ class ModelBuilder:
             f"Successfully expanded transition '{id}' into {len(source)} transitions"
         )
 
-    def create_condition(
-        self,
-        logic: Literal["and", "or"],
-        rules: list[RuleDict],
-    ) -> Condition:
-        """
-        Create a condition object for use in transitions.
-
-        Parameters
-        ----------
-        logic : Literal["and", "or"]
-            How to combine the rules.
-        rules : List[RuleDict]
-            List of rule dictionaries with 'variable', 'operator', and 'value' keys.
-            Each dictionary must have:
-            - 'variable': str (format '<prefix>:<variable_id>')
-            - 'operator': Literal["eq", "neq", "gt", "get", "lt", "let"]
-            - 'value': str | int | float | bool
-
-        Returns
-        -------
-        Condition
-            The created condition object.
-
-        Examples
-        --------
-        >>> condition = builder.create_condition(
-        ...     "and",
-        ...     [
-        ...         {"variable": "states:I", "operator": "gt", "value": 0},
-        ...         {"variable": "strati:age", "operator": "eq", "value": "adult"},
-        ...     ],
-        ... )
-        """
-        rule_objects: list[Rule] = []
-        for rule_dict in rules:
-            rule_objects.append(
-                Rule(
-                    variable=rule_dict["variable"],
-                    operator=rule_dict["operator"],
-                    value=rule_dict["value"],
-                )
-            )
-
-        return Condition(
-            logic=cast(
-                Literal[LogicOperators.AND, LogicOperators.OR], LogicOperators(logic)
-            ),
-            rules=rule_objects,
-        )
-
     def set_initial_conditions(
         self,
-        population_size: int,
+        total: float,
         bin_fractions: list[BinFractionDict],
         stratification_fractions: list[StratificationFractionsDict] | None = None,
         *,
@@ -796,8 +765,9 @@ class ModelBuilder:
 
         Parameters
         ----------
-        population_size : int
-            Total population size.
+        total : float
+            The sum of every compartment at the start, finite and greater than
+            0. It can be a count, a mass or a concentration.
         bin_fractions : list[BinFractionDict]
             List of bin fractions. Each item is a dictionary with:
             - "bin": str (bin id)
@@ -805,9 +775,9 @@ class ModelBuilder:
 
             Example:
             [
-                {"bin": "S", "fraction": 0.99},
-                {"bin": "I", "fraction": 0.01},
-                {"bin": "R", "fraction": 0.0}
+                {"bin": "A", "fraction": 0.99},
+                {"bin": "B", "fraction": 0.01},
+                {"bin": "C", "fraction": 0.0}
             ]
         stratification_fractions : list[StratificationFractionsDict] | None,
             default=None
@@ -818,11 +788,11 @@ class ModelBuilder:
             Example:
             [
                 {
-                    "stratification": "age_group",
+                    "stratification": "group",
                     "fractions": [
-                        {"category": "young", "fraction": 0.3},
-                        {"category": "adult", "fraction": 0.5},
-                        {"category": "elderly", "fraction": 0.2}
+                        {"category": "g1", "fraction": 0.3},
+                        {"category": "g2", "fraction": 0.5},
+                        {"category": "g3", "fraction": 0.2}
                     ]
                 }
             ]
@@ -830,14 +800,14 @@ class ModelBuilder:
             List of per-compartment overrides applied after the uniform
             expansion. Each item is a dictionary with:
             - "compartment": str (expanded compartment name)
-            - "fraction": float (fraction of the total population)
+            - "fraction": float (fraction of the total)
 
             Example:
             [
-                {"compartment": "IH_y60", "fraction": 0.0}
+                {"compartment": "A_g1", "fraction": 0.0}
             ]
 
-            Compartment names and the resulting total population are checked
+            Compartment names and the resulting sum of the amounts are checked
             against the engine expansion when the model is built.
 
         Returns
@@ -848,8 +818,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If initial conditions have already been set, a compartment name is
-            repeated, or a fraction lies outside ``[0.0, 1.0]``.
+            If initial conditions have already been set, the total is not
+            finite or not greater than 0, a compartment name is repeated, or a
+            fraction lies outside ``[0.0, 1.0]``.
         """
         if self._initial_conditions is not None:
             raise ValueError("Initial conditions have already been set")
@@ -889,18 +860,13 @@ class ModelBuilder:
         ]
 
         self._initial_conditions = InitialConditions(
-            population_size=population_size,
+            total=total,
             bin_fractions=bin_fractions_list,
             stratification_fractions=strat_fractions_list,
             compartment_fractions=compartment_fraction_list,
         )
         bin_ids = [bf["bin"] for bf in bin_fractions]
-        logging.info(
-            (
-                f"Set initial conditions: population_size={population_size}, "
-                f"bins={bin_ids}"
-            )
-        )
+        logging.info((f"Set initial conditions: total={total}, bins={bin_ids}"))
         return self
 
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
@@ -934,22 +900,19 @@ class ModelBuilder:
         Returns
         -------
         ModelBuilder
-            A new ModelBuilder instance with the same configuration.
+            A new ModelBuilder instance with the same configuration: every
+            bin, accumulator, stratification, transition, parameter and the
+            initial conditions. Changes to one builder do not affect the other.
         """
-
-        new_builder = type(self)(self._name, self._description, self._version)
-
-        new_builder._bins = copy.deepcopy(self._bins)
-        new_builder._stratifications = copy.deepcopy(self._stratifications)
-        new_builder._transitions = copy.deepcopy(self._transitions)
-        new_builder._parameters = copy.deepcopy(self._parameters)
-        new_builder._initial_conditions = copy.deepcopy(self._initial_conditions)
-
-        return new_builder
+        return copy.deepcopy(self)
 
     def reset(self) -> Self:
         """
-        Reset the builder to empty state while keeping name, description, and version.
+        Reset the builder to empty state.
+
+        The name, description, version and ``bin_unit`` are kept. Every bin,
+        accumulator, stratification, transition, parameter and the initial
+        conditions are removed.
 
         Returns
         -------
@@ -957,69 +920,48 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._bins.clear()
+        self._accumulators.clear()
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._initial_conditions = None
+        self._series_counter = 0
         return self
 
-    def _validate_typology(self, typology: str) -> ModelTypes:
+    def build(
+        self,
+        engine: CompartmentalEngineType,
+        settings: EngineSettings | None = None,
+    ) -> Model[CompartmentalStructure]:
         """
-        Validate and convert typology string to ModelTypes enum.
+        Build and return the final compartmental Model.
 
         Parameters
         ----------
-        typology : str
-            The model typology as a string.
+        engine : CompartmentalEngineType
+            The engine that runs the model: ``"DifferenceEquations"``
+            (discrete time) or ``"DifferentialEquations"`` (continuous time).
+        settings : EngineSettings | None, default=None
+            Settings of that engine; None uses its defaults. Only
+            ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
         Returns
         -------
-        ModelTypes
-            The validated ModelTypes enum value.
+        Model[CompartmentalStructure]
+            The constructed compartmental model.
 
         Raises
         ------
         ValueError
-            If the typology string is not a valid ModelTypes value.
-        """
-        try:
-            return ModelTypes(typology)
-        except ValueError:
-            valid_values = [t.value for t in ModelTypes]
-            raise ValueError(
-                f"Invalid typology: '{typology}'. Must be one of {valid_values}"
-            ) from None
-
-    def build(self, typology: str) -> Model:
-        """
-        Build and return the final Model instance.
-
-        Parameters
-        ----------
-        typology : str
-            Type of the model. Must be one of the valid ModelTypes values:
-            "DifferenceEquations".
-
-        Returns
-        -------
-        Model
-            The constructed compartment model.
-
-        Raises
-        ------
-        ValueError
-            If validation fails, required components are missing,
-            typology is invalid, or a per-compartment override names an unknown
-            compartment or makes the initial population exceed
-            ``population_size``.
+            If validation fails, required components are missing, the engine
+            is unknown, the settings are not settings of that engine, or a
+            per-compartment override names an unknown compartment or makes
+            the initial amounts exceed the total.
         """
         if self._initial_conditions is None:
             raise ValueError("Initial conditions must be set")
 
-        # Validate and convert typology string to enum
-        validated_typology = self._validate_typology(typology)
-
-        population = Population(
+        structure = CompartmentalStructure(
             bins=self._bins,
             accumulators=self._accumulators,
             stratifications=self._stratifications,
@@ -1027,22 +969,18 @@ class ModelBuilder:
             initial_conditions=self._initial_conditions,
         )
 
-        dynamics = Dynamics(
-            typology=validated_typology,
-            transitions=self._transitions,
-        )
-
-        model = Model(
+        model = Model[CompartmentalStructure](
             name=self._name,
             description=self._description,
             version=self._version,
-            population=population,
             parameters=self._parameters,
-            dynamics=dynamics,
+            engine=ModelEngine(type=engine, settings=settings),
+            structure=structure,
+            step_unit=self._step_unit,
         )
 
         logging.info(
-            f"Model '{self._name}' successfully built with typology '{typology}'."
+            f"Model '{self._name}' successfully built for the {engine} engine."
         )
 
         return model

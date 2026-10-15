@@ -1,25 +1,18 @@
+"""Simulation of a model with the Rust engine, and access to its outputs."""
+
 import logging
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Literal, assert_never, overload
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import (
-        DifferenceEquationsProtocol,
-        RustModelProtocol,
-    )
+    from commol.commol_rs._commol_rs import EngineProtocol
 
-try:
-    from commol.commol_rs import _commol_rs as commol_rs
-
-    core = commol_rs.core
-    difference = commol_rs.difference
-except ImportError as e:
-    raise ImportError(f"Error importing Rust extension: {e}") from e
-
+from commol.api.results import SimulationResults
 from commol.api.windows import windowed_totals
-from commol.constants import ModelTypes
+from commol.context._model.engine_state import build_engine
 from commol.context.model import Model
+from commol.context.structure import ModelStructure
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +20,10 @@ logger = logging.getLogger(__name__)
 class Simulation:
     """
     A Facade for running a simulation from a defined Model.
+
+    The engine follows the model: ``run`` and ``engine`` rebuild it when
+    ``model_definition`` no longer serializes to the JSON the engine was built
+    from, for example after ``Model.update_parameters``.
     """
 
     def __init__(self, model: Model):
@@ -36,29 +33,45 @@ class Simulation:
         Parameters
         ----------
         model : Model
-            A fully constructed and validated model object.
+            A fully constructed and validated model object, of any kind.
             None values for parameters/initial conditions if used for calibration.
 
+        Raises
+        ------
+        TypeError
+            If the structure of the model is not a `ModelStructure`.
+
         """
+        if not isinstance(model.structure, ModelStructure):
+            raise TypeError(
+                f"The structure of model '{model.name}' is a "
+                f"{type(model.structure).__name__}, not a ModelStructure. A model "
+                "holds the structure of its kind, such as a CompartmentalStructure."
+            )
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
+        self._build_engine(model.model_dump_json())
 
-        self._engine: "DifferenceEquationsProtocol" = self._initialize_engine()
-
-        self._compartments: list[str] = self._engine.compartments
-        self._simulation_outputs: list[str] = getattr(
-            self._engine,
-            "output_names",
-            self._compartments,
-        )
+    def _build_engine(self, model_json: str) -> None:
+        """Build the engine and its output names from a model JSON."""
+        self._model_json: str = model_json
+        self._engine: "EngineProtocol" = build_engine(model_json)
+        self._simulation_outputs: list[str] = self._engine.output_names
         logging.info(
-            f"Simulation engine ready. Total compartments: {len(self._compartments)}"
+            f"Simulation engine ready. Outputs: {len(self._simulation_outputs)}"
         )
+
+    def _sync_engine(self) -> None:
+        """Rebuild the engine when the model changed since it was built."""
+        model_json = self.model_definition.model_dump_json()
+        if model_json != self._model_json:
+            logging.info("Model changed since the engine was built; rebuilding it.")
+            self._build_engine(model_json)
 
     def _validate_all_parameters_calibrated(self, model: Model) -> None:
         """
-        Validates that all parameters and initial conditions have values
-        (are calibrated).
+        Validates that every parameter, and every value of the model kind, has
+        a value (is calibrated).
 
         Parameters
         ----------
@@ -68,10 +81,11 @@ class Simulation:
         Raises
         ------
         ValueError
-            If any parameter or initial condition has a None value.
+            If any parameter, or any value of the model kind such as an
+            initial condition, has a None value.
         """
         uncalibrated_params = model.get_uncalibrated_parameters()
-        uncalibrated_ics = model.get_uncalibrated_initial_conditions()
+        uncalibrated_ics = model.structure.uncalibrated_values()
 
         errors = []
         if uncalibrated_params:
@@ -90,108 +104,109 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def _initialize_engine(self) -> "DifferenceEquationsProtocol":
-        """Internal method to set up the Rust backend."""
-        logging.info("Preparing model definition for Rust serialization...")
-        model_json = self.model_definition.model_dump_json()
-
-        rust_model_instance: "RustModelProtocol" = core.Model.from_json(model_json)
-        logging.info("Rust model instance created from JSON.")
-
-        # This could be extended if you have more engine types
-        if self.model_definition.dynamics.typology == ModelTypes.DIFFERENCE_EQUATIONS:
-            logging.info("Initializing DifferenceEquations engine.")
-            return difference.DifferenceEquations(rust_model_instance)
-
-        raise NotImplementedError(
-            (
-                f"Engine for typology '{self.model_definition.dynamics.typology}' "
-                f"not implemented."
-            )
-        )
-
-    def _run_raw(self, num_steps: int) -> list[list[float]]:
+    def run(self, num_steps: int) -> SimulationResults:
         """
-        Runs the simulation and returns the raw, high-performance output.
-        This is the fastest method, returning a list of lists of floats.
-        """
-        logging.info(f"Running raw simulation for {num_steps} steps.")
-        start = time.time()
-        results = self._engine.run(num_steps)
-        end = time.time()
-        logging.info(f"Raw simulation complete. It tool {end - start} seconds.")
-        return results
+        Runs the simulation from the initial state on its default grid.
 
-    @overload
-    def run(
-        self, num_steps: int, output_format: Literal["list_of_lists"]
-    ) -> list[list[float]]: ...
-    @overload
-    def run(
-        self, num_steps: int, output_format: Literal["dict_of_lists"]
-    ) -> dict[str, list[float]]: ...
-    @overload
-    def run(self, num_steps: int) -> dict[str, list[float]]: ...
-    def run(
-        self,
-        num_steps: int,
-        output_format: Literal["dict_of_lists", "list_of_lists"] = "dict_of_lists",
-    ) -> dict[str, list[float]] | list[list[float]]:
-        """
-        Runs the simulation and returns the output in the specified format.
+        Every call starts at position 0 with the current ``model_definition``,
+        so two calls with the same model give the same result. To continue a
+        run, call ``simulation.engine.step()``.
 
         Parameters
         ----------
         num_steps : int
-            The number of steps for the simulation.
-        output_format : {'dict_of_lists', 'list_of_lists'}, default 'dict_of_lists'
-            - 'dict_of_lists': Returns a dictionary of lists, with compartment names
-                as keys.
-            - 'list_of_lists': Returns a list of lists of floats, where the first level
-                is the step and the second level the comptarment.
+            The number of steps: the results hold the positions
+            ``0, 1, ..., num_steps``.
 
         Returns
         -------
-        dict[str, list[float]] | list[list[float]]
-            The simulation results in the specified format.
+        SimulationResults
+            One value per position for each output, and the positions.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
+        ValueError
+            If a parameter or initial condition has no value.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
-        raw_results = self._run_raw(num_steps)
-        if output_format == "list_of_lists":
-            logging.info("Returning results in 'list_of_lists' format.")
-            return raw_results
+        self._sync_engine()
+        self._engine.reset()
+        logging.info(f"Running simulation for {num_steps} steps.")
+        start = time.time()
+        positions, rows = self._engine.run(num_steps)
+        logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
+        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 
-        elif output_format == "dict_of_lists":
-            logging.info("Transposing raw results to 'dict_of_lists' format.")
-            if not raw_results:
-                return {c: [] for c in self._simulation_outputs}
-            transposed_results = zip(*raw_results)
-            return {
-                column: list(values)
-                for column, values in zip(self._simulation_outputs, transposed_results)
-            }
+    def run_at(self, at: Sequence[float]) -> SimulationResults:
+        """
+        Runs the simulation from the initial state and reports at given positions.
 
-        else:
-            assert_never(output_format)
+        The positions are on the axis, the independent variable of the model.
+        The engine decides which positions its model type reports at: a
+        DifferentialEquations model at any finite, non-negative position, from
+        the dense output of its solver; a DifferenceEquations model only at
+        integer steps.
+
+        Parameters
+        ----------
+        at : Sequence[float]
+            Sorted, unique positions to report at.
+
+        Returns
+        -------
+        SimulationResults
+            One value per position for each output, and the positions.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
+        ValueError
+            If a parameter or initial condition has no value, the positions are
+            not sorted and unique, or the engine does not report at one of them;
+            the message is the engine's.
+        """
+        positions = [float(position) for position in at]
+        self._validate_all_parameters_calibrated(self.model_definition)
+        self._sync_engine()
+        self._engine.reset()
+        rows = self._engine.run_at(positions)
+        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
 
     @property
-    def engine(self) -> "DifferenceEquationsProtocol":
-        """Get the underlying simulation engine."""
+    def engine(self) -> "EngineProtocol":
+        """
+        The engine for the current ``model_definition``.
+
+        It is rebuilt, at step 0, when the model changed since it was built.
+        Otherwise it is the same object, in the state the last ``run`` or
+        ``step`` left it.
+        """
+        self._sync_engine()
         return self._engine
 
     @property
     def simulation_outputs(self) -> list[str]:
         """Names of the columns returned by simulation runs."""
+        self._sync_engine()
         return self._simulation_outputs
 
-    def outputs_for(self, source_id: str) -> list[str]:
+    def outputs_for(self, id: str) -> list[str]:
         """
-        Names of the outputs a bin or accumulator expands into.
+        Names of the outputs a source id expands into.
+
+        The structure of the model groups its outputs by source
+        (`ModelStructure.outputs_by_source`): for a compartmental model, by
+        bin and accumulator.
 
         Parameters
         ----------
-        source_id : str
-            A bin id or an accumulator id.
+        id : str
+            A source id, such as a bin id or an accumulator id.
 
         Returns
         -------
@@ -201,23 +216,23 @@ class Simulation:
         Raises
         ------
         KeyError
-            If `source_id` is not a bin or accumulator of the model.
+            If `id` is not a source of the model.
         """
-        outputs = self.model_definition.get_outputs_by_source()
-        if source_id not in outputs:
+        outputs = self.model_definition.structure.outputs_by_source()
+        if id not in outputs:
             raise KeyError(
-                f"'{source_id}' is not a bin or accumulator of model "
+                f"'{id}' is not a bin or accumulator of model "
                 f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
             )
-        return outputs[source_id]
+        return outputs[id]
 
-    def group_outputs(self, source_ids: Iterable[str]) -> dict[str, list[str]]:
+    def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
         """
         Group output names by the bin or accumulator they belong to.
 
         Parameters
         ----------
-        source_ids : Iterable[str]
+        ids : Iterable[str]
             Bin and accumulator ids.
 
         Returns
@@ -230,27 +245,27 @@ class Simulation:
         KeyError
             If an id is not a bin or accumulator of the model.
         """
-        return {source_id: self.outputs_for(source_id) for source_id in source_ids}
+        return {id: self.outputs_for(id) for id in ids}
 
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
-        source_ids: Iterable[str],
+        ids: Iterable[str],
     ) -> list[float]:
         """
-        Sum the outputs of the given bins or accumulators at each step.
+        Sum the outputs of the given bins or accumulators at each position.
 
         Parameters
         ----------
         results : Mapping[str, Sequence[float]]
-            Simulation results in `dict_of_lists` form.
-        source_ids : Iterable[str]
+            Simulation results, such as those of `run` or `run_at`.
+        ids : Iterable[str]
             Bin and accumulator ids whose outputs are summed together.
 
         Returns
         -------
         list[float]
-            One value per step.
+            One value per position of `results`.
 
         Raises
         ------
@@ -258,9 +273,7 @@ class Simulation:
             If an id is not a bin or accumulator of the model, or an expected
             output is missing from `results`.
         """
-        names = [
-            name for source_id in source_ids for name in self.outputs_for(source_id)
-        ]
+        names = [name for id in ids for name in self.outputs_for(id)]
         missing = [name for name in names if name not in results]
         if missing:
             raise KeyError(f"Missing output series in results: {sorted(missing)}")
@@ -273,26 +286,27 @@ class Simulation:
 
     def windowed_totals(
         self,
-        results: Mapping[str, Sequence[float]],
-        source_ids: Iterable[str],
-        window_steps: int,
-        at_steps: Iterable[int] | None = None,
+        results: SimulationResults,
+        ids: Iterable[str],
+        window: float,
+        at: Iterable[float] | None = None,
     ) -> list[float]:
         """
         Amount the given accumulators gained over each window.
 
         Parameters
         ----------
-        results : Mapping[str, Sequence[float]]
-            Simulation results in `dict_of_lists` form.
-        source_ids : Iterable[str]
+        results : SimulationResults
+            Simulation results, with their positions.
+        ids : Iterable[str]
             Accumulator ids whose outputs are summed before windowing.
-        window_steps : int
-            Length of one window, in simulation steps.
-        at_steps : Iterable[int] | None, optional
-            Steps at which windows close. Defaults to every complete window of
-            the run. Pass the observation steps to reproduce exactly the values
-            a calibration used.
+        window : float
+            Length of one window on the axis.
+        at : Iterable[float] | None, optional
+            Positions at which windows close. Defaults to every complete
+            window of the results (:func:`commol.window_ends`). Pass the
+            observation positions to reproduce exactly the values a
+            calibration used.
 
         Returns
         -------
@@ -305,11 +319,9 @@ class Simulation:
             If an id is not a bin or accumulator of the model, or an expected
             output is missing from `results`.
         ValueError
-            If `window_steps` is not positive, or a requested step has no
-            complete window inside the run.
+            If `window` is not positive, or the results have no value at the
+            end or the start of a requested window.
         """
         return windowed_totals(
-            self.total_series(results, source_ids),
-            window_steps,
-            at_steps,
+            self.total_series(results, ids), results.positions, window, at
         )

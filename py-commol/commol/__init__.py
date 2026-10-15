@@ -1,3 +1,5 @@
+"""Compartment models with a Rust engine: build, simulate and calibrate them."""
+
 import logging
 from typing import TextIO
 
@@ -6,16 +8,22 @@ from commol.api import (
     ModelBuilder,
     Simulation,
     SimulationPlotter,
-    TimePattern,
-    TimeScale,
+    SimulationResults,
+    AxisPattern,
     applied_parameters_report,
     ci_percentiles,
     simulation_report,
     member_statistics,
-    window_end_steps,
+    window_end,
+    window_ends,
+    window_index,
+    window_start,
     windowed_totals,
 )
-from commol.context import Model
+from commol.commol_rs._commol_rs import engine as _engine
+from commol.context import CompartmentalStructure, Model, ModelStructure
+from commol.context.axis_units import AxisUnits
+from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
     CalibrationParameter,
@@ -40,6 +48,13 @@ from commol.context.probabilistic_calibration import (
 )
 from commol.context.visualization import PlotConfig
 
+InfeasibleStateError = _engine.InfeasibleStateError
+"""A run left the values its model allows, such as an amount below zero.
+
+A difference-equations step that leaves a compartment below zero raises it.
+It is a `ValueError`; a calibration treats such a run as infeasible.
+"""
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -58,14 +73,18 @@ __all__ = [
     "CalibrationEvaluation",
     "EnsembleSolution",
     "EnsembleSelectionSummary",
+    "InfeasibleStateError",
     "CalibrationParameter",
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
+    "CompartmentalStructure",
     "Model",
     "ModelBuilder",
+    "ModelStructure",
     "NelderMeadConfig",
     "ObservedDataPoint",
+    "OdeSolver",
     "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",
@@ -78,12 +97,16 @@ __all__ = [
     "ProbRepresentativeConfig",
     "Simulation",
     "SimulationPlotter",
-    "TimePattern",
-    "TimeScale",
+    "SimulationResults",
+    "AxisPattern",
+    "AxisUnits",
     "applied_parameters_report",
     "ci_percentiles",
     "member_statistics",
     "simulation_report",
-    "window_end_steps",
+    "window_end",
+    "window_ends",
+    "window_index",
+    "window_start",
     "windowed_totals",
 ]

@@ -1,6 +1,24 @@
 # Examples
 
-Complete examples demonstrating different modeling scenarios using abstract, domain-agnostic compartment models.
+[Back to Home](../index.md)
+
+Complete models, each runnable on its own, with abstract names. Each example
+shows one technique:
+
+| Example | Technique |
+|---|---|
+| 1. Basic three-state model | Absolute and proportional rates |
+| 2. Four-state model | A chain of states |
+| 3. Periodic rates | `sin` of `step` in a rate |
+| 4. Group-specific rates | Stratified rates |
+| 5. Waning effect | A cyclic transition back to the first state |
+| 6. Capacity-constrained rate | `max` in a rate |
+| 7. Intersection rates | Stratified rates with several conditions |
+| 8. Subgroup-normalized rate | `total_<category>` variables |
+| 9. Conditional stratification | A stratification that splits one group only |
+| 10. Parameter calibration | `Calibrator` |
+| Axis-pattern transition | `AxisPattern` as a rate |
+| Schedules per subgroup | `AxisPattern.add_group` |
 
 ## Example 1: Basic Three-State Model
 
@@ -16,17 +34,17 @@ model = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -47,11 +65,11 @@ model = (
     .add_parameter(id="k1", value=0.4, description="A to M rate")
     .add_parameter(id="k2", value=0.2, description="M to B rate")
     .add_parameter(id="k3", value=0.1, description="B to C rate")
-    .add_transition(id="flow_AM", source=["A"], target=["M"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AM", source=["A"], target=["M"], rate="k1 * A * B / total")
     .add_transition(id="flow_MB", source=["M"], target=["B"], rate="k2")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.999},
             {"bin": "M", "fraction": 0.0},
@@ -59,14 +77,14 @@ model = (
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
-## Example 3: Periodic (Time-Dependent) Rates
+## Example 3: Periodic Rates
 
 Modelling periodic variation in a transition rate:
 
@@ -83,18 +101,18 @@ model = (
         id="periodic_flow",
         source=["A"],
         target=["B"],
-        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / N"
+        rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / total"
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -142,7 +160,7 @@ model = (
         ]
     )
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -159,7 +177,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -183,18 +201,18 @@ model = (
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2", value=0.1)
     .add_parameter(id="k3", value=0.01)  # Return rate
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -203,7 +221,9 @@ results = simulation.run(num_steps=1000)
 
 ## Example 6: Capacity-Constrained Rate
 
-The flow rate slows as a downstream compartment approaches a capacity limit:
+The flow from `B` slows as the downstream compartment `C` fills, and stops
+when `C` reaches `capacity`. The rate names `B`, so it is the flow itself; the
+factor `max(0, 1 - C / capacity)` never turns it negative:
 
 ```python
 model = (
@@ -214,22 +234,22 @@ model = (
     .add_parameter(id="k1", value=0.5)
     .add_parameter(id="k2_max", value=0.15)
     .add_parameter(id="capacity", value=100.0)
-    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / N")
+    .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(
         id="flow_BC",
         source=["B"],
         target=["C"],
-        rate="k2_max * (1 - max(0, (B - capacity) / capacity))"
+        rate="k2_max * B * max(0, 1 - C / capacity)"
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.95},
             {"bin": "B", "fraction": 0.05},
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -238,7 +258,10 @@ results = simulation.run(num_steps=100)
 
 ## Example 7: Multi-Stratified Model with Intersection Rates
 
-A model with two stratifications and a rate specific to a particular intersection of categories:
+A model with two stratifications and a rate specific to a particular intersection of categories.
+`per_compartment=True` makes `A` and `B` in the rate the compartments of each
+flow, so each compartment of `A` loses an amount computed from its own amount,
+not from the total of the bin:
 
 ```python
 model = (
@@ -255,17 +278,18 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1_low * A * B / N",
+        rate="k1_low * A * B / total",
         stratified_rates=[
             {
                 "conditions": [{"stratification": "type", "category": "t2"}],
-                "rate": "k1_high * A * B / N"
+                "rate": "k1_high * A * B / total"
             }
-        ]
+        ],
+        per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -288,20 +312,23 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
 results = simulation.run(num_steps=100)
 ```
 
-## Example 8: Subpopulation-Normalized Rate
+## Example 8: Subgroup-Normalized Rate
 
-Using the automatically computed `N_{category}` variable to normalize a rate by subpopulation size instead of total population:
+The engine computes the subgroup total `total_<category>`. This example
+divides a rate by the total of its subgroup instead of the total of the model.
+`per_compartment=True` makes each compartment of `A` lose an amount computed
+from its own amount, not from the total of the bin:
 
 ```python
 model = (
-    ModelBuilder(name="Subpopulation-Normalized Model", version="1.0")
+    ModelBuilder(name="Subgroup-Normalized Model", version="1.0")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -312,17 +339,18 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N",
+        rate="k1 * A * B / total",
         stratified_rates=[
             {
                 "conditions": [{"stratification": "group", "category": "g1"}],
-                "rate": "k1 * A * B / N_g1"  # Normalized by subpopulation
+                "rate": "k1 * A * B / total_g1"  # Divided by the subgroup total
             }
-        ]
+        ],
+        per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -338,7 +366,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -348,6 +376,8 @@ results = simulation.run(num_steps=100)
 ## Example 9: Conditional Stratification
 
 A second stratification that only applies to a subset of the first. Here, the `subtype` stratification only expands `g2` compartments — `g1` compartments are not split further.
+`per_compartment=True` on `flow_AB` makes each compartment of `A` lose an
+amount computed from its own amount, not from the total of the bin.
 
 ```python
 model = (
@@ -371,7 +401,8 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N"
+        rate="k1 * A * B / total",
+        per_compartment=True,
     )
     .add_transition(
         id="flow_BC",
@@ -390,7 +421,7 @@ model = (
         ]
     )
     .set_initial_conditions(
-        population_size=10000,
+        total=10000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
@@ -413,7 +444,7 @@ model = (
             }
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 # Generated compartments:
@@ -455,7 +486,7 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / N"
+        rate="k1 * A * B / total"
     )
     .add_transition(
         id="flow_BC",
@@ -464,24 +495,24 @@ model = (
         rate="k2 * B"
     )
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 0.99},
             {"bin": "B", "fraction": 0.01},
             {"bin": "C", "fraction": 0.0},
         ]
     )
-    .build(typology="DifferenceEquations")
+    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
-    ObservedDataPoint(step=0,  compartment="B", value=10.0),
-    ObservedDataPoint(step=10, compartment="B", value=45.2),
-    ObservedDataPoint(step=20, compartment="B", value=78.5),
-    ObservedDataPoint(step=30, compartment="B", value=62.3),
-    ObservedDataPoint(step=40, compartment="B", value=38.1),
-    ObservedDataPoint(step=50, compartment="B", value=18.7),
-    ObservedDataPoint(step=60, compartment="B", value=8.2),
+    ObservedDataPoint(at=0,  output="B", value=10.0),
+    ObservedDataPoint(at=10, output="B", value=45.2),
+    ObservedDataPoint(at=20, output="B", value=78.5),
+    ObservedDataPoint(at=30, output="B", value=62.3),
+    ObservedDataPoint(at=40, output="B", value=38.1),
+    ObservedDataPoint(at=50, output="B", value=18.7),
+    ObservedDataPoint(at=60, output="B", value=8.2),
 ]
 
 simulation = Simulation(model)
@@ -528,27 +559,27 @@ calibrated_sim = Simulation(model)
 results = calibrated_sim.run(num_steps=100)
 ```
 
-## Example: Time-Pattern Driven Transition
+## Example: Axis-Pattern Driven Transition
 
-A composed time-varying transition: an opening pulse, a monthly periodic
-event, and a continuous seasonal baseline.
+A composed transition that changes along the axis: an opening pulse, a
+periodic event every 30 steps, and a continuous sinusoid baseline.
 
 ```python
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 
-rate = TimePattern.combine(
-    TimePattern.pulse(at=0, amount=0.3),
-    TimePattern.periodic(period=30, amount=0.05),
-    TimePattern.seasonal(amplitude=0.005, period=365, baseline=0.01),
+rate = AxisPattern.combine(
+    AxisPattern.pulse(at=0, value=0.3),
+    AxisPattern.periodic(period=30, value=0.05),
+    AxisPattern.sinusoid(amplitude=0.005, period=365, baseline=0.01),
 )
 
 model = (
-    ModelBuilder("AB-time-varying")
+    ModelBuilder("AB-axis-pattern")
     .add_bin("A", "Source")
     .add_bin("B", "Sink")
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .set_initial_conditions(
-        population_size=10_000,
+        total=10_000,
         bin_fractions=[
             {"bin": "A", "fraction": 1.0},
             {"bin": "B", "fraction": 0.0},
@@ -563,20 +594,20 @@ results = Simulation(model).run(num_steps=365)
 ## Example: Sub-Group Specific Schedules
 
 Different stratification sub-groups receive different patterns. The schedule
-is built by chaining `TimePattern.add_group(...)` calls — the first call
+is built by chaining `AxisPattern.add_group(...)` calls — the first call
 on the class itself, subsequent calls on the returned instance:
 
 ```python
-from commol import ModelBuilder, Simulation, TimePattern
+from commol import ModelBuilder, Simulation, AxisPattern
 
 rate = (
-    TimePattern.add_group(
+    AxisPattern.add_group(
         conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=TimePattern.periodic(period=7, amount=0.05),
+        schedule=AxisPattern.periodic(period=7, value=0.05),
     )
     .add_group(
         conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=TimePattern.periodic(period=30, amount=0.05),
+        schedule=AxisPattern.periodic(period=30, value=0.05),
     )
 )
 
@@ -587,7 +618,7 @@ model = (
     .add_stratification("group", ["cat1", "cat2"])
     .add_transition("flow", ["A"], ["B"], rate=rate)
     .set_initial_conditions(
-        population_size=1000,
+        total=1000,
         bin_fractions=[
             {"bin": "A", "fraction": 1.0},
             {"bin": "B", "fraction": 0.0},
@@ -613,5 +644,5 @@ results = Simulation(model).run(num_steps=60)
 - [API Reference](../api/model-builder.md) - Complete API documentation
 - [Calibration Guide](calibration.md) - Comprehensive calibration documentation
 - [Mathematical Expressions](mathematical-expressions.md) - Advanced formulas
-- [Time Patterns](time-patterns.md) - Time-varying rate helpers
+- [Axis Patterns](axis-patterns.md) - Rates that change along the axis
 - [Contributing](../development/contributing.md) - Build your own examples

@@ -211,13 +211,13 @@ mod tests {
 
     #[test]
     fn test_parse_variable() {
-        let expr = parse_expression("beta").unwrap();
+        let expr = parse_expression("k1").unwrap();
         assert!(matches!(expr, Expr::Variable(_)));
     }
 
     #[test]
     fn test_parse_binary_op() {
-        let expr = parse_expression("beta * gamma").unwrap();
+        let expr = parse_expression("k1 * k2").unwrap();
         if let Expr::BinaryOp { op, .. } = expr {
             assert_eq!(op, BinaryOperator::Mul);
         } else {
@@ -227,8 +227,8 @@ mod tests {
 
     #[test]
     fn test_parse_complex_expression() {
-        let expr = parse_expression("beta * S * I / N").unwrap();
-        // Should parse as ((beta * S) * I) / N
+        let expr = parse_expression("k1 * A * B / total").unwrap();
+        // Should parse as ((k1 * A) * B) / total
         assert!(matches!(expr, Expr::BinaryOp { .. }));
     }
 

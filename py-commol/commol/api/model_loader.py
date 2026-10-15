@@ -1,3 +1,5 @@
+"""Loading of model definitions from JSON files."""
+
 from pathlib import Path
 
 from commol.context.model import Model

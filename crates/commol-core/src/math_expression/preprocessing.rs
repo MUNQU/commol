@@ -5,12 +5,30 @@
 use evalexpr::{Node, build_operator_tree};
 use std::collections::HashSet;
 
-// Special variable names that are automatically available in all expressions
-pub const SPECIAL_VAR_N: &str = "N";
+/// The total: the sum of every compartment at the current position,
+/// accumulators excluded.
+pub const SPECIAL_VAR_TOTAL: &str = "total";
+/// The prefix of a subgroup total: `total_<cat>…` is the sum of the
+/// compartments with the categories `<cat>…`.
+pub const SUBGROUP_TOTAL_PREFIX: &str = "total_";
+/// The step that holds the current position: `floor(t)`.
 pub const SPECIAL_VAR_STEP: &str = "step";
+/// The current position on the axis. A difference engine reads it at each
+/// step, so there it equals `step`; a differential engine reads it anywhere.
 pub const SPECIAL_VAR_T: &str = "t";
+/// The constant π.
 pub const SPECIAL_VAR_PI: &str = "pi";
+/// The constant e.
 pub const SPECIAL_VAR_E: &str = "e";
+/// Every variable the engine provides in every expression. No parameter, bin
+/// or accumulator may take one of these ids.
+pub const ENGINE_VARIABLES: [&str; 5] = [
+    SPECIAL_VAR_TOTAL,
+    SPECIAL_VAR_STEP,
+    SPECIAL_VAR_T,
+    SPECIAL_VAR_PI,
+    SPECIAL_VAR_E,
+];
 
 /// Preprocesses a formula by adding `math::` prefix to mathematical functions that require it
 /// and converting Python-style operators to evalexpr syntax.
@@ -84,12 +102,7 @@ pub fn preprocess_formula(formula: &str) -> String {
 pub fn get_variables_from_node(node: &Node, variables: &mut HashSet<String>) {
     for ident in node.iter_variable_identifiers() {
         // Exclude special variables that are automatically available
-        if ident != SPECIAL_VAR_PI
-            && ident != SPECIAL_VAR_E
-            && ident != SPECIAL_VAR_N
-            && ident != SPECIAL_VAR_STEP
-            && ident != SPECIAL_VAR_T
-        {
+        if !ENGINE_VARIABLES.contains(&ident) {
             variables.insert(ident.to_string());
         }
     }
@@ -119,6 +132,15 @@ pub fn get_variables(preprocessed: &str) -> Vec<String> {
     variables.into_iter().collect()
 }
 
+/// Whether an expression reads the variable `name`, special variables such as
+/// `step` included.
+///
+/// Returns `false` if the expression is syntactically invalid.
+pub fn reads_variable(preprocessed: &str, name: &str) -> bool {
+    build_operator_tree(preprocessed)
+        .is_ok_and(|node: Node| node.iter_variable_identifiers().any(|ident| ident == name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,15 +156,23 @@ mod tests {
 
     #[test]
     fn test_get_variables() {
-        let vars = get_variables("beta * S * I");
+        let vars = get_variables("k1 * A * B");
         assert_eq!(vars.len(), 3);
-        assert!(vars.contains(&"beta".to_string()));
-        assert!(vars.contains(&"S".to_string()));
-        assert!(vars.contains(&"I".to_string()));
+        assert!(vars.contains(&"k1".to_string()));
+        assert!(vars.contains(&"A".to_string()));
+        assert!(vars.contains(&"B".to_string()));
 
         // Special variables should be excluded
-        let vars = get_variables("beta * N + pi");
+        let vars = get_variables("k1 * total + pi");
         assert_eq!(vars.len(), 1);
-        assert!(vars.contains(&"beta".to_string()));
+        assert!(vars.contains(&"k1".to_string()));
+    }
+
+    #[test]
+    fn reads_variable_sees_special_variables() {
+        assert!(reads_variable("k * (step + 1)", "step"));
+        assert!(reads_variable("if(t >= 2, k, 0)", "t"));
+        assert!(!reads_variable("k * steps", "step"));
+        assert!(!reads_variable("k * (", "k"));
     }
 }

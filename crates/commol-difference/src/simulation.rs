@@ -1,58 +1,202 @@
-//! Simulation methods for running the difference equations engine.
+//! The difference equations engine: one step adds the right-hand side once.
 
-use crate::types::{DifferenceEquations, FastRateExpression, FastRateOp, TransitionFlow, VarSlot};
-use commol_core::{MathExpression, MathExpressionContext, RateMathExpression};
+use commol_core::{ModelValue, SimulationError};
+use commol_model::{
+    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
+};
 use std::collections::HashMap;
 
-// Cached parameter names to avoid string allocations
-const PARAM_N: &str = "N";
-const PARAM_T: &str = "t";
+/// How far below zero, relative to the total at the start of a step, an
+/// amount may fall: the rounding of flows that empty a compartment exactly.
+const AMOUNT_TOLERANCE: f64 = 1e-12;
 
-/// Set a reserved parameter slot during a simulation step. When
-/// `keep_cache_live` is true the call routes through the name-keyed path so
-/// the cached evalexpr context (used by formula parameters and slow-path rate
-/// fallbacks) stays warm; otherwise the indexed path skips the cache patch.
-#[inline]
-fn set_step_parameter(
-    ctx: &mut MathExpressionContext,
-    name: &str,
-    index: usize,
-    value: f64,
-    keep_cache_live: bool,
-) -> Result<(), String> {
-    if keep_cache_live {
-        ctx.set_parameter_str(name, value);
-        Ok(())
-    } else {
-        ctx.set_parameter_by_index(index, value)
-    }
+/// The lowest amount a compartment may hold after a step that starts from
+/// `amounts`.
+fn lowest_amount(amounts: &[f64]) -> f64 {
+    -AMOUNT_TOLERANCE * amounts.iter().sum::<f64>()
+}
+
+/// `value` to six significant digits, for a message.
+fn rounded(value: f64) -> f64 {
+    format!("{value:.5e}").parse().unwrap_or(value)
+}
+
+/// Difference equations simulation engine.
+///
+/// It wraps a [`CompiledModel`] and steps it in discrete time: each step adds
+/// the flows of every transition, computed from one snapshot of the state,
+/// so `X(n + 1) = X(n) + derivatives(n, X(n))`.
+#[derive(Clone)]
+pub struct DifferenceEquations {
+    model: CompiledModel,
+    /// Current state: compartments, then accumulators.
+    state: Vec<f64>,
+    /// Reusable buffer for the right-hand side to avoid allocations. Before
+    /// the impulses of a step act, it holds the state they start from.
+    rates: Vec<f64>,
+    current_step: f64,
+    /// Whether the impulses at `current_step` are already in `state`.
+    settled: bool,
 }
 
 impl DifferenceEquations {
-    /// Get the current population vector.
-    pub fn population(&self) -> Vec<f64> {
-        self.population.clone()
+    /// Create a new DifferenceEquations instance from a model.
+    ///
+    /// # Panics
+    ///
+    /// Panics when [`Self::try_from_model`] returns an error.
+    pub fn from_model(model: &commol_core::Model) -> Self {
+        Self::try_from_model(model)
+            .unwrap_or_else(|error| panic!("Failed to build the engine: {error}"))
+    }
+
+    /// Fallible counterpart of [`Self::from_model`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the model is not a difference-equations model,
+    /// or when [`CompiledModel::try_from_model`] fails.
+    pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
+        let engine_type = model.engine.engine_type();
+        if engine_type != commol_core::EngineType::DifferenceEquations {
+            return Err(format!(
+                "The DifferenceEquations engine cannot solve a {} model",
+                engine_type.name()
+            ));
+        }
+        Self::from_compiled(CompiledModel::try_from_model(model)?)
+    }
+
+    /// Step a compiled model in discrete time, whatever its engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the impulse transition or the series
+    /// parameter when one of its positions is not an integer, because the
+    /// engine only steps at integers.
+    pub fn from_compiled(model: CompiledModel) -> Result<Self, String> {
+        if let Some((transition, position)) = model.first_non_integer_impulse() {
+            return Err(format!(
+                "Impulse transition '{transition}' acts at {position}, which is not an \
+                 integer step; a difference-equations model steps only at integers"
+            ));
+        }
+        if let Some((parameter, position)) = model.first_non_integer_series_point() {
+            return Err(format!(
+                "Series parameter '{parameter}' has a point at {position}, which is not \
+                 an integer step; a difference-equations model steps only at integers"
+            ));
+        }
+        let state = model.initial_state().to_vec();
+        let rates = vec![0.0; state.len()];
+        Ok(Self {
+            model,
+            state,
+            rates,
+            current_step: 0.0,
+            settled: false,
+        })
+    }
+
+    /// Apply the impulses at the current step, once.
+    ///
+    /// At step `n` the state first jumps, then the flows of the step run from
+    /// the new state, so the output at `n` shows the state after the jump.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::Infeasible`] when the impulses leave a
+    /// compartment below zero, and [`SimulationError::Failed`] when a rate
+    /// cannot be evaluated.
+    fn settle(&mut self) -> Result<(), SimulationError> {
+        if self.settled {
+            return Ok(());
+        }
+        if self.model.has_impulses() {
+            self.rates.copy_from_slice(&self.state);
+            if self
+                .model
+                .apply_impulses(self.current_step, &mut self.state)?
+            {
+                self.check_impulses()?;
+            }
+        }
+        self.settled = true;
+        Ok(())
+    }
+
+    /// Check the state the impulses of the current step wrote, from the
+    /// state in `rates` they started from.
+    fn check_impulses(&mut self) -> Result<(), SimulationError> {
+        let num_compartments = self.model.num_compartments();
+        let before = &self.rates[..num_compartments];
+        let lowest = lowest_amount(before);
+        let Some(compartment) = (0..num_compartments).find(|&i| self.state[i] < lowest) else {
+            return Ok(());
+        };
+        let step = self.current_step;
+        let drains = self
+            .model
+            .impulse_outflows(step, &self.rates, compartment)?;
+        Err(self.below_zero(
+            format!("The impulses at step {step}"),
+            compartment,
+            self.rates[compartment],
+            self.state[compartment],
+            &drains,
+        ))
+    }
+
+    /// The error for a compartment that `cause` leaves at `after`, from
+    /// `before`, with the flows that drain it.
+    fn below_zero(
+        &self,
+        cause: String,
+        compartment: usize,
+        before: f64,
+        after: f64,
+        drains: &[(String, f64)],
+    ) -> SimulationError {
+        let drains: Vec<String> = drains
+            .iter()
+            .map(|(transition, amount)| format!("'{transition}' {}", rounded(*amount)))
+            .collect();
+        SimulationError::Infeasible {
+            position: self.current_step,
+            message: format!(
+                "{cause} leave compartment '{}' at {after}, below zero: it held {before}, \
+                 and the flows out of it move {}. A difference step cannot move more \
+                 than a compartment holds",
+                self.model.compartments()[compartment],
+                drains.join(", "),
+                after = rounded(after),
+                before = rounded(before),
+            ),
+        }
+    }
+
+    /// The compiled model the engine steps.
+    pub fn model(&self) -> &CompiledModel {
+        &self.model
+    }
+
+    /// Current amount of each compartment, without the accumulators.
+    pub fn state(&self) -> Vec<f64> {
+        self.state[..self.model.num_compartments()].to_vec()
     }
 
     /// Get the list of compartment names.
     pub fn compartments(&self) -> Vec<String> {
-        self.compartments.clone()
+        self.model.compartments().to_vec()
     }
 
     /// Get all simulation output names: state compartments followed by accumulators.
     pub fn output_names(&self) -> Vec<String> {
-        self.output_names.clone()
+        self.model.output_names().to_vec()
     }
 
     fn output_len(&self) -> usize {
-        self.population.len() + self.accumulators.len()
-    }
-
-    fn output_row(&self) -> Vec<f64> {
-        let mut row = Vec::with_capacity(self.output_len());
-        row.extend_from_slice(&self.population);
-        row.extend_from_slice(&self.accumulators);
-        row
+        self.state.len()
     }
 
     fn copy_output_row(&self, row: &mut Vec<f64>) {
@@ -60,543 +204,179 @@ impl DifferenceEquations {
         if row.len() != output_len {
             row.resize(output_len, 0.0);
         }
-        let population_len = self.population.len();
-        row[..population_len].copy_from_slice(&self.population);
-        row[population_len..].copy_from_slice(&self.accumulators);
+        row.copy_from_slice(&self.state);
     }
 
     /// Execute a single simulation step.
     ///
-    /// This method:
-    /// 1. Updates the expression context with current state
-    /// 2. Computes flows for all transitions
-    /// 3. Applies flows to update compartment populations
-    /// 4. Increments the step counter
+    /// The impulses of the current step act first. Then every flow is
+    /// computed from the state, added to it, and the step counter advances by
+    /// one.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// `Ok(())` on success, or an error message if rate evaluation fails.
-    pub fn step(&mut self) -> Result<(), String> {
-        // Reuse compartment flows buffer instead of allocating
-        self.compartment_flows.fill(0.0);
-
-        let keep_cache_live = self.requires_compartment_context;
-
-        // Update expression context with current population values
-        self.expression_context.set_step(self.current_step);
-
-        // Calculate and set total population N
-        let total_population: f64 = self.population.iter().sum();
-        set_step_parameter(
-            &mut self.expression_context,
-            PARAM_N,
-            self.n_parameter_index,
-            total_population,
-            keep_cache_live,
-        )?;
-
-        // Set t as an alias for step (for convenience in formulas)
-        set_step_parameter(
-            &mut self.expression_context,
-            PARAM_T,
-            self.t_parameter_index,
-            self.current_step,
-            keep_cache_live,
-        )?;
-
-        // Only evalexpr fallback/formula-parameter paths need compartment
-        // values in the expression context. JIT-resolved transition formulas
-        // and fast-path rates read compartment values directly from
-        // `population`.
-        if keep_cache_live {
-            self.expression_context
-                .set_compartments_by_index(&self.population);
+    /// Returns [`SimulationError::Infeasible`] when the impulses or the flows
+    /// leave a compartment below zero (by more than the rounding of a flow
+    /// that empties it), and the state stays as it was before them. Returns
+    /// [`SimulationError::Failed`] when a rate cannot be evaluated.
+    pub fn step(&mut self) -> Result<(), SimulationError> {
+        self.settle()?;
+        let step = self.current_step;
+        self.model
+            .derivatives(step, step, &self.state, &mut self.rates)?;
+        let num_compartments = self.model.num_compartments();
+        let lowest = lowest_amount(&self.state[..num_compartments]);
+        if let Some(compartment) =
+            (0..num_compartments).find(|&i| self.state[i] + self.rates[i] < lowest)
+        {
+            let drains = self.model.outflows(step, step, &self.state, compartment)?;
+            return Err(self.below_zero(
+                format!("The flows of step {step}"),
+                compartment,
+                self.state[compartment],
+                self.state[compartment] + self.rates[compartment],
+                &drains,
+            ));
         }
-
-        // Compute subpopulation totals using pre-computed mappings (if any)
-        for mapping in &self.subpopulation_mappings {
-            let total: f64 = mapping
-                .contributing_compartment_indices
-                .iter()
-                .map(|&idx| self.population[idx])
-                .sum();
-            set_step_parameter(
-                &mut self.expression_context,
-                &mapping.parameter_name,
-                mapping.parameter_index,
-                total,
-                keep_cache_live,
-            )?;
+        for (value, rate) in self.state.iter_mut().zip(&self.rates) {
+            *value += rate;
         }
-
-        // Evaluate time-series parameters (O(log N) binary search, no allocation)
-        let step_u64 = self.current_step as u64;
-        for ts in &self.series_parameters {
-            let value = ts.evaluate(step_u64);
-            set_step_parameter(
-                &mut self.expression_context,
-                &ts.parameter_name,
-                ts.parameter_index,
-                value,
-                keep_cache_live,
-            )?;
-        }
-
-        // Evaluate formula parameters and update context
-        // Note: We need to clone to avoid borrow checker issues
-        let formula_params = self.formula_parameters.clone();
-        for (param_name, rate_expr) in &formula_params {
-            match rate_expr.evaluate(&mut self.expression_context) {
-                Ok(value) => {
-                    self.expression_context.set_parameter_str(param_name, value);
-                }
-                Err(error) => {
-                    return Err(format!(
-                        "Failed to evaluate formula parameter '{}': {}",
-                        param_name, error
-                    ));
-                }
-            }
-        }
-
-        // Use pre-computed transition flows - much faster!
-        // Stack buffer for the JIT input vector — most rate expressions
-        // reference <= 16 variables.
-        let mut jit_buf = [0.0_f64; 16];
-        for flow_info in &self.transition_flows {
-            let source_population = flow_info
-                .source_index
-                .map(|i| self.population[i])
-                .unwrap_or(0.0);
-
-            let rate = evaluate_rate(
-                flow_info,
-                &self.population,
-                &mut self.expression_context,
-                self.current_step,
-                &mut jit_buf,
-            )?;
-
-            let flow = if flow_info.is_absolute_flow {
-                rate
-            } else {
-                source_population * rate
-            };
-
-            if let Some(src) = flow_info.source_index {
-                self.compartment_flows[src] -= flow;
-            }
-            if let Some(tgt) = flow_info.target_index {
-                self.compartment_flows[tgt] += flow;
-            }
-            for &(src, tgt) in &flow_info.extra_pieces {
-                if let Some(src) = src {
-                    self.compartment_flows[src] -= flow;
-                }
-                if let Some(tgt) = tgt {
-                    self.compartment_flows[tgt] += flow;
-                }
-            }
-            for &accumulator_idx in &flow_info.accumulator_indices {
-                self.accumulators[accumulator_idx] += flow;
-            }
-        }
-
-        // Apply the calculated flows to the population vector.
-        for (i, flow) in self.compartment_flows.iter().enumerate() {
-            self.population[i] += flow;
-        }
-
-        // Increment step
         self.current_step += 1.0;
-
+        self.settled = false;
         Ok(())
     }
 
-    /// Run the simulation for a specified number of steps.
+    /// Step through the largest of `steps`, recording the outputs at each of
+    /// them into `buffer`.
     ///
-    /// # Arguments
-    ///
-    /// * `num_steps` - Number of time steps to simulate
-    ///
-    /// # Returns
-    ///
-    /// A vector of population states, where the first element is the initial state (t=0)
-    /// and subsequent elements are states at t=1, t=2, ..., t=num_steps.
-    pub fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        // Pre-allocate memory for efficiency
-        let mut steps = Vec::with_capacity(num_steps as usize + 1);
-
-        // Store initial state (t=0)
-        steps.push(self.output_row());
-
-        for _ in 0..num_steps {
-            self.step()?;
-            steps.push(self.output_row());
-        }
-
-        Ok(steps)
-    }
-
-    /// Optimized version that writes simulation results into a pre-allocated buffer.
-    ///
-    /// This method is more memory-efficient than `run()` when the caller can
-    /// provide a reusable buffer.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_steps` - Number of time steps to simulate
-    /// * `buffer` - Pre-allocated buffer to store results
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` on success, or an error message if simulation fails.
-    pub fn run_into_buffer(
+    /// `steps` are sorted, unique and not before the current step; the
+    /// caller checks them ([`commol_core::check_positions`]).
+    fn record_steps(
         &mut self,
-        num_steps: u32,
+        steps: &[u32],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let total_steps = (num_steps + 1) as usize;
+    ) -> Result<(), SimulationError> {
         let output_len = self.output_len();
 
         // Keep existing row allocations alive across repeated calls. This is
         // especially important for calibration, where the same buffer is reused
         // for hundreds or thousands of full simulations.
-        if buffer.len() < total_steps {
-            buffer.reserve(total_steps - buffer.len());
-            while buffer.len() < total_steps {
-                buffer.push(vec![0.0; output_len]);
-            }
-        } else if buffer.len() > total_steps {
-            buffer.truncate(total_steps);
-        }
-
+        buffer.resize_with(steps.len(), Vec::new);
         for row in buffer.iter_mut() {
             if row.len() != output_len {
                 row.resize(output_len, 0.0);
             }
         }
 
-        // Store initial state (t=0)
-        self.copy_output_row(&mut buffer[0]);
-
-        for row in buffer.iter_mut().take(total_steps).skip(1) {
+        self.settle()?;
+        let mut next = 0;
+        loop {
+            while next < steps.len() && f64::from(steps[next]) == self.current_step {
+                self.copy_output_row(&mut buffer[next]);
+                next += 1;
+            }
+            if next == steps.len() {
+                return Ok(());
+            }
             self.step()?;
-            self.copy_output_row(row);
+            self.settle()?;
         }
+    }
+}
 
+/// Why a difference engine does not report at `position`, if it does not.
+fn check_step(position: f64) -> Result<(), String> {
+    if position >= 0.0 && position.fract() == 0.0 && position <= f64::from(u32::MAX) {
         Ok(())
-    }
-
-    /// Run through the largest requested step while recording only selected
-    /// steps. `time_steps` must be sorted and deduplicated by the caller.
-    pub fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        let output_len = self.output_len();
-
-        if buffer.len() < time_steps.len() {
-            buffer.reserve(time_steps.len() - buffer.len());
-            while buffer.len() < time_steps.len() {
-                buffer.push(vec![0.0; output_len]);
-            }
-        } else if buffer.len() > time_steps.len() {
-            buffer.truncate(time_steps.len());
-        }
-
-        for row in buffer.iter_mut() {
-            if row.len() != output_len {
-                row.resize(output_len, 0.0);
-            }
-        }
-
-        let mut next_record_idx = 0;
-        while next_record_idx < time_steps.len() && time_steps[next_record_idx] == 0 {
-            self.copy_output_row(&mut buffer[next_record_idx]);
-            next_record_idx += 1;
-        }
-
-        let Some(&max_step) = time_steps.last() else {
-            return Ok(());
-        };
-
-        for step in 1..=max_step {
-            self.step()?;
-            while next_record_idx < time_steps.len() && time_steps[next_record_idx] == step {
-                self.copy_output_row(&mut buffer[next_record_idx]);
-                next_record_idx += 1;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Evaluate a transition flow's rate, choosing the fastest path the rate
-/// supports: the specialized fast-path interpreter, the JIT with pre-resolved
-/// slots, or the evalexpr fallback.
-#[inline]
-fn evaluate_rate(
-    flow: &TransitionFlow,
-    population: &[f64],
-    ctx: &mut MathExpressionContext,
-    current_step: f64,
-    jit_buf: &mut [f64; 16],
-) -> Result<f64, String> {
-    let rate_result = if let Some(fast_expr) = &flow.fast_rate_expression {
-        eval_fast_rate(fast_expr, population, ctx, current_step)
-    } else if let (RateMathExpression::Formula(expr), Some(slots)) =
-        (&flow.rate_expression, &flow.resolved_slots)
-    {
-        evaluate_jit_rate(expr, slots, population, ctx, current_step, jit_buf)
     } else {
-        flow.rate_expression
-            .evaluate(ctx)
-            .map_err(|error| error.to_string())
-    };
-
-    rate_result.map_err(|error| {
-        format!(
-            "Failed to evaluate rate for transition from {:?} to {:?}: {}",
-            flow.source_index, flow.target_index, error
-        )
-    })
-}
-
-/// Resolve every variable slot the JIT-compiled rate needs, then invoke the
-/// compiled function. The 16-slot stack buffer covers the vast majority of
-/// rate expressions; wider expressions fall back to a one-off heap buffer.
-#[inline]
-fn evaluate_jit_rate(
-    expr: &MathExpression,
-    slots: &[VarSlot],
-    population: &[f64],
-    ctx: &MathExpressionContext,
-    current_step: f64,
-    jit_buf: &mut [f64; 16],
-) -> Result<f64, String> {
-    let n = slots.len();
-    if n <= jit_buf.len() {
-        let values = &mut jit_buf[..n];
-        for (i, slot) in slots.iter().enumerate() {
-            values[i] = resolve_slot(slot, population, ctx, current_step)?;
-        }
-        expr.call_jit_with_buffer(values)
-            .map_err(|error| error.to_string())
-    } else {
-        let mut heap = vec![0.0; n];
-        for (i, slot) in slots.iter().enumerate() {
-            heap[i] = resolve_slot(slot, population, ctx, current_step)?;
-        }
-        expr.call_jit_with_buffer(&heap)
-            .map_err(|error| error.to_string())
+        Err(format!(
+            "a difference-equations model reports only at integer steps; {position} is not one"
+        ))
     }
-}
-
-/// Resolve a pre-computed `VarSlot` to its current numeric value. Compartments
-/// and the step alias are O(1); parameters fall back to a single HashMap probe.
-#[inline]
-fn resolve_slot(
-    slot: &VarSlot,
-    population: &[f64],
-    ctx: &MathExpressionContext,
-    current_step: f64,
-) -> Result<f64, String> {
-    match slot {
-        VarSlot::Compartment(idx) => Ok(population[*idx]),
-        VarSlot::Step => Ok(current_step),
-        VarSlot::ParameterIndex(idx) => ctx
-            .get_parameter_by_index(*idx)
-            .ok_or_else(|| format!("Parameter index '{}' not found", idx)),
-        VarSlot::Parameter(name) => ctx
-            .get_parameter(name)
-            .ok_or_else(|| format!("Variable '{}' not found", name)),
-    }
-}
-
-#[inline]
-fn eval_fast_rate(
-    expr: &FastRateExpression,
-    population: &[f64],
-    ctx: &MathExpressionContext,
-    current_step: f64,
-) -> Result<f64, String> {
-    match expr {
-        FastRateExpression::Constant(value) => return Ok(*value),
-        FastRateExpression::Slot(slot) => {
-            return resolve_slot(slot, population, ctx, current_step);
-        }
-        FastRateExpression::Mul2(a, b) => {
-            return Ok(resolve_slot(a, population, ctx, current_step)?
-                * resolve_slot(b, population, ctx, current_step)?);
-        }
-        FastRateExpression::Mul3(a, b, c) => {
-            return Ok(resolve_slot(a, population, ctx, current_step)?
-                * resolve_slot(b, population, ctx, current_step)?
-                * resolve_slot(c, population, ctx, current_step)?);
-        }
-        FastRateExpression::OneMinusMul3 {
-            subtract,
-            factor,
-            value,
-        } => {
-            return Ok(
-                (1.0 - resolve_slot(subtract, population, ctx, current_step)?)
-                    * resolve_slot(factor, population, ctx, current_step)?
-                    * resolve_slot(value, population, ctx, current_step)?,
-            );
-        }
-        FastRateExpression::MulAddDiv {
-            first,
-            second,
-            add_left,
-            add_right,
-            denominator,
-        } => {
-            return Ok(resolve_slot(first, population, ctx, current_step)?
-                * resolve_slot(second, population, ctx, current_step)?
-                * (resolve_slot(add_left, population, ctx, current_step)?
-                    + resolve_slot(add_right, population, ctx, current_step)?)
-                / resolve_slot(denominator, population, ctx, current_step)?);
-        }
-        FastRateExpression::Program(_) => {}
-    }
-
-    let FastRateExpression::Program(ops) = expr else {
-        unreachable!("specialized fast rate variants return above");
-    };
-    let mut stack = [0.0_f64; 32];
-    let mut sp = 0usize;
-
-    for op in ops {
-        match op {
-            FastRateOp::Constant(value) => push_stack(&mut stack, &mut sp, *value)?,
-            FastRateOp::Slot(slot) => push_stack(
-                &mut stack,
-                &mut sp,
-                resolve_slot(slot, population, ctx, current_step)?,
-            )?,
-            FastRateOp::Add => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs + rhs)?;
-            }
-            FastRateOp::Sub => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs - rhs)?;
-            }
-            FastRateOp::Mul => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs * rhs)?;
-            }
-            FastRateOp::Div => {
-                let rhs = pop_stack(&stack, &mut sp)?;
-                let lhs = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, lhs / rhs)?;
-            }
-            FastRateOp::Neg => {
-                let value = pop_stack(&stack, &mut sp)?;
-                push_stack(&mut stack, &mut sp, -value)?;
-            }
-        }
-    }
-
-    if sp == 1 {
-        pop_stack(&stack, &mut sp)
-    } else {
-        Err("fast rate expression left an invalid stack state".to_string())
-    }
-}
-
-#[inline]
-fn push_stack(stack: &mut [f64; 32], sp: &mut usize, value: f64) -> Result<(), String> {
-    if *sp >= stack.len() {
-        return Err("fast rate expression stack overflow".to_string());
-    }
-    stack[*sp] = value;
-    *sp += 1;
-    Ok(())
-}
-
-#[inline]
-fn pop_stack(stack: &[f64; 32], sp: &mut usize) -> Result<f64, String> {
-    if *sp == 0 {
-        return Err("fast rate expression stack underflow".to_string());
-    }
-    *sp -= 1;
-    Ok(stack[*sp])
 }
 
 /// Implementation of the SimulationEngine trait.
 impl commol_core::SimulationEngine for DifferenceEquations {
-    fn run(&mut self, num_steps: u32) -> Result<Vec<Vec<f64>>, String> {
-        // Delegate to existing implementation
-        DifferenceEquations::run(self, num_steps)
+    type ValuePlan = InitialConditionPlan;
+
+    fn check_position(&self, position: f64) -> Result<(), String> {
+        check_step(position)
     }
 
-    fn step(&mut self) -> Result<(), String> {
-        // Delegate to existing implementation
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
+        commol_core::check_positions(positions, self.current_step, check_step)?;
+        // `check_step` accepts only integers that fit in a `u32`.
+        let steps: Vec<u32> = positions.iter().map(|&position| position as u32).collect();
+        self.record_steps(&steps, buffer)
+    }
+
+    fn step(&mut self) -> Result<(), SimulationError> {
         DifferenceEquations::step(self)
-    }
-
-    fn compartments(&self) -> Vec<String> {
-        self.compartments.clone()
-    }
-
-    fn output_labels(&self) -> Vec<commol_core::OutputLabels> {
-        self.output_labels.clone()
     }
 
     fn output_names(&self) -> Vec<String> {
         DifferenceEquations::output_names(self)
     }
 
-    fn population(&self) -> Vec<f64> {
-        self.population.clone()
-    }
-
     fn reset(&mut self) {
-        // Reset population to initial state
-        self.population.copy_from_slice(&self.initial_population);
-        self.accumulators
-            .copy_from_slice(&self.initial_accumulators);
-        // Reset step counter
+        self.state.copy_from_slice(self.model.initial_state());
         self.current_step = 0.0;
+        self.settled = false;
     }
 
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.expression_context
-            .set_parameter(parameter_id.to_string(), value);
+        self.model.set_parameter(parameter_id, value);
         Ok(())
     }
 
     fn get_parameters(&self) -> &HashMap<String, f64> {
-        self.expression_context.get_parameters()
+        self.model.parameters()
     }
 
-    fn current_step(&self) -> f64 {
+    fn current_position(&self) -> f64 {
         self.current_step
     }
 
-    fn run_into_buffer(
-        &mut self,
-        num_steps: u32,
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        // Delegate to optimized implementation
-        DifferenceEquations::run_into_buffer(self, num_steps, buffer)
+    fn state_outputs(&self) -> usize {
+        self.model.num_compartments()
     }
 
-    fn run_at_steps_into_buffer(
-        &mut self,
-        time_steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        DifferenceEquations::run_at_steps_into_buffer(self, time_steps, buffer)
+    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
+        output_sums(self.model.output_labels())
+    }
+
+    fn plan_values(
+        &self,
+        values: &[ModelValue],
+        remainder: Option<&str>,
+    ) -> Result<InitialConditionPlan, String> {
+        InitialConditionPlan::new(self, values, remainder)
+    }
+
+    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
+        plan.apply(self, values)
+    }
+}
+
+impl CompartmentalEngine for DifferenceEquations {
+    fn compartments(&self) -> Vec<String> {
+        DifferenceEquations::compartments(self)
+    }
+
+    fn output_labels(&self) -> Vec<OutputLabels> {
+        self.model.output_labels().to_vec()
+    }
+
+    fn state(&self) -> Vec<f64> {
+        DifferenceEquations::state(self)
+    }
+
+    fn total(&self) -> f64 {
+        self.model.total()
     }
 
     fn set_initial_condition(
@@ -604,29 +384,14 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         compartment_index: usize,
         value: f64,
     ) -> Result<(), String> {
-        // Validate compartment index
-        if compartment_index >= self.initial_population.len() {
-            return Err(format!(
-                "Invalid compartment index: {}. Model has {} compartments.",
-                compartment_index,
-                self.initial_population.len()
-            ));
+        self.model.set_initial_condition(compartment_index, value)?;
+        // Also update the current state to reflect the change
+        self.state[compartment_index] = value;
+        if self.current_step == 0.0 && self.settled {
+            // The impulses at step 0 must act on the new initial state.
+            self.state.copy_from_slice(self.model.initial_state());
+            self.settled = false;
         }
-
-        // Validate value (non-negative population)
-        if value < 0.0 {
-            return Err(format!(
-                "Initial condition value must be non-negative, got: {}",
-                value
-            ));
-        }
-
-        // Update initial population
-        self.initial_population[compartment_index] = value;
-
-        // Also update current population to reflect the change
-        self.population[compartment_index] = value;
-
         Ok(())
     }
 }
@@ -635,9 +400,33 @@ impl commol_core::SimulationEngine for DifferenceEquations {
 mod tests {
     use super::*;
     use commol_core::{
-        Bin, BinFraction, Dynamics, InitialConditions, Model, ModelTypes, Population,
-        RateMathExpression, Transition,
+        Bin, BinFraction, CompartmentalStructure, EngineType, InitialConditions, Model,
+        ModelEngine, ModelStructure, RateMathExpression, SimulationEngine, Transition,
     };
+
+    /// One difference step is exactly `state + derivatives(n, state)`.
+    fn assert_step_adds_derivatives(model: &Model, steps: u32) {
+        let mut engine = DifferenceEquations::from_model(model);
+        let mut compiled = CompiledModel::try_from_model(model).unwrap();
+        for n in 0..steps {
+            let before = engine.state.clone();
+            let mut rates = vec![0.0; before.len()];
+            compiled
+                .derivatives(n as f64, n as f64, &before, &mut rates)
+                .unwrap();
+            engine.step().unwrap();
+            let expected: Vec<f64> = before.iter().zip(&rates).map(|(x, d)| x + d).collect();
+            assert_eq!(engine.state, expected, "{} at step {n}", model.name);
+        }
+    }
+
+    #[test]
+    fn one_step_adds_the_derivatives_exactly() {
+        assert_step_adds_derivatives(&make_periodic_ab_model(), 9);
+        assert_step_adds_derivatives(&make_three_bin_model(), 20);
+        assert_step_adds_derivatives(&ab_model_with_rate("if(step >= 0, e * k2 * A, 0)"), 5);
+        assert_step_adds_derivatives(&ab_model_with_rate("k1 * A * B / total + t * 0.001"), 5);
+    }
 
     fn make_periodic_ab_model() -> Model {
         Model {
@@ -645,7 +434,7 @@ mod tests {
             description: None,
             version: None,
             parameters: vec![],
-            population: Population {
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -658,25 +447,6 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
-                transitions: vec![],
-                initial_conditions: InitialConditions {
-                    population_size: 1000,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(1.0),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
-                },
-            },
-            dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -686,35 +456,12 @@ mod tests {
                         "if(step - floor(step / 7) * 7 == 0, 0.1, 0)".to_string(),
                     )),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
+                    impulse_at: None,
+                    impulse_every: None,
                 }],
-            },
-        }
-    }
-
-    fn make_missing_parameter_model() -> Model {
-        Model {
-            name: "AB_missing_parameter".to_string(),
-            description: None,
-            version: None,
-            parameters: vec![],
-            population: Population {
-                bins: vec![
-                    Bin {
-                        id: "A".to_string(),
-                        name: "Source".to_string(),
-                    },
-                    Bin {
-                        id: "B".to_string(),
-                        name: "Sink".to_string(),
-                    },
-                ],
-                accumulators: vec![],
-                stratifications: vec![],
-                transitions: vec![],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![
                         BinFraction {
                             bin: "A".to_string(),
@@ -728,9 +475,30 @@ mod tests {
                     stratification_fractions: vec![],
                     compartment_fractions: vec![],
                 },
-            },
-            dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
+            }),
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
+        }
+    }
+
+    fn make_missing_parameter_model() -> Model {
+        Model {
+            name: "AB_missing_parameter".to_string(),
+            description: None,
+            version: None,
+            parameters: vec![],
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
+                bins: vec![
+                    Bin {
+                        id: "A".to_string(),
+                        name: "Source".to_string(),
+                    },
+                    Bin {
+                        id: "B".to_string(),
+                        name: "Sink".to_string(),
+                    },
+                ],
+                accumulators: vec![],
+                stratifications: vec![],
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -738,10 +506,27 @@ mod tests {
                     accumulators: vec![],
                     rate: Some(RateMathExpression::from_string("missing * A".to_string())),
                     stratified_rates: None,
-                    condition: None,
                     per_compartment: None,
+                    impulse_at: None,
+                    impulse_every: None,
                 }],
-            },
+                initial_conditions: InitialConditions {
+                    total: 1000.0,
+                    bin_fractions: vec![
+                        BinFraction {
+                            bin: "A".to_string(),
+                            fraction: Some(1.0),
+                        },
+                        BinFraction {
+                            bin: "B".to_string(),
+                            fraction: Some(0.0),
+                        },
+                    ],
+                    stratification_fractions: vec![],
+                    compartment_fractions: vec![],
+                },
+            }),
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 
@@ -752,7 +537,7 @@ mod tests {
         // correctly end-to-end through the DifferenceEquations engine.
         let model = make_periodic_ab_model();
         let mut engine = DifferenceEquations::from_model(&model);
-        let results = engine.run(14).unwrap();
+        let results = engine.run(14).unwrap().rows;
 
         // results[k] = state after k step() calls; step counter k-1 was used for k>=1.
         // Compartment order: A=index 0, B=index 1.
@@ -785,11 +570,11 @@ mod tests {
             );
         }
 
-        // Population conserved at every recorded state
+        // Total kept at every recorded state
         for k in 0..=14 {
             assert!(
                 (a[k] + b[k] - 1000.0).abs() < 1e-8,
-                "Population not conserved at step {}: A={}, B={}, total={}",
+                "Total not kept at step {}: A={}, B={}, total={}",
                 k,
                 a[k],
                 b[k],
@@ -804,142 +589,10 @@ mod tests {
         let mut engine = DifferenceEquations::from_model(&model);
         let error = engine
             .step()
-            .expect_err("missing parameter must not be treated as zero");
+            .expect_err("missing parameter must not be treated as zero")
+            .to_string();
 
         assert!(error.contains("Variable 'missing' not found"));
-    }
-
-    fn ctx_with_params(pairs: &[(&str, f64)]) -> MathExpressionContext {
-        let mut ctx = MathExpressionContext::new();
-        for (name, value) in pairs {
-            ctx.set_parameter((*name).to_string(), *value);
-        }
-        ctx
-    }
-
-    fn param_slot(ctx: &MathExpressionContext, name: &str) -> VarSlot {
-        VarSlot::ParameterIndex(
-            ctx.parameter_index(name)
-                .expect("parameter must be registered"),
-        )
-    }
-
-    #[test]
-    fn fast_rate_constant_returns_value() {
-        let ctx = MathExpressionContext::new();
-        let expr = FastRateExpression::Constant(0.42);
-        let result = eval_fast_rate(&expr, &[], &ctx, 0.0).unwrap();
-        assert_eq!(result, 0.42);
-    }
-
-    #[test]
-    fn fast_rate_slot_resolves_compartment_and_step() {
-        let ctx = MathExpressionContext::new();
-        let population = vec![10.0, 20.0];
-
-        let compartment = FastRateExpression::Slot(VarSlot::Compartment(1));
-        assert_eq!(
-            eval_fast_rate(&compartment, &population, &ctx, 5.0).unwrap(),
-            20.0
-        );
-
-        let step = FastRateExpression::Slot(VarSlot::Step);
-        assert_eq!(eval_fast_rate(&step, &population, &ctx, 5.0).unwrap(), 5.0);
-    }
-
-    #[test]
-    fn fast_rate_mul2_and_mul3_compute_products() {
-        let ctx = ctx_with_params(&[("k1", 2.0), ("k2", 3.0), ("k3", 4.0)]);
-        let mul2 = FastRateExpression::Mul2(param_slot(&ctx, "k1"), param_slot(&ctx, "k2"));
-        assert_eq!(eval_fast_rate(&mul2, &[], &ctx, 0.0).unwrap(), 6.0);
-
-        let mul3 = FastRateExpression::Mul3(
-            param_slot(&ctx, "k1"),
-            param_slot(&ctx, "k2"),
-            param_slot(&ctx, "k3"),
-        );
-        assert_eq!(eval_fast_rate(&mul3, &[], &ctx, 0.0).unwrap(), 24.0);
-    }
-
-    #[test]
-    fn fast_rate_one_minus_mul3_and_mul_add_div() {
-        let ctx = ctx_with_params(&[
-            ("k1", 0.25),
-            ("k2", 0.5),
-            ("k3", 80.0),
-            ("k4", 20.0),
-            ("k5", 2.0),
-            ("k6", 3.0),
-            ("k7", 100.0),
-        ]);
-
-        let one_minus = FastRateExpression::OneMinusMul3 {
-            subtract: param_slot(&ctx, "k1"),
-            factor: param_slot(&ctx, "k2"),
-            value: param_slot(&ctx, "k3"),
-        };
-        let expected = (1.0 - 0.25) * 0.5 * 80.0;
-        assert!((eval_fast_rate(&one_minus, &[], &ctx, 0.0).unwrap() - expected).abs() < 1e-12);
-
-        let mul_add_div = FastRateExpression::MulAddDiv {
-            first: param_slot(&ctx, "k2"),
-            second: param_slot(&ctx, "k3"),
-            add_left: param_slot(&ctx, "k5"),
-            add_right: param_slot(&ctx, "k6"),
-            denominator: param_slot(&ctx, "k7"),
-        };
-        let expected = 0.5 * 80.0 * (2.0 + 3.0) / 100.0;
-        assert!((eval_fast_rate(&mul_add_div, &[], &ctx, 0.0).unwrap() - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn fast_rate_program_evaluates_in_postfix_order() {
-        let ctx = ctx_with_params(&[("k1", 5.0), ("k2", 3.0)]);
-        let program = FastRateExpression::Program(vec![
-            FastRateOp::Slot(param_slot(&ctx, "k1")),
-            FastRateOp::Slot(param_slot(&ctx, "k2")),
-            FastRateOp::Sub,
-            FastRateOp::Constant(2.0),
-            FastRateOp::Mul,
-        ]);
-        let expected = (5.0 - 3.0) * 2.0;
-        assert!((eval_fast_rate(&program, &[], &ctx, 0.0).unwrap() - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn fast_rate_program_neg_unary_op() {
-        let ctx = ctx_with_params(&[("k1", 7.0)]);
-        let program = FastRateExpression::Program(vec![
-            FastRateOp::Slot(param_slot(&ctx, "k1")),
-            FastRateOp::Neg,
-        ]);
-        assert_eq!(eval_fast_rate(&program, &[], &ctx, 0.0).unwrap(), -7.0);
-    }
-
-    #[test]
-    fn fast_rate_program_detects_invalid_stack_state() {
-        let ctx = MathExpressionContext::new();
-        let program =
-            FastRateExpression::Program(vec![FastRateOp::Constant(1.0), FastRateOp::Constant(2.0)]);
-        let error = eval_fast_rate(&program, &[], &ctx, 0.0).unwrap_err();
-        assert!(error.contains("invalid stack state"));
-    }
-
-    #[test]
-    fn fast_rate_program_underflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let program = FastRateExpression::Program(vec![FastRateOp::Add]);
-        let error = eval_fast_rate(&program, &[], &ctx, 0.0).unwrap_err();
-        assert!(error.contains("underflow"));
-    }
-
-    #[test]
-    fn fast_rate_program_overflow_is_reported() {
-        let ctx = MathExpressionContext::new();
-        let ops: Vec<FastRateOp> = (0..33).map(|_| FastRateOp::Constant(1.0)).collect();
-        let program = FastRateExpression::Program(ops);
-        let error = eval_fast_rate(&program, &[], &ctx, 0.0).unwrap_err();
-        assert!(error.contains("overflow"));
     }
 
     fn make_three_bin_model() -> Model {
@@ -960,7 +613,7 @@ mod tests {
                     description: None,
                 },
             ],
-            population: Population {
+            structure: ModelStructure::Compartmental(CompartmentalStructure {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -977,9 +630,34 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
-                transitions: vec![],
+                transitions: vec![
+                    Transition {
+                        id: "a_to_b".to_string(),
+                        source: vec!["A".to_string()],
+                        target: vec!["B".to_string()],
+                        accumulators: vec![],
+                        rate: Some(RateMathExpression::from_string(
+                            "k1 * A * B / total".to_string(),
+                        )),
+                        stratified_rates: None,
+                        per_compartment: None,
+                        impulse_at: None,
+                        impulse_every: None,
+                    },
+                    Transition {
+                        id: "b_to_c".to_string(),
+                        source: vec!["B".to_string()],
+                        target: vec!["C".to_string()],
+                        accumulators: vec![],
+                        rate: Some(RateMathExpression::from_string("k2".to_string())),
+                        stratified_rates: None,
+                        per_compartment: None,
+                        impulse_at: None,
+                        impulse_every: None,
+                    },
+                ],
                 initial_conditions: InitialConditions {
-                    population_size: 1000,
+                    total: 1000.0,
                     bin_fractions: vec![
                         BinFraction {
                             bin: "A".to_string(),
@@ -997,68 +675,310 @@ mod tests {
                     stratification_fractions: vec![],
                     compartment_fractions: vec![],
                 },
-            },
-            dynamics: Dynamics {
-                typology: ModelTypes::DifferenceEquations,
-                transitions: vec![
-                    Transition {
-                        id: "a_to_b".to_string(),
-                        source: vec!["A".to_string()],
-                        target: vec!["B".to_string()],
-                        accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string(
-                            "k1 * A * B / N".to_string(),
-                        )),
-                        stratified_rates: None,
-                        condition: None,
-                        per_compartment: None,
-                    },
-                    Transition {
-                        id: "b_to_c".to_string(),
-                        source: vec!["B".to_string()],
-                        target: vec!["C".to_string()],
-                        accumulators: vec![],
-                        rate: Some(RateMathExpression::from_string("k2".to_string())),
-                        stratified_rates: None,
-                        condition: None,
-                        per_compartment: None,
-                    },
-                ],
-            },
+            }),
+            engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
     }
 
     #[test]
-    fn get_parameters_exposes_n_after_step_without_compartment_context() {
-        use commol_core::SimulationEngine;
+    fn get_parameters_exposes_the_total_after_step_without_compartment_context() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
 
         engine.step().unwrap();
 
         let params = engine.get_parameters();
-        let n = params
-            .get("N")
+        let total = params
+            .get("total")
             .copied()
-            .expect("N must be visible in get_parameters() after a step");
-        // The model conserves total population at 1000 across the first step.
-        assert!((n - 1000.0).abs() < 1e-6, "expected N=1000, got {}", n);
+            .expect("total must be visible in get_parameters() after a step");
+        // The model keeps its total at 1000 across the first step.
+        assert!(
+            (total - 1000.0).abs() < 1e-6,
+            "expected total=1000, got {}",
+            total
+        );
     }
 
     #[test]
-    fn three_bin_model_conserves_population_through_fast_path() {
+    fn three_bin_model_keeps_its_total_through_fast_path() {
         let model = make_three_bin_model();
         let mut engine = DifferenceEquations::from_model(&model);
-        let results = engine.run(50).unwrap();
+        let results = engine.run(50).unwrap().rows;
 
         for (k, state) in results.iter().enumerate() {
             let total: f64 = state.iter().sum();
             assert!(
                 (total - 1000.0).abs() < 1e-6,
-                "population not conserved at step {}: total = {}",
+                "total not kept at step {}: total = {}",
                 k,
                 total
             );
         }
+    }
+
+    fn ab_model_with_rate(rate: &str) -> Model {
+        let mut model = make_three_bin_model();
+        model.compartmental_mut().unwrap().transitions = vec![Transition {
+            id: "a_to_b".to_string(),
+            source: vec!["A".to_string()],
+            target: vec!["B".to_string()],
+            accumulators: vec![],
+            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            stratified_rates: None,
+            per_compartment: None,
+            impulse_at: None,
+            impulse_every: None,
+        }];
+        model
+    }
+
+    /// A transition of the three-bin model, an impulse at `impulse_at` if
+    /// there are positions.
+    fn transition(
+        id: &str,
+        source: &str,
+        target: &str,
+        rate: &str,
+        impulse_at: &[f64],
+    ) -> Transition {
+        Transition {
+            id: id.to_string(),
+            source: vec![source.to_string()],
+            target: vec![target.to_string()],
+            accumulators: vec![],
+            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            stratified_rates: None,
+            per_compartment: None,
+            impulse_at: (!impulse_at.is_empty()).then(|| impulse_at.to_vec()),
+            impulse_every: None,
+        }
+    }
+
+    /// The three-bin model (`A` = 990, `B` = 10, `C` = 0) with `transitions`.
+    fn three_bins_with(transitions: Vec<Transition>) -> Model {
+        let mut model = make_three_bin_model();
+        model.compartmental_mut().unwrap().transitions = transitions;
+        model
+    }
+
+    /// The position and the message of an infeasible run, or a panic.
+    fn infeasible(error: SimulationError) -> (f64, String) {
+        match error {
+            SimulationError::Infeasible { position, message } => (position, message),
+            SimulationError::Failed(message) => panic!("expected an infeasible run: {message}"),
+        }
+    }
+
+    #[test]
+    fn flows_that_move_more_than_a_compartment_holds_stop_the_first_step() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![
+            transition("a_to_c", "A", "C", "0.5", &[]),
+            transition("a_to_b", "A", "B", "0.7", &[]),
+        ]));
+
+        let (position, message) = infeasible(engine.run(3).unwrap_err());
+
+        assert_eq!(position, 0.0);
+        assert_eq!(
+            message,
+            "The flows of step 0 leave compartment 'A' at -198, below zero: \
+             it held 990, and the flows out of it move 'a_to_b' 693, 'a_to_c' 495. A \
+             difference step cannot move more than a compartment holds"
+        );
+        // The state stays as it was before the step.
+        assert_eq!(engine.state(), vec![990.0, 10.0, 0.0]);
+        assert_eq!(engine.current_step, 0.0);
+    }
+
+    #[test]
+    fn a_rate_that_turns_negative_stops_the_step_where_an_amount_drops_below_zero() {
+        // From step 7 the flow runs backwards and takes 2 × 990 from `B`.
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![transition(
+            "a_to_b",
+            "A",
+            "B",
+            "if(step >= 7, -2, 0)",
+            &[],
+        )]));
+
+        let (position, message) = infeasible(engine.run(20).unwrap_err());
+
+        assert_eq!(position, 7.0);
+        assert!(
+            message.starts_with("The flows of step 7 leave compartment 'B' at -1970")
+                && message.contains("it held 10, and the flows out of it move 'a_to_b' 1980."),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn proportional_rates_that_sum_to_one_empty_a_compartment() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![
+            transition("a_to_b", "A", "B", "0.1", &[]),
+            transition("a_to_c", "A", "C", "0.2", &[]),
+            transition("a_to_b_again", "A", "B", "0.7", &[]),
+        ]));
+
+        let rows = engine.run(3).unwrap().rows;
+
+        assert!(rows[1][0].abs() < 1e-12 * 1000.0, "{}", rows[1][0]);
+        assert!(((rows[3][1] + rows[3][2]) - 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn an_impulse_that_moves_more_than_its_source_holds_stops_its_step() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![transition(
+            "dose",
+            "B",
+            "C",
+            "1.5",
+            &[3.0],
+        )]));
+
+        let (position, message) = infeasible(engine.run(5).unwrap_err());
+
+        assert_eq!(position, 3.0);
+        assert_eq!(
+            message,
+            "The impulses at step 3 leave compartment 'B' at -5, below zero: it held 10, \
+             and the flows out of it move 'dose' 15. A difference step cannot move more \
+             than a compartment holds"
+        );
+    }
+
+    #[test]
+    fn an_accumulator_may_count_a_negative_net_flow() {
+        let mut model = three_bins_with(vec![Transition {
+            accumulators: vec!["moved".to_string()],
+            ..transition("a_to_b", "A", "B", "-0.001", &[])
+        }]);
+        model.compartmental_mut().unwrap().accumulators = vec![commol_core::Accumulator {
+            id: "moved".to_string(),
+            name: "Moved".to_string(),
+        }];
+        let mut engine = DifferenceEquations::from_model(&model);
+
+        let rows = engine.run(2).unwrap().rows;
+
+        assert!(rows[2][3] < 0.0, "{:?}", rows[2]);
+    }
+
+    #[test]
+    fn pi_and_e_are_constants_in_every_rate_path() {
+        // k2 = 0.1, A starts at 990: one step moves `constant * 0.1 * 990`.
+        let cases = [
+            ("pi * k2 * A", std::f64::consts::PI),
+            ("e * k2 * A", std::f64::consts::E),
+            ("k2 * pi * A + 0 * B", std::f64::consts::PI),
+            ("if(step >= 0, e * k2 * A, 0)", std::f64::consts::E),
+        ];
+        for (rate, constant) in cases {
+            let model = ab_model_with_rate(rate);
+            let mut engine = DifferenceEquations::from_model(&model);
+            let results = engine
+                .run(1)
+                .unwrap_or_else(|error| panic!("{rate}: {error}"))
+                .rows;
+            let expected = 990.0 - constant * 0.1 * 990.0;
+            assert!(
+                (results[1][0] - expected).abs() < 1e-9,
+                "{rate}: expected A = {expected}, got {}",
+                results[1][0]
+            );
+        }
+    }
+
+    #[test]
+    fn pi_alone_is_a_proportional_constant_rate() {
+        let model = ab_model_with_rate("pi / 10");
+        let mut engine = DifferenceEquations::from_model(&model);
+        let results = engine.run(1).unwrap().rows;
+        let expected = 990.0 - std::f64::consts::PI / 10.0 * 990.0;
+        assert!((results[1][0] - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_run_reports_at_its_grid() {
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let trajectory = engine.run(3).unwrap();
+        assert_eq!(trajectory.positions, vec![0.0, 1.0, 2.0, 3.0]);
+
+        let mut fresh = DifferenceEquations::from_model(&make_three_bin_model());
+        let rows = fresh.run_at(&[1.0, 3.0]).unwrap();
+        assert_eq!(
+            rows,
+            vec![trajectory.rows[1].clone(), trajectory.rows[3].clone()]
+        );
+    }
+
+    #[test]
+    fn a_run_continues_from_the_current_step() {
+        let mut whole = DifferenceEquations::from_model(&make_three_bin_model());
+        let expected = whole.run(5).unwrap();
+
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        engine.run(2).unwrap();
+        let rest = engine.run(3).unwrap();
+        assert_eq!(rest.positions, vec![2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(rest.rows, expected.rows[2..].to_vec());
+    }
+
+    #[test]
+    fn integer_positions_are_accepted_and_others_rejected() {
+        let engine = DifferenceEquations::from_model(&make_three_bin_model());
+        assert_eq!(engine.check_position(0.0), Ok(()));
+        assert_eq!(engine.check_position(12.0), Ok(()));
+        for position in [2.5, -1.0, f64::NAN, f64::INFINITY] {
+            let error = engine.check_position(position).unwrap_err();
+            assert!(
+                error.contains("only at integer steps") && error.contains(&position.to_string()),
+                "{position}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn unsorted_or_past_positions_are_rejected() {
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let error = engine.run_at(&[3.0, 1.0]).unwrap_err().to_string();
+        assert!(error.contains("sorted and unique"), "{error}");
+        let error = engine.run_at(&[2.5]).unwrap_err().to_string();
+        assert!(error.contains("2.5 is not one"), "{error}");
+
+        engine.run(4).unwrap();
+        let error = engine.run_at(&[2.0]).unwrap_err().to_string();
+        assert!(error.contains("before the current position 4"), "{error}");
+    }
+
+    #[test]
+    fn the_engine_writes_initial_conditions_that_reset_keeps() {
+        use commol_core::{ModelValue, ModelValueType};
+        let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
+        let plan = engine
+            .plan_values(
+                &[ModelValue {
+                    value_type: ModelValueType::InitialCondition,
+                    id: "B".to_string(),
+                }],
+                Some("A"),
+            )
+            .unwrap();
+
+        assert_eq!(engine.apply_values(&plan, &[0.25]).unwrap(), 0.0);
+        engine.step().unwrap();
+        engine.reset();
+
+        assert_eq!(engine.state(), vec![750.0, 250.0, 0.0]);
+        assert_eq!(engine.total(), 1000.0);
+    }
+
+    #[test]
+    fn the_state_is_the_compartments_and_a_bin_total_is_a_sum() {
+        let engine = DifferenceEquations::from_model(&make_three_bin_model());
+
+        assert_eq!(engine.state_outputs(), 3);
+        // Without stratifications no name sums several outputs.
+        assert!(engine.output_sums().is_empty());
     }
 }

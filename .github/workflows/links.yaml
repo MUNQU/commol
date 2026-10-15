@@ -1,0 +1,50 @@
+name: Links
+
+# External links in the documentation. Internal links and anchors are checked by
+# `mkdocs build --strict` in the Documentation workflow.
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".github/workflows/links.yaml"
+  schedule:
+    - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check-links:
+    name: Check External Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          # Local addresses (such as `mkdocs serve`) are examples, not links, and
+          # the release template's compare link is a placeholder.
+          # Links to this site are checked against docs/ by
+          # py-commol/tests/docs/test_reference.py, because new pages reach
+          # the published site only after a release.
+          args: >-
+            --no-progress
+            --scheme https
+            --scheme http
+            --exclude-loopback
+            --exclude "/compare/vPREVIOUS"
+            --exclude "^https://munqu\.github\.io/commol/"
+            "docs/**/*.md" README.md AGENTS.md
+          fail: true

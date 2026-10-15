@@ -1,13 +1,15 @@
+"""Stratifications that split compartments into categories."""
+
 from typing import override, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import ConfigDict, BaseModel, Field, model_validator
 
 from commol.context.stratification_condition import StratificationCondition
 
 
 class Stratification(BaseModel):
     """
-    Defines a categorical subdivision of the population.
+    Defines a categorical subdivision of the compartments.
 
     Attributes
     ----------
@@ -25,6 +27,8 @@ class Stratification(BaseModel):
 
         May only reference stratifications declared before this one.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(default=..., description="Identifier of the stratification.")
     categories: list[str] = Field(

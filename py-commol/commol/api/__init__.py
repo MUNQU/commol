@@ -1,12 +1,20 @@
+"""User-facing workflows: building, simulating, calibrating, plotting and reporting."""
+
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
 from .plotter import SimulationPlotter
 from .probabilistic.intervals import ci_percentiles, member_statistics
 from .reporting import applied_parameters_report, simulation_report
+from .results import SimulationResults
 from .simulation import Simulation
-from .time_patterns import TimePattern
-from .time_scale import TimeScale
-from .windows import window_end_steps, windowed_totals
+from .patterns import AxisPattern
+from .windows import (
+    window_end,
+    window_ends,
+    window_index,
+    window_start,
+    windowed_totals,
+)
 
 __all__ = [
     "Calibrator",
@@ -14,11 +22,14 @@ __all__ = [
     "ModelBuilder",
     "SimulationPlotter",
     "Simulation",
-    "TimePattern",
-    "TimeScale",
+    "SimulationResults",
+    "AxisPattern",
     "ci_percentiles",
     "member_statistics",
     "simulation_report",
-    "window_end_steps",
+    "window_end",
+    "window_ends",
+    "window_index",
+    "window_start",
     "windowed_totals",
 ]

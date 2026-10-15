@@ -1,7 +1,10 @@
+"""Repeated calibration runs that feed probabilistic calibration."""
+
 import logging
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context._model import engine_state
 from commol.context.calibration import (
     PSOChaoticInertia,
     PSOConstantAcceleration,
@@ -68,6 +71,11 @@ class CalibrationRunner:
         ----------
         n_runs : int
             Number of calibration runs to perform.
+        evaluation_retention : str, default="all"
+            Which evaluations of each run to keep: "all", "best_per_run" or
+            "top_k_per_run".
+        top_k_per_run : int | None, default=None
+            Number of evaluations kept per run with "top_k_per_run".
 
         Returns
         -------
@@ -86,7 +94,6 @@ class CalibrationRunner:
         rust_constraints = self.build_rust_constraints()
         rust_loss_config = self.build_loss_config()
         rust_optimization_config = self._build_optimization_config()
-        initial_population_size = self.initial_population_size()
 
         # Call Rust function for parallel execution
         try:
@@ -97,7 +104,6 @@ class CalibrationRunner:
                 rust_constraints,
                 rust_loss_config,
                 rust_optimization_config,
-                initial_population_size,
                 n_runs,
                 self.seed,
                 evaluation_retention,
@@ -111,18 +117,7 @@ class CalibrationRunner:
 
     def build_rust_observed_data(self):
         """Convert observed data to Rust types."""
-        return [
-            commol_rs.calibration.ObservedDataPoint(
-                step=point.step,
-                compartment=point.compartment,
-                value=point.value,
-                weight=point.weight,
-                scale_id=point.scale_id,
-                window_steps=point.window_steps,
-                compartments=point.compartments,
-            )
-            for point in self.problem.observed_data
-        ]
+        return engine_state.rust_observed_data(self.problem.observed_data)
 
     def build_rust_parameters(self):
         """Convert calibration parameters to Rust types."""
@@ -139,24 +134,11 @@ class CalibrationRunner:
 
     def build_rust_constraints(self):
         """Convert calibration constraints to Rust types."""
-        return [
-            commol_rs.calibration.CalibrationConstraint(
-                id=constraint.id,
-                expression=constraint.expression,
-                description=constraint.description,
-                weight=constraint.weight,
-                time_steps=constraint.time_steps,
-            )
-            for constraint in self.problem.constraints
-        ]
+        return engine_state.rust_constraints(self.problem.constraints)
 
     def build_loss_config(self) -> "LossConfigProtocol":
         """Convert the configured Python loss function to Rust."""
         return self._build_loss_config()
-
-    def initial_population_size(self) -> int:
-        """Return the model initial population size used by Rust calibration."""
-        return self._get_initial_population_size()
 
     def _to_rust_parameter_type(
         self, param_type: str
@@ -166,8 +148,8 @@ class CalibrationRunner:
             return commol_rs.calibration.CalibrationParameterType.Parameter
         elif param_type == CalibrationParameterType.INITIAL_CONDITION:
             return commol_rs.calibration.CalibrationParameterType.InitialCondition
-        elif param_type == CalibrationParameterType.SCALE:
-            return commol_rs.calibration.CalibrationParameterType.Scale
+        elif param_type == CalibrationParameterType.FACTOR:
+            return commol_rs.calibration.CalibrationParameterType.Factor
         else:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
@@ -181,8 +163,6 @@ class CalibrationRunner:
             loss_config = commol_rs.calibration.LossConfig.rmse()
         elif loss_func == LossFunction.MAE:
             loss_config = commol_rs.calibration.LossConfig.mae()
-        elif loss_func == LossFunction.WEIGHTED_SSE:
-            loss_config = commol_rs.calibration.LossConfig.weighted_sse()
         else:
             raise ValueError(f"Unsupported loss function: {loss_func}")
 
@@ -202,6 +182,7 @@ class CalibrationRunner:
             nm_config = commol_rs.calibration.NelderMeadConfig(
                 max_iterations=opt_config.max_iterations,
                 sd_tolerance=opt_config.sd_tolerance,
+                initial_simplex_size=opt_config.initial_simplex_size,
                 alpha=opt_config.alpha,
                 gamma=opt_config.gamma,
                 rho=opt_config.rho,
@@ -290,10 +271,3 @@ class CalibrationRunner:
                 c2_final=acceleration.c2_final,
             )
         return None
-
-    def _get_initial_population_size(self) -> int:
-        """Get the initial population size from the model."""
-        initial_conditions = (
-            self.simulation.model_definition.population.initial_conditions
-        )
-        return initial_conditions.population_size

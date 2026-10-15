@@ -8,32 +8,38 @@
 //!
 //! ## Modules
 //!
-//! - `core`: Core data structures (Model, Population, etc.)
-//! - `difference`: Discrete-time difference equation solver
+//! - `core`: Core data structures (Model, CompartmentalStructure, etc.)
+//! - `model`: What a model expands into (compartments, flows, initial state)
+//! - `engine`: The list of engines, and the engine a model names
 //! - `calibration`: Parameter calibration and optimization
 //!
 //! ## Example
 //!
 //! ```python
-//! from commol_rs import core, difference
+//! from commol_rs import core, engine
 //!
 //! # Load a model
-//! model = core.Model.from_json_file("sir_model.json")
+//! model = core.Model.from_json_file("model.json")
 //!
-//! # Create solver
-//! solver = difference.DifferenceEquations(model)
+//! # Build the engine the model names
+//! simulation = engine.Engine(model)
 //!
 //! # Run simulation
-//! results = solver.run(100)
+//! positions, rows = simulation.run(100)
 //! ```
+
+#![warn(missing_docs)]
 
 use pyo3::prelude::*;
 
 // Module declarations
 mod calibration;
 mod core;
-mod difference;
+mod engine;
+mod model;
 pub(crate) mod python_observer;
+#[cfg(feature = "test-kind")]
+mod test_kind;
 
 /// High-performance compartment modelling library.
 ///
@@ -46,21 +52,32 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     core_module.add(
         "__doc__",
         "Core data structures for compartment models.\n\n\
-         Includes Model, Population, Bin, Transition, and related types.",
+         Includes Model, CompartmentalStructure, Bin, Transition, and related types.",
     )?;
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;
 
-    // Difference module: discrete-time solver
-    let difference_module = PyModule::new(py, "difference")?;
-    difference_module.add(
+    // Model module: expansion shared by every engine
+    let model_module = PyModule::new(py, "model")?;
+    model_module.add(
         "__doc__",
-        "Discrete-time difference equation solver.\n\n\
-         Provides the DifferenceEquations class for simulating compartment\n\
-         models using difference equations (discrete time steps).",
+        "What a model expands into, whatever engine runs it.\n\n\
+         Provides the initial state, the expanded outputs, the transition\n\
+         flows and the name checks of a model.",
     )?;
-    difference::register(&difference_module)?;
-    m.add_submodule(&difference_module)?;
+    model::register(&model_module)?;
+    m.add_submodule(&model_module)?;
+
+    // Engine module: the list of engines and the engine a model names
+    let engine_module = PyModule::new(py, "engine")?;
+    engine_module.add(
+        "__doc__",
+        "The engines a model can name.\n\n\
+         Provides EngineType, the list of engines and what each one means,\n\
+         and Engine, the engine a model names, built from the model.",
+    )?;
+    engine::register(&engine_module)?;
+    m.add_submodule(&engine_module)?;
 
     // Calibration module: parameter optimization
     let calibration_module = PyModule::new(py, "calibration")?;
