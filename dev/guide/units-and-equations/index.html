@@ -922,6 +922,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#positions-and-numbers-in-a-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positions and numbers in a rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#impulses" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1536,14 +1547,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-scale/" class="md-nav__link">
+      <a href="../../api/axis-units/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimeScale
+    AxisUnits
   
 
     
@@ -2262,6 +2273,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#positions-and-numbers-in-a-rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positions and numbers in a rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#impulses" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2339,7 +2361,7 @@ equations that the engine simulates, as text or LaTeX. Both work on a built
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Model with Units&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Model with Units&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State C&quot;</span><span class="p">)</span>
@@ -2366,7 +2388,8 @@ equations that the engine simulates, as text or LaTeX. Both work on a built
 unit <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, every <a href="../transitions/#impulses">impulse</a> the
 unit <code>&lt;bin unit&gt;</code>, and that every function receives a plain number. It checks
 <code>DifferenceEquations</code> and <code>DifferentialEquations</code> models alike: in both, a rate
-is per unit of the axis.
+is per unit of the axis, and only what its value means differs (see
+<a href="../core-concepts/#what-a-rate-means">What a rate means</a>).
 It raises <code>UnitConsistencyError</code> (from <code>commol.utils.equations</code>) and lists every
 transition that fails.</p>
 <h3 id="what-needs-a-unit">What needs a unit<a class="headerlink" href="#what-needs-a-unit" title="Permanent link">&para;</a></h3>
@@ -2395,8 +2418,12 @@ transition that fails.</p>
 <td>Inferred from the formula; a unit is optional</td>
 </tr>
 <tr>
-<td><code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code></td>
-<td>Dimensionless, automatically</td>
+<td><code>t</code></td>
+<td>The step unit, automatically: it is a position on the axis</td>
+</tr>
+<tr>
+<td><code>step</code>, <code>pi</code>, <code>e</code></td>
+<td>Dimensionless, automatically: <code>step</code> counts increments</td>
 </tr>
 </tbody>
 </table>
@@ -2417,65 +2444,62 @@ transition that fails.</p>
 <td>Ratios, fractions, amplitudes, function arguments</td>
 </tr>
 <tr>
-<td>Any word, such as <code>"item"</code></td>
-<td>A custom unit for bins; Commol registers it</td>
+<td>Any word that <code>pint</code> does not define, such as <code>"item"</code></td>
+<td>A unit of its own dimension; Commol registers it</td>
 </tr>
 </tbody>
 </table>
+<p>A unit means what <a href="https://pint.readthedocs.io/"><code>pint</code></a> defines, for time as
+for any other quantity: <code>month</code>, <code>year</code> and <code>fortnight</code> are units of time, but
+<code>quarter</code> is a unit of mass and <code>decade</code> is a number. A word that <code>pint</code> does
+not define, such as <code>mo</code>, becomes a unit of its own dimension, which no other
+unit converts to.</p>
 <h3 id="the-step-unit">The step unit<a class="headerlink" href="#the-step-unit" title="Permanent link">&para;</a></h3>
-<p>The engine applies every flow once per step and converts no value between
-units. So one step has one unit, and every rate must use it
-(<code>UnitChecker._step_unit</code> in <code>py-commol/commol/context/_model/units.py</code>).</p>
+<p>The engine converts no value between units. So one step has one unit, and every
+rate must use it (<code>UnitChecker._step_unit</code> in
+<code>py-commol/commol/context/_model/units.py</code>).</p>
 <p>The axis of a model is its independent variable: the quantity the model steps
 along or differentiates over. Time is one case; a length, a dose or any other
 quantity is another. So the step unit may have any single dimension. Declare it
-with <code>ModelBuilder(..., step_unit="meter")</code>
-(<code>Model.step_unit</code>); <code>check_step_unit</code> accepts one unit of one dimension with
-exponent 1, such as <code>day</code> or <code>meter</code>, and rejects <code>1/day</code> or <code>meter**2</code>. When
-it is not declared, the check infers it from the parameters:</p>
+with <code>ModelBuilder(..., step_unit="day")</code> (<code>Model.step_unit</code>); <code>check_step_unit</code>
+accepts one unit of one dimension with exponent 1, such as <code>day</code> or <code>meter</code>, and
+rejects <code>1/day</code> or <code>meter**2</code>. A model that declares no step unit has the
+step unit <code>step</code>, the default increment of any axis, of its own dimension
+<code>[step]</code>. The check never guesses the step unit from the parameters.</p>
 <table>
 <thead>
 <tr>
-<th>Parameter units</th>
+<th>Model</th>
 <th>Step unit</th>
-<th>Result</th>
+<th>Flows must be</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>All in one unit of time, such as <code>"1/day"</code> and <code>"day"</code></td>
+<td><code>step_unit="day"</code></td>
 <td><code>day</code></td>
-<td>Flows must be <code>&lt;bin unit&gt;/day</code></td>
+<td><code>&lt;bin unit&gt;/day</code>: a rate in <code>1/d</code> passes, a rate in <code>1/week</code> or <code>1/quarter</code> fails</td>
 </tr>
 <tr>
-<td>All in <code>"1/week"</code></td>
-<td><code>week</code></td>
-<td>Accepted: one step is one week</td>
+<td><code>step_unit="meter"</code></td>
+<td><code>meter</code></td>
+<td><code>&lt;bin unit&gt;/meter</code></td>
 </tr>
 <tr>
-<td>All in <code>"1/step"</code></td>
+<td>No <code>step_unit</code>, rates in <code>1/step</code> or none</td>
 <td><code>step</code></td>
-<td>Accepted</td>
+<td><code>&lt;bin unit&gt;/step</code></td>
 </tr>
 <tr>
-<td>No unit of time</td>
+<td>No <code>step_unit</code>, rates in <code>1/day</code></td>
 <td><code>step</code></td>
-<td>Flows must be <code>&lt;bin unit&gt;/step</code></td>
-</tr>
-<tr>
-<td><code>"1/day"</code> and <code>"1/week"</code>, or <code>"1/day"</code> and <code>"1/step"</code></td>
-<td>—</td>
-<td>Error that names each parameter and its unit</td>
+<td>Fails; the error says to declare <code>step_unit</code></td>
 </tr>
 </tbody>
 </table>
-<p>Inference looks only at units of time: a unit of dimension <code>[time]</code>
-(<code>second</code>, <code>hour</code>, <code>day</code>, <code>week</code>, <code>month</code>, <code>year</code>, …) or <code>step</code>. A rate in
-<code>1/meter</code> needs <code>step_unit="meter"</code>; without it the step unit is <code>step</code> and the
-flow fails. Two names of one unit, such as <code>d</code> and
-<code>day</code>, are one unit. A flow must have exactly the expected unit: <code>item/week</code>
-does not match <code>item/day</code>, because the engine would apply a weekly rate
-every day.</p>
+<p>Two names of one unit, such as <code>d</code> and <code>day</code>, are one unit. A flow must have
+exactly the expected unit: <code>item/week</code> does not match <code>item/day</code>, because the
+engine would read a weekly rate as a daily one.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">along_a_line</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Along a line&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;meter&quot;</span><span class="p">)</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
@@ -2490,8 +2514,19 @@ every day.</p>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">)</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">along_a_line</span><span class="o">.</span><span class="n">check_unit_consistency</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Unit consistency check passed successfully.</span>
 </span></code></pre></div>
-<p><code>TimeScale.from_step_unit(unit)</code> gives the time scale of a step unit of time,
-and raises <code>ValueError</code> for a unit of another dimension, such as <code>meter</code>.</p>
+<p><code>Model.axis_units()</code> converts values in units of the step dimension to steps,
+and gives the rates the engine reads; see
+<a href="../core-concepts/#units-of-the-axis">Units of the axis</a>.</p>
+<h3 id="positions-and-numbers-in-a-rate">Positions and numbers in a rate<a class="headerlink" href="#positions-and-numbers-in-a-rate" title="Permanent link">&para;</a></h3>
+<p><code>t</code> is a position on the axis, so it has the step unit: with <code>step_unit="day"</code>,
+<code>k * t * A</code> passes when <code>k</code> is in <code>1/day**2</code>. <code>step</code> counts increments and is
+dimensionless.</p>
+<p>A number written in a rate and added to, subtracted from or compared with a
+quantity is read in the unit of that quantity, as the engine reads it:
+<code>if(t &gt;= 10, k, 0)</code> compares <code>t</code> with 10 days, and <code>t - 3</code> is 3 days before
+<code>t</code>. The two branches of <code>if</code> and the arguments of <code>min</code> and <code>max</code> must share
+a unit, and a written <code>0</code> takes the unit of the other branch. A number that a
+function computes, such as <code>exp(2)</code>, stays dimensionless.</p>
 <h3 id="impulses">Impulses<a class="headerlink" href="#impulses" title="Permanent link">&para;</a></h3>
 <p>An impulse moves an amount at once, so its rate must have the bin unit:
 <code>p * A</code> with <code>p</code> in <code>"dimensionless"</code> is an amount of <code>&lt;bin unit&gt;</code>; <code>k * A</code>
@@ -2500,7 +2535,7 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.utils.equations</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitConsistencyError</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">wrong_units</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Wrong units&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Wrong units&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>  <span class="c1"># should be &quot;1/day&quot;</span>
@@ -2544,8 +2579,8 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 <td>A bin has no unit (set <code>bin_unit</code>)</td>
 </tr>
 <tr>
-<td><code>the parameters use more than one unit of time ('k1' in '1/day', 'k2' in '1/week')</code></td>
-<td>Rates in two units of time; see <a href="#the-step-unit">The step unit</a></td>
+<td><code>The model declares no step unit, so it is 'step'</code></td>
+<td>Rates in a unit such as <code>1/day</code> without <code>step_unit</code>; see <a href="#the-step-unit">The step unit</a></td>
 </tr>
 <tr>
 <td><code>Variable '…' … has no defined unit</code></td>
@@ -2555,7 +2590,8 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 </table>
 <p>To pass a quantity to a function, make it dimensionless first, for example
 <code>sin(2 * pi * step / 365)</code> or <code>exp(-decay * step)</code> with <code>decay</code> in
-<code>"dimensionless"</code>.</p>
+<code>"dimensionless"</code>, or <code>sin(2 * pi * t / period)</code> with <code>period</code> in the step
+unit.</p>
 <h2 id="printing-equations">Printing equations<a class="headerlink" href="#printing-equations" title="Permanent link">&para;</a></h2>
 <p><code>Model.print_equations(output_file=None, format="text")</code> prints the flows that
 the engine plans, after it has decided which rates are proportional (see

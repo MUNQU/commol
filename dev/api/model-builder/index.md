@@ -82,8 +82,9 @@ class ModelBuilder:
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
-            ``<bin unit>/<step_unit>``. None infers it from the parameter units
-            of dimension time.
+            ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+            values to steps of it. None means ``step``, the default increment
+            of any axis.
         """
         self._name: str = name
         self._description: str | None = description
@@ -345,8 +346,10 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per step, and that value is applied to
-        all source compartments at once.
+        The rate is evaluated once, at each position the engine reads it, and
+        that value applies to all source compartments at once. What the value
+        means (an amount moved in one step or an instantaneous rate) is the
+        engine's; see "What a rate means" in the Core Concepts guide.
 
         When you use the $compartment placeholder in the rate formula with multiple
         sources, the system automatically expands this into multiple independent
@@ -958,13 +961,13 @@ Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type  | Description                                | Default                                                                                                                                                                                                            |
-| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
-| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
-| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                   |
-| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
-| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
+| Name          | Type  | Description                                | Default                                                                                                                                                                                                                                                            |
+| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                                                                         |
+| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                                                                  |
+| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                                                                   |
+| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                                                                    |
+| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>, and Model.axis_units() converts values to steps of it. None means step, the default increment of any axis. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -996,8 +999,9 @@ def __init__(
     step_unit : str | None, default=None
         Unit of one step on the axis, of any single dimension (for example
         ``"day"`` or ``"meter"``). The unit check requires every flow to be
-        ``<bin unit>/<step_unit>``. None infers it from the parameter units
-        of dimension time.
+        ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+        values to steps of it. None means ``step``, the default increment
+        of any axis.
     """
     self._name: str = name
     self._description: str | None = description
@@ -1308,7 +1312,7 @@ Add a transition between states to the model.
 
 This method supports two distinct behaviors:
 
-When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per step, and that value is applied to all source compartments at once.
+When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated once, at each position the engine reads it, and that value applies to all source compartments at once. What the value means (an amount moved in one step or an instantaneous rate) is the engine's; see "What a rate means" in the Core Concepts guide.
 
 When you use the $compartment placeholder in the rate formula with multiple sources, the system automatically expands this into multiple independent transitions - one for each source compartment. Each transition has its own rate calculation where $compartment is replaced with the actual compartment name.
 
@@ -1374,8 +1378,10 @@ def add_transition(
 
     When you specify multiple sources without the $compartment placeholder,
     a single transition is created that affects all sources simultaneously.
-    The rate is evaluated ONCE per step, and that value is applied to
-    all source compartments at once.
+    The rate is evaluated once, at each position the engine reads it, and
+    that value applies to all source compartments at once. What the value
+    means (an amount moved in one step or an instantaneous rate) is the
+    engine's; see "What a rate means" in the Core Concepts guide.
 
     When you use the $compartment placeholder in the rate formula with multiple
     sources, the system automatically expands this into multiple independent

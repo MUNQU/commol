@@ -1380,14 +1380,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-scale/" class="md-nav__link">
+      <a href="../../api/axis-units/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimeScale
+    AxisUnits
   
 
     
@@ -2594,8 +2594,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>print_equations</code> lists impulses apart.</li>
 <li><code>ModelBuilder(..., step_unit=...)</code> (<code>Model.step_unit</code>): the unit of one step
   for the unit check, of any single dimension: the axis is the independent
-  variable of the model, which need not be time (for example <code>"meter"</code>). Without it, the check infers the unit as before.</li>
-<li><code>TimeScale.from_step_unit(unit)</code>, which raises for a unit that is not time.</li>
+  variable of the model, which need not be time (for example <code>"meter"</code>).
+  Without it, the step unit is <code>step</code>, the default increment of any axis.</li>
+<li><code>AxisUnits(step_unit, engine)</code> and <code>Model.axis_units()</code>: <code>steps(value, unit)</code>
+  converts a value in any unit of the step dimension to steps on <code>pint</code>
+  (<code>3 day</code> with a step of <code>hour</code> is <code>72.0</code>; <code>2 km</code> with a step of <code>m</code> is
+  <code>2000.0</code>), and raises, naming both units, for a unit of another dimension.
+  <code>rate_from_mean_span(span, unit)</code> and <code>rate_from_probability(probability,
+  period, unit)</code> ask the engine what a rate means: the per-step rate for
+  <code>DifferenceEquations</code> (<code>1 - exp(-1/n)</code>, <code>1 - (1 - p)^(1/n)</code>) and the
+  continuous rate for <code>DifferentialEquations</code> (<code>1/n</code>, <code>-ln(1 - p)/n</code>).</li>
+<li><code>EngineType.rate_from_mean_span</code> and <code>rate_from_probability</code> in the engine's
+  list (<code>RateMeaning</code> in Rust), which hold those formulas.</li>
+<li>The unit check reads <code>if(condition, a, b)</code>: both branches share a unit.</li>
 <li>One interface for every kind of model: <code>ModelStructure</code>, an abstract base
   class that the structure of each kind inherits. <code>Simulation</code>, <code>Calibrator</code>,
   <code>ProbabilisticCalibrator</code>, the reports and <code>SimulationPlotter</code> use only it,
@@ -3018,7 +3029,65 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </tr>
 </tbody>
 </table>
+<ul>
+<li>The unit check no longer infers the step unit from the parameter units: it
+  is the declared <code>step_unit</code> or else <code>step</code>. A model with rates in <code>1/day</code>
+  and no <code>step_unit</code> fails the check, and the message says to declare it:
+  add <code>step_unit="day"</code> to <code>ModelBuilder</code>.</li>
+<li>A unit means what <code>pint</code> defines. The list of time aliases (<code>decade</code>,
+  <code>quarter</code>, <code>semester</code>, <code>mo</code>, <code>wk</code>, …) is gone: <code>pint</code> reads <code>quarter</code> as a
+  mass and <code>decade</code> as a number, so <code>1/quarter</code> was a mass without error. A
+  name that <code>pint</code> does not define is a unit of its own dimension.</li>
+<li>In the unit check, <code>t</code> has the step unit (it is a position on the axis), and
+  a number written beside it in a sum, a difference or a comparison is read in
+  that unit. <code>step</code> stays dimensionless. A rate such as <code>sin(2 * pi * t / 365)</code>
+  now fails the check; write <code>sin(2 * pi * t / period)</code> with <code>period</code> in the
+  step unit.</li>
+<li>Guides and docstrings say what a rate means for each engine
+  (<a href="../../guide/core-concepts/#what-a-rate-means">What a rate means</a>) instead
+  of "every flow applies once per step".</li>
+</ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>TimeScale</code> (<code>commol.api.time_scale</code>). Its rate conversions gave per-step
+  rates only, which a differential model reads as too small.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TimeScale(step_seconds=3600)</code>, <code>TimeScale.from_step_unit("hour")</code></td>
+<td><code>AxisUnits(step_unit="hour")</code>, or <code>model.axis_units()</code></td>
+</tr>
+<tr>
+<td><code>steps_from_seconds/minutes/hours/days/weeks(x)</code></td>
+<td><code>steps(x, "second")</code>, <code>steps(x, "minute")</code>, …</td>
+</tr>
+<tr>
+<td><code>steps_per_hour</code>, <code>steps_per_day</code>, <code>steps_per_week</code></td>
+<td><code>steps(1, "hour")</code>, <code>steps(1, "day")</code>, <code>steps(1, "week")</code></td>
+</tr>
+<tr>
+<td><code>rate_from_mean_duration(seconds)</code></td>
+<td><code>rate_from_mean_span(span, unit)</code>, which asks the engine</td>
+</tr>
+<tr>
+<td><code>rate_from_probability(p, period_steps)</code></td>
+<td><code>rate_from_probability(p, period, unit)</code>, which asks the engine</td>
+</tr>
+<tr>
+<td><code>window_start</code>, <code>window_end</code>, <code>window_index</code></td>
+<td><code>commol.window_start</code>, <code>window_end</code>, <code>window_index</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>steps</code> returns a <code>float</code> and does not raise for a fraction of a step; the
+  engine rejects a position it does not accept where the position is used.</p>
 <ul>
 <li>Transition conditions: <code>Transition.condition</code>, the <code>condition</code> argument of
   <code>ModelBuilder.add_transition</code>, <code>ModelBuilder.create_condition</code>, the

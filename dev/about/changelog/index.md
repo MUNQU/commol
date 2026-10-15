@@ -18,8 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The window grid as module functions: `window_start`, `window_end`, `window_index` and `window_ends`, beside `windowed_totals`.
 - A public Pydantic class rejects an unknown field and names it (`extra="forbid"` on every class of `commol.__all__`), so a misspelt or an old name is an error instead of being dropped.
 - Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.
-- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the check infers the unit as before.
-- `TimeScale.from_step_unit(unit)`, which raises for a unit that is not time.
+- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the step unit is `step`, the default increment of any axis.
+- `AxisUnits(step_unit, engine)` and `Model.axis_units()`: `steps(value, unit)` converts a value in any unit of the step dimension to steps on `pint` (`3 day` with a step of `hour` is `72.0`; `2 km` with a step of `m` is `2000.0`), and raises, naming both units, for a unit of another dimension. `rate_from_mean_span(span, unit)` and `rate_from_probability(probability, period, unit)` ask the engine what a rate means: the per-step rate for `DifferenceEquations` (`1 - exp(-1/n)`, `1 - (1 - p)^(1/n)`) and the continuous rate for `DifferentialEquations` (`1/n`, `-ln(1 - p)/n`).
+- `EngineType.rate_from_mean_span` and `rate_from_probability` in the engine's list (`RateMeaning` in Rust), which hold those formulas.
+- The unit check reads `if(condition, a, b)`: both branches share a unit.
 - One interface for every kind of model: `ModelStructure`, an abstract base class that the structure of each kind inherits. `Simulation`, `Calibrator`, `ProbabilisticCalibrator`, the reports and `SimulationPlotter` use only it, so another kind (for example an agent network) is a new subclass with its engines in the engine's list. `CompartmentalStructure` is the structure of a compartmental model. A subclass that misses a method cannot be made, and the error names the method.
 - An engine runs one model kind, and a model whose engine runs another kind is rejected when it is made, with an error that names the engine and both kinds.
 - Each kind declares the values calibration may set besides `parameter` and `factor` (`ModelStructure.calibration_value_types`); a compartmental model accepts `initial_condition`. A type the kind does not accept raises an error that names the kind.
@@ -127,7 +129,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | Guide anchor `#absolute-and-per-capita-rates`                         | `#absolute-and-proportional-rates`                         |
 | Guide anchor `#time-dependent-rates`                                  | `#rates-that-change-along-the-axis`                        |
 
+- The unit check no longer infers the step unit from the parameter units: it is the declared `step_unit` or else `step`. A model with rates in `1/day` and no `step_unit` fails the check, and the message says to declare it: add `step_unit="day"` to `ModelBuilder`.
+- A unit means what `pint` defines. The list of time aliases (`decade`, `quarter`, `semester`, `mo`, `wk`, …) is gone: `pint` reads `quarter` as a mass and `decade` as a number, so `1/quarter` was a mass without error. A name that `pint` does not define is a unit of its own dimension.
+- In the unit check, `t` has the step unit (it is a position on the axis), and a number written beside it in a sum, a difference or a comparison is read in that unit. `step` stays dimensionless. A rate such as `sin(2 * pi * t / 365)` now fails the check; write `sin(2 * pi * t / period)` with `period` in the step unit.
+- Guides and docstrings say what a rate means for each engine ([What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)) instead of "every flow applies once per step".
+
 ### Removed
+
+- `TimeScale` (`commol.api.time_scale`). Its rate conversions gave per-step rates only, which a differential model reads as too small.
+
+| Before                                                             | Now                                                             |
+| ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `TimeScale(step_seconds=3600)`, `TimeScale.from_step_unit("hour")` | `AxisUnits(step_unit="hour")`, or `model.axis_units()`          |
+| `steps_from_seconds/minutes/hours/days/weeks(x)`                   | `steps(x, "second")`, `steps(x, "minute")`, …                   |
+| `steps_per_hour`, `steps_per_day`, `steps_per_week`                | `steps(1, "hour")`, `steps(1, "day")`, `steps(1, "week")`       |
+| `rate_from_mean_duration(seconds)`                                 | `rate_from_mean_span(span, unit)`, which asks the engine        |
+| `rate_from_probability(p, period_steps)`                           | `rate_from_probability(p, period, unit)`, which asks the engine |
+| `window_start`, `window_end`, `window_index`                       | `commol.window_start`, `window_end`, `window_index`             |
+
+`steps` returns a `float` and does not raise for a fraction of a step; the engine rejects a position it does not accept where the position is used.
 
 - Transition conditions: `Transition.condition`, the `condition` argument of `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the `Condition` and `Rule` types, and the `LogicOperators` and `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated them, so a condition that was never true still moved population. Write the condition in the rate (`"if(step > 30, k, 0)"`), or use an `AxisPattern` or a stratified rate. A model file with a `condition` key raises an error that names it.
 - `Simulation.run(..., output_format=...)` and `run_at(..., output_format=...)`: both return `SimulationResults`; use `rows()` for one row per position.

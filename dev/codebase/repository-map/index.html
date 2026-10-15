@@ -1384,14 +1384,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-scale/" class="md-nav__link">
+      <a href="../../api/axis-units/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimeScale
+    AxisUnits
   
 
     
@@ -2498,9 +2498,9 @@
 <td>Domain vocabulary; sections of one model kind.</td>
 </tr>
 <tr>
-<td><code>api/patterns.py</code>, <code>api/time_scale.py</code>, <code>api/windows.py</code></td>
-<td>Rates that change along the axis (<code>AxisPattern</code>), step/physical-time conversion, the window grid and windowed totals.</td>
-<td>Physical time inside the model.</td>
+<td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
+<td>Rates that change along the axis (<code>AxisPattern</code>), the window grid and windowed totals.</td>
+<td>Physical units inside the model.</td>
 </tr>
 <tr>
 <td><code>api/plotter.py</code></td>
@@ -2531,6 +2531,11 @@
 <td><code>context/transition.py</code></td>
 <td><code>Transition</code> and <code>StratifiedRate</code>.</td>
 <td>—</td>
+</tr>
+<tr>
+<td><code>context/axis_units.py</code></td>
+<td><code>AxisUnits</code>: values in units to steps of the axis, and rates asked from the engine (<code>Model.axis_units</code>).</td>
+<td>Formulas of a rate per engine (they are in <code>RateMeaning</code>).</td>
 </tr>
 <tr>
 <td><code>context/engine.py</code></td>

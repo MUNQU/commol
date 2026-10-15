@@ -2,7 +2,7 @@
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-A Commol model is a set of **compartments** that each hold an **amount**, and **transitions** that move amounts between them at each step. The amounts of every compartment together are the **state** of the model, and their sum is the **total**. An amount can be a count, a mass or a concentration. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
+A Commol model is a set of **compartments** that each hold an **amount**, and **transitions** that move amounts between them along the **axis**, the independent variable of the model (time is the most common one). The amounts of every compartment together are the **state** of the model, and their sum is the **total**. An amount can be a count, a mass or a concentration. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
 
 ## The concepts at a glance
 
@@ -46,9 +46,9 @@ builder = (
 
 ## Transitions
 
-A transition moves an amount from its `source` compartments to its `target` compartments at each step. How much it moves depends on its rate:
+A transition moves an amount from its `source` compartments to its `target` compartments along the axis. How much it moves depends on its rate:
 
-| The rate…                                   | Kind             | Flow per step   | Example                |
+| The rate…                                   | Kind             | Flow            | Example                |
 | ------------------------------------------- | ---------------- | --------------- | ---------------------- |
 | names a compartment, a bin total or `total` | **Absolute**     | the rate itself | `"k1 * A * B / total"` |
 | names no compartment                        | **Proportional** | rate × source   | `"k2"` moves `k2 × B`  |
@@ -134,6 +134,17 @@ Two engines run a compartmental model, with the same structure:
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
 
 See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).
+
+### What a rate means
+
+A flow is per unit of the axis in every engine, and the unit check is the same for both. What its value means is the engine's (`rate_meaning` of the engine's list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
+
+| Engine                  | `rate_meaning` | A flow of value `f`                                                                          | Equation                  |
+| ----------------------- | -------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
+| `DifferenceEquations`   | `per_step`     | Moves `f` in one step: the flow of an absolute rate, or `f × source` for a proportional rate | `X(n+1) = X(n) + Σ flows` |
+| `DifferentialEquations` | `continuous`   | Is the instantaneous rate of change: over a short span `Δ` it moves about `f × Δ`            | `dX/dt = Σ flows`         |
+
+So one rate gives two different dynamics: a proportional rate `k` keeps `(1 - k)^n` of its source after `n` steps in a difference model, and `exp(-k n)` in a differential model. To find the rate that gives a mean span or a probability over a period in the engine of a model, use [`AxisUnits`](#units-of-the-axis): it asks the engine.
 
 ## Stratifications
 
@@ -366,51 +377,53 @@ outflow = (
 print([t.id for t in outflow.structure.transitions])  # ['outflow__A', 'outflow__B']
 ```
 
-## Steps and physical time
+## Units of the axis
 
-A model knows only steps: a rate is per step and a period is a number of steps. `TimeScale` gives a step a duration, and converts physical quantities to the step counts and per-step rates a model needs:
-
-```python
-from commol import TimeScale
-
-scale = TimeScale(step_seconds=60 * 60)  # one hour per step
-
-print(scale.steps_per_day)        # 24
-print(scale.steps_per_week)       # 168
-print(scale.steps_from_days(3))   # 72
-```
-
-A period that is not a whole number of steps raises instead of rounding, so a step size that cannot express a period fails early:
+A model knows only steps: a rate is per step, and a position or a period is a number of steps. `AxisUnits` converts values in units to steps, and gives the rate that the engine of a model reads. `Model.axis_units()` gives the one of a model: its `step_unit` (or `step` when it declares none) and its engine.
 
 ```python
-daily = TimeScale(step_seconds=24 * 60 * 60)
-try:
-    daily.steps_from_hours(1)
-except ValueError as error:
-    print(error)
+from commol import AxisUnits
+
+hourly = AxisUnits(step_unit="hour")
+
+print(hourly.steps(1, "day"))     # 24.0
+print(hourly.steps(3, "day"))     # 72.0
+print(hourly.steps(30, "minute")) # 0.5
+
+along_a_line = AxisUnits(step_unit="meter")
+print(along_a_line.steps(2, "km"))  # 2000.0
 ```
 
-| Method                                   | Returns                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------- |
-| `rate_from_mean_duration(seconds)`       | `1 - exp(-step / duration)`: the per-step rate for a mean time in a state       |
-| `rate_from_probability(p, period_steps)` | `1 - (1 - p) ** (1 / period_steps)`: applied over the period, it gives back `p` |
+`steps` works for any dimension, and raises `ValueError` for a unit of another dimension than the step, naming both units. It returns a `float`: whether a position must be a whole number of steps is the engine's check, made where the position is used. A result within `1e-9` of an integer is that integer.
+
+The rate conversions ask the engine what a rate means ([What a rate means](#what-a-rate-means)):
+
+| Method                                   | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
+| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `rate_from_mean_span(span, unit)`        | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
+| `rate_from_probability(p, period, unit)` | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
+
+```python
+difference = AxisUnits(step_unit="day", engine="DifferenceEquations")
+differential = AxisUnits(step_unit="day", engine="DifferentialEquations")
+
+print(difference.rate_from_mean_span(4, "day"))    # 0.2212 = 1 - exp(-1/4)
+print(differential.rate_from_mean_span(4, "day"))  # 0.25
+print(difference.rate_from_probability(0.3, 1, "week"))
+print(differential.rate_from_probability(0.3, 1, "week"))
+```
+
+With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
+
+The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
 
 ```python
 from commol import window_end, window_index, window_start
 
-print(scale.rate_from_mean_duration(4 * 24 * 60 * 60))  # mean of 4 days
-print(scale.rate_from_probability(0.3, scale.steps_per_week))
-
-week = scale.steps_per_week
+week = int(hourly.steps(1, "week"))
 print(window_start(0, week), window_end(0, week))  # 0 168
 print(window_index(168, week))                     # 0
 ```
-
-The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
-
-Rates for difference models only
-
-`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities, which a `DifferenceEquations` model applies once per step. A `DifferentialEquations` model integrates its rates in continuous time, so it needs the continuous rate: `1 / duration` for a mean duration and `-ln(1 - p) / period` for a probability `p` over a period, both in steps. With the per-step value, the model moves too little.
 
 A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
 

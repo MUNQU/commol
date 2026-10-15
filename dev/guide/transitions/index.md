@@ -54,7 +54,7 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.git
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                                       | Kind         | Flow per step   |
+| Case                                                                       | Kind         | Flow            |
 | -------------------------------------------------------------------------- | ------------ | --------------- |
 | The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute     | `rate`          |
 | The transition has no source                                               | Absolute     | `rate`          |

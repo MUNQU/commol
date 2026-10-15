@@ -201,26 +201,26 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## What each call does
 
-| Call                                              | What it does                                                                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                              |
-| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                          |
-| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                           |
-| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
-| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                            |
-| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                               |
-| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                           |
-| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                             |
+| Call                                              | What it does                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
+| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
+| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
+| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
+| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
+| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                                                                                                                                                                                                       |
+| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                                                                                                                                                                                                   |
+| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
 
 ## Check units
 
-Give every bin and parameter a unit, and Commol checks that each rate gives the bin unit per unit of time:
+Give every bin and parameter a unit, and the unit of one step, and Commol checks that each rate gives the bin unit per step unit:
 
 ```python
 model_with_units = (
-    ModelBuilder(name="Model with Units", version="1.0", bin_unit="item")
+    ModelBuilder(name="Model with Units", version="1.0", bin_unit="item", step_unit="day")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -242,7 +242,7 @@ model_with_units = (
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
 ```
 
-The check catches rates that mix time scales or pass a quantity with units to a function that needs a plain number. See [Unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking).
+The check catches rates in another unit than the step unit, and quantities with units passed to a function that needs a plain number. See [Unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking).
 
 ## Calibrate unknown parameters
 
@@ -343,7 +343,7 @@ See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-A Commol model is a set of **compartments** that each hold an **amount**, and **transitions** that move amounts between them at each step. The amounts of every compartment together are the **state** of the model, and their sum is the **total**. An amount can be a count, a mass or a concentration. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
+A Commol model is a set of **compartments** that each hold an **amount**, and **transitions** that move amounts between them along the **axis**, the independent variable of the model (time is the most common one). The amounts of every compartment together are the **state** of the model, and their sum is the **total**. An amount can be a count, a mass or a concentration. This page explains each building block once, with a runnable example. For every option of every method, see [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md).
 
 ## The concepts at a glance
 
@@ -387,9 +387,9 @@ builder = (
 
 ## Transitions
 
-A transition moves an amount from its `source` compartments to its `target` compartments at each step. How much it moves depends on its rate:
+A transition moves an amount from its `source` compartments to its `target` compartments along the axis. How much it moves depends on its rate:
 
-| The rate…                                   | Kind             | Flow per step   | Example                |
+| The rate…                                   | Kind             | Flow            | Example                |
 | ------------------------------------------- | ---------------- | --------------- | ---------------------- |
 | names a compartment, a bin total or `total` | **Absolute**     | the rate itself | `"k1 * A * B / total"` |
 | names no compartment                        | **Proportional** | rate × source   | `"k2"` moves `k2 × B`  |
@@ -475,6 +475,17 @@ Two engines run a compartmental model, with the same structure:
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
 
 See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations).
+
+### What a rate means
+
+A flow is per unit of the axis in every engine, and the unit check is the same for both. What its value means is the engine's (`rate_meaning` of the engine's list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
+
+| Engine                  | `rate_meaning` | A flow of value `f`                                                                          | Equation                  |
+| ----------------------- | -------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
+| `DifferenceEquations`   | `per_step`     | Moves `f` in one step: the flow of an absolute rate, or `f × source` for a proportional rate | `X(n+1) = X(n) + Σ flows` |
+| `DifferentialEquations` | `continuous`   | Is the instantaneous rate of change: over a short span `Δ` it moves about `f × Δ`            | `dX/dt = Σ flows`         |
+
+So one rate gives two different dynamics: a proportional rate `k` keeps `(1 - k)^n` of its source after `n` steps in a difference model, and `exp(-k n)` in a differential model. To find the rate that gives a mean span or a probability over a period in the engine of a model, use [`AxisUnits`](#units-of-the-axis): it asks the engine.
 
 ## Stratifications
 
@@ -707,51 +718,53 @@ outflow = (
 print([t.id for t in outflow.structure.transitions])  # ['outflow__A', 'outflow__B']
 ```
 
-## Steps and physical time
+## Units of the axis
 
-A model knows only steps: a rate is per step and a period is a number of steps. `TimeScale` gives a step a duration, and converts physical quantities to the step counts and per-step rates a model needs:
-
-```python
-from commol import TimeScale
-
-scale = TimeScale(step_seconds=60 * 60)  # one hour per step
-
-print(scale.steps_per_day)        # 24
-print(scale.steps_per_week)       # 168
-print(scale.steps_from_days(3))   # 72
-```
-
-A period that is not a whole number of steps raises instead of rounding, so a step size that cannot express a period fails early:
+A model knows only steps: a rate is per step, and a position or a period is a number of steps. `AxisUnits` converts values in units to steps, and gives the rate that the engine of a model reads. `Model.axis_units()` gives the one of a model: its `step_unit` (or `step` when it declares none) and its engine.
 
 ```python
-daily = TimeScale(step_seconds=24 * 60 * 60)
-try:
-    daily.steps_from_hours(1)
-except ValueError as error:
-    print(error)
+from commol import AxisUnits
+
+hourly = AxisUnits(step_unit="hour")
+
+print(hourly.steps(1, "day"))     # 24.0
+print(hourly.steps(3, "day"))     # 72.0
+print(hourly.steps(30, "minute")) # 0.5
+
+along_a_line = AxisUnits(step_unit="meter")
+print(along_a_line.steps(2, "km"))  # 2000.0
 ```
 
-| Method                                   | Returns                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------- |
-| `rate_from_mean_duration(seconds)`       | `1 - exp(-step / duration)`: the per-step rate for a mean time in a state       |
-| `rate_from_probability(p, period_steps)` | `1 - (1 - p) ** (1 / period_steps)`: applied over the period, it gives back `p` |
+`steps` works for any dimension, and raises `ValueError` for a unit of another dimension than the step, naming both units. It returns a `float`: whether a position must be a whole number of steps is the engine's check, made where the position is used. A result within `1e-9` of an integer is that integer.
+
+The rate conversions ask the engine what a rate means ([What a rate means](#what-a-rate-means)):
+
+| Method                                   | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
+| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `rate_from_mean_span(span, unit)`        | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
+| `rate_from_probability(p, period, unit)` | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
+
+```python
+difference = AxisUnits(step_unit="day", engine="DifferenceEquations")
+differential = AxisUnits(step_unit="day", engine="DifferentialEquations")
+
+print(difference.rate_from_mean_span(4, "day"))    # 0.2212 = 1 - exp(-1/4)
+print(differential.rate_from_mean_span(4, "day"))  # 0.25
+print(difference.rate_from_probability(0.3, 1, "week"))
+print(differential.rate_from_probability(0.3, 1, "week"))
+```
+
+With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
+
+The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
 
 ```python
 from commol import window_end, window_index, window_start
 
-print(scale.rate_from_mean_duration(4 * 24 * 60 * 60))  # mean of 4 days
-print(scale.rate_from_probability(0.3, scale.steps_per_week))
-
-week = scale.steps_per_week
+week = int(hourly.steps(1, "week"))
 print(window_start(0, week), window_end(0, week))  # 0 168
 print(window_index(168, week))                     # 0
 ```
-
-The window grid (`window_start`, `window_end`, `window_index`) is in `py-commol/commol/api/windows.py`; see [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals).
-
-Rates for difference models only
-
-`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities, which a `DifferenceEquations` model applies once per step. A `DifferentialEquations` model integrates its rates in continuous time, so it needs the continuous rate: `1 / duration` for a mean duration and `-ln(1 - p) / period` for a probability `p` over a period, both in steps. With the per-step value, the model moves too little.
 
 A window covers the positions `(start, end]`, the same interval that [windowed observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#counts-per-period-windows) use.
 
@@ -1172,7 +1185,7 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.git
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                                       | Kind         | Flow per step   |
+| Case                                                                       | Kind         | Flow            |
 | -------------------------------------------------------------------------- | ------------ | --------------- |
 | The rate names a compartment, a bin total, `total` or a `total_…` variable | Absolute     | `rate`          |
 | The transition has no source                                               | Absolute     | `rate`          |
@@ -2032,7 +2045,7 @@ Commol can check that every rate has the right units, and can print the equation
 from commol import ModelBuilder
 
 model = (
-    ModelBuilder(name="Model with Units", bin_unit="item")
+    ModelBuilder(name="Model with Units", bin_unit="item", step_unit="day")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -2057,7 +2070,7 @@ model.print_equations()
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -2067,29 +2080,31 @@ model.print_equations()
 | `total`, `total_<category>…` | The bin unit, automatically                                                                                        |
 | Constant parameters          | `add_parameter(unit=...)`. Required: the check raises if one is missing.                                           |
 | Formula parameters           | Inferred from the formula; a unit is optional                                                                      |
-| `step`, `t`, `pi`, `e`       | Dimensionless, automatically                                                                                       |
+| `t`                          | The step unit, automatically: it is a position on the axis                                                         |
+| `step`, `pi`, `e`            | Dimensionless, automatically: `step` counts increments                                                             |
 
-| Unit                              | Use for                                           |
-| --------------------------------- | ------------------------------------------------- |
-| `"1/day"`, `"1/week"`, `"1/step"` | Rates                                             |
-| `"dimensionless"`                 | Ratios, fractions, amplitudes, function arguments |
-| Any word, such as `"item"`        | A custom unit for bins; Commol registers it       |
+| Unit                                                   | Use for                                           |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `"1/day"`, `"1/week"`, `"1/step"`                      | Rates                                             |
+| `"dimensionless"`                                      | Ratios, fractions, amplitudes, function arguments |
+| Any word that `pint` does not define, such as `"item"` | A unit of its own dimension; Commol registers it  |
+
+A unit means what [`pint`](https://pint.readthedocs.io/) defines, for time as for any other quantity: `month`, `year` and `fortnight` are units of time, but `quarter` is a unit of mass and `decade` is a number. A word that `pint` does not define, such as `mo`, becomes a unit of its own dimension, which no other unit converts to.
 
 ### The step unit
 
-The engine applies every flow once per step and converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`).
+The engine converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`).
 
-The axis of a model is its independent variable: the quantity the model steps along or differentiates over. Time is one case; a length, a dose or any other quantity is another. So the step unit may have any single dimension. Declare it with `ModelBuilder(..., step_unit="meter")` (`Model.step_unit`); `check_step_unit` accepts one unit of one dimension with exponent 1, such as `day` or `meter`, and rejects `1/day` or `meter**2`. When it is not declared, the check infers it from the parameters:
+The axis of a model is its independent variable: the quantity the model steps along or differentiates over. Time is one case; a length, a dose or any other quantity is another. So the step unit may have any single dimension. Declare it with `ModelBuilder(..., step_unit="day")` (`Model.step_unit`); `check_step_unit` accepts one unit of one dimension with exponent 1, such as `day` or `meter`, and rejects `1/day` or `meter**2`. A model that declares no step unit has the step unit `step`, the default increment of any axis, of its own dimension `[step]`. The check never guesses the step unit from the parameters.
 
-| Parameter units                                        | Step unit | Result                                       |
-| ------------------------------------------------------ | --------- | -------------------------------------------- |
-| All in one unit of time, such as `"1/day"` and `"day"` | `day`     | Flows must be `<bin unit>/day`               |
-| All in `"1/week"`                                      | `week`    | Accepted: one step is one week               |
-| All in `"1/step"`                                      | `step`    | Accepted                                     |
-| No unit of time                                        | `step`    | Flows must be `<bin unit>/step`              |
-| `"1/day"` and `"1/week"`, or `"1/day"` and `"1/step"`  | —         | Error that names each parameter and its unit |
+| Model                                     | Step unit | Flows must be                                                                     |
+| ----------------------------------------- | --------- | --------------------------------------------------------------------------------- |
+| `step_unit="day"`                         | `day`     | `<bin unit>/day`: a rate in `1/d` passes, a rate in `1/week` or `1/quarter` fails |
+| `step_unit="meter"`                       | `meter`   | `<bin unit>/meter`                                                                |
+| No `step_unit`, rates in `1/step` or none | `step`    | `<bin unit>/step`                                                                 |
+| No `step_unit`, rates in `1/day`          | `step`    | Fails; the error says to declare `step_unit`                                      |
 
-Inference looks only at units of time: a unit of dimension `[time]` (`second`, `hour`, `day`, `week`, `month`, `year`, …) or `step`. A rate in `1/meter` needs `step_unit="meter"`; without it the step unit is `step` and the flow fails. Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `item/week` does not match `item/day`, because the engine would apply a weekly rate every day.
+Two names of one unit, such as `d` and `day`, are one unit. A flow must have exactly the expected unit: `item/week` does not match `item/day`, because the engine would read a weekly rate as a daily one.
 
 ```python
 along_a_line = (
@@ -2107,7 +2122,13 @@ along_a_line = (
 along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
 ```
 
-`TimeScale.from_step_unit(unit)` gives the time scale of a step unit of time, and raises `ValueError` for a unit of another dimension, such as `meter`.
+`Model.axis_units()` converts values in units of the step dimension to steps, and gives the rates the engine reads; see [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
+
+### Positions and numbers in a rate
+
+`t` is a position on the axis, so it has the step unit: with `step_unit="day"`, `k * t * A` passes when `k` is in `1/day**2`. `step` counts increments and is dimensionless.
+
+A number written in a rate and added to, subtracted from or compared with a quantity is read in the unit of that quantity, as the engine reads it: `if(t >= 10, k, 0)` compares `t` with 10 days, and `t - 3` is 3 days before `t`. The two branches of `if` and the arguments of `min` and `max` must share a unit, and a written `0` takes the unit of the other branch. A number that a function computes, such as `exp(2)`, stays dimensionless.
 
 ### Impulses
 
@@ -2119,7 +2140,7 @@ An impulse moves an amount at once, so its rate must have the bin unit: `p * A` 
 from commol.utils.equations import UnitConsistencyError
 
 wrong_units = (
-    ModelBuilder(name="Wrong units", bin_unit="item")
+    ModelBuilder(name="Wrong units", bin_unit="item", step_unit="day")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.5, unit="day")  # should be "1/day"
@@ -2139,16 +2160,16 @@ except UnitConsistencyError as error:
     print(error)
 ```
 
-| Error                                                                               | Cause                                                                    |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'`         | A rate with the wrong unit                                               |
-| `Cannot convert from 'item' to 'dimensionless'`                                     | A function such as `sin`, `exp` or `log` received a quantity with a unit |
-| `The following constant parameters are missing units: …`                            | A constant parameter has no unit                                         |
-| `The following bins have no unit: …`                                                | A bin has no unit (set `bin_unit`)                                       |
-| `the parameters use more than one unit of time ('k1' in '1/day', 'k2' in '1/week')` | Rates in two units of time; see [The step unit](#the-step-unit)          |
-| `Variable '…' … has no defined unit`                                                | A variable of a rate has no unit                                         |
+| Error                                                                       | Cause                                                                                    |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'` | A rate with the wrong unit                                                               |
+| `Cannot convert from 'item' to 'dimensionless'`                             | A function such as `sin`, `exp` or `log` received a quantity with a unit                 |
+| `The following constant parameters are missing units: …`                    | A constant parameter has no unit                                                         |
+| `The following bins have no unit: …`                                        | A bin has no unit (set `bin_unit`)                                                       |
+| `The model declares no step unit, so it is 'step'`                          | Rates in a unit such as `1/day` without `step_unit`; see [The step unit](#the-step-unit) |
+| `Variable '…' … has no defined unit`                                        | A variable of a rate has no unit                                                         |
 
-To pass a quantity to a function, make it dimensionless first, for example `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in `"dimensionless"`.
+To pass a quantity to a function, make it dimensionless first, for example `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in `"dimensionless"`, or `sin(2 * pi * t / period)` with `period` in the step unit.
 
 ## Printing equations
 
@@ -2466,7 +2487,7 @@ A `"step_function"` or `"linear"` [series](https://munqu.github.io/commol/latest
 
 A rate can also jump where `t` reaches a value that it compares `t` with, such as `if(t >= t_on, k1, 0)`. The engine restarts the integration there too, so the solver cannot step over a short window. This works when the value reads only numbers, `pi`, `e` and parameters with a constant or calibrated value, and `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump that depends on the state, such as `if(t >= A, ...)`, is not found.
 
-`TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step probabilities for difference models. A differential model needs the continuous rate; see [Steps and physical time](https://munqu.github.io/commol/latest/guide/core-concepts/#steps-and-physical-time).
+A rate of a differential model is continuous, not a fraction per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). `Model.axis_units()` gives the rate that the engine of a model reads from a mean span or a probability over a period; see [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
 
 ```python
 from commol import AxisPattern
@@ -4578,7 +4599,7 @@ Every public name of `commol`, generated from the docstrings. The guide pages ex
 | [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)                              | `Simulation`, `SimulationResults`, `OdeSolver`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals`                                                                                                                                                                                                                   |
 | [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)                                  | `SimulationPlotter`, `PlotConfig`                                                                                                                                                                                                                                                                                                                |
 | [AxisPattern](https://munqu.github.io/commol/latest/api/axis-patterns/index.md)                          | `AxisPattern`                                                                                                                                                                                                                                                                                                                                    |
-| [TimeScale](https://munqu.github.io/commol/latest/api/time-scale/index.md)                               | `TimeScale`                                                                                                                                                                                                                                                                                                                                      |
+| [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)                               | `AxisUnits`                                                                                                                                                                                                                                                                                                                                      |
 | [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)                             | `Calibrator`, `CalibrationProblem`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `LossFunction`, `OptimizationAlgorithm`                                                                                                                                |
 | [Probabilistic Calibration](https://munqu.github.io/commol/latest/api/probabilistic-calibrator/index.md) | `ProbabilisticCalibrationConfig`, `ProbEvaluationFilterConfig`, `ProbClusteringConfig`, `ProbRepresentativeConfig`, `ProbNsga2Config`, `ProbGreedyLocalSearchConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics`, `CalibrationEvaluation`, `ci_percentiles`, `member_statistics` |
 | [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                                    | `applied_parameters_report`, `simulation_report`                                                                                                                                                                                                                                                                                                 |
@@ -5294,6 +5315,493 @@ def from_formula(
     wrapped = f"({expr})"
     validate_expression_security(wrapped, config)
     return _ComputedAxisPattern(computed_formula=wrapped)
+```
+
+# AxisUnits API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+Converts values in units to steps of a model axis, and gives the rate that an engine reads from a mean span or a probability over a period. Guide: [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
+
+## AxisUnits
+
+Bases: `BaseModel`
+
+The unit of one step on a model axis, and the engine that reads its rates.
+
+The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads.
+
+`Model.axis_units` builds the one of a model: its `step_unit` and its engine.
+
+Attributes:
+
+| Name        | Type  | Description                                                                                                          |
+| ----------- | ----- | -------------------------------------------------------------------------------------------------------------------- |
+| `step_unit` | `str` | Unit of one step, of one dimension with exponent 1. A name that pint does not define is a unit of its own dimension. |
+| `engine`    | \`str | None\`                                                                                                               |
+
+Examples:
+
+```pycon
+>>> hours = AxisUnits(step_unit="hour")
+>>> hours.steps(3, "day")
+72.0
+>>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
+>>> daily.rate_from_mean_span(2, "week")
+0.07142857142857142
+```
+
+Source code in `commol/context/axis_units.py`
+
+```python
+class AxisUnits(BaseModel):
+    """
+    The unit of one step on a model axis, and the engine that reads its rates.
+
+    The axis of a model is its independent variable, of any quantity: time
+    (``"day"``), a length (``"meter"``) or ``"step"``, the default increment.
+    `steps` converts a value in a unit of the same dimension to steps.
+    `rate_from_mean_span` and `rate_from_probability` ask the engine what a
+    rate means (`rate_meaning`) and give the rate it reads.
+
+    `Model.axis_units` builds the one of a model: its ``step_unit`` and its
+    engine.
+
+    Attributes
+    ----------
+    step_unit : str
+        Unit of one step, of one dimension with exponent 1. A name that
+        `pint` does not define is a unit of its own dimension.
+    engine : str | None
+        Name of the engine that reads the rates, such as
+        ``"DifferenceEquations"``. None allows only `steps`.
+
+    Examples
+    --------
+    >>> hours = AxisUnits(step_unit="hour")
+    >>> hours.steps(3, "day")
+    72.0
+    >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
+    >>> daily.rate_from_mean_span(2, "week")
+    0.07142857142857142
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    step_unit: str = Field(
+        default=DEFAULT_STEP_UNIT, description="Unit of one step on the axis."
+    )
+    engine: str | None = Field(
+        default=None, description="Name of the engine that reads the rates."
+    )
+
+    @model_validator(mode="after")
+    def check_units_and_engine(self) -> Self:
+        """Check the step unit, and ask the engine's list for the engine."""
+        define_units(self.step_unit)
+        check_step_unit(self.step_unit)
+        if self.engine is not None:
+            commol_rs.engine.EngineType(self.engine)
+        return self
+
+    def steps(self, value: float, unit: str) -> float:
+        """
+        Number of steps that a value in `unit` spans on the axis.
+
+        A result within ``1e-9`` of an integer is that integer, so
+        ``steps(4.1, "hour")`` with a step of ``minute`` is ``246.0``, not
+        ``245.99999999999997``. Whether a position must be a whole number of
+        steps is the engine's check.
+
+        Parameters
+        ----------
+        value : float
+            The value, in `unit`.
+        unit : str
+            A unit of the dimension of the step unit, such as ``"day"`` for a
+            step of ``"hour"``.
+
+        Returns
+        -------
+        float
+            The value in steps.
+
+        Raises
+        ------
+        ValueError
+            If `unit` has another dimension than the step unit; the message
+            names both units, and says to declare a step unit when the step
+            unit is ``step``.
+        """
+        define_units(unit)
+        try:
+            quantity = ureg.Quantity(float(value), ureg.parse_units(unit))
+            result = float(quantity.to(ureg.parse_units(self.step_unit)).magnitude)
+        except Exception as error:
+            message = (
+                f"Cannot convert {value} {unit} to steps of '{self.step_unit}': "
+                f"'{unit}' has dimension "
+                f"{ureg.parse_units(unit).dimensionality} and '{self.step_unit}' "
+                f"has dimension {ureg.parse_units(self.step_unit).dimensionality}."
+            )
+            if self.step_unit == DEFAULT_STEP_UNIT:
+                message += (
+                    " Declare the unit of a step (step_unit in ModelBuilder) "
+                    "to convert values in that unit."
+                )
+            raise ValueError(message) from error
+        nearest = round(result)
+        if math.isclose(result, nearest, rel_tol=0.0, abs_tol=WHOLE_STEP_TOLERANCE):
+            return float(nearest)
+        return result
+
+    def rate_from_mean_span(self, span: float, unit: str) -> float:
+        """
+        Rate of one outflow whose residence has a mean `span` on the axis.
+
+        The engine says what a rate means (`rate_meaning`). For a per-step
+        rate (``DifferenceEquations``) it is ``1 - exp(-1/n)``, with `span`
+        equal to ``n`` steps: the bin keeps ``exp(-k/n)`` of its start at each
+        step ``k``, as the continuous process does, and its mean residence is
+        ``1/rate`` steps, a little more than ``n``. For a continuous rate
+        (``DifferentialEquations``) it is ``1/n``.
+
+        Parameters
+        ----------
+        span : float
+            Mean span of the residence, in `unit`.
+        unit : str
+            Unit of `span`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            The rate, per step.
+
+        Raises
+        ------
+        ValueError
+            If there is no engine, `unit` has another dimension than the step
+            unit, or `span` is not positive.
+        """
+        return self._engine_type().rate_from_mean_span(self.steps(span, unit))
+
+    def rate_from_probability(
+        self, probability: float, period: float, unit: str
+    ) -> float:
+        """
+        Rate of one outflow that moves `probability` of the bin over a period.
+
+        The engine says what a rate means (`rate_meaning`). For a per-step
+        rate (``DifferenceEquations``) it is ``1 - (1 - p)^(1/n)``, with the
+        period equal to ``n`` steps; for a continuous rate
+        (``DifferentialEquations``) it is ``-ln(1 - p)/n``. Either way the
+        bin keeps ``1 - p`` of its start after the period.
+
+        Parameters
+        ----------
+        probability : float
+            Fraction of the bin that leaves over the period, between 0 and 1.
+            A continuous rate needs it below 1.
+        period : float
+            Length of the period, in `unit`.
+        unit : str
+            Unit of `period`, of the dimension of the step unit.
+
+        Returns
+        -------
+        float
+            The rate, per step.
+
+        Raises
+        ------
+        ValueError
+            If there is no engine, `unit` has another dimension than the step
+            unit, `period` is not positive, or `probability` is outside the
+            range the engine accepts.
+        """
+        return self._engine_type().rate_from_probability(
+            probability, self.steps(period, unit)
+        )
+
+    @property
+    def rate_meaning(self) -> str:
+        """
+        What a rate means to the engine: ``"per_step"`` or ``"continuous"``.
+
+        Raises
+        ------
+        ValueError
+            If there is no engine.
+        """
+        return self._engine_type().rate_meaning
+
+    def _engine_type(self) -> "EngineTypeProtocol":
+        if self.engine is None:
+            raise ValueError(
+                "A rate needs the engine that reads it: give AxisUnits an "
+                "engine, or use Model.axis_units()."
+            )
+        return commol_rs.engine.EngineType(self.engine)
+```
+
+### Attributes
+
+#### rate_meaning
+
+```python
+rate_meaning: str
+```
+
+What a rate means to the engine: `"per_step"` or `"continuous"`.
+
+Raises:
+
+| Type         | Description            |
+| ------------ | ---------------------- |
+| `ValueError` | If there is no engine. |
+
+### Methods:
+
+#### check_units_and_engine
+
+```python
+check_units_and_engine() -> Self
+```
+
+Check the step unit, and ask the engine's list for the engine.
+
+Source code in `commol/context/axis_units.py`
+
+```python
+@model_validator(mode="after")
+def check_units_and_engine(self) -> Self:
+    """Check the step unit, and ask the engine's list for the engine."""
+    define_units(self.step_unit)
+    check_step_unit(self.step_unit)
+    if self.engine is not None:
+        commol_rs.engine.EngineType(self.engine)
+    return self
+```
+
+#### steps
+
+```python
+steps(value: float, unit: str) -> float
+```
+
+Number of steps that a value in `unit` spans on the axis.
+
+A result within `1e-9` of an integer is that integer, so `steps(4.1, "hour")` with a step of `minute` is `246.0`, not `245.99999999999997`. Whether a position must be a whole number of steps is the engine's check.
+
+Parameters:
+
+| Name    | Type    | Description                                                                   | Default    |
+| ------- | ------- | ----------------------------------------------------------------------------- | ---------- |
+| `value` | `float` | The value, in unit.                                                           | *required* |
+| `unit`  | `str`   | A unit of the dimension of the step unit, such as "day" for a step of "hour". | *required* |
+
+Returns:
+
+| Type    | Description         |
+| ------- | ------------------- |
+| `float` | The value in steps. |
+
+Raises:
+
+| Type         | Description                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If unit has another dimension than the step unit; the message names both units, and says to declare a step unit when the step unit is step. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def steps(self, value: float, unit: str) -> float:
+    """
+    Number of steps that a value in `unit` spans on the axis.
+
+    A result within ``1e-9`` of an integer is that integer, so
+    ``steps(4.1, "hour")`` with a step of ``minute`` is ``246.0``, not
+    ``245.99999999999997``. Whether a position must be a whole number of
+    steps is the engine's check.
+
+    Parameters
+    ----------
+    value : float
+        The value, in `unit`.
+    unit : str
+        A unit of the dimension of the step unit, such as ``"day"`` for a
+        step of ``"hour"``.
+
+    Returns
+    -------
+    float
+        The value in steps.
+
+    Raises
+    ------
+    ValueError
+        If `unit` has another dimension than the step unit; the message
+        names both units, and says to declare a step unit when the step
+        unit is ``step``.
+    """
+    define_units(unit)
+    try:
+        quantity = ureg.Quantity(float(value), ureg.parse_units(unit))
+        result = float(quantity.to(ureg.parse_units(self.step_unit)).magnitude)
+    except Exception as error:
+        message = (
+            f"Cannot convert {value} {unit} to steps of '{self.step_unit}': "
+            f"'{unit}' has dimension "
+            f"{ureg.parse_units(unit).dimensionality} and '{self.step_unit}' "
+            f"has dimension {ureg.parse_units(self.step_unit).dimensionality}."
+        )
+        if self.step_unit == DEFAULT_STEP_UNIT:
+            message += (
+                " Declare the unit of a step (step_unit in ModelBuilder) "
+                "to convert values in that unit."
+            )
+        raise ValueError(message) from error
+    nearest = round(result)
+    if math.isclose(result, nearest, rel_tol=0.0, abs_tol=WHOLE_STEP_TOLERANCE):
+        return float(nearest)
+    return result
+```
+
+#### rate_from_mean_span
+
+```python
+rate_from_mean_span(span: float, unit: str) -> float
+```
+
+Rate of one outflow whose residence has a mean `span` on the axis.
+
+The engine says what a rate means (`rate_meaning`). For a per-step rate (`DifferenceEquations`) it is `1 - exp(-1/n)`, with `span` equal to `n` steps: the bin keeps `exp(-k/n)` of its start at each step `k`, as the continuous process does, and its mean residence is `1/rate` steps, a little more than `n`. For a continuous rate (`DifferentialEquations`) it is `1/n`.
+
+Parameters:
+
+| Name   | Type    | Description                                      | Default    |
+| ------ | ------- | ------------------------------------------------ | ---------- |
+| `span` | `float` | Mean span of the residence, in unit.             | *required* |
+| `unit` | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+
+Returns:
+
+| Type    | Description         |
+| ------- | ------------------- |
+| `float` | The rate, per step. |
+
+Raises:
+
+| Type         | Description                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `ValueError` | If there is no engine, unit has another dimension than the step unit, or span is not positive. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def rate_from_mean_span(self, span: float, unit: str) -> float:
+    """
+    Rate of one outflow whose residence has a mean `span` on the axis.
+
+    The engine says what a rate means (`rate_meaning`). For a per-step
+    rate (``DifferenceEquations``) it is ``1 - exp(-1/n)``, with `span`
+    equal to ``n`` steps: the bin keeps ``exp(-k/n)`` of its start at each
+    step ``k``, as the continuous process does, and its mean residence is
+    ``1/rate`` steps, a little more than ``n``. For a continuous rate
+    (``DifferentialEquations``) it is ``1/n``.
+
+    Parameters
+    ----------
+    span : float
+        Mean span of the residence, in `unit`.
+    unit : str
+        Unit of `span`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        The rate, per step.
+
+    Raises
+    ------
+    ValueError
+        If there is no engine, `unit` has another dimension than the step
+        unit, or `span` is not positive.
+    """
+    return self._engine_type().rate_from_mean_span(self.steps(span, unit))
+```
+
+#### rate_from_probability
+
+```python
+rate_from_probability(probability: float, period: float, unit: str) -> float
+```
+
+Rate of one outflow that moves `probability` of the bin over a period.
+
+The engine says what a rate means (`rate_meaning`). For a per-step rate (`DifferenceEquations`) it is `1 - (1 - p)^(1/n)`, with the period equal to `n` steps; for a continuous rate (`DifferentialEquations`) it is `-ln(1 - p)/n`. Either way the bin keeps `1 - p` of its start after the period.
+
+Parameters:
+
+| Name          | Type    | Description                                                                                           | Default    |
+| ------------- | ------- | ----------------------------------------------------------------------------------------------------- | ---------- |
+| `probability` | `float` | Fraction of the bin that leaves over the period, between 0 and 1. A continuous rate needs it below 1. | *required* |
+| `period`      | `float` | Length of the period, in unit.                                                                        | *required* |
+| `unit`        | `str`   | Unit of period, of the dimension of the step unit.                                                    | *required* |
+
+Returns:
+
+| Type    | Description         |
+| ------- | ------------------- |
+| `float` | The rate, per step. |
+
+Raises:
+
+| Type         | Description                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If there is no engine, unit has another dimension than the step unit, period is not positive, or probability is outside the range the engine accepts. |
+
+Source code in `commol/context/axis_units.py`
+
+```python
+def rate_from_probability(
+    self, probability: float, period: float, unit: str
+) -> float:
+    """
+    Rate of one outflow that moves `probability` of the bin over a period.
+
+    The engine says what a rate means (`rate_meaning`). For a per-step
+    rate (``DifferenceEquations``) it is ``1 - (1 - p)^(1/n)``, with the
+    period equal to ``n`` steps; for a continuous rate
+    (``DifferentialEquations``) it is ``-ln(1 - p)/n``. Either way the
+    bin keeps ``1 - p`` of its start after the period.
+
+    Parameters
+    ----------
+    probability : float
+        Fraction of the bin that leaves over the period, between 0 and 1.
+        A continuous rate needs it below 1.
+    period : float
+        Length of the period, in `unit`.
+    unit : str
+        Unit of `period`, of the dimension of the step unit.
+
+    Returns
+    -------
+    float
+        The rate, per step.
+
+    Raises
+    ------
+    ValueError
+        If there is no engine, `unit` has another dimension than the step
+        unit, `period` is not positive, or `probability` is outside the
+        range the engine accepts.
+    """
+    return self._engine_type().rate_from_probability(
+        probability, self.steps(period, unit)
+    )
 ```
 
 # Calibration API
@@ -7790,8 +8298,9 @@ class ModelBuilder:
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
-            ``<bin unit>/<step_unit>``. None infers it from the parameter units
-            of dimension time.
+            ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+            values to steps of it. None means ``step``, the default increment
+            of any axis.
         """
         self._name: str = name
         self._description: str | None = description
@@ -8053,8 +8562,10 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per step, and that value is applied to
-        all source compartments at once.
+        The rate is evaluated once, at each position the engine reads it, and
+        that value applies to all source compartments at once. What the value
+        means (an amount moved in one step or an instantaneous rate) is the
+        engine's; see "What a rate means" in the Core Concepts guide.
 
         When you use the $compartment placeholder in the rate formula with multiple
         sources, the system automatically expands this into multiple independent
@@ -8666,13 +9177,13 @@ Initialize the ModelBuilder.
 
 Parameters:
 
-| Name          | Type  | Description                                | Default                                                                                                                                                                                                            |
-| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                         |
-| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                  |
-| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                   |
-| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                    |
-| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>. None infers it from the parameter units of dimension time. |
+| Name          | Type  | Description                                | Default                                                                                                                                                                                                                                                            |
+| ------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `str` | The unique name that identifies the model. | *required*                                                                                                                                                                                                                                                         |
+| `description` | \`str | None\`                                     | A human-readable description of the model's purpose and function.                                                                                                                                                                                                  |
+| `version`     | \`str | None\`                                     | The version number of the model.                                                                                                                                                                                                                                   |
+| `bin_unit`    | \`str | None\`                                     | The default unit for all bins. Individual bins can override this with their own unit parameter. Units are optional but required for model.print_equations() and model.check_unit_consistency().                                                                    |
+| `step_unit`   | \`str | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>, and Model.axis_units() converts values to steps of it. None means step, the default increment of any axis. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -8704,8 +9215,9 @@ def __init__(
     step_unit : str | None, default=None
         Unit of one step on the axis, of any single dimension (for example
         ``"day"`` or ``"meter"``). The unit check requires every flow to be
-        ``<bin unit>/<step_unit>``. None infers it from the parameter units
-        of dimension time.
+        ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+        values to steps of it. None means ``step``, the default increment
+        of any axis.
     """
     self._name: str = name
     self._description: str | None = description
@@ -9016,7 +9528,7 @@ Add a transition between states to the model.
 
 This method supports two distinct behaviors:
 
-When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated ONCE per step, and that value is applied to all source compartments at once.
+When you specify multiple sources without the $compartment placeholder, a single transition is created that affects all sources simultaneously. The rate is evaluated once, at each position the engine reads it, and that value applies to all source compartments at once. What the value means (an amount moved in one step or an instantaneous rate) is the engine's; see "What a rate means" in the Core Concepts guide.
 
 When you use the $compartment placeholder in the rate formula with multiple sources, the system automatically expands this into multiple independent transitions - one for each source compartment. Each transition has its own rate calculation where $compartment is replaced with the actual compartment name.
 
@@ -9082,8 +9594,10 @@ def add_transition(
 
     When you specify multiple sources without the $compartment placeholder,
     a single transition is created that affects all sources simultaneously.
-    The rate is evaluated ONCE per step, and that value is applied to
-    all source compartments at once.
+    The rate is evaluated once, at each position the engine reads it, and
+    that value applies to all source compartments at once. What the value
+    means (an amount moved in one step or an instantaneous rate) is the
+    engine's; see "What a rate means" in the Core Concepts guide.
 
     When you use the $compartment placeholder in the rate formula with multiple
     sources, the system automatically expands this into multiple independent
@@ -9679,8 +10193,8 @@ class Model(BaseModel, Generic[StructureT]):
         stratifications and transitions of a compartmental model.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
-        ``"meter"``). The unit check uses it; when None, the check infers it
-        from the parameter units of dimension time (or uses ``step``).
+        ``"meter"``). The unit check and `axis_units` use it; None means
+        ``step``, the default increment of any axis.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -9699,8 +10213,8 @@ class Model(BaseModel, Generic[StructureT]):
         None,
         description=(
             "Unit of one step on the axis (the independent variable, of any "
-            "dimension), for the unit check. "
-            "Inferred from the parameter units when None."
+            "dimension), for the unit check and axis_units. "
+            "None means 'step', the default increment of any axis."
         ),
     )
 
@@ -9932,17 +10446,40 @@ class Model(BaseModel, Generic[StructureT]):
         """
         self.structure.print_equations(self, output_file, format)
 
+    def axis_units(self) -> AxisUnits:
+        """
+        The unit of one step of the model, and its engine, to convert values.
+
+        The step unit is ``step_unit`` or, when the model declares none,
+        ``step``, the default increment of any axis. The engine is the one of
+        the model, so the rates of `AxisUnits` mean what this engine reads.
+
+        Returns
+        -------
+        AxisUnits
+            The converter of the model.
+
+        Examples
+        --------
+        >>> units = model.axis_units()
+        >>> units.steps(2, "week")  # with step_unit="day"
+        14.0
+        >>> gamma = units.rate_from_mean_span(5, "day")
+        """
+        return AxisUnits(
+            step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+        )
+
     def check_unit_consistency(self, verbose: bool = False) -> None:
         """
         Check unit consistency of all equations in the model.
 
         The structure checks them (`ModelStructure.check_unit_consistency`).
-        For a compartmental model, the engine applies every flow once per step
-        and converts no value between units. So the check infers one step unit
-        from the parameter
-        units: the one unit of time (``day``, ``week``, ``step``, …) that they
-        use, or ``step`` when they use none. Every flow must then be exactly
-        ``<bin unit>/<step unit>``, such as ``item/day``.
+        For a compartmental model, the engine converts no value between units.
+        So the check uses one step unit, ``step_unit`` or else ``step``, and
+        every flow must be exactly ``<bin unit>/<step unit>``, such as
+        ``item/day``. The unit is the same for every engine; what the value of
+        a flow means is the engine's.
 
         Parameters
         ----------
@@ -9952,9 +10489,10 @@ class Model(BaseModel, Generic[StructureT]):
         Raises
         ------
         UnitConsistencyError
-            If a constant parameter or a bin has no unit, if the parameters use
-            more than one unit of time (``1/day`` and ``1/week``), or if a flow
-            does not have the unit ``<bin unit>/<step unit>``.
+            If a constant parameter or a bin has no unit, if ``step_unit`` is
+            not one unit of one dimension, or if a flow does not have the unit
+            ``<bin unit>/<step unit>``. Without ``step_unit``, the message
+            says to declare it.
         ValueError
             If the model type doesn't support unit checking.
         NotImplementedError
@@ -9963,7 +10501,9 @@ class Model(BaseModel, Generic[StructureT]):
         Notes
         -----
         - Predefined variables (total, total_g1, etc.) have the bin unit
-        - Position variables (t, step) are dimensionless
+        - ``t``, a position on the axis, has the step unit; a number added
+          to, subtracted from or compared with it is read in that unit
+        - ``step``, a count of increments, is dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
         self.structure.check_unit_consistency(self, verbose)
@@ -10413,6 +10953,59 @@ def print_equations(
     self.structure.print_equations(self, output_file, format)
 ```
 
+#### axis_units
+
+```python
+axis_units() -> AxisUnits
+```
+
+The unit of one step of the model, and its engine, to convert values.
+
+The step unit is `step_unit` or, when the model declares none, `step`, the default increment of any axis. The engine is the one of the model, so the rates of `AxisUnits` mean what this engine reads.
+
+Returns:
+
+| Type        | Description                 |
+| ----------- | --------------------------- |
+| `AxisUnits` | The converter of the model. |
+
+Examples:
+
+```pycon
+>>> units = model.axis_units()
+>>> units.steps(2, "week")  # with step_unit="day"
+14.0
+>>> gamma = units.rate_from_mean_span(5, "day")
+```
+
+Source code in `commol/context/model.py`
+
+```python
+def axis_units(self) -> AxisUnits:
+    """
+    The unit of one step of the model, and its engine, to convert values.
+
+    The step unit is ``step_unit`` or, when the model declares none,
+    ``step``, the default increment of any axis. The engine is the one of
+    the model, so the rates of `AxisUnits` mean what this engine reads.
+
+    Returns
+    -------
+    AxisUnits
+        The converter of the model.
+
+    Examples
+    --------
+    >>> units = model.axis_units()
+    >>> units.steps(2, "week")  # with step_unit="day"
+    14.0
+    >>> gamma = units.rate_from_mean_span(5, "day")
+    """
+    return AxisUnits(
+        step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+    )
+```
+
 #### check_unit_consistency
 
 ```python
@@ -10421,7 +11014,7 @@ check_unit_consistency(verbose: bool = False) -> None
 
 Check unit consistency of all equations in the model.
 
-The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine applies every flow once per step and converts no value between units. So the check infers one step unit from the parameter units: the one unit of time (`day`, `week`, `step`, …) that they use, or `step` when they use none. Every flow must then be exactly `<bin unit>/<step unit>`, such as `item/day`.
+The structure checks them (`ModelStructure.check_unit_consistency`). For a compartmental model, the engine converts no value between units. So the check uses one step unit, `step_unit` or else `step`, and every flow must be exactly `<bin unit>/<step unit>`, such as `item/day`. The unit is the same for every engine; what the value of a flow means is the engine's.
 
 Parameters:
 
@@ -10431,16 +11024,17 @@ Parameters:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `UnitConsistencyError` | If a constant parameter or a bin has no unit, if the parameters use more than one unit of time (1/day and 1/week), or if a flow does not have the unit <bin unit>/<step unit>. |
-| `ValueError`           | If the model type doesn't support unit checking.                                                                                                                               |
-| `NotImplementedError`  | If the kind of the model has no unit check.                                                                                                                                    |
+| Type                   | Description                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UnitConsistencyError` | If a constant parameter or a bin has no unit, if step_unit is not one unit of one dimension, or if a flow does not have the unit <bin unit>/<step unit>. Without step_unit, the message says to declare it. |
+| `ValueError`           | If the model type doesn't support unit checking.                                                                                                                                                            |
+| `NotImplementedError`  | If the kind of the model has no unit check.                                                                                                                                                                 |
 
 Notes
 
 - Predefined variables (total, total_g1, etc.) have the bin unit
-- Position variables (t, step) are dimensionless
+- `t`, a position on the axis, has the step unit; a number added to, subtracted from or compared with it is read in that unit
+- `step`, a count of increments, is dimensionless
 - Mathematical constants (pi, e) are dimensionless
 
 Source code in `commol/context/model.py`
@@ -10451,12 +11045,11 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     Check unit consistency of all equations in the model.
 
     The structure checks them (`ModelStructure.check_unit_consistency`).
-    For a compartmental model, the engine applies every flow once per step
-    and converts no value between units. So the check infers one step unit
-    from the parameter
-    units: the one unit of time (``day``, ``week``, ``step``, …) that they
-    use, or ``step`` when they use none. Every flow must then be exactly
-    ``<bin unit>/<step unit>``, such as ``item/day``.
+    For a compartmental model, the engine converts no value between units.
+    So the check uses one step unit, ``step_unit`` or else ``step``, and
+    every flow must be exactly ``<bin unit>/<step unit>``, such as
+    ``item/day``. The unit is the same for every engine; what the value of
+    a flow means is the engine's.
 
     Parameters
     ----------
@@ -10466,9 +11059,10 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     Raises
     ------
     UnitConsistencyError
-        If a constant parameter or a bin has no unit, if the parameters use
-        more than one unit of time (``1/day`` and ``1/week``), or if a flow
-        does not have the unit ``<bin unit>/<step unit>``.
+        If a constant parameter or a bin has no unit, if ``step_unit`` is
+        not one unit of one dimension, or if a flow does not have the unit
+        ``<bin unit>/<step unit>``. Without ``step_unit``, the message
+        says to declare it.
     ValueError
         If the model type doesn't support unit checking.
     NotImplementedError
@@ -10477,7 +11071,9 @@ def check_unit_consistency(self, verbose: bool = False) -> None:
     Notes
     -----
     - Predefined variables (total, total_g1, etc.) have the bin unit
-    - Position variables (t, step) are dimensionless
+    - ``t``, a position on the axis, has the step unit; a number added
+      to, subtracted from or compared with it is read in that unit
+    - ``step``, a count of increments, is dimensionless
     - Mathematical constants (pi, e) are dimensionless
     """
     self.structure.check_unit_consistency(self, verbose)
@@ -17195,590 +17791,6 @@ def windowed_totals(
     return totals
 ```
 
-# TimeScale API
-
-[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
-
-Converts between physical time and steps. Guide: [Steps and physical time](https://munqu.github.io/commol/latest/guide/core-concepts/#steps-and-physical-time).
-
-## TimeScale
-
-Bases: `BaseModel`
-
-Physical duration of one simulation step.
-
-A model is defined purely in steps. Attaching a duration to a step makes it possible to express periods in physical units, and to convert durations and probabilities into the per-step rates a transition expects.
-
-Units up to a week have a fixed length and are provided directly. Months and years vary in length and have no single definition in step terms; give them as an explicit number of days.
-
-Warnings
-
-`rate_from_mean_duration` and `rate_from_probability` return per-step probabilities for a DifferenceEquations model. A DifferentialEquations model needs a continuous rate instead: `1 / duration` for a mean duration, and `-ln(1 - p) / period` for a probability `p` over a period (both in steps).
-
-Attributes:
-
-| Name           | Type    | Description                                              |
-| -------------- | ------- | -------------------------------------------------------- |
-| `step_seconds` | `float` | Duration represented by one simulation step, in seconds. |
-
-Source code in `commol/api/time_scale.py`
-
-```python
-class TimeScale(BaseModel):
-    """
-    Physical duration of one simulation step.
-
-    A model is defined purely in steps. Attaching a duration to a step makes it
-    possible to express periods in physical units, and to convert durations and
-    probabilities into the per-step rates a transition expects.
-
-    Units up to a week have a fixed length and are provided directly. Months
-    and years vary in length and have no single definition in step terms; give
-    them as an explicit number of days.
-
-    Warnings
-    --------
-    `rate_from_mean_duration` and `rate_from_probability` return per-step
-    probabilities for a DifferenceEquations model. A DifferentialEquations
-    model needs a continuous rate instead: ``1 / duration`` for a mean
-    duration, and ``-ln(1 - p) / period`` for a probability ``p`` over a
-    period (both in steps).
-
-    Attributes
-    ----------
-    step_seconds : float
-        Duration represented by one simulation step, in seconds.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    step_seconds: float = Field(
-        gt=0.0, description="Duration of one simulation step, in seconds."
-    )
-
-    @classmethod
-    def from_step_unit(cls, unit: str) -> "TimeScale":
-        """
-        Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
-
-        The axis of a model is its independent variable and need not be time
-        (``step_unit="meter"``, for example); a time scale applies only when it
-        is time.
-
-        Parameters
-        ----------
-        unit : str
-            Step unit of a model, of dimension time.
-
-        Returns
-        -------
-        TimeScale
-            A scale with ``step_seconds`` equal to one `unit`.
-
-        Raises
-        ------
-        ValueError
-            If `unit` is not a unit of time; the message names it.
-        """
-        from commol.utils.equations import ureg
-
-        try:
-            quantity = ureg.Quantity(1.0, unit)
-        except Exception as error:
-            raise ValueError(f"'{unit}' is not a unit: {error}") from error
-        if quantity.dimensionality != ureg.second.dimensionality:
-            raise ValueError(
-                f"A TimeScale needs a step unit of time; '{unit}' has dimension "
-                f"{quantity.dimensionality}. A model whose axis is not time has "
-                f"no time scale."
-            )
-        return cls(step_seconds=float(quantity.to("second").magnitude))
-
-    def steps_from_seconds(self, seconds: float) -> int:
-        """
-        Number of steps spanning a duration.
-
-        Parameters
-        ----------
-        seconds : float
-            Duration to convert.
-
-        Returns
-        -------
-        int
-            Steps spanning that duration.
-
-        Raises
-        ------
-        ValueError
-            If the duration is not a whole number of steps.
-        """
-        steps = seconds / self.step_seconds
-        rounded = round(steps)
-        if not math.isclose(steps, rounded, rel_tol=0.0, abs_tol=1e-9):
-            raise ValueError(
-                f"A step of {self.step_seconds} seconds does not divide "
-                f"{seconds} seconds into a whole number of steps (got {steps})."
-            )
-        return int(rounded)
-
-    def steps_from_minutes(self, minutes: float) -> int:
-        """Number of steps spanning `minutes` minutes."""
-        return self.steps_from_seconds(minutes * SECONDS_PER_MINUTE)
-
-    def steps_from_hours(self, hours: float) -> int:
-        """Number of steps spanning `hours` hours."""
-        return self.steps_from_seconds(hours * SECONDS_PER_HOUR)
-
-    def steps_from_days(self, days: float) -> int:
-        """Number of steps spanning `days` days."""
-        return self.steps_from_seconds(days * SECONDS_PER_DAY)
-
-    def steps_from_weeks(self, weeks: float) -> int:
-        """Number of steps spanning `weeks` weeks."""
-        return self.steps_from_seconds(weeks * SECONDS_PER_WEEK)
-
-    @property
-    def steps_per_hour(self) -> int:
-        """Steps in one hour."""
-        return self.steps_from_seconds(SECONDS_PER_HOUR)
-
-    @property
-    def steps_per_day(self) -> int:
-        """Steps in one day."""
-        return self.steps_from_seconds(SECONDS_PER_DAY)
-
-    @property
-    def steps_per_week(self) -> int:
-        """Steps in one week."""
-        return self.steps_from_seconds(SECONDS_PER_WEEK)
-
-    def rate_from_mean_duration(self, duration_seconds: float) -> float:
-        """
-        Per-step rate of leaving a state with a given mean residence time.
-
-        Returns ``1 - exp(-step_seconds / duration_seconds)``, the probability
-        that an exponential process of that mean duration fires within one
-        step.
-
-        This is a rate for a DifferenceEquations model only. A
-        DifferentialEquations model needs the continuous rate
-        ``step_seconds / duration_seconds``.
-
-        Parameters
-        ----------
-        duration_seconds : float
-            Mean time spent in the state, in seconds.
-
-        Returns
-        -------
-        float
-            Per-step rate, between 0 and 1.
-
-        Raises
-        ------
-        ValueError
-            If `duration_seconds` is not positive.
-        """
-        if duration_seconds <= 0.0:
-            raise ValueError(
-                f"duration_seconds must be positive, got {duration_seconds}."
-            )
-        return 1.0 - math.exp(-self.step_seconds / duration_seconds)
-
-    def rate_from_probability(self, probability: float, period_steps: int) -> float:
-        """
-        Per-step rate equivalent to a probability over a longer period.
-
-        Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
-        rate that accumulates to `probability` over `period_steps` steps.
-
-        This is a rate for a DifferenceEquations model only. A
-        DifferentialEquations model needs the continuous rate
-        ``-ln(1 - probability) / period_steps``.
-
-        Parameters
-        ----------
-        probability : float
-            Probability of the event over the whole period, between 0 and 1.
-        period_steps : int
-            Length of the period, in steps.
-
-        Returns
-        -------
-        float
-            Per-step rate, between 0 and 1.
-
-        Raises
-        ------
-        ValueError
-            If `probability` is outside [0, 1], or `period_steps` is not
-            positive.
-        """
-        if not 0.0 <= probability <= 1.0:
-            raise ValueError(f"probability must be between 0 and 1, got {probability}.")
-        if period_steps <= 0:
-            raise ValueError(f"period_steps must be positive, got {period_steps}.")
-        return 1.0 - (1.0 - probability) ** (1.0 / period_steps)
-```
-
-### Attributes
-
-#### steps_per_hour
-
-```python
-steps_per_hour: int
-```
-
-Steps in one hour.
-
-#### steps_per_day
-
-```python
-steps_per_day: int
-```
-
-Steps in one day.
-
-#### steps_per_week
-
-```python
-steps_per_week: int
-```
-
-Steps in one week.
-
-### Methods:
-
-#### from_step_unit
-
-```python
-from_step_unit(unit: str) -> TimeScale
-```
-
-Time scale whose step lasts one `unit`, such as `"day"` or `"h"`.
-
-The axis of a model is its independent variable and need not be time (`step_unit="meter"`, for example); a time scale applies only when it is time.
-
-Parameters:
-
-| Name   | Type  | Description                              | Default    |
-| ------ | ----- | ---------------------------------------- | ---------- |
-| `unit` | `str` | Step unit of a model, of dimension time. | *required* |
-
-Returns:
-
-| Type        | Description                                  |
-| ----------- | -------------------------------------------- |
-| `TimeScale` | A scale with step_seconds equal to one unit. |
-
-Raises:
-
-| Type         | Description                                          |
-| ------------ | ---------------------------------------------------- |
-| `ValueError` | If unit is not a unit of time; the message names it. |
-
-Source code in `commol/api/time_scale.py`
-
-```python
-@classmethod
-def from_step_unit(cls, unit: str) -> "TimeScale":
-    """
-    Time scale whose step lasts one `unit`, such as ``"day"`` or ``"h"``.
-
-    The axis of a model is its independent variable and need not be time
-    (``step_unit="meter"``, for example); a time scale applies only when it
-    is time.
-
-    Parameters
-    ----------
-    unit : str
-        Step unit of a model, of dimension time.
-
-    Returns
-    -------
-    TimeScale
-        A scale with ``step_seconds`` equal to one `unit`.
-
-    Raises
-    ------
-    ValueError
-        If `unit` is not a unit of time; the message names it.
-    """
-    from commol.utils.equations import ureg
-
-    try:
-        quantity = ureg.Quantity(1.0, unit)
-    except Exception as error:
-        raise ValueError(f"'{unit}' is not a unit: {error}") from error
-    if quantity.dimensionality != ureg.second.dimensionality:
-        raise ValueError(
-            f"A TimeScale needs a step unit of time; '{unit}' has dimension "
-            f"{quantity.dimensionality}. A model whose axis is not time has "
-            f"no time scale."
-        )
-    return cls(step_seconds=float(quantity.to("second").magnitude))
-```
-
-#### steps_from_seconds
-
-```python
-steps_from_seconds(seconds: float) -> int
-```
-
-Number of steps spanning a duration.
-
-Parameters:
-
-| Name      | Type    | Description          | Default    |
-| --------- | ------- | -------------------- | ---------- |
-| `seconds` | `float` | Duration to convert. | *required* |
-
-Returns:
-
-| Type  | Description                   |
-| ----- | ----------------------------- |
-| `int` | Steps spanning that duration. |
-
-Raises:
-
-| Type         | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `ValueError` | If the duration is not a whole number of steps. |
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def steps_from_seconds(self, seconds: float) -> int:
-    """
-    Number of steps spanning a duration.
-
-    Parameters
-    ----------
-    seconds : float
-        Duration to convert.
-
-    Returns
-    -------
-    int
-        Steps spanning that duration.
-
-    Raises
-    ------
-    ValueError
-        If the duration is not a whole number of steps.
-    """
-    steps = seconds / self.step_seconds
-    rounded = round(steps)
-    if not math.isclose(steps, rounded, rel_tol=0.0, abs_tol=1e-9):
-        raise ValueError(
-            f"A step of {self.step_seconds} seconds does not divide "
-            f"{seconds} seconds into a whole number of steps (got {steps})."
-        )
-    return int(rounded)
-```
-
-#### steps_from_minutes
-
-```python
-steps_from_minutes(minutes: float) -> int
-```
-
-Number of steps spanning `minutes` minutes.
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def steps_from_minutes(self, minutes: float) -> int:
-    """Number of steps spanning `minutes` minutes."""
-    return self.steps_from_seconds(minutes * SECONDS_PER_MINUTE)
-```
-
-#### steps_from_hours
-
-```python
-steps_from_hours(hours: float) -> int
-```
-
-Number of steps spanning `hours` hours.
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def steps_from_hours(self, hours: float) -> int:
-    """Number of steps spanning `hours` hours."""
-    return self.steps_from_seconds(hours * SECONDS_PER_HOUR)
-```
-
-#### steps_from_days
-
-```python
-steps_from_days(days: float) -> int
-```
-
-Number of steps spanning `days` days.
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def steps_from_days(self, days: float) -> int:
-    """Number of steps spanning `days` days."""
-    return self.steps_from_seconds(days * SECONDS_PER_DAY)
-```
-
-#### steps_from_weeks
-
-```python
-steps_from_weeks(weeks: float) -> int
-```
-
-Number of steps spanning `weeks` weeks.
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def steps_from_weeks(self, weeks: float) -> int:
-    """Number of steps spanning `weeks` weeks."""
-    return self.steps_from_seconds(weeks * SECONDS_PER_WEEK)
-```
-
-#### rate_from_mean_duration
-
-```python
-rate_from_mean_duration(duration_seconds: float) -> float
-```
-
-Per-step rate of leaving a state with a given mean residence time.
-
-Returns `1 - exp(-step_seconds / duration_seconds)`, the probability that an exponential process of that mean duration fires within one step.
-
-This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `step_seconds / duration_seconds`.
-
-Parameters:
-
-| Name               | Type    | Description                               | Default    |
-| ------------------ | ------- | ----------------------------------------- | ---------- |
-| `duration_seconds` | `float` | Mean time spent in the state, in seconds. | *required* |
-
-Returns:
-
-| Type    | Description                     |
-| ------- | ------------------------------- |
-| `float` | Per-step rate, between 0 and 1. |
-
-Raises:
-
-| Type         | Description                          |
-| ------------ | ------------------------------------ |
-| `ValueError` | If duration_seconds is not positive. |
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def rate_from_mean_duration(self, duration_seconds: float) -> float:
-    """
-    Per-step rate of leaving a state with a given mean residence time.
-
-    Returns ``1 - exp(-step_seconds / duration_seconds)``, the probability
-    that an exponential process of that mean duration fires within one
-    step.
-
-    This is a rate for a DifferenceEquations model only. A
-    DifferentialEquations model needs the continuous rate
-    ``step_seconds / duration_seconds``.
-
-    Parameters
-    ----------
-    duration_seconds : float
-        Mean time spent in the state, in seconds.
-
-    Returns
-    -------
-    float
-        Per-step rate, between 0 and 1.
-
-    Raises
-    ------
-    ValueError
-        If `duration_seconds` is not positive.
-    """
-    if duration_seconds <= 0.0:
-        raise ValueError(
-            f"duration_seconds must be positive, got {duration_seconds}."
-        )
-    return 1.0 - math.exp(-self.step_seconds / duration_seconds)
-```
-
-#### rate_from_probability
-
-```python
-rate_from_probability(probability: float, period_steps: int) -> float
-```
-
-Per-step rate equivalent to a probability over a longer period.
-
-Returns `1 - (1 - probability) ** (1 / period_steps)`, the per-step rate that accumulates to `probability` over `period_steps` steps.
-
-This is a rate for a DifferenceEquations model only. A DifferentialEquations model needs the continuous rate `-ln(1 - probability) / period_steps`.
-
-Parameters:
-
-| Name           | Type    | Description                                                      | Default    |
-| -------------- | ------- | ---------------------------------------------------------------- | ---------- |
-| `probability`  | `float` | Probability of the event over the whole period, between 0 and 1. | *required* |
-| `period_steps` | `int`   | Length of the period, in steps.                                  | *required* |
-
-Returns:
-
-| Type    | Description                     |
-| ------- | ------------------------------- |
-| `float` | Per-step rate, between 0 and 1. |
-
-Raises:
-
-| Type         | Description                                                        |
-| ------------ | ------------------------------------------------------------------ |
-| `ValueError` | If probability is outside [0, 1], or period_steps is not positive. |
-
-Source code in `commol/api/time_scale.py`
-
-```python
-def rate_from_probability(self, probability: float, period_steps: int) -> float:
-    """
-    Per-step rate equivalent to a probability over a longer period.
-
-    Returns ``1 - (1 - probability) ** (1 / period_steps)``, the per-step
-    rate that accumulates to `probability` over `period_steps` steps.
-
-    This is a rate for a DifferenceEquations model only. A
-    DifferentialEquations model needs the continuous rate
-    ``-ln(1 - probability) / period_steps``.
-
-    Parameters
-    ----------
-    probability : float
-        Probability of the event over the whole period, between 0 and 1.
-    period_steps : int
-        Length of the period, in steps.
-
-    Returns
-    -------
-    float
-        Per-step rate, between 0 and 1.
-
-    Raises
-    ------
-    ValueError
-        If `probability` is outside [0, 1], or `period_steps` is not
-        positive.
-    """
-    if not 0.0 <= probability <= 1.0:
-        raise ValueError(f"probability must be between 0 and 1, got {probability}.")
-    if period_steps <= 0:
-        raise ValueError(f"period_steps must be positive, got {period_steps}.")
-    return 1.0 - (1.0 - probability) ** (1.0 / period_steps)
-```
-
 # Model Structure
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
@@ -20168,8 +20180,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The window grid as module functions: `window_start`, `window_end`, `window_index` and `window_ends`, beside `windowed_totals`.
 - A public Pydantic class rejects an unknown field and names it (`extra="forbid"` on every class of `commol.__all__`), so a misspelt or an old name is an error instead of being dropped.
 - Impulses: `add_transition(..., impulse_at=[...])` or `impulse_every=(period, offset)` moves the rate (a fraction or an amount) at once at those steps, in both engines, before the flows of the step. `print_equations` lists impulses apart.
-- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the check infers the unit as before.
-- `TimeScale.from_step_unit(unit)`, which raises for a unit that is not time.
+- `ModelBuilder(..., step_unit=...)` (`Model.step_unit`): the unit of one step for the unit check, of any single dimension: the axis is the independent variable of the model, which need not be time (for example `"meter"`). Without it, the step unit is `step`, the default increment of any axis.
+- `AxisUnits(step_unit, engine)` and `Model.axis_units()`: `steps(value, unit)` converts a value in any unit of the step dimension to steps on `pint` (`3 day` with a step of `hour` is `72.0`; `2 km` with a step of `m` is `2000.0`), and raises, naming both units, for a unit of another dimension. `rate_from_mean_span(span, unit)` and `rate_from_probability(probability, period, unit)` ask the engine what a rate means: the per-step rate for `DifferenceEquations` (`1 - exp(-1/n)`, `1 - (1 - p)^(1/n)`) and the continuous rate for `DifferentialEquations` (`1/n`, `-ln(1 - p)/n`).
+- `EngineType.rate_from_mean_span` and `rate_from_probability` in the engine's list (`RateMeaning` in Rust), which hold those formulas.
+- The unit check reads `if(condition, a, b)`: both branches share a unit.
 - One interface for every kind of model: `ModelStructure`, an abstract base class that the structure of each kind inherits. `Simulation`, `Calibrator`, `ProbabilisticCalibrator`, the reports and `SimulationPlotter` use only it, so another kind (for example an agent network) is a new subclass with its engines in the engine's list. `CompartmentalStructure` is the structure of a compartmental model. A subclass that misses a method cannot be made, and the error names the method.
 - An engine runs one model kind, and a model whose engine runs another kind is rejected when it is made, with an error that names the engine and both kinds.
 - Each kind declares the values calibration may set besides `parameter` and `factor` (`ModelStructure.calibration_value_types`); a compartmental model accepts `initial_condition`. A type the kind does not accept raises an error that names the kind.
@@ -20277,7 +20291,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | Guide anchor `#absolute-and-per-capita-rates`                         | `#absolute-and-proportional-rates`                         |
 | Guide anchor `#time-dependent-rates`                                  | `#rates-that-change-along-the-axis`                        |
 
+- The unit check no longer infers the step unit from the parameter units: it is the declared `step_unit` or else `step`. A model with rates in `1/day` and no `step_unit` fails the check, and the message says to declare it: add `step_unit="day"` to `ModelBuilder`.
+- A unit means what `pint` defines. The list of time aliases (`decade`, `quarter`, `semester`, `mo`, `wk`, …) is gone: `pint` reads `quarter` as a mass and `decade` as a number, so `1/quarter` was a mass without error. A name that `pint` does not define is a unit of its own dimension.
+- In the unit check, `t` has the step unit (it is a position on the axis), and a number written beside it in a sum, a difference or a comparison is read in that unit. `step` stays dimensionless. A rate such as `sin(2 * pi * t / 365)` now fails the check; write `sin(2 * pi * t / period)` with `period` in the step unit.
+- Guides and docstrings say what a rate means for each engine ([What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)) instead of "every flow applies once per step".
+
 ### Removed
+
+- `TimeScale` (`commol.api.time_scale`). Its rate conversions gave per-step rates only, which a differential model reads as too small.
+
+| Before                                                             | Now                                                             |
+| ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `TimeScale(step_seconds=3600)`, `TimeScale.from_step_unit("hour")` | `AxisUnits(step_unit="hour")`, or `model.axis_units()`          |
+| `steps_from_seconds/minutes/hours/days/weeks(x)`                   | `steps(x, "second")`, `steps(x, "minute")`, …                   |
+| `steps_per_hour`, `steps_per_day`, `steps_per_week`                | `steps(1, "hour")`, `steps(1, "day")`, `steps(1, "week")`       |
+| `rate_from_mean_duration(seconds)`                                 | `rate_from_mean_span(span, unit)`, which asks the engine        |
+| `rate_from_probability(p, period_steps)`                           | `rate_from_probability(p, period, unit)`, which asks the engine |
+| `window_start`, `window_end`, `window_index`                       | `commol.window_start`, `window_end`, `window_index`             |
+
+`steps` returns a `float` and does not raise for a fraction of a step; the engine rejects a position it does not accept where the position is used.
 
 - Transition conditions: `Transition.condition`, the `condition` argument of `ModelBuilder.add_transition`, `ModelBuilder.create_condition`, the `Condition` and `Rule` types, and the `LogicOperators` and `VariablePrefixes` enums, in Python and in Rust. The engine never evaluated them, so a condition that was never true still moved population. Write the condition in the rate (`"if(step > 30, k, 0)"`), or use an `AxisPattern` or a stratified rate. A model file with a `condition` key raises an error that names it.
 - `Simulation.run(..., output_format=...)` and `run_at(..., output_format=...)`: both return `SimulationResults`; use `rows()` for one row per position.

@@ -754,6 +754,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Build and run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-rate-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a rate means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -818,10 +835,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps-and-physical-time" class="md-nav__link">
+  <a href="#units-of-the-axis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps and physical time
+        Units of the axis
       
     </span>
   </a>
@@ -1600,14 +1617,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/time-scale/" class="md-nav__link">
+      <a href="../../api/axis-units/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    TimeScale
+    AxisUnits
   
 
     
@@ -2355,6 +2372,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Build and run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-rate-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a rate means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2419,10 +2453,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps-and-physical-time" class="md-nav__link">
+  <a href="#units-of-the-axis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps and physical time
+        Units of the axis
       
     </span>
   </a>
@@ -2463,7 +2497,8 @@
 <h1 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h1>
 <p><a href="../../">Back to Home</a></p>
 <p>A Commol model is a set of <strong>compartments</strong> that each hold an <strong>amount</strong>, and
-<strong>transitions</strong> that move amounts between them at each step. The amounts of
+<strong>transitions</strong> that move amounts between them along the <strong>axis</strong>, the
+independent variable of the model (time is the most common one). The amounts of
 every compartment together are the <strong>state</strong> of the model, and their sum is the
 <strong>total</strong>. An amount can be a count, a mass or a concentration. This page explains each
 building block once, with a runnable example. For every option of every method,
@@ -2545,13 +2580,13 @@ will find it.</p>
 </span></code></pre></div>
 <h2 id="transitions">Transitions<a class="headerlink" href="#transitions" title="Permanent link">&para;</a></h2>
 <p>A transition moves an amount from its <code>source</code> compartments to its <code>target</code>
-compartments at each step. How much it moves depends on its rate:</p>
+compartments along the axis. How much it moves depends on its rate:</p>
 <table>
 <thead>
 <tr>
 <th>The rate…</th>
 <th>Kind</th>
-<th>Flow per step</th>
+<th>Flow</th>
 <th>Example</th>
 </tr>
 </thead>
@@ -2680,6 +2715,39 @@ holds the bins, stratifications, transitions and initial conditions:</p>
 </tbody>
 </table>
 <p>See <a href="../simulations/#differential-equations">Differential equations</a>.</p>
+<h3 id="what-a-rate-means">What a rate means<a class="headerlink" href="#what-a-rate-means" title="Permanent link">&para;</a></h3>
+<p>A flow is per unit of the axis in every engine, and the unit check is the same
+for both. What its value means is the engine's (<code>rate_meaning</code> of the engine's
+list, <code>EngineType</code> in <code>crates/commol-core/src/types/engine.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th><code>rate_meaning</code></th>
+<th>A flow of value <code>f</code></th>
+<th>Equation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DifferenceEquations</code></td>
+<td><code>per_step</code></td>
+<td>Moves <code>f</code> in one step: the flow of an absolute rate, or <code>f × source</code> for a proportional rate</td>
+<td><code>X(n+1) = X(n) + Σ flows</code></td>
+</tr>
+<tr>
+<td><code>DifferentialEquations</code></td>
+<td><code>continuous</code></td>
+<td>Is the instantaneous rate of change: over a short span <code>Δ</code> it moves about <code>f × Δ</code></td>
+<td><code>dX/dt = Σ flows</code></td>
+</tr>
+</tbody>
+</table>
+<p>So one rate gives two different dynamics: a proportional rate <code>k</code> keeps
+<code>(1 - k)^n</code> of its source after <code>n</code> steps in a difference model, and
+<code>exp(-k n)</code> in a differential model. To find the rate that gives a mean span
+or a probability over a period in the engine of a model, use
+<a href="#units-of-the-axis"><code>AxisUnits</code></a>: it asks the engine.</p>
 <h2 id="stratifications">Stratifications<a class="headerlink" href="#stratifications" title="Permanent link">&para;</a></h2>
 <p>A stratification splits every compartment into one compartment per category.
 The expanded name is <code>{bin}_{category}</code>, with one suffix per stratification, in
@@ -2947,65 +3015,71 @@ removes the flow from the system.</p>
 </span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="p">)</span>
 </span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="nb">print</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">outflow</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">transitions</span><span class="p">])</span>  <span class="c1"># [&#39;outflow__A&#39;, &#39;outflow__B&#39;]</span>
 </span></code></pre></div>
-<h2 id="steps-and-physical-time">Steps and physical time<a class="headerlink" href="#steps-and-physical-time" title="Permanent link">&para;</a></h2>
-<p>A model knows only steps: a rate is per step and a period is a number of steps.
-<code>TimeScale</code> gives a step a duration, and converts physical quantities to the
-step counts and per-step rates a model needs:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeScale</span>
+<h2 id="units-of-the-axis">Units of the axis<a class="headerlink" href="#units-of-the-axis" title="Permanent link">&para;</a></h2>
+<p>A model knows only steps: a rate is per step, and a position or a period is a
+number of steps. <code>AxisUnits</code> converts values in units to steps, and gives the
+rate that the engine of a model reads. <code>Model.axis_units()</code> gives the one of a
+model: its <code>step_unit</code> (or <code>step</code> when it declares none) and its engine.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">AxisUnits</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">scale</span> <span class="o">=</span> <span class="n">TimeScale</span><span class="p">(</span><span class="n">step_seconds</span><span class="o">=</span><span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>  <span class="c1"># one hour per step</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">hourly</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;hour&quot;</span><span class="p">)</span>
 </span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">scale</span><span class="o">.</span><span class="n">steps_per_day</span><span class="p">)</span>        <span class="c1"># 24</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span><span class="p">)</span>       <span class="c1"># 168</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">scale</span><span class="o">.</span><span class="n">steps_from_days</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>   <span class="c1"># 72</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>     <span class="c1"># 24.0</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>     <span class="c1"># 72.0</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span> <span class="c1"># 0.5</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="n">along_a_line</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;meter&quot;</span><span class="p">)</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">along_a_line</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;km&quot;</span><span class="p">))</span>  <span class="c1"># 2000.0</span>
 </span></code></pre></div>
-<p>A period that is not a whole number of steps raises instead of rounding, so a
-step size that cannot express a period fails early:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">daily</span> <span class="o">=</span> <span class="n">TimeScale</span><span class="p">(</span><span class="n">step_seconds</span><span class="o">=</span><span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">daily</span><span class="o">.</span><span class="n">steps_from_hours</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
-</span></code></pre></div>
+<p><code>steps</code> works for any dimension, and raises <code>ValueError</code> for a unit of another
+dimension than the step, naming both units. It returns a <code>float</code>: whether a
+position must be a whole number of steps is the engine's check, made where the
+position is used. A result within <code>1e-9</code> of an integer is that integer.</p>
+<p>The rate conversions ask the engine what a rate means
+(<a href="#what-a-rate-means">What a rate means</a>):</p>
 <table>
 <thead>
 <tr>
 <th>Method</th>
-<th>Returns</th>
+<th><code>DifferenceEquations</code> (<code>per_step</code>)</th>
+<th><code>DifferentialEquations</code> (<code>continuous</code>)</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>rate_from_mean_duration(seconds)</code></td>
-<td><code>1 - exp(-step / duration)</code>: the per-step rate for a mean time in a state</td>
+<td><code>rate_from_mean_span(span, unit)</code></td>
+<td><code>1 - exp(-1 / n)</code>, with <code>span</code> equal to <code>n</code> steps</td>
+<td><code>1 / n</code></td>
 </tr>
 <tr>
-<td><code>rate_from_probability(p, period_steps)</code></td>
-<td><code>1 - (1 - p) ** (1 / period_steps)</code>: applied over the period, it gives back <code>p</code></td>
+<td><code>rate_from_probability(p, period, unit)</code></td>
+<td><code>1 - (1 - p) ** (1 / n)</code>, with <code>period</code> equal to <code>n</code> steps</td>
+<td><code>-ln(1 - p) / n</code></td>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end</span><span class="p">,</span> <span class="n">window_index</span><span class="p">,</span> <span class="n">window_start</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">scale</span><span class="o">.</span><span class="n">rate_from_mean_duration</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">))</span>  <span class="c1"># mean of 4 days</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">scale</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span><span class="p">))</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="n">week</span> <span class="o">=</span> <span class="n">scale</span><span class="o">.</span><span class="n">steps_per_week</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_start</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">),</span> <span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>  <span class="c1"># 0 168</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_index</span><span class="p">(</span><span class="mi">168</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>                     <span class="c1"># 0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">difference</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">differential</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>    <span class="c1"># 0.2212 = 1 - exp(-1/4)</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>  <span class="c1"># 0.25</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
 </span></code></pre></div>
+<p>With either rate, one outflow moves <code>p</code> of its bin over the period, and the bin
+keeps <code>exp(-n / span)</code> at each step <code>n</code>. In the difference model the mean
+residence is then <code>1 / rate</code> steps (<code>4.52</code> for a span of 4), not the span: a
+per-step rate cannot keep both the survival and the mean of the continuous
+process, and these conversions keep the survival.</p>
 <p>The window grid (<code>window_start</code>, <code>window_end</code>, <code>window_index</code>) is in
 <code>py-commol/commol/api/windows.py</code>; see
 <a href="../simulations/#windowed-totals">Windowed totals</a>.</p>
-<div class="admonition warning">
-<p class="admonition-title">Rates for difference models only</p>
-<p><code>rate_from_mean_duration</code> and <code>rate_from_probability</code> return per-step
-probabilities, which a <code>DifferenceEquations</code> model applies once per step.
-A <code>DifferentialEquations</code> model integrates its rates in continuous time, so
-it needs the continuous rate: <code>1 / duration</code> for a mean duration and
-<code>-ln(1 - p) / period</code> for a probability <code>p</code> over a period, both in steps.
-With the per-step value, the model moves too little.</p>
-</div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_end</span><span class="p">,</span> <span class="n">window_index</span><span class="p">,</span> <span class="n">window_start</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">week</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_start</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">),</span> <span class="n">window_end</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>  <span class="c1"># 0 168</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">window_index</span><span class="p">(</span><span class="mi">168</span><span class="p">,</span> <span class="n">week</span><span class="p">))</span>                     <span class="c1"># 0</span>
+</span></code></pre></div>
 <p>A window covers the positions <code>(start, end]</code>, the same interval that
 <a href="../calibration-observations/#counts-per-period-windows">windowed observations</a>
 use.</p>

@@ -45,26 +45,26 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## What each call does
 
-| Call                                              | What it does                                                                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                              |
-| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                          |
-| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                           |
-| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` each step. This rate names compartments, so it is the flow itself (*absolute*). |
-| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                            |
-| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                               |
-| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                           |
-| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                             |
+| Call                                              | What it does                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
+| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
+| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
+| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
+| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
+| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                                                                                                                                                                                                       |
+| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                                                                                                                                                                                                   |
+| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
 
 ## Check units
 
-Give every bin and parameter a unit, and Commol checks that each rate gives the bin unit per unit of time:
+Give every bin and parameter a unit, and the unit of one step, and Commol checks that each rate gives the bin unit per step unit:
 
 ```python
 model_with_units = (
-    ModelBuilder(name="Model with Units", version="1.0", bin_unit="item")
+    ModelBuilder(name="Model with Units", version="1.0", bin_unit="item", step_unit="day")
     .add_bin(id="A", name="State A")
     .add_bin(id="B", name="State B")
     .add_bin(id="C", name="State C")
@@ -86,7 +86,7 @@ model_with_units = (
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
 ```
 
-The check catches rates that mix time scales or pass a quantity with units to a function that needs a plain number. See [Unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking).
+The check catches rates in another unit than the step unit, and quantities with units passed to a function that needs a plain number. See [Unit checking](https://munqu.github.io/commol/latest/guide/units-and-equations/#unit-checking).
 
 ## Calibrate unknown parameters
 
