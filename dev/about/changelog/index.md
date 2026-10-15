@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- **Breaking:** a `DifferenceEquations` step that leaves a compartment below zero (by more than `10⁻¹²` of the total) raises `InfeasibleStateError`, a `ValueError`. The message names the compartment, the step, its amount before the step and the flows out of it. Before, the run went on with negative amounts. A calibration gives such a run a penalty and goes on; any other error of a run still stops it. See [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero).
+- **Breaking (Rust):** `SimulationEngine::run_at_positions_into_buffer`, `run_at`, `run` and `step` return `SimulationError` (`Infeasible` or `Failed`) instead of `String`.
 - A position on the axis is a `float` everywhere, and the engine alone decides which positions its model type accepts: a difference model integer steps, a differential model any non-negative position. Its error names the observation, constraint, impulse transition or series parameter that holds a rejected position. The engine trait runs only at positions (`run_at_positions_into_buffer`); `run(n)` returns the grid it ran on.
 - The engine of a model and its settings are one field, `Model.engine = {type, settings}` (`ModelEngine`), which replaces `Model.dynamics.typology`. The builder takes the engine where it builds, so one builder builds the model for each engine with its own settings. Settings of one engine given to another raise an error from the engine that names both. A model file saved before has `dynamics.typology` and does not load: move it to `"engine": {"type": …, "settings": null}`.
 
@@ -159,6 +161,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Examples 6 to 9 of the guide (`examples.md`) no longer go below zero. Example 6 writes the rate it describes, `k2_max * B * max(0, 1 - C / capacity)`; Examples 7, 8 and 9 set `per_compartment=True` on `flow_AB`, so each compartment of `A` loses an amount computed from its own amount.
 - A differential model: on a piece of integration that ends where a rate jumps (a value `t` is compared with, a series point), the right-hand side sees `t` below the end. Before, the last solver step of the piece already saw the rate after the jump, so a rate of 0.5 that starts at 2.5 moved `3·10⁻⁸` of the state before 2.5.
 - `CalibrationResult.converged` is `True` only when the optimizer met its convergence test or `target_cost`. Before, every finished run reported `True`, also one that stopped at `max_iterations`.
 - Nelder-Mead from a start value of 0 builds a real simplex, and no longer stops at a bound where the clamped loss is flat. Before, the simplex was degenerate at 0, and could collapse on a bound and report `converged=True`.

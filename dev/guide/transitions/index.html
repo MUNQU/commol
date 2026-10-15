@@ -954,6 +954,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amounts-below-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amounts below zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-building-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2467,6 +2478,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amounts-below-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amounts below zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-building-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2513,7 +2535,8 @@
 <p>A transition moves an amount at every step: from its <code>source</code> compartments to
 its <code>target</code> compartments, at the rate you give. This page documents
 <code>ModelBuilder.add_transition</code> completely: rates, several sources, transitions
-between categories, stratified rates, impulses, and what <code>build</code> checks.</p>
+between categories, stratified rates, impulses, amounts below zero, and what
+<code>build</code> checks.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3097,6 +3120,65 @@ rate: a difference model applies it for one step with the other flows, and a
 differential model applies it as a constant rate for one unit of the axis, so it
 moves <code>1 − e^(−p)</code> of its source. An impulse moves exactly <code>p</code> of its source in
 both engines.</p>
+<h2 id="amounts-below-zero">Amounts below zero<a class="headerlink" href="#amounts-below-zero" title="Permanent link">&para;</a></h2>
+<p>A <code>DifferenceEquations</code> step never leaves a compartment below zero. After the
+impulses of a step and after its flows, the engine checks every compartment.
+An amount below <code>−10⁻¹² × total</code> (the total at the start of the step) stops the
+run with <code>InfeasibleStateError</code>, a <code>ValueError</code>. The message names the
+compartment, the step, its amount before the step and the flows out of it,
+largest first. The tolerance lets a flow that empties a compartment exactly
+pass. Accumulators are not checked: a net flow may count negative
+(<code>DifferenceEquations::step</code> in <code>crates/commol-difference/src/simulation.rs</code>).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">InfeasibleStateError</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">too_fast</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Too fast&quot;</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">)</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="o">.</span><span class="n">set_initial_conditions</span><span class="p">(</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="n">bin_fractions</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;bin&quot;</span><span class="p">:</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;fraction&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}],</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="p">)</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">)</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="n">Simulation</span><span class="p">(</span><span class="n">too_fast</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="k">except</span> <span class="n">InfeasibleStateError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>  <span class="c1"># The flows of step 0 leave compartment &#39;A&#39; at -500, ...</span>
+</span></code></pre></div>
+<p>A step moves what the flows give, so the usual causes are in the rates:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Example</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Proportional rates that sum above 1</td>
+<td><code>rate="k"</code> with <code>k = 1.5</code> moves 1.5 times its source in one step</td>
+<td>A smaller rate per step, or a shorter step</td>
+</tr>
+<tr>
+<td>An absolute rate on a bin total</td>
+<td>With stratifications, <code>"k1 * A * B / total"</code> moves from each compartment of <code>A</code> an amount computed from the total of <code>A</code></td>
+<td><code>per_compartment=True</code>, so each compartment loses an amount from its own amount (<a href="#per_compartment"><code>per_compartment</code></a>)</td>
+</tr>
+<tr>
+<td>A rate that turns negative</td>
+<td><code>"k * B * (1 - C / capacity)"</code> once <code>C &gt; capacity</code>: the flow runs backwards and drains its target</td>
+<td>Bound the factor: <code>"k * B * max(0, 1 - C / capacity)"</code></td>
+</tr>
+</tbody>
+</table>
+<p>A calibration gives a run that stops this way a penalty and goes on; see
+<a href="../calibration/#losses">Calibration</a>. A <code>DifferentialEquations</code> model is not
+checked: its solver may step below zero by its tolerance.</p>
 <h2 id="what-building-checks">What building checks<a class="headerlink" href="#what-building-checks" title="Permanent link">&para;</a></h2>
 <p><code>build</code> plans every flow in the engine and rejects a transition it cannot
 simulate as written:</p>

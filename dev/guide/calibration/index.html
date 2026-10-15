@@ -2697,6 +2697,15 @@ and for the ensemble central loss.</p>
 </div>
 <p>With <code>normalize_observations=True</code>, each residual is first divided by the RMS
 of the observations of its series (its <code>label</code>).</p>
+<p>A run the model does not allow gets a penalty instead of a loss: a run with
+values that are not finite, or a difference step that leaves an amount below
+zero (<code>InfeasibleStateError</code>, see
+<a href="../transitions/#amounts-below-zero">Amounts below zero</a>). The penalty is much
+larger than any fit, and the run is not recorded in the history, so the
+optimizer moves away from it and goes on. Any other error of a run, such as a
+rate that cannot be evaluated, stops the calibration with its message
+(<code>CalibrationProblem::cost</code> in
+<code>crates/commol-calibration/src/calibration_problem.rs</code>).</p>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator(simulation, problem)</code> checks the problem against the model, and
 <code>run()</code> returns a <code>CalibrationResult</code>:</p>

@@ -2128,6 +2128,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-difference-step-never-leaves-an-amount-below-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A difference step never leaves an amount below zero
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-solver-is-diffsol" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2966,6 +2977,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-difference-step-never-leaves-an-amount-below-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A difference step never leaves an amount below zero
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-solver-is-diffsol" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3677,6 +3699,66 @@ Accumulators are state components: a difference step adds the counted flows, a
 differential engine integrates them.</p>
 <p><strong>Guard:</strong>
 <code>crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly</code>.</p>
+<h3 id="a-difference-step-never-leaves-an-amount-below-zero">A difference step never leaves an amount below zero<a class="headerlink" href="#a-difference-step-never-leaves-an-amount-below-zero" title="Permanent link">&para;</a></h3>
+<p><code>DifferenceEquations</code> checks every compartment after the impulses of a step and
+after its flows (<code>DifferenceEquations::step</code>, <code>settle</code> in
+<code>crates/commol-difference/src/simulation.rs</code>). An amount below
+<code>−10⁻¹² × total</code>, the total at the start of the step, stops the run with
+<code>SimulationError::Infeasible</code> (<code>crates/commol-core/src/simulation_engine.rs</code>).
+The message names the compartment, the step, its amount before the step and
+the flows that drain it (<code>CompiledModel::outflows</code>, <code>impulse_outflows</code>). The
+check reads the state and the right-hand side once, with no allocation, and the
+state stays as it was before the step. Accumulators are not checked: a net flow
+may count negative.</p>
+<p>An error, for every cause, and not:</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A check only of proportional rates that sum above 1</td>
+<td>None of the seven negative runs the test suite had broke that rule: they came from absolute rates on a bin total and from rates that turn negative.</td>
+</tr>
+<tr>
+<td>A warning</td>
+<td>A negative amount is never a correct state, and a warning inside a loop of calibrations is lost.</td>
+</tr>
+<tr>
+<td>Clamp the amount to zero</td>
+<td>The total is no longer kept, and the flows are no longer those of the model, without notice.</td>
+</tr>
+<tr>
+<td>Scale the outflows down to what the compartment holds</td>
+<td>A different model, chosen by the library; modelling choices belong to the user.</td>
+</tr>
+</tbody>
+</table>
+<p>Calibration tells such a run from a failure by its type, not by its message.
+<code>SimulationEngine</code> returns <code>SimulationError</code>: <code>Infeasible { position, message }</code>
+for a state outside the values the model allows, and <code>Failed(String)</code> for every
+other error. <code>CalibrationProblem::cost</code> gives an infeasible run the base
+penalty, as it does for values that are not finite, and records nothing in the
+history; a failed run still stops the calibration, so a rate that cannot be
+evaluated does not hide behind a poor fit. An optimizer that explores the
+bounds of a rate would otherwise stop on the first infeasible point, though the
+fit lies elsewhere. The predictions of an ensemble return the type as
+<code>CalibrationError::Infeasible</code>. Python receives <code>InfeasibleStateError</code>, a
+<code>ValueError</code> (<code>simulation_error</code> in <code>py-commol/src/engine.rs</code>); a failed run
+stays a <code>RuntimeError</code>.</p>
+<p>The differential engine is not checked: a solver may step below zero by its
+tolerance, and a model whose exact solution goes negative is a modelling choice
+there.</p>
+<p><strong>Guards:</strong> <code>crates/commol-difference/src/simulation.rs</code>
+(<code>flows_that_move_more_than_a_compartment_holds_stop_the_first_step</code>,
+<code>a_rate_that_turns_negative_stops_the_step_where_an_amount_drops_below_zero</code>,
+<code>proportional_rates_that_sum_to_one_empty_a_compartment</code>,
+<code>an_impulse_that_moves_more_than_its_source_holds_stops_its_step</code>,
+<code>an_accumulator_may_count_a_negative_net_flow</code>),
+<code>crates/commol-calibration/tests/test_infeasible_runs.rs</code>.</p>
 <h3 id="the-solver-is-diffsol">The solver is <code>diffsol</code><a class="headerlink" href="#the-solver-is-diffsol" title="Permanent link">&para;</a></h3>
 <p>The differential engine keeps no numerical method of its own: <code>diffsol</code>
 (pinned to a minor version, <code>~0.17.1</code>) solves the system with <code>tsit45</code> or

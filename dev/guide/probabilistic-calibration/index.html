@@ -2525,6 +2525,11 @@ problem and call <code>Calibrator.run_probabilistic()</code>.</p>
 <p>Every loss works (<code>"sse"</code>, <code>"rmse"</code>, <code>"mae"</code>): the ensemble is
 scored with the same loss as the runs. Use <code>normalize_observations=True</code> when
 series differ in size.</p>
+<p>A run that leaves an amount below zero gets a penalty, as in
+<a href="../calibration/#losses">Calibration</a>, and is not kept, so it is never a member.
+The predictions of the members run one step past the last observation; if a
+member leaves an amount below zero there, <code>run_probabilistic()</code> raises
+<code>InfeasibleStateError</code>.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <h3 id="probabilisticcalibrationconfig"><code>ProbabilisticCalibrationConfig</code><a class="headerlink" href="#probabilisticcalibrationconfig" title="Permanent link">&para;</a></h3>
 <table>

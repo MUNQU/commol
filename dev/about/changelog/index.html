@@ -2623,6 +2623,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> a <code>DifferenceEquations</code> step that leaves a compartment below
+  zero (by more than <code>10⁻¹²</code> of the total) raises <code>InfeasibleStateError</code>, a
+  <code>ValueError</code>. The message names the compartment, the step, its amount before
+  the step and the flows out of it. Before, the run went on with negative
+  amounts. A calibration gives such a run a penalty and goes on; any other
+  error of a run still stops it. See
+  <a href="../../guide/transitions/#amounts-below-zero">Amounts below zero</a>.</li>
+<li><strong>Breaking (Rust):</strong> <code>SimulationEngine::run_at_positions_into_buffer</code>,
+  <code>run_at</code>, <code>run</code> and <code>step</code> return <code>SimulationError</code> (<code>Infeasible</code> or
+  <code>Failed</code>) instead of <code>String</code>.</li>
 <li>A position on the axis is a <code>float</code> everywhere, and the engine alone decides
   which positions its model type accepts: a difference model integer steps, a
   differential model any non-negative position. Its error names the
@@ -3116,6 +3126,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Examples 6 to 9 of the guide (<code>examples.md</code>) no longer go below zero.
+  Example 6 writes the rate it describes, <code>k2_max * B * max(0, 1 - C /
+  capacity)</code>; Examples 7, 8 and 9 set <code>per_compartment=True</code> on <code>flow_AB</code>, so
+  each compartment of <code>A</code> loses an amount computed from its own amount.</li>
 <li>
 <p>A differential model: on a piece of integration that ends where a rate
   jumps (a value <code>t</code> is compared with, a series point), the right-hand side

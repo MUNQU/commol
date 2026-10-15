@@ -2,7 +2,7 @@
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-A transition moves an amount at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, impulses, and what `build` checks.
+A transition moves an amount at every step: from its `source` compartments to its `target` compartments, at the rate you give. This page documents `ModelBuilder.add_transition` completely: rates, several sources, transitions between categories, stratified rates, impulses, amounts below zero, and what `build` checks.
 
 ## Quick path
 
@@ -386,6 +386,42 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
+
+## Amounts below zero
+
+A `DifferenceEquations` step never leaves a compartment below zero. After the impulses of a step and after its flows, the engine checks every compartment. An amount below `−10⁻¹² × total` (the total at the start of the step) stops the run with `InfeasibleStateError`, a `ValueError`. The message names the compartment, the step, its amount before the step and the flows out of it, largest first. The tolerance lets a flow that empties a compartment exactly pass. Accumulators are not checked: a net flow may count negative (`DifferenceEquations::step` in `crates/commol-difference/src/simulation.rs`).
+
+```python
+from commol import InfeasibleStateError
+
+too_fast = (
+    ModelBuilder(name="Too fast")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k", value=1.5)
+    .add_transition(id="t", source=["A"], target=["B"], rate="k")
+    .set_initial_conditions(
+        total=1000,
+        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    )
+    .build(engine="DifferenceEquations")
+)
+
+try:
+    Simulation(too_fast).run(num_steps=3)
+except InfeasibleStateError as error:
+    print(error)  # The flows of step 0 leave compartment 'A' at -500, ...
+```
+
+A step moves what the flows give, so the usual causes are in the rates:
+
+| Cause                               | Example                                                                                                                  | Fix                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Proportional rates that sum above 1 | `rate="k"` with `k = 1.5` moves 1.5 times its source in one step                                                         | A smaller rate per step, or a shorter step                                                                              |
+| An absolute rate on a bin total     | With stratifications, `"k1 * A * B / total"` moves from each compartment of `A` an amount computed from the total of `A` | `per_compartment=True`, so each compartment loses an amount from its own amount ([`per_compartment`](#per_compartment)) |
+| A rate that turns negative          | `"k * B * (1 - C / capacity)"` once `C > capacity`: the flow runs backwards and drains its target                        | Bound the factor: `"k * B * max(0, 1 - C / capacity)"`                                                                  |
+
+A calibration gives a run that stops this way a penalty and goes on; see [Calibration](https://munqu.github.io/commol/latest/guide/calibration/#losses). A `DifferentialEquations` model is not checked: its solver may step below zero by its tolerance.
 
 ## What building checks
 

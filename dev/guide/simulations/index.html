@@ -2529,7 +2529,7 @@ plotting them.</p>
 <tr>
 <td><code>run(num_steps)</code></td>
 <td><code>SimulationResults</code></td>
-<td>Runs from the initial state, with the model as it is now, and reports at the positions <code>0, 1, …, num_steps</code>. Raises <code>ValueError</code> if a parameter is still <code>None</code>.</td>
+<td>Runs from the initial state, with the model as it is now, and reports at the positions <code>0, 1, …, num_steps</code>. Raises <code>ValueError</code> if a parameter is still <code>None</code>, and <code>InfeasibleStateError</code> if a difference step leaves an amount below zero (<a href="../transitions/#amounts-below-zero">Amounts below zero</a>).</td>
 </tr>
 <tr>
 <td><code>run_at(at)</code></td>

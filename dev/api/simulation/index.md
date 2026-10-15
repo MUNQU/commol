@@ -121,6 +121,9 @@ class Simulation:
 
         Raises
         ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
         ValueError
             If a parameter or initial condition has no value.
         """
@@ -155,6 +158,9 @@ class Simulation:
 
         Raises
         ------
+        InfeasibleStateError
+            If a step leaves an amount below zero; the message names the
+            compartment, the step and the flows out of it.
         ValueError
             If a parameter or initial condition has no value, the positions are
             not sorted and unique, or the engine does not report at one of them;
@@ -413,9 +419,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `ValueError` | If a parameter or initial condition has no value. |
+| Type                   | Description                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it. |
+| `ValueError`           | If a parameter or initial condition has no value.                                                           |
 
 Source code in `commol/api/simulation.py`
 
@@ -441,6 +448,9 @@ def run(self, num_steps: int) -> SimulationResults:
 
     Raises
     ------
+    InfeasibleStateError
+        If a step leaves an amount below zero; the message names the
+        compartment, the step and the flows out of it.
     ValueError
         If a parameter or initial condition has no value.
     """
@@ -478,9 +488,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
+| Type                   | Description                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it.                                                           |
+| `ValueError`           | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
 
 Source code in `commol/api/simulation.py`
 
@@ -507,6 +518,9 @@ def run_at(self, at: Sequence[float]) -> SimulationResults:
 
     Raises
     ------
+    InfeasibleStateError
+        If a step leaves an amount below zero; the message names the
+        compartment, the step and the flows out of it.
     ValueError
         If a parameter or initial condition has no value, the positions are
         not sorted and unique, or the engine does not report at one of them;
@@ -1087,6 +1101,16 @@ class OdeSolver(BaseModel):
     rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
     atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
 ```
+
+## InfeasibleStateError
+
+```python
+InfeasibleStateError = _engine.InfeasibleStateError
+```
+
+A run left the values its model allows, such as an amount below zero.
+
+A difference-equations step that leaves a compartment below zero raises it. It is a `ValueError`; a calibration treats such a run as infeasible.
 
 ## Windows
 

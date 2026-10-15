@@ -220,7 +220,7 @@ results = simulation.run(num_steps=1000)
 
 ## Example 6: Capacity-Constrained Rate
 
-The flow rate slows as a downstream compartment approaches a capacity limit:
+The flow from `B` slows as the downstream compartment `C` fills, and stops when `C` reaches `capacity`. The rate names `B`, so it is the flow itself; the factor `max(0, 1 - C / capacity)` never turns it negative:
 
 ```python
 model = (
@@ -236,7 +236,7 @@ model = (
         id="flow_BC",
         source=["B"],
         target=["C"],
-        rate="k2_max * (1 - max(0, (B - capacity) / capacity))"
+        rate="k2_max * B * max(0, 1 - C / capacity)"
     )
     .set_initial_conditions(
         total=1000,
@@ -255,7 +255,7 @@ results = simulation.run(num_steps=100)
 
 ## Example 7: Multi-Stratified Model with Intersection Rates
 
-A model with two stratifications and a rate specific to a particular intersection of categories:
+A model with two stratifications and a rate specific to a particular intersection of categories. `per_compartment=True` makes `A` and `B` in the rate the compartments of each flow, so each compartment of `A` loses an amount computed from its own amount, not from the total of the bin:
 
 ```python
 model = (
@@ -278,7 +278,8 @@ model = (
                 "conditions": [{"stratification": "type", "category": "t2"}],
                 "rate": "k1_high * A * B / total"
             }
-        ]
+        ],
+        per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
@@ -314,7 +315,7 @@ results = simulation.run(num_steps=100)
 
 ## Example 8: Subgroup-Normalized Rate
 
-The engine computes the subgroup total `total_<category>`. This example divides a rate by the total of its subgroup instead of the total of the model:
+The engine computes the subgroup total `total_<category>`. This example divides a rate by the total of its subgroup instead of the total of the model. `per_compartment=True` makes each compartment of `A` lose an amount computed from its own amount, not from the total of the bin:
 
 ```python
 model = (
@@ -335,7 +336,8 @@ model = (
                 "conditions": [{"stratification": "group", "category": "g1"}],
                 "rate": "k1 * A * B / total_g1"  # Divided by the subgroup total
             }
-        ]
+        ],
+        per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .set_initial_conditions(
@@ -364,7 +366,7 @@ results = simulation.run(num_steps=100)
 
 ## Example 9: Conditional Stratification
 
-A second stratification that only applies to a subset of the first. Here, the `subtype` stratification only expands `g2` compartments — `g1` compartments are not split further.
+A second stratification that only applies to a subset of the first. Here, the `subtype` stratification only expands `g2` compartments — `g1` compartments are not split further. `per_compartment=True` on `flow_AB` makes each compartment of `A` lose an amount computed from its own amount, not from the total of the bin.
 
 ```python
 model = (
@@ -388,7 +390,8 @@ model = (
         id="flow_AB",
         source=["A"],
         target=["B"],
-        rate="k1 * A * B / total"
+        rate="k1 * A * B / total",
+        per_compartment=True,
     )
     .add_transition(
         id="flow_BC",
