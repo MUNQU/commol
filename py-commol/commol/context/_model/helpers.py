@@ -1,13 +1,12 @@
 import re
 
-import pint
-
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.utils.equations import (
+    DEFAULT_STEP_UNIT,
     UnitConsistencyError,
+    define_units,
     get_predefined_variable_units,
-    ureg,
 )
 from commol.utils.security import get_expression_variables
 
@@ -160,10 +159,10 @@ class ModelCompartmentHelper:
         )
         variable_units.update(predefined_units)
 
-    @staticmethod
-    def _add_special_variable_units(variable_units: dict[str, str]) -> None:
+    def _add_special_variable_units(self, variable_units: dict[str, str]) -> None:
+        # `t` is a position on the axis; `step` counts increments.
         variable_units["step"] = "dimensionless"
-        variable_units["t"] = "dimensionless"
+        variable_units["t"] = self._model.step_unit or DEFAULT_STEP_UNIT
         variable_units["pi"] = "dimensionless"
         variable_units["e"] = "dimensionless"
 
@@ -275,53 +274,13 @@ class ModelCompartmentHelper:
         return f"{annotated_rate}{unit_suffix}"
 
     def register_custom_units(self) -> None:
-        """Register custom units in the pint registry."""
-        units_to_register: set[str] = set()
-        for bin_item in self._model.structure.bins:
-            if bin_item.unit:
-                units_to_register.add(bin_item.unit)
-        for param in self._model.parameters:
-            if param.unit:
-                unit_parts = re.split(r"[*/\s\(\)]+", param.unit)
-                for part in unit_parts:
-                    part = part.strip()
-                    if part and not part.replace(".", "").replace("-", "").isdigit():
-                        units_to_register.add(part)
-
-        known_time_aliases = {
-            "decade": "10 * year",
-            "century": "100 * year",
-            "millennium": "1000 * year",
-            "fortnight": "14 * day",
-            "biweek": "14 * day",
-            "semester": "6 * month",
-            "trimester": "3 * month",
-            "quarter": "3 * month",
-            "bimester": "2 * month",
-            "wk": "week",
-            "mo": "month",
-            "mon": "month",
-            "yr": "year",
-            "hr": "hour",
-            "min": "minute",
-            "sec": "second",
-            "secs": "second",
-            "mins": "minute",
-            "hrs": "hour",
-            "wks": "week",
-            "mons": "month",
-            "yrs": "year",
-        }
-
-        for unit_name in units_to_register:
-            try:
-                ureg(unit_name)
-            except pint.UndefinedUnitError:
-                if unit_name in known_time_aliases:
-                    ureg.define(f"{unit_name} = {known_time_aliases[unit_name]}")
-                else:
-                    dimension_name = f"{unit_name}_dimension"
-                    ureg.define(f"{unit_name} = [{dimension_name}]")
+        """Define the units of the bins, parameters and step that pint lacks."""
+        units = [b.unit for b in self._model.structure.bins if b.unit]
+        units += [p.unit for p in self._model.parameters if p.unit]
+        if self._model.step_unit:
+            units.append(self._model.step_unit)
+        for unit in units:
+            define_units(unit)
 
 
 # ------------------------------------------------------------------

@@ -200,15 +200,15 @@ Each row says why the recommendation beats each alternative.
 
 ## Tasks
 
-| ID | Specs | Task | Route | Commit |
+| ID | Specs | Task | Route | Status |
 |---|---|---|---|---|
 | T0 | all | Audit of every place that assumes one model type (section "Audit T0") | direct | done (2026-10-13) |
-| T1 | S1 | Converter on `pint` from a step unit (D1, D2, D5); tests on a time and a length axis | direct | |
-| T2 | S2 | Rate conversions that ask the model type (D3); closed-form tests in both engines | direct | |
-| T3 | S3 | The meaning of a rate per type in guides and docstrings (E2) | direct | |
-| T4 | S4 | Time as a unit like any other: no inference (D6), no time aliases, `t` with the step unit, `rate_from_mean_span` | direct | |
-| T5 | S5 | Remove or alias `TimeScale` (D4); documentation, API pages, changelog; remove the ODE-PR warning | direct | |
-| T6 | all | Final audit: every runner | direct | |
+| T1 | S1 | Converter on `pint` from a step unit (D1, D2, D5); tests on a time and a length axis | direct | done |
+| T2 | S2 | Rate conversions that ask the model type (D3); closed-form tests in both engines | direct | done |
+| T3 | S3 | The meaning of a rate per type in guides and docstrings (E2) | direct | done |
+| T4 | S4 | Time as a unit like any other: no inference (D6), no time aliases, `t` with the step unit, `rate_from_mean_span` | direct | done |
+| T5 | S5 | Remove or alias `TimeScale` (D4); documentation, API pages, changelog; remove the ODE-PR warning | direct | done |
+| T6 | all | Final audit: every runner | direct | done |
 
 ## Delivery
 
@@ -221,7 +221,27 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Runners on `refactor/axis-scale` (2026-10-15), before commit:
+
+| Runner | Result |
+|---|---|
+| Rust tests (six crates) | all pass; +2 in `commol-core` (`a_rate_from_a_mean_span_keeps_the_exponential_survival`, `a_rate_from_a_probability_moves_it_over_the_period`) |
+| `cargo test -p commol --features test-kind` | pass |
+| `cargo fmt --check`, `clippy -D warnings`, `cargo doc` with `-D warnings` | clean |
+| `pytest` | 1005 passed, 3 xfailed; `test_axis_units.py` (27) replaces `test_time_scale.py` |
+| `pytest -m docs` | 62 passed |
+| `ruff check`, `ruff format --check`, `ty check commol`, `vulture` | clean |
+| `mkdocs build --strict` | built, exit 0 |
+
+Checks of the specs:
+
+| Spec | Evidence |
+|---|---|
+| S1 | `TestSteps`: `3 day` → `72.0` hours, `2 km` → `2000.0` m, `4.1 hour` → `246.0` minutes; another dimension names both units; on `step` the error says to declare `step_unit`. |
+| S2 | `TestRatesMoveTheBinInBothEngines`: with the rate from `p = 0.3` over a week, A keeps `700` at day 7 in both engines; with the rate from a mean of 10 days, A keeps `1000 e^(−n/10)` at every day `n` in both; the continuous rate is `1/10`. The per-step mean residence is `10.508` (`TestRates`). |
+| S3 | "once per step" is only in text about the difference engine (`quickstart.md`, `mental-model.md`, `design-decisions.md`, `commol-model` docs). "What a rate means" in `core-concepts.md` is the one page; the units guide, `simulations.md`, `quickstart.md` and the `add_transition` docstring link to it. |
+| S4 | `TestStepUnit`, `TestAxisUnit`, `TestPositionOnTheAxis`: `1/day` without `step_unit` fails and says to declare it; with `step_unit="day"`, `1/week`, `1/quarter` and `1/mo` fail and are named; `k * t * A` passes with `k` in `1/day**2`; a length and a time axis go through one path. |
+| S5 | `TimeScale` and its page are gone; `AxisUnits` has an API page (`test_public_name_has_an_api_entry`); the ODE-PR warning is gone; the changelog has "Added", "Changed" and "Removed" with the mapping of every member. |
 
 ## Log
 
@@ -264,3 +284,24 @@ Each row says why the recommendation beats each alternative.
   `steps` is `value`, the name `pint` gives the number of a quantity
   (`Quantity(value, units)`) and the name `AxisPattern` takes. S1 and D1 say
   "value" too. The decision is otherwise unchanged.
+- L12 (implementation, 2026-10-15): choices made while implementing,
+  within the approved decisions.
+  - D3: the engine is a field of `AxisUnits` (`AxisUnits(step_unit,
+    engine)`), not an argument of each rate method. `Model.axis_units()`
+    passes the model's engine; a converter without one converts values and
+    raises on a rate, naming the fix. One source of the engine per converter.
+  - D3: the formulas are in Rust, `RateMeaning::rate_from_mean_span` and
+    `rate_from_probability` (`commol-core/src/types/engine.rs`), bound on
+    `EngineType`. Python holds no formula per meaning, so a new engine with an
+    existing meaning changes no Python, and a new meaning changes only Rust.
+  - D5: `AxisUnits` is in `context/axis_units.py`, not `api/`, because
+    `Model.axis_units()` builds it and `context/` does not import `api/`.
+  - S4: the rule "a number compared with `t` is read in its unit" applies to
+    every quantity and to sums and differences too (pint needs one unit for
+    each), and the check now reads `if(c, a, b)` (both branches share a unit)
+    and `min`/`max`. A number a function computes stays dimensionless. Before,
+    any rate with `if` failed the check with a syntax error.
+  - S4: a step unit or a unit that `pint` does not define is a unit of its
+    own dimension (`define_units`, shared by the check and `AxisUnits`).
+  - The patterns of `AxisPattern` hold no units, so a rate made of one alone
+    fails the check of a model with bin units, before and after.

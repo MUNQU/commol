@@ -27,7 +27,7 @@ that runs that kind; the generic layers work with any kind.
 |---|---|
 | A domain library | It knows bins, categories and rates, not diseases or drugs. Domain vocabulary belongs in user scripts. |
 | A numerical-methods library | The differential engine delegates the integration to `diffsol`; Commol keeps no ODE method of its own (see [Design decisions](design-decisions.md#the-solver-is-diffsol)). |
-| A clock | A model has no physical time: rates are per step and periods are step counts, and the axis is the independent variable of the model, whatever quantity it is. `TimeScale` converts at the edges (see [Design decisions](design-decisions.md#physical-time-is-not-in-the-model)). |
+| A clock | A model has no physical units: rates are per step and positions and periods are step counts, and the axis is the independent variable of the model, whatever quantity it is. `AxisUnits` converts at the edges (see [Design decisions](design-decisions.md#physical-units-are-not-in-the-model)). |
 | A rule engine for transitions | A transition has no condition. A rate expresses a gate, such as `if(A > 0, k, 0)` (see [Mathematical expressions](../guide/mathematical-expressions.md)), and [stratified rates](../guide/transitions.md#stratified-rates) set a rate per category. |
 
 ## Model kind and engine

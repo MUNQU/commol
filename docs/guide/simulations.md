@@ -324,9 +324,11 @@ only numbers, `pi`, `e` and parameters with a constant or calibrated value, and
 `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump
 that depends on the state, such as `if(t >= A, ...)`, is not found.
 
-`TimeScale.rate_from_mean_duration` and `rate_from_probability` give per-step
-probabilities for difference models. A differential model needs the
-continuous rate; see [Steps and physical time](core-concepts.md#steps-and-physical-time).
+A rate of a differential model is continuous, not a fraction per step; see
+[What a rate means](core-concepts.md#what-a-rate-means).
+`Model.axis_units()` gives the rate that the engine of a model reads from a mean
+span or a probability over a period; see
+[Units of the axis](core-concepts.md#units-of-the-axis).
 
 ```python
 from commol import AxisPattern

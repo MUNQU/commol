@@ -16,7 +16,7 @@ merged or archived.
 | 4 | `odd/archive/tasks/model-kind-interface.md` | merged by PR #106 (squash `77aa9fd`, 2026-10-14) | 3 | Yes |
 | 5 | `odd/archive/tasks/neutral-state-terms.md` | delivered by PR #108 | 4 | Yes |
 | 6 | `odd/archive/tasks/domain-agnostic-audit.md` | delivered by PR #109 | 5 | Yes |
-| 7 | `odd/tasks/axis-scale-refactor.md` | T1 → T6 (T0 done) | 6 | Yes |
+| 7 | `odd/archive/tasks/axis-scale-refactor.md` | delivered by this PR (`refactor/axis-scale`) | 6 | Yes |
 | 8 | `odd/tasks/difference-negative-amounts.md` | T1 → T5 | 7 | Yes |
 | 9 | Release 0.3.0 (`docs/development/release.md`) | — | 2–8 | — |
 | 10 | `odd/tasks/library-benchmark.md` | T1 → T5 | 9 | No |

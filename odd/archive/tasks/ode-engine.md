@@ -329,7 +329,7 @@ Verified 2026-10-13 on `feat/ode-engine` before the merge, Apple M-series,
   variable the model differentiates over. Docs and docstrings say so.
 - L17 (user, 2026-10-13): `TimeScale` rate methods are discrete-time; this PR
   only warns (docstrings, `core-concepts.md`, `simulations.md`). The refactor
-  is `odd/tasks/axis-scale-refactor.md`.
+  is `odd/archive/tasks/axis-scale-refactor.md`.
 - L18 (user, 2026-10-13): accepted the piece rule of the implementation (D12):
   restart at every integer only when a rate reads `step` or a time series.
   S3 rewritten. D7 (size threshold 128) stays as approved; a density-based

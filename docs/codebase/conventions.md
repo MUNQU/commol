@@ -156,7 +156,7 @@ The tests live in `py-commol/tests/`.
 
 A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
-of X". A pure-Python helper (`utils/security.py`, `api/time_scale.py`,
+of X". A pure-Python helper (`utils/security.py`, `context/axis_units.py`,
 `api/probabilistic/`) goes in the package of its feature. The exceptions are
 `reference_models/`, which checks published models across features (see
 [Reference models](#reference-models)), and `model_kinds/`, which runs a model
@@ -169,7 +169,7 @@ kind that is not compartmental through every generic layer.
 | `rates/` | Formulas, functions, variables, expression security | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#initial-conditions) |
-| `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `TimeScale` | [Running Simulations](../guide/simulations.md) |
+| `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |
 | `units/` | Unit checks and `print_equations` | [Units and Equations](../guide/units-and-equations.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |

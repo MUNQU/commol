@@ -1,18 +1,11 @@
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
+    DEFAULT_STEP_UNIT,
     UnitConsistencyError,
     check_equation_units,
-    same_unit,
     ureg,
 )
 from commol.utils.security import get_expression_variables
-
-
-DEFAULT_STEP_UNIT = "step"
-"""Step unit of a model whose parameters name no unit of time."""
-
-TIME_DIMENSIONS = ("[time]", "[step]")
-"""Dimensions of a unit the check infers as the step unit."""
 
 
 def check_step_unit(unit: str) -> str:
@@ -59,10 +52,11 @@ class UnitChecker:
     """
     Validates unit consistency of model equations.
 
-    The engine applies every flow once per step and never converts values
-    between units. So the check uses one step unit, declared on the model or
-    inferred from the parameters, and requires every flow to be exactly
-    ``<bin unit>/<step unit>`` and every impulse to be ``<bin unit>``.
+    The engine converts no value between units. So the check uses one step
+    unit, the declared ``step_unit`` of the model or else ``step``, and
+    requires every flow to be exactly ``<bin unit>/<step unit>`` and every
+    impulse to be ``<bin unit>``. What the value of a flow means (an amount
+    per step or an instantaneous rate) is the engine's; the unit is the same.
     """
 
     def __init__(self, model) -> None:
@@ -82,6 +76,12 @@ class UnitChecker:
             error_message = "Unit consistency check failed:\n" + "\n".join(
                 f"  - {err}" for err in errors
             )
+            if self._model.step_unit is None:
+                error_message += (
+                    f"\nThe model declares no step unit, so it is "
+                    f"'{DEFAULT_STEP_UNIT}'. Declare step_unit in ModelBuilder "
+                    f"(such as step_unit='day') when the rates use another unit."
+                )
             raise UnitConsistencyError(error_message)
 
         if verbose:
@@ -143,44 +143,16 @@ class UnitChecker:
 
     def _step_unit(self) -> str:
         """
-        The step unit: the declared ``step_unit`` of the model or, when there
-        is none, the one unit of time that the parameter units use.
-
-        A unit of time is a unit of dimension ``[time]`` (such as ``day``) or
-        ``[step]`` (``step``), with any exponent: ``1/day`` and ``day`` both use
-        ``day``. Units are equal when they convert with a factor of 1, so
-        ``d`` and ``day`` are one unit.
+        The step unit: the declared ``step_unit`` of the model, else ``step``.
 
         Raises
         ------
         UnitConsistencyError
-            If the declared step unit is not one unit of one dimension, or no
-            unit is declared and the parameters use more than one unit of time.
+            If the declared step unit is not one unit of one dimension.
         """
         if self._model.step_unit is not None:
             return check_step_unit(self._model.step_unit)
-
-        uses: list[tuple[str, str, str]] = []
-        for param in self._model.parameters:
-            if param.unit is None:
-                continue
-            for name in ureg.parse_units(param.unit)._units:
-                dimensionality = str(ureg.parse_units(name).dimensionality)
-                if dimensionality in TIME_DIMENSIONS:
-                    uses.append((param.id, param.unit, name))
-
-        if not uses:
-            return DEFAULT_STEP_UNIT
-        step_unit = uses[0][2]
-        if all(same_unit(name, step_unit) for _, _, name in uses):
-            return step_unit
-
-        listed = ", ".join(f"'{param_id}' in '{unit}'" for param_id, unit, _ in uses)
-        raise UnitConsistencyError(
-            f"Unit consistency check failed: the parameters use more than one "
-            f"unit of time ({listed}). The engine applies every rate once per "
-            f"step and converts nothing, so all rates must use one step unit."
-        )
+        return DEFAULT_STEP_UNIT
 
     def _check_transition_rate_units(
         self,

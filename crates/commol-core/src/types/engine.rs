@@ -98,6 +98,66 @@ impl RateMeaning {
             Self::Continuous => "continuous",
         }
     }
+
+    /// The rate of one outflow whose residence is exponential with a mean
+    /// span of `span` steps.
+    ///
+    /// Per step: `1 - e^(-1/span)`, the fraction an exponential process of
+    /// that mean moves in one step, so the bin keeps `e^(-n/span)` at each
+    /// step `n`; its mean residence is `1/rate` steps, a little more than
+    /// `span`. Continuous: `1/span`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when `span` is not positive and finite.
+    pub fn rate_from_mean_span(self, span: f64) -> Result<f64, String> {
+        if !(span.is_finite() && span > 0.0) {
+            return Err(format!(
+                "The mean span must be positive and finite, got {span} steps"
+            ));
+        }
+        Ok(match self {
+            Self::PerStep => -(-1.0 / span).exp_m1(),
+            Self::Continuous => 1.0 / span,
+        })
+    }
+
+    /// The rate of one outflow that moves `probability` of the bin over
+    /// `period` steps.
+    ///
+    /// Per step: `1 - (1 - p)^(1/period)`, so the bin keeps `(1 - rate)^period
+    /// = 1 - p`. Continuous: `-ln(1 - p) / period`, so it keeps
+    /// `e^(-rate * period) = 1 - p`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when `period` is not positive and finite, or when
+    /// `probability` is outside `[0, 1]`. A continuous rate needs
+    /// `probability < 1`: no finite rate empties a bin.
+    pub fn rate_from_probability(self, probability: f64, period: f64) -> Result<f64, String> {
+        if !(period.is_finite() && period > 0.0) {
+            return Err(format!(
+                "The period must be positive and finite, got {period} steps"
+            ));
+        }
+        if !(0.0..=1.0).contains(&probability) {
+            return Err(format!(
+                "The probability must be between 0 and 1, got {probability}"
+            ));
+        }
+        let log_survival = (-probability).ln_1p();
+        Ok(match self {
+            Self::PerStep => -(log_survival / period).exp_m1(),
+            Self::Continuous if probability == 1.0 => {
+                return Err(
+                    "A continuous rate cannot move a probability of 1: no finite rate \
+                     empties a bin"
+                        .to_string(),
+                );
+            }
+            Self::Continuous => -log_survival / period,
+        })
+    }
 }
 
 /// The list of engines a model can name.
@@ -471,6 +531,49 @@ mod tests {
         assert_eq!(
             EngineType::DifferentialEquations.rate_meaning(),
             RateMeaning::Continuous
+        );
+    }
+
+    #[test]
+    fn a_rate_from_a_mean_span_keeps_the_exponential_survival() {
+        let per_step = RateMeaning::PerStep.rate_from_mean_span(10.0).unwrap();
+        assert!((per_step - (1.0 - (-0.1_f64).exp())).abs() < 1e-15);
+        assert!((1.0 / per_step - 10.508).abs() < 1e-3);
+        assert_eq!(RateMeaning::Continuous.rate_from_mean_span(10.0), Ok(0.1));
+        for span in [0.0, -1.0, f64::INFINITY, f64::NAN] {
+            assert!(RateMeaning::PerStep.rate_from_mean_span(span).is_err());
+        }
+    }
+
+    #[test]
+    fn a_rate_from_a_probability_moves_it_over_the_period() {
+        let per_step = RateMeaning::PerStep
+            .rate_from_probability(0.3, 7.0)
+            .unwrap();
+        assert!(((1.0 - per_step).powf(7.0) - 0.7).abs() < 1e-14);
+        let continuous = RateMeaning::Continuous
+            .rate_from_probability(0.3, 7.0)
+            .unwrap();
+        assert!(((-continuous * 7.0).exp() - 0.7).abs() < 1e-14);
+        assert_eq!(
+            RateMeaning::PerStep.rate_from_probability(1.0, 2.0),
+            Ok(1.0)
+        );
+        assert!(
+            RateMeaning::Continuous
+                .rate_from_probability(1.0, 2.0)
+                .unwrap_err()
+                .contains("probability of 1")
+        );
+        assert!(
+            RateMeaning::PerStep
+                .rate_from_probability(1.5, 2.0)
+                .is_err()
+        );
+        assert!(
+            RateMeaning::PerStep
+                .rate_from_probability(0.5, 0.0)
+                .is_err()
         );
     }
 

@@ -14,3 +14,4 @@ ObservedDataPointProtocol
 CalibrationResultWithHistoryProtocol
 LossConfigProtocol
 OptimizationConfigProtocol
+EngineTypeProtocol

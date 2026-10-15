@@ -8,7 +8,6 @@ from .reporting import applied_parameters_report, simulation_report
 from .results import SimulationResults
 from .simulation import Simulation
 from .patterns import AxisPattern
-from .time_scale import TimeScale
 from .windows import (
     window_end,
     window_ends,
@@ -25,7 +24,6 @@ __all__ = [
     "Simulation",
     "SimulationResults",
     "AxisPattern",
-    "TimeScale",
     "ci_percentiles",
     "member_statistics",
     "simulation_report",

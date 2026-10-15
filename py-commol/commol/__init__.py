@@ -10,7 +10,6 @@ from commol.api import (
     SimulationPlotter,
     SimulationResults,
     AxisPattern,
-    TimeScale,
     applied_parameters_report,
     ci_percentiles,
     simulation_report,
@@ -22,6 +21,7 @@ from commol.api import (
     windowed_totals,
 )
 from commol.context import CompartmentalStructure, Model, ModelStructure
+from commol.context.axis_units import AxisUnits
 from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
@@ -90,7 +90,7 @@ __all__ = [
     "SimulationPlotter",
     "SimulationResults",
     "AxisPattern",
-    "TimeScale",
+    "AxisUnits",
     "applied_parameters_report",
     "ci_percentiles",
     "member_statistics",

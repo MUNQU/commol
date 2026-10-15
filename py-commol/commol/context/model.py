@@ -20,6 +20,8 @@ except ImportError as e:
 
 from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
+from commol.context._model.units import DEFAULT_STEP_UNIT
+from commol.context.axis_units import AxisUnits
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -60,8 +62,8 @@ class Model(BaseModel, Generic[StructureT]):
         stratifications and transitions of a compartmental model.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
-        ``"meter"``). The unit check uses it; when None, the check infers it
-        from the parameter units of dimension time (or uses ``step``).
+        ``"meter"``). The unit check and `axis_units` use it; None means
+        ``step``, the default increment of any axis.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -80,8 +82,8 @@ class Model(BaseModel, Generic[StructureT]):
         None,
         description=(
             "Unit of one step on the axis (the independent variable, of any "
-            "dimension), for the unit check. "
-            "Inferred from the parameter units when None."
+            "dimension), for the unit check and axis_units. "
+            "None means 'step', the default increment of any axis."
         ),
     )
 
@@ -313,17 +315,40 @@ class Model(BaseModel, Generic[StructureT]):
         """
         self.structure.print_equations(self, output_file, format)
 
+    def axis_units(self) -> AxisUnits:
+        """
+        The unit of one step of the model, and its engine, to convert values.
+
+        The step unit is ``step_unit`` or, when the model declares none,
+        ``step``, the default increment of any axis. The engine is the one of
+        the model, so the rates of `AxisUnits` mean what this engine reads.
+
+        Returns
+        -------
+        AxisUnits
+            The converter of the model.
+
+        Examples
+        --------
+        >>> units = model.axis_units()
+        >>> units.steps(2, "week")  # with step_unit="day"
+        14.0
+        >>> gamma = units.rate_from_mean_span(5, "day")
+        """
+        return AxisUnits(
+            step_unit=self.step_unit or DEFAULT_STEP_UNIT, engine=self.engine.type
+        )
+
     def check_unit_consistency(self, verbose: bool = False) -> None:
         """
         Check unit consistency of all equations in the model.
 
         The structure checks them (`ModelStructure.check_unit_consistency`).
-        For a compartmental model, the engine applies every flow once per step
-        and converts no value between units. So the check infers one step unit
-        from the parameter
-        units: the one unit of time (``day``, ``week``, ``step``, …) that they
-        use, or ``step`` when they use none. Every flow must then be exactly
-        ``<bin unit>/<step unit>``, such as ``item/day``.
+        For a compartmental model, the engine converts no value between units.
+        So the check uses one step unit, ``step_unit`` or else ``step``, and
+        every flow must be exactly ``<bin unit>/<step unit>``, such as
+        ``item/day``. The unit is the same for every engine; what the value of
+        a flow means is the engine's.
 
         Parameters
         ----------
@@ -333,9 +358,10 @@ class Model(BaseModel, Generic[StructureT]):
         Raises
         ------
         UnitConsistencyError
-            If a constant parameter or a bin has no unit, if the parameters use
-            more than one unit of time (``1/day`` and ``1/week``), or if a flow
-            does not have the unit ``<bin unit>/<step unit>``.
+            If a constant parameter or a bin has no unit, if ``step_unit`` is
+            not one unit of one dimension, or if a flow does not have the unit
+            ``<bin unit>/<step unit>``. Without ``step_unit``, the message
+            says to declare it.
         ValueError
             If the model type doesn't support unit checking.
         NotImplementedError
@@ -344,7 +370,9 @@ class Model(BaseModel, Generic[StructureT]):
         Notes
         -----
         - Predefined variables (total, total_g1, etc.) have the bin unit
-        - Position variables (t, step) are dimensionless
+        - ``t``, a position on the axis, has the step unit; a number added
+          to, subtracted from or compared with it is read in that unit
+        - ``step``, a count of increments, is dimensionless
         - Mathematical constants (pi, e) are dimensionless
         """
         self.structure.check_unit_consistency(self, verbose)

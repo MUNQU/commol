@@ -119,8 +119,9 @@ class ModelBuilder:
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
-            ``<bin unit>/<step_unit>``. None infers it from the parameter units
-            of dimension time.
+            ``<bin unit>/<step_unit>``, and ``Model.axis_units()`` converts
+            values to steps of it. None means ``step``, the default increment
+            of any axis.
         """
         self._name: str = name
         self._description: str | None = description
@@ -382,8 +383,10 @@ class ModelBuilder:
 
         When you specify multiple sources without the $compartment placeholder,
         a single transition is created that affects all sources simultaneously.
-        The rate is evaluated ONCE per step, and that value is applied to
-        all source compartments at once.
+        The rate is evaluated once, at each position the engine reads it, and
+        that value applies to all source compartments at once. What the value
+        means (an amount moved in one step or an instantaneous rate) is the
+        engine's; see "What a rate means" in the Core Concepts guide.
 
         When you use the $compartment placeholder in the rate formula with multiple
         sources, the system automatically expands this into multiple independent
