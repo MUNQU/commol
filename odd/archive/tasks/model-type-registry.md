@@ -5,7 +5,7 @@ is declared in one place, in the engine: its engine, the model kind it runs,
 its settings, the form of its equations and the meaning of a rate. Adding a type adds an entry, not
 edits in five places, and Python asks the engine instead of branching on the
 typology.
-Motivation: audit T0 of `odd/tasks/axis-scale-refactor.md` (theme D, and the
+Motivation: audit T0 of `odd/archive/tasks/axis-scale-refactor.md` (theme D, and the
 "meaning of a rate" of theme E that `axis-scale-refactor` S2 needs). The goal
 of commol includes other model types later (for example stochastic, delay or
 spatial models).
@@ -20,7 +20,7 @@ and `vulture` (from `py-commol/`), `mkdocs build --strict` (from the root).
 
 ## Current state (verified 2026-10-13 on `develop` at `34d75eb` with PR #102)
 
-The findings, with their places, are in `odd/tasks/axis-scale-refactor.md`,
+The findings, with their places, are in `odd/archive/tasks/axis-scale-refactor.md`,
 section "Audit T0":
 
 - D-1: two typologies, declared in Python (`constants.ModelTypes`) and in Rust
@@ -145,7 +145,7 @@ Branch `refactor/model-type-registry` from `develop` at `e997d58`
 ## Log
 
 - L1 (user, 2026-10-13): split the audit T0 of
-  `odd/tasks/axis-scale-refactor.md` into three ODDs; this one takes theme D
+  `odd/archive/tasks/axis-scale-refactor.md` into three ODDs; this one takes theme D
   and the meaning of a rate per type.
 - L2 (user, 2026-10-13): approved D1, corrected: the crates are not
   published, so the argument of a Rust-only user does not hold; Python keeps

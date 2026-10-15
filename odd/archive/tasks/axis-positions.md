@@ -4,7 +4,7 @@ Goal: every public name that takes or gives a position on the axis takes or
 gives a `float`, the engine alone decides which positions its model type
 accepts, and results carry their positions. Reports, windows, plots and
 ensembles read a value at a position, not at a list index.
-Motivation: audit T0 of `odd/tasks/axis-scale-refactor.md` (themes A, B and
+Motivation: audit T0 of `odd/archive/tasks/axis-scale-refactor.md` (themes A, B and
 C). Part of the API was written for the difference engine only, where a list
 index is a step. A differential model, or any later type, does not fit it.
 Branch: `refactor/axis-positions` from `develop`, after PR #102 is merged.
@@ -17,7 +17,7 @@ and `vulture` (from `py-commol/`), `mkdocs build --strict` (from the root).
 
 ## Current state (verified 2026-10-13 on `develop` at `34d75eb` with PR #102)
 
-The findings, with their places, are in `odd/tasks/axis-scale-refactor.md`,
+The findings, with their places, are in `odd/archive/tasks/axis-scale-refactor.md`,
 section "Audit T0":
 
 - A1–A5: a position has several names and types. The engine trait has
@@ -175,7 +175,7 @@ Branch `refactor/axis-positions` from `develop` at `a001e2a`, 2026-10-13.
 ## Log
 
 - L1 (user, 2026-10-13): split the audit T0 of
-  `odd/tasks/axis-scale-refactor.md` into three ODDs; this one takes themes
+  `odd/archive/tasks/axis-scale-refactor.md` into three ODDs; this one takes themes
   A, B and C, and the window grid and S5/S6 of that ODD.
 - L2 (user, 2026-10-13): approved D1 with `rows()` in place of
   `output_format="list_of_lists"`.

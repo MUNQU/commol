@@ -12,7 +12,7 @@ The audit below was verified 2026-10-14 on `refactor/model-kind-interface` at
 | Findings | Owner |
 |---|---|
 | C1, D1 | Done: `odd/archive/tasks/neutral-state-terms.md` (PR #108). |
-| A5, D3, D4, D5 | `odd/tasks/axis-scale-refactor.md`: S3 (E2, "once per step"), S4 and D6 (time is a unit like any other, no time aliases), D4 (`TimeScale` goes). |
+| A5, D3, D4, D5 | `odd/archive/tasks/axis-scale-refactor.md`: S3 (E2, "once per step"), S4 and D6 (time is a unit like any other, no time aliases), D4 (`TimeScale` goes). |
 | Everything else | This ODD. |
 
 ## The rule
@@ -126,7 +126,7 @@ concepts in the docs. A change needs a decision first.
 | D1 | `py-commol/commol/context/initial_conditions.py:134` (`population_size: int`), `py-commol/commol/api/model_builder.py:751`, `crates/commol-core/src/types/compartmental.rs:84` (`population_size: u64`) | The total amount at the start must be a whole positive count. | A model of a mass, a concentration or a fraction (total `0.5`, `2.75`) cannot be stated. The type assumes discrete individuals. |
 | D2 | `AxisPattern.seasonal` (`py-commol/commol/api/patterns.py:451`, class `_SeasonalAxisPattern` at `:656`; `docs/guide/axis-patterns.md:52, 58, 267`) | A sine pattern has a name from time (seasons). | The public name assumes a time axis. Neutral names: `sinusoid`, `sine`, `harmonic`. |
 | D3 | `py-commol/commol/context/_model/units.py:14` (`TIME_DIMENSIONS = ("[time]", "[step]")`), `:169`; `design-decisions.md:224-234`; `docs/guide/units-and-equations.md:77-87` | The step unit is inferred only from units of time. Any other axis must declare `step_unit`. | Time is the default axis of the unit check. Documented and guarded on purpose (a `1/meter` parameter may be a density). Decide whether to keep it. |
-| D4 | `TimeScale` (`py-commol/commol/api/time_scale.py`) | A public, time-only helper (`steps_per_week`, `steps_from_hours`). | Acceptable as an edge helper (see "Not violations"). An axis-neutral `AxisScale` would make the API symmetric. `odd/tasks/axis-scale-refactor.md` already plans to replace `TimeScale` with axis-neutral pieces. |
+| D4 | `TimeScale` (`py-commol/commol/api/time_scale.py`) | A public, time-only helper (`steps_per_week`, `steps_from_hours`). | Acceptable as an edge helper (see "Not violations"). An axis-neutral `AxisScale` would make the API symmetric. `odd/archive/tasks/axis-scale-refactor.md` already plans to replace `TimeScale` with axis-neutral pieces. |
 | D5 | `py-commol/commol/context/_model/helpers.py:290-321` (`known_time_aliases`) | The unit registration knows aliases only for time (`fortnight`, `semester`, `yr`, `hrs`, …). Every other unknown unit gets a new dimension of its own. | A second place where time is special in the unit check (found by the tests search). Same decision as D3. |
 
 ## E. Examples with application or unit names

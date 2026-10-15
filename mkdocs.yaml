@@ -148,7 +148,7 @@ nav:
       - Simulation: api/simulation.md
       - Plotting: api/plotting.md
       - AxisPattern: api/axis-patterns.md
-      - TimeScale: api/time-scale.md
+      - AxisUnits: api/axis-units.md
       - Calibration: api/calibrator.md
       - Probabilistic Calibration: api/probabilistic-calibrator.md
       - Reports: api/reports.md

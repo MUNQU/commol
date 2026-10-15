@@ -51,13 +51,14 @@ Use this page when you know what to change but not where it belongs.
 | `api/calibrator.py`, `api/probabilistic_calibrator.py` | Calibration entry points and conversion to Rust types. | Loss or optimizer logic. |
 | `api/probabilistic/` | Ensemble statistics, normalization and confidence intervals (`intervals.py`). | New interval conventions outside `ci_percentiles`. |
 | `api/reporting.py` | `simulation_report` and `applied_parameters_report`, with the sections the structure adds (`ModelStructure.report_sections`). | Domain vocabulary; sections of one model kind. |
-| `api/patterns.py`, `api/time_scale.py`, `api/windows.py` | Rates that change along the axis (`AxisPattern`), step/physical-time conversion, the window grid and windowed totals. | Physical time inside the model. |
+| `api/patterns.py`, `api/windows.py` | Rates that change along the axis (`AxisPattern`), the window grid and windowed totals. | Physical units inside the model. |
 | `api/plotter.py` | Plots of results. | Computation of results. |
 | `context/` | The Pydantic model: fields, validation, JSON I/O, update methods. | Engine rules. |
 | `context/model.py` | `Model`: the header, the engine and the structure of any kind, generic in its structure class (`Model[CompartmentalStructure]`). | Anything of one model kind. |
 | `context/structure.py` | `ModelStructure`, the interface every model kind gives the generic layers, and its registry of kinds. | Code of one kind. |
 | `context/compartmental.py` | `CompartmentalStructure`: bins, stratifications, transitions and initial conditions, their validation, and the compartmental side of the interface. | Generic code. |
 | `context/transition.py` | `Transition` and `StratifiedRate`. | — |
+| `context/axis_units.py` | `AxisUnits`: values in units to steps of the axis, and rates asked from the engine (`Model.axis_units`). | Formulas of a rate per engine (they are in `RateMeaning`). |
 | `context/engine.py` | `ModelEngine` (`Model.engine`: the engine type and its settings), `OdeSolver`, and the names of the compartmental engines as the `Literal` `CompartmentalEngineType`. | Settings validation or engine meanings: ask `commol_rs.engine.EngineType`. |
 | `context/_model/engine_state.py` | The only Python access to the engine queries, and `build_engine`, which builds the engine the model names. | Python re-implementations of them. |
 | `context/_model/` (other files) | Internals of a compartmental model: equation printer, unit checker, calibration write-back, the `initial_conditions` report section (`report.py`); JSON rendering of any model. | Public API. |

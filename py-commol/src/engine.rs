@@ -428,6 +428,39 @@ impl PyEngineType {
         self.inner.rate_meaning().name()
     }
 
+    /// The rate of one outflow whose residence has a mean span, as the
+    /// engine reads a rate
+    ///
+    /// Args:
+    ///     span: Mean span of the residence, in steps
+    ///
+    /// Raises:
+    ///     ValueError: If the span is not positive and finite
+    fn rate_from_mean_span(&self, span: f64) -> PyResult<f64> {
+        self.inner
+            .rate_meaning()
+            .rate_from_mean_span(span)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The rate of one outflow that moves a probability of the bin over a
+    /// period, as the engine reads a rate
+    ///
+    /// Args:
+    ///     probability: Fraction of the bin that leaves over the period
+    ///     period: Length of the period, in steps
+    ///
+    /// Raises:
+    ///     ValueError: If the period is not positive and finite, the
+    ///         probability is outside [0, 1], or the rate is continuous and
+    ///         the probability is 1
+    fn rate_from_probability(&self, probability: f64, period: f64) -> PyResult<f64> {
+        self.inner
+            .rate_meaning()
+            .rate_from_probability(probability, period)
+            .map_err(PyValueError::new_err)
+    }
+
     /// Left-hand side of the equation of a variable
     ///
     /// Args:

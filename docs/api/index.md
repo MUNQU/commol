@@ -12,7 +12,7 @@ explain how to use them; these pages list every argument, attribute and error.
 | [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `OdeSolver`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals` |
 | [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
-| [TimeScale](time-scale.md) | `TimeScale` |
+| [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `LossFunction`, `OptimizationAlgorithm` |
 | [Probabilistic Calibration](probabilistic-calibrator.md) | `ProbabilisticCalibrationConfig`, `ProbEvaluationFilterConfig`, `ProbClusteringConfig`, `ProbRepresentativeConfig`, `ProbNsga2Config`, `ProbGreedyLocalSearchConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics`, `CalibrationEvaluation`, `ci_percentiles`, `member_statistics` |
 | [Reports](reports.md) | `applied_parameters_report`, `simulation_report` |

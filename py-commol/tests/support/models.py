@@ -18,8 +18,8 @@ what it changes. The factories share these keywords:
   ``Conditions``.
 - ``compartment_fractions``: per-compartment overrides, as in
   ``set_initial_conditions``.
-- ``bin_unit`` and ``units``: the unit of every bin, and of each parameter by
-  id.
+- ``bin_unit``, ``units`` and ``step_unit``: the unit of every bin, of each
+  parameter by id, and of one step.
 - A rate keyword (``ab``, ``rate``, …): ``None`` leaves that
   transition out.
 - ``accumulator``: the id of an accumulator that counts the first transition.
@@ -133,6 +133,7 @@ def abc_builder(
     stratifications: Stratifications | None = None,
     conditions: Conditions | None = None,
     bin_unit: str | None = None,
+    step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
     accumulator: str | None = None,
 ) -> ModelBuilder:
@@ -142,7 +143,9 @@ def abc_builder(
     The defaults are ``k1 = 0.3``, ``k2 = 0.1``, a total of 1000, 99 % in A
     and 1 % in B. See the module docstring for the keywords.
     """
-    builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
+    builder = ModelBuilder(
+        name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
+    )
     builder.add_bin(id="A", name="State A")
     builder.add_bin(id="B", name="State B")
     builder.add_bin(id="C", name="State C")
@@ -182,6 +185,7 @@ def abcd_builder(
     total: float = 1000,
     fractions: Mapping[str, float | None] | None = None,
     bin_unit: str | None = None,
+    step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
 ) -> ModelBuilder:
     """
@@ -192,7 +196,9 @@ def abcd_builder(
     1000, 98 % in A, 1 % in B and 1 % in C. See the module docstring for the
     keywords.
     """
-    builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
+    builder = ModelBuilder(
+        name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
+    )
     for bin_id in ("A", "B", "C", "D"):
         builder.add_bin(id=bin_id, name=bin_id)
     for transition_id, source, target, rate in (
@@ -234,6 +240,7 @@ def a_to_b_builder(
     compartment_fractions: list[CompartmentFractionDict] | None = None,
     accumulator: str | None = None,
     bin_unit: str | None = None,
+    step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
 ) -> ModelBuilder:
     """
@@ -243,7 +250,9 @@ def a_to_b_builder(
     step, and the total of 1000 starts in A. ``per_compartment`` is passed to
     ``add_transition``. See the module docstring for the other keywords.
     """
-    builder = ModelBuilder(name=name, version="1.0", bin_unit=bin_unit)
+    builder = ModelBuilder(
+        name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
+    )
     builder.add_bin(id="A", name="A")
     builder.add_bin(id="B", name="B")
     if accumulator is not None:

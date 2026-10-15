@@ -12,7 +12,7 @@ test that guards it. Read the ones of your area before you change it.
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [what they hold](#state-amount-total-and-subgroup-total), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Transitions and rates | [Rate semantics](#absolute-and-proportional-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
-| Time | [Physical time](#physical-time-is-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
+| Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
@@ -262,39 +262,59 @@ See also [Per-compartment initial conditions](../development/design-per-compartm
 
 ## Time
 
-### Physical time is not in the model
+### Physical units are not in the model
 
-A `Model` records no step length: rates are per step and periods are step
-counts. The axis of a model is its independent variable, whatever quantity it
-is (time is one case), so the engines never ask which dimension it has. `Model.step_unit` is optional and only the unit check
-reads it. `TimeScale` (`api/time_scale.py`) holds the length of a step of time
-and converts durations and probabilities; the window grid is in
-`api/windows.py`. Conversions **raise**
-when a period is not a whole number of steps, instead of rounding. Months and
-years are absent on purpose, because they have no fixed length in steps.
-`TimeScale` applies only when that variable is time:
-`TimeScale.from_step_unit` raises for a step unit that is not time.
+A `Model` records no step length: rates are per step and positions and periods
+are step counts. The axis of a model is its independent variable, whatever
+quantity it is (time is one case), so the engines never ask which dimension it
+has. `Model.step_unit` is optional; only the unit check and `AxisUnits` read
+it. `AxisUnits` (`context/axis_units.py`) converts a value in any unit of the
+step dimension to steps on `pint`, and `Model.axis_units()` builds it from
+`step_unit` (or `step`) and the engine of the model. `steps` returns a `float`
+and snaps a result within `1e-9` of an integer to it; whether a position must
+be whole is the engine's check, not the converter's. The window grid is in
+`api/windows.py`.
 
-**Guards:** `tests/simulation/test_time_scale.py::TestFromStepUnit`,
+The rate conversions (`rate_from_mean_span`, `rate_from_probability`) ask the
+engine: `RateMeaning::rate_from_mean_span` and `rate_from_probability`
+(`crates/commol-core/src/types/engine.rs`) hold the formula of each meaning, so
+a new engine picks a meaning and Python does not change. The per-step rate
+from a mean span is `1 - e^(-1/n)`: it keeps the survival of the continuous
+process at every step, and its mean residence is `1/rate`, not `n` (10.508
+steps for `n = 10`). `r = 1/n` keeps the mean and loses the survival.
+
+**Rule:** no formula of a rate per engine in Python; ask the engine.
+
+**Guards:** `tests/simulation/test_axis_units.py`,
+`crates/commol-core/src/types/engine.rs` (tests `a_rate_from_…`),
 `tests/simulation/test_windows.py::TestWindowGrid`.
 
 ### One step unit in the unit check
 
-The engine applies every flow once per step and converts no value between
-units. So `UnitChecker._step_unit` (`context/_model/units.py`) uses one step
-unit: the declared `Model.step_unit`, of any single dimension
-(`check_step_unit`), or else the one unit of time that the parameter units use
-(`step` when there is none). `check_equation_units` requires every flow to be
-**equal** to `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not
-only convertible to it (`utils/equations.py`, `same_unit`). Inference never
-takes a unit that is not time: a parameter in `1/(item·meter)` may be a
-density, not a rate along the axis, so the check does not guess.
+The engine converts no value between units. So `UnitChecker._step_unit`
+(`context/_model/units.py`) uses one step unit: the declared
+`Model.step_unit`, of any single dimension (`check_step_unit`), or else `step`,
+the default increment of any axis (dimension `[step]`). The check never infers
+the step unit from the parameters: a parameter in `1/meter` may be a density,
+not a rate along the axis, and inferring only from units of time gives time a
+privilege that no other axis has. Without `step_unit`, a failed check says to
+declare it. `check_equation_units` requires every flow to be **equal** to
+`<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not only
+convertible to it (`utils/equations.py`, `same_unit`).
+
+A unit means what `pint` defines; there is no list of aliases. A name that
+`pint` does not define becomes the one unit of its own dimension
+(`define_units`). In the check, `t` (a position) has the step unit and `step`
+(a count) is dimensionless. A number written in a rate and added to,
+subtracted from or compared with a quantity is read in its unit, as the engine
+reads it (`parse_equation_unit`); a computed number stays dimensionless.
 
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
-model would apply a weekly rate every day.
+model would read a weekly rate as a daily one.
 
 **Guards:** `tests/units/test_model_units.py::TestStepUnit`,
-`tests/units/test_model_units.py::TestAxisUnit`.
+`tests/units/test_model_units.py::TestAxisUnit`,
+`tests/units/test_model_units.py::TestPositionOnTheAxis`.
 
 ### Time inside a step
 

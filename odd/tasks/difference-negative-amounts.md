@@ -11,7 +11,7 @@ with negative amounts, four of them in published examples. None comes from
 proportional rates that sum above 1, the case `markov-chains.md` S2 checked;
 so the rule is wider than that ODD said, and it moves here.
 Branch: `fix/difference-negative-amounts` from `develop`, after
-`odd/tasks/axis-scale-refactor.md` is merged and before the 0.3.0 release.
+`odd/archive/tasks/axis-scale-refactor.md` is merged and before the 0.3.0 release.
 Engram mirror: topic `odd/difference-negative-amounts/tasks` (project `commol`).
 Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
 --release --features test-kind`, then `pytest`, `pytest -m docs`, `ruff check
