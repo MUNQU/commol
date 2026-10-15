@@ -4,9 +4,10 @@ Goal: measure, on one stratified model taken from the group's applied work,
 what commol does better or worse than the closest libraries, so that the work
 after this ODD is chosen by evidence. The result also serves as material for a
 software paper.
-Branch: `chore/library-benchmark` from `develop`, after the PRs of
-`odd/archive/tasks/test-suite-refactor.md`, `odd/archive/tasks/ode-engine.md` and
-`odd/archive/tasks/reference-model-tests.md` merge.
+Branch: `chore/library-benchmark` from `develop`, after the release that
+follows the uncertainty and identifiability program
+(`odd/tasks/inference-foundation.md` to `odd/tasks/emulation-discrepancy.md`;
+`odd/execution-order.md`, L7).
 Engram mirror: topic `odd/library-benchmark/tasks` (project `commol`).
 Runners: `pytest` (from `py-commol/`), the benchmark command of S5,
 `mkdocs build --strict` (from the root).
@@ -22,7 +23,10 @@ library for other researchers. The closest libraries:
 | odin2 + dust2 + monty | R (DSL compiled to C++) | Difference equations and ODE, deterministic or stochastic | Particle filter, MCMC | MRC-IDE |
 
 Commol today: deterministic only; optimization (Nelder-Mead, PSO) and ensemble
-calibration, no likelihood-based Bayesian inference.
+calibration, no likelihood-based Bayesian inference. When this ODD runs (L7),
+commol will have stochastic engines (`stochastic-compartmental.md`), ABC-SMC
+(`smc-inference.md`), particle filters and PMMH (`state-space-inference.md`),
+and no ensemble; D6 revisits D3 and D4 for that state.
 
 ## Specs
 
@@ -98,6 +102,7 @@ Each row says why the recommendation beats each alternative.
 | D3 | S2 | How to compare deterministic with stochastic? | Commol's run against the stochastic mean at large population, with the gap and the number of runs reported. | Compare single runs: one stochastic run is noise. Ask commol for a stochastic mode: does not exist. Skip accuracy, time only: a fast wrong answer looks good. | approved (L4) |
 | D4 | S3 | How to compare calibration? | Parameter recovery on synthetic data, and wall time to reach it; the posterior of ABC is reported, not scored. | Score the posterior against commol's ensemble: they answer different questions (Bayesian posterior against an ensemble of good fits). Skip calibration: it is half of what commol offers. | approved (L5); the posteriors of ABC (epydemix) and MCMC (odin2) are shown, not scored |
 | D5 | S5 | Where does the benchmark live? | A `benchmarks/` directory in this repository, outside the package, with its own dependency group (not shipped in the wheel); results summarized in `docs/about/`. | A separate repository: cleaner for the GPL-3.0 dependency, but it drifts from commol's API. Inside `tests/`: it would run in CI, which is slow and depends on another library. | approved (L6) |
+| D6 | S2, S3 | With stochastic engines and Bayesian inference in commol (L7), how do D3 and D4 change? | Compare like with like: commol's stochastic engine against epydemix's and odin2's stochastic runs; commol's ABC-SMC against epydemix's ABC-SMC and commol's PMMH against monty's, on the same synthetic data, scoring each posterior by coverage of the true parameters and CRPS (`commol.scores`), not only showing it. Keep D3's deterministic comparison as one row. | Keep D3 and D4 as approved: compares commol's deterministic run with stochastic means and leaves posteriors unscored, when like-for-like runs exist. Drop the deterministic row: loses the run-against-run comparison with odin2's deterministic mode that S2 keeps. | proposed |
 
 ## Tasks
 
@@ -113,8 +118,8 @@ Each row says why the recommendation beats each alternative.
 ## Delivery
 
 - Strategy: one PR to `develop`, squash-merged (`chore(benchmark): …`).
-- Order: after the three planned PRs (test refactor, ODE engine, reference
-  tests). T1 → T2 → T3 → T3b → T4 → T5.
+- Order: after the release that follows `emulation-discrepancy.md`
+  (`odd/execution-order.md`). T1 → T2 → T3 → T3b → T4 → T5.
 - Version impact: none (nothing in the package changes).
 - The leak check of `odd/archive/tasks/reference-model-tests.md` (Confidentiality) also runs
   here.
@@ -133,3 +138,9 @@ Each row says why the recommendation beats each alternative.
 - L4 (user, 2026-10-13): D3 → "Media estocástica, población grande".
 - L5 (user, 2026-10-13): D4 → "Recuperar parámetros conocidos".
 - L6 (user, 2026-10-13): D5 → "benchmarks/ en este repo".
+- L7 (user, 2026-10-15): asked to run the benchmark after the uncertainty
+  and identifiability program (`odd/tasks/inference-foundation.md` L5). That
+  program needs the stochastic engine for its state-space methods, so the
+  benchmark also follows `model-kind-foundation.md` and
+  `stochastic-compartmental.md`; the other modelling ODDs (Markov chains,
+  integral outputs, networks, agents) stay after it. D6 proposed.

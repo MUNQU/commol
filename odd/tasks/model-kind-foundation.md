@@ -351,9 +351,9 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
   replicates allow; two runs with one seed give the same result; the CRPS of
   one replicate equals the absolute error, and the CRPS of a known ensemble
   equals its closed form `E|X − y| − ½ E|X − X'|`.
-- Out of scope: likelihood-based inference (particle filters, ABC). It needs
-  its own ODD once a stochastic engine exists; the benchmark ODD lists it as a
-  candidate (`odd/tasks/library-benchmark.md` S6).
+- Out of scope: likelihood-based inference (particle filters, ABC). ABC is
+  in `odd/tasks/smc-inference.md`, particle filters in
+  `odd/tasks/state-space-inference.md` (L18).
 
 ### S8 — Documentation and README
 
@@ -476,3 +476,7 @@ Each row says why the recommendation beats each alternative.
   S0 enables the rules and fixes them.
 - L17 (user, 2026-10-15): approved D11, variants of a structure, so
   `MarkovChain` and `Network` are classes that load back as themselves.
+- L18 (user, 2026-10-15): asked for the uncertainty and identifiability
+  program (`odd/tasks/inference-foundation.md`) before the benchmark; the
+  out-of-scope note of S7 now points to its ODDs. This ODD runs before that
+  program, which builds on its seeds, replicates and calibration objective.
