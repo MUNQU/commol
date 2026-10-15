@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
 ### Added
 
 - An ODE engine: a model built with `engine="DifferentialEquations"` runs in
@@ -545,6 +547,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
 - **0.2.0** - Per-compartment initial conditions and engine-planned transitions
 - **0.1.0 to 0.1.3** - First 0.1 versions
 - **0.0.1** - Initial release with core functionality
