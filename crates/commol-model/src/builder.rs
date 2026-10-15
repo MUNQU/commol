@@ -207,28 +207,14 @@ impl CompiledModel {
         let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
             .into_iter()
             .partition(|flow| schedules.contains_key(&flow.transition_id));
-        let impulse_schedules: Vec<(String, ImpulseSchedule)> = impulse_plans
-            .iter()
-            .map(|plan| {
-                (
-                    plan.transition_id.clone(),
-                    schedules[&plan.transition_id].clone(),
-                )
-            })
-            .collect();
-        let impulse_flows: Vec<ImpulseFlow> = impulse_schedules
-            .into_iter()
-            .zip(compile_transition_flows(
-                impulse_plans,
-                &compartment_map,
-                &expression_context,
-            ))
-            .map(|((transition_id, schedule), flow)| ImpulseFlow {
-                transition_id,
-                flow,
-                schedule,
-            })
-            .collect();
+        let impulse_flows: Vec<ImpulseFlow> =
+            compile_transition_flows(impulse_plans, &compartment_map, &expression_context)
+                .into_iter()
+                .map(|flow| ImpulseFlow {
+                    schedule: schedules[&flow.transition_id].clone(),
+                    flow,
+                })
+                .collect();
         let transition_flows =
             compile_transition_flows(flow_plans, &compartment_map, &expression_context);
 
@@ -651,6 +637,7 @@ fn compile_transition_flows(
                 build_fast_rate_expression(&rate_expression, compartment_map, expression_context);
             let (source_index, target_index) = flow.pieces[0];
             TransitionFlow {
+                transition_id: flow.transition_id,
                 source_index,
                 target_index,
                 extra_pieces: flow.pieces[1..].to_vec(),

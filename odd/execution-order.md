@@ -17,7 +17,7 @@ merged or archived.
 | 5 | `odd/archive/tasks/neutral-state-terms.md` | delivered by PR #108 | 4 | Yes |
 | 6 | `odd/archive/tasks/domain-agnostic-audit.md` | delivered by PR #109 | 5 | Yes |
 | 7 | `odd/archive/tasks/axis-scale-refactor.md` | delivered by PR #112 | 6 | Yes |
-| 8 | `odd/tasks/difference-negative-amounts.md` | T1 → T5 | 7 | Yes |
+| 8 | `odd/archive/tasks/difference-negative-amounts.md` | delivered by the PR of `fix/difference-negative-amounts` | 7 | Yes |
 | 9 | Release 0.3.0 (`docs/development/release.md`) | — | 2–8 | — |
 | 10 | `odd/tasks/library-benchmark.md` | T1 → T5 | 9 | No |
 | 11 | `odd/tasks/model-kind-foundation.md` | T0 → T8 | 9 | Yes |

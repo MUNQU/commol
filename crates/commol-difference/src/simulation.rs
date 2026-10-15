@@ -1,10 +1,25 @@
 //! The difference equations engine: one step adds the right-hand side once.
 
-use commol_core::ModelValue;
+use commol_core::{ModelValue, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
 };
 use std::collections::HashMap;
+
+/// How far below zero, relative to the total at the start of a step, an
+/// amount may fall: the rounding of flows that empty a compartment exactly.
+const AMOUNT_TOLERANCE: f64 = 1e-12;
+
+/// The lowest amount a compartment may hold after a step that starts from
+/// `amounts`.
+fn lowest_amount(amounts: &[f64]) -> f64 {
+    -AMOUNT_TOLERANCE * amounts.iter().sum::<f64>()
+}
+
+/// `value` to six significant digits, for a message.
+fn rounded(value: f64) -> f64 {
+    format!("{value:.5e}").parse().unwrap_or(value)
+}
 
 /// Difference equations simulation engine.
 ///
@@ -16,7 +31,8 @@ pub struct DifferenceEquations {
     model: CompiledModel,
     /// Current state: compartments, then accumulators.
     state: Vec<f64>,
-    /// Reusable buffer for the right-hand side to avoid allocations.
+    /// Reusable buffer for the right-hand side to avoid allocations. Before
+    /// the impulses of a step act, it holds the state they start from.
     rates: Vec<f64>,
     current_step: f64,
     /// Whether the impulses at `current_step` are already in `state`.
@@ -86,13 +102,77 @@ impl DifferenceEquations {
     ///
     /// At step `n` the state first jumps, then the flows of the step run from
     /// the new state, so the output at `n` shows the state after the jump.
-    fn settle(&mut self) -> Result<(), String> {
-        if !self.settled {
-            self.model
-                .apply_impulses(self.current_step, &mut self.state)?;
-            self.settled = true;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::Infeasible`] when the impulses leave a
+    /// compartment below zero, and [`SimulationError::Failed`] when a rate
+    /// cannot be evaluated.
+    fn settle(&mut self) -> Result<(), SimulationError> {
+        if self.settled {
+            return Ok(());
         }
+        if self.model.has_impulses() {
+            self.rates.copy_from_slice(&self.state);
+            if self
+                .model
+                .apply_impulses(self.current_step, &mut self.state)?
+            {
+                self.check_impulses()?;
+            }
+        }
+        self.settled = true;
         Ok(())
+    }
+
+    /// Check the state the impulses of the current step wrote, from the
+    /// state in `rates` they started from.
+    fn check_impulses(&mut self) -> Result<(), SimulationError> {
+        let num_compartments = self.model.num_compartments();
+        let before = &self.rates[..num_compartments];
+        let lowest = lowest_amount(before);
+        let Some(compartment) = (0..num_compartments).find(|&i| self.state[i] < lowest) else {
+            return Ok(());
+        };
+        let step = self.current_step;
+        let drains = self
+            .model
+            .impulse_outflows(step, &self.rates, compartment)?;
+        Err(self.below_zero(
+            format!("The impulses at step {step}"),
+            compartment,
+            self.rates[compartment],
+            self.state[compartment],
+            &drains,
+        ))
+    }
+
+    /// The error for a compartment that `cause` leaves at `after`, from
+    /// `before`, with the flows that drain it.
+    fn below_zero(
+        &self,
+        cause: String,
+        compartment: usize,
+        before: f64,
+        after: f64,
+        drains: &[(String, f64)],
+    ) -> SimulationError {
+        let drains: Vec<String> = drains
+            .iter()
+            .map(|(transition, amount)| format!("'{transition}' {}", rounded(*amount)))
+            .collect();
+        SimulationError::Infeasible {
+            position: self.current_step,
+            message: format!(
+                "{cause} leave compartment '{}' at {after}, below zero: it held {before}, \
+                 and the flows out of it move {}. A difference step cannot move more \
+                 than a compartment holds",
+                self.model.compartments()[compartment],
+                drains.join(", "),
+                after = rounded(after),
+                before = rounded(before),
+            ),
+        }
     }
 
     /// The compiled model the engine steps.
@@ -135,12 +215,29 @@ impl DifferenceEquations {
     ///
     /// # Errors
     ///
-    /// Returns an error message if rate evaluation fails.
-    pub fn step(&mut self) -> Result<(), String> {
+    /// Returns [`SimulationError::Infeasible`] when the impulses or the flows
+    /// leave a compartment below zero (by more than the rounding of a flow
+    /// that empties it), and the state stays as it was before them. Returns
+    /// [`SimulationError::Failed`] when a rate cannot be evaluated.
+    pub fn step(&mut self) -> Result<(), SimulationError> {
         self.settle()?;
         let step = self.current_step;
         self.model
             .derivatives(step, step, &self.state, &mut self.rates)?;
+        let num_compartments = self.model.num_compartments();
+        let lowest = lowest_amount(&self.state[..num_compartments]);
+        if let Some(compartment) =
+            (0..num_compartments).find(|&i| self.state[i] + self.rates[i] < lowest)
+        {
+            let drains = self.model.outflows(step, step, &self.state, compartment)?;
+            return Err(self.below_zero(
+                format!("The flows of step {step}"),
+                compartment,
+                self.state[compartment],
+                self.state[compartment] + self.rates[compartment],
+                &drains,
+            ));
+        }
         for (value, rate) in self.state.iter_mut().zip(&self.rates) {
             *value += rate;
         }
@@ -154,7 +251,11 @@ impl DifferenceEquations {
     ///
     /// `steps` are sorted, unique and not before the current step; the
     /// caller checks them ([`commol_core::check_positions`]).
-    fn record_steps(&mut self, steps: &[u32], buffer: &mut Vec<Vec<f64>>) -> Result<(), String> {
+    fn record_steps(
+        &mut self,
+        steps: &[u32],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
         let output_len = self.output_len();
 
         // Keep existing row allocations alive across repeated calls. This is
@@ -206,14 +307,14 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimulationError> {
         commol_core::check_positions(positions, self.current_step, check_step)?;
         // `check_step` accepts only integers that fit in a `u32`.
         let steps: Vec<u32> = positions.iter().map(|&position| position as u32).collect();
         self.record_steps(&steps, buffer)
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         DifferenceEquations::step(self)
     }
 
@@ -488,7 +589,8 @@ mod tests {
         let mut engine = DifferenceEquations::from_model(&model);
         let error = engine
             .step()
-            .expect_err("missing parameter must not be treated as zero");
+            .expect_err("missing parameter must not be treated as zero")
+            .to_string();
 
         assert!(error.contains("Variable 'missing' not found"));
     }
@@ -631,6 +733,137 @@ mod tests {
         model
     }
 
+    /// A transition of the three-bin model, an impulse at `impulse_at` if
+    /// there are positions.
+    fn transition(
+        id: &str,
+        source: &str,
+        target: &str,
+        rate: &str,
+        impulse_at: &[f64],
+    ) -> Transition {
+        Transition {
+            id: id.to_string(),
+            source: vec![source.to_string()],
+            target: vec![target.to_string()],
+            accumulators: vec![],
+            rate: Some(RateMathExpression::from_string(rate.to_string())),
+            stratified_rates: None,
+            per_compartment: None,
+            impulse_at: (!impulse_at.is_empty()).then(|| impulse_at.to_vec()),
+            impulse_every: None,
+        }
+    }
+
+    /// The three-bin model (`A` = 990, `B` = 10, `C` = 0) with `transitions`.
+    fn three_bins_with(transitions: Vec<Transition>) -> Model {
+        let mut model = make_three_bin_model();
+        model.compartmental_mut().unwrap().transitions = transitions;
+        model
+    }
+
+    /// The position and the message of an infeasible run, or a panic.
+    fn infeasible(error: SimulationError) -> (f64, String) {
+        match error {
+            SimulationError::Infeasible { position, message } => (position, message),
+            SimulationError::Failed(message) => panic!("expected an infeasible run: {message}"),
+        }
+    }
+
+    #[test]
+    fn flows_that_move_more_than_a_compartment_holds_stop_the_first_step() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![
+            transition("a_to_c", "A", "C", "0.5", &[]),
+            transition("a_to_b", "A", "B", "0.7", &[]),
+        ]));
+
+        let (position, message) = infeasible(engine.run(3).unwrap_err());
+
+        assert_eq!(position, 0.0);
+        assert_eq!(
+            message,
+            "The flows of step 0 leave compartment 'A' at -198, below zero: \
+             it held 990, and the flows out of it move 'a_to_b' 693, 'a_to_c' 495. A \
+             difference step cannot move more than a compartment holds"
+        );
+        // The state stays as it was before the step.
+        assert_eq!(engine.state(), vec![990.0, 10.0, 0.0]);
+        assert_eq!(engine.current_step, 0.0);
+    }
+
+    #[test]
+    fn a_rate_that_turns_negative_stops_the_step_where_an_amount_drops_below_zero() {
+        // From step 7 the flow runs backwards and takes 2 × 990 from `B`.
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![transition(
+            "a_to_b",
+            "A",
+            "B",
+            "if(step >= 7, -2, 0)",
+            &[],
+        )]));
+
+        let (position, message) = infeasible(engine.run(20).unwrap_err());
+
+        assert_eq!(position, 7.0);
+        assert!(
+            message.starts_with("The flows of step 7 leave compartment 'B' at -1970")
+                && message.contains("it held 10, and the flows out of it move 'a_to_b' 1980."),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn proportional_rates_that_sum_to_one_empty_a_compartment() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![
+            transition("a_to_b", "A", "B", "0.1", &[]),
+            transition("a_to_c", "A", "C", "0.2", &[]),
+            transition("a_to_b_again", "A", "B", "0.7", &[]),
+        ]));
+
+        let rows = engine.run(3).unwrap().rows;
+
+        assert!(rows[1][0].abs() < 1e-12 * 1000.0, "{}", rows[1][0]);
+        assert!(((rows[3][1] + rows[3][2]) - 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn an_impulse_that_moves_more_than_its_source_holds_stops_its_step() {
+        let mut engine = DifferenceEquations::from_model(&three_bins_with(vec![transition(
+            "dose",
+            "B",
+            "C",
+            "1.5",
+            &[3.0],
+        )]));
+
+        let (position, message) = infeasible(engine.run(5).unwrap_err());
+
+        assert_eq!(position, 3.0);
+        assert_eq!(
+            message,
+            "The impulses at step 3 leave compartment 'B' at -5, below zero: it held 10, \
+             and the flows out of it move 'dose' 15. A difference step cannot move more \
+             than a compartment holds"
+        );
+    }
+
+    #[test]
+    fn an_accumulator_may_count_a_negative_net_flow() {
+        let mut model = three_bins_with(vec![Transition {
+            accumulators: vec!["moved".to_string()],
+            ..transition("a_to_b", "A", "B", "-0.001", &[])
+        }]);
+        model.compartmental_mut().unwrap().accumulators = vec![commol_core::Accumulator {
+            id: "moved".to_string(),
+            name: "Moved".to_string(),
+        }];
+        let mut engine = DifferenceEquations::from_model(&model);
+
+        let rows = engine.run(2).unwrap().rows;
+
+        assert!(rows[2][3] < 0.0, "{:?}", rows[2]);
+    }
+
     #[test]
     fn pi_and_e_are_constants_in_every_rate_path() {
         // k2 = 0.1, A starts at 990: one step moves `constant * 0.1 * 990`.
@@ -708,13 +941,13 @@ mod tests {
     #[test]
     fn unsorted_or_past_positions_are_rejected() {
         let mut engine = DifferenceEquations::from_model(&make_three_bin_model());
-        let error = engine.run_at(&[3.0, 1.0]).unwrap_err();
+        let error = engine.run_at(&[3.0, 1.0]).unwrap_err().to_string();
         assert!(error.contains("sorted and unique"), "{error}");
-        let error = engine.run_at(&[2.5]).unwrap_err();
+        let error = engine.run_at(&[2.5]).unwrap_err().to_string();
         assert!(error.contains("2.5 is not one"), "{error}");
 
         engine.run(4).unwrap();
-        let error = engine.run_at(&[2.0]).unwrap_err();
+        let error = engine.run_at(&[2.0]).unwrap_err().to_string();
         assert!(error.contains("before the current position 4"), "{error}");
     }
 

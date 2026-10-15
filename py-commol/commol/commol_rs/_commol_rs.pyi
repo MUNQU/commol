@@ -128,8 +128,12 @@ class ModelKindProtocol(Protocol):
     def name(self) -> str: ...
     def value_types(self) -> list[str]: ...
 
+class InfeasibleStateError(ValueError):
+    """A run left the values its model allows, such as an amount below zero."""
+
 class EngineModule(Protocol):
     Engine: type[EngineProtocol]
+    InfeasibleStateError: type[InfeasibleStateError]
     EngineType: type[EngineTypeProtocol]
     ModelKind: type[ModelKindProtocol]
 

@@ -62,6 +62,8 @@ pub(crate) enum FastRateOp {
 /// Pre-computed transition flow information for performance
 #[derive(Clone)]
 pub(crate) struct TransitionFlow {
+    /// Id of the transition the flow comes from.
+    pub(crate) transition_id: String,
     /// `None` for source-less transitions.
     pub(crate) source_index: Option<usize>,
     /// `None` for target-less transitions.
@@ -151,8 +153,6 @@ impl ImpulseSchedule {
 /// A transition that moves its rate at once at the positions of a schedule.
 #[derive(Clone)]
 pub(crate) struct ImpulseFlow {
-    /// Id of the impulse transition.
-    pub(crate) transition_id: String,
     /// Pieces, rate and accumulators, compiled as for any transition.
     pub(crate) flow: TransitionFlow,
     pub(crate) schedule: ImpulseSchedule,

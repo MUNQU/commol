@@ -155,6 +155,16 @@ that names the kind when you create the `Calibrator`.
 With `normalize_observations=True`, each residual is first divided by the RMS
 of the observations of its series (its `label`).
 
+A run the model does not allow gets a penalty instead of a loss: a run with
+values that are not finite, or a difference step that leaves an amount below
+zero (`InfeasibleStateError`, see
+[Amounts below zero](transitions.md#amounts-below-zero)). The penalty is much
+larger than any fit, and the run is not recorded in the history, so the
+optimizer moves away from it and goes on. Any other error of a run, such as a
+rate that cannot be evaluated, stops the calibration with its message
+(`CalibrationProblem::cost` in
+`crates/commol-calibration/src/calibration_problem.rs`).
+
 ## Results
 
 `Calibrator(simulation, problem)` checks the problem against the model, and

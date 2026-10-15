@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use crate::calibration_problem::CalibrationProblem;
 use crate::optimization::{optimize_with_history, OptimizationConfig};
 use crate::types::CalibrationResultWithHistory;
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, SimulationError};
 
 use super::error::{CalibrationError, CalibrationResult};
 
@@ -157,7 +157,17 @@ fn apply_evaluation_retention(
 /// within the parallel execution, then convert to the appropriate CalibrationError.
 enum PredictionError {
     ParameterSetFailed { name: String, reason: String },
+    Infeasible(String),
     SimulationFailed(String),
+}
+
+impl From<SimulationError> for PredictionError {
+    fn from(error: SimulationError) -> Self {
+        match error {
+            SimulationError::Infeasible { message, .. } => Self::Infeasible(message),
+            SimulationError::Failed(message) => Self::SimulationFailed(message),
+        }
+    }
 }
 
 /// Generate predictions for multiple parameter sets in parallel.
@@ -177,7 +187,8 @@ enum PredictionError {
 ///
 /// # Errors
 /// - `CalibrationError::ParameterSetFailed` if setting a parameter fails
-/// - `CalibrationError::SimulationFailed` if simulation fails
+/// - `CalibrationError::Infeasible` if a run leaves the values the model allows
+/// - `CalibrationError::SimulationFailed` if simulation fails for another reason
 pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
     base_engine: &E,
     parameter_sets: Vec<Vec<f64>>,
@@ -205,27 +216,11 @@ pub fn generate_predictions_parallel<E: SimulationEngine + Send + Sync>(
             }
 
             // Run simulation - this returns [position][output]
-            engine
-                .run_at(&positions)
-                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))
+            engine.run_at(&positions).map_err(PredictionError::from)
         })
         .collect();
 
-    // Collect successful results
-    let mut all_predictions = Vec::new();
-    for result in predictions {
-        match result {
-            Ok(pred) => all_predictions.push(pred),
-            Err(PredictionError::ParameterSetFailed { name, reason }) => {
-                return Err(CalibrationError::ParameterSetFailed { name, reason });
-            }
-            Err(PredictionError::SimulationFailed(reason)) => {
-                return Err(CalibrationError::SimulationFailed(reason));
-            }
-        }
-    }
-
-    Ok(all_predictions)
+    collect_prediction_results(predictions)
 }
 
 /// Generate predictions for calibration parameter sets, applying both model
@@ -247,9 +242,7 @@ pub fn generate_calibrated_predictions_parallel<E: SimulationEngine + Send + Syn
                 }
             })?;
 
-            engine
-                .run_at(&positions)
-                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))
+            engine.run_at(&positions).map_err(PredictionError::from)
         })
         .collect();
 
@@ -299,7 +292,7 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
             let mut sparse_results = Vec::with_capacity(positions.len());
             engine
                 .run_at_positions_into_buffer(&positions, &mut sparse_results)
-                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
+                .map_err(PredictionError::from)?;
 
             metric_points
                 .iter()
@@ -320,20 +313,7 @@ pub fn generate_predictions_at_points_parallel<E: SimulationEngine + Send + Sync
         })
         .collect();
 
-    let mut all_predictions = Vec::new();
-    for result in predictions {
-        match result {
-            Ok(pred) => all_predictions.push(pred),
-            Err(PredictionError::ParameterSetFailed { name, reason }) => {
-                return Err(CalibrationError::ParameterSetFailed { name, reason });
-            }
-            Err(PredictionError::SimulationFailed(reason)) => {
-                return Err(CalibrationError::SimulationFailed(reason));
-            }
-        }
-    }
-
-    Ok(all_predictions)
+    collect_prediction_results(predictions)
 }
 
 /// Generate compact predictions for calibration parameter sets, applying both
@@ -372,7 +352,7 @@ pub fn generate_calibrated_predictions_at_points_parallel<E: SimulationEngine + 
             let mut sparse_results = Vec::with_capacity(positions.len());
             engine
                 .run_at_positions_into_buffer(&positions, &mut sparse_results)
-                .map_err(|e| PredictionError::SimulationFailed(e.to_string()))?;
+                .map_err(PredictionError::from)?;
 
             metric_points
                 .iter()
@@ -405,6 +385,9 @@ fn collect_prediction_results<T>(
             Ok(pred) => all_predictions.push(pred),
             Err(PredictionError::ParameterSetFailed { name, reason }) => {
                 return Err(CalibrationError::ParameterSetFailed { name, reason });
+            }
+            Err(PredictionError::Infeasible(reason)) => {
+                return Err(CalibrationError::Infeasible(reason));
             }
             Err(PredictionError::SimulationFailed(reason)) => {
                 return Err(CalibrationError::SimulationFailed(reason));

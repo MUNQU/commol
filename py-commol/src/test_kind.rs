@@ -8,7 +8,8 @@
 use std::collections::HashMap;
 
 use commol_core::{
-    DecayOutput, Model, ModelStructure, ModelValue, ParameterValue, SimulationEngine, ValuePlan,
+    DecayOutput, Model, ModelStructure, ModelValue, ParameterValue, SimulationEngine,
+    SimulationError, ValuePlan,
 };
 
 /// The engine of the test model kind.
@@ -93,7 +94,7 @@ impl SimulationEngine for TestEngine {
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SimulationError> {
         commol_core::check_positions(positions, self.position, check_position)?;
         buffer.clear();
         for &position in positions {
@@ -105,7 +106,7 @@ impl SimulationEngine for TestEngine {
         Ok(())
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         self.position += 1.0;
         Ok(())
     }

@@ -33,6 +33,8 @@ class TestFullProduct:
         model = build(
             abc_builder(
                 parameters={"k1": 0.25, "k2": 0.1},
+                ab="k1",
+                bc="k2",
                 stratifications={
                     "group": {"g1": 0.6, "g2": 0.4},
                     "type": {"t1": 0.7, "t2": 0.3},
@@ -90,6 +92,8 @@ class TestConditionalStratification:
     def test_a_run_keeps_the_total(self) -> None:
         model = build(
             abc_builder(
+                ab="k1",
+                bc="k2",
                 fractions={"A": 0.9, "B": 0.1, "C": 0.0},
                 stratifications={"group": GROUP, "status": STATUS},
                 conditions={"status": {"group": "g2"}},

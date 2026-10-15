@@ -1,7 +1,9 @@
 //! Calibration problem definition and implementation
 
 use argmin::core::{CostFunction, Error};
-use commol_core::{MathExpression, MathExpressionContext, SimulationEngine, ENGINE_VARIABLES};
+use commol_core::{
+    MathExpression, MathExpressionContext, SimulationEngine, SimulationError, ENGINE_VARIABLES,
+};
 use std::marker::PhantomData;
 use std::sync::RwLock;
 
@@ -852,9 +854,15 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             .write()
             .expect("Failed to acquire write lock on result_buffer");
 
-        engine
-            .run_at_positions_into_buffer(&self.observed_positions, &mut buffer)
-            .map_err(|e| Error::msg(format!("Simulation failed: {}", e)))?;
+        match engine.run_at_positions_into_buffer(&self.observed_positions, &mut buffer) {
+            Ok(()) => {}
+            // The parameters leave the values the model allows: a point to
+            // avoid, not a reason to stop.
+            Err(SimulationError::Infeasible { .. }) => return Ok(self.calculate_base_penalty()),
+            Err(SimulationError::Failed(error)) => {
+                return Err(Error::msg(format!("Simulation failed: {error}")));
+            }
+        }
 
         // Check for numerical instability (NaN or infinity values)
         let has_invalid_values = buffer

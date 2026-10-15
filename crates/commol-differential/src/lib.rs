@@ -35,7 +35,7 @@ pub use solve::SPARSE_THRESHOLD;
 
 use std::collections::HashMap;
 
-use commol_core::{EngineSettings, ModelValue, OdeSolver};
+use commol_core::{EngineSettings, ModelValue, OdeSolver, SimulationError};
 use commol_model::{
     CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
 };
@@ -196,18 +196,18 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         check_time(position)
     }
 
-    fn step(&mut self) -> Result<(), String> {
+    fn step(&mut self) -> Result<(), SimulationError> {
         let end = self.current_time + 1.0;
         let mut buffer = Vec::with_capacity(1);
-        self.integrate_to(&[end], &mut buffer)
+        Ok(self.integrate_to(&[end], &mut buffer)?)
     }
 
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), String> {
-        self.integrate_to(positions, buffer)
+    ) -> Result<(), SimulationError> {
+        Ok(self.integrate_to(positions, buffer)?)
     }
 
     fn output_names(&self) -> Vec<String> {

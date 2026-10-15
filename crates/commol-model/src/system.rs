@@ -238,20 +238,12 @@ impl CompiledModel {
     /// The first impulse position that is not an integer, with its
     /// transition id, if any. A difference engine only steps at integers.
     pub fn first_non_integer_impulse(&self) -> Option<(String, f64)> {
-        self.transition_ids_of_impulses()
-            .zip(&self.impulse_flows)
-            .find_map(|(id, impulse)| {
-                impulse
-                    .schedule
-                    .first_non_integer()
-                    .map(|position| (id.clone(), position))
-            })
-    }
-
-    fn transition_ids_of_impulses(&self) -> impl Iterator<Item = &String> {
-        self.impulse_flows
-            .iter()
-            .map(|impulse| &impulse.transition_id)
+        self.impulse_flows.iter().find_map(|impulse| {
+            impulse
+                .schedule
+                .first_non_integer()
+                .map(|position| (impulse.flow.transition_id.clone(), position))
+        })
     }
 
     /// Apply the impulses that act at position `t` to `state`, at once.
@@ -295,6 +287,65 @@ impl CompiledModel {
             add_flow(&impulse.flow, amount, compartment_out, accumulator_out);
         }
         Ok(true)
+    }
+
+    /// The flows that drain compartment `compartment` when
+    /// [`Self::derivatives`] reads `state` at `step` and `t`: the transition
+    /// id of each and the net amount it takes from the compartment, largest
+    /// first.
+    ///
+    /// A flow drains a compartment when it leaves it with a positive amount
+    /// or enters it with a negative one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a formula parameter or a rate cannot be
+    /// evaluated.
+    pub fn outflows(
+        &mut self,
+        step: f64,
+        t: f64,
+        state: &[f64],
+        compartment: usize,
+    ) -> Result<Vec<(String, f64)>, String> {
+        let amounts = &state[..self.compartments.len()];
+        let clock = self.prepare_context(step, t, amounts)?;
+        drains(
+            self.transition_flows.iter(),
+            amounts,
+            compartment,
+            &mut self.expression_context,
+            clock,
+        )
+    }
+
+    /// The impulses that act at `t` and drain compartment `compartment` when
+    /// [`Self::apply_impulses`] reads `state`, as [`Self::outflows`] gives
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a rate cannot be evaluated.
+    pub fn impulse_outflows(
+        &mut self,
+        t: f64,
+        state: &[f64],
+        compartment: usize,
+    ) -> Result<Vec<(String, f64)>, String> {
+        let amounts = &state[..self.compartments.len()];
+        let clock = self.prepare_context(t.floor(), t, amounts)?;
+        let firing = self
+            .impulse_flows
+            .iter()
+            .filter(|impulse| impulse.schedule.fires_at(t))
+            .map(|impulse| &impulse.flow);
+        drains(
+            firing,
+            amounts,
+            compartment,
+            &mut self.expression_context,
+            clock,
+        )
     }
 
     /// Set every variable a rate may read for the compartment amounts
@@ -390,6 +441,41 @@ fn flow_amount(
     } else {
         flow_info.source_index.map(|i| amounts[i]).unwrap_or(0.0) * rate
     })
+}
+
+/// The flows of `flows` that drain `compartment`, with the net amount each
+/// takes from it, largest first. The context is prepared for `amounts`.
+fn drains<'a>(
+    flows: impl Iterator<Item = &'a TransitionFlow>,
+    amounts: &[f64],
+    compartment: usize,
+    ctx: &mut MathExpressionContext,
+    clock: Clock,
+) -> Result<Vec<(String, f64)>, String> {
+    let mut jit_buf = [0.0_f64; 16];
+    let mut drains = Vec::new();
+    for flow_info in flows {
+        let pieces = std::iter::once((flow_info.source_index, flow_info.target_index))
+            .chain(flow_info.extra_pieces.iter().copied());
+        let mut times: f64 = 0.0;
+        for (source, target) in pieces {
+            if source == Some(compartment) {
+                times += 1.0;
+            }
+            if target == Some(compartment) {
+                times -= 1.0;
+            }
+        }
+        if times == 0.0 {
+            continue;
+        }
+        let drain = times * flow_amount(flow_info, amounts, ctx, clock, &mut jit_buf)?;
+        if drain > 0.0 {
+            drains.push((flow_info.transition_id.clone(), drain));
+        }
+    }
+    drains.sort_by(|a, b| b.1.total_cmp(&a.1));
+    Ok(drains)
 }
 
 /// Subtract `flow` from the sources of a flow, add it to its targets and to

@@ -72,6 +72,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** a `DifferenceEquations` step that leaves a compartment below
+  zero (by more than `10⁻¹²` of the total) raises `InfeasibleStateError`, a
+  `ValueError`. The message names the compartment, the step, its amount before
+  the step and the flows out of it. Before, the run went on with negative
+  amounts. A calibration gives such a run a penalty and goes on; any other
+  error of a run still stops it. See
+  [Amounts below zero](../guide/transitions.md#amounts-below-zero).
+- **Breaking (Rust):** `SimulationEngine::run_at_positions_into_buffer`,
+  `run_at`, `run` and `step` return `SimulationError` (`Infeasible` or
+  `Failed`) instead of `String`.
 - A position on the axis is a `float` everywhere, and the engine alone decides
   which positions its model type accepts: a difference model integer steps, a
   differential model any non-negative position. Its error names the
@@ -305,6 +315,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Examples 6 to 9 of the guide (`examples.md`) no longer go below zero.
+  Example 6 writes the rate it describes, `k2_max * B * max(0, 1 - C /
+  capacity)`; Examples 7, 8 and 9 set `per_compartment=True` on `flow_AB`, so
+  each compartment of `A` loses an amount computed from its own amount.
 - A differential model: on a piece of integration that ends where a rate
   jumps (a value `t` is compared with, a series point), the right-hand side
   sees `t` below the end. Before, the last solver step of the piece already

@@ -20,6 +20,7 @@ from commol.api import (
     window_start,
     windowed_totals,
 )
+from commol.commol_rs._commol_rs import engine as _engine
 from commol.context import CompartmentalStructure, Model, ModelStructure
 from commol.context.axis_units import AxisUnits
 from commol.context.engine import OdeSolver
@@ -47,6 +48,13 @@ from commol.context.probabilistic_calibration import (
 )
 from commol.context.visualization import PlotConfig
 
+InfeasibleStateError = _engine.InfeasibleStateError
+"""A run left the values its model allows, such as an amount below zero.
+
+A difference-equations step that leaves a compartment below zero raises it.
+It is a `ValueError`; a calibration treats such a run as infeasible.
+"""
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -65,6 +73,7 @@ __all__ = [
     "CalibrationEvaluation",
     "EnsembleSolution",
     "EnsembleSelectionSummary",
+    "InfeasibleStateError",
     "CalibrationParameter",
     "CalibrationProblem",
     "CalibrationResult",

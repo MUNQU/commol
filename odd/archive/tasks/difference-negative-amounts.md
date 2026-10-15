@@ -140,13 +140,13 @@ Each row says why the recommendation beats each alternative.
 
 ## Tasks
 
-| ID | Specs | Task | Route | Commit |
+| ID | Specs | Task | Route | Status |
 |---|---|---|---|---|
-| T1 | S1 | The check in `DifferenceEquations::step` and after impulses; Rust tests | direct | |
-| T2 | S2 | `SimulationError`, the trait and the engines; penalty in calibration; Python error | direct | |
-| T3 | S3 | Examples 6–9, the two tests, `increments`; the instrumented run | direct | |
-| T4 | S4 | Documentation | direct | |
-| T5 | all | Final audit: every runner | direct | |
+| T1 | S1 | The check in `DifferenceEquations::step` and after impulses; Rust tests | direct | done |
+| T2 | S2 | `SimulationError`, the trait and the engines; penalty in calibration; Python error | direct | done |
+| T3 | S3 | Examples 6–9, the two tests, `increments`; the instrumented run | direct | done |
+| T4 | S4 | Documentation | direct | done |
+| T5 | all | Final audit: every runner | direct | done |
 
 ## Delivery
 
@@ -177,3 +177,31 @@ Each row says why the recommendation beats each alternative.
   today should not wait for the Markov ODD.
 - L2 (user, 2026-10-14): approved D1 (an error for every amount below zero)
   and D2 (a typed error; calibration gives the run the base penalty).
+- L3 (agent, 2026-10-15): delivered T1–T5, with these choices inside the
+  approved specs:
+  - S1: the step checks `state + rates` before it writes them, one pass, so
+    the amounts in the message are exact and the state stays as it was before
+    the failing step. Before the impulses act, `settle` copies the state into
+    the `rates` buffer (no allocation), and the check reads the state the
+    impulses wrote. The flows in the message come from
+    `CompiledModel::outflows` and `impulse_outflows`; a flow drains a
+    compartment when it leaves it with a positive amount or enters it with a
+    negative one. `TransitionFlow` holds its transition id (it was only on
+    `ImpulseFlow`). Amounts in the message have six significant digits.
+  - S2: `SimulationError` is the error of the methods that run
+    (`run_at_positions_into_buffer`, `run_at`, `run`, `step`);
+    `check_position`, `set_parameter`, `plan_values` and `apply_values` keep
+    `String`, because no state is reached there. `From<String>` makes a
+    `String` error `Failed`. The predictions of an ensemble cannot be scored,
+    so an infeasible run there returns `CalibrationError::Infeasible`, which
+    Python raises as `InfeasibleStateError`. A kept member was feasible
+    through the last observation, but `prediction_positions` runs one step
+    past it, so the error can come from that step. Dropping the member would
+    change the ensemble without notice (D1).
+    `InfeasibleStateError` is made in Rust (`create_exception!`, module
+    `commol`) and exported as `commol.InfeasibleStateError`.
+  - S3: the two tests of `test_stratifications.py` also pass `bc="k2"`: with
+    `ab="k1"` more of the total reaches `B` early, and `k2 * B`, an absolute
+    rate on the bin total, then drains `B_g2_t2` and `B_g2_s2` below zero.
+  - The instrumented run of L1, repeated after T3 on
+    `pytest -m "docs or not docs"`: 290 difference runs, none below `−10⁻⁹`.
