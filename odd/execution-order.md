@@ -22,7 +22,7 @@ Written 2026-10-13 on `develop` at `34d75eb`; reordered 2026-10-15 at
 | 9 | Release 0.3.0 (`docs/development/release.md`) | released 2026-10-15 (PR #114, tag `v0.3.0`, PyPI) | 2–8 | — |
 | 10 | `odd/archive/tasks/model-kind-foundation.md` | delivered by PR #117 | 9 | Yes |
 | 11 | `odd/archive/tasks/stochastic-compartmental.md` | delivered by PR #118 | 10 | No |
-| 12 | Release 0.4.0 (`docs/development/release.md`) | released 2026-10-16 (PR #120, tag `v0.4.0`, PyPI) | 10, 11 | — |
+| 12 | Release 0.4.0 (`docs/development/release.md`) | — | 10, 11 | — |
 | 13 | `odd/tasks/inference-foundation.md` | T0 → T9 | 10, 11, 12 | Yes |
 | 14 | `odd/tasks/identifiability.md` | T1 → T7 | 13 | No |
 | 15 | `odd/tasks/resampling-uncertainty.md` | T1 → T8 | 13 | No |
