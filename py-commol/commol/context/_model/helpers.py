@@ -1,6 +1,5 @@
 import re
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.context.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
 from commol.utils.equations import (
@@ -13,7 +12,7 @@ from commol.utils.security import get_expression_variables
 
 
 class ModelCompartmentHelper:
-    """Utilities shared by EquationPrinter and UnitChecker."""
+    """Utilities shared by the description of the dynamics and UnitChecker."""
 
     def __init__(self, model) -> None:
         self._model = model
@@ -59,7 +58,7 @@ class ModelCompartmentHelper:
         return self._expanded_outputs()[1]
 
     def compartment_to_string(
-        self, compartment: tuple[str, dict[str, str]], format: str
+        self, compartment: tuple[str, dict[str, str]], latex: bool = False
     ) -> str:
         """Convert compartment tuple to display string."""
         bin_id, applied = compartment
@@ -70,7 +69,7 @@ class ModelCompartmentHelper:
         ]
         name = "_".join(parts)
 
-        if format == PrintEquationsOutputFormat.LATEX:
+        if latex:
             from commol.context._model.equations import latex_variable
 
             return latex_variable(name)
@@ -141,9 +140,7 @@ class ModelCompartmentHelper:
             return
         compartments = self.generate_compartments()
         for compartment in compartments:
-            compartment_str = self.compartment_to_string(
-                compartment, format=PrintEquationsOutputFormat.TEXT
-            )
+            compartment_str = self.compartment_to_string(compartment)
             bin_id = compartment[0]
             bin_obj = next(
                 (b for b in self._model.process.bins if b.id == bin_id), None
@@ -253,15 +250,13 @@ class ModelCompartmentHelper:
         rate: str | None,
         variable_units: dict[str, str] | None = None,
         show_units: bool = True,
-        format: str = PrintEquationsOutputFormat.TEXT,
+        latex: bool = False,
     ) -> str:
         """Format a rate expression with variable units and final unit annotation."""
         if not rate:
-            return (
-                "None" if format == PrintEquationsOutputFormat.TEXT else "\\text{None}"
-            )
+            return "\\text{None}" if latex else "None"
 
-        if format == PrintEquationsOutputFormat.LATEX:
+        if latex:
             from commol.context._model.equations import latex_rate_expression
 
             if not show_units:

@@ -31,7 +31,7 @@ struct SeriesPayload {
 }
 
 impl CompiledModel {
-    /// Compile a model, whatever its engine.
+    /// Compile an aggregate model, whatever its engine.
     ///
     /// This constructor performs several pre-computation steps for efficiency:
     /// 1. Generates all stratified compartment combinations
@@ -41,8 +41,8 @@ impl CompiledModel {
     ///
     /// # Errors
     ///
-    /// Returns a message when the model is not compartmental, when a name of
-    /// the model conflicts with a name the engine provides ([`check_names`]),
+    /// Returns a message when the model is not aggregate, when a check of the
+    /// model fails ([`check_model`]),
     /// when a transition cannot be planned, or when an initial-condition
     /// override is not valid for the expansion.
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
@@ -481,7 +481,7 @@ const TOTAL_TOLERANCE: f64 = 1e-9;
 /// Expand a process into its compartments and their initial amounts.
 ///
 /// This is the single source of truth for the initial state of a
-/// compartmental model. Bins
+/// aggregate model. Bins
 /// are expanded over the stratifications in declaration order; when a
 /// stratification has conditions that a compartment's already-applied
 /// categories do not meet, that compartment is kept as-is and its amount

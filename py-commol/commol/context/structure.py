@@ -28,6 +28,7 @@ from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.context.calibration import CalibrationProblem
+    from commol.context.description import Section
     from commol.context.model import Model
     from commol.context.probabilistic_calibration import ParameterSetStatistics
 
@@ -272,18 +273,31 @@ class ModelStructure(BaseModel, ABC):
         """
         return {}
 
-    def print_equations(
-        self, model: "Model[Self]", output_file: str | None, format: str
-    ) -> None:
+    def describe(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+    ) -> "list[Section]":
         """
-        Print the equations of the model.
+        The sections of a description that this kind fills.
 
-        Raises
-        ------
-        NotImplementedError
-            If the kind has no equations to print.
+        `Model.describe` adds them to the sections every kind shares
+        (overview, schedule, parameters, outputs). A kind fills the sections
+        it knows, by key: ``entities`` (what holds the state), ``dynamics``
+        (how it changes), ``initialization`` (the state it starts from) and
+        ``design_concepts`` (a `Table` of elements of the ODD protocol and
+        their text). A section with no blocks is left out of a rendering.
+
+        Parameters
+        ----------
+        model : Model
+            The model that holds this structure.
+
+        Returns
+        -------
+        list[Section]
+            The sections of the kind; none by default.
         """
-        raise NotImplementedError(f"A {self.kind} model has no equations to print")
+        return []
 
     def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
         """

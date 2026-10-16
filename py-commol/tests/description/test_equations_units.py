@@ -1,17 +1,13 @@
-"""print_equations shows units when every parameter and bin has one."""
+"""The equations of the description shows units when every parameter and bin has one."""
 
 import pytest
 
 from commol.context.model import Model
+from tests.support.description import equation_forms
 from tests.support import FactoryBuilder, build, build_ode, abc_builder
 from commol import Aggregate
 
 DAILY = {"k1": "1/day", "k2": "1/day"}
-
-
-def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
-    model.print_equations(**options)
-    return capsys.readouterr().out
 
 
 def _ab_into_b(**options) -> Model:
@@ -29,26 +25,15 @@ def _ab_into_b(**options) -> Model:
 
 
 class TestUnits:
-    def test_print_equations_latex_with_units(self, capsys) -> None:
+    def test_latex_with_units(self) -> None:
         model = build_ode(
             abc_builder(name="ABC Model with Units", bin_unit="item", units=DAILY),
             settings=None,
         )
 
-        output = _printed(model, capsys, format="latex")
+        output = equation_forms(model, latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model with Units\n"
-            "Model Type: DifferentialEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -70,25 +55,14 @@ class TestUnits:
             "\\[\\frac{dA}{dt} = - (\\frac{k1 \\cdot A \\cdot B}{total})\\]\n"
             "\\[\\frac{dB}{dt} = (\\frac{k1 \\cdot A \\cdot B}{total}) "
             "- (k2 \\cdot B)\\]\n"
-            "\\[\\frac{dC}{dt} = (k2 \\cdot B)\\]\n"
+            "\\[\\frac{dC}{dt} = (k2 \\cdot B)\\]"
         )
         assert output == expected
 
-    def test_print_equations_compact_with_complete_units(self, capsys) -> None:
-        output = _printed(_ab_into_b(bin_unit="item", units=DAILY), capsys)
+    def test_compact_with_complete_units(self) -> None:
+        output = equation_forms(_ab_into_b(bin_unit="item", units=DAILY))
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -110,25 +84,14 @@ class TestUnits:
             "========================================\n"
             "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
             "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
         )
         assert output == expected
 
-    def test_print_equations_compact_without_units(self, capsys) -> None:
-        output = _printed(_ab_into_b(), capsys)
+    def test_compact_without_units(self) -> None:
+        output = equation_forms(_ab_into_b())
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -148,23 +111,18 @@ class TestUnits:
             "========================================\n"
             "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
             "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
         )
         assert output == expected
 
-    def test_print_equations_compact_with_partial_units(self) -> None:
-        model = _ab_into_b(bin_unit="item", units={"k1": "1/day"})
+    @pytest.mark.parametrize("units", [{"k1": "1/day"}, {}])
+    def test_partial_units_are_left_out(self, units: dict[str, str]) -> None:
+        output = equation_forms(_ab_into_b(bin_unit="item", units=units))
 
-        with pytest.raises(ValueError, match="Some parameters have units but not all"):
-            model.print_equations()
+        assert "  A -> B: k1 * A * B / total" in output
+        assert "[item" not in output
 
-    def test_print_equations_compact_with_bin_unit_only(self) -> None:
-        model = _ab_into_b(bin_unit="item")
-
-        with pytest.raises(ValueError, match="Some parameters have units but not all"):
-            model.print_equations()
-
-    def test_print_equations_compact_with_different_bin_units(self, capsys) -> None:
+    def test_compact_with_different_bin_units(self) -> None:
         model = build(
             FactoryBuilder(name="Mole Units", version="1.0", bin_unit="mol")
             .add_bin(id="A", name="A")
@@ -181,20 +139,9 @@ class TestUnits:
             )
         )
 
-        output = _printed(model, capsys)
+        output = equation_forms(model)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Mole Units\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -214,6 +161,6 @@ class TestUnits:
             "========================================\n"
             "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B) + (k2 * C)\n"
             "[B(t+Dt) - B(t)] / Dt = - (k1 * A * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (2 * k1 * A * B) - (k2 * C)\n"
+            "[C(t+Dt) - C(t)] / Dt = (2 * k1 * A * B) - (k2 * C)"
         )
         assert output == expected

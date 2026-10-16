@@ -49,8 +49,9 @@ every such change.
 
 ## Example
 
-A model of three states with one unknown rate. Commol derives its equations,
-fits the rate to five observations, and simulates the result:
+A model of three states with one unknown rate. Commol describes the model with
+the equations it derived, fits the rate to five observations, and simulates
+the result:
 
 ```python
 from commol import (
@@ -64,7 +65,8 @@ from commol import (
     Simulation,
 )
 
-# 1. Describe the system: the states, the flows between them, and the start.
+# 1. Write the process (the states and the flows between them), and build it
+#    with a structure (how much starts where) and an engine.
 model = (
     ModelBuilder(name="Three states")
     .add_bin(id="A", name="State A")
@@ -82,7 +84,8 @@ model = (
         engine="DifferentialEquations",
     )  # or "DifferenceEquations"
 )
-model.print_equations()  # the equations Commol derived from the description
+print(model.describe().render("text"))  # the equations Commol derived, and more
+model.describe().save("model.md")  # Markdown, with the state graph as a diagram
 
 # 2. Fit the unknown to the observations of B.
 observed = [

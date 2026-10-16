@@ -1,10 +1,10 @@
-# Units and Equations
+# Units
 
 [Back to Building Models](building-models.md)
 
-Commol can check that every rate has the right units, and can print the
-equations that the engine simulates, as text or LaTeX. Both work on a built
-`Model`.
+Commol checks that every rate of a built `Model` has the right units. To see
+the equations the engine simulates, with their units, see
+[Describing a Model](describing-models.md).
 
 ## Quick path
 
@@ -30,7 +30,6 @@ model = (
 )
 
 model.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
-model.print_equations()
 ```
 
 ## Unit checking
@@ -176,52 +175,10 @@ To pass a quantity to a function, make it dimensionless first, for example
 `"dimensionless"`, or `sin(2 * pi * t / period)` with `period` in the step
 unit.
 
-## Printing equations
-
-`Model.print_equations(output_file=None, format="text")` prints the flows that
-the engine plans, after it has decided which rates are proportional (see
-[Transitions](transitions.md#absolute-and-proportional-rates)). It has three
-parts:
-
-| Part | Content |
-|---|---|
-| Model information | Name, engine, and the number of bins, stratifications, parameters and transitions |
-| Compact form | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit. |
-| Expanded form | One difference equation per compartment: `[A(t+Dt) - A(t)] / Dt = …` |
-
-For the model above, the compact form is:
-
-```text
-t_ab (A -> B):
-  A -> B: k1(1/day) * A(item) * B(item) / total(item) [item / day]
-t_bc (B -> C):
-  B -> C: k2(1/day) * B(item) [item / day]
-```
-
-and the expanded form is:
-
-```text
-[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)
-[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)
-[C(t+Dt) - C(t)] / Dt = (k2 * B)
-```
-
-| Argument | Values | Effect |
-|---|---|---|
-| `format` | `"text"` (default), `"latex"` | LaTeX writes inline math for the compact form and display math (`\[…\]`) for the expanded form. |
-| `output_file` | `None` (default) or a path | Writes to the file instead of printing. |
-
-```python
-model.print_equations(format="latex", output_file="equations.tex")
-```
-
-Units appear only when every bin and every constant parameter has one. If only
-some parameters have a unit, `print_equations` raises `ValueError` ("Some
-parameters have units but not all").
-
 ## Next steps
 
 | To learn | Read |
 |---|---|
+| The equations the engine simulates | [Describing a Model](describing-models.md) |
 | What a formula can contain | [Mathematical Expressions](mathematical-expressions.md) |
 | Running the model | [Running Simulations](simulations.md) |

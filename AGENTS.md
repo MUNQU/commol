@@ -60,7 +60,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Task | Start with | Then check |
 |---|---|---|
 | Change how a model expands into compartments | `crates/commol-model/src/builder.rs` (`expand`) | `layout.rs`, `py-commol/commol/context/_model/engine_state.py` |
-| Change how transitions become flows | `crates/commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`derivatives`), `context/_model/equations.py` (`print_equations`) |
+| Change how transitions become flows | `crates/commol-model/src/flows.rs` | `helpers.rs`, `system.rs` (`derivatives`), `context/_model/equations.py` (`DynamicsDescription`) |
 | Change the difference step | `crates/commol-difference/src/simulation.rs` | `crates/commol-core/src/simulation_engine.rs` |
 | Change the ODE engine or its solver settings | `crates/commol-differential/src/solve.rs` | `lib.rs`, `crates/commol-core/src/types/engine.rs` (`OdeSolver`), `py-commol/commol/context/engine.py` |
 | Add a model type (engine) | `crates/commol-core/src/types/engine.rs` (`EngineType`) | `py-commol/src/engine.rs` (`Engine`), `py-commol/commol/context/engine.py`, the [checklist](docs/codebase/maintainer-playbook.md#model-type-engine) |
@@ -75,6 +75,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change probabilistic calibration | `py-commol/commol/api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
+| Change how a model is described | `py-commol/commol/context/description.py` (blocks), `context/_model/describe.py` (layouts) | `ModelStructure.describe`, `context/_model/aggregate_description.py`, `api/description.py` (renderers), `docs/guide/describing-models.md` |
 | Change reports | `py-commol/commol/api/reporting.py` | `ModelStructure.report_sections`, `context/_model/report.py`, [Design decisions](docs/codebase/design-decisions.md#reports) |
 
 ## Documentation map

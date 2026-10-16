@@ -15,7 +15,7 @@ test that guards it. Read the ones of your area before you change it.
 | Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
-| Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
+| Results | [Confidence intervals](#one-confidence-interval-convention), [descriptions](#a-description-is-data-rendered-apart), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
 
 ## Model kinds
@@ -254,7 +254,7 @@ is absolute or proportional:
 | Otherwise | Proportional | `rate × source` |
 
 A transition with several sources and a proportional rate is rejected, because
-it has no single source to multiply. `print_equations` shows the planned flows,
+it has no single source to multiply. `Model.describe` shows the planned flows,
 so a proportional rate prints as `k1 * A`.
 
 The name says what the flow is: proportional to its source. The name
@@ -508,14 +508,16 @@ model types. An entry is an engine, named by its type
 (`DifferenceEquations`, `DifferentialEquations`): a method, not a kind. It
 names the model kinds it runs (`EngineType::kinds`; today both run
 `aggregate`). Each entry validates its settings and
-says the form of its equations and the meaning of a rate (`per_step` or
+says the form of its dynamics (`DynamicsForm`: the schedule a description
+shows and the left-hand side of its equations) and the meaning of a rate (`per_step` or
 `continuous`). `Engine::build` (`py-commol/src/engine.rs`) builds the engine of
 an entry. A model holds its engine and the settings of that engine,
 `Model.engine = {type, settings}`, because the engine sets what a rate means,
 so a saved model reproduces its runs.
 
 Python asks the list (`commol_rs.engine.EngineType`): it builds the engine,
-prints the left-hand side of an equation and checks settings through it, and
+writes the left-hand side of an equation and the schedule of a description,
+and checks settings through it, and
 never branches on an engine name. It keeps the names of the engines only as
 the `Literal` `EngineName` (`context/engine.py`), for static typing and
 completion of `ModelBuilder.build`; a test checks that it equals the entries of
@@ -663,6 +665,38 @@ member to the quantity of interest **first**, and then takes percentiles across
 members. Taking percentiles first gives a band that describes no member.
 
 **Rule:** every new interval goes through these two functions.
+
+### A description is data, rendered apart
+
+`Model.describe(layout)` returns a `ModelDescription`
+(`context/description.py`): sections with a key, a title and blocks from a
+closed set of Pydantic models (`Text`, `Table`, `Equations`, `StateGraph`,
+`Matrix`). The sections every kind shares come from `Model`
+(`context/_model/describe.py`); a kind adds its own through
+`ModelStructure.describe` (`Aggregate`: `context/_model/aggregate_description.py`).
+The renderers (`api/description.py`) read only blocks, so a new kind renders
+in every format with no new renderer. The form of the dynamics and the
+schedule come from the engine's list (`EngineType::dynamics_form`), because
+one structure runs as equations or as events depending on its engine.
+
+| Part | Rule |
+|---|---|
+| Equations | Computed by the code of the planner's flows (`transition_flows`), so a description shows what the engine simulates. The text rendering keeps the compact and expanded forms line by line. |
+| Diagrams | Mermaid in the Markdown rendering, only for a graph that is not `expanded`; Graphviz DOT for every graph in a `.dot` file. Text, LaTeX and JSON draw none. |
+| Layouts | `"default"`: overview, entities, dynamics, schedule, initialization, parameters, outputs. `"odd"`: the ODD protocol; an element commol cannot fill is marked `TO_BE_WRITTEN`. A section with no blocks is left out of every rendering. |
+
+| Alternative | Why not |
+|---|---|
+| A printer per kind and per format (the former `print_equations`) | Every kind writes every format, and no caller can read or export the description. |
+| A free-form dict | The renderers would guess its shape; typed blocks are checked by Pydantic and `ty`. |
+| An image (PNG, SVG) of a graph | Needs Graphviz or a browser at run time, a dependency for a view. |
+| TikZ in the LaTeX rendering | Needs node coordinates, so a layout algorithm; a PDF made from the DOT file does the same. |
+
+**Guards:** `tests/description/` (`test_equations*.py` check the lines of the
+equations through `equation_forms`; `test_rendering.py` checks the snapshots of
+`description/snapshots/`, parses the DOT with `pydot` and compiles the LaTeX
+with `latexmk` when they are installed), `tests/building/test_engine.py`
+(every engine gives a form).
 
 ### Reports
 

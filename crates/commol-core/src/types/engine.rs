@@ -2,7 +2,8 @@
 //!
 //! [`EngineType`] is the one list of engines. An engine names a method, not
 //! a kind: each entry names the model kinds it runs, validates its settings,
-//! and says the form of its equations and the meaning of a rate. A model names its engine and the settings of that
+//! and says the form of its dynamics ([`DynamicsForm`]) and the meaning of a
+//! rate. A model names its engine and the settings of that
 //! engine in [`ModelEngine`].
 
 use serde::{Deserialize, Serialize};
@@ -160,6 +161,82 @@ impl RateMeaning {
     }
 }
 
+/// How an engine advances the state, as a description of a model shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DynamicsForm {
+    /// One equation per state component, applied once per step.
+    DifferenceEquation,
+    /// One equation per state component, integrated in continuous time.
+    DifferentialEquation,
+    /// An event table: each event, its change of the state and its
+    /// propensity.
+    StochasticEvents,
+    /// Rules that each unit applies.
+    Rules,
+}
+
+impl DynamicsForm {
+    /// Every form.
+    pub const ALL: &'static [Self] = &[
+        Self::DifferenceEquation,
+        Self::DifferentialEquation,
+        Self::StochasticEvents,
+        Self::Rules,
+    ];
+
+    /// Name of the form, as Python shows it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::DifferenceEquation => "difference_equation",
+            Self::DifferentialEquation => "differential_equation",
+            Self::StochasticEvents => "stochastic_events",
+            Self::Rules => "rules",
+        }
+    }
+
+    /// How the engine advances, in words: the `schedule` section of a
+    /// description.
+    pub fn schedule(self) -> &'static str {
+        match self {
+            Self::DifferenceEquation => {
+                "Each step applies every flow once, computed from the state at the start of \
+                 the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act \
+                 first, and its flows run from the new state."
+            }
+            Self::DifferentialEquation => {
+                "The solver integrates dX/dt = sum of the flows in continuous time: a rate \
+                 is an instantaneous rate per unit of the axis. The integration stops and \
+                 restarts at each impulse and at each position where a rate jumps."
+            }
+            Self::StochasticEvents => {
+                "Events happen one at a time, at random times: each event changes the \
+                 state by its change, with a probability per unit of the axis given by its \
+                 propensity."
+            }
+            Self::Rules => {
+                "Each step, every unit applies the rules of the model to its own state and \
+                 to its neighbors."
+            }
+        }
+    }
+
+    /// Left-hand side of the equation of a variable, in plain text or in
+    /// LaTeX, or `None` when the form has no equations.
+    pub fn equation_lhs(self, variable: &str, latex: bool) -> Option<String> {
+        Some(match (self, latex) {
+            (Self::DifferenceEquation, false) => {
+                format!("[{variable}(t+Dt) - {variable}(t)] / Dt")
+            }
+            (Self::DifferenceEquation, true) => {
+                format!("\\frac{{{variable}(t+\\Delta t) - {variable}(t)}}{{\\Delta t}}")
+            }
+            (Self::DifferentialEquation, false) => format!("d{variable}/dt"),
+            (Self::DifferentialEquation, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+            (Self::StochasticEvents | Self::Rules, _) => return None,
+        })
+    }
+}
+
 /// The list of engines a model can name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EngineType {
@@ -267,22 +344,14 @@ impl EngineType {
         }
     }
 
-    /// Left-hand side of the equation of a variable, in plain text or in
-    /// LaTeX.
-    pub fn equation_lhs(self, variable: &str, latex: bool) -> String {
-        match (self, latex) {
-            (Self::DifferenceEquations, false) => {
-                format!("[{variable}(t+Dt) - {variable}(t)] / Dt")
-            }
-            (Self::DifferenceEquations, true) => {
-                format!("\\frac{{{variable}(t+\\Delta t) - {variable}(t)}}{{\\Delta t}}")
-            }
-            (Self::DifferentialEquations, false) => format!("d{variable}/dt"),
-            (Self::DifferentialEquations, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+    /// How the engine advances the state: the form of the dynamics a
+    /// description of the model shows.
+    pub fn dynamics_form(self) -> DynamicsForm {
+        match self {
+            Self::DifferenceEquations => DynamicsForm::DifferenceEquation,
+            Self::DifferentialEquations => DynamicsForm::DifferentialEquation,
             #[cfg(feature = "test-kind")]
-            (Self::TestEngine, false) => format!("d{variable}/dt"),
-            #[cfg(feature = "test-kind")]
-            (Self::TestEngine, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+            Self::TestEngine => DynamicsForm::DifferentialEquation,
         }
     }
 
@@ -609,19 +678,42 @@ mod tests {
     }
 
     #[test]
-    fn every_entry_prints_its_equations() {
+    fn every_entry_gives_a_form_of_its_dynamics() {
         for &engine in EngineType::ALL {
+            let form = engine.dynamics_form();
+            assert!(DynamicsForm::ALL.contains(&form));
+            assert!(!form.schedule().is_empty());
+        }
+        assert_eq!(
+            EngineType::DifferenceEquations.dynamics_form(),
+            DynamicsForm::DifferenceEquation
+        );
+        assert_eq!(
+            EngineType::DifferentialEquations.dynamics_form(),
+            DynamicsForm::DifferentialEquation
+        );
+    }
+
+    #[test]
+    fn a_form_with_equations_gives_their_left_hand_side() {
+        for &form in DynamicsForm::ALL {
             for latex in [false, true] {
-                assert!(engine.equation_lhs("A", latex).contains('A'));
+                match form.equation_lhs("A", latex) {
+                    Some(lhs) => assert!(lhs.contains('A'), "{lhs}"),
+                    None => assert!(matches!(
+                        form,
+                        DynamicsForm::StochasticEvents | DynamicsForm::Rules
+                    )),
+                }
             }
         }
         assert_eq!(
-            EngineType::DifferentialEquations.equation_lhs("A", false),
-            "dA/dt"
+            DynamicsForm::DifferentialEquation.equation_lhs("A", false),
+            Some("dA/dt".to_string())
         );
         assert_eq!(
-            EngineType::DifferenceEquations.equation_lhs("A", false),
-            "[A(t+Dt) - A(t)] / Dt"
+            DynamicsForm::DifferenceEquation.equation_lhs("A", false),
+            Some("[A(t+Dt) - A(t)] / Dt".to_string())
         );
     }
 

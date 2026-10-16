@@ -27,8 +27,8 @@ pub mod transitions;
 // Re-export all public types for convenient access
 pub use aggregate::{Aggregate, AggregateVariant, InitialConditions, Neighbors};
 pub use engine::{
-    EngineSettings, EngineType, ModelEngine, ModelKind, ModelValueType, OdeMethod, OdeSolver,
-    RateMeaning,
+    DynamicsForm, EngineSettings, EngineType, ModelEngine, ModelKind, ModelValueType, OdeMethod,
+    OdeSolver, RateMeaning,
 };
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};

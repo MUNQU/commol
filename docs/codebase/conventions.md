@@ -170,7 +170,8 @@ kind that is not aggregate through every generic layer.
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |
-| `units/` | Unit checks and `print_equations` | [Units and Equations](../guide/units-and-equations.md) |
+| `units/` | Unit checks | [Units](../guide/units-and-equations.md) |
+| `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |

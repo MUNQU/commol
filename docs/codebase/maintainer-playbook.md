@@ -49,7 +49,8 @@ Use this page before you make or review a change. It turns the
 
 - [ ] Plan the flows in `flows.rs`; reject what cannot be simulated.
 - [ ] Check the [rate semantics](design-decisions.md#absolute-and-proportional-rates).
-- [ ] Add a case to `tests/transitions/test_flows.py`, and check `print_equations`.
+- [ ] Add a case to `tests/transitions/test_flows.py`, and check the `dynamics`
+      section of `Model.describe` (`tests/description/`).
 - [ ] Update [Building models](../guide/building-models.md).
 
 ### Expressions (functions, variables)
@@ -130,7 +131,7 @@ To add a kind of model, such as an agent network (see
 - [ ] Write a `ModelStructure` subclass in `py-commol/commol/context/`, with
       `kind` as a `Literal` default. Implement `check_model` and
       `outputs_by_source`; override `series_label`, `uncalibrated_values`,
-      `with_calibrated_values`, `report_sections`, `print_equations` and
+      `with_calibrated_values`, `report_sections`, `describe` and
       `check_unit_consistency` when the kind has them. Reject in
       `check_model` a feature of the process the kind cannot run, and name
       the form that carries over. Import the module in `context/__init__.py`,

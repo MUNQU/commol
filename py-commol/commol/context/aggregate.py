@@ -25,6 +25,7 @@ from commol.utils.security import get_expression_variables
 
 if TYPE_CHECKING:
     from commol.context.calibration import CalibrationProblem
+    from commol.context.description import Section
     from commol.context.model import Model
     from commol.context.probabilistic_calibration import ParameterSetStatistics
 
@@ -251,13 +252,31 @@ class Aggregate(ModelStructure, InitialConditions):
             )
         }
 
-    def print_equations(
-        self, model: "Model[Self]", output_file: str | None, format: str
-    ) -> None:
-        """Print the equations of the model; see `Model.print_equations`."""
-        from commol.context._model.equations import EquationPrinter
+    def describe(self, model: "Model[Self]") -> "list[Section]":
+        """
+        The entities, dynamics, initialization and design concepts.
 
-        EquationPrinter(model).print_equations(output_file, format)
+        ``entities``: the bins, accumulators, stratifications and expanded
+        compartments. ``dynamics``: the state graphs, the compact and expanded
+        forms of the equations the engine simulates, the impulses and the
+        neighbors. ``initialization``: the total, the fractions, the overrides
+        and the initial state the engine builds. ``design_concepts``: the
+        interaction of the units, when the structure says who their neighbors
+        are.
+
+        Parameters
+        ----------
+        model : Model
+            The model that holds this structure.
+
+        Returns
+        -------
+        list[Section]
+            The sections of an aggregate model.
+        """
+        from commol.context._model.aggregate_description import describe_aggregate
+
+        return describe_aggregate(model)
 
     def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
         """Check the units of the model; see `Model.check_unit_consistency`."""

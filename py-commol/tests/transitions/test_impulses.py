@@ -130,9 +130,8 @@ class TestDefinition:
                 impulse_at=[1],
             )
 
-    def test_print_equations_lists_an_impulse_apart(self, capsys) -> None:
-        _impulse_model(ode=True, impulse_at=[1, 3]).print_equations()
+    def test_the_description_lists_an_impulse_apart(self) -> None:
+        printed = _impulse_model(ode=True, impulse_at=[1, 3]).describe().render("text")
 
-        printed = capsys.readouterr().out
         assert "dA/dt = 0" in printed
         assert "jump, impulse at 1, 3:\n  A -> B: p * A" in printed

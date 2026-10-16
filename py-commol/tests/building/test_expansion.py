@@ -1,6 +1,5 @@
 """Python helpers expand a model exactly as the engine does."""
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.engine_state import expanded_outputs
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.stratification import Stratification
@@ -46,7 +45,7 @@ class TestEngineExpansion:
         helper = ModelCompartmentHelper(model)
 
         helper_names = [
-            helper.compartment_to_string(compartment, PrintEquationsOutputFormat.TEXT)
+            helper.compartment_to_string(compartment)
             for compartment in helper.generate_compartments()
         ]
 

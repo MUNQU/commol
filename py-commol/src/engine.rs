@@ -510,13 +510,27 @@ impl PyEngineType {
             .map_err(PyValueError::new_err)
     }
 
-    /// Left-hand side of the equation of a variable
+    /// How the engine advances the state: "difference_equation",
+    /// "differential_equation", "stochastic_events" or "rules"
+    #[getter]
+    fn dynamics_form(&self) -> &'static str {
+        self.inner.dynamics_form().name()
+    }
+
+    /// How the engine advances, in words, for a description of a model
+    #[getter]
+    fn schedule(&self) -> &'static str {
+        self.inner.dynamics_form().schedule()
+    }
+
+    /// Left-hand side of the equation of a variable, or None when the form
+    /// of the dynamics of the engine has no equations
     ///
     /// Args:
     ///     variable: Name of the variable, already formatted
     ///     latex: Whether to write it in LaTeX
-    fn equation_lhs(&self, variable: &str, latex: bool) -> String {
-        self.inner.equation_lhs(variable, latex)
+    fn equation_lhs(&self, variable: &str, latex: bool) -> Option<String> {
+        self.inner.dynamics_form().equation_lhs(variable, latex)
     }
 
     /// Check settings against the engine

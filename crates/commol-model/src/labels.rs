@@ -1,4 +1,4 @@
-//! Labels of the outputs of a compartmental model, and the sums they name.
+//! Labels of the outputs of an aggregate model, and the sums they name.
 
 /// Source and applied stratification categories of one simulation output.
 #[derive(Debug, Clone, PartialEq, Eq)]

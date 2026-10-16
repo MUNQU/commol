@@ -14,6 +14,12 @@ from pydantic import BaseModel, ConfigDict
 
 from commol import Aggregate, Model, ModelStructure
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.description import (
+    Equation,
+    EquationGroup,
+    Equations,
+    Section,
+)
 from commol.context.structure import ReportSections, SeriesLabel
 from commol.context.parameter import Parameter
 from commol.context.engine import ModelEngine
@@ -77,6 +83,35 @@ class DecayStructure(ModelStructure):
     ) -> SeriesLabel:
         """Outputs are named "Output <id>" and measured in "unit"."""
         return SeriesLabel(f"Output {series_id}", "unit")
+
+    def describe(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+    ) -> list[Section]:
+        """A ``dynamics`` section: ``dx/dt = -k * x`` for each output."""
+        return [
+            Section(
+                key="dynamics",
+                title="Dynamics",
+                blocks=[
+                    Equations(
+                        groups=[
+                            EquationGroup(
+                                equations=[
+                                    Equation(
+                                        left=f"d{output.id}/dt",
+                                        right=f"-{output.rate} * {output.id}",
+                                        left_latex=f"\\frac{{d{output.id}}}{{dt}}",
+                                        right_latex=f"-{output.rate} {output.id}",
+                                    )
+                                    for output in self.outputs
+                                ]
+                            )
+                        ]
+                    )
+                ],
+            )
+        ]
 
     def report_sections(
         self,

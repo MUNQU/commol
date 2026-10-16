@@ -1,16 +1,10 @@
-"""print_equations of an unstratified model, in text and in LaTeX."""
-
-from pathlib import Path
+"""The equations of the description of an unstratified model, in text and in LaTeX."""
 
 import pytest
 
 from commol.context.model import Model
+from tests.support.description import equation_forms
 from tests.support import build, build_ode, abcd_builder, abc_builder
-
-
-def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
-    model.print_equations(**options)
-    return capsys.readouterr().out
 
 
 def _without_ab_rate() -> Model:
@@ -23,21 +17,10 @@ def _without_ab_rate() -> Model:
 
 
 class TestText:
-    def test_print_equations_to_console(self, capsys) -> None:
-        output = _printed(build(abc_builder(name="ABC Model")), capsys)
+    def test_to_console(self) -> None:
+        output = equation_forms(build(abc_builder(name="ABC Model")))
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -56,28 +39,14 @@ class TestText:
             "========================================\n"
             "[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)\n"
             "[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
         )
         assert output == expected
 
-    def test_print_equations_to_file(self, tmp_path: Path) -> None:
-        model = build(abcd_builder(name="ABCD Model"))
-        output_path = tmp_path / "equations.txt"
-
-        model.print_equations(output_file=str(output_path))
+    def test_the_forms_of_four_bins(self) -> None:
+        output = equation_forms(build(abcd_builder(name="ABCD Model")))
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABCD Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 4\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 3\n"
-            "Bins: A, B, C, D\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -102,30 +71,19 @@ class TestText:
             "[C(t+Dt) - C(t)] / Dt = (k3 * B) - (k2 * C)\n"
             "[D(t+Dt) - D(t)] / Dt = (k2 * C)"
         )
-        assert output_path.read_text() == expected
+        assert output == expected
 
-    def test_print_equations_without_rate(self, capsys) -> None:
-        output = _printed(_without_ab_rate(), capsys)
+    def test_without_rate(self) -> None:
+        output = equation_forms(_without_ab_rate())
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Test Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 1\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
             "ab (A -> B):\n"
-            "  (no flows)\n"
+            "  (none)\n"
             "\n"
             "bc (B -> C):\n"
             "  B -> C: k2 * B\n"
@@ -137,33 +95,22 @@ class TestText:
             "========================================\n"
             "[A(t+Dt) - A(t)] / Dt = 0\n"
             "[B(t+Dt) - B(t)] / Dt = - (k2 * B)\n"
-            "[C(t+Dt) - C(t)] / Dt = (k2 * B)\n"
+            "[C(t+Dt) - C(t)] / Dt = (k2 * B)"
         )
         assert output == expected
 
-    def test_print_equations_invalid_format(self) -> None:
-        model = build(abc_builder(name="ABC Model"))
+    def test_an_unknown_format_lists_the_formats(self) -> None:
+        description = build(abc_builder(name="ABC Model")).describe()
 
-        with pytest.raises(ValueError, match="Invalid format"):
-            model.print_equations(format="invalid")
+        with pytest.raises(ValueError, match="markdown"):
+            description.render("invalid")  # ty: ignore[invalid-argument-type]
 
 
 class TestLatex:
-    def test_print_equations_latex_format(self, capsys) -> None:
-        output = _printed(build(abc_builder(name="ABC Model")), capsys, format="latex")
+    def test_latex_format(self) -> None:
+        output = equation_forms(build(abc_builder(name="ABC Model")), latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -184,39 +131,27 @@ class TestLatex:
             "\\cdot B}{total})\\]\n"
             "\\[\\frac{B(t+\\Delta t) - B(t)}{\\Delta t} = (\\frac{k1 \\cdot A "
             "\\cdot B}{total}) - (k2 \\cdot B)\\]\n"
-            "\\[\\frac{C(t+\\Delta t) - C(t)}{\\Delta t} = (k2 \\cdot B)\\]\n"
+            "\\[\\frac{C(t+\\Delta t) - C(t)}{\\Delta t} = (k2 \\cdot B)\\]"
         )
         assert output == expected
 
-    def test_a_greek_letter_id_prints_as_its_latex_command(self, capsys) -> None:
+    def test_a_greek_letter_id_prints_as_its_latex_command(self) -> None:
         model = build(
             abc_builder(
                 parameters={"alpha": 0.3, "k2": 0.1}, ab="alpha * A * B / total"
             )
         )
 
-        output = _printed(model, capsys, format="latex")
+        output = equation_forms(model, latex=True)
 
         assert "$A \\to B: \\frac{\\alpha \\cdot A \\cdot B}{total}$" in output
 
-    def test_print_equations_latex_to_file(self, tmp_path: Path) -> None:
+    def test_a_differential_model_writes_its_derivatives(self) -> None:
         model = build_ode(abc_builder(name="ABC Model"), settings=None)
-        output_file = tmp_path / "equations_latex.txt"
 
-        model.print_equations(output_file=str(output_file), format="latex")
+        output = equation_forms(model, latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Model\n"
-            "Model Type: DifferentialEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 2\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -238,30 +173,19 @@ class TestLatex:
             "- (k2 \\cdot B)\\]\n"
             "\\[\\frac{dC}{dt} = (k2 \\cdot B)\\]"
         )
-        assert output_file.read_text() == expected
+        assert output == expected
 
-    def test_print_equations_latex_without_rate(self, capsys) -> None:
-        output = _printed(_without_ab_rate(), capsys, format="latex")
+    def test_latex_without_rate(self) -> None:
+        output = equation_forms(_without_ab_rate(), latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Test Model\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 1\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
             "\n"
             "Bin Transitions:\n"
             "ab (A -> B):\n"
-            "  (no flows)\n"
+            "  (none)\n"
             "\n"
             "bc (B -> C):\n"
             "  $B \\to C: k2 \\cdot B$\n"
@@ -273,13 +197,11 @@ class TestLatex:
             "========================================\n"
             "\\[\\frac{A(t+\\Delta t) - A(t)}{\\Delta t} = 0\\]\n"
             "\\[\\frac{B(t+\\Delta t) - B(t)}{\\Delta t} = - (k2 \\cdot B)\\]\n"
-            "\\[\\frac{C(t+\\Delta t) - C(t)}{\\Delta t} = (k2 \\cdot B)\\]\n"
+            "\\[\\frac{C(t+\\Delta t) - C(t)}{\\Delta t} = (k2 \\cdot B)\\]"
         )
         assert output == expected
 
-    def test_print_equations_latex_no_text_wrapping_on_math_parentheses(
-        self, capsys
-    ) -> None:
+    def test_latex_no_text_wrapping_on_math_parentheses(self) -> None:
         """
         ``(1 - p_h)`` is grouping, not a unit annotation, so it is not wrapped
         in ``\\text{...}``.
@@ -292,20 +214,9 @@ class TestLatex:
             )
         )
 
-        output = _printed(model, capsys, format="latex")
+        output = equation_forms(model, latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Parenthesized Rate\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 0\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 2\n"
-            "Bins: A, B, C\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -330,6 +241,6 @@ class TestLatex:
             "(\\frac{k1 \\cdot A \\cdot B}{total}) "
             "- ((1 - p_{h}) \\cdot k2 \\cdot B)\\]\n"
             "\\[\\frac{C(t+\\Delta t) - C(t)}{\\Delta t} = "
-            "((1 - p_{h}) \\cdot k2 \\cdot B)\\]\n"
+            "((1 - p_{h}) \\cdot k2 \\cdot B)\\]"
         )
         assert output == expected

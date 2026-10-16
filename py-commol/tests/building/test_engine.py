@@ -41,6 +41,27 @@ class TestEngineList:
         with pytest.raises(ValueError, match="DifferentialEquations"):
             commol_rs.engine.EngineType("Stochastic")
 
+    def test_every_engine_gives_the_form_of_its_dynamics(self) -> None:
+        forms = {
+            "difference_equation",
+            "differential_equation",
+            "stochastic_events",
+            "rules",
+        }
+        for name in commol_rs.engine.EngineType.names():
+            engine = commol_rs.engine.EngineType(name)
+            assert engine.dynamics_form in forms
+            assert engine.schedule
+
+    def test_an_engine_of_equations_gives_their_left_hand_side(self) -> None:
+        difference = commol_rs.engine.EngineType("DifferenceEquations")
+        differential = commol_rs.engine.EngineType("DifferentialEquations")
+
+        assert difference.dynamics_form == "difference_equation"
+        assert difference.equation_lhs("A", False) == "[A(t+Dt) - A(t)] / Dt"
+        assert differential.equation_lhs("A", False) == "dA/dt"
+        assert differential.equation_lhs("A", True) == "\\frac{dA}{dt}"
+
     def test_every_engine_runs_a_kind_of_the_list(self) -> None:
         kinds = commol_rs.engine.ModelKind.names()
 

@@ -77,7 +77,8 @@ results = Simulation(model).run(num_steps=100)
 | Stratifications, conditional stratifications, per-compartment initial conditions | [Core Concepts](guide/core-concepts.md#stratifications) |
 | Rate formulas compiled with Cranelift | [Mathematical Expressions](guide/mathematical-expressions.md) |
 | Pulses, windows, ramps, sinusoids and schedules per subgroup | [Axis Patterns](guide/axis-patterns.md) |
-| Unit checking and equation output (text, LaTeX) | [Units and Equations](guide/units-and-equations.md) |
+| Unit checking | [Units](guide/units-and-equations.md) |
+| A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](guide/describing-models.md) |
 | Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
 | Ensembles and prediction intervals | [Probabilistic Calibration](guide/probabilistic-calibration.md) |
 | JSON-ready reports and seaborn plots | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |

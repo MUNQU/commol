@@ -14,7 +14,8 @@ which have their own page:
 |---|---|
 | Bins, parameters, stratifications, accumulators, the structure (`Aggregate`), build, save and load | This page |
 | Transitions and their rates | [Transitions](transitions.md) |
-| Units and printing equations | [Units and Equations](units-and-equations.md) |
+| Units | [Units](units-and-equations.md) |
+| The equations and a description of a model | [Describing a Model](describing-models.md) |
 | What the concepts mean | [Core Concepts](core-concepts.md) |
 
 ## Quick path
@@ -427,6 +428,7 @@ print(reloaded == stratified_model)  # True
 | To learn | Read |
 |---|---|
 | Transitions and rates | [Transitions](transitions.md) |
-| Units and equations | [Units and Equations](units-and-equations.md) |
+| Units | [Units](units-and-equations.md) |
+| The equations and a description of a model | [Describing a Model](describing-models.md) |
 | What rate formulas can contain | [Mathematical Expressions](mathematical-expressions.md) |
 | Running a model | [Running Simulations](simulations.md) |

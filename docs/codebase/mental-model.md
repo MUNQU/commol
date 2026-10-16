@@ -71,7 +71,7 @@ Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ..
 
 The same model functions also answer questions about a process and its
 aggregate structure without a simulation:
-`Aggregate.initial_state(process)`, `print_equations` and the unit checker call
+`Aggregate.initial_state(process)`, `Model.describe` and the unit checker call
 `initial_state`, `transition_flows` and `expanded_outputs` of `commol_rs.model`
 through `py-commol/commol/context/_model/engine_state.py`.
 

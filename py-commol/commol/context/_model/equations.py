@@ -1,29 +1,52 @@
+"""The dynamics of an aggregate model, as blocks of its description.
+
+The flows come from the engine (``commol_rs.model.transition_flows``), so the
+equations a description shows are the ones the engine simulates: each flow
+moves an amount from one compartment to another, and a proportional rate is
+shown multiplied by its source. An impulse is not part of the equations: it is
+listed apart, with the positions where it moves its amount at once.
+"""
+
 import re
+from typing import TYPE_CHECKING
 
 try:
     from commol.commol_rs import _commol_rs as commol_rs
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
 from commol.context._model.engine_state import TransitionFlow
 from commol.context._model.helpers import ModelCompartmentHelper
+from commol.context.description import (
+    Block,
+    Equation,
+    EquationGroup,
+    Equations,
+    GraphEdge,
+    GraphNode,
+    StateGraph,
+    Text,
+)
 from commol.utils.security import get_expression_variables
 
+if TYPE_CHECKING:
+    from commol.context.model import Model
+    from commol.context.transition import Transition
 
-class EquationPrinter:
+
+class DynamicsDescription:
     """
-    Formats and prints model equations in text or LaTeX.
+    Builds the blocks of the ``dynamics`` section of an aggregate model.
 
-    The flows come from the engine, so the printed equations are the ones the
-    engine simulates: each flow moves an amount from one compartment to
-    another, and a proportional rate is shown multiplied by its source. An
-    impulse is not part of the equations: it is listed apart, with the
-    positions where it moves its amount at once.
+    The compact form lists each transition with the flows it creates between
+    compartments; the expanded form gives one equation per compartment, its
+    inflows minus its outflows; the impulses are listed apart. The state
+    graphs draw the bins and the transitions, and the expanded compartments
+    and their flows.
     """
 
-    def __init__(self, model) -> None:
+    def __init__(self, model: "Model") -> None:
         self._model = model
         self._helper = ModelCompartmentHelper(model)
         self._flows: list[TransitionFlow] | None = None
@@ -35,180 +58,247 @@ class EquationPrinter:
             )
         return self._flows
 
-    def print_equations(
-        self,
-        output_file: str | None = None,
-        format: str = PrintEquationsOutputFormat.TEXT,
-    ) -> None:
-        """Print the equations of the model in mathematical form."""
-        if format not in PrintEquationsOutputFormat:
-            raise ValueError(
-                f"Invalid format: {format}. "
-                f"Must be one of {list(PrintEquationsOutputFormat)}"
-            )
+    def blocks(self) -> list[Block]:
+        """
+        The blocks of the dynamics: graphs, equations and impulses.
 
-        lines = self._generate_model_header()
-        lines.extend(self._generate_compact_form(format=format))
-        lines.append("")
-        lines.extend(self._generate_expanded_form(format=format))
-        impulses = self._generate_impulses(format=format)
-        if impulses:
-            lines.append("")
-            lines.extend(impulses)
-
-        output = "\n".join(lines)
-        _write_output(output, output_file)
+        Returns
+        -------
+        list[Block]
+            The state graphs, the compact form, the expanded form when the
+            engine has equations, and the impulses.
+        """
+        blocks: list[Block] = [self.state_graph(), self.expanded_graph()]
+        blocks.extend(self.compact_form())
+        if commol_rs.engine.EngineType(self._model.engine.type).equation_lhs(
+            "X", False
+        ):
+            blocks.append(self.expanded_form())
+        impulses = self.impulses()
+        if impulses is not None:
+            blocks.append(impulses)
+        return blocks
 
     # ------------------------------------------------------------------
-    # Header
+    # State graphs
     # ------------------------------------------------------------------
 
-    def _generate_model_header(self) -> list[str]:
-        """Generate the header lines with model metadata."""
-        lines: list[str] = []
-        lines.append("=" * 40)
-        lines.append("MODEL INFORMATION")
-        lines.append("=" * 40)
-        lines.append(f"Model: {self._model.name}")
-        lines.append(f"Model Type: {self._model.engine.type}")
-        lines.append(f"Number of Bins: {len(self._model.process.bins)}")
-        lines.append(
-            f"Number of Stratifications: {len(self._model.process.stratifications)}"
+    def state_graph(self) -> StateGraph:
+        """
+        The bins, and one edge per transition, labelled with its rate.
+
+        A transition between the categories of a stratification moves between
+        nodes of those categories. A transition with several sources or
+        targets has an edge from each source to each target; one with no
+        source or no target has an edge from or to nowhere.
+
+        Returns
+        -------
+        StateGraph
+            The graph of the states of the model.
+        """
+        process = self._model.process
+        nodes = [
+            GraphNode(id=bin_item.id, label=bin_item.name or bin_item.id, group="bin")
+            for bin_item in process.bins
+        ]
+        bin_ids = {bin_item.id for bin_item in process.bins}
+        category_nodes: dict[str, GraphNode] = {}
+        edges: list[GraphEdge] = []
+        for transition in process.transitions:
+            ids = [*transition.source, *transition.target]
+            if not set(ids) <= bin_ids:
+                stratification = next(
+                    strat
+                    for strat in process.stratifications
+                    if set(ids) <= set(strat.categories)
+                )
+                for category in ids:
+                    node_id = f"{stratification.id}:{category}"
+                    category_nodes.setdefault(
+                        category,
+                        GraphNode(id=node_id, label=category, group=stratification.id),
+                    )
+            label = f"{transition.id}: {_rate_text(transition)}"
+
+            def node(item: str) -> str:
+                found = category_nodes.get(item)
+                return item if found is None else found.id
+
+            sources = [node(item) for item in dict.fromkeys(transition.source)]
+            targets = [node(item) for item in dict.fromkeys(transition.target)]
+            for source in sources or [None]:
+                for target in targets or [None]:
+                    edges.append(GraphEdge(source=source, target=target, label=label))
+        return StateGraph(
+            heading="States and transitions",
+            name="states",
+            nodes=[*nodes, *category_nodes.values()],
+            edges=edges,
         )
-        lines.append(f"Number of Parameters: {len(self._model.parameters)}")
-        lines.append(f"Number of Transitions: {len(self._model.process.transitions)}")
 
-        bin_ids = [bin_item.id for bin_item in self._model.process.bins]
-        lines.append(f"Bins: {', '.join(bin_ids)}")
+    def expanded_graph(self) -> StateGraph:
+        """
+        The expanded compartments, and one edge per flow, as the engine runs it.
 
-        if self._model.process.stratifications:
-            lines.append("Stratifications:")
-            for strat in self._model.process.stratifications:
-                categories = ", ".join(strat.categories)
-                lines.append(f"  - {strat.id}: [{categories}]")
-
-        lines.append("")
-        return lines
+        Returns
+        -------
+        StateGraph
+            The graph of the compartments, marked as expanded.
+        """
+        compartments, _ = engine_state.expanded_outputs(self._model.process)
+        nodes = [
+            GraphNode(
+                id=compartment.name, label=compartment.name, group=compartment.source
+            )
+            for compartment in compartments
+        ]
+        edges = [
+            GraphEdge(
+                source=flow.source,
+                target=flow.target,
+                label=f"{flow.transition}: {flow.term}",
+            )
+            for flow in self._transition_flows()
+        ]
+        return StateGraph(
+            heading="Expanded compartments",
+            name="compartments",
+            nodes=nodes,
+            edges=edges,
+            expanded=True,
+        )
 
     # ------------------------------------------------------------------
     # Compact form
     # ------------------------------------------------------------------
 
-    def _generate_compact_form(self, format: str) -> list[str]:
-        """Each transition, with the flows it creates between compartments."""
-        lines: list[str] = []
-        lines.append("=" * 40)
-        lines.append("COMPACT FORM")
-        lines.append("=" * 40)
-        lines.append("")
+    def compact_form(self) -> list[Block]:
+        """
+        Each transition, with the flows it creates between compartments.
 
-        show_units = self._helper.has_all_units()
-        variable_units = self._helper.build_variable_units() if show_units else None
+        Transitions are grouped as the definition declares them: between
+        bins, or between the categories of one stratification. The last block
+        gives the size of the system.
+
+        Returns
+        -------
+        list[Block]
+            One `Equations` block per group, then a `Text` with the size.
+        """
+        process = self._model.process
+        units = self._variable_units()
 
         flows_by_transition: dict[str, list[TransitionFlow]] = {}
         for flow in self._transition_flows():
             flows_by_transition.setdefault(flow.transition, []).append(flow)
 
-        # Transitions are grouped as the definition declares them: between
-        # bins, or between the categories of one stratification.
-        bin_ids = {bin_item.id for bin_item in self._model.process.bins}
-        groups: list[tuple[str, list]] = [("Bin Transitions:", [])]
-        by_stratification: dict[str, list] = {}
-        for transition in self._model.process.transitions:
+        bin_ids = {bin_item.id for bin_item in process.bins}
+        groups: list[tuple[str, list["Transition"]]] = [("Bin Transitions", [])]
+        by_stratification: dict[str, list["Transition"]] = {}
+        for transition in process.transitions:
             states = set(transition.source) | set(transition.target)
             if states <= bin_ids:
                 groups[0][1].append(transition)
                 continue
-            for strat in self._model.process.stratifications:
+            for strat in process.stratifications:
                 if states <= set(strat.categories):
                     by_stratification.setdefault(strat.id, []).append(transition)
                     break
         groups.extend(
-            (f"{strat_id.capitalize()} Stratification Transitions:", transitions)
+            (f"{strat_id.capitalize()} Stratification Transitions", transitions)
             for strat_id, transitions in by_stratification.items()
         )
 
-        for heading, transitions in groups:
+        blocks: list[Block] = []
+        for title, transitions in groups:
             if not transitions:
                 continue
-            lines.append(heading)
-            for transition in transitions:
-                lines.extend(
-                    self._format_transition_flows(
-                        transition,
-                        flows_by_transition.get(transition.id, []),
-                        variable_units,
-                        show_units,
-                        format,
-                    )
+            blocks.append(
+                Equations(
+                    heading="Compact form" if not blocks else None,
+                    title=title,
+                    groups=[
+                        self._transition_group(
+                            transition,
+                            flows_by_transition.get(transition.id, []),
+                            units,
+                        )
+                        for transition in transitions
+                    ],
                 )
-
-        num_compartments = len(self._helper.generate_compartments())
-        lines.extend(
-            self._format_total_system_size(
-                [bin_item.id for bin_item in self._model.process.bins],
-                num_compartments,
             )
-        )
+        blocks.append(Text(text=self._system_size()))
+        return blocks
 
-        return lines
+    def _variable_units(self) -> dict[str, str] | None:
+        """The unit of every variable, or None when the model has no units."""
+        try:
+            if not self._helper.has_all_units():
+                return None
+        except ValueError:
+            return None
+        return self._helper.build_variable_units()
 
-    def _format_transition_flows(
+    def _transition_group(
         self,
-        transition,
+        transition: "Transition",
         flows: list[TransitionFlow],
-        variable_units: dict[str, str] | None,
-        show_units: bool,
-        format: str,
-    ) -> list[str]:
+        units: dict[str, str] | None,
+    ) -> EquationGroup:
         source_str = ", ".join(sorted(set(transition.source))) or "none"
         target_str = ", ".join(sorted(set(transition.target))) or "none"
         schedule = f", {_impulse_schedule(transition)}" if transition.is_impulse else ""
-        lines = [f"{transition.id} ({source_str} -> {target_str}{schedule}):"]
-        if not flows:
-            # The engine creates no flow, for example when the rate is missing.
-            lines.append("  (no flows)")
-        for flow in flows:
-            source = self._display_name(flow.source, format)
-            target = self._display_name(flow.target, format)
-            term = self._helper.format_rate_with_unit(
-                flow.term, variable_units, show_units, format
-            )
-            if format == PrintEquationsOutputFormat.LATEX:
-                arrow = _latex_transition_arrow(source, target)
-                lines.append(f"  ${arrow}: {term}$")
-            else:
-                lines.append(f"  {source} -> {target}: {term}")
-        lines.append("")
-        return lines
+        show_units = units is not None
+        return EquationGroup(
+            heading=f"{transition.id} ({source_str} -> {target_str}{schedule})",
+            equations=[
+                Equation(
+                    left=_text_arrow(flow),
+                    right=self._helper.format_rate_with_unit(
+                        flow.term, units, show_units
+                    ),
+                    left_latex=_latex_transition_arrow(
+                        _display_name(flow.source, latex=True),
+                        _display_name(flow.target, latex=True),
+                    ),
+                    right_latex=self._helper.format_rate_with_unit(
+                        flow.term, units, show_units, latex=True
+                    ),
+                    relation="flow",
+                )
+                for flow in flows
+            ],
+        )
 
-    def _format_total_system_size(
-        self, bin_ids: list[str], num_compartments: int
-    ) -> list[str]:
-        num_bins = len(bin_ids)
-        if not self._model.process.stratifications:
-            return [f"Total System: {num_bins} coupled equations ({num_bins} bins)"]
-
+    def _system_size(self) -> str:
+        process = self._model.process
+        num_bins = len(process.bins)
+        if not process.stratifications:
+            return f"Total System: {num_bins} coupled equations ({num_bins} bins)"
+        num_compartments = len(self._helper.generate_compartments())
         strat_details = [
-            f"{len(strat.categories)} {strat.id}"
-            for strat in self._model.process.stratifications
+            f"{len(strat.categories)} {strat.id}" for strat in process.stratifications
         ]
-        return [
+        return (
             f"Total System: {num_compartments} coupled equations "
             f"({num_bins} bins × {' × '.join(strat_details)})"
-        ]
+        )
 
     # ------------------------------------------------------------------
     # Expanded form
     # ------------------------------------------------------------------
 
-    def _generate_expanded_form(self, format: str) -> list[str]:
-        """One equation per compartment: its inflows minus its outflows."""
-        lines: list[str] = []
-        lines.append("=" * 40)
-        lines.append("EXPANDED FORM")
-        lines.append("=" * 40)
+    def expanded_form(self) -> Equations:
+        """
+        One equation per compartment: its inflows minus its outflows.
 
+        Returns
+        -------
+        Equations
+            One group with the equation of every compartment, in engine
+            order.
+        """
         compartments, _ = engine_state.expanded_outputs(self._model.process)
         # Net coefficient of each flow term per compartment, in first-seen
         # order: a piece that leaves and enters the same compartment cancels,
@@ -225,6 +315,8 @@ class EquationPrinter:
                     terms = net[name]
                     terms[flow.term] = terms.get(flow.term, 0) + sign
 
+        engine_type = self._model.engine.type
+        equations = []
         for compartment in compartments:
             raw_terms = [
                 (
@@ -234,72 +326,91 @@ class EquationPrinter:
                 for term, count in net[compartment.name].items()
                 if count != 0
             ]
-            equation = self._format_equation(raw_terms, format)
-            lhs = _get_equation_lhs(
-                self._display_name(compartment.name, format),
-                format,
-                self._model.engine.type,
+            equations.append(
+                Equation(
+                    left=_equation_lhs(compartment.name, False, engine_type),
+                    right=_format_equation(raw_terms, latex=False),
+                    left_latex=_equation_lhs(
+                        latex_variable(compartment.name), True, engine_type
+                    ),
+                    right_latex=_format_equation(raw_terms, latex=True),
+                )
             )
-            if format == PrintEquationsOutputFormat.LATEX:
-                lines.append(f"\\[{lhs} = {equation}\\]")
-            else:
-                lines.append(f"{lhs} = {equation}")
+        return Equations(
+            heading="Expanded form", groups=[EquationGroup(equations=equations)]
+        )
 
-        return lines
+    def impulses(self) -> Equations | None:
+        """
+        Each impulse transition: where it acts and the amounts it moves.
 
-    def _generate_impulses(self, format: str) -> list[str]:
-        """Each impulse transition: where it acts and the amounts it moves."""
+        Returns
+        -------
+        Equations | None
+            One group per impulse transition, or None when there is none.
+        """
         transitions = [t for t in self._model.process.transitions if t.is_impulse]
         if not transitions:
-            return []
-        lines = ["=" * 40, "IMPULSES", "=" * 40]
+            return None
+        groups = []
         for transition in transitions:
-            lines.append(f"{transition.id}, {_impulse_schedule(transition)}:")
-            for flow in self._transition_flows():
-                if flow.transition != transition.id:
-                    continue
-                source = self._display_name(flow.source, format)
-                target = self._display_name(flow.target, format)
-                amount = self._format_rate_expr(flow.term, format)
-                if format == PrintEquationsOutputFormat.LATEX:
-                    arrow = _latex_transition_arrow(source, target)
-                    lines.append(f"  ${arrow}: {amount}$")
-                else:
-                    lines.append(f"  {source} -> {target}: {amount}")
-        return lines
-
-    def _format_equation(self, raw_terms: list[tuple[int, str]], format: str) -> str:
-        terms = [
-            f"{'+' if sign > 0 else '-'} ({self._format_rate_expr(rate, format)})"
-            for sign, rate in simplify_complementary_terms(raw_terms)
-        ]
-        if not terms:
-            return "0"
-        equation = " ".join(terms)
-        return equation[2:] if equation.startswith("+ ") else equation
-
-    # ------------------------------------------------------------------
-    # Formatting helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _display_name(name: str | None, format: str) -> str:
-        if name is None:
-            return "none"
-        if format == PrintEquationsOutputFormat.LATEX:
-            return latex_variable(name)
-        return name
-
-    @staticmethod
-    def _format_rate_expr(rate: str, format: str) -> str:
-        if format == PrintEquationsOutputFormat.LATEX:
-            return latex_rate_expression(rate)
-        return rate
+            equations = [
+                Equation(
+                    left=_text_arrow(flow),
+                    right=flow.term,
+                    left_latex=_latex_transition_arrow(
+                        _display_name(flow.source, latex=True),
+                        _display_name(flow.target, latex=True),
+                    ),
+                    right_latex=latex_rate_expression(flow.term),
+                    relation="flow",
+                )
+                for flow in self._transition_flows()
+                if flow.transition == transition.id
+            ]
+            groups.append(
+                EquationGroup(
+                    heading=f"{transition.id}, {_impulse_schedule(transition)}",
+                    equations=equations,
+                )
+            )
+        return Equations(heading="Impulses", groups=groups)
 
 
 # ======================================================================
 # Module-level functions (no model dependency)
 # ======================================================================
+
+
+def _rate_text(transition: "Transition") -> str:
+    """The rate of a transition as written, or ``stratified`` when it has none."""
+    if transition.rate is not None:
+        return str(transition.rate)
+    if transition.stratified_rates:
+        return "stratified rates"
+    return "no rate"
+
+
+def _text_arrow(flow: TransitionFlow) -> str:
+    """Where a flow moves an amount, as ``A -> B``."""
+    return f"{_display_name(flow.source)} -> {_display_name(flow.target)}"
+
+
+def _display_name(name: str | None, latex: bool = False) -> str:
+    if name is None:
+        return "none"
+    return latex_variable(name) if latex else name
+
+
+def _format_equation(raw_terms: list[tuple[int, str]], latex: bool) -> str:
+    terms = [
+        f"{'+' if sign > 0 else '-'} ({latex_rate_expression(rate) if latex else rate})"
+        for sign, rate in simplify_complementary_terms(raw_terms)
+    ]
+    if not terms:
+        return "0"
+    equation = " ".join(terms)
+    return equation[2:] if equation.startswith("+ ") else equation
 
 
 def _impulse_schedule(transition) -> str:
@@ -310,20 +421,15 @@ def _impulse_schedule(transition) -> str:
     return f"impulse every {period:g} from {offset:g}"
 
 
-def _write_output(output: str, output_file: str | None) -> None:
-    """Write output to file or console."""
-    if output_file:
-        with open(output_file, "w") as f:
-            _ = f.write(output)
-    else:
-        print(output)
-
-
-def _get_equation_lhs(variable_name: str, format: str, engine_type: str) -> str:
+def _equation_lhs(variable_name: str, latex: bool, engine_type: str) -> str:
     """The left-hand side of an equation, as the engine of the model writes it."""
-    return commol_rs.engine.EngineType(engine_type).equation_lhs(
-        variable_name, format == PrintEquationsOutputFormat.LATEX
-    )
+    lhs = commol_rs.engine.EngineType(engine_type).equation_lhs(variable_name, latex)
+    if lhs is None:
+        raise ValueError(
+            f"The {engine_type} engine has no equations: its dynamics are "
+            f"{commol_rs.engine.EngineType(engine_type).dynamics_form}"
+        )
+    return lhs
 
 
 def _latex_transition_arrow(source: str, target: str) -> str:

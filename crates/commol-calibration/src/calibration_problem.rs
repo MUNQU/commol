@@ -490,7 +490,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// Name the id that takes what the calibrated initial conditions leave of
     /// the total the model kind keeps; the engine resolves it.
     ///
-    /// For a compartmental model it is a compartment or bin that absorbs the
+    /// For an aggregate model it is a compartment or bin that absorbs the
     /// difference to the total. Without a remainder, calibrated initial
     /// conditions are applied as given and only a sum above the total is
     /// penalized. With one, the sum of the initial amounts always equals the

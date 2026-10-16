@@ -117,9 +117,11 @@ class TestStructureInterface:
         with pytest.raises(ValueError, match="only an aggregate model"):
             engine.state
 
-    def test_a_kind_without_equations_says_so(self) -> None:
-        with pytest.raises(NotImplementedError, match="test model"):
-            decay_model().print_equations()
+    def test_a_kind_describes_itself_through_the_interface(self) -> None:
+        description = decay_model().describe()
+
+        assert description.section("dynamics").blocks
+        assert "dx/dt = -k * x" in description.render("text")
 
 
 class TestVariants:

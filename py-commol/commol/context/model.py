@@ -18,7 +18,6 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
 from commol.context._model.units import DEFAULT_STEP_UNIT
 from commol.context.axis_units import AxisUnits
@@ -28,6 +27,7 @@ from commol.context.calibration import (
     calibrated_values,
 )
 from commol.context.constants import CalibrationParameterType
+from commol.context.description import Layout, ModelDescription
 from commol.context.engine import ModelEngine
 from commol.context.parameter import Parameter
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
@@ -281,50 +281,47 @@ class Model(BaseModel, Generic[StructureT]):
             self.update_parameters(parameters)
         self.structure = structure
 
-    def print_equations(
-        self,
-        output_file: str | None = None,
-        format: str = PrintEquationsOutputFormat.TEXT,
-    ) -> None:
+    def describe(self, layout: Layout = "default") -> ModelDescription:
         """
-        Prints the equations of the model in mathematical form.
+        A description of the model, as data.
 
-        The structure prints them (`ModelStructure.print_equations`). A
-        aggregate model displays its metadata and the system of equations
-        in both compact (mathematical notation) and expanded (individual
-        equations) forms.
-
-        For DifferentialEquations models, displays equations as dX/dt = ...
-        For DifferenceEquations models,
-        displays equations as [X(t+Dt) - X(t)] / Dt = ...
+        The description is a list of sections of typed blocks: tables,
+        equations, state graphs and text. `ModelDescription.render` turns it
+        into text, Markdown, LaTeX or JSON, and `ModelDescription.save` writes
+        it to a file; in a notebook it shows as Markdown, with the state graph
+        of the model drawn.
 
         Parameters
         ----------
-        output_file : str | None
-            If provided, writes the equations to this file path instead of printing
-            to console. If None, prints to console.
-        format : str, default="text"
-            Output format for equations. Must be one of:
-            - "text": Plain text format (default)
-            - "latex": LaTeX mathematical notation format
+        layout : {"default", "odd"}, default="default"
+            ``"default"``: overview, entities, dynamics, schedule,
+            initialization, parameters and outputs. ``"odd"``: the ODD
+            protocol for describing individual- and agent-based models
+            (Grimm et al. 2006, 2010, 2020): purpose, entities, process
+            overview and scheduling, design concepts, initialization, input
+            data and submodels; an element commol cannot fill says "To be
+            written by the modeller.".
+
+        Returns
+        -------
+        ModelDescription
+            The description.
 
         Raises
         ------
         ValueError
-            If format is not "text" or "latex"
-        NotImplementedError
-            If the kind of the model has no equations to print.
+            If the layout is not one of these.
 
         Examples
         --------
-        >>> model.print_equations()  # Print to console in text format
-        >>> model.print_equations(output_file="equations.txt")  # Save text format
-        >>> model.print_equations(format="latex")  # Print LaTeX to console
-        >>> model.print_equations(
-        ...     output_file="equations.txt", format="latex"
-        ... )  # Save LaTeX
+        >>> description = model.describe()
+        >>> print(description.render("text"))
+        >>> description.save("model.md")
+        >>> model.describe(layout="odd").save("model.tex")
         """
-        self.structure.print_equations(self, output_file, format)
+        from commol.context._model.describe import describe_model
+
+        return describe_model(self, layout)
 
     def axis_units(self) -> AxisUnits:
         """

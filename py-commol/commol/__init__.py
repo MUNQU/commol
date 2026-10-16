@@ -30,6 +30,7 @@ from commol.context import (
     Process,
 )
 from commol.context.axis_units import AxisUnits
+from commol.context.description import ModelDescription
 from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
@@ -90,6 +91,7 @@ __all__ = [
     "Groups",
     "Model",
     "ModelBuilder",
+    "ModelDescription",
     "ModelStructure",
     "NelderMeadConfig",
     "ObservedDataPoint",

@@ -31,7 +31,7 @@ model = (
     )
 )
 
-model.print_equations()  # shows every flow as the engine computes it
+print(model.describe().render("text"))  # every flow, as the engine computes it
 ```
 
 ## `add_transition`
@@ -73,8 +73,8 @@ per member of the source:
 | `"k1 * A * B / total"` | Absolute | `k1 * A * B / total` |
 | `"0.5"` with `source=[]` | Absolute | `0.5` enters the target |
 
-`print_equations()` prints every flow after this decision, so a proportional rate
-appears multiplied by its source.
+The [description](describing-models.md) of the model shows every flow after
+this decision, so a proportional rate appears multiplied by its source.
 
 ### Rates that change along the axis
 
@@ -127,7 +127,7 @@ merge = (
         engine="DifferenceEquations",
     )
 )
-merge.print_equations()
+print(merge.describe().render("text"))
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
 ```
 
@@ -197,7 +197,7 @@ moving = (
         engine="DifferenceEquations",
     )
 )
-moving.print_equations()
+print(moving.describe().render("text"))
 # move (g1 -> g2):  A_g1 -> A_g2: k * A_g1   and   B_g1 -> B_g2: k * B_g1
 ```
 
@@ -235,7 +235,7 @@ own_compartment = (
         engine="DifferenceEquations",
     )
 )
-own_compartment.print_equations()
+print(own_compartment.describe().render("text"))
 # A_g1 -> B_g1: k * A_g1   and   A_g2 -> B_g2: k * A_g2
 ```
 
@@ -275,7 +275,7 @@ group_rates = (
         engine="DifferenceEquations",
     )
 )
-group_rates.print_equations()
+print(group_rates.describe().render("text"))
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
 ```
 
@@ -338,7 +338,7 @@ redirect = (
         engine="DifferenceEquations",
     )
 )
-redirect.print_equations()
+print(redirect.describe().render("text"))
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
@@ -388,8 +388,8 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | Order | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`). |
 | Several impulses at one step | Every jump is computed from the state before any of them. |
 | Steps | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
-| Units | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](units-and-equations.md#impulses)). |
-| `print_equations` | Lists impulses apart from the equations, with their steps. |
+| Units | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](units-and-equations.md#impulses)). |
+| `describe()` | Lists impulses apart from the equations, with their steps ([Describing a Model](describing-models.md#the-equations)). |
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](axis-patterns.md) is a
 rate: a difference model applies it for one step with the other flows, and a
@@ -466,4 +466,5 @@ simulate as written:
 |---|---|
 | Rates that change along the axis | [Axis Patterns](axis-patterns.md) |
 | Everything a formula can contain | [Mathematical Expressions](mathematical-expressions.md) |
-| Units and equation output | [Units and Equations](units-and-equations.md) |
+| Units | [Units](units-and-equations.md) |
+| The equations of a model | [Describing a Model](describing-models.md) |

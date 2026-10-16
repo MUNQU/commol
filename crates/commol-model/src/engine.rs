@@ -1,4 +1,4 @@
-//! What an engine of a compartmental model gives besides the generic engine
+//! What an engine of an aggregate model gives besides the generic engine
 //! interface.
 
 use commol_core::SimulationEngine;
@@ -6,9 +6,9 @@ use commol_core::SimulationEngine;
 use crate::labels::OutputLabels;
 
 /// An engine whose state is the amount of each compartment of a
-/// compartmental model, followed by its accumulators.
+/// aggregate model, followed by its accumulators.
 ///
-/// Both engines of the compartmental kind implement it; the initial
+/// Both engines of the aggregate kind implement it; the initial
 /// conditions that calibration writes ([`crate::InitialConditionPlan`]) use
 /// it.
 pub trait CompartmentalEngine: SimulationEngine {
