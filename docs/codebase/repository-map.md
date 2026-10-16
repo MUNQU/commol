@@ -101,6 +101,7 @@ Use this page when you know what to change but not where it belongs.
 | `.github/scripts/start.sh` | Start an issue: take it, set it to `In Progress`, and create its branch and worktree, linked to the issue. |
 | `.github/scripts/next.sh` | The next proposals to implement: open, not blocked, not taken, by the field `Order` of the project. |
 | `.github/scripts/parallel.py` | The proposals that can run in parallel, from the Touches and the links of the open issues. |
+| `.github/scripts/affected.py` | The open issues that the changes of a branch affect: those whose body names a changed path. |
 | `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
 | `.github/workflows/` | CI: code quality, build, docs, release, and the weekly coverage studies (`coverage.yaml`). |
 

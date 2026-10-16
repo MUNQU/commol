@@ -30,7 +30,8 @@ with the paths and symbols an agent must read first:
 ## Touches
 
 <!-- What the change edits, so the proposals that can run in parallel are
-known (`python .github/scripts/parallel.py`). An item is a path, or a path
+known (`python .github/scripts/parallel.py`) and a change to these paths
+finds this issue (`python .github/scripts/affected.py`). An item is a path, or a path
 and a symbol (`path::Symbol`); a path that ends in `/` is a directory.
 Changes: edits to what exists (a behavior, a signature, a contract other
 code implements). Adds: new code next to what exists (a module, a method of

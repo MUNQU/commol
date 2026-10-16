@@ -4,7 +4,7 @@
 
 Closes #<!-- the issue this delivers; delete the line if there is none -->
 
-- [ ] Every open issue this change affects is updated (body and a comment), and work it leaves undone is in an open issue: <!-- the issues, or "none" -->
+- [ ] Every open issue this change affects is updated (body and a comment), and work it leaves undone is in an open issue: <!-- the issues that `python .github/scripts/affected.py --closes <number>` lists, each updated or why it needs no update; or "none" if it lists none -->
 
 ## Testing
 
