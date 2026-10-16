@@ -29,7 +29,14 @@ what it changes. The factories share these keywords:
 from collections.abc import Mapping
 from typing import Self
 
-from commol import Aggregate, ModelBuilder, OdeSolver
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    OdeSolver,
+    StochasticEventsSettings,
+    StochasticStepsSettings,
+)
+from commol.context.engine import EngineName
 from commol.api.patterns import AxisPattern
 from commol.context.model import Model
 from commol.context.neighbors import Neighbors
@@ -68,6 +75,25 @@ def build_ode(
     return builder.build(
         builder.structure, engine="DifferentialEquations", settings=settings
     )
+
+
+STOCHASTIC_ENGINES: tuple[EngineName, ...] = ("StochasticEvents", "StochasticSteps")
+"""The stochastic engines of the aggregate kind."""
+
+MEAN_FIELD: dict[EngineName, EngineName] = {
+    "StochasticEvents": "DifferentialEquations",
+    "StochasticSteps": "DifferenceEquations",
+}
+"""The deterministic engine each stochastic engine has as its mean-field limit."""
+
+
+def build_stochastic(
+    builder: FactoryBuilder,
+    engine: EngineName = "StochasticEvents",
+    settings: StochasticEventsSettings | StochasticStepsSettings | None = None,
+) -> Model[Aggregate]:
+    """Build a model of a stochastic engine with `settings`."""
+    return builder.build(builder.structure, engine=engine, settings=settings)
 
 
 def stratify(

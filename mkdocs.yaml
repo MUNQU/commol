@@ -75,6 +75,7 @@ plugins:
           - guide/units-and-equations.md: Unit checking of rates, impulses and the step unit
           - guide/describing-models.md: Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
           - guide/simulations.md: Simulation.run, output formats, totals by bin and category, windowed totals, plotting
+          - guide/stochastic.md: The StochasticEvents and StochasticSteps engines, how rates become events, whole units, methods, calibration with replicates
           - guide/calibration.md: CalibrationProblem, observations, unknowns, losses, results and writing results back
           - guide/calibration-initial-conditions.md: Calibrating bins, categories and compartments, the remainder and the order of application
           - guide/calibration-observations.md: Several outputs, sums of outputs, weights, scale factors and windowed observations
@@ -134,6 +135,7 @@ nav:
           - Units: guide/units-and-equations.md
           - Describing a Model: guide/describing-models.md
       - Running Simulations: guide/simulations.md
+      - Stochastic Simulation: guide/stochastic.md
       - Calibration:
           - Calibration Basics: guide/calibration.md
           - Initial Conditions: guide/calibration-initial-conditions.md

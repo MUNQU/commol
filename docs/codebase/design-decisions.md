@@ -13,7 +13,7 @@ test that guards it. Read the ones of your area before you change it.
 | Transitions and rates | [Rate semantics](#absolute-and-proportional-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
-| Engines | [One right-hand side](#one-right-hand-side-two-engines), [seeds](#stochastic-engines-and-seeds), [solver](#the-solver-is-diffsol) |
+| Engines | [One set of flows](#every-engine-reads-one-set-of-flows), [seeds](#stochastic-engines-and-seeds), [whole units](#whole-units-in-a-stochastic-engine), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [descriptions](#a-description-is-data-rendered-apart), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
@@ -510,9 +510,9 @@ every observation position and window start.
 
 `EngineType` (`crates/commol-core/src/types/engine.rs`) is the one list of
 model types. An entry is an engine, named by its type
-(`DifferenceEquations`, `DifferentialEquations`): a method, not a kind. It
-names the model kinds it runs (`EngineType::kinds`; today both run
-`aggregate`). Each entry validates its settings and
+(`DifferenceEquations`, `DifferentialEquations`, `StochasticEvents`,
+`StochasticSteps`): a method, not a kind. It names the model kinds it runs
+(`EngineType::kinds`; today all four run `aggregate`). Each entry validates its settings and
 says the form of its dynamics (`DynamicsForm`: the schedule a description
 shows and the left-hand side of its equations) and the meaning of a rate (`per_step` or
 `continuous`). `Engine::build` (`py-commol/src/engine.rs`) builds the engine of
@@ -527,8 +527,10 @@ never branches on an engine name. It keeps the names of the engines only as
 the `Literal` `EngineName` (`context/engine.py`), for static typing and
 completion of `ModelBuilder.build`; a test checks that it equals the entries of
 the list (`test_the_python_names_equal_the_engines_of_the_list`). `ModelEngine.type` is a `str` that
-the list checks, so a model can name an engine of any kind. Generating the `Literal` from Rust would need
-a code-generation step for two names; the test catches the same drift. An
+the list checks, so a model can name an engine of any kind; its settings are read
+with the class of that engine (`ModelEngine.settings_of_the_engine`), so a model
+loads back with the class it was saved with. Generating the `Literal` from Rust would need
+a code-generation step for four names; the test catches the same drift. An
 entry names the kinds it runs, so another kind (for example an agent network)
 adds kinds to an entry or new entries, not a second meaning of the type; see
 [One interface for every model kind](#one-interface-for-every-model-kind).
@@ -542,18 +544,34 @@ from the engine that names both.
 `py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs`,
 `tests/building/test_engine.py`.
 
-### One right-hand side, two engines
+### Every engine reads one set of flows
 
-`CompiledModel::derivatives` (`crates/commol-model/src/system.rs`) computes
-every flow from one snapshot of the state: it is the right-hand side
-`dX/dt = Σ flows`. The difference engine adds it once per step
-(`X(n + 1) = X(n) + derivatives(n, X(n))`); the differential engine integrates
-it. Neither engine has flow logic of its own, so both run the same model.
-Accumulators are state components: a difference step adds the counted flows, a
-differential engine integrates them.
+A compiled model is a set of flows (`crates/commol-model/src/system.rs`):
+`CompiledModel::flow_rates` gives the value of each flow, its rate times its
+source for a proportional rate (`transition_rates` gives the rate alone), and
+`CompiledModel::flow_changes` gives the change of the state of one event of
+each flow: `−1` for each source piece, `+1` for each target piece and each
+accumulator. Every engine reads them, and none has flow logic of its own:
 
-**Guard:**
-`crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`.
+| Engine | Reads |
+|---|---|
+| `DifferenceEquations` | `derivatives`, `Σ changes × flow`, added once per step |
+| `DifferentialEquations` | `derivatives`, integrated |
+| `StochasticEvents` | `flow_rates` as propensities, and one event of `flow_changes` at a time |
+| `StochasticSteps` | `transition_rates` as per-step probabilities, and the drawn number of events of each flow |
+
+`derivatives` is `flow_changes`ᵀ · `flow_rates`, computed piece by piece in the
+order of the old right-hand side, so the deterministic runs did not change by
+a bit. The deterministic engines are the mean-field limits of the stochastic
+ones, which gives the main test oracle. The positions where a rate can jump
+come from the same model (`CompiledModel::breakpoints`), so the differential
+and the continuous-time stochastic engines stop at the same positions.
+
+**Guards:** `crates/commol-model/tests/flows.rs`,
+`crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`,
+`crates/commol-stochastic/tests/oracles.rs`
+(`the_mean_of_many_runs_is_the_solution_of_the_ode`,
+`the_mean_of_many_chain_binomial_runs_is_the_difference_engine`).
 
 ### A difference step never leaves an amount below zero
 
@@ -608,7 +626,11 @@ A stochastic engine draws every random number from one generator seeded by
 `SimulationEngine::set_seed` (`crates/commol-core/src/simulation_engine.rs`);
 `reset` restores it, so a run is reproducible from its seed. The default
 `set_seed` does nothing, so the deterministic engines did not change.
-`EngineType::is_stochastic` says which engines draw.
+`EngineType::is_stochastic` says which engines draw: `StochasticEvents` and
+`StochasticSteps` (`crates/commol-stochastic/`). A run does not depend on the
+positions it reports at: `StochasticEvents` measures each wait from the last
+change of the state, never from a reported position, and draws the flow of an
+event only when the event happens.
 
 | Part | Rule |
 |---|---|
@@ -636,9 +658,50 @@ version may change a run, and the changelog says so.
 **Guards:** `crates/commol-random/` (tests, with the stored first values of each
 sampler in `tests/reference_values.txt`), `py-commol/src/engine.rs`
 (`a_stochastic_engine_repeats_a_run_from_its_seed`,
+`an_aggregate_stochastic_engine_repeats_a_run_from_its_seed`,
 `a_deterministic_engine_ignores_the_seed`),
+`crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports`,
 `crates/commol-calibration/src/types.rs` (`replicate_tests`),
 `tests/model_kinds/test_stochastic.py`.
+
+### Whole units in a stochastic engine
+
+A stochastic engine moves whole units, so it starts from whole amounts.
+`check_model` (`crates/commol-model/src/builder.rs`, called by `build` and by
+every engine) rejects a total that is not whole, and initial amounts that are
+not whole unless the settings of the engine name a `Rounding`
+(`crates/commol-core/src/types/engine.rs`); the message lists both. There is no
+default:
+
+| `rounding` | Start of each run (`Units::begin` in `crates/commol-stochastic/src/units.rs`) |
+|---|---|
+| `"largest_remainder"` | The same whole amounts: each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie |
+| `"random"` | A multinomial draw of the total with the fractions of the model, from the generator of the run |
+
+The engine rounds at the start of a run, not when it is built, so a value that
+calibration writes (`InitialConditionPlan`) goes through the same rounding, and
+`"random"` draws after the values are written. With no rounding, a written
+value that is not whole is an error.
+
+| Alternative | Why not |
+|---|---|
+| Largest remainder by default | With small amounts the rounding is a modelling choice: half a unit in each of ten groups starts five groups with one unit and five with none, which decides which groups can start a process at all. The library would choose it without notice. |
+| Random rounding by default | The same objection, the other way. |
+| Reject every amount that is not whole | Most stratified models would fail, with no way out but to compute whole amounts by hand. |
+
+A per-step probability of `StochasticSteps` outside `[0, 1]`, or proportional
+rates out of one compartment that sum to more than 1, are an error that names
+the compartment, the step and the flows (`SimulationError::Infeasible`), not a
+clamp: a binomial draw has no meaning outside `[0, 1]`, and a clamp would change
+the model without notice.
+
+**Guards:** `crates/commol-stochastic/tests/oracles.rs`
+(`amounts_that_are_not_whole_need_a_rounding`,
+`the_largest_remainder_starts_every_run_from_the_same_whole_amounts`,
+`a_random_rounding_starts_on_average_from_the_amounts_of_the_model`,
+`calibrated_initial_conditions_go_through_the_rounding`,
+`a_negative_rate_or_probabilities_above_one_fail_at_their_step`),
+`tests/stochastic/test_whole_units.py`.
 
 ### The solver is `diffsol`
 

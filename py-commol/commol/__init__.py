@@ -33,7 +33,11 @@ from commol.context import (
 )
 from commol.context.axis_units import AxisUnits
 from commol.context.description import ModelDescription
-from commol.context.engine import OdeSolver
+from commol.context.engine import (
+    OdeSolver,
+    StochasticEventsSettings,
+    StochasticStepsSettings,
+)
 from commol.context.calibration import (
     CalibrationConstraint,
     CalibrationParameter,
@@ -99,6 +103,8 @@ __all__ = [
     "NelderMeadConfig",
     "ObservedDataPoint",
     "OdeSolver",
+    "StochasticEventsSettings",
+    "StochasticStepsSettings",
     "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",

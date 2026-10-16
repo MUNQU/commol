@@ -118,7 +118,7 @@ def describe_model(model: "Model", layout: Layout) -> ModelDescription:
 def _default_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
     generic: dict[str, list[Block]] = {
         "overview": overview_blocks(model),
-        "schedule": [Text(text=_engine(model).schedule)],
+        "schedule": schedule_blocks(model),
         "parameters": parameter_blocks(model),
         "outputs": output_blocks(model),
     }
@@ -162,6 +162,23 @@ def overview_blocks(model: "Model") -> list[Block]:
             rows=[[field, value] for field, value in rows if value is not None],
         )
     ]
+
+
+def schedule_blocks(model: "Model") -> list[Block]:
+    """How the engine advances, and the settings it advances with."""
+    blocks: list[Block] = [Text(text=_engine(model).schedule)]
+    if model.engine.settings is not None:
+        blocks.append(
+            Table(
+                heading="Settings",
+                columns=["Setting", "Value"],
+                rows=[
+                    [setting, "none" if value is None else value]
+                    for setting, value in model.engine.settings.model_dump().items()
+                ],
+            )
+        )
+    return blocks
 
 
 def parameter_blocks(model: "Model") -> list[Block]:
@@ -214,10 +231,7 @@ def _odd_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
     elements: dict[str, list[Block]] = {
         "purpose": [Text(text=model.description or TO_BE_WRITTEN)],
         "entities": [*blocks_of("entities"), *_scales(model)],
-        "process_overview": [
-            *_process_overview(model),
-            Text(heading="Scheduling", text=_engine(model).schedule),
-        ],
+        "process_overview": [*_process_overview(model), *_scheduling(model)],
         "design_concepts": _design_concepts(model, kind.get("design_concepts")),
         "initialization": blocks_of("initialization") or [Text(text=TO_BE_WRITTEN)],
         "input_data": _input_data(model),
@@ -239,9 +253,15 @@ def _odd_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
     ]
 
 
+def _scheduling(model: "Model") -> list[Block]:
+    blocks = schedule_blocks(model)
+    blocks[0] = blocks[0].model_copy(update={"heading": "Scheduling"})
+    return blocks
+
+
 def _scales(model: "Model") -> list[Block]:
-    form = _engine(model).dynamics_form
-    time = "continuous" if form == "differential_equation" else "discrete steps"
+    continuous = _engine(model).rate_meaning == "continuous"
+    time = "continuous" if continuous else "discrete steps"
     return [
         Table(
             heading="Scales",

@@ -18,8 +18,10 @@ amounts per compartment.
 Model                      name, description, version, step_unit
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
-│   ├── type: "DifferenceEquations" or "DifferentialEquations"
-│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
+│   ├── type: "DifferenceEquations", "DifferentialEquations",
+│   │         "StochasticEvents" or "StochasticSteps"
+│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│                                           (settings of that engine; None: its defaults)
 ├── process: Process
 │   ├── bins: [Bin]
 │   ├── accumulators: [Accumulator]

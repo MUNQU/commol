@@ -11,7 +11,7 @@ dust2 + monty, calibrates with particle filters and MCMC
 (`library-benchmark.md`, Context).
 Program: eleventh of fourteen; follows the architecture of
 `odd/tasks/inference-foundation.md`; needs the engines of
-`odd/tasks/stochastic-compartmental.md`, the likelihood of
+`odd/archive/tasks/stochastic-compartmental.md`, the likelihood of
 `odd/tasks/observation-models.md` and the chains of
 `odd/tasks/mcmc-samplers.md`.
 Branch: `feat/state-space-inference` from `develop`, after

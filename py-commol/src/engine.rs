@@ -12,6 +12,7 @@ use commol_core::{
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_model::{CompartmentalEngine, InitialConditionPlan};
+use commol_stochastic::{StochasticEvents, StochasticSteps};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -41,6 +42,10 @@ pub enum Engine {
     Difference(DifferenceEquations),
     /// Continuous time.
     Differential(DifferentialEquations),
+    /// Continuous time, at random.
+    StochasticEvents(StochasticEvents),
+    /// Discrete time, at random.
+    StochasticSteps(StochasticSteps),
     /// The engine of the test model kind.
     #[cfg(feature = "test-kind")]
     Test(TestEngine),
@@ -89,6 +94,12 @@ impl Engine {
             (EngineType::DifferentialEquations, ModelKind::Aggregate) => {
                 DifferentialEquations::try_from_model(model).map(Self::Differential)
             }
+            (EngineType::StochasticEvents, ModelKind::Aggregate) => {
+                StochasticEvents::try_from_model(model).map(Self::StochasticEvents)
+            }
+            (EngineType::StochasticSteps, ModelKind::Aggregate) => {
+                StochasticSteps::try_from_model(model).map(Self::StochasticSteps)
+            }
             #[cfg(feature = "test-kind")]
             (EngineType::TestEngine, ModelKind::Test) => {
                 TestEngine::try_from_model(model).map(Self::Test)
@@ -117,6 +128,8 @@ impl Engine {
         match self {
             Self::Difference(_) => EngineType::DifferenceEquations,
             Self::Differential(_) => EngineType::DifferentialEquations,
+            Self::StochasticEvents(_) => EngineType::StochasticEvents,
+            Self::StochasticSteps(_) => EngineType::StochasticSteps,
             #[cfg(feature = "test-kind")]
             Self::Test(_) => EngineType::TestEngine,
             #[cfg(feature = "test-kind")]
@@ -131,6 +144,8 @@ macro_rules! dispatch {
         match $self {
             Engine::Difference($engine) => $body,
             Engine::Differential($engine) => $body,
+            Engine::StochasticEvents($engine) => $body,
+            Engine::StochasticSteps($engine) => $body,
             #[cfg(feature = "test-kind")]
             Engine::Test($engine) => $body,
             #[cfg(feature = "test-kind")]
@@ -146,6 +161,8 @@ macro_rules! compartmental {
         match $self {
             Engine::Difference($engine) => Ok::<_, String>($body),
             Engine::Differential($engine) => Ok::<_, String>($body),
+            Engine::StochasticEvents($engine) => Ok::<_, String>($body),
+            Engine::StochasticSteps($engine) => Ok::<_, String>($body),
             #[cfg(feature = "test-kind")]
             other => Err(format!(
                 "The {} engine of this model has no compartments; only an aggregate model \
@@ -238,6 +255,12 @@ impl SimulationEngine for Engine {
             Self::Differential(engine) => engine
                 .plan_values(values, remainder)
                 .map(EngineValuePlan::Aggregate),
+            Self::StochasticEvents(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Aggregate),
+            Self::StochasticSteps(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Aggregate),
             #[cfg(feature = "test-kind")]
             Self::Test(engine) => engine
                 .plan_values(values, remainder)
@@ -255,6 +278,12 @@ impl SimulationEngine for Engine {
                 engine.apply_values(plan, values)
             }
             (Self::Differential(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            (Self::StochasticEvents(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            (Self::StochasticSteps(engine), EngineValuePlan::Aggregate(plan)) => {
                 engine.apply_values(plan, values)
             }
             #[cfg(feature = "test-kind")]
@@ -624,7 +653,7 @@ impl PyEngineType {
     /// How the engine advances, in words, for a description of a model
     #[getter]
     fn schedule(&self) -> &'static str {
-        self.inner.dynamics_form().schedule()
+        self.inner.schedule()
     }
 
     /// Left-hand side of the equation of a variable, or None when the form
@@ -887,13 +916,31 @@ mod tests {
     }
 
     #[test]
-    fn a_deterministic_engine_ignores_the_seed() {
+    fn an_aggregate_stochastic_engine_repeats_a_run_from_its_seed() {
         for &engine_type in EngineType::ALL {
-            if !engine_type.runs(ModelKind::Aggregate) {
+            if !engine_type.runs(ModelKind::Aggregate) || !engine_type.is_stochastic() {
                 continue;
             }
             let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
-            assert!(!engine_type.is_stochastic());
+            assert_eq!(engine.engine_type(), engine_type);
+            let mut run = |seed| {
+                engine.set_seed(seed);
+                engine.reset();
+                SimulationEngine::run(&mut engine, 20).unwrap().rows
+            };
+            let first = run(1);
+            assert_eq!(run(1), first);
+            assert_ne!(run(2), first);
+        }
+    }
+
+    #[test]
+    fn a_deterministic_engine_ignores_the_seed() {
+        for &engine_type in EngineType::ALL {
+            if !engine_type.runs(ModelKind::Aggregate) || engine_type.is_stochastic() {
+                continue;
+            }
+            let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
             engine.set_seed(1);
             let first = SimulationEngine::run(&mut engine, 3).unwrap().rows;
             engine.set_seed(2);

@@ -245,6 +245,14 @@ pub enum EngineType {
     /// Continuous time: the engine integrates `dX/dt = Σ flows` with an ODE
     /// solver (`commol-differential`).
     DifferentialEquations,
+    /// Continuous time, at random: whole units move one event at a time, each
+    /// flow at its rate as a hazard (Gillespie's direct method, or
+    /// tau-leaping; `commol-stochastic`).
+    StochasticEvents,
+    /// Discrete time, at random: each step draws how many whole units each
+    /// flow moves, a proportional rate being a per-step probability (the
+    /// chain binomial; `commol-stochastic`).
+    StochasticSteps,
     /// The engine of the test model kind: each output decays exponentially
     /// (`types::test_kind`).
     #[cfg(feature = "test-kind")]
@@ -260,6 +268,8 @@ impl EngineType {
     pub const ALL: &'static [Self] = &[
         Self::DifferenceEquations,
         Self::DifferentialEquations,
+        Self::StochasticEvents,
+        Self::StochasticSteps,
         #[cfg(feature = "test-kind")]
         Self::TestEngine,
         #[cfg(feature = "test-kind")]
@@ -271,6 +281,8 @@ impl EngineType {
         match self {
             Self::DifferenceEquations => "DifferenceEquations",
             Self::DifferentialEquations => "DifferentialEquations",
+            Self::StochasticEvents => "StochasticEvents",
+            Self::StochasticSteps => "StochasticSteps",
             #[cfg(feature = "test-kind")]
             Self::TestEngine => "TestEngine",
             #[cfg(feature = "test-kind")]
@@ -297,7 +309,10 @@ impl EngineType {
     /// The kinds of model the engine runs.
     pub fn kinds(self) -> &'static [ModelKind] {
         match self {
-            Self::DifferenceEquations | Self::DifferentialEquations => &[ModelKind::Aggregate],
+            Self::DifferenceEquations
+            | Self::DifferentialEquations
+            | Self::StochasticEvents
+            | Self::StochasticSteps => &[ModelKind::Aggregate],
             #[cfg(feature = "test-kind")]
             Self::TestEngine | Self::TestStochasticEngine => &[ModelKind::Test],
         }
@@ -308,6 +323,7 @@ impl EngineType {
     pub fn is_stochastic(self) -> bool {
         match self {
             Self::DifferenceEquations | Self::DifferentialEquations => false,
+            Self::StochasticEvents | Self::StochasticSteps => true,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => false,
             #[cfg(feature = "test-kind")]
@@ -357,8 +373,8 @@ impl EngineType {
     /// What the value of a rate expression means to the engine.
     pub fn rate_meaning(self) -> RateMeaning {
         match self {
-            Self::DifferenceEquations => RateMeaning::PerStep,
-            Self::DifferentialEquations => RateMeaning::Continuous,
+            Self::DifferenceEquations | Self::StochasticSteps => RateMeaning::PerStep,
+            Self::DifferentialEquations | Self::StochasticEvents => RateMeaning::Continuous,
             #[cfg(feature = "test-kind")]
             Self::TestEngine | Self::TestStochasticEngine => RateMeaning::Continuous,
         }
@@ -370,10 +386,34 @@ impl EngineType {
         match self {
             Self::DifferenceEquations => DynamicsForm::DifferenceEquation,
             Self::DifferentialEquations => DynamicsForm::DifferentialEquation,
+            Self::StochasticEvents | Self::StochasticSteps => DynamicsForm::StochasticEvents,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => DynamicsForm::DifferentialEquation,
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => DynamicsForm::StochasticEvents,
+        }
+    }
+
+    /// How the engine advances, in words: the `schedule` section of a
+    /// description. It is the text of its form of dynamics
+    /// ([`DynamicsForm::schedule`]), unless the engine says more.
+    pub fn schedule(self) -> &'static str {
+        match self {
+            Self::StochasticEvents => {
+                "Events happen one at a time, at random times: each event of a flow moves one \
+                 unit from its sources to its targets, with a probability per unit of the axis \
+                 (its propensity) of the rate times its source for a proportional rate, or the \
+                 rate for an absolute one. The engine stops at each impulse, where the impulses \
+                 act first, and at each position where a rate jumps."
+            }
+            Self::StochasticSteps => {
+                "Each step draws at random how many whole units each flow moves, from the state \
+                 at the start of the step: the units of a compartment leave by its proportional \
+                 flows in one multinomial draw, each rate the probability that one unit leaves \
+                 in the step; an absolute flow moves a Poisson number of units of mean its rate, \
+                 capped by what its sources still hold. The impulses of a step act first."
+            }
+            _ => self.dynamics_form().schedule(),
         }
     }
 
@@ -413,6 +453,12 @@ impl EngineType {
             Self::DifferentialEquations => {
                 EngineSettings::DifferentialEquations(OdeSolver::default())
             }
+            Self::StochasticEvents => {
+                EngineSettings::StochasticEvents(StochasticEventsSettings::default())
+            }
+            Self::StochasticSteps => {
+                EngineSettings::StochasticSteps(StochasticStepsSettings::default())
+            }
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineSettings::TestEngine,
             #[cfg(feature = "test-kind")]
@@ -424,7 +470,7 @@ impl EngineType {
     fn takes_settings(self) -> bool {
         match self {
             Self::DifferenceEquations => false,
-            Self::DifferentialEquations => true,
+            Self::DifferentialEquations | Self::StochasticEvents | Self::StochasticSteps => true,
             #[cfg(feature = "test-kind")]
             Self::TestEngine | Self::TestStochasticEngine => false,
         }
@@ -447,6 +493,17 @@ impl EngineType {
                 solver.validate()?;
                 Ok(EngineSettings::DifferentialEquations(solver))
             }
+            Self::StochasticEvents => {
+                let settings: StochasticEventsSettings =
+                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                settings.validate()?;
+                Ok(EngineSettings::StochasticEvents(settings))
+            }
+            Self::StochasticSteps => {
+                let settings: StochasticStepsSettings =
+                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                Ok(EngineSettings::StochasticSteps(settings))
+            }
         }
     }
 }
@@ -458,6 +515,10 @@ pub enum EngineSettings {
     DifferenceEquations,
     /// Solver settings of the differential engine.
     DifferentialEquations(OdeSolver),
+    /// Method and rounding of the continuous-time stochastic engine.
+    StochasticEvents(StochasticEventsSettings),
+    /// Rounding of the discrete-time stochastic engine.
+    StochasticSteps(StochasticStepsSettings),
     /// The engine of the test model kind has no settings.
     #[cfg(feature = "test-kind")]
     TestEngine,
@@ -472,10 +533,22 @@ impl EngineSettings {
         match self {
             Self::DifferenceEquations => EngineType::DifferenceEquations,
             Self::DifferentialEquations(_) => EngineType::DifferentialEquations,
+            Self::StochasticEvents(_) => EngineType::StochasticEvents,
+            Self::StochasticSteps(_) => EngineType::StochasticSteps,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineType::TestEngine,
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => EngineType::TestStochasticEngine,
+        }
+    }
+
+    /// How a stochastic engine makes whole the initial amounts that are not,
+    /// if its settings name a way; `None` for the other engines.
+    pub fn rounding(&self) -> Option<Rounding> {
+        match self {
+            Self::StochasticEvents(settings) => settings.rounding,
+            Self::StochasticSteps(settings) => settings.rounding,
+            _ => None,
         }
     }
 
@@ -484,6 +557,8 @@ impl EngineSettings {
         match self {
             Self::DifferenceEquations => None,
             Self::DifferentialEquations(solver) => serde_json::to_value(solver).ok(),
+            Self::StochasticEvents(settings) => serde_json::to_value(settings).ok(),
+            Self::StochasticSteps(settings) => serde_json::to_value(settings).ok(),
             #[cfg(feature = "test-kind")]
             Self::TestEngine | Self::TestStochasticEngine => None,
         }
@@ -619,6 +694,139 @@ impl Default for OdeSolver {
     }
 }
 
+/// How a stochastic engine makes whole the initial amounts of a model that
+/// are not. There is no default: with small amounts the rounding decides
+/// which compartments start with a unit, so it is a choice of the model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Rounding {
+    /// The same whole amounts in every run: each amount rounded down, and the
+    /// units left over to the largest remainders, so they sum to the total.
+    #[serde(rename = "largest_remainder")]
+    LargestRemainder,
+    /// A multinomial draw of the total with the fractions of the model in
+    /// each run, so the mean start equals the amounts of the model.
+    #[serde(rename = "random")]
+    Random,
+}
+
+impl Rounding {
+    /// Every rounding, as a stochastic engine lists them.
+    pub const ALL: &'static [Self] = &[Self::LargestRemainder, Self::Random];
+
+    /// Name of the rounding, as the settings write it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::LargestRemainder => "largest_remainder",
+            Self::Random => "random",
+        }
+    }
+}
+
+/// Method of the continuous-time stochastic engine.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EventMethod {
+    /// Gillespie's direct method: one event at a time, exact.
+    #[default]
+    #[serde(rename = "direct")]
+    Direct,
+    /// Tau-leaping: a Poisson number of events of each flow in a leap of
+    /// length `tau`, an approximation for many events.
+    #[serde(rename = "tau_leaping")]
+    TauLeaping,
+}
+
+/// Settings of the continuous-time stochastic engine.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StochasticEventsSettings {
+    /// The method.
+    #[serde(default)]
+    pub method: EventMethod,
+    /// The length of a leap of tau-leaping; `None` chooses each leap as Cao,
+    /// Gillespie and Petzold (2006) do, from `epsilon`.
+    #[serde(default)]
+    pub tau: Option<f64>,
+    /// How much a propensity may change in one adaptive leap, relative to
+    /// its value.
+    #[serde(default = "StochasticEventsSettings::default_epsilon")]
+    pub epsilon: f64,
+    /// Relative tolerance of the time of an event when a rate reads `t`.
+    #[serde(default = "StochasticEventsSettings::default_tolerance")]
+    pub tolerance: f64,
+    /// How to make whole the initial amounts that are not.
+    #[serde(default)]
+    pub rounding: Option<Rounding>,
+}
+
+impl StochasticEventsSettings {
+    /// Default `epsilon` of an adaptive leap (Cao, Gillespie and Petzold 2006).
+    pub const DEFAULT_EPSILON: f64 = 0.03;
+    /// Default relative tolerance of the time of an event.
+    pub const DEFAULT_TOLERANCE: f64 = 1e-8;
+
+    fn default_epsilon() -> f64 {
+        Self::DEFAULT_EPSILON
+    }
+
+    fn default_tolerance() -> f64 {
+        Self::DEFAULT_TOLERANCE
+    }
+
+    /// Check the settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when `tau` is not a positive number or is given
+    /// for the direct method, when `epsilon` is not in `(0, 1)`, or when the
+    /// tolerance is not a positive number.
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(tau) = self.tau {
+            if !(tau.is_finite() && tau > 0.0) {
+                return Err(format!("tau must be a positive number, got {tau}"));
+            }
+            if self.method != EventMethod::TauLeaping {
+                return Err(
+                    "tau is the length of a leap: it needs the method \"tau_leaping\"".to_string(),
+                );
+            }
+        }
+        if !(self.epsilon > 0.0 && self.epsilon < 1.0) {
+            return Err(format!(
+                "epsilon must be between 0 and 1, got {}",
+                self.epsilon
+            ));
+        }
+        if !(self.tolerance.is_finite() && self.tolerance > 0.0) {
+            return Err(format!(
+                "The tolerance must be a positive number, got {}",
+                self.tolerance
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Default for StochasticEventsSettings {
+    fn default() -> Self {
+        Self {
+            method: EventMethod::default(),
+            tau: None,
+            epsilon: Self::DEFAULT_EPSILON,
+            tolerance: Self::DEFAULT_TOLERANCE,
+            rounding: None,
+        }
+    }
+}
+
+/// Settings of the discrete-time stochastic engine.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StochasticStepsSettings {
+    /// How to make whole the initial amounts that are not.
+    #[serde(default)]
+    pub rounding: Option<Rounding>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,8 +860,18 @@ mod tests {
             EngineType::engines_of(ModelKind::Aggregate),
             vec![
                 EngineType::DifferenceEquations,
-                EngineType::DifferentialEquations
+                EngineType::DifferentialEquations,
+                EngineType::StochasticEvents,
+                EngineType::StochasticSteps,
             ]
+        );
+        assert_eq!(
+            EngineType::StochasticSteps.rate_meaning(),
+            RateMeaning::PerStep
+        );
+        assert_eq!(
+            EngineType::StochasticEvents.rate_meaning(),
+            RateMeaning::Continuous
         );
         assert_eq!(
             EngineType::DifferenceEquations.rate_meaning(),
@@ -726,9 +944,63 @@ mod tests {
     }
 
     #[test]
-    fn the_engines_of_a_release_are_deterministic() {
+    fn only_the_stochastic_engines_draw_random_numbers() {
         assert!(!EngineType::DifferenceEquations.is_stochastic());
         assert!(!EngineType::DifferentialEquations.is_stochastic());
+        assert!(EngineType::StochasticEvents.is_stochastic());
+        assert!(EngineType::StochasticSteps.is_stochastic());
+        for engine in [EngineType::StochasticEvents, EngineType::StochasticSteps] {
+            assert_eq!(engine.dynamics_form(), DynamicsForm::StochasticEvents);
+            assert_ne!(
+                engine.schedule(),
+                DynamicsForm::DifferenceEquation.schedule()
+            );
+        }
+    }
+
+    #[test]
+    fn stochastic_settings_read_back_and_name_their_rounding() {
+        let engine: ModelEngine = serde_json::from_value(json!({
+            "type": "StochasticEvents",
+            "settings": {"method": "tau_leaping", "tau": 0.5, "rounding": "random"}
+        }))
+        .unwrap();
+        let EngineSettings::StochasticEvents(settings) = engine.settings() else {
+            panic!("expected stochastic event settings");
+        };
+        assert_eq!(settings.method, EventMethod::TauLeaping);
+        assert_eq!(settings.tau, Some(0.5));
+        assert_eq!(engine.settings().rounding(), Some(Rounding::Random));
+        let again: ModelEngine =
+            serde_json::from_value(serde_json::to_value(engine).unwrap()).unwrap();
+        assert_eq!(again, engine);
+
+        let steps = EngineType::StochasticSteps
+            .settings(Some(&json!({"rounding": "largest_remainder"})))
+            .unwrap();
+        assert_eq!(steps.rounding(), Some(Rounding::LargestRemainder));
+        assert_eq!(
+            EngineType::StochasticSteps
+                .settings(None)
+                .unwrap()
+                .rounding(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_leap_needs_tau_leaping_and_a_positive_length() {
+        for settings in [
+            json!({"tau": 0.5}),
+            json!({"method": "tau_leaping", "tau": 0.0}),
+            json!({"epsilon": 1.5}),
+            json!({"tolerance": -1.0}),
+        ] {
+            let error = EngineType::StochasticEvents
+                .settings(Some(&settings))
+                .unwrap_err();
+            assert!(error.contains("StochasticEvents"), "{error}");
+        }
     }
 
     #[test]

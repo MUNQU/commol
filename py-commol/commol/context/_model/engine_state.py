@@ -199,6 +199,9 @@ class TransitionFlow(NamedTuple):
         Compartment a proportional rate is multiplied by, or None for an absolute
         flow. The pieces of a transition with several sources (``A + B -> C``)
         share the flow of the first source.
+    flow : int
+        Index of the flow the piece belongs to. The pieces of one flow move
+        together: in a stochastic engine they are one event.
     """
 
     transition: str
@@ -206,6 +209,7 @@ class TransitionFlow(NamedTuple):
     target: str | None
     rate: str
     proportional_to: str | None
+    flow: int
 
     @property
     def term(self) -> str:

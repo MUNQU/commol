@@ -203,6 +203,7 @@ dependencies = [
  "commol-differential",
  "commol-model",
  "commol-random",
+ "commol-stochastic",
  "pyo3",
  "serde_json",
 ]
@@ -275,6 +276,18 @@ version = "0.1.0"
 dependencies = [
  "rand_core 0.10.1",
  "rand_xoshiro",
+]
+
+[[package]]
+name = "commol-stochastic"
+version = "0.1.0"
+dependencies = [
+ "commol-core",
+ "commol-difference",
+ "commol-differential",
+ "commol-model",
+ "commol-random",
+ "serde_json",
 ]
 
 [[package]]

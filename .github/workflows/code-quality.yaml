@@ -112,7 +112,7 @@ jobs:
       # Public items must have docs (`missing_docs`, denied by clippy above), and
       # their docs must not have broken links.
       - name: Check Rust documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic
 
       - name: Run tests
         run: cargo test --all-features --workspace

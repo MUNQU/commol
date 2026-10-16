@@ -6,7 +6,13 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from commol import Model, OdeSolver, Simulation
+from commol import (
+    Model,
+    OdeSolver,
+    Simulation,
+    StochasticEventsSettings,
+    StochasticStepsSettings,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine import EngineName
 from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
@@ -26,7 +32,12 @@ class TestEngineList:
     def test_the_aggregate_kind_lists_its_engines(self) -> None:
         kind = commol_rs.engine.ModelKind("aggregate")
 
-        assert kind.engines() == ["DifferenceEquations", "DifferentialEquations"]
+        assert kind.engines() == [
+            "DifferenceEquations",
+            "DifferentialEquations",
+            "StochasticEvents",
+            "StochasticSteps",
+        ]
 
     def test_each_engine_says_what_a_rate_means(self) -> None:
         meanings = {
@@ -37,6 +48,8 @@ class TestEngineList:
         assert meanings == {
             "DifferenceEquations": "per_step",
             "DifferentialEquations": "continuous",
+            "StochasticEvents": "continuous",
+            "StochasticSteps": "per_step",
         }
 
     def test_an_unknown_engine_lists_the_engines(self) -> None:
@@ -149,6 +162,27 @@ class TestSaveAndLoad:
         loaded = Model.from_json(path)
 
         assert loaded.engine == model.engine
+
+    @pytest.mark.parametrize(
+        ("engine", "settings"),
+        [
+            ("StochasticEvents", StochasticEventsSettings(method="tau_leaping")),
+            ("StochasticEvents", StochasticEventsSettings(rounding="random")),
+            ("StochasticSteps", StochasticStepsSettings(rounding="random")),
+        ],
+    )
+    def test_stochastic_settings_load_back_as_their_class(
+        self, tmp_path, engine: EngineName, settings: object
+    ) -> None:
+        builder = a_to_b_builder()
+        model = builder.build(builder.structure, engine=engine, settings=settings)  # ty: ignore[invalid-argument-type]
+        path = tmp_path / "model.json"
+        model.to_json(path)
+
+        loaded = Model.from_json(path)
+
+        assert loaded == model
+        assert type(loaded.engine.settings) is type(settings)
 
     def test_a_difference_model_saves_no_settings(self) -> None:
         model = build(a_to_b_builder())

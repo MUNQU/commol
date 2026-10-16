@@ -144,13 +144,26 @@ replicate gives the same run however many replicates run, and
 | `quantiles(levels)` | `{level: SimulationResults}`, at each position |
 | `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate as [`ci_percentiles`](../codebase/design-decisions.md#one-confidence-interval-convention) requires |
 
-<!-- doc-test: skip: needs a stochastic engine; the engines of this release are deterministic -->
 ```python
-replicates = simulation.replicates(200, seed=42).run(num_steps=50)
+from commol.api.plotter import SimulationPlotter
+
+stochastic = Simulation(
+    ModelBuilder(name="Stochastic Model")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_parameter(id="k", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
+    .build(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}), engine="StochasticEvents")
+)
+replicates = stochastic.replicates(200, seed=42).run(num_steps=50)
 mean = replicates.mean()
 band = replicates.member_statistics("B", confidence_level=0.9)
-SimulationPlotter(simulation, replicates).plot_series()  # the mean and a 95 % band
+SimulationPlotter(stochastic, replicates).plot_series()  # the mean and a 95 % band
+print(replicates.seeds[:2] == [run.seed for run in replicates[:2]])  # True
 ```
+
+The stochastic engines and what they draw are in
+[Stochastic Simulation](stochastic.md).
 
 A run is reproducible from its model and its seed, on one platform and one
 commol version:

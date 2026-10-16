@@ -19,6 +19,7 @@ commol-core = { path = "../crates/commol-core" }
 commol-model = { path = "../crates/commol-model" }
 commol-difference = { path = "../crates/commol-difference" }
 commol-differential = { path = "../crates/commol-differential" }
+commol-stochastic = { path = "../crates/commol-stochastic" }
 commol-calibration = { path = "../crates/commol-calibration" }
 commol-random = { path = "../crates/commol-random" }
 

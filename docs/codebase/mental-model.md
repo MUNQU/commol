@@ -3,7 +3,8 @@
 [Back to Codebase Guide](index.md)
 
 Commol builds compartment models from a declarative definition and runs them
-as difference equations or as ordinary differential equations. Python owns the
+as difference equations, as ordinary differential equations, or as stochastic
+processes of whole units. Python owns the
 user-facing API and validation; Rust owns every rule about how a model becomes
 numbers. A model has a **process** written once (bins, stratifications,
 transitions), a **structure** that lays it out and sets its **kind** (today
@@ -17,9 +18,10 @@ generic layers work with any kind.
 | A Python library with a fluent builder of the process | `py-commol/commol/api/model_builder.py` |
 | A validated, serializable model definition: a header, a process, a structure and an engine | `py-commol/commol/context/` (Pydantic): `model.py`, `process.py`, `structure.py`, `aggregate.py` |
 | Generic layers that work with any model kind | `Simulation`, `Calibrator`, reports and plots use only `ModelStructure`; Rust calibration uses only `SimulationEngine` (see [Design decisions](design-decisions.md#one-interface-for-every-model-kind)) |
-| One model compiler for both engines: expansion, flows, rates, the right-hand side | `crates/commol-model/` |
+| One model compiler for every engine: expansion, flows, rates, the change of one event of each flow, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
 | A Rust ODE engine on `diffsol` | `crates/commol-differential/` |
+| Two Rust stochastic engines of whole units: events in continuous time (direct method, tau-leaping) and the chain binomial | `crates/commol-stochastic/` |
 | Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
 | A calibration toolkit: optimizers, constraints, ensembles | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py`, `probabilistic_calibrator.py` |
@@ -39,7 +41,7 @@ generic layers work with any kind.
 |---|---|---|
 | Process | What changes and how, written once for every kind: bins, accumulators, stratifications, transitions. | `Process` (`crates/commol-core/src/types/process.rs`, `context/process.py`); `Model.process` |
 | Model kind | How the process is laid out: the kind of its `structure`. `aggregate`: the bins expanded over the stratifications into compartments, each holding an amount. A **variant** is a narrower form of a structure with the same kind and engines. | `ModelKind` (`crates/commol-core/src/types/engine.rs`); `ModelStructure` and its subclasses in Python |
-| Engine | A method: how a model advances along the axis, and what a rate means: `DifferenceEquations`, `DifferentialEquations`. | `EngineType`, the one list (`engine.rs`); `Model.engine` |
+| Engine | A method: how a model advances along the axis, and what a rate means: `DifferenceEquations`, `DifferentialEquations`, `StochasticEvents`, `StochasticSteps`. | `EngineType`, the one list (`engine.rs`); `Model.engine` |
 
 Each engine runs some kinds (`EngineType::kinds`). A model whose engine does
 not run its kind is rejected when it is made, and the error lists the engines
@@ -62,9 +64,12 @@ Simulation(model)                  -> engine_state.build_engine(model JSON)
                                         expand the bins of the process over its stratifications
                                         build the initial state
                                         plan the transition flows, resolve the neighbors, compile the rates
-                                        derivatives(step, t, X) = Σ flows
+                                        flow_rates and flow_changes (one event of each flow)
+                                        derivatives(step, t, X) = Σ changes × flows
 Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per step
                                       differential: diffsol integrates derivatives
+                                      stochastic events: one event (or a leap) at a time
+                                      stochastic steps: a chain binomial draw per step
                                       (a stochastic engine: set_seed, then reset)
 Simulation.replicates(n).run(…)    -> Engine.run_replicates: one seed per replicate,
                                       run in parallel (run_replicates, rayon)

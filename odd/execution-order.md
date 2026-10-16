@@ -21,7 +21,7 @@ ODD is added, merged or archived.
 | 8 | `odd/archive/tasks/difference-negative-amounts.md` | delivered by PR #113 | 7 | Yes |
 | 9 | Release 0.3.0 (`docs/development/release.md`) | released 2026-10-15 (PR #114, tag `v0.3.0`, PyPI) | 2–8 | — |
 | 10 | `odd/archive/tasks/model-kind-foundation.md` | delivered on `refactor/model-kind-foundation` (2026-10-16) | 9 | Yes |
-| 11 | `odd/tasks/stochastic-compartmental.md` | T1 → T8 | 10 | No |
+| 11 | `odd/archive/tasks/stochastic-compartmental.md` | delivered by PR #118 | 10 | No |
 | 12 | `odd/tasks/inference-foundation.md` | T0 → T9 | 10, 11 | Yes |
 | 13 | `odd/tasks/identifiability.md` | T1 → T7 | 12 | No |
 | 14 | `odd/tasks/resampling-uncertainty.md` | T1 → T8 | 12 | No |
