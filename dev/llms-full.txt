@@ -25,7 +25,7 @@ The API can change between minor versions (`0.2` → `0.3`). The [changelog](htt
 | Looking up a class or argument | [API Reference](https://munqu.github.io/commol/latest/api/index.md)                      | [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md)                                                                                                 |
 | Contributing to Commol         | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                | [Development Workflow](https://munqu.github.io/commol/latest/development/workflow/index.md)                                                                                                |
 | An AI agent using Commol       | [`llms.txt`](https://munqu.github.io/commol/latest/llms.txt): an index of the site       | [`llms-full.txt`](https://munqu.github.io/commol/latest/llms-full.txt): the whole site in one file                                                                                         |
-| An AI agent changing Commol    | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md)                    | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                                                                                                                  |
+| An AI agent changing Commol    | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md)                       | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                                                                                                                  |
 
 ## How Commol works
 
@@ -120,7 +120,7 @@ print(importlib.metadata.version("commol"))
 
 ## Build from source
 
-To work on Commol, or to use unreleased code from `develop`:
+To work on Commol, or to use unreleased code from `main`:
 
 1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
 1. Install [uv](https://docs.astral.sh/uv/).
@@ -22278,6 +22278,10 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- The `latest` version of the documentation site is the documentation of the last release, published from its tag; the `dev` version follows `main`.
 
 ## [0.4.0] - 2026-10-16
 

@@ -29,7 +29,7 @@ print(importlib.metadata.version("commol"))
 
 ## Build from source
 
-To work on Commol, or to use unreleased code from `develop`:
+To work on Commol, or to use unreleased code from `main`:
 
 1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
 1. Install [uv](https://docs.astral.sh/uv/).

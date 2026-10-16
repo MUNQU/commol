@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The `latest` version of the documentation site is the documentation of the last release, published from its tag; the `dev` version follows `main`.
+
 ## [0.4.0] - 2026-10-16
 
 ### Added

@@ -16,7 +16,7 @@ The API can change between minor versions (`0.2` → `0.3`). The [changelog](htt
 | Looking up a class or argument | [API Reference](https://munqu.github.io/commol/latest/api/index.md)                      | [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md)                                                                                                 |
 | Contributing to Commol         | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                | [Development Workflow](https://munqu.github.io/commol/latest/development/workflow/index.md)                                                                                                |
 | An AI agent using Commol       | [`llms.txt`](https://munqu.github.io/commol/latest/llms.txt): an index of the site       | [`llms-full.txt`](https://munqu.github.io/commol/latest/llms-full.txt): the whole site in one file                                                                                         |
-| An AI agent changing Commol    | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md)                    | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                                                                                                                  |
+| An AI agent changing Commol    | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md)                       | [Codebase Guide](https://munqu.github.io/commol/latest/codebase/index.md)                                                                                                                  |
 
 ## How Commol works
 

@@ -2075,10 +2075,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-date-the-changelog-in-develop" class="md-nav__link">
+  <a href="#step-2-date-the-changelog" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Date the Changelog in develop
+        Step 2: Date the Changelog
       
     </span>
   </a>
@@ -2086,10 +2086,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-promote-develop-to-main" class="md-nav__link">
+  <a href="#step-3-wait-for-the-build-of-main" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Promote develop to main
+        Step 3: Wait for the Build of main
       
     </span>
   </a>
@@ -2498,10 +2498,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-date-the-changelog-in-develop" class="md-nav__link">
+  <a href="#step-2-date-the-changelog" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Date the Changelog in develop
+        Step 2: Date the Changelog
       
     </span>
   </a>
@@ -2509,10 +2509,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-promote-develop-to-main" class="md-nav__link">
+  <a href="#step-3-wait-for-the-build-of-main" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Promote develop to main
+        Step 3: Wait for the Build of main
       
     </span>
   </a>
@@ -2728,13 +2728,13 @@ it. Check the tag and the commit before you publish.</p>
 <p>When every issue of the milestone is closed, list the changes since the last
 release:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>fetch<span class="w"> </span>--tags<span class="w"> </span>origin
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>--first-parent<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>describe<span class="w"> </span>--tags<span class="w"> </span>--abbrev<span class="o">=</span><span class="m">0</span><span class="w"> </span>origin/main<span class="k">)</span><span class="s2">&quot;</span>..origin/develop
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>--first-parent<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>describe<span class="w"> </span>--tags<span class="w"> </span>--abbrev<span class="o">=</span><span class="m">0</span><span class="w"> </span>origin/main<span class="k">)</span><span class="s2">&quot;</span>..origin/main
 </span></code></pre></div>
 <p>Use the Version Guidelines above. The <code>[Unreleased]</code> section of
 <code>docs/about/changelog.md</code> lists the changes, and the breaking ones are marked
 <strong>Breaking</strong>.</p>
-<h3 id="step-2-date-the-changelog-in-develop">Step 2: Date the Changelog in <code>develop</code><a class="headerlink" href="#step-2-date-the-changelog-in-develop" title="Permanent link">&para;</a></h3>
-<p>On a branch from <code>develop</code>, in <code>docs/about/changelog.md</code>:</p>
+<h3 id="step-2-date-the-changelog">Step 2: Date the Changelog<a class="headerlink" href="#step-2-date-the-changelog" title="Permanent link">&para;</a></h3>
+<p>On a branch from <code>main</code>, in <code>docs/about/changelog.md</code>:</p>
 <ol>
 <li>Rename <code>## [Unreleased]</code> to <code>## [X.Y.Z] - YYYY-MM-DD</code>, the day you
    publish, and add an empty <code>## [Unreleased]</code> above it.</li>
@@ -2746,16 +2746,11 @@ release:</p>
 <p>Check the notes the release will have (Step 5):</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>.github/scripts/release_notes.py<span class="w"> </span>X.Y.Z
 </span></code></pre></div>
-<p>Open the pull request to <code>develop</code> (<code>docs(changelog): release X.Y.Z</code>) and
-merge it. <code>main</code> then carries the changelog of its own release.</p>
-<h3 id="step-3-promote-develop-to-main">Step 3: Promote <code>develop</code> to <code>main</code><a class="headerlink" href="#step-3-promote-develop-to-main" title="Permanent link">&para;</a></h3>
-<p>Open a pull request from <code>develop</code> to <code>main</code> and merge it with <strong>"Create a
-merge commit"</strong>, the only method the <code>main</code> ruleset allows (see
-<a href="../workflow/#8-promoting-develop-to-main">Development Workflow</a>). Wait until the
-<strong>Build</strong> run of the push to <code>main</code> passes: it is the only run that builds the
-wheels for every target architecture.</p>
-<p>You do not need to merge <code>main</code> back into <code>develop</code>: the merge commit keeps the
-two histories together.</p>
+<p>Open the pull request to <code>main</code> (<code>docs(changelog): release X.Y.Z</code>) and merge
+it through the merge queue.</p>
+<h3 id="step-3-wait-for-the-build-of-main">Step 3: Wait for the Build of <code>main</code><a class="headerlink" href="#step-3-wait-for-the-build-of-main" title="Permanent link">&para;</a></h3>
+<p>Wait until the <strong>Build</strong> run of the push of that merge to <code>main</code> passes: it is
+the only run that builds the wheels for every target architecture.</p>
 <h3 id="step-4-create-the-tag">Step 4: Create the Tag<a class="headerlink" href="#step-4-create-the-tag" title="Permanent link">&para;</a></h3>
 <p>Tag the commit at the top of <code>main</code> with an annotated tag:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
@@ -2847,8 +2842,7 @@ publisher on PyPI first, or the upload fails.</p>
 <ul>
 <li>[ ] Every issue of the milestone closed</li>
 <li>[ ] Version chosen</li>
-<li>[ ] Changelog dated in <code>develop</code>, with its opening paragraph</li>
-<li>[ ] <code>develop</code> merged into <code>main</code> with a merge commit</li>
+<li>[ ] Changelog dated on <code>main</code>, with its opening paragraph</li>
 <li>[ ] <strong>Build</strong> run on <code>main</code> passed</li>
 <li>[ ] Annotated tag <code>vX.Y.Z</code> created on <code>main</code> and pushed</li>
 <li>[ ] GitHub release published with the notes of <code>release_notes.py</code></li>
@@ -2869,7 +2863,7 @@ publisher on PyPI first, or the upload fails.</p>
 <p>Nothing reaches PyPI when a build job fails, because the upload job needs all
 of them.</p>
 <ol>
-<li>Fix the problem on <code>develop</code> and promote it to <code>main</code> (Step 3)</li>
+<li>Fix the problem on <code>main</code> (a pull request through the merge queue)</li>
 <li>
 <p>Delete the GitHub release and the tag:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>gh<span class="w"> </span>release<span class="w"> </span>delete<span class="w"> </span>vX.Y.Z<span class="w"> </span>--yes
