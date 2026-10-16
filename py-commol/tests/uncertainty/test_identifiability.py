@@ -168,8 +168,12 @@ class TestCollinearity:
             ["k1", "k2"],
             ["k2", "s"],
         ]
-        assert report.verdicts["k1"].practical is not None
-        assert report.verdicts["k1"].practical.verdict == "determined"
+        verdicts = {name: v.practical for name, v in report.verdicts.items()}
+        assert {name: v.verdict for name, v in verdicts.items() if v} == {
+            "k1": "poorly_determined",
+            "s": "poorly_determined",
+            "k2": "determined",
+        }
 
     def test_a_sample_summarizes_the_indices_of_its_draws(
         self, product: Calibrator

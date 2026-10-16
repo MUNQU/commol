@@ -3,7 +3,7 @@
 //! | Module | Answers |
 //! |---|---|
 //! | [`structural`] | The numerical rank of the scaled sensitivities at random points, and the combinations a rank deficit leaves |
-//! | [`collinearity`] | Brun's sensitivity measures and collinearity indices |
+//! | [`collinearity`](mod@collinearity) | Brun's sensitivity measures and collinearity indices |
 //! | [`sample`] | The contraction, correlations and modes of a parameter sample |
 //! | [`starts`] | The parameters that differ between starts of equal loss |
 //!

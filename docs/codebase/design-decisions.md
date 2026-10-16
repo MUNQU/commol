@@ -830,7 +830,12 @@ weights give the unweighted statistic.
 
 ### Methods plug into one entry point
 
-`Calibrator.uncertainty(method: UncertaintyMethod[R]) -> R` runs every method.
+`Calibrator.uncertainty(method: UncertaintyMethod[R]) -> R` runs every
+uncertainty method, and `Calibrator.identifiability(method:
+IdentifiabilityMethod[R]) -> R` every identifiability method. Both kinds
+subclass `InferenceMethod[R]` (`context/inference/method.py`) and share one
+registry; each entry point refuses the other kind with a `TypeError` that
+names the right one.
 A method is three parts: a configuration that subclasses `UncertaintyMethod`
 with its result type (`context/inference/`), a runner in Rust bound in
 `py-commol/src/inference.rs`, and a result (`context/inference/`). It registers
@@ -852,6 +857,50 @@ intervals cover the truth at their level; they run weekly
 
 **Guards:** `tests/uncertainty/test_entry_point.py`,
 `tests/uncertainty/test_coverage.py`.
+
+### Sensitivities come from one port
+
+Every reader of derivatives of the predicted observations asks
+`SensitivitySource` (`crates/commol-inference/src/sensitivity/`); only a source
+knows how its derivatives are made. `FiniteDifferences` is the first: central
+differences, one-sided of second order at a bound, with the step
+`h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the output
+accuracy of the engine (`SimulationEngine::output_accuracy`: machine epsilon,
+or the `rtol` of the ODE engine) and `w` the width of the bounds. Each entry
+carries an estimated error, from the steps `h` and `2h` and the accuracy of
+the runs; the structural rank counts a singular value only above the norm of
+that error (Weyl's inequality). The scaled sensitivities
+`S_ij = J_ij · |θ_j| / s_i` do not depend on units. A stochastic engine is
+refused: its runs change in jumps with the parameters.
+
+| Alternative | Why not |
+|---|---|
+| Each method differentiates on its own | The step, the error and the scaling would differ between methods. |
+| Exact derivatives first | Symbolic differentiation of expressions and sensitivity equations in two engines; a later source behind the same port. |
+| Machine epsilon as the accuracy of every engine | With `rtol = 1e-6` the solver's error over the step is a fifth of the derivative, and the rank reads noise. |
+| A fixed rank threshold such as `1e-10` | Below the error of finite differences, so every model looks identifiable. |
+
+**Guards:** `crates/commol-inference/tests/test_sensitivity.rs`,
+`crates/commol-inference/tests/test_identifiability.rs`,
+`tests/uncertainty/test_identifiability.py`.
+
+### Two verdicts per parameter
+
+An `IdentifiabilityReport` gives each parameter a structural verdict (what
+any data of the design of the observations can determine) and a practical
+verdict (what these data determine). Only `StructuralRank` on the design of
+the observations gives the structural verdict; a dense design keeps its
+verdicts in its section. Merging reports keeps a verdict the reports agree
+on, and makes one they disagree on `conflicting`, with every reason.
+Thresholds and tolerances of the methods are required arguments: they are
+modelling judgments.
+
+| Alternative | Why not |
+|---|---|
+| One verdict | A parameter structurally identifiable and poorly determined by the data, the usual case, would look like a conflict. |
+| Defaults for the thresholds | A judgment hidden in the library. |
+
+**Guards:** `tests/uncertainty/test_identifiability.py` (`TestReport`).
 
 ## Results
 

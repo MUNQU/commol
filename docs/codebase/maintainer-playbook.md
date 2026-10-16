@@ -106,6 +106,11 @@ changing it ([Design decisions](design-decisions.md#methods-plug-into-one-entry-
 - [ ] A guide page under `docs/guide/uncertainty/`, a row in the table
       "Which method answers which question" of its index, and an API entry.
 
+An identifiability method follows the same steps with
+`IdentifiabilityMethod[IdentifiabilityReport]` and `Calibrator.identifiability`;
+it reads derivatives only through `SensitivitySource`, adds its section to
+`IdentifiabilityReport`, and needs no coverage study.
+
 ### Model type (engine)
 
 To add an engine to the list:

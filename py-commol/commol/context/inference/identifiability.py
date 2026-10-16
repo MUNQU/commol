@@ -140,8 +140,9 @@ class StructuralSection(_Frozen):
 
     Attributes
     ----------
-    design : {"observations", "dense"}
-        The design the sensitivities were evaluated on.
+    design : str
+        The design the sensitivities were evaluated on: ``"observations"`` or
+        ``"dense"``.
     points : list[PointRank]
         Each feasible point.
     skipped : list[str]
@@ -241,8 +242,9 @@ class SampleSection(_Frozen):
 
     Attributes
     ----------
-    reference : {"bounds"}
-        The distribution the contraction compares with.
+    reference : str
+        The distribution the contraction compares with: ``"bounds"``, the
+        uniform distribution on the bounds.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
     contraction : dict[str, float]
@@ -426,7 +428,7 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     points : int
         How many rows of a Latin hypercube over the bounds, at least 1.
-    design : {"observations", "dense"}
+    design : str
         ``"observations"``: the positions and outputs of the observations,
         their values ignored (can this design determine the parameters?).
         ``"dense"``: every observed series at every unit position up to the
@@ -478,9 +480,9 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
-    reference : {"bounds"}
-        The distribution the contraction compares with: the uniform
-        distribution on the bounds.
+    reference : str
+        The distribution the contraction compares with: ``"bounds"``, the
+        uniform distribution on the bounds.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No

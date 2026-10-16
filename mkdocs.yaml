@@ -82,6 +82,7 @@ plugins:
           - guide/calibration-optimizers.md: Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
           - guide/calibration-constraints.md: Constraints on unknowns and outputs, and how violations count
           - guide/uncertainty/index.md: The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
+          - guide/uncertainty/identifiability.md: Structural against practical identifiability, the structural rank, collinearity, a sample, starts, combinations and the report
           - guide/reports.md: applied_parameters_report and simulation_report
           - guide/examples.md: Complete models
         API reference:
@@ -145,6 +146,7 @@ nav:
           - Reports: guide/reports.md
       - Uncertainty:
           - Uncertainty: guide/uncertainty/index.md
+          - Identifiability: guide/uncertainty/identifiability.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -156,6 +158,7 @@ nav:
       - AxisUnits: api/axis-units.md
       - Calibration: api/calibrator.md
       - Uncertainty: api/uncertainty.md
+      - Identifiability: api/identifiability.md
       - Reports: api/reports.md
       - Model Structure: advanced/model-structure.md
   - Development:

@@ -7,3 +7,5 @@ Plain-dictionary reports of a calibrated model and of a run. Guide: [Reports](..
 ::: commol.api.reporting.applied_parameters_report
 
 ::: commol.api.reporting.simulation_report
+
+::: commol.api.reporting.identifiability_report

@@ -203,22 +203,25 @@ def run_collinearity(
     practical: dict[str, PracticalVerdict] = {}
     for name in names:
         others = {other: g for other, g in pair_gamma[name].items() if other != name}
-        lowest = min(others, key=lambda other: others[other])
+        collinear = [
+            other for other, gamma in others.items() if gamma >= method.threshold
+        ]
         if section.sensitivity[name] == 0.0:
             verdict, reason = (
                 "poorly_determined",
                 "Collinearity: no observation is sensitive to it.",
             )
-        elif others[lowest] >= method.threshold:
+        elif collinear:
             verdict, reason = (
                 "poorly_determined",
-                f"Collinearity: every pair that holds it has an index above "
-                f"{method.threshold:g} (lowest {others[lowest]:.3g}, with {lowest}).",
+                "Collinearity: it cannot be fitted together with "
+                f"{', '.join(collinear)} (index at or above {method.threshold:g}).",
             )
         else:
             verdict, reason = (
                 "determined",
-                f"Collinearity: it fits with {lowest} (index {others[lowest]:.3g}).",
+                f"Collinearity: every pair that holds it has an index below "
+                f"{method.threshold:g}.",
             )
         practical[name] = PracticalVerdict(verdict=verdict, reasons=[reason])
     return _report(calibrator, practical_verdicts=practical, collinearity=[section])
@@ -308,14 +311,16 @@ def run_starts_identifiability(
         name: PracticalVerdict(
             verdict="poorly_determined",
             reasons=[
-                f"Starts: {count} starts of equal loss end {spread[name]:.0%} of "
-                "its bounds apart."
+                f"Starts: the {count} converged starts of equal loss end "
+                f"{spread[name]:.0%} of its bounds apart."
             ],
         )
         if name in flagged
         else PracticalVerdict(
             verdict="determined",
-            reasons=[f"Starts: {count} starts of equal loss agree on it."],
+            reasons=[
+                f"Starts: the {count} converged starts of equal loss agree on it."
+            ],
         )
         for name in names
     }

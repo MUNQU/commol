@@ -14,8 +14,9 @@ explain how to use them; these pages list every argument, attribute and error.
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation`, `LossFunction`, `OptimizationAlgorithm` |
-| [Uncertainty](uncertainty.md) | `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles` |
-| [Reports](reports.md) | `applied_parameters_report`, `simulation_report` |
+| [Uncertainty](uncertainty.md) | `InferenceMethod`, `UncertaintyMethod`, `ParameterSample`, `SampleMethod`, `ParameterSummary`, `Predictive`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `commol.scores`, `weighted_quantiles`, `member_statistics`, `ci_percentiles` |
+| [Identifiability](identifiability.md) | `IdentifiabilityMethod`, `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `IdentifiabilityReport` |
+| [Reports](reports.md) | `applied_parameters_report`, `simulation_report`, `identifiability_report` |
 
 Import every name from the package root, as in `from commol import Simulation`.
 `UnitConsistencyError` is in `commol.utils.equations`; the scores are the
