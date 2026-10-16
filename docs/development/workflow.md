@@ -56,12 +56,22 @@ Planned work lives in GitHub issues, written from the templates of
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
 | What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
 
-To find the next piece of work:
+To find the next piece of work, in one call and one line:
+
+```bash
+.github/scripts/next.sh        # the next proposal; .github/scripts/next.sh 3 for three
+```
+
+It lists the open proposals that no open issue blocks and nobody has taken,
+by the field `Order` of the project, not by issue number: the dependencies set
+what must come first, and `Order` the preference among the proposals that are
+ready. A new proposal gets an `Order` between those of its neighbours; the
+values go in steps of 10 so one fits in without renumbering. To see the whole
+plan:
 
 ```bash
 gh issue list --label proposal --state open
 gh issue list --milestone 0.5.0
-gh api repos/MUNQU/commol/issues/<number>/dependencies/blocked_by --jq '.[].number'
 ```
 
 An issue is ready when every issue that blocks it is closed.
@@ -85,7 +95,8 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    paths and symbols, one requirement per behavior (`The <component> SHALL …`,
    with `WHEN … THEN …` scenarios), each scenario with the test that checks
    it. Add `breaking` when it breaks the public API, the milestone of its
-   release and its blockers. A large proposal splits into sub-issues.
+   release, its blockers and its `Order` in the project. A large proposal
+   splits into sub-issues.
 2. Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
