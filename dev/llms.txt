@@ -27,7 +27,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md): Several outputs, sums of outputs, weights, scale factors and windowed observations
 - [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md): Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
 - [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md): Constraints on unknowns and outputs, and how violations count
-- [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md): Ensembles, every configuration field, reading results, member statistics
+- [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md): The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): applied_parameters_report and simulation_report
 - [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md): Complete models
 
@@ -40,9 +40,9 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [ModelBuilder](https://munqu.github.io/commol/latest/api/model-builder/index.md)
 - [Model](https://munqu.github.io/commol/latest/api/model/index.md)
 - [Plotting](https://munqu.github.io/commol/latest/api/plotting/index.md)
-- [Probabilistic Calibration](https://munqu.github.io/commol/latest/api/probabilistic-calibrator/index.md)
 - [Reports](https://munqu.github.io/commol/latest/api/reports/index.md)
 - [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md)
+- [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md)
 - [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md): The data model of a Model
 
 ## Changelog

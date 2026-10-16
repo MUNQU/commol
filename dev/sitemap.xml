@@ -45,15 +45,15 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/commol/dev/api/probabilistic-calibrator/</loc>
-         <lastmod>2026-10-16</lastmod>
-    </url>
-    <url>
          <loc>https://munqu.github.io/commol/dev/api/reports/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/api/simulation/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/uncertainty/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -153,10 +153,6 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
-         <loc>https://munqu.github.io/commol/dev/guide/probabilistic-calibration/</loc>
-         <lastmod>2026-10-16</lastmod>
-    </url>
-    <url>
          <loc>https://munqu.github.io/commol/dev/guide/reports/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -174,6 +170,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/guide/units-and-equations/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/guide/uncertainty/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
 </urlset>

@@ -1354,14 +1354,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../probabilistic-calibration/" class="md-nav__link">
+      <a href="../reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1375,6 +1375,69 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1382,14 +1445,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reports/" class="md-nav__link">
+      <a href="../uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1729,14 +1792,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2807,11 +2870,11 @@ replicate gives the same run however many replicates run, and
 </tr>
 <tr>
 <td><code>quantiles(levels)</code></td>
-<td><code>{level: SimulationResults}</code>, at each position</td>
+<td><code>{level: SimulationResults}</code>, at each position, by <a href="../../codebase/design-decisions/#one-confidence-interval-convention">the one quantile</a> (NumPy's <code>method="hazen"</code>)</td>
 </tr>
 <tr>
 <td><code>member_statistics(output, confidence_level)</code></td>
-<td><code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code> of one output at each position, reduced replicate by replicate as <a href="../../codebase/design-decisions/#one-confidence-interval-convention"><code>ci_percentiles</code></a> requires</td>
+<td><code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code> of one output at each position, reduced replicate by replicate with <a href="../../codebase/design-decisions/#one-confidence-interval-convention">the one quantile</a></td>
 </tr>
 </tbody>
 </table>
@@ -3170,7 +3233,7 @@ series first:</p>
 <tr>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
-<td>With a probabilistic result, draws the median and the confidence band; factor parameters are applied to the observations.</td>
+<td>A <code>CalibrationResult</code> gives the factor values that scale the model. A <a href="../uncertainty/#the-predictive"><code>Predictive</code></a> draws the weighted median of its draws and their band of <code>confidence_level</code>, each draw read through the observation operator (sums, windows, factors).</td>
 </tr>
 <tr>
 <td><code>config</code></td>

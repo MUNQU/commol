@@ -1119,14 +1119,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1140,6 +1140,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1147,14 +1207,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../guide/reports/" class="md-nav__link">
+      <a href="../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1509,14 +1569,14 @@
   
   
     <li class="md-nav__item">
-      <a href="probabilistic-calibrator/" class="md-nav__link">
+      <a href="uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2211,11 +2271,11 @@ explain how to use them; these pages list every argument, attribute and error.</
 </tr>
 <tr>
 <td><a href="calibrator/">Calibration</a></td>
-<td><code>Calibrator</code>, <code>CalibrationProblem</code>, <code>Quantile</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code>, <code>CalibrationResult</code>, <code>LossFunction</code>, <code>OptimizationAlgorithm</code></td>
+<td><code>Calibrator</code>, <code>CalibrationProblem</code>, <code>Quantile</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code>, <code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>, <code>CalibrationEvaluation</code>, <code>LossFunction</code>, <code>OptimizationAlgorithm</code></td>
 </tr>
 <tr>
-<td><a href="probabilistic-calibrator/">Probabilistic Calibration</a></td>
-<td><code>ProbabilisticCalibrationConfig</code>, <code>ProbEvaluationFilterConfig</code>, <code>ProbClusteringConfig</code>, <code>ProbRepresentativeConfig</code>, <code>ProbNsga2Config</code>, <code>ProbGreedyLocalSearchConfig</code>, <code>ProbabilisticCalibrationResult</code>, <code>EnsembleSolution</code>, <code>EnsembleSelectionSummary</code>, <code>ParameterSetStatistics</code>, <code>CalibrationEvaluation</code>, <code>ci_percentiles</code>, <code>member_statistics</code></td>
+<td><a href="uncertainty/">Uncertainty</a></td>
+<td><code>UncertaintyMethod</code>, <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, <code>Predictive</code>, <code>PredictiveBand</code>, <code>SeriesBand</code>, <code>ObservationDraws</code>, <code>commol.scores</code>, <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code></td>
 </tr>
 <tr>
 <td><a href="reports/">Reports</a></td>
@@ -2224,7 +2284,8 @@ explain how to use them; these pages list every argument, attribute and error.</
 </tbody>
 </table>
 <p>Import every name from the package root, as in <code>from commol import Simulation</code>.
-<code>UnitConsistencyError</code> is in <code>commol.utils.equations</code>.</p>
+<code>UnitConsistencyError</code> is in <code>commol.utils.equations</code>; the scores are the
+module <code>commol.scores</code> (<code>from commol import scores</code>).</p>
 
 
 

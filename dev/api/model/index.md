@@ -218,9 +218,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     def apply_calibration_parameters(
         self,
-        result: CalibrationResult
-        | ProbabilisticCalibrationResult
-        | Mapping[str, float],
+        result: CalibrationResult | Mapping[str, float],
         problem: CalibrationProblem,
     ) -> None:
         """
@@ -236,10 +234,9 @@ class Model(BaseModel, Generic[StructureT]):
 
         Parameters
         ----------
-        result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-            The calibration outcome, or a mapping of parameter id to value.
-            For a probabilistic result the point parameters of the selected
-            ensemble are applied.
+        result : CalibrationResult | Mapping
+            The calibration result, or a mapping of parameter id to value such
+            as one draw of a `ParameterSample` (``sample.draws()``).
         problem : CalibrationProblem
             The problem the result came from, used to resolve parameter types.
 
@@ -248,6 +245,9 @@ class Model(BaseModel, Generic[StructureT]):
         ValueError
             If an id is not declared in ``problem``, or the structure cannot
             write back a value of its kind.
+        TypeError
+            If `result` is a `ParameterSample`, which has no single set of
+            parameters.
         """
         values = calibrated_values(result)
         types = {param.id: param.parameter_type for param in problem.parameters}
@@ -658,7 +658,7 @@ def get_uncalibrated_parameters(self) -> list[str]:
 #### apply_calibration_parameters
 
 ```python
-apply_calibration_parameters(result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float], problem: CalibrationProblem) -> None
+apply_calibration_parameters(result: CalibrationResult | Mapping[str, float], problem: CalibrationProblem) -> None
 ```
 
 Write calibrated values back onto the model.
@@ -667,25 +667,24 @@ Each value is routed by the `parameter_type` declared for it in `problem`: `para
 
 Parameters:
 
-| Name      | Type                 | Description                                                        | Default    |
-| --------- | -------------------- | ------------------------------------------------------------------ | ---------- |
-| `result`  | \`CalibrationResult  | ProbabilisticCalibrationResult                                     | Mapping\`  |
-| `problem` | `CalibrationProblem` | The problem the result came from, used to resolve parameter types. | *required* |
+| Name      | Type                 | Description                                                        | Default                                                                                                               |
+| --------- | -------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `result`  | \`CalibrationResult  | Mapping\`                                                          | The calibration result, or a mapping of parameter id to value such as one draw of a ParameterSample (sample.draws()). |
+| `problem` | `CalibrationProblem` | The problem the result came from, used to resolve parameter types. | *required*                                                                                                            |
 
 Raises:
 
 | Type         | Description                                                                                  |
 | ------------ | -------------------------------------------------------------------------------------------- |
 | `ValueError` | If an id is not declared in problem, or the structure cannot write back a value of its kind. |
+| `TypeError`  | If result is a ParameterSample, which has no single set of parameters.                       |
 
 Source code in `commol/context/model.py`
 
 ```python
 def apply_calibration_parameters(
     self,
-    result: CalibrationResult
-    | ProbabilisticCalibrationResult
-    | Mapping[str, float],
+    result: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem,
 ) -> None:
     """
@@ -701,10 +700,9 @@ def apply_calibration_parameters(
 
     Parameters
     ----------
-    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-        The calibration outcome, or a mapping of parameter id to value.
-        For a probabilistic result the point parameters of the selected
-        ensemble are applied.
+    result : CalibrationResult | Mapping
+        The calibration result, or a mapping of parameter id to value such
+        as one draw of a `ParameterSample` (``sample.draws()``).
     problem : CalibrationProblem
         The problem the result came from, used to resolve parameter types.
 
@@ -713,6 +711,9 @@ def apply_calibration_parameters(
     ValueError
         If an id is not declared in ``problem``, or the structure cannot
         write back a value of its kind.
+    TypeError
+        If `result` is a `ParameterSample`, which has no single set of
+        parameters.
     """
     values = calibrated_values(result)
     types = {param.id: param.parameter_type for param in problem.parameters}
@@ -1534,7 +1535,7 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],  # noqa: ARG002
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",  # noqa: ARG002
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
@@ -1545,8 +1546,8 @@ class ModelStructure(BaseModel, ABC):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------
@@ -1952,18 +1953,18 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSetStatistics] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
 ```
 
 Sections of this kind in a report of applied values.
 
 Parameters:
 
-| Name                   | Type                                   | Description                              | Default                                              |
-| ---------------------- | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `model`                | `Model`                                | The model that holds the applied values. | *required*                                           |
-| `calibrated_ids`       | `set[str]`                             | Ids that calibration set.                | *required*                                           |
-| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                   | Ensemble spread per id, or None without an ensemble. |
+| Name                   | Type                             | Description                              | Default                                                   |
+| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -1978,7 +1979,7 @@ def report_sections(
     self,
     model: "Model[Self]",  # noqa: ARG002
     calibrated_ids: set[str],  # noqa: ARG002
-    parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",  # noqa: ARG002
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
 ) -> ReportSections:
     """
     Sections of this kind in a report of applied values.
@@ -1989,8 +1990,8 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-        Ensemble spread per id, or None without an ensemble.
+    parameter_statistics : Mapping[str, ParameterSummary] | None
+        Statistics of each id from a sample, or None without one.
 
     Returns
     -------
@@ -2297,7 +2298,7 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """
         The ``initial_conditions`` section of a report of applied values.
@@ -2310,8 +2311,8 @@ class Aggregate(ModelStructure, InitialConditions):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------
@@ -2933,7 +2934,7 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSetStatistics] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
 ```
 
 The `initial_conditions` section of a report of applied values.
@@ -2942,11 +2943,11 @@ See :func:`commol.applied_parameters_report`.
 
 Parameters:
 
-| Name                   | Type                                   | Description                              | Default                                              |
-| ---------------------- | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `model`                | `Model`                                | The model that holds the applied values. | *required*                                           |
-| `calibrated_ids`       | `set[str]`                             | Ids that calibration set.                | *required*                                           |
-| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                   | Ensemble spread per id, or None without an ensemble. |
+| Name                   | Type                             | Description                              | Default                                                   |
+| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -2961,7 +2962,7 @@ def report_sections(
     self,
     model: "Model[Self]",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",
 ) -> ReportSections:
     """
     The ``initial_conditions`` section of a report of applied values.
@@ -2974,8 +2975,8 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-        Ensemble spread per id, or None without an ensemble.
+    parameter_statistics : Mapping[str, ParameterSummary] | None
+        Statistics of each id from a sample, or None without one.
 
     Returns
     -------

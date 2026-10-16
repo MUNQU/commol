@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -3151,6 +3211,12 @@ Updating the file there also triggers a version-update check right away.</p>
 <td><code>Build Documentation</code></td>
 </tr>
 <tr>
+<td>Coverage Studies (<code>coverage.yaml</code>)</td>
+<td>Every Monday; on demand</td>
+<td><code>pytest -m coverage_study</code>: the intervals of each uncertainty method cover the truth at their level (<a href="../../codebase/design-decisions/#methods-plug-into-one-entry-point">Design decisions</a>).</td>
+<td>None: each study runs many fits</td>
+</tr>
+<tr>
 <td>Links (<code>links.yaml</code>)</td>
 <td>Pull requests that change <code>docs/</code>, <code>README.md</code> or <code>AGENTS.md</code>; every Monday; on demand</td>
 <td>External links, with lychee.</td>
@@ -3179,11 +3245,14 @@ Updating the file there also triggers a version-update check right away.</p>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Rust, from the repository root</span>
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w"> </span>--<span class="w"> </span>--check
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--workspace<span class="w"> </span>--all-targets<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol-random<span class="w"> </span>-p<span class="w"> </span>commol-stochastic<span class="w"> </span>-p<span class="w"> </span>commol
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol-inference<span class="w"> </span>-p<span class="w"> </span>commol-random<span class="w"> </span>-p<span class="w"> </span>commol-stochastic<span class="w"> </span>-p<span class="w"> </span>commol
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol<span class="w"> </span>--features<span class="w"> </span>test-kind<span class="w">   </span><span class="c1"># the engine of the test model kind</span>
 </span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># Documentation, from the repository root</span>
-</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># Coverage studies (slow), from py-commol/</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>pytest<span class="w"> </span>-m<span class="w"> </span>coverage_study
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="c1"># Documentation, from the repository root</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
 </span></code></pre></div>
 <h3 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h3>
 <p>Install pre-commit hooks to automatically check code before committing:</p>

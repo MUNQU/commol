@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2018,6 +2078,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#uncertainty-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uncertainty method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#model-type-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2477,6 +2548,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#uncertainty-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uncertainty method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#model-type-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2660,15 +2742,37 @@
 </ul>
 <h3 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Keep the loss and the constraints in <code>calibration_problem.rs</code>, and use
-      only <code>SimulationEngine</code> there: a rule of one model kind goes behind
+<li>[ ] Put the change in its layer of <code>crates/commol-calibration/</code>: running the
+      engine in <code>forward.rs</code>, reading observations in <code>observation.rs</code>,
+      bounds and constraints in <code>feasibility.rs</code>, the loss in
+      <code>discrepancy.rs</code>, penalties only in <code>objective.rs</code>. Use only
+      <code>SimulationEngine</code>: a rule of one model kind goes behind
       <code>plan_values</code>, <code>apply_values</code> or <code>output_sums</code> of its engines.</li>
-<li>[ ] Convert new options in <code>api/calibrator.py</code> and
-      <code>api/probabilistic/calibration_runner.py</code>.</li>
+<li>[ ] Convert new options once, in <code>api/calibrator.py</code>.</li>
 <li>[ ] Check that <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> still
       passes if the loss changes.</li>
-<li>[ ] Update <a href="../../guide/calibration/">Calibration</a> and, for ensembles,
-      <a href="../../guide/probabilistic-calibration/">Probabilistic calibration</a>.</li>
+<li>[ ] Update <a href="../../guide/calibration/">Calibration</a>.</li>
+</ul>
+<h3 id="uncertainty-method">Uncertainty method<a class="headerlink" href="#uncertainty-method" title="Permanent link">&para;</a></h3>
+<p>A method is three parts, and plugs into <code>Calibrator.uncertainty</code> without
+changing it (<a href="../design-decisions/#methods-plug-into-one-entry-point">Design decisions</a>):</p>
+<ul>
+<li>[ ] The algorithm in <code>crates/commol-inference/</code>. It runs the engine only
+      through <code>ForwardModel</code>, reads observations only through
+      <code>ObservationOperator</code>, sees a <code>Violation</code> as outside the support
+      (<code>discrepancy_in_support</code>), and draws every random number from a
+      <code>commol_random::Generator</code> seeded from the problem's seed.</li>
+<li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, and its stub in
+      <code>_commol_rs.pyi</code>.</li>
+<li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
+      the result, in <code>context/inference/</code>; a result with draws holds a
+      <code>ParameterSample</code>.</li>
+<li>[ ] <code>register(YourMethod, runner)</code> in <code>api/inference/registry.py</code> (import it
+      from <code>commol.api.inference</code>).</li>
+<li>[ ] A coverage study (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>)
+      that shows its intervals cover at their level.</li>
+<li>[ ] A guide page under <code>docs/guide/uncertainty/</code>, a row in the table
+      "Which method answers which question" of its index, and an API entry.</li>
 </ul>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
@@ -2758,7 +2862,8 @@
 <li>[ ] Keep the key order of existing entries.</li>
 <li>[ ] Put a section that only one model kind has in its
       <code>ModelStructure.report_sections</code>, not in <code>api/reporting.py</code>.</li>
-<li>[ ] Use <code>member_statistics</code> and <code>ci_percentiles</code> for ensemble values.</li>
+<li>[ ] Use <code>member_statistics</code> (with the weights of a <code>Predictive</code>) for values
+      across members, and <code>ParameterSample.summary</code> for parameters.</li>
 <li>[ ] Update <code>tests/reporting/</code>.</li>
 </ul>
 <h3 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>

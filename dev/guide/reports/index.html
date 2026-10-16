@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/guide/reports/">
       
       
-        <link rel="prev" href="../probabilistic-calibration/">
+        <link rel="prev" href="../calibration-constraints/">
       
       
-        <link rel="next" href="../examples/">
+        <link rel="next" href="../uncertainty/">
       
       
         
@@ -1129,34 +1129,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../probabilistic-calibration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Probabilistic Calibration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -1278,6 +1250,97 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1609,14 +1672,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2341,7 +2404,8 @@
 <p>Two functions turn a calibrated model and a run into plain dictionaries, ready
 for JSON: <code>applied_parameters_report</code> (what the model holds and what calibration
 set) and <code>simulation_report</code> (what a run produced, next to the observations).
-Both work for a single calibration and for an ensemble, with the same layout.</p>
+Both work for a single calibration and for a sample of the parameters, with
+the same layout.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -2449,15 +2513,15 @@ kind of model; the structure of the model adds the sections of its kind
 </tr>
 <tr>
 <td><code>result</code></td>
-<td>A <code>CalibrationResult</code>, a <code>ProbabilisticCalibrationResult</code>, or an <code>{id: value}</code> mapping.</td>
+<td>A <code>CalibrationResult</code>, or an <code>{id: value}</code> mapping such as one of <code>sample.draws()</code>.</td>
 </tr>
 <tr>
 <td><code>problem</code></td>
 <td>Optional. Adds the <code>factor</code> parameters, which the model does not hold.</td>
 </tr>
 <tr>
-<td><code>parameter_statistics</code>, <code>confidence_level</code></td>
-<td>Optional. Taken from a probabilistic <code>result</code> when not given.</td>
+<td><code>sample</code>, <code>confidence_level</code></td>
+<td>Optional. A <code>ParameterSample</code>: each entry gains its weighted statistics (<code>ParameterSample.summary</code>). A sample needs a confidence level.</td>
 </tr>
 </tbody>
 </table>
@@ -2494,8 +2558,8 @@ kind of model; the structure of the model adds the sections of its kind
 <td><code>fraction</code> and <code>value</code> are <code>null</code>.</td>
 </tr>
 <tr>
-<td>A probabilistic result</td>
-<td>Each entry gains an <code>interval</code> block, and the report starts with <code>confidence_level</code>.</td>
+<td>A <code>sample</code></td>
+<td>Each entry gains an <code>interval</code> block (<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code>, <code>std</code>, all weighted), and the report starts with <code>confidence_level</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -2561,7 +2625,7 @@ model reports at non-integer positions once the results hold them
 </tr>
 <tr>
 <td><code>ensemble_runs</code>, <code>confidence_level</code></td>
-<td>One <code>SimulationResults</code> per ensemble member, or the <code>SimulationReplicates</code> of a stochastic engine. Every number becomes a <code>{mean, median, ci_lower, ci_upper, min, max}</code> block; the layout does not change.</td>
+<td>The <code>SimulationReplicates</code> of a stochastic engine, one <code>SimulationResults</code> per member, or a <a href="../uncertainty/#the-predictive"><code>Predictive</code></a>, whose draws carry their weights. Every number becomes a <code>{mean, median, ci_lower, ci_upper, min, max}</code> block, reduced member by member with the weights; the layout does not change.</td>
 </tr>
 </tbody>
 </table>
@@ -2586,8 +2650,8 @@ a run label or summary figures in your domain's terms:</p>
 </thead>
 <tbody>
 <tr>
-<td>Ensembles and intervals</td>
-<td><a href="../probabilistic-calibration/">Probabilistic Calibration</a></td>
+<td>Samples, predictives and intervals</td>
+<td><a href="../uncertainty/">Uncertainty</a></td>
 </tr>
 <tr>
 <td>Signatures</td>

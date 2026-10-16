@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2350,7 +2410,7 @@ into numbers.</p>
     API["Python: api/&lt;br/&gt;ModelBuilder, Simulation, Calibrator"]
     CTX["Python: context/&lt;br/&gt;Model: validated data"]
     BR["Bridge: py-commol/src&lt;br/&gt;PyO3 module commol_rs"]
-    RS["Rust: crates/&lt;br/&gt;compiler, engines, calibration"]
+    RS["Rust: crates/&lt;br/&gt;compiler, engines, calibration, inference"]
     U --&gt; API
     API --&gt; CTX
     CTX --&gt;|model as JSON| BR
@@ -2378,7 +2438,7 @@ into numbers.</p>
 <tr>
 <td>Rust</td>
 <td><code>crates/</code></td>
-<td>Every rule about how a model becomes numbers.</td>
+<td>Every rule about how a model becomes numbers, how it is calibrated, and how the uncertainty of a calibration is measured.</td>
 </tr>
 </tbody>
 </table>
@@ -2387,7 +2447,8 @@ Rust.</p>
 <h2 id="inside-rust">Inside Rust<a class="headerlink" href="#inside-rust" title="Permanent link">&para;</a></h2>
 <p>One compiler reads the model. Each engine runs the compiled model with its own
 method and gives one series per output. Calibration runs an engine many times
-and compares the series with the observations. The arrows show this flow, from
+and compares the series with the observations. Inference reads the
+calibration problem to measure uncertainty. The arrows show this flow, from
 top to bottom. The dashed box is the base that every box uses.</p>
 <pre class="mermaid"><code>flowchart TB
     J[/model as JSON/]
@@ -2396,13 +2457,15 @@ top to bottom. The dashed box is the base that every box uses.</p>
     E2["Differential&lt;br/&gt;ODE solver"]
     E3["Stochastic&lt;br/&gt;random events"]
     O[/one series per output/]
-    C["Calibration&lt;br/&gt;runs an engine many times"]
+    C["Calibration&lt;br/&gt;the problem in layers, optimizers"]
+    I["Inference&lt;br/&gt;parameter sample, predictive, scores"]
     F["Base: commol-core, commol-random&lt;br/&gt;used by every box"]
     J --&gt; M
     M --&gt; E1 &amp; E2 &amp; E3
     E1 &amp; E2 &amp; E3 --&gt; O
     O --&gt; C
-    C ~~~ F
+    C --&gt; I
+    I ~~~ F
     classDef base stroke-dasharray: 5 5
     class F base</code></pre>
 <table>
@@ -2437,14 +2500,21 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Calibration</td>
 <td><code>commol-calibration</code></td>
-<td>Finds the values that make an engine match observations.</td>
+<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts.</td>
+</tr>
+<tr>
+<td>Inference</td>
+<td><code>commol-inference</code></td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample and its scores. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>
 <p>Every box uses <code>commol-core</code> (shared types, rate formulas, the
 <code>SimulationEngine</code> trait). The stochastic engines and calibration also use
-<code>commol-random</code> (random numbers). Calibration works through the
-<code>SimulationEngine</code> trait, so it does not depend on a specific engine.</p>
+<code>commol-random</code> (random numbers), and so does inference. Calibration works
+through the <code>SimulationEngine</code> trait, so it does not depend on a specific
+engine; inference reaches an engine only through the forward model of a
+calibration problem.</p>
 <h2 id="the-path-of-a-simulation-and-a-calibration">The path of a simulation and a calibration<a class="headerlink" href="#the-path-of-a-simulation-and-a-calibration" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart TB
     A[ModelBuilder] --&gt;|build| B[Model]
@@ -2453,9 +2523,13 @@ top to bottom. The dashed box is the base that every box uses.</p>
     K --&gt; R[Rust: run the engine]
     R --&gt; SR[SimulationResults]
     K --&gt; CAL[Calibrator]
-    CAL --&gt; L[Rust: optimizer loop]
+    CAL --&gt;|problem, once| P[Rust: calibration problem]
+    P --&gt; L[Rust: optimizer loop, one or more starts]
     L --&gt; CR[CalibrationResult]
-    CR -.-&gt;|apply_calibration_parameters| B</code></pre>
+    CR -.-&gt;|apply_calibration_parameters| B
+    P --&gt; U[Rust: uncertainty method]
+    U --&gt; PS[ParameterSample]
+    PS --&gt; PR[Predictive: bands, scores]</code></pre>
 <ol>
 <li><code>ModelBuilder</code> (<code>api/model_builder.py</code>) collects the model, and <code>build</code>
    returns a validated <code>Model</code> (<code>context/model.py</code>).</li>
@@ -2467,10 +2541,16 @@ top to bottom. The dashed box is the base that every box uses.</p>
 </li>
 <li>
 <p><code>Calibrator</code> (<code>api/calibrator.py</code>) takes the compiled engine of a
-   <code>Simulation</code> and gives it to Rust with the problem. The optimizer loop
-   runs in Rust and returns a <code>CalibrationResult</code>.</p>
+   <code>Simulation</code> and builds the calibration problem in Rust once
+   (<code>commol_rs.inference.CalibrationProblem</code>, <code>py-commol/src/inference.rs</code>).
+   <code>run(starts=n)</code> runs the optimizer loop in Rust from each start and
+   returns the best <code>CalibrationResult</code>.</p>
 </li>
 <li><code>apply_calibration_parameters</code> writes the result back into the <code>Model</code>.</li>
+<li><code>Calibrator.uncertainty(method)</code> runs a method on the same problem. A method
+   with draws returns a <code>ParameterSample</code>; a <code>Predictive</code>
+   (<code>api/inference/predictive.py</code>) runs its draws, and <code>commol.scores</code> checks
+   them against observations.</li>
 </ol>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>

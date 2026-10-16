@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2435,8 +2495,12 @@ generic layers work with any kind.</p>
 <td><code>crates/commol-core/src/math_expression/jit/</code> (Cranelift)</td>
 </tr>
 <tr>
-<td>A calibration toolkit: optimizers, constraints, ensembles</td>
-<td><code>crates/commol-calibration/</code>, <code>py-commol/commol/api/calibrator.py</code>, <code>probabilistic_calibrator.py</code></td>
+<td>A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts</td>
+<td><code>crates/commol-calibration/</code>, <code>py-commol/commol/api/calibrator.py</code></td>
+</tr>
+<tr>
+<td>What every uncertainty method returns or reads: a weighted parameter sample, its predictive, scores, one entry point</td>
+<td><code>crates/commol-inference/</code>, <code>py-commol/commol/api/inference/</code>, <code>py-commol/commol/context/inference/</code></td>
 </tr>
 </tbody>
 </table>

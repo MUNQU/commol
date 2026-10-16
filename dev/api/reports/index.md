@@ -7,7 +7,7 @@ Plain-dictionary reports of a calibrated model and of a run. Guide: [Reports](ht
 ## applied_parameters_report
 
 ```python
-applied_parameters_report(model: Model, result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters_report(model: Model, result: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: ParameterSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of a calibrated model, and the values of its kind.
@@ -18,17 +18,17 @@ Parameters that are not a single number, such as a formula or a series, are omit
 
 Initial conditions of an aggregate model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
 
-For a probabilistic result each entry gains an `interval` holding the ensemble spread. A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
+With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
 
 Parameters:
 
-| Name                   | Type                                   | Description                            | Default                                                                                                             |
-| ---------------------- | -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `model`                | `Model`                                | The model carrying the applied values. | *required*                                                                                                          |
-| `result`               | \`CalibrationResult                    | ProbabilisticCalibrationResult         | Mapping\`                                                                                                           |
-| `problem`              | \`CalibrationProblem                   | None\`                                 | The problem the result came from, used to report factor parameters.                                                 |
-| `parameter_statistics` | \`Mapping[str, ParameterSetStatistics] | None\`                                 | Ensemble spread per entry. Taken from result when it is a probabilistic result and this is not given.               |
-| `confidence_level`     | \`float                                | None\`                                 | Confidence level the intervals describe. Taken from result when it is a probabilistic result and this is not given. |
+| Name               | Type                 | Description                            | Default                                                                                     |
+| ------------------ | -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `model`            | `Model`              | The model carrying the applied values. | *required*                                                                                  |
+| `result`           | \`CalibrationResult  | Mapping\`                              | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
+| `problem`          | \`CalibrationProblem | None\`                                 | The problem the result came from, used to report factor parameters.                         |
+| `sample`           | \`ParameterSample    | None\`                                 | Draws of the parameters, such as the sample of an uncertainty method.                       |
+| `confidence_level` | \`float              | None\`                                 | Confidence level of the intervals; required with a sample.                                  |
 
 Returns:
 
@@ -36,14 +36,20 @@ Returns:
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for an aggregate model), preceded by confidence_level when there is one. |
 
+Raises:
+
+| Type         | Description                                      |
+| ------------ | ------------------------------------------------ |
+| `ValueError` | If a sample is given without a confidence level. |
+
 Source code in `commol/api/reporting.py`
 
 ```python
 def applied_parameters_report(
     model: Model,
-    result: CalibrationResult | ProbabilisticCalibrationResult | Mapping[str, float],
+    result: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem | None = None,
-    parameter_statistics: Mapping[str, ParameterSetStatistics] | None = None,
+    sample: ParameterSample | None = None,
     confidence_level: float | None = None,
 ) -> AppliedParametersReport:
     """
@@ -70,8 +76,9 @@ def applied_parameters_report(
     uncalibrated keeps a ``None`` fraction and ``None`` value as its "needs
     calibration" marker even when overrides touch some of its compartments.
 
-    For a probabilistic result each entry gains an ``interval`` holding the
-    ensemble spread. A parameter is in the unit it was calibrated in. An
+    With a `sample` each entry gains an ``interval`` holding the weighted
+    statistics of its draws (`ParameterSample.summary`). A parameter is in
+    the unit it was calibrated in. An
     initial-condition entry is in the fraction the row reports: a conditional
     stratification's category is calibrated as a group fraction but reported
     over the total, so its interval is rescaled by the group's share of the
@@ -81,17 +88,15 @@ def applied_parameters_report(
     ----------
     model : Model
         The model carrying the applied values.
-    result : CalibrationResult | ProbabilisticCalibrationResult | Mapping
-        The calibration outcome, or a mapping of parameter id to value such as
-        one ensemble member's parameters.
+    result : CalibrationResult | Mapping
+        The calibration result, or a mapping of parameter id to value such as
+        one draw of a sample.
     problem : CalibrationProblem | None, optional
         The problem the result came from, used to report factor parameters.
-    parameter_statistics : Mapping[str, ParameterSetStatistics] | None, optional
-        Ensemble spread per entry. Taken from `result` when it is a
-        probabilistic result and this is not given.
+    sample : ParameterSample | None, optional
+        Draws of the parameters, such as the sample of an uncertainty method.
     confidence_level : float | None, optional
-        Confidence level the intervals describe. Taken from `result` when it is
-        a probabilistic result and this is not given.
+        Confidence level of the intervals; required with a sample.
 
     Returns
     -------
@@ -99,11 +104,14 @@ def applied_parameters_report(
         Key ``parameters`` and the sections of the kind (``initial_conditions``
         for an aggregate model), preceded by ``confidence_level`` when there
         is one.
+
+    Raises
+    ------
+    ValueError
+        If a sample is given without a confidence level.
     """
     calibrated = calibrated_values(result)
-    parameter_statistics, confidence_level = _ensemble_details(
-        result, parameter_statistics, confidence_level
-    )
+    parameter_statistics = _sample_statistics(sample, confidence_level)
     calibrated_ids = set(calibrated)
 
     parameters: dict[str, ParameterEntry] = {
@@ -133,7 +141,7 @@ def applied_parameters_report(
 ## simulation_report
 
 ```python
-simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | None = None, confidence_level: float | None = None) -> SimulationReport
+simulation_report(simulation: Simulation, results: SimulationResults, at: Sequence[float], window: float, num_windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), ensemble_runs: Sequence[SimulationResults] | Predictive | None = None, confidence_level: float | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of a run.
@@ -153,7 +161,7 @@ Parameters:
 | `num_windows`      | `int`                         | Number of windows on the observed and windowed axes.             | *required*                                  |
 | `observed_data`    | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.             | `()`                                        |
 | `accumulators`     | `Iterable[str]`               | Accumulator ids to report.                                       | `()`                                        |
-| `ensemble_runs`    | \`Sequence[SimulationResults] | None\`                                                           | One results mapping per ensemble member.    |
+| `ensemble_runs`    | \`Sequence[SimulationResults] | Predictive                                                       | None\`                                      |
 | `confidence_level` | \`float                       | None\`                                                           | Confidence level of the reported intervals. |
 
 Returns:
@@ -179,7 +187,7 @@ def simulation_report(
     num_windows: int,
     observed_data: Iterable[ObservedDataPoint] = (),
     accumulators: Iterable[str] = (),
-    ensemble_runs: Sequence[SimulationResults] | None = None,
+    ensemble_runs: "Sequence[SimulationResults] | Predictive | None" = None,
     confidence_level: float | None = None,
 ) -> SimulationReport:
     """
@@ -210,8 +218,9 @@ def simulation_report(
         The calibration targets to report alongside the run.
     accumulators : Iterable[str], optional
         Accumulator ids to report.
-    ensemble_runs : Sequence[SimulationResults] | None, optional
-        One results mapping per ensemble member.
+    ensemble_runs : Sequence[SimulationResults] | Predictive | None, optional
+        One results mapping per member, such as the replicates of a stochastic
+        engine, or a `Predictive`, whose draws carry their weights.
     confidence_level : float | None, optional
         Confidence level of the reported intervals.
 

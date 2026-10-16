@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2499,12 +2559,42 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td>Loss, constraints, the objective function (with the replicates of a stochastic engine, <code>with_replicates</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
-<td>Optimizer setup; anything of one model kind.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), the one evaluation of a point (<code>evaluate</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td>Penalties; optimizer setup; anything of one model kind.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/forward.rs</code></td>
+<td><code>ForwardModel</code>: the only code that clones, resets, writes values to or runs the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine; <code>Workspace</code>.</td>
+<td>Loss, penalties, history.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/observation.rs</code></td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors).</td>
+<td>Comparison with data.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/feasibility.rs</code></td>
+<td><code>Feasibility</code> (bounds, constraints), <code>Violation</code> and <code>EvaluationError</code>.</td>
+<td>Penalties.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/discrepancy.rs</code></td>
+<td><code>Discrepancy</code>: the loss of predictions against the data, with weights, per-series normalization and the summary of the replicates.</td>
+<td>Running engines.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/objective.rs</code></td>
+<td><code>OptimizationObjective</code>: the argmin cost function, the only place that turns a violation into a penalty; the history decorator.</td>
+<td>Recording history inside the objective.</td>
+</tr>
+<tr>
+<td><code>crates/commol-calibration/src/starts.rs</code></td>
+<td>The starts of a multi-start optimization (<code>start_points</code>: the guess, then a Latin hypercube) and <code>optimize_starts</code>, in parallel.</td>
+<td>Statistics.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/types.rs</code></td>
-<td><code>LossConfig</code> (every loss, and <code>replicate_loss</code>), <code>ReplicateSummary</code>, <code>crps</code>, <code>Replicates</code>, the observation, parameter and constraint types.</td>
+<td><code>LossConfig</code> (every loss, and <code>replicate_loss</code>), <code>ReplicateSummary</code>, <code>crps</code> and <code>weighted_crps</code>, <code>Replicates</code>, the observation, parameter, constraint and result types.</td>
 <td>Optimizer setup.</td>
 </tr>
 <tr>
@@ -2514,13 +2604,33 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
-<td>Nelder-Mead and particle swarm setup on the argmin fork.</td>
+<td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>, <code>optimize_with_observer</code>); no output to the process streams.</td>
 <td>Loss definitions.</td>
 </tr>
 <tr>
-<td><code>crates/commol-calibration/src/probabilistic/</code></td>
-<td>Parallel calibration runs, deduplication, clustering and ensemble selection (NSGA-II).</td>
-<td>Statistics for reports.</td>
+<td><code>crates/commol-inference/src/statistics.rs</code></td>
+<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), weighted mean and covariance, Kish's effective size.</td>
+<td>Quantiles anywhere else.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/sample.rs</code></td>
+<td><code>ParameterSample</code>: weighted draws, their invariants and statistics, resampling.</td>
+<td>What a method does.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/predictive.rs</code></td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through the observation operator, the <code>ObservationNoise</code> port and <code>NoNoise</code>.</td>
+<td>Noise models of one method.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/scores.rs</code></td>
+<td>Coverage, interval score, weighted interval score, sample CRPS, PIT, and their means per series.</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/target.rs</code></td>
+<td><code>Target</code> (a log density, <code>−∞</code> outside the support) and <code>discrepancy_in_support</code>.</td>
+<td>Penalties.</td>
 </tr>
 </tbody>
 </table>
@@ -2556,8 +2666,18 @@
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>Calibration types and functions; each takes an <code>Engine</code>.</td>
+<td>The calibration types (observations, parameters, constraints, loss, optimizers, results) and the checks that take an <code>Engine</code>.</td>
 <td>Logic beyond type conversion.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/inference.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>: starts, history, predictions, the predictive), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>; the runners of methods.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/python_observer.rs</code></td>
+<td>The progress table of a verbose optimization, written to Python's <code>sys.stdout</code>.</td>
+<td>Writes to the standard error.</td>
 </tr>
 <tr>
 <td><code>py-commol/commol/commol_rs/_commol_rs.pyi</code></td>
@@ -2592,14 +2712,14 @@
 <td>Engine rules.</td>
 </tr>
 <tr>
-<td><code>api/calibrator.py</code>, <code>api/probabilistic_calibrator.py</code></td>
-<td>Calibration entry points and conversion to Rust types.</td>
+<td><code>api/calibrator.py</code></td>
+<td><code>Calibrator</code>: the one conversion of a problem to Rust types, <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry point <code>uncertainty</code>.</td>
 <td>Loss or optimizer logic.</td>
 </tr>
 <tr>
-<td><code>api/probabilistic/</code></td>
-<td>Ensemble statistics, normalization and confidence intervals (<code>intervals.py</code>).</td>
-<td>New interval conventions outside <code>ci_percentiles</code>.</td>
+<td><code>api/inference/</code></td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), the scores (<code>scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), and the registry of method runners (<code>registry.py</code>).</td>
+<td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
 <td><code>api/reporting.py</code></td>
@@ -2613,8 +2733,13 @@
 </tr>
 <tr>
 <td><code>api/plotter.py</code></td>
-<td>Plots of results.</td>
+<td>Plots of results and of the bands of a <code>Predictive</code>.</td>
 <td>Computation of results.</td>
+</tr>
+<tr>
+<td><code>context/inference/</code></td>
+<td><code>UncertaintyMethod</code> (the generic base of a method's configuration), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>.</td>
+<td>Runners.</td>
 </tr>
 <tr>
 <td><code>api/description.py</code></td>
@@ -2693,7 +2818,7 @@
 </tr>
 <tr>
 <td><code>context/report_entry.py</code></td>
-<td>The ensemble spread of a report entry (<code>Interval</code>, <code>entry_interval</code>), for every kind.</td>
+<td>The spread of a report entry from the summary of a sample (<code>Interval</code>, <code>entry_interval</code>), for every kind.</td>
 <td>—</td>
 </tr>
 <tr>
@@ -2719,7 +2844,7 @@
 <tbody>
 <tr>
 <td><code>py-commol/tests/</code></td>
-<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>probabilistic/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
+<td>Python tests: one package per page of the user guide (<code>building/</code>, <code>transitions/</code>, <code>rates/</code>, <code>axis_patterns/</code>, <code>initial_conditions/</code>, <code>simulation/</code>, <code>stochastic/</code>, <code>units/</code>, <code>calibration/</code>, <code>uncertainty/</code>, <code>reporting/</code>, <code>plotting/</code>, <code>docs/</code>); <code>reference_models/</code>, published models checked against their stated results; <code>model_kinds/</code>, the test model kind through every generic layer; and <code>support/</code> with the shared model factories, the test kind (<code>kinds.py</code>), the test uncertainty method (<code>methods.py</code>), the coverage harness (<code>coverage.py</code>), the flow models, the reference solver, the oracles and the assertions. See <a href="../conventions/#tests">Tests</a>.</td>
 </tr>
 <tr>
 <td><code>crates/*/tests/</code>, <code>#[cfg(test)]</code> modules</td>
@@ -2751,7 +2876,7 @@
 </tr>
 <tr>
 <td><code>.github/workflows/</code></td>
-<td>CI: code quality, build, docs, release.</td>
+<td>CI: code quality, build, docs, release, and the weekly coverage studies (<code>coverage.yaml</code>).</td>
 </tr>
 </tbody>
 </table>
@@ -2817,13 +2942,13 @@
 </tr>
 <tr>
 <td>Change calibration</td>
-<td><code>calibration_problem.rs</code></td>
+<td><code>calibration_problem.rs</code> and its layers (<code>forward.rs</code>, <code>observation.rs</code>, <code>feasibility.rs</code>, <code>discrepancy.rs</code>, <code>objective.rs</code>)</td>
 <td><code>values.rs</code>, <code>commol-model/src/initial_conditions.rs</code>, <code>api/calibrator.py</code>, <code>tests/calibration/</code></td>
 </tr>
 <tr>
-<td>Change ensembles</td>
-<td><code>api/probabilistic_calibrator.py</code></td>
-<td><code>api/probabilistic/</code>, <code>crates/commol-calibration/src/probabilistic/</code></td>
+<td>Add an uncertainty method</td>
+<td><code>crates/commol-inference/</code></td>
+<td><code>py-commol/src/inference.rs</code>, <code>context/inference/</code>, <code>api/inference/registry.py</code>, <a href="../maintainer-playbook/#uncertainty-method">checklist</a></td>
 </tr>
 <tr>
 <td>Expose an engine rule to Python</td>

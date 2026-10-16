@@ -2,7 +2,7 @@
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for an ensemble, with the same layout.
+Two functions turn a calibrated model and a run into plain dictionaries, ready for JSON: `applied_parameters_report` (what the model holds and what calibration set) and `simulation_report` (what a run produced, next to the observations). Both work for a single calibration and for a sample of the parameters, with the same layout.
 
 ## Quick path
 
@@ -99,22 +99,22 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 }
 ```
 
-| Argument                                   | Meaning                                                                                 |
-| ------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `model`                                    | The model **after** `apply_calibration_parameters`.                                     |
-| `result`                                   | A `CalibrationResult`, a `ProbabilisticCalibrationResult`, or an `{id: value}` mapping. |
-| `problem`                                  | Optional. Adds the `factor` parameters, which the model does not hold.                  |
-| `parameter_statistics`, `confidence_level` | Optional. Taken from a probabilistic `result` when not given.                           |
+| Argument                     | Meaning                                                                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                      | The model **after** `apply_calibration_parameters`.                                                                                     |
+| `result`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                     |
+| `problem`                    | Optional. Adds the `factor` parameters, which the model does not hold.                                                                  |
+| `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
-| Entry                                 | Rule                                                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| Parameters                            | Only numeric parameters: formulas and series are inputs, not fitted values.          |
-| `total`                               | The declared `total`, with fraction 1.0.                                             |
-| Initial-condition `value`             | The amount the engine builds, overrides included.                                    |
-| Initial-condition `fraction`          | That amount over `total`, so every row shares one denominator.                       |
-| `group`                               | `"total"`, or the conditioning categories for a conditional stratification.          |
-| An uncalibrated bin (`None` fraction) | `fraction` and `value` are `null`.                                                   |
-| A probabilistic result                | Each entry gains an `interval` block, and the report starts with `confidence_level`. |
+| Entry                                 | Rule                                                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Parameters                            | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                        |
+| `total`                               | The declared `total`, with fraction 1.0.                                                                                                                           |
+| Initial-condition `value`             | The amount the engine builds, overrides included.                                                                                                                  |
+| Initial-condition `fraction`          | That amount over `total`, so every row shares one denominator.                                                                                                     |
+| `group`                               | `"total"`, or the conditioning categories for a conditional stratification.                                                                                        |
+| An uncalibrated bin (`None` fraction) | `fraction` and `value` are `null`.                                                                                                                                 |
+| A `sample`                            | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
 
 The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `group`, `fraction`, `value`, `calibrated`, then `interval`), so saved JSON files stay comparable.
 
@@ -128,14 +128,14 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `g
 | `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                         |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                       |
 
-| Argument                            | Meaning                                                                                                                                                                                                     |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                                                                                   |
-| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                            |
-| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                                                                               |
-| `observed_data`                     | The observations to report next to the run.                                                                                                                                                                 |
-| `accumulators`                      | The accumulator ids to report.                                                                                                                                                                              |
-| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member, or the `SimulationReplicates` of a stochastic engine. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
+| Argument                            | Meaning                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                                                                                                                                                                                                                                                 |
+| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                                                                                                                                                                                          |
+| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                                                                                                                                                                                                                                             |
+| `observed_data`                     | The observations to report next to the run.                                                                                                                                                                                                                                                                                                                               |
+| `accumulators`                      | The accumulator ids to report.                                                                                                                                                                                                                                                                                                                                            |
+| `ensemble_runs`, `confidence_level` | The `SimulationReplicates` of a stochastic engine, one `SimulationResults` per member, or a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive), whose draws carry their weights. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, reduced member by member with the weights; the layout does not change. |
 
 The report holds only these blocks. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 
@@ -152,7 +152,7 @@ print(json.dumps(document)[:30])
 
 ## Next steps
 
-| To learn                | Read                                                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Ensembles and intervals | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md) |
-| Signatures              | [API reference: Reports](https://munqu.github.io/commol/latest/api/reports/index.md)                        |
+| To learn                           | Read                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------ |
+| Samples, predictives and intervals | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)      |
+| Signatures                         | [API reference: Reports](https://munqu.github.io/commol/latest/api/reports/index.md) |

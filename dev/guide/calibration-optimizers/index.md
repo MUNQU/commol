@@ -93,7 +93,7 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 | `sd_tolerance`                   | `1e-6`                   | Stops when the spread of the simplex values falls below it.                                                                              |
 | `initial_simplex_size`           | `0.1`                    | The size of the first simplex: each vertex moves one unknown by this fraction of its bound width, towards the farther bound. In (0, 1\]. |
 | `alpha`, `gamma`, `rho`, `sigma` | `None` (argmin defaults) | Reflection, expansion, contraction and shrink coefficients.                                                                              |
-| `verbose`                        | `False`                  | Prints a progress table.                                                                                                                 |
+| `verbose`                        | `False`                  | Writes a progress table to `sys.stdout` (a notebook shows it). It shows one start, so it needs `run(starts=1)`.                          |
 | `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
 The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead searches an unbounded coordinate `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` in `crates/commol-calibration/src/optimization.rs`). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations.
@@ -127,7 +127,7 @@ print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 | `num_particles`  | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
 | `max_iterations` | `1000`      | The iteration limit.                                                                                                                 |
 | `initialization` | `"uniform"` | Where particles start: `"uniform"`, `"latin_hypercube"` (spread evenly) or `"opposition_based"` (each random point with its mirror). |
-| `verbose`        | `False`     | Prints progress.                                                                                                                     |
+| `verbose`        | `False`     | Writes progress to `sys.stdout`; needs `run(starts=1)`.                                                                              |
 
 Each method returns the configuration, so they chain:
 
@@ -140,13 +140,40 @@ Each method returns the configuration, so they chain:
 | `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions             | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
 | `.mutation(strategy, *, scale, probability, application)`                           | see right             | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
 
+## Several starts
+
+`Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
+
+```python
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run(starts=4)
+print(len(result.starts), result.failed_runs)  # 4 []
+print(result.starts[0].start)  # {'k1': 0.5, 'k2': 0.5}
+print({name: round(value, 2) for name, value in result.best_parameters.items()})  # {'k1': 0.4, 'k2': 0.1}
+```
+
+| `CalibrationResult` field | Meaning                                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                     |
+| `failed_runs`             | Why each start that failed did, with its number; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
+
+The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters (see [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)).
+
 ## Reproducibility
 
-Set `CalibrationProblem(seed=...)`: particle swarm, the initialization and the probabilistic ensemble then make the same random choices on every run.
+Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it, so the run can be repeated.
 
 ## History of evaluations
 
-`Calibrator.run_with_history()` returns the result and **every** evaluation the optimizer made, which is what [probabilistic calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md) builds its ensembles from.
+`Calibrator.run_with_history()` optimizes from the initial guess and returns a `CalibrationHistory`: the `result`, and every evaluation of a feasible point the optimizer made (`CalibrationEvaluation`: its `parameters` and `loss`), in order. A point the objective penalizes is not kept.
 
 ## Troubleshooting
 
@@ -155,12 +182,13 @@ Set `CalibrationProblem(seed=...)`: particle swarm, the initialization and the p
 | A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm     |
 | `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations` |
 | Different results on each run      | Set `seed`; use more particles or iterations                               |
+| A local minimum                    | `run(starts=n)` from several points                                        |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations     |
 | Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start        |
 
 ## Next steps
 
-| To learn                          | Read                                                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Relations the result must respect | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                 |
-| Uncertainty                       | [Probabilistic Calibration](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/index.md) |
+| To learn                          | Read                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------- |
+| Relations the result must respect | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md) |
+| Uncertainty                       | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)             |

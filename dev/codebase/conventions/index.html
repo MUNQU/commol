@@ -1121,14 +1121,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/probabilistic-calibration/" class="md-nav__link">
+      <a href="../../guide/reports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Reports
   
 
     
@@ -1142,6 +1142,66 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1149,14 +1209,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/reports/" class="md-nav__link">
+      <a href="../../guide/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reports
+    Uncertainty
   
 
     
@@ -1496,14 +1556,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/probabilistic-calibrator/" class="md-nav__link">
+      <a href="../../api/uncertainty/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Probabilistic Calibration
+    Uncertainty
   
 
     
@@ -2703,7 +2763,10 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
   may use a one-line docstring.</li>
 <li>Context data structures are Pydantic v2 models.</li>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
-<li>Log with the standard <code>logging</code> module.</li>
+<li>Log with the standard <code>logging</code> module. Library code never writes to the
+  standard error of the process: a failure is part of the result and the
+  caller logs it (<code>CalibrationResult.failed_runs</code>). Output the user asks for,
+  such as a verbose optimizer's table, goes to Python's <code>sys.stdout</code>.</li>
 </ul>
 <h2 id="rust">Rust<a class="headerlink" href="#rust" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2712,6 +2775,8 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
   summary.</li>
 <li>Hot paths avoid allocation: reuse buffers, access by index, keep evaluation
   contexts alive.</li>
+<li>No <code>println!</code> or <code>eprintln!</code> in library code: return the information to the
+  caller.</li>
 </ul>
 <h2 id="comments-and-docstrings">Comments and docstrings<a class="headerlink" href="#comments-and-docstrings" title="Permanent link">&para;</a></h2>
 <p>Describe the code as it is now. Never describe how it came to be.</p>
@@ -2769,8 +2834,8 @@ agents, to features, fixes, refactors, dependency updates and CI changes.</p>
 <td>The guide page in <code>docs/guide/</code>; <a href="../../advanced/model-structure/">Model structure</a> if a type changes</td>
 </tr>
 <tr>
-<td>Changes calibration or ensembles</td>
-<td><code>guide/calibration.md</code> or <code>guide/probabilistic-calibration.md</code></td>
+<td>Changes calibration or uncertainty</td>
+<td><code>guide/calibration.md</code> and its sub-pages, or <code>guide/uncertainty/</code></td>
 </tr>
 <tr>
 <td>Changes an expression function or variable</td>
@@ -2923,7 +2988,7 @@ The tests live in <code>py-commol/tests/</code>.</p>
 <p>A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (<code>utils/security.py</code>, <code>context/axis_units.py</code>,
-<code>api/probabilistic/</code>) goes in the package of its feature. The exceptions are
+<code>api/inference/intervals.py</code>) goes in the package of its feature. The exceptions are
 <code>reference_models/</code>, which checks published models across features (see
 <a href="#reference-models">Reference models</a>), and <code>model_kinds/</code>, which runs a model
 kind that is not aggregate through every generic layer.</p>
@@ -2983,13 +3048,13 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>calibration/</code></td>
-<td>One file per calibration page: <code>test_problem.py</code>, <code>test_optimizers.py</code>, <code>test_constraints.py</code>, <code>test_observations.py</code>, <code>test_initial_conditions.py</code>, <code>test_write_back.py</code></td>
+<td>One file per calibration page: <code>test_problem.py</code>, <code>test_optimizers.py</code>, <code>test_starts.py</code>, <code>test_constraints.py</code>, <code>test_observations.py</code>, <code>test_initial_conditions.py</code>, <code>test_write_back.py</code></td>
 <td><a href="../../guide/calibration/">Model Calibration</a> and its sub-pages</td>
 </tr>
 <tr>
-<td><code>probabilistic/</code></td>
-<td>Ensembles, their selection and intervals</td>
-<td><a href="../../guide/probabilistic-calibration/">Probabilistic Calibration</a></td>
+<td><code>uncertainty/</code></td>
+<td>The parameter sample, the one quantile, the predictive, the scores, the entry point <code>Calibrator.uncertainty</code>, and the coverage harness (<code>test_coverage.py</code>, marker <code>coverage_study</code>)</td>
+<td><a href="../../guide/uncertainty/">Uncertainty</a></td>
 </tr>
 <tr>
 <td><code>reporting/</code></td>
