@@ -1,0 +1,48 @@
+name: Coverage Studies
+
+# Coverage studies check that the intervals of each uncertainty method cover
+# the truth at their nominal rate (tests marked `coverage_study`,
+# py-commol/tests/support/coverage.py). Each runs many fits, so they run every
+# week and on demand, never in a pull request.
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  coverage-studies:
+    name: Coverage studies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./py-commol
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up Rust
+        run: rustup toolchain install
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: py-commol/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Build Rust extension
+        run: uv run maturin develop --release --features test-kind
+
+      - name: Run the coverage studies
+        run: uv run pytest -m coverage_study

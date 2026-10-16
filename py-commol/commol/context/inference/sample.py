@@ -139,6 +139,14 @@ class ParameterSample(BaseModel):
         )
         return self
 
+    def __eq__(self, other: object) -> bool:
+        """Two samples are equal when their fields are."""
+        if not isinstance(other, ParameterSample):
+            return NotImplemented
+        return self.model_dump() == other.model_dump()
+
+    __hash__ = None  # type: ignore[assignment]
+
     @classmethod
     def equally_weighted(
         cls,
