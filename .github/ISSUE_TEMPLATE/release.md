@@ -10,7 +10,6 @@ Follow [the release process](https://github.com/MUNQU/commol/blob/main/docs/deve
 - [ ] Every issue of the milestone closed
 - [ ] Version chosen
 - [ ] Changelog dated on `main`, with its opening paragraph
-- [ ] **Build** run on `main` passed
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
 - [ ] GitHub release published with the notes of `python .github/scripts/release_notes.py X.Y.Z`
 - [ ] **Release to PyPI** workflow passed
