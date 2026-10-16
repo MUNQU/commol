@@ -37,23 +37,53 @@ We use a simplified Git Flow approach:
 
 ## Planning
 
-Planned work is written as task documents (ODDs) and tracked on GitHub:
+Planned work lives in GitHub issues, written from the templates of
+`.github/ISSUE_TEMPLATE/`:
+
+| Template | Label | For |
+|---|---|---|
+| Proposal (`proposal.md`) | `proposal` | A feature, a refactor or a breaking change: goal, current state, requirements with the tests that check them, decisions, tasks |
+| Bug or small change (`change.md`) | `change` | A defect or a change that needs no proposal: the behavior, a reproduction and the test that will show it |
+| Release (`release.md`) | `release` | The checklist of one release, blocked by the issues it ships |
 
 | What | Where |
 |---|---|
-| The specification of one piece of work | `odd/<name>.md`, a file that never moves |
-| Its status, order and dependencies | Its issue, label `odd`, with its blockers ("blocked by") |
-| A release | Its issue, label `release`, with the release checklist, and its milestone |
+| The specification of a change | The body of its issue |
+| Decisions and findings during the work | Comments of the issue (`L<n> (user|implementation): …`), and the Decisions table of the body |
+| Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
+| Releases | A milestone per release, and its release issue |
+| Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
+| What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
 
-[`odd/README.md`](https://github.com/MUNQU/commol/blob/develop/odd/README.md)
-explains the lifecycle of an ODD and why the work runs in its order. To find
-the next piece of work:
+To find the next piece of work:
 
 ```bash
-gh issue list --label odd --state open
+gh issue list --label proposal --state open
+gh issue list --milestone 0.5.0
+gh api repos/MUNQU/commol/issues/<number>/dependencies/blocked_by --jq '.[].number'
 ```
 
 An issue is ready when every issue that blocks it is closed.
+
+### Lifecycle of a proposal
+
+1. Open the issue from the template: a scoped goal, the current state with
+   paths and symbols, one requirement per behavior (`The <component> SHALL …`,
+   with `WHEN … THEN …` scenarios), each scenario with the test that checks
+   it. Add `breaking` when it breaks the public API, the milestone of its
+   release and its blockers. A large proposal splits into sub-issues.
+2. Settle its decisions when its implementation starts, not before. A
+   decision that changes what an earlier proposal built, or what a later one
+   relies on, updates those issues too, with a comment in each.
+3. Work on a branch from `develop`, one task after the other, the tests of a
+   requirement before its code. Tick the tasks of the body as they land.
+4. Open the pull request with `Closes #N` and the evidence. The merge closes
+   the issue (`close-issues.yaml`).
+
+The proposals run one after the other, each from `develop` after the previous
+pull request merges, so each is written against the merged code of the one
+before. Two proposals that touch different modules may run in parallel on two
+branches; their issues say so.
 
 ## Development Process
 

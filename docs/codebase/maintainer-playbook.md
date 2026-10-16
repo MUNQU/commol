@@ -26,8 +26,8 @@ Use this page before you make or review a change. It turns the
   the transition, compartment or parameter.
 - **Do not change saved formats by accident.** Model JSON and report key order
   are part of the contract.
-- **Do not trust `odd/` as specification.** It records past work; the code and
-  this guide describe the present.
+- **Do not trust a closed proposal as specification.** A closed issue records
+  past work; the code and this guide describe the present.
 
 ## Checklists by type of change
 

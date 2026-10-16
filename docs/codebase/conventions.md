@@ -73,7 +73,7 @@ Design reasons and invariants that cross components go to
 | Moves code, adds a module, or changes who owns what | [Repository map](repository-map.md); `AGENTS.md` if a "If you need to…" row changes |
 | Adds or changes a rule that is not obvious from the code | [Design decisions](design-decisions.md), with the test that guards it |
 | Changes a workflow, a command, CI or the release | `AGENTS.md`; `docs/development/` |
-| Plans new work | An ODD in `odd/<name>.md` and its issue ([Planning](../development/workflow.md#planning)) |
+| Plans new work | An issue from a template of `.github/ISSUE_TEMPLATE/` ([Planning](../development/workflow.md#planning)) |
 | Is visible to users | `docs/about/changelog.md`, under `[Unreleased]` |
 | Adds or changes a public Rust item | Its rustdoc comment |
 
