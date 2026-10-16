@@ -91,8 +91,8 @@ class TestSubgroupTotals:
             },
             "conditions": {"sub": {"group": "g1"}},
         }
-        structure = build(a_to_b_builder(**strata)).structure
-        names = engine_state.subgroup_total_names(structure)
+        process = build(a_to_b_builder(**strata)).process
+        names = engine_state.subgroup_total_names(process)
 
         assert "total_g1_s1" in names
         assert "total_g2_s1" not in names

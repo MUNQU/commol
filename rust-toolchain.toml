@@ -1,0 +1,7 @@
+# The one Rust toolchain of commol: local builds, pre-commit and CI use it, so
+# a lint that a newer clippy adds cannot pass locally and fail in CI. Change
+# it on purpose: see docs/development/workflow.md, "The Rust toolchain".
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

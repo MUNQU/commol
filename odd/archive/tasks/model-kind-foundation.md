@@ -2,7 +2,7 @@
 
 Goal: the code that every model kind shares can describe a model in a
 readable, exportable form, run a stochastic engine, and calibrate it, so that
-the ODDs of new kinds and engines (`odd/tasks/stochastic-compartmental.md`,
+the ODDs of new kinds and engines (`odd/archive/tasks/stochastic-compartmental.md`,
 `odd/tasks/markov-chains.md`, `odd/tasks/network-models.md`,
 `odd/tasks/agent-based-models.md`) only add their own parts.
 Motivation: the user noted that `print_equations` only makes sense for a model
@@ -85,7 +85,7 @@ Nelder-Mead and particle swarm would chase noise.
 
 ## Specs
 
-Every spec follows the [documentation definition of done](../../docs/codebase/conventions.md#documentation-definition-of-done).
+Every spec follows the [documentation definition of done](../../../docs/codebase/conventions.md#documentation-definition-of-done).
 
 ### S0 — One process, structures apart
 
@@ -351,9 +351,9 @@ Every spec follows the [documentation definition of done](../../docs/codebase/co
   replicates allow; two runs with one seed give the same result; the CRPS of
   one replicate equals the absolute error, and the CRPS of a known ensemble
   equals its closed form `E|X − y| − ½ E|X − X'|`.
-- Out of scope: likelihood-based inference (particle filters, ABC). It needs
-  its own ODD once a stochastic engine exists; the benchmark ODD lists it as a
-  candidate (`odd/tasks/library-benchmark.md` S6).
+- Out of scope: likelihood-based inference (particle filters, ABC). ABC is
+  in `odd/tasks/smc-inference.md`, particle filters in
+  `odd/tasks/state-space-inference.md` (L18).
 
 ### S8 — Documentation and README
 
@@ -393,15 +393,15 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T0 | S0 | `Process` and `ModelStructure` apart in Rust and Python; `Aggregate`; `build(structure, engine)`; `neighbors_` variables; migrate tests, examples and guide | direct | |
-| T1 | S1, S2 | Description blocks and `ModelStructure.describe`; the compartmental sections from today's printer and initial state; the test kind's sections | direct | |
-| T2 | S3 | Renderers (text, Markdown, LaTeX, JSON) and `save`; layouts (the seven sections, `"odd"`); Mermaid and DOT; remove `print_equations` (D5); move its tests | direct | |
-| T3 | S4 | `EngineType::dynamics_form` replaces `equation_lhs` | direct | |
-| T4 | S5 | `is_stochastic`, `set_seed`; the `commol-random` crate; a stochastic test engine | direct | |
-| T5 | S6 | Replicates in `Simulation`, `SimulationReplicates`, plotter and reports | direct | |
-| T6 | S7 | Replicates with common random numbers in the calibration objective | direct | |
-| T7 | S8 | Documentation, README, changelog | direct | |
-| T8 | all | Final audit: every runner | direct | |
+| T0 | S0 | `Process` and `ModelStructure` apart in Rust and Python; `Aggregate`; `build(structure, engine)`; `neighbors_` variables; migrate tests, examples and guide | direct | `70ca27b`, `7734914` |
+| T1 | S1, S2 | Description blocks and `ModelStructure.describe`; the compartmental sections from today's printer and initial state; the test kind's sections | direct | `613e10b` |
+| T2 | S3 | Renderers (text, Markdown, LaTeX, JSON) and `save`; layouts (the seven sections, `"odd"`); Mermaid and DOT; remove `print_equations` (D5); move its tests | direct | `613e10b` |
+| T3 | S4 | `EngineType::dynamics_form` replaces `equation_lhs` | direct | `613e10b` |
+| T4 | S5 | `is_stochastic`, `set_seed`; the `commol-random` crate; a stochastic test engine | direct | `6d05741` |
+| T5 | S6 | Replicates in `Simulation`, `SimulationReplicates`, plotter and reports | direct | `6d05741` |
+| T6 | S7 | Replicates with common random numbers in the calibration objective | direct | `6d05741` |
+| T7 | S8 | Documentation, README, changelog | direct | `6d05741` and the audit commit |
+| T8 | all | Final audit: every runner | direct | the audit commit |
 
 ## Delivery
 
@@ -416,7 +416,24 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Verified 2026-10-16 on `refactor/model-kind-foundation`, every runner of
+`AGENTS.md`: Rust 312 tests (with `commol-random` and the `test-kind`
+feature), `cargo fmt --check`, `clippy -D warnings` (with and without
+`--all-features`), `rustdoc -D warnings`; Python 1116 tests (1 skipped:
+`pydot` is not installed, so the DOT parse runs only as a snapshot), 71 docs
+tests, `ruff`, `ty`, `vulture`; `mkdocs build --strict`. The LaTeX renderings
+of both layouts compile with `latexmk` (`tests/description/test_rendering.py`).
+
+| Spec | Evidence |
+|---|---|
+| S0 | `crates/commol-core/src/types/{process,aggregate,structure,model}.rs`; `context/{process,aggregate,neighbors}.py`; `ModelBuilder.build(structure, engine)`; `resolve_neighbors` (`crates/commol-model/src/flows.rs`); `check_model` reserves `neighbors`/`neighbors_*`; `EngineType::kinds`, `runs`, `engines_of`; `Engine::build` by `(engine, kind)`; variants (`AggregateVariant`, registry by `(kind, variant)`, `UnstratifiedVariant`); ruff `N`. Tests: `tests/transitions/test_neighbors.py` (Complete equals `k1 * A * B / total`; Groups with weights equals the per-category rates by hand; missing neighbors lists `Complete()` and `Groups(`; `neighbors_A` rejected), `tests/model_kinds/test_interface.py::TestVariants`, `tests/building/test_engine.py::TestBuild`, `tests/building/test_save_and_load.py`. |
+| S1, S2 | `context/description.py`, `context/_model/{describe,aggregate_description,equations}.py`; `tests/description/test_description.py`. |
+| S3 | `api/description.py`; `tests/description/test_rendering.py` (snapshots in `tests/description/snapshots/`), `tests/description/test_equations*.py` (the lines of `print_equations`, through `equation_forms`). |
+| S4 | `DynamicsForm` (`crates/commol-core/src/types/engine.rs`); `tests/building/test_engine.py::TestEngineList`. |
+| S5 | `crates/commol-random/` (reference values in `tests/reference_values.txt`); `SimulationEngine::set_seed`; `TestStochasticEngine` (`py-commol/src/test_kind.rs`); `py-commol/src/engine.rs` tests. |
+| S6 | `Simulation.run/run_at(seed=)`, `Simulation.replicates`, `ReplicateRuns`, `SimulationReplicates`, `run_replicates`; `tests/model_kinds/test_stochastic.py::{TestSeeds,TestReplicates,TestLayers}`. |
+| S7 | `ReplicateSummary`, `crps`, `Replicates`, `LossConfig::replicate_loss`, `CalibrationProblem::with_replicates`; `Quantile`; `rust_loss_config`; `replicate_tests` in `crates/commol-calibration/src/types.rs`; `tests/model_kinds/test_stochastic.py::TestCalibration`. |
+| S8 | `docs/guide/describing-models.md`; `docs/guide/simulations.md` (seeds and replicates), `docs/guide/calibration.md` (stochastic engines); `design-decisions.md` ("A description is data, rendered apart", "Stochastic engines and seeds"); `mental-model.md`, `maintainer-playbook.md`, `repository-map.md`, `AGENTS.md`, README, changelog. |
 
 ## Log
 
@@ -476,3 +493,37 @@ Each row says why the recommendation beats each alternative.
   S0 enables the rules and fixes them.
 - L17 (user, 2026-10-15): approved D11, variants of a structure, so
   `MarkovChain` and `Network` are classes that load back as themselves.
+- L18 (user, 2026-10-15): asked for the uncertainty and identifiability
+  program (`odd/tasks/inference-foundation.md`) before the benchmark; the
+  out-of-scope note of S7 now points to its ODDs. This ODD runs before that
+  program, which builds on its seeds, replicates and calibration objective.
+- L19 (implementation, 2026-10-16): `Aggregate` stores its fractions as
+  mappings by id, in Python and in the file (`bin_fractions={"A": 0.99}`),
+  so the constructor of S0 is the plain Pydantic one; Pydantic calls a custom
+  `__init__` when it validates a file, so a list storage with a mapping
+  constructor would need two shapes. Rust keeps the order (`IndexMap`).
+  `BinFraction`, `StratificationFraction(s)` and `CompartmentFraction` go.
+- L20 (implementation): the interface of a kind reads the process from the
+  model (`outputs_by_source(model)`, `series_label(model, id)`), and the
+  methods of `Aggregate` that need the bins take the process
+  (`initial_state(process)`, `subgroup_total(process, …)`); a structure that
+  held a reference to its process would keep a stale copy.
+- L21 (implementation): `build(structure, engine)` is typed with a `TypeVar`
+  of the structure class, which gives what the overloads of S0 asked for;
+  `EngineName` (all the engines of a release) replaces
+  `CompartmentalEngineType`.
+- L22 (implementation): `neighbors_<bin>` under `Groups` resolves to sums of
+  compartments found by label, not to `total_<cat>` names, which a category
+  shared by two stratifications would make ambiguous. The planner decides
+  whether a rate is absolute before it resolves them.
+- L23 (implementation): the unit check read each raw rate, so every
+  proportional rate (`k2` in `1/day`) failed it, and so would every rate of
+  the neighbors. It now reads the flows the engine plans (rate × source for a
+  proportional rate); the changelog lists the fix.
+- L24 (implementation): the stochastic test engine draws events one at a time
+  (an exact Gillespie run with a `SumTree`), so a run does not depend on the
+  positions it reports at. `Simulation.replicates` returns `ReplicateRuns`.
+  With `"crps"` the loss is the weighted mean score, whatever `loss_function`
+  is; a constraint at positions is checked on every replicate. The
+  replicates of a calibration run one after the other: the objective is
+  generic and the engines need not be `Send`.

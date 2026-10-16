@@ -37,7 +37,7 @@ class AppliedParametersReport(TypedDict):
     """
     Every parameter of a calibrated model, and the sections of its kind.
 
-    A compartmental model adds ``initial_conditions``; another kind adds the
+    An aggregate model adds ``initial_conditions``; another kind adds the
     sections its structure gives (`ModelStructure.report_sections`).
     """
 
@@ -91,7 +91,7 @@ def applied_parameters_report(
     Each entry carries the value the model holds and whether calibration set
     it, so entries the calibration left alone appear alongside the fitted ones.
     The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); a compartmental model adds
+    (`ModelStructure.report_sections`); an aggregate model adds
     ``initial_conditions``.
 
     Parameters that are not a single number, such as a formula or a
@@ -99,7 +99,7 @@ def applied_parameters_report(
     ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions of a compartmental model carry the effective
+    Initial conditions of an aggregate model carry the effective
     ``value`` the engine builds
     from the uniform expansion plus the declared compartment overrides, its
     ``fraction`` as that value over the declared total, and the
@@ -136,7 +136,7 @@ def applied_parameters_report(
     -------
     AppliedParametersReport
         Key ``parameters`` and the sections of the kind (``initial_conditions``
-        for a compartmental model), preceded by ``confidence_level`` when there
+        for an aggregate model), preceded by ``confidence_level`` when there
         is one.
     """
     calibrated = calibrated_values(result)

@@ -162,7 +162,7 @@ uv pip install --python /tmp/commol-check/bin/python --refresh commol==X.Y.Z
 
 ```python
 # check.py
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Release check")
@@ -173,15 +173,13 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="a_to_b", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="b_to_c", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=100)

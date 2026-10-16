@@ -1,4 +1,4 @@
-"""Bins and accumulators of a compartmental model."""
+"""Bins and accumulators of a process."""
 
 from typing import override
 
@@ -7,7 +7,7 @@ from pydantic import ConfigDict, BaseModel, Field
 
 class Bin(BaseModel):
     """
-    Defines a single bin (base category) in the compartmental model.
+    Defines a single bin (base category) of the process of a model.
 
     A bin represents a fundamental category before stratification. The combination
     of a bin with all stratifications produces the actual compartments.

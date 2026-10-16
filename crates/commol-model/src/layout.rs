@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use commol_core::CompartmentalStructure;
+use commol_core::Process;
 
 use crate::labels::OutputLabels;
 
@@ -21,10 +21,10 @@ pub(crate) struct CompartmentLayout {
 }
 
 impl CompartmentLayout {
-    pub(crate) fn new(structure: &CompartmentalStructure) -> Self {
+    pub(crate) fn new(process: &Process) -> Self {
         let mut names = Vec::new();
         let mut labels = Vec::new();
-        for output in expand_compartments(structure) {
+        for output in expand_compartments(process) {
             names.push(output.name);
             labels.push(OutputLabels {
                 source: output.source,

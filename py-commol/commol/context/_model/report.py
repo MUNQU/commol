@@ -1,4 +1,4 @@
-"""The ``initial_conditions`` section of a report of a compartmental model."""
+"""The ``initial_conditions`` section of a report of an aggregate model."""
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, NotRequired, TypedDict
@@ -8,8 +8,9 @@ from commol.context.initial_conditions import CATEGORY_SEPARATOR
 from commol.context.report_entry import Interval, entry_interval
 
 if TYPE_CHECKING:
-    from commol.context.compartmental import CompartmentalStructure
+    from commol.context.aggregate import Aggregate
     from commol.context.probabilistic_calibration import ParameterSetStatistics
+    from commol.context.process import Process
 
 WHOLE_GROUP = "total"
 
@@ -52,7 +53,7 @@ def _entry(
 
 
 def _category_ids(
-    structure: "CompartmentalStructure", stratification: str, category: str
+    structure: "Aggregate", stratification: str, category: str
 ) -> list[str]:
     """
     Ids that name a stratification category, preferred first.
@@ -61,12 +62,13 @@ def _category_ids(
     when no other stratification declares a category of that name.
     """
     qualified = f"{stratification}{CATEGORY_SEPARATOR}{category}"
-    preferred = structure.initial_conditions.category_id(stratification, category)
+    preferred = structure.category_id(stratification, category)
     return [qualified] if preferred == qualified else [preferred, qualified]
 
 
 def _override_is_calibrated(
-    structure: "CompartmentalStructure",
+    process: "Process",
+    structure: "Aggregate",
     compartment: InitialCompartment,
     calibrated_ids: set[str],
 ) -> bool:
@@ -81,7 +83,7 @@ def _override_is_calibrated(
         return True
     categories_by_stratification = {
         stratification.id: stratification.categories
-        for stratification in structure.stratifications
+        for stratification in process.stratifications
     }
     return any(
         not calibrated_ids.isdisjoint(
@@ -93,7 +95,8 @@ def _override_is_calibrated(
 
 
 def initial_conditions_report(
-    structure: "CompartmentalStructure",
+    process: "Process",
+    structure: "Aggregate",
     calibrated_ids: set[str],
     parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
 ) -> dict[str, InitialConditionEntry]:
@@ -101,7 +104,7 @@ def initial_conditions_report(
     Every bin fraction, stratification category and compartment override.
 
     The ``initial_conditions`` section of :func:`commol.applied_parameters_report`
-    for a compartmental model.
+    for an aggregate model.
 
     Every row reports its effective amount the engine builds from the
     uniform expansion plus the declared compartment overrides, and its fraction
@@ -116,14 +119,10 @@ def initial_conditions_report(
     amount that mark it as needing calibration, even when overrides touch
     some of its compartments; the override rows still carry their own numbers.
     """
-    initial_conditions_block = structure.initial_conditions
-    total = initial_conditions_block.total
-    state = structure.initial_state()
+    total = structure.total
+    state = structure.initial_state(process)
     by_name = {compartment.name: compartment for compartment in state}
-    override_names = {
-        override.compartment
-        for override in initial_conditions_block.compartment_fractions
-    }
+    override_names = set(structure.compartment_fractions)
 
     report: dict[str, InitialConditionEntry] = {
         "total": {
@@ -133,11 +132,11 @@ def initial_conditions_report(
             "calibrated": False,
         }
     }
-    for bin_fraction in initial_conditions_block.bin_fractions:
-        compartments = [c for c in state if c.bin == bin_fraction.bin]
+    for bin_id, declared in structure.bin_fractions.items():
+        compartments = [c for c in state if c.bin == bin_id]
         fraction: float | None
         value: float | None
-        if bin_fraction.fraction is None:
+        if declared is None:
             # A bin needing calibration keeps its marker even when overrides
             # pin some of its compartments; the override rows carry the numbers.
             fraction = None
@@ -146,38 +145,35 @@ def initial_conditions_report(
             # No override touches this row, so report the declared fraction
             # verbatim rather than an expansion sum that drifts in the last
             # float bits.
-            fraction = bin_fraction.fraction
+            fraction = declared
             value = fraction * total
         else:
             value = sum(c.amount for c in compartments)
             fraction = value / total
-        report[bin_fraction.bin] = _entry(
-            bin_fraction.bin,
+        report[bin_id] = _entry(
+            bin_id,
             WHOLE_GROUP,
             fraction,
             value,
             calibrated_ids,
             parameter_statistics,
         )
-    for stratification in initial_conditions_block.stratification_fractions:
-        group = structure.get_conditioning_categories(stratification.stratification)
+    for stratification, categories in structure.stratification_fractions.items():
+        group = structure.get_conditioning_categories(process, stratification)
         # A conditional stratification's category is calibrated as a fraction
         # of its conditioning subgroup, but reported as a fraction of the
         # total. The group's share of the total is the same factor that
         # converts one unit into the other, so it rescales the interval.
-        interval_scale = structure.subgroup_total(group) / total if group else 1.0
-        for category_fraction in stratification.fractions:
+        interval_scale = (
+            structure.subgroup_total(process, group) / total if group else 1.0
+        )
+        for category in categories:
             row_value = sum(
-                c.amount
-                for c in state
-                if c.categories.get(stratification.stratification)
-                == category_fraction.category
+                c.amount for c in state if c.categories.get(stratification) == category
             )
             # A category name two stratifications declare is reported under
             # its qualified id, so the rows do not overwrite each other.
-            ids = _category_ids(
-                structure, stratification.stratification, category_fraction.category
-            )
+            ids = _category_ids(structure, stratification, category)
             entry_id = next((i for i in ids if i in calibrated_ids), ids[0])
             report[ids[0]] = _entry(
                 entry_id,
@@ -188,16 +184,16 @@ def initial_conditions_report(
                 parameter_statistics,
                 interval_scale,
             )
-    for override in initial_conditions_block.compartment_fractions:
+    for compartment, override in structure.compartment_fractions.items():
         calibrated = _override_is_calibrated(
-            structure, by_name[override.compartment], calibrated_ids
+            process, structure, by_name[compartment], calibrated_ids
         )
-        report[override.compartment] = _entry(
-            override.compartment,
+        report[compartment] = _entry(
+            compartment,
             WHOLE_GROUP,
-            override.fraction,
-            override.fraction * total,
-            {override.compartment} if calibrated else set(),
+            override,
+            override * total,
+            {compartment} if calibrated else set(),
             parameter_statistics,
         )
     return report

@@ -3,6 +3,7 @@
 import pytest
 
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -15,6 +16,7 @@ from commol.api.model_builder import ModelBuilder
 from commol.context._model.engine_state import calibrated_initial_state
 from commol.context.model import Model
 from tests.support import (
+    FactoryBuilder,
     a_to_b_builder,
     build,
     conditional_pathway_builder,
@@ -41,9 +43,7 @@ def _flat_category() -> ModelBuilder:
 
 
 def _shared_category_override() -> ModelBuilder:
-    return shared_category_builder(
-        compartment_fractions=[{"compartment": "A_c1_c1", "fraction": 0.0}]
-    )
+    return shared_category_builder(compartment_fractions={"A_c1_c1": 0.0})
 
 
 def _mixed_replay() -> ModelBuilder:
@@ -63,19 +63,20 @@ def _mixed_replay() -> ModelBuilder:
 def _prefixed_bins() -> ModelBuilder:
     """Bins A and A_x: the id of one begins with the id of the other."""
     builder = (
-        ModelBuilder(name="Prefixes", version="1.0")
+        FactoryBuilder(name="Prefixes", version="1.0")
         .add_bin(id="A", name="A")
         .add_bin(id="A_x", name="A x")
         .add_parameter(id="k", value=0.1)
         .add_transition(id="flow", source=["A"], target=["A_x"], rate="k * A")
     )
-    return builder.set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.5},
-            {"bin": "A_x", "fraction": 0.5},
-        ],
-        stratification_fractions=stratify(builder, {"group": {"g1": 0.5, "g2": 0.5}}),
+    return builder.set_structure(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.5, "A_x": 0.5},
+            stratification_fractions=stratify(
+                builder, {"group": {"g1": 0.5, "g2": 0.5}}
+            ),
+        )
     )
 
 
@@ -97,10 +98,7 @@ def _scored(
 
 
 def _overrides(model: Model) -> dict[str, float]:
-    return {
-        fraction.compartment: fraction.fraction
-        for fraction in model.structure.initial_conditions.compartment_fractions
-    }
+    return dict(model.structure.compartment_fractions)
 
 
 WRITE_BACK_CASES = [
@@ -170,10 +168,7 @@ class TestWriteBackReadability:
             {"A": 0.4, "B": 0.6}, initial_condition_problem("A", "B")
         )
 
-        bins = model.structure.initial_conditions.bin_fractions
-        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
-            {"A": 0.4, "B": 0.6}
-        )
+        assert model.structure.bin_fractions == pytest.approx({"A": 0.4, "B": 0.6})
         assert _overrides(model) == {}
 
     def test_remainder_bin_takes_the_rest_of_the_total(self) -> None:
@@ -183,10 +178,7 @@ class TestWriteBackReadability:
             {"A": 0.7}, initial_condition_problem("A", remainder="B")
         )
 
-        bins = model.structure.initial_conditions.bin_fractions
-        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
-            {"A": 0.7, "B": 0.3}
-        )
+        assert model.structure.bin_fractions == pytest.approx({"A": 0.7, "B": 0.3})
         assert _overrides(model) == {}
 
     def test_category_value_updates_the_category_fraction(self) -> None:
@@ -195,9 +187,9 @@ class TestWriteBackReadability:
         model.apply_calibration_parameters({"g1": 0.3}, initial_condition_problem("g1"))
 
         fractions = {
-            f.category: f.fraction
-            for s in model.structure.initial_conditions.stratification_fractions
-            for f in s.fractions
+            category: fraction
+            for categories in model.structure.stratification_fractions.values()
+            for category, fraction in categories.items()
         }
         assert fractions == pytest.approx({"g1": 0.3, "g2": 0.7})
         assert _overrides(model) == {}
@@ -210,9 +202,11 @@ class TestWriteBackReadability:
         )
 
         fractions = {
-            (s.stratification, f.category): f.fraction
-            for s in model.structure.initial_conditions.stratification_fractions
-            for f in s.fractions
+            (stratification, category): fraction
+            for stratification, categories in (
+                model.structure.stratification_fractions.items()
+            )
+            for category, fraction in categories.items()
         }
         assert fractions == pytest.approx(
             {
@@ -234,10 +228,7 @@ class TestWriteBackReadability:
 
         # B totals 0 + 25 + 70 = 95, so A takes the remaining 905 and keeps
         # its split; only the B compartments need overrides.
-        bins = model.structure.initial_conditions.bin_fractions
-        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
-            {"A": 0.905, "B": 0.095}
-        )
+        assert model.structure.bin_fractions == pytest.approx({"A": 0.905, "B": 0.095})
         assert set(_overrides(model)) == {"B_g1", "B_g2_t1", "B_g2_t2"}
         rebuilt = initial_state(model)
         assert rebuilt["B_g2_t2"] == pytest.approx(70.0)
@@ -282,10 +273,7 @@ class TestWriteBackReadability:
             {"A": 0.3}, initial_condition_problem("A", remainder="A_x")
         )
 
-        bins = model.structure.initial_conditions.bin_fractions
-        assert {bf.bin: bf.fraction for bf in bins} == pytest.approx(
-            {"A": 0.3, "A_x": 0.7}
-        )
+        assert model.structure.bin_fractions == pytest.approx({"A": 0.3, "A_x": 0.7})
         assert _overrides(model) == {}
         assert initial_state(model) == pytest.approx(
             {"A_g1": 150.0, "A_g2": 150.0, "A_x_g1": 350.0, "A_x_g2": 350.0}
@@ -343,7 +331,7 @@ class TestCompositeStateCalibration:
 
     def test_calibrated_composite_state_is_written_back(self) -> None:
         truth = build(conditional_pathway_builder())
-        truth.structure.update_compartment_fractions({"B_g2_t2": 0.07})
+        truth.structure.update_compartment_fractions(truth.process, {"B_g2_t2": 0.07})
         observed = Simulation(truth).run(10)
         problem = CalibrationProblem(
             observed_data=[
@@ -455,9 +443,9 @@ class TestApplyCalibrationParameters:
         model.apply_calibration_parameters(result, problem)
 
         fractions = {
-            f.category: f.fraction
-            for s in model.structure.initial_conditions.stratification_fractions
-            for f in s.fractions
+            category: fraction
+            for categories in model.structure.stratification_fractions.values()
+            for category, fraction in categories.items()
         }
         assert fractions["group1"] == pytest.approx(result.best_parameters["group1"])
         assert fractions["group2"] == pytest.approx(
@@ -473,8 +461,8 @@ class TestApplyCalibrationParameters:
         )
 
         assert model.parameters[0].value == pytest.approx(0.15)
-        group = model.structure.initial_conditions.stratification_fractions[0]
-        assert group.fractions[0].fraction == pytest.approx(0.4)
+        group = model.structure.stratification_fractions["group"]
+        assert group["group1"] == pytest.approx(0.4)
 
     def test_scale_parameters_are_ignored(self) -> None:
         model = _binary_split()
@@ -517,10 +505,7 @@ class TestApplyCalibrationParameters:
         model.apply_calibration_parameters({"A_group1": 0.3, "A_group2": 0.7}, problem)
         model.apply_calibration_parameters({"A_group1": 0.4, "A_group2": 0.6}, problem)
 
-        overrides = [
-            (fraction.compartment, fraction.fraction)
-            for fraction in model.structure.initial_conditions.compartment_fractions
-        ]
+        overrides = list(model.structure.compartment_fractions.items())
         assert overrides == [
             ("A_group1", pytest.approx(0.4)),
             ("A_group2", pytest.approx(0.6)),

@@ -12,11 +12,12 @@ use commol_core::{
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_model::{CompartmentalEngine, InitialConditionPlan};
+use commol_stochastic::{StochasticEvents, StochasticSteps};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 #[cfg(feature = "test-kind")]
-use crate::test_kind::{TestEngine, TestValuePlan};
+use crate::test_kind::{TestEngine, TestStochasticEngine, TestValuePlan};
 
 pyo3::create_exception!(
     commol,
@@ -41,16 +42,23 @@ pub enum Engine {
     Difference(DifferenceEquations),
     /// Continuous time.
     Differential(DifferentialEquations),
+    /// Continuous time, at random.
+    StochasticEvents(StochasticEvents),
+    /// Discrete time, at random.
+    StochasticSteps(StochasticSteps),
     /// The engine of the test model kind.
     #[cfg(feature = "test-kind")]
     Test(TestEngine),
+    /// The stochastic engine of the test model kind.
+    #[cfg(feature = "test-kind")]
+    TestStochastic(TestStochasticEngine),
 }
 
 /// The values of the model kind of an [`Engine`], resolved by it.
 #[derive(Clone, Debug)]
 pub enum EngineValuePlan {
-    /// Initial conditions of a compartmental model.
-    Compartmental(InitialConditionPlan),
+    /// Initial conditions of an aggregate model.
+    Aggregate(InitialConditionPlan),
     /// The test model kind has none.
     #[cfg(feature = "test-kind")]
     Test(TestValuePlan),
@@ -59,7 +67,7 @@ pub enum EngineValuePlan {
 impl ValuePlan for EngineValuePlan {
     fn infeasibility(&self, excess: f64) -> String {
         match self {
-            Self::Compartmental(plan) => plan.infeasibility(excess),
+            Self::Aggregate(plan) => plan.infeasibility(excess),
             #[cfg(feature = "test-kind")]
             Self::Test(plan) => plan.infeasibility(excess),
         }
@@ -67,23 +75,51 @@ impl ValuePlan for EngineValuePlan {
 }
 
 impl Engine {
-    /// Build the engine the model names.
+    /// Build the engine the model names, for the kind of its structure.
+    ///
+    /// An engine names a method; the implementation is picked by the pair
+    /// of the engine and the kind of the structure.
     ///
     /// # Errors
     ///
     /// Returns a message when the engine does not run the kind of the model
-    /// (it names the engine and both kinds), or cannot compile the model.
+    /// (it names the engine, both kinds and the engines of the kind of the
+    /// model), or cannot compile the model.
     pub fn build(model: &commol_core::Model) -> Result<Self, String> {
         model.check_kind()?;
-        match model.engine.engine_type() {
-            EngineType::DifferenceEquations => {
+        match (model.engine.engine_type(), model.structure.kind()) {
+            (EngineType::DifferenceEquations, ModelKind::Aggregate) => {
                 DifferenceEquations::try_from_model(model).map(Self::Difference)
             }
-            EngineType::DifferentialEquations => {
+            (EngineType::DifferentialEquations, ModelKind::Aggregate) => {
                 DifferentialEquations::try_from_model(model).map(Self::Differential)
             }
+            (EngineType::StochasticEvents, ModelKind::Aggregate) => {
+                StochasticEvents::try_from_model(model).map(Self::StochasticEvents)
+            }
+            (EngineType::StochasticSteps, ModelKind::Aggregate) => {
+                StochasticSteps::try_from_model(model).map(Self::StochasticSteps)
+            }
             #[cfg(feature = "test-kind")]
-            EngineType::TestEngine => TestEngine::try_from_model(model).map(Self::Test),
+            (EngineType::TestEngine, ModelKind::Test) => {
+                TestEngine::try_from_model(model).map(Self::Test)
+            }
+            #[cfg(feature = "test-kind")]
+            (EngineType::TestStochasticEngine, ModelKind::Test) => {
+                TestStochasticEngine::try_from_model(model).map(Self::TestStochastic)
+            }
+            #[allow(unreachable_patterns)]
+            (engine, kind) => Err(format!(
+                "The {} engine has no implementation for {} models; the engines of {} \
+                 models are {:?}",
+                engine.name(),
+                kind.name(),
+                kind.name(),
+                EngineType::engines_of(kind)
+                    .into_iter()
+                    .map(EngineType::name)
+                    .collect::<Vec<_>>()
+            )),
         }
     }
 
@@ -92,8 +128,12 @@ impl Engine {
         match self {
             Self::Difference(_) => EngineType::DifferenceEquations,
             Self::Differential(_) => EngineType::DifferentialEquations,
+            Self::StochasticEvents(_) => EngineType::StochasticEvents,
+            Self::StochasticSteps(_) => EngineType::StochasticSteps,
             #[cfg(feature = "test-kind")]
             Self::Test(_) => EngineType::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(_) => EngineType::TestStochasticEngine,
         }
     }
 }
@@ -104,24 +144,30 @@ macro_rules! dispatch {
         match $self {
             Engine::Difference($engine) => $body,
             Engine::Differential($engine) => $body,
+            Engine::StochasticEvents($engine) => $body,
+            Engine::StochasticSteps($engine) => $body,
             #[cfg(feature = "test-kind")]
             Engine::Test($engine) => $body,
+            #[cfg(feature = "test-kind")]
+            Engine::TestStochastic($engine) => $body,
         }
     };
 }
 
 /// Call `$body` with `$engine` bound to the compartmental engine inside an
-/// [`Engine`], or return an error that names the kind of the engine.
+/// [`Engine`], or return an error that names the engine.
 macro_rules! compartmental {
     ($self:expr, $engine:ident => $body:expr) => {
         match $self {
             Engine::Difference($engine) => Ok::<_, String>($body),
             Engine::Differential($engine) => Ok::<_, String>($body),
+            Engine::StochasticEvents($engine) => Ok::<_, String>($body),
+            Engine::StochasticSteps($engine) => Ok::<_, String>($body),
             #[cfg(feature = "test-kind")]
             other => Err(format!(
-                "The {} engine runs {} models, not compartmental models",
+                "The {} engine of this model has no compartments; only an aggregate model \
+                 has them",
                 other.engine_type().name(),
-                other.engine_type().kind().name()
             )),
         }
     };
@@ -132,16 +178,17 @@ macro_rules! compartmental {
 ///
 /// # Errors
 ///
-/// Returns a message when the engine or the plan is not compartmental.
+/// Returns a message when the engine or the plan is not of an aggregate
+/// model.
 pub fn compartmental_state(
     engine: &Engine,
     plan: &EngineValuePlan,
 ) -> Result<(Vec<f64>, Vec<usize>), String> {
     let state = compartmental!(engine, engine => engine.state())?;
     match plan {
-        EngineValuePlan::Compartmental(plan) => Ok((state, plan.covered_compartments())),
+        EngineValuePlan::Aggregate(plan) => Ok((state, plan.covered_compartments())),
         #[cfg(feature = "test-kind")]
-        EngineValuePlan::Test(_) => Err("The plan is not of a compartmental model".to_string()),
+        EngineValuePlan::Test(_) => Err("The plan is not of an aggregate model".to_string()),
     }
 }
 
@@ -180,6 +227,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.reset())
     }
 
+    fn set_seed(&mut self, seed: u64) {
+        dispatch!(self, engine => engine.set_seed(seed))
+    }
+
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         dispatch!(self, engine => engine.set_parameter(parameter_id, value))
     }
@@ -200,12 +251,22 @@ impl SimulationEngine for Engine {
         match self {
             Self::Difference(engine) => engine
                 .plan_values(values, remainder)
-                .map(EngineValuePlan::Compartmental),
+                .map(EngineValuePlan::Aggregate),
             Self::Differential(engine) => engine
                 .plan_values(values, remainder)
-                .map(EngineValuePlan::Compartmental),
+                .map(EngineValuePlan::Aggregate),
+            Self::StochasticEvents(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Aggregate),
+            Self::StochasticSteps(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Aggregate),
             #[cfg(feature = "test-kind")]
             Self::Test(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Test),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(engine) => engine
                 .plan_values(values, remainder)
                 .map(EngineValuePlan::Test),
         }
@@ -213,14 +274,24 @@ impl SimulationEngine for Engine {
 
     fn apply_values(&mut self, plan: &EngineValuePlan, values: &[f64]) -> Result<f64, String> {
         match (self, plan) {
-            (Self::Difference(engine), EngineValuePlan::Compartmental(plan)) => {
+            (Self::Difference(engine), EngineValuePlan::Aggregate(plan)) => {
                 engine.apply_values(plan, values)
             }
-            (Self::Differential(engine), EngineValuePlan::Compartmental(plan)) => {
+            (Self::Differential(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            (Self::StochasticEvents(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.apply_values(plan, values)
+            }
+            (Self::StochasticSteps(engine), EngineValuePlan::Aggregate(plan)) => {
                 engine.apply_values(plan, values)
             }
             #[cfg(feature = "test-kind")]
             (Self::Test(engine), EngineValuePlan::Test(plan)) => engine.apply_values(plan, values),
+            #[cfg(feature = "test-kind")]
+            (Self::TestStochastic(engine), EngineValuePlan::Test(plan)) => {
+                engine.apply_values(plan, values)
+            }
             #[cfg(feature = "test-kind")]
             (engine, _) => Err(format!(
                 "The plan of values is not a plan of the {} engine",
@@ -279,6 +350,68 @@ impl PyEngine {
         Ok((trajectory.positions, trajectory.rows))
     }
 
+    /// Run replicates of a stochastic engine in parallel, each from the
+    /// initial state with a seed of its own
+    ///
+    /// Replicate `i` takes the seed `replicate_seed(seed, i)`, the SplitMix64
+    /// of `seed + i`, so it gives the same run however many replicates run.
+    ///
+    /// Args:
+    ///     seed: The seed of the replicates, from 0 to 2**64 - 1
+    ///     count: How many replicates to run
+    ///     num_steps: Run on the default grid of this many steps, or
+    ///     positions: report at these sorted, unique positions instead
+    ///
+    /// Returns:
+    ///     The positions, the seed of each replicate, and one list of output
+    ///     rows per replicate
+    ///
+    /// Raises:
+    ///     ValueError: If the engine is not stochastic, both or neither of
+    ///         num_steps and positions are given, or a position is not valid
+    ///         for the engine
+    ///     InfeasibleStateError: If a replicate leaves the values the model
+    ///         allows
+    ///     RuntimeError: If a replicate fails for another reason
+    #[pyo3(signature = (seed, count, num_steps=None, positions=None))]
+    #[allow(clippy::type_complexity)]
+    fn run_replicates(
+        &self,
+        py: Python<'_>,
+        seed: u64,
+        count: u64,
+        num_steps: Option<u32>,
+        positions: Option<Vec<f64>>,
+    ) -> PyResult<(Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
+        let engine_type = self.inner.engine_type();
+        if !engine_type.is_stochastic() {
+            return Err(PyValueError::new_err(format!(
+                "The {} engine is deterministic: every replicate would be equal",
+                engine_type.name()
+            )));
+        }
+        let mut start = self.inner.clone();
+        start.reset();
+        let positions = match (num_steps, positions) {
+            (Some(num_steps), None) => start.grid(num_steps),
+            (None, Some(positions)) => positions,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Give num_steps or positions, not both",
+                ));
+            }
+        };
+        commol_core::check_positions(&positions, 0.0, |position| start.check_position(position))
+            .map_err(PyValueError::new_err)?;
+        let seeds: Vec<u64> = (0..count)
+            .map(|index| commol_random::replicate_seed(seed, index))
+            .collect();
+        let runs = py
+            .detach(|| commol_core::run_replicates(&start, &positions, &seeds))
+            .map_err(simulation_error)?;
+        Ok((positions, seeds, runs))
+    }
+
     /// Run through the last of the given positions on the axis
     ///
     /// Args:
@@ -327,20 +460,20 @@ impl PyEngine {
         SimulationEngine::step(&mut self.inner).map_err(simulation_error)
     }
 
-    /// Current amount of each compartment of a compartmental model
+    /// Current amount of each compartment of an aggregate model
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models
+    ///     ValueError: If the model is not aggregate
     #[getter]
     fn state(&self) -> PyResult<Vec<f64>> {
         compartmental!(&self.inner, engine => engine.state()).map_err(PyValueError::new_err)
     }
 
-    /// Names of the compartments of a compartmental model (e.g., ["A",
+    /// Names of the compartments of an aggregate model (e.g., ["A",
     /// "B_g1", "C_g2"])
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models
+    ///     ValueError: If the model is not aggregate
     #[getter]
     fn compartments(&self) -> PyResult<Vec<String>> {
         compartmental!(&self.inner, engine => engine.compartments()).map_err(PyValueError::new_err)
@@ -353,8 +486,21 @@ impl PyEngine {
     }
 
     /// Reset the simulation to initial conditions
+    ///
+    /// A stochastic engine also restores the generator of its seed, so a run
+    /// after a reset repeats the run before it.
     fn reset(&mut self) {
         self.inner.reset();
+    }
+
+    /// Seed the random numbers of the engine, and restore its generator
+    ///
+    /// A deterministic engine ignores the seed.
+    ///
+    /// Args:
+    ///     seed: The seed, from 0 to 2**64 - 1
+    fn set_seed(&mut self, seed: u64) {
+        self.inner.set_seed(seed);
     }
 
     /// Set a parameter value
@@ -385,8 +531,8 @@ impl PyEngine {
     ///     value: The new initial amount
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models,
-    ///         compartment_index is invalid or value is negative
+    ///     ValueError: If the model is not aggregate, compartment_index is
+    ///         invalid or value is negative
     fn set_initial_condition(&mut self, compartment_index: usize, value: f64) -> PyResult<()> {
         compartmental!(&mut self.inner, engine => engine.set_initial_condition(compartment_index, value))
             .and_then(|result| result)
@@ -444,10 +590,16 @@ impl PyEngineType {
         self.inner.name()
     }
 
-    /// The kind of model the engine runs, for example "compartmental"
+    /// The kinds of model the engine runs, for example ["aggregate"]
     #[getter]
-    fn kind(&self) -> &'static str {
-        self.inner.kind().name()
+    fn kinds(&self) -> Vec<&'static str> {
+        self.inner.kinds().iter().map(|kind| kind.name()).collect()
+    }
+
+    /// Whether the engine draws random numbers, so a run depends on its seed
+    #[getter]
+    fn is_stochastic(&self) -> bool {
+        self.inner.is_stochastic()
     }
 
     /// What a rate means to the engine: "per_step" (the amount or fraction
@@ -491,13 +643,27 @@ impl PyEngineType {
             .map_err(PyValueError::new_err)
     }
 
-    /// Left-hand side of the equation of a variable
+    /// How the engine advances the state: "difference_equation",
+    /// "differential_equation", "stochastic_events" or "rules"
+    #[getter]
+    fn dynamics_form(&self) -> &'static str {
+        self.inner.dynamics_form().name()
+    }
+
+    /// How the engine advances, in words, for a description of a model
+    #[getter]
+    fn schedule(&self) -> &'static str {
+        self.inner.schedule()
+    }
+
+    /// Left-hand side of the equation of a variable, or None when the form
+    /// of the dynamics of the engine has no equations
     ///
     /// Args:
     ///     variable: Name of the variable, already formatted
     ///     latex: Whether to write it in LaTeX
-    fn equation_lhs(&self, variable: &str, latex: bool) -> String {
-        self.inner.equation_lhs(variable, latex)
+    fn equation_lhs(&self, variable: &str, latex: bool) -> Option<String> {
+        self.inner.dynamics_form().equation_lhs(variable, latex)
     }
 
     /// Check settings against the engine
@@ -525,11 +691,12 @@ impl PyEngineType {
     ///
     /// Args:
     ///     kind: Name of the kind of a model structure, for example
-    ///         "compartmental"
+    ///         "aggregate"
     ///
     /// Raises:
-    ///     ValueError: If the kind is unknown, or the engine runs another
-    ///         kind; the message names the engine and both kinds
+    ///     ValueError: If the kind is unknown, or the engine does not run
+    ///         it; the message names the engine, the kinds and the engines
+    ///         of the kind
     fn check_kind(&self, kind: &str) -> PyResult<()> {
         let kind = ModelKind::from_name(kind).map_err(PyValueError::new_err)?;
         self.inner.check_kind(kind).map_err(PyValueError::new_err)
@@ -551,7 +718,7 @@ impl PyModelKind {
     /// The kind with a name
     ///
     /// Args:
-    ///     name: Name of the kind, for example "compartmental"
+    ///     name: Name of the kind, for example "aggregate"
     ///
     /// Raises:
     ///     ValueError: If no kind has the name; the message lists them all
@@ -566,6 +733,14 @@ impl PyModelKind {
     #[staticmethod]
     fn names() -> Vec<&'static str> {
         ModelKind::ALL.iter().map(|kind| kind.name()).collect()
+    }
+
+    /// Names of the engines that run the kind, in the order of the list
+    fn engines(&self) -> Vec<&'static str> {
+        EngineType::engines_of(self.inner)
+            .into_iter()
+            .map(EngineType::name)
+            .collect()
     }
 
     /// Name of the kind
@@ -610,14 +785,11 @@ mod tests {
     fn decay_model(engine: EngineType) -> Model {
         let mut model: Model = serde_json::from_str(
             r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},
-            "structure":{"kind":"compartmental",
-            "bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+            "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
             "accumulators":[],"stratifications":[],
             "transitions":[{"id":"ab","source":["A"],"target":["B"],
-            "rate":"0.1","stratified_rates":null,"per_compartment":null}],
-            "initial_conditions":{"total":1000,"bin_fractions":[
-            {"bin":"A","fraction":1.0},{"bin":"B","fraction":0.0}],
-            "stratification_fractions":[]}}}"#,
+            "rate":"0.1","stratified_rates":null,"per_compartment":null}]},
+            "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#,
         )
         .expect("valid model JSON");
         model.engine = ModelEngine::new(engine);
@@ -627,7 +799,7 @@ mod tests {
     #[test]
     fn every_entry_builds_its_engine_and_runs() {
         for &engine_type in EngineType::ALL {
-            if engine_type.kind() != commol_core::ModelKind::Compartmental {
+            if !engine_type.runs(ModelKind::Aggregate) {
                 continue;
             }
             let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
@@ -668,16 +840,20 @@ mod tests {
         let mut test_model = test_model();
         test_model.engine = ModelEngine::new(EngineType::DifferenceEquations);
         let error = Engine::build(&test_model).err().expect("a kind mismatch");
-        for name in ["DifferenceEquations", "compartmental", "test"] {
+        for name in ["DifferenceEquations", "aggregate", "test", "TestEngine"] {
             assert!(error.contains(name), "{error}");
         }
 
-        let mut compartmental = decay_model(EngineType::DifferenceEquations);
-        compartmental.engine = ModelEngine::new(EngineType::TestEngine);
-        let error = Engine::build(&compartmental)
-            .err()
-            .expect("a kind mismatch");
-        for name in ["TestEngine", "compartmental", "test"] {
+        let mut aggregate = decay_model(EngineType::DifferenceEquations);
+        aggregate.engine = ModelEngine::new(EngineType::TestEngine);
+        let error = Engine::build(&aggregate).err().expect("a kind mismatch");
+        for name in [
+            "TestEngine",
+            "aggregate",
+            "test",
+            "DifferenceEquations",
+            "DifferentialEquations",
+        ] {
             assert!(error.contains(name), "{error}");
         }
     }
@@ -690,5 +866,87 @@ mod tests {
         assert_eq!(rows[0], vec![10.0]);
         assert!((rows[1][0] - 10.0 * (-1.0f64).exp()).abs() < 1e-12);
         assert!(engine.plan_values(&[], Some("x")).is_err());
+    }
+
+    /// A stochastic test model: 100 units of `x` leave at rate `k`.
+    #[cfg(feature = "test-kind")]
+    fn stochastic_model() -> Model {
+        let mut model = test_model();
+        model.engine = ModelEngine::new(EngineType::TestStochasticEngine);
+        if let commol_core::ModelStructure::Test(structure) = &mut model.structure {
+            structure.outputs[0].initial = 100.0;
+        }
+        model
+    }
+
+    #[cfg(feature = "test-kind")]
+    fn stochastic_run(engine: &mut Engine, seed: u64) -> Vec<Vec<f64>> {
+        engine.set_seed(seed);
+        engine.reset();
+        engine.run_at(&[0.5, 1.0, 2.0, 4.0]).unwrap()
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_stochastic_engine_repeats_a_run_from_its_seed() {
+        let mut engine = Engine::build(&stochastic_model()).unwrap();
+        assert!(engine.engine_type().is_stochastic());
+
+        let first = stochastic_run(&mut engine, 7);
+        let again = stochastic_run(&mut engine, 7);
+        let other = stochastic_run(&mut engine, 8);
+
+        assert_eq!(first, again);
+        assert_ne!(first, other);
+        engine.reset();
+        assert_eq!(engine.run_at(&[0.5, 1.0, 2.0, 4.0]).unwrap(), other);
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_stochastic_run_does_not_depend_on_where_it_reports() {
+        let mut engine = Engine::build(&stochastic_model()).unwrap();
+        engine.set_seed(3);
+        engine.reset();
+        let coarse = engine.run_at(&[4.0]).unwrap();
+        engine.reset();
+        let fine = engine.run_at(&[1.0, 2.0, 3.0, 4.0]).unwrap();
+
+        assert_eq!(coarse[0], fine[3]);
+    }
+
+    #[test]
+    fn an_aggregate_stochastic_engine_repeats_a_run_from_its_seed() {
+        for &engine_type in EngineType::ALL {
+            if !engine_type.runs(ModelKind::Aggregate) || !engine_type.is_stochastic() {
+                continue;
+            }
+            let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
+            assert_eq!(engine.engine_type(), engine_type);
+            let mut run = |seed| {
+                engine.set_seed(seed);
+                engine.reset();
+                SimulationEngine::run(&mut engine, 20).unwrap().rows
+            };
+            let first = run(1);
+            assert_eq!(run(1), first);
+            assert_ne!(run(2), first);
+        }
+    }
+
+    #[test]
+    fn a_deterministic_engine_ignores_the_seed() {
+        for &engine_type in EngineType::ALL {
+            if !engine_type.runs(ModelKind::Aggregate) || engine_type.is_stochastic() {
+                continue;
+            }
+            let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
+            engine.set_seed(1);
+            let first = SimulationEngine::run(&mut engine, 3).unwrap().rows;
+            engine.set_seed(2);
+            engine.reset();
+            let second = SimulationEngine::run(&mut engine, 3).unwrap().rows;
+            assert_eq!(first, second);
+        }
     }
 }

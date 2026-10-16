@@ -1,0 +1,23 @@
+[package]
+name = "commol-stochastic"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Stochastic engines of aggregate compartment models: whole units moved at random"
+
+[lib]
+name = "commol_stochastic"
+crate-type = ["rlib"]
+
+[dependencies]
+commol-core = { path = "../commol-core" }
+commol-model = { path = "../commol-model" }
+commol-random = { path = "../commol-random" }
+
+[dev-dependencies]
+serde_json = "1.0"
+commol-difference = { path = "../commol-difference" }
+commol-differential = { path = "../commol-differential" }

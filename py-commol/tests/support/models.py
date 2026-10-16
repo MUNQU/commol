@@ -1,9 +1,10 @@
 """
 Small models that many tests share.
 
-Each factory returns a ``ModelBuilder`` with its initial conditions set, so a
+Each factory returns a `FactoryBuilder`: a ``ModelBuilder`` that writes the
+process, and the ``Aggregate`` that lays it out (``builder.structure``). A
 test can add transitions and parameters before it calls ``build``. It cannot
-add bins or stratifications afterwards: the initial conditions name them all.
+add bins or stratifications afterwards: the structure names them all.
 
 Every keyword overrides one part of the default model, so a test names only
 what it changes. The factories share these keywords:
@@ -16,8 +17,8 @@ what it changes. The factories share these keywords:
 - ``total``: the total of the initial conditions.
 - ``stratifications``: see ``Stratifications``; ``conditions``: see
   ``Conditions``.
-- ``compartment_fractions``: per-compartment overrides, as in
-  ``set_initial_conditions``.
+- ``compartment_fractions``: per-compartment overrides, as ``Aggregate``
+  takes them.
 - ``bin_unit``, ``units`` and ``step_unit``: the unit of every bin, of each
   parameter by id, and of one step.
 - A rate keyword (``ab``, ``rate``, …): ``None`` leaves that
@@ -26,15 +27,19 @@ what it changes. The factories share these keywords:
 """
 
 from collections.abc import Mapping
+from typing import Self
 
-from commol import CompartmentalStructure, ModelBuilder, OdeSolver
-from commol.api.model_builder import (
-    BinFractionDict,
-    CompartmentFractionDict,
-    StratificationFractionsDict,
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    OdeSolver,
+    StochasticEventsSettings,
+    StochasticStepsSettings,
 )
+from commol.context.engine import EngineName
 from commol.api.patterns import AxisPattern
 from commol.context.model import Model
+from commol.context.neighbors import Neighbors
 
 TIGHT = OdeSolver(rtol=1e-10, atol=1e-8)
 """Tolerances tight enough for closed-form checks."""
@@ -47,33 +52,65 @@ Conditions = Mapping[str, Mapping[str, str]]
 """Stratification id to the stratification and category it is conditional on."""
 
 
-def build(builder: ModelBuilder) -> Model[CompartmentalStructure]:
+class FactoryBuilder(ModelBuilder):
+    """A builder of a process, and the aggregate structure its factory chose."""
+
+    structure: Aggregate
+
+    def set_structure(self, structure: Aggregate) -> Self:
+        """Choose the structure `build` and `build_ode` lay the process out with."""
+        self.structure = structure
+        return self
+
+
+def build(builder: FactoryBuilder) -> Model[Aggregate]:
     """Build a difference-equation model."""
-    return builder.build(engine="DifferenceEquations")
+    return builder.build(builder.structure, engine="DifferenceEquations")
 
 
 def build_ode(
-    builder: ModelBuilder, settings: OdeSolver | None = TIGHT
-) -> Model[CompartmentalStructure]:
+    builder: FactoryBuilder, settings: OdeSolver | None = TIGHT
+) -> Model[Aggregate]:
     """Build a differential-equation model with `settings`."""
-    return builder.build(engine="DifferentialEquations", settings=settings)
+    return builder.build(
+        builder.structure, engine="DifferentialEquations", settings=settings
+    )
+
+
+STOCHASTIC_ENGINES: tuple[EngineName, ...] = ("StochasticEvents", "StochasticSteps")
+"""The stochastic engines of the aggregate kind."""
+
+MEAN_FIELD: dict[EngineName, EngineName] = {
+    "StochasticEvents": "DifferentialEquations",
+    "StochasticSteps": "DifferenceEquations",
+}
+"""The deterministic engine each stochastic engine has as its mean-field limit."""
+
+
+def build_stochastic(
+    builder: FactoryBuilder,
+    engine: EngineName = "StochasticEvents",
+    settings: StochasticEventsSettings | StochasticStepsSettings | None = None,
+) -> Model[Aggregate]:
+    """Build a model of a stochastic engine with `settings`."""
+    return builder.build(builder.structure, engine=engine, settings=settings)
 
 
 def stratify(
     builder: ModelBuilder,
     stratifications: Stratifications,
     conditions: Conditions | None = None,
-) -> list[StratificationFractionsDict]:
+) -> dict[str, dict[str, float]]:
     """
     Add the stratifications to the builder.
 
     Returns
     -------
-    list[StratificationFractionsDict]
-        The fractions of the stratifications, for ``set_initial_conditions``.
+    dict[str, dict[str, float]]
+        The fractions of the stratifications, as ``Aggregate`` takes them.
     """
     conditions = conditions or {}
-    fractions: list[StratificationFractionsDict] = []
+    fractions: dict[str, dict[str, float]] = {}
     for stratification_id, categories in stratifications.items():
         builder.add_stratification(
             id=stratification_id,
@@ -84,20 +121,12 @@ def stratify(
             ]
             or None,
         )
-        fractions.append(
-            {
-                "stratification": stratification_id,
-                "fractions": [
-                    {"category": category, "fraction": fraction}
-                    for category, fraction in categories.items()
-                ],
-            }
-        )
+        fractions[stratification_id] = dict(categories)
     return fractions
 
 
 def _finish(
-    builder: ModelBuilder,
+    builder: FactoryBuilder,
     *,
     parameters: Parameters,
     units: Mapping[str, str],
@@ -105,21 +134,21 @@ def _finish(
     fractions: Mapping[str, float | None],
     stratifications: Stratifications | None,
     conditions: Conditions | None,
-    compartment_fractions: list[CompartmentFractionDict] | None,
-) -> ModelBuilder:
+    compartment_fractions: Mapping[str, float] | None,
+    neighbors: Neighbors | None = None,
+) -> FactoryBuilder:
     for parameter_id, value in parameters.items():
         builder.add_parameter(
             id=parameter_id, value=value, unit=units.get(parameter_id)
         )
-    bin_fractions: list[BinFractionDict] = [
-        {"bin": bin_id, "fraction": fraction} for bin_id, fraction in fractions.items()
-    ]
-    return builder.set_initial_conditions(
+    builder.structure = Aggregate(
         total=total,
-        bin_fractions=bin_fractions,
+        bin_fractions=fractions,
         stratification_fractions=stratify(builder, stratifications or {}, conditions),
-        compartment_fractions=compartment_fractions,
+        compartment_fractions=dict(compartment_fractions or {}),
+        neighbors=neighbors,
     )
+    return builder
 
 
 def abc_builder(
@@ -136,14 +165,14 @@ def abc_builder(
     step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
     accumulator: str | None = None,
-) -> ModelBuilder:
+) -> FactoryBuilder:
     """
     A → B → C: ``ab`` at ``k1 * A * B / total``, ``bc`` at ``k2 * B``.
 
     The defaults are ``k1 = 0.3``, ``k2 = 0.1``, a total of 1000, 99 % in A
     and 1 % in B. See the module docstring for the keywords.
     """
-    builder = ModelBuilder(
+    builder = FactoryBuilder(
         name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
     )
     builder.add_bin(id="A", name="State A")
@@ -187,7 +216,7 @@ def abcd_builder(
     bin_unit: str | None = None,
     step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
-) -> ModelBuilder:
+) -> FactoryBuilder:
     """
     A → B → C → D: ``ab`` at ``k1 * A * C / total``, ``bc`` at ``k3 * B``,
     ``cd`` at ``k2 * C``.
@@ -196,7 +225,7 @@ def abcd_builder(
     1000, 98 % in A, 1 % in B and 1 % in C. See the module docstring for the
     keywords.
     """
-    builder = ModelBuilder(
+    builder = FactoryBuilder(
         name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
     )
     for bin_id in ("A", "B", "C", "D"):
@@ -237,12 +266,12 @@ def a_to_b_builder(
     fractions: Mapping[str, float | None] | None = None,
     stratifications: Stratifications | None = None,
     conditions: Conditions | None = None,
-    compartment_fractions: list[CompartmentFractionDict] | None = None,
+    compartment_fractions: Mapping[str, float] | None = None,
     accumulator: str | None = None,
     bin_unit: str | None = None,
     step_unit: str | None = None,
     units: Mapping[str, str] | None = None,
-) -> ModelBuilder:
+) -> FactoryBuilder:
     """
     One transition, ``transition_id``, from bin A to bin B.
 
@@ -250,7 +279,7 @@ def a_to_b_builder(
     step, and the total of 1000 starts in A. ``per_compartment`` is passed to
     ``add_transition``. See the module docstring for the other keywords.
     """
-    builder = ModelBuilder(
+    builder = FactoryBuilder(
         name=name, version="1.0", bin_unit=bin_unit, step_unit=step_unit
     )
     builder.add_bin(id="A", name="A")
@@ -277,7 +306,7 @@ def a_to_b_builder(
     )
 
 
-def override_builder(fraction: float = 0.3) -> ModelBuilder:
+def override_builder(fraction: float = 0.3) -> FactoryBuilder:
     """
     ``a_to_b_builder`` split into halves ``g1`` and ``g2``, with ``A_g1`` set.
 
@@ -288,7 +317,7 @@ def override_builder(fraction: float = 0.3) -> ModelBuilder:
         rate="k * A",
         per_compartment=True,
         stratifications={"group": {"g1": 0.5, "g2": 0.5}},
-        compartment_fractions=[{"compartment": "A_g1", "fraction": fraction}],
+        compartment_fractions={"A_g1": fraction},
     )
 
 
@@ -296,15 +325,15 @@ def shared_category_builder(
     *,
     group: tuple[float, float] = (0.5, 0.5),
     level: tuple[float, float] = (0.5, 0.5),
-    compartment_fractions: list[CompartmentFractionDict] | None = None,
-) -> ModelBuilder:
+    compartment_fractions: Mapping[str, float] | None = None,
+) -> FactoryBuilder:
     """
     One bin A, stratified by ``group`` and ``level``, which share the
     categories ``c1`` and ``c2``; so a bare ``c1`` is ambiguous and needs
     ``group:c1`` or ``level:c1``. Each tuple gives the fractions of ``c1`` and
     ``c2``.
     """
-    builder = ModelBuilder(name="SharedCategory", version="1.0")
+    builder = FactoryBuilder(name="SharedCategory", version="1.0")
     builder.add_bin(id="A", name="A")
     builder.add_transition(
         id="flow", source=["A"], target=[], rate="k * A", per_compartment=True
@@ -324,7 +353,7 @@ def shared_category_builder(
     )
 
 
-def conditional_pathway_builder() -> ModelBuilder:
+def conditional_pathway_builder() -> FactoryBuilder:
     """
     Bins A and B, where only group ``g2`` moves from A to B.
 
@@ -334,7 +363,7 @@ def conditional_pathway_builder() -> ModelBuilder:
         A_g1 450, A_g2_t1 225, A_g2_t2 225,
         B_g1 0,   B_g2_t1 25,  B_g2_t2 25
     """
-    builder = ModelBuilder(name="ConditionalPathway", version="1.0")
+    builder = FactoryBuilder(name="ConditionalPathway", version="1.0")
     builder.add_bin(id="A", name="A")
     builder.add_bin(id="B", name="B")
     builder.add_transition(
@@ -360,5 +389,5 @@ def conditional_pathway_builder() -> ModelBuilder:
             "type": {"t1": 0.5, "t2": 0.5},
         },
         conditions={"type": {"group": "g2"}},
-        compartment_fractions=[{"compartment": "B_g1", "fraction": 0.0}],
+        compartment_fractions={"B_g1": 0.0},
     )

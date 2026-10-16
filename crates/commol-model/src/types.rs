@@ -98,7 +98,9 @@ pub(crate) enum ImpulseSchedule {
 /// Relative tolerance with which a position matches an impulse position.
 const POSITION_TOLERANCE: f64 = 1e-9;
 
-fn same_position(a: f64, b: f64) -> bool {
+/// Whether two positions on the axis are the same, within
+/// [`POSITION_TOLERANCE`].
+pub(crate) fn same_position(a: f64, b: f64) -> bool {
     (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
 }
 
@@ -212,6 +214,12 @@ impl SeriesParameter {
         })
     }
 
+    /// Whether the value of the series changes between two of its points:
+    /// a `"linear"` series read at `t`.
+    pub(crate) fn changes_along_t(&self) -> bool {
+        self.mode == SeriesMode::Linear
+    }
+
     /// Whether the series is read at `step` rather than at `t`.
     pub(crate) fn reads_step(&self) -> bool {
         self.mode == SeriesMode::Pulse
@@ -302,6 +310,89 @@ pub(crate) struct GeneratedAccumulatorOutput {
     pub(crate) output_ref: AccumulatorOutputRef,
 }
 
+/// What one event of a flow does to the state, and the units it needs.
+///
+/// An event moves one unit: it takes one from each source piece, adds one to
+/// each target piece and to each accumulator of the transition. The flow of
+/// a deterministic engine is the number of events per unit of the axis, so
+/// [`CompiledModel::derivatives`] is `Σ changes × flow`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlowChange {
+    /// Id of the transition the flow comes from.
+    pub(crate) transition_id: String,
+    /// The compartment a proportional rate is multiplied by, or `None` for
+    /// an absolute flow.
+    pub(crate) proportional_to: Option<usize>,
+    /// The compartments an event takes from, with how many units it takes.
+    pub(crate) takes: Vec<(usize, u32)>,
+    /// `(state index, change)` of one event, piece by piece (source `-1`,
+    /// target `+1`), then `+1` for each accumulator; an accumulator's index
+    /// follows the compartments.
+    pub(crate) changes: Vec<(usize, f64)>,
+}
+
+impl FlowChange {
+    /// The change of one event of `flow`, in a state of `num_compartments`
+    /// compartments followed by the accumulators.
+    pub(crate) fn of(flow: &TransitionFlow, num_compartments: usize) -> Self {
+        let pieces = std::iter::once((flow.source_index, flow.target_index))
+            .chain(flow.extra_pieces.iter().copied());
+        let mut changes = Vec::new();
+        let mut takes: Vec<(usize, u32)> = Vec::new();
+        for (source, target) in pieces {
+            if let Some(source) = source {
+                changes.push((source, -1.0));
+                match takes.iter_mut().find(|(index, _)| *index == source) {
+                    Some((_, count)) => *count += 1,
+                    None => takes.push((source, 1)),
+                }
+            }
+            if let Some(target) = target {
+                changes.push((target, 1.0));
+            }
+        }
+        changes.extend(
+            flow.accumulator_indices
+                .iter()
+                .map(|&index| (num_compartments + index, 1.0)),
+        );
+        Self {
+            transition_id: flow.transition_id.clone(),
+            proportional_to: if flow.is_absolute_flow {
+                None
+            } else {
+                flow.source_index
+            },
+            takes,
+            changes,
+        }
+    }
+
+    /// Id of the transition the flow comes from.
+    pub fn transition_id(&self) -> &str {
+        &self.transition_id
+    }
+
+    /// The compartment a proportional rate is multiplied by, or `None` for
+    /// an absolute flow.
+    pub fn proportional_to(&self) -> Option<usize> {
+        self.proportional_to
+    }
+
+    /// The compartments an event takes from, each with how many units it
+    /// takes, in the order of the pieces.
+    pub fn takes(&self) -> &[(usize, u32)] {
+        &self.takes
+    }
+
+    /// `(state index, change)` of one event: `-1` for each source piece, `+1`
+    /// for each target piece and each accumulator. An accumulator's index
+    /// follows the compartments, as in the state.
+    pub fn changes(&self) -> &[(usize, f64)] {
+        &self.changes
+    }
+}
+
 /// A model compiled into the right-hand side that every engine integrates.
 ///
 /// It holds the expanded compartments and accumulators, the planned flows with
@@ -323,12 +414,24 @@ pub struct CompiledModel {
     pub(crate) expression_context: MathExpressionContext,
     /// Pre-computed transition flows for performance
     pub(crate) transition_flows: Vec<TransitionFlow>,
+    /// The change of one event of each transition flow, parallel to
+    /// `transition_flows`.
+    pub(crate) flow_changes: Vec<FlowChange>,
+    /// The change of one event of each impulse, parallel to `impulse_flows`.
+    pub(crate) impulse_changes: Vec<FlowChange>,
+    /// The value of each transition flow at the last evaluation, reused by
+    /// [`CompiledModel::derivatives`].
+    pub(crate) flow_buffer: Vec<f64>,
     /// Impulse transitions: they move their rate at once at their positions
     /// and are not part of the right-hand side.
     pub(crate) impulse_flows: Vec<ImpulseFlow>,
     /// Whether a rate or a formula parameter reads `step` or a pulse series,
     /// so the right-hand side jumps at integer positions.
     pub(crate) depends_on_step: bool,
+    /// Whether a rate or a formula parameter reads `t`, or a `"linear"`
+    /// series changes along it, so a rate can change between two
+    /// breakpoints with the state fixed.
+    pub(crate) reads_time: bool,
     /// Values that a rate or a formula parameter compares `t` with, such as
     /// `t_on` in `t >= t_on`: the right-hand side jumps where `t` reaches them.
     pub(crate) time_thresholds: Vec<MathExpression>,

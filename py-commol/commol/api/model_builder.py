@@ -2,7 +2,7 @@
 
 import copy
 import logging
-from typing import Self, TypedDict
+from typing import Self, TypeVar
 
 from commol.api.patterns import (
     ConditionDict as StratificationConditionDict,
@@ -13,64 +13,29 @@ from commol.api.patterns import (
     _ScheduleAxisPattern,
 )
 from commol.context.bin import Accumulator, Bin
-from commol.context.compartmental import CompartmentalStructure
-from commol.context.engine import (
-    CompartmentalEngineType,
-    EngineSettings,
-    ModelEngine,
-)
-from commol.context.initial_conditions import (
-    BinFraction,
-    CompartmentFraction,
-    InitialConditions,
-    StratificationFraction,
-    StratificationFractions,
-)
+from commol.context.engine import EngineName, EngineSettings, ModelEngine
 from commol.context.model import Model
 from commol.context.parameter import Parameter, SeriesValue
+from commol.context.process import Process
 from commol.context.stratification import Stratification
 from commol.context.stratification_condition import StratificationCondition
+from commol.context.structure import ModelStructure
 from commol.context.transition import StratifiedRate, Transition
 
 logger = logging.getLogger(__name__)
 
-
-class BinFractionDict(TypedDict):
-    """Type definition for a single bin fraction."""
-
-    bin: str
-    fraction: float | None
-
-
-class StratificationFractionDict(TypedDict):
-    """Type definition for a single stratification category fraction."""
-
-    category: str
-    fraction: float
-
-
-class StratificationFractionsDict(TypedDict):
-    """Type definition for stratification fractions dictionary."""
-
-    stratification: str
-    fractions: list[StratificationFractionDict]
-
-
-class CompartmentFractionDict(TypedDict):
-    """Type definition for a single expanded compartment override."""
-
-    compartment: str
-    fraction: float
+StructureT = TypeVar("StructureT", bound=ModelStructure)
+"""The structure class `build` joins the process with."""
 
 
 class ModelBuilder:
     """
-    A programmatic interface for building compartment models.
+    A fluent interface that writes the process of a model, once.
 
-    This class provides a fluent API for constructing Model instances by progressively
-    adding bins, stratifications, transitions, parameters, and
-    initial conditions. It includes validation methods to ensure model consistency
-    before building.
+    The builder adds bins, accumulators, stratifications, transitions and
+    parameters: the process, which is the same for every kind of model.
+    `build` joins it with a structure, which lays the process out (such as
+    `Aggregate`, amounts per compartment), and an engine, which runs it.
 
     Attributes
     ----------
@@ -88,8 +53,6 @@ class ModelBuilder:
         List of transitions between states.
     _parameters : list[Parameter]
         List of model parameters.
-    _initial_conditions : InitialConditions | None
-        Initial conditions.
     """
 
     def __init__(
@@ -114,8 +77,7 @@ class ModelBuilder:
         bin_unit : str | None, default=None
             The default unit for all bins.
             Individual bins can override this with their own unit parameter.
-            Units are optional but required for model.print_equations() and
-            model.check_unit_consistency().
+            Units are optional but required for model.check_unit_consistency().
         step_unit : str | None, default=None
             Unit of one step on the axis, of any single dimension (for example
             ``"day"`` or ``"meter"``). The unit check requires every flow to be
@@ -134,7 +96,6 @@ class ModelBuilder:
         self._stratifications: list[Stratification] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
-        self._initial_conditions: InitialConditions | None = None
         self._series_counter: int = 0
 
         logging.info(
@@ -752,123 +713,6 @@ class ModelBuilder:
             f"Successfully expanded transition '{id}' into {len(source)} transitions"
         )
 
-    def set_initial_conditions(
-        self,
-        total: float,
-        bin_fractions: list[BinFractionDict],
-        stratification_fractions: list[StratificationFractionsDict] | None = None,
-        *,
-        compartment_fractions: list[CompartmentFractionDict] | None = None,
-    ) -> Self:
-        """
-        Set the initial conditions for the model.
-
-        Parameters
-        ----------
-        total : float
-            The sum of every compartment at the start, finite and greater than
-            0. It can be a count, a mass or a concentration.
-        bin_fractions : list[BinFractionDict]
-            List of bin fractions. Each item is a dictionary with:
-            - "bin": str (bin id)
-            - "fraction": float (fractional size)
-
-            Example:
-            [
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0}
-            ]
-        stratification_fractions : list[StratificationFractionsDict] | None,
-            default=None
-            List of stratification fractions. Each item is a dictionary with:
-            - "stratification": str (stratification id)
-            - "fractions": list of dicts, each with "category" and "fraction"
-
-            Example:
-            [
-                {
-                    "stratification": "group",
-                    "fractions": [
-                        {"category": "g1", "fraction": 0.3},
-                        {"category": "g2", "fraction": 0.5},
-                        {"category": "g3", "fraction": 0.2}
-                    ]
-                }
-            ]
-        compartment_fractions : list[CompartmentFractionDict] | None, default=None
-            List of per-compartment overrides applied after the uniform
-            expansion. Each item is a dictionary with:
-            - "compartment": str (expanded compartment name)
-            - "fraction": float (fraction of the total)
-
-            Example:
-            [
-                {"compartment": "A_g1", "fraction": 0.0}
-            ]
-
-            Compartment names and the resulting sum of the amounts are checked
-            against the engine expansion when the model is built.
-
-        Returns
-        -------
-        ModelBuilder
-            Self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If initial conditions have already been set, the total is not
-            finite or not greater than 0, a compartment name is repeated, or a
-            fraction lies outside ``[0.0, 1.0]``.
-        """
-        if self._initial_conditions is not None:
-            raise ValueError("Initial conditions have already been set")
-
-        bin_fractions_list: list[BinFraction] = []
-        for bf_dict in bin_fractions:
-            bin_fractions_list.append(
-                BinFraction(
-                    bin=bf_dict["bin"],
-                    fraction=bf_dict["fraction"],
-                )
-            )
-
-        strat_fractions_list: list[StratificationFractions] = []
-        if stratification_fractions:
-            for strat_dict in stratification_fractions:
-                fractions_list: list[StratificationFraction] = []
-                for frac_dict in strat_dict["fractions"]:
-                    fractions_list.append(
-                        StratificationFraction(
-                            category=frac_dict["category"],
-                            fraction=frac_dict["fraction"],
-                        )
-                    )
-                strat_fractions_list.append(
-                    StratificationFractions(
-                        stratification=strat_dict["stratification"],
-                        fractions=fractions_list,
-                    )
-                )
-
-        compartment_fraction_list = [
-            CompartmentFraction(
-                compartment=override["compartment"], fraction=override["fraction"]
-            )
-            for override in compartment_fractions or []
-        ]
-
-        self._initial_conditions = InitialConditions(
-            total=total,
-            bin_fractions=bin_fractions_list,
-            stratification_fractions=strat_fractions_list,
-            compartment_fractions=compartment_fraction_list,
-        )
-        bin_ids = [bf["bin"] for bf in bin_fractions]
-        logging.info((f"Set initial conditions: total={total}, bins={bin_ids}"))
-        return self
-
     def get_summary(self) -> dict[str, str | int | list[str] | None]:
         """
         Get a summary of the current model builder state.
@@ -890,7 +734,6 @@ class ModelBuilder:
             "transition_ids": [trans.id for trans in self._transitions],
             "parameters_count": len(self._parameters),
             "parameter_ids": [param.id for param in self._parameters],
-            "has_initial_conditions": self._initial_conditions is not None,
         }
 
     def clone(self) -> Self:
@@ -901,8 +744,8 @@ class ModelBuilder:
         -------
         ModelBuilder
             A new ModelBuilder instance with the same configuration: every
-            bin, accumulator, stratification, transition, parameter and the
-            initial conditions. Changes to one builder do not affect the other.
+            bin, accumulator, stratification, transition and parameter.
+            Changes to one builder do not affect the other.
         """
         return copy.deepcopy(self)
 
@@ -911,8 +754,7 @@ class ModelBuilder:
         Reset the builder to empty state.
 
         The name, description, version and ``bin_unit`` are kept. Every bin,
-        accumulator, stratification, transition, parameter and the initial
-        conditions are removed.
+        accumulator, stratification, transition and parameter is removed.
 
         Returns
         -------
@@ -924,57 +766,81 @@ class ModelBuilder:
         self._stratifications.clear()
         self._transitions.clear()
         self._parameters.clear()
-        self._initial_conditions = None
         self._series_counter = 0
         return self
 
+    def process(self) -> Process:
+        """
+        The process the builder has written so far.
+
+        Returns
+        -------
+        Process
+            The bins, accumulators, stratifications and transitions.
+
+        Raises
+        ------
+        ValueError
+            If ids repeat, or a transition or a stratified rate names an id
+            the process does not have.
+        """
+        return Process(
+            bins=self._bins,
+            accumulators=self._accumulators,
+            stratifications=self._stratifications,
+            transitions=self._transitions,
+        )
+
     def build(
         self,
-        engine: CompartmentalEngineType,
+        structure: StructureT,
+        engine: EngineName,
         settings: EngineSettings | None = None,
-    ) -> Model[CompartmentalStructure]:
+    ) -> Model[StructureT]:
         """
-        Build and return the final compartmental Model.
+        Join the process with a structure and an engine into a model.
+
+        The process is written once; the structure lays it out and sets the
+        kind of the model, so one builder builds every kind its process fits:
+
+        ``builder.build(Aggregate(total=1000, bin_fractions={"A": 0.99,
+        "B": 0.01, "C": 0.0}), engine="DifferentialEquations")``
 
         Parameters
         ----------
-        engine : CompartmentalEngineType
-            The engine that runs the model: ``"DifferenceEquations"``
-            (discrete time) or ``"DifferentialEquations"`` (continuous time).
+        structure : ModelStructure
+            How the process is laid out, such as `Aggregate` (amounts per
+            compartment). The model is a ``Model`` of its class.
+        engine : EngineName
+            The engine that runs the model, which must run the kind of the
+            structure: ``"DifferenceEquations"`` (discrete time) or
+            ``"DifferentialEquations"`` (continuous time).
         settings : EngineSettings | None, default=None
             Settings of that engine; None uses its defaults. Only
             ``"DifferentialEquations"`` takes settings (`OdeSolver`).
 
         Returns
         -------
-        Model[CompartmentalStructure]
-            The constructed compartmental model.
+        Model[StructureT]
+            The model, of the class of ``structure``.
 
         Raises
         ------
         ValueError
-            If validation fails, required components are missing, the engine
-            is unknown, the settings are not settings of that engine, or a
-            per-compartment override names an unknown compartment or makes
-            the initial amounts exceed the total.
+            If validation fails, the structure does not fit the process (for
+            example a fraction names no bin, or a rate reads ``neighbors_<bin>``
+            and the structure has no ``neighbors``), the engine is unknown or
+            does not run the kind of the structure, the settings are not
+            settings of that engine, or a per-compartment override names an
+            unknown compartment or makes the initial amounts exceed the total.
         """
-        if self._initial_conditions is None:
-            raise ValueError("Initial conditions must be set")
-
-        structure = CompartmentalStructure(
-            bins=self._bins,
-            accumulators=self._accumulators,
-            stratifications=self._stratifications,
-            transitions=self._transitions,
-            initial_conditions=self._initial_conditions,
-        )
-
-        model = Model[CompartmentalStructure](
+        model: Model[StructureT] = Model(
             name=self._name,
             description=self._description,
             version=self._version,
             parameters=self._parameters,
             engine=ModelEngine(type=engine, settings=settings),
+            process=self.process(),
             structure=structure,
             step_unit=self._step_unit,
         )

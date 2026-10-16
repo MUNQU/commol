@@ -1,0 +1,13 @@
+flowchart LR
+    n0["State A"]
+    n1["State B"]
+    n2["State C"]
+    n3["g1"]
+    n4["g2"]
+    n0 -->|"pair: k1 * A * B"| n2
+    n1 -->|"pair: k1 * A * B"| n2
+    in2(("none"))
+    in2 -->|"inflow: b"| n0
+    out3(("none"))
+    n2 -->|"outflow: 0.01"| out3
+    n3 -->|"move: 0.02"| n4

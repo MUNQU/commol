@@ -13,6 +13,7 @@ Both work for a single calibration and for an ensemble, with the same layout.
 import json
 
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -38,15 +39,13 @@ def model(k1: float | None):
             id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 ends = [7, 14, 21, 28]
@@ -90,7 +89,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 confidence_level=None)` lists every number the calibrated model holds, and
 whether calibration set it. The `parameters` section is the same for every
 kind of model; the structure of the model adds the sections of its kind
-(`ModelStructure.report_sections`). A compartmental model adds
+(`ModelStructure.report_sections`). An aggregate model adds
 `initial_conditions`:
 
 ```json
@@ -151,7 +150,7 @@ model reports at non-integer positions once the results hold them
 | `window`, `num_windows` | The window axis of `observed` and `windowed`. |
 | `observed_data` | The observations to report next to the run. |
 | `accumulators` | The accumulator ids to report. |
-| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
+| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member, or the `SimulationReplicates` of a stochastic engine. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
 
 The report holds only these blocks. Add your own envelope around them, such as
 a run label or summary figures in your domain's terms:

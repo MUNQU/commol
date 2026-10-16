@@ -18,7 +18,6 @@ try:
 except ImportError as e:
     raise ImportError(f"Error importing Rust extension: {e}") from e
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.serialization import render_json
 from commol.context._model.units import DEFAULT_STEP_UNIT
 from commol.context.axis_units import AxisUnits
@@ -28,9 +27,11 @@ from commol.context.calibration import (
     calibrated_values,
 )
 from commol.context.constants import CalibrationParameterType
+from commol.context.description import Layout, ModelDescription
 from commol.context.engine import ModelEngine
 from commol.context.parameter import Parameter
 from commol.context.probabilistic_calibration import ProbabilisticCalibrationResult
+from commol.context.process import Process
 from commol.context.structure import ModelStructure
 
 StructureT = TypeVar("StructureT", bound=ModelStructure)
@@ -39,11 +40,14 @@ StructureT = TypeVar("StructureT", bound=ModelStructure)
 
 class Model(BaseModel, Generic[StructureT]):
     """
-    A model of any kind: a header, an engine and the structure of its kind.
+    A model of any kind: a header, a process, a structure and an engine.
 
-    ``Model[CompartmentalStructure]`` is a compartmental model, the model
-    `ModelBuilder` builds. A model loaded without a structure class reads the
-    class from the ``kind`` of its structure.
+    The process (bins, stratifications, transitions) is written once; the
+    structure lays it out and changes between kinds of model, so
+    ``Model[Aggregate]`` is a model of amounts per compartment.
+    `ModelBuilder.build` joins its process with a structure. A model loaded
+    without a structure class reads the class from the ``kind`` and the
+    ``variant`` of its structure.
 
     Attributes
     ----------
@@ -57,9 +61,12 @@ class Model(BaseModel, Generic[StructureT]):
         A list of global model parameters.
     engine : ModelEngine
         The engine that runs the model, and its settings.
+    process : Process
+        What changes and how: the bins, accumulators, stratifications and
+        transitions, written once for every structure.
     structure : StructureT
-        The part of the model that depends on its kind, such as the bins,
-        stratifications and transitions of a compartmental model.
+        How the process is laid out, which changes between kinds of model,
+        such as the amounts per compartment of an `Aggregate`.
     step_unit : str | None
         Unit of one step on the axis, of any single dimension (``"day"``,
         ``"meter"``). The unit check and `axis_units` use it; None means
@@ -77,6 +84,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     parameters: list[Parameter]
     engine: ModelEngine
+    process: Process = Field(default_factory=Process)
     structure: SerializeAsAny[StructureT]
     step_unit: str | None = Field(
         None,
@@ -90,16 +98,19 @@ class Model(BaseModel, Generic[StructureT]):
     @field_validator("structure", mode="before")
     @classmethod
     def read_structure_kind(cls, value: object) -> object:
-        """Read a structure given as a mapping as the class of its ``kind``."""
+        """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value
         kind = value.get("kind")
+        variant = value.get("variant")
         if not isinstance(kind, str):
             raise ValueError(
                 "A model structure needs a 'kind'. Known kinds: "
-                f"{sorted(ModelStructure._kinds)}"
+                f"{sorted({known for known, _ in ModelStructure._kinds})}"
             )
-        return ModelStructure.of_kind(kind).model_validate(value)
+        if variant is not None and not isinstance(variant, str):
+            raise ValueError(f"The variant of a structure is a name, got {variant!r}")
+        return ModelStructure.of_kind(kind, variant).model_validate(value)
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:
@@ -229,7 +240,7 @@ class Model(BaseModel, Generic[StructureT]):
         ``problem``: ``parameter`` values update model parameters, ``factor``
         values are ignored because they apply to observations rather than to
         the model, and the structure writes back the values of its kind
-        (`ModelStructure.with_calibrated_values`). A compartmental structure
+        (`ModelStructure.with_calibrated_values`). An aggregate structure
         writes ``initial_condition`` values so that the model rebuilds the
         initial state the engine scored for them.
 
@@ -270,50 +281,47 @@ class Model(BaseModel, Generic[StructureT]):
             self.update_parameters(parameters)
         self.structure = structure
 
-    def print_equations(
-        self,
-        output_file: str | None = None,
-        format: str = PrintEquationsOutputFormat.TEXT,
-    ) -> None:
+    def describe(self, layout: Layout = "default") -> ModelDescription:
         """
-        Prints the equations of the model in mathematical form.
+        A description of the model, as data.
 
-        The structure prints them (`ModelStructure.print_equations`). A
-        compartmental model displays its metadata and the system of equations
-        in both compact (mathematical notation) and expanded (individual
-        equations) forms.
-
-        For DifferentialEquations models, displays equations as dX/dt = ...
-        For DifferenceEquations models,
-        displays equations as [X(t+Dt) - X(t)] / Dt = ...
+        The description is a list of sections of typed blocks: tables,
+        equations, state graphs and text. `ModelDescription.render` turns it
+        into text, Markdown, LaTeX or JSON, and `ModelDescription.save` writes
+        it to a file; in a notebook it shows as Markdown, with the state graph
+        of the model drawn.
 
         Parameters
         ----------
-        output_file : str | None
-            If provided, writes the equations to this file path instead of printing
-            to console. If None, prints to console.
-        format : str, default="text"
-            Output format for equations. Must be one of:
-            - "text": Plain text format (default)
-            - "latex": LaTeX mathematical notation format
+        layout : {"default", "odd"}, default="default"
+            ``"default"``: overview, entities, dynamics, schedule,
+            initialization, parameters and outputs. ``"odd"``: the ODD
+            protocol for describing individual- and agent-based models
+            (Grimm et al. 2006, 2010, 2020): purpose, entities, process
+            overview and scheduling, design concepts, initialization, input
+            data and submodels; an element commol cannot fill says "To be
+            written by the modeller.".
+
+        Returns
+        -------
+        ModelDescription
+            The description.
 
         Raises
         ------
         ValueError
-            If format is not "text" or "latex"
-        NotImplementedError
-            If the kind of the model has no equations to print.
+            If the layout is not one of these.
 
         Examples
         --------
-        >>> model.print_equations()  # Print to console in text format
-        >>> model.print_equations(output_file="equations.txt")  # Save text format
-        >>> model.print_equations(format="latex")  # Print LaTeX to console
-        >>> model.print_equations(
-        ...     output_file="equations.txt", format="latex"
-        ... )  # Save LaTeX
+        >>> description = model.describe()
+        >>> print(description.render("text"))
+        >>> description.save("model.md")
+        >>> model.describe(layout="odd").save("model.tex")
         """
-        self.structure.print_equations(self, output_file, format)
+        from commol.context._model.describe import describe_model
+
+        return describe_model(self, layout)
 
     def axis_units(self) -> AxisUnits:
         """
@@ -344,7 +352,7 @@ class Model(BaseModel, Generic[StructureT]):
         Check unit consistency of all equations in the model.
 
         The structure checks them (`ModelStructure.check_unit_consistency`).
-        For a compartmental model, the engine converts no value between units.
+        For an aggregate model, the engine converts no value between units.
         So the check uses one step unit, ``step_unit`` or else ``step``, and
         every flow must be exactly ``<bin unit>/<step unit>``, such as
         ``item/day``. The unit is the same for every engine; what the value of

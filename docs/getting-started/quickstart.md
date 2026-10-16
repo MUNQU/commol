@@ -7,12 +7,13 @@ This page assumes Commol is installed (see [Installation](installation.md)).
 
 ## Quick path
 
-1. Build a model with `ModelBuilder`.
+1. Write the process with `ModelBuilder`, and build it with a structure
+   (`Aggregate`) and an engine.
 2. Run it with `Simulation`.
 3. Read the results by compartment name.
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Basic Model", version="1.0")
@@ -23,15 +24,13 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -54,8 +53,7 @@ to step 100.
 | `.add_parameter(id="k1", value=0.3)` | Adds a named constant for rate formulas. `value=None` marks it for calibration. |
 | `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](../guide/core-concepts.md#what-a-rate-means). |
 | `.add_transition(..., rate="k2")` | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`. |
-| `.set_initial_conditions(...)` | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1. |
-| `.build(engine="DifferenceEquations")` | Validates the definition and returns a `Model`. |
+| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `total` and the fraction of it that starts in each bin. The fractions must sum to 1. |
 | `Simulation(model).run(num_steps=100)` | Runs the Rust engine and returns the results. |
 
 See [Core Concepts](../guide/core-concepts.md) for bins, transitions and the
@@ -76,15 +74,13 @@ model_with_units = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
@@ -117,15 +113,13 @@ calibration_model = (
     .add_parameter(id="k2", value=None)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
@@ -187,5 +181,6 @@ constraints, scale factors and the optimizers.
 | Every builder option | [Building Models](../guide/building-models.md) |
 | What rate formulas can contain | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | Running and reading simulations | [Running Simulations](../guide/simulations.md) |
+| Runs at random, with whole units | [Stochastic Simulation](../guide/stochastic.md) |
 | Calibration in depth | [Model Calibration](../guide/calibration.md) |
 | Complete models | [Examples](../guide/examples.md) |

@@ -18,10 +18,11 @@ pub struct PyModel {
 #[pymethods]
 impl PyModel {
     #[new]
-    #[pyo3(signature = (name, structure, parameters, engine, description=None, version=None))]
+    #[pyo3(signature = (name, process, structure, parameters, engine, description=None, version=None))]
     fn new(
         name: String,
-        structure: PyCompartmentalStructure,
+        process: PyProcess,
+        structure: PyAggregate,
         parameters: Vec<PyParameter>,
         engine: &str,
         description: Option<String>,
@@ -36,7 +37,8 @@ impl PyModel {
                 version,
                 parameters: parameters.into_iter().map(|p| p.inner).collect(),
                 engine: commol_core::ModelEngine::new(engine_type),
-                structure: commol_core::ModelStructure::Compartmental(structure.inner),
+                process: process.inner,
+                structure: commol_core::ModelStructure::Aggregate(structure.inner),
             },
         })
     }
@@ -84,26 +86,25 @@ impl PyModel {
     }
 }
 
-/// Wrapper for commol_core::CompartmentalStructure
-#[pyclass(name = "CompartmentalStructure", from_py_object)]
+/// Wrapper for commol_core::Process
+#[pyclass(name = "Process", from_py_object)]
 #[derive(Clone)]
-pub struct PyCompartmentalStructure {
-    pub inner: commol_core::CompartmentalStructure,
+pub struct PyProcess {
+    pub inner: commol_core::Process,
 }
 
 #[pymethods]
-impl PyCompartmentalStructure {
+impl PyProcess {
     #[new]
-    #[pyo3(signature = (bins, stratifications, initial_conditions, transitions=None, accumulators=None))]
+    #[pyo3(signature = (bins, stratifications, transitions=None, accumulators=None))]
     fn new(
         bins: Vec<PyBin>,
         stratifications: Vec<PyStratification>,
-        initial_conditions: PyInitialConditions,
         transitions: Option<Vec<PyTransition>>,
         accumulators: Option<Vec<PyAccumulator>>,
     ) -> Self {
         Self {
-            inner: commol_core::CompartmentalStructure {
+            inner: commol_core::Process {
                 bins: bins.into_iter().map(|ds| ds.inner).collect(),
                 accumulators: accumulators
                     .unwrap_or_default()
@@ -116,25 +117,56 @@ impl PyCompartmentalStructure {
                     .into_iter()
                     .map(|t| t.inner)
                     .collect(),
-                initial_conditions: initial_conditions.inner,
             },
         }
     }
 
-    /// Load a compartmental structure from JSON, with its `kind`
+    /// Load a process from JSON
+    ///
+    /// Raises:
+    ///     ValueError: If the JSON is not a process
+    #[staticmethod]
+    fn from_json(json_str: String) -> PyResult<Self> {
+        serde_json::from_str(&json_str)
+            .map(|inner| Self { inner })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+}
+
+/// Wrapper for commol_core::Aggregate
+#[pyclass(name = "Aggregate", from_py_object)]
+#[derive(Clone)]
+pub struct PyAggregate {
+    pub inner: commol_core::Aggregate,
+}
+
+#[pymethods]
+impl PyAggregate {
+    #[new]
+    fn new(initial_conditions: PyInitialConditions) -> Self {
+        Self {
+            inner: commol_core::Aggregate {
+                variant: None,
+                initial_conditions: initial_conditions.inner,
+                neighbors: None,
+            },
+        }
+    }
+
+    /// Load an aggregate structure from JSON, with its `kind`
     ///
     /// Raises:
     ///     ValueError: If the JSON is not a structure, or the structure is
-    ///         not compartmental
+    ///         not aggregate
     #[staticmethod]
     fn from_json(json_str: String) -> PyResult<Self> {
         let structure: commol_core::ModelStructure = serde_json::from_str(&json_str)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         match structure {
-            commol_core::ModelStructure::Compartmental(inner) => Ok(Self { inner }),
+            commol_core::ModelStructure::Aggregate(inner) => Ok(Self { inner }),
             #[cfg(feature = "test-kind")]
             other => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "The structure is a {} structure, not a compartmental structure",
+                "The structure is a {} structure, not an aggregate structure",
                 other.kind().name()
             ))),
         }
@@ -221,43 +253,21 @@ impl PyInitialConditions {
         stratification_fractions: Option<HashMap<String, HashMap<String, f64>>>,
         compartment_fractions: Option<Vec<(String, f64)>>,
     ) -> Self {
-        let bin_fractions: Vec<commol_core::BinFraction> = bin_fractions
-            .into_iter()
-            .map(|(bin, fraction)| commol_core::BinFraction { bin, fraction })
-            .collect();
-
-        let stratification_fractions = stratification_fractions
-            .unwrap_or_default()
-            .into_iter()
-            .map(
-                |(stratification, fractions)| commol_core::StratificationFractions {
-                    stratification,
-                    fractions: fractions
-                        .into_iter()
-                        .map(|(category, fraction)| commol_core::StratificationFraction {
-                            category,
-                            fraction,
-                        })
-                        .collect(),
-                },
-            )
-            .collect();
-
-        let compartment_fractions = compartment_fractions
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(compartment, fraction)| commol_core::CompartmentFraction {
-                compartment,
-                fraction,
-            })
-            .collect();
-
         Self {
             inner: commol_core::InitialConditions {
                 total,
-                bin_fractions,
-                stratification_fractions,
-                compartment_fractions,
+                bin_fractions: bin_fractions.into_iter().collect(),
+                stratification_fractions: stratification_fractions
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(stratification, fractions)| {
+                        (stratification, fractions.into_iter().collect())
+                    })
+                    .collect(),
+                compartment_fractions: compartment_fractions
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
             },
         }
     }
@@ -274,7 +284,7 @@ impl PyInitialConditions {
         self.inner
             .bin_fractions
             .iter()
-            .map(|bin_fraction| (bin_fraction.bin.clone(), bin_fraction.fraction))
+            .map(|(bin, fraction)| (bin.clone(), *fraction))
             .collect()
     }
 
@@ -284,13 +294,12 @@ impl PyInitialConditions {
         self.inner
             .stratification_fractions
             .iter()
-            .map(|stratification| {
+            .map(|(stratification, fractions)| {
                 (
-                    stratification.stratification.clone(),
-                    stratification
-                        .fractions
+                    stratification.clone(),
+                    fractions
                         .iter()
-                        .map(|fraction| (fraction.category.clone(), fraction.fraction))
+                        .map(|(category, fraction)| (category.clone(), *fraction))
                         .collect(),
                 )
             })
@@ -303,12 +312,7 @@ impl PyInitialConditions {
         self.inner
             .compartment_fractions
             .iter()
-            .map(|override_fraction| {
-                (
-                    override_fraction.compartment.clone(),
-                    override_fraction.fraction,
-                )
-            })
+            .map(|(compartment, fraction)| (compartment.clone(), *fraction))
             .collect()
     }
 }
@@ -449,7 +453,8 @@ impl PyMathExpression {
 /// Register all core types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModel>()?;
-    m.add_class::<PyCompartmentalStructure>()?;
+    m.add_class::<PyProcess>()?;
+    m.add_class::<PyAggregate>()?;
     m.add_class::<PyBin>()?;
     m.add_class::<PyAccumulator>()?;
     m.add_class::<PyStratification>()?;

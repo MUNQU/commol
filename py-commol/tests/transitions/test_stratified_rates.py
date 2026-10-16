@@ -3,8 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, Simulation
 from tests.support import (
+    FactoryBuilder,
     ENGINE_REL,
     assert_close,
     build,
@@ -141,7 +142,7 @@ class TestConditionalCompartments:
 class TestStratifiedRateValidation:
     def test_a_condition_the_source_cannot_meet_is_rejected_at_build(self) -> None:
         builder = (
-            ModelBuilder(name="Routing", version="1.0")
+            FactoryBuilder(name="Routing", version="1.0")
             .add_bin(id="A", name="A")
             .add_parameter(id="a", value=0.1)
             .add_transition(
@@ -159,14 +160,16 @@ class TestStratifiedRateValidation:
                 ],
             )
         )
-        builder.set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}],
-            stratification_fractions=stratify(
-                builder,
-                {"group": {"g1": 0.5, "g2": 0.5}, "type": {"t1": 0.5, "t2": 0.5}},
-                {"type": {"group": "g2"}},
-            ),
+        builder.set_structure(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 1.0},
+                stratification_fractions=stratify(
+                    builder,
+                    {"group": {"g1": 0.5, "g2": 0.5}, "type": {"t1": 0.5, "t2": 0.5}},
+                    {"type": {"group": "g2"}},
+                ),
+            )
         )
 
         with pytest.raises(ValidationError, match="use 'to'"):

@@ -18,6 +18,7 @@ argmin-observer-slog = { git = "https://github.com/MUNQU/argmin", branch = "deve
 
 # Commol dependencies
 commol-core = { path = "../commol-core" }
+commol-random = { path = "../commol-random" }
 
 # Random number generation
 rand = "0.10"

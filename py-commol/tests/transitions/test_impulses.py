@@ -5,9 +5,9 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder, Simulation, AxisPattern
+from commol import Aggregate, Simulation, AxisPattern
 from commol.context.model import Model
-from tests.support import TIGHT, assert_close, build, build_ode
+from tests.support import FactoryBuilder, TIGHT, assert_close, build, build_ode
 
 
 def _impulse_model(
@@ -18,7 +18,7 @@ def _impulse_model(
     impulse_every: tuple[float, float] | None = None,
 ) -> Model:
     """A → B moves only by an impulse of fraction ``p``; ``jumped`` counts it."""
-    builder = ModelBuilder(name="impulse", version="1.0")
+    builder = FactoryBuilder(name="impulse", version="1.0")
     builder.add_bin("A", "A").add_bin("B", "B").add_accumulator("jumped", "jumped")
     builder.add_parameter("p", p)
     builder.add_transition(
@@ -30,10 +30,7 @@ def _impulse_model(
         impulse_at=impulse_at,
         impulse_every=impulse_every,
     )
-    builder.set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-    )
+    builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0}))
     return build_ode(builder) if ode else build(builder)
 
 
@@ -52,15 +49,12 @@ class TestJump:
 
     def test_the_jump_comes_before_the_flows_of_its_step(self) -> None:
         # The flow `k A` of step 1 sees A after the jump: 750, not 1000.
-        builder = ModelBuilder(name="both", version="1.0")
+        builder = FactoryBuilder(name="both", version="1.0")
         builder.add_bin("A", "A").add_bin("B", "B")
         builder.add_parameter("p", 0.25).add_parameter("k", 0.1)
         builder.add_transition("jump", ["A"], ["B"], rate="p", impulse_at=[1])
         builder.add_transition("flow", ["A"], ["B"], rate="k")
-        builder.set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0}],
-        )
+        builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0}))
 
         results = Simulation(build(builder)).run(2)
 
@@ -76,7 +70,7 @@ class TestJump:
     def test_periodic_impulses_reach_the_periodic_orbit(self) -> None:
         # A' = k1 K - k1 A between jumps, A -> (1 - p) A at t = k T.
         k1, k, p, period = 0.02, 1000.0, 0.3, 5.0
-        builder = ModelBuilder(name="periodic impulses", version="1.0")
+        builder = FactoryBuilder(name="periodic impulses", version="1.0")
         builder.add_bin("A", "A").add_bin("V", "V")
         for name, value in {"k1": k1, "K": k, "p": p}.items():
             builder.add_parameter(name, value)
@@ -85,10 +79,7 @@ class TestJump:
         builder.add_transition(
             "av", ["A"], ["V"], rate="p", impulse_every=(period, period)
         )
-        builder.set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "V", "fraction": 0}],
-        )
+        builder.set_structure(Aggregate(total=1000, bin_fractions={"A": 1.0, "V": 0}))
         steps = [j * period for j in range(1, 201)]
 
         results = Simulation(build_ode(builder, TIGHT)).run_at(steps)
@@ -104,7 +95,7 @@ class TestDefinition:
         path = tmp_path / "impulse.json"
         model.to_json(path)
 
-        transition = Model.from_json(path).structure.transitions[0]
+        transition = Model.from_json(path).process.transitions[0]
 
         assert transition.impulse_every == (7.5, 0.5)
         assert transition.is_impulse
@@ -127,7 +118,7 @@ class TestDefinition:
             _impulse_model(ode=True, impulse_every=schedule)
 
     def test_a_time_pattern_cannot_be_an_impulse(self) -> None:
-        builder = ModelBuilder(name="m")
+        builder = FactoryBuilder(name="m")
         builder.add_bin("A", "A").add_bin("B", "B")
 
         with pytest.raises(ValueError, match="not a AxisPattern"):
@@ -139,9 +130,8 @@ class TestDefinition:
                 impulse_at=[1],
             )
 
-    def test_print_equations_lists_an_impulse_apart(self, capsys) -> None:
-        _impulse_model(ode=True, impulse_at=[1, 3]).print_equations()
+    def test_the_description_lists_an_impulse_apart(self) -> None:
+        printed = _impulse_model(ode=True, impulse_at=[1, 3]).describe().render("text")
 
-        printed = capsys.readouterr().out
         assert "dA/dt = 0" in printed
         assert "jump, impulse at 1, 3:\n  A -> B: p * A" in printed

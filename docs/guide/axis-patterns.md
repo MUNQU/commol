@@ -10,7 +10,7 @@ a tested, parenthesised expression, so patterns combine safely.
 ## Quick path
 
 ```python
-from commol import ModelBuilder, Simulation, AxisPattern
+from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
 
 def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
     """The flow into B at each step, for a transition with no source."""
@@ -19,11 +19,13 @@ def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
         .add_bin(id="A", name="State A")
         .add_bin(id="B", name="State B")
         .add_transition(id="inflow", source=[], target=["B"], rate=rate)
-        .set_initial_conditions(
-            total=100,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        .build(
+            Aggregate(
+                total=100,
+                bin_fractions={"A": 1.0, "B": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=num_steps)["B"]
     return [round(series[i + 1] - series[i], 4) for i in range(num_steps)]
@@ -126,20 +128,14 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
         .add_bin(id="B", name="State B")
         .add_stratification(id="group", categories=["cat1", "cat2"])
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-            stratification_fractions=[
-                {
-                    "stratification": "group",
-                    "fractions": [
-                        {"category": "cat1", "fraction": 0.5},
-                        {"category": "cat2", "fraction": 0.5},
-                    ],
-                }
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 1.0, "B": 0.0},
+                stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=num_steps)
     return {
@@ -236,20 +232,14 @@ routing = (
             schedule=AxisPattern.pulse(at=1, value=0.5),
         ),
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}],
-        stratification_fractions=[
-            {
-                "stratification": "status",
-                "fractions": [
-                    {"category": "s0", "fraction": 0.5},
-                    {"category": "s1", "fraction": 0.5},
-                ],
-            }
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0},
+            stratification_fractions={"status": {"s0": 0.5, "s1": 0.5}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 routed = Simulation(routing).run(num_steps=2)
 print(routed["A_s0"], routed["A_s1"])  # [500.0, 500.0, 250.0] [500.0, 500.0, 750.0]
@@ -274,11 +264,13 @@ def remaining_a(rate: AxisPattern, at: float) -> float:
         .add_bin(id="A", name="State A")
         .add_bin(id="B", name="State B")
         .add_transition(id="flow", source=["A"], target=["B"], rate=rate)
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 1.0, "B": 0.0},
+            ),
+            engine="DifferentialEquations",
         )
-        .build(engine="DifferentialEquations")
     )
     return Simulation(model).run_at([at])["A"][0]
 

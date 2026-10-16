@@ -1,4 +1,4 @@
-"""The engine of a model: the engine's list, `build(engine, settings)`, saving."""
+"""The engine of a model: the list of engines, `build(structure, engine)`, saving."""
 
 import math
 from typing import get_args
@@ -6,60 +6,105 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from commol import Model, OdeSolver, Simulation
+from commol import (
+    Model,
+    OdeSolver,
+    Simulation,
+    StochasticEventsSettings,
+    StochasticStepsSettings,
+)
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine import CompartmentalEngineType
+from commol.context.engine import EngineName
+from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
 from tests.support import a_to_b_builder, assert_close, build, build_ode
 
 
 class TestEngineList:
-    def test_the_python_names_equal_the_compartmental_engines(self) -> None:
-        compartmental = [
+    def test_the_python_names_equal_the_engines_of_the_list(self) -> None:
+        engines = [
             name
             for name in commol_rs.engine.EngineType.names()
-            if commol_rs.engine.EngineType(name).kind == "compartmental"
+            if name not in {TEST_ENGINE, TEST_STOCHASTIC_ENGINE}
         ]
 
-        assert list(get_args(CompartmentalEngineType)) == compartmental
+        assert list(get_args(EngineName)) == engines
+
+    def test_the_aggregate_kind_lists_its_engines(self) -> None:
+        kind = commol_rs.engine.ModelKind("aggregate")
+
+        assert kind.engines() == [
+            "DifferenceEquations",
+            "DifferentialEquations",
+            "StochasticEvents",
+            "StochasticSteps",
+        ]
 
     def test_each_engine_says_what_a_rate_means(self) -> None:
         meanings = {
             name: commol_rs.engine.EngineType(name).rate_meaning
-            for name in get_args(CompartmentalEngineType)
+            for name in get_args(EngineName)
         }
 
         assert meanings == {
             "DifferenceEquations": "per_step",
             "DifferentialEquations": "continuous",
+            "StochasticEvents": "continuous",
+            "StochasticSteps": "per_step",
         }
 
     def test_an_unknown_engine_lists_the_engines(self) -> None:
         with pytest.raises(ValueError, match="DifferentialEquations"):
             commol_rs.engine.EngineType("Stochastic")
 
+    def test_every_engine_gives_the_form_of_its_dynamics(self) -> None:
+        forms = {
+            "difference_equation",
+            "differential_equation",
+            "stochastic_events",
+            "rules",
+        }
+        for name in commol_rs.engine.EngineType.names():
+            engine = commol_rs.engine.EngineType(name)
+            assert engine.dynamics_form in forms
+            assert engine.schedule
+
+    def test_an_engine_of_equations_gives_their_left_hand_side(self) -> None:
+        difference = commol_rs.engine.EngineType("DifferenceEquations")
+        differential = commol_rs.engine.EngineType("DifferentialEquations")
+
+        assert difference.dynamics_form == "difference_equation"
+        assert difference.equation_lhs("A", False) == "[A(t+Dt) - A(t)] / Dt"
+        assert differential.equation_lhs("A", False) == "dA/dt"
+        assert differential.equation_lhs("A", True) == "\\frac{dA}{dt}"
+
     def test_every_engine_runs_a_kind_of_the_list(self) -> None:
         kinds = commol_rs.engine.ModelKind.names()
 
-        assert "compartmental" in kinds
+        assert "aggregate" in kinds
         for name in commol_rs.engine.EngineType.names():
-            assert commol_rs.engine.EngineType(name).kind in kinds
+            engine_kinds = commol_rs.engine.EngineType(name).kinds
+            assert engine_kinds
+            assert set(engine_kinds) <= set(kinds)
 
-    def test_a_compartmental_model_accepts_initial_conditions(self) -> None:
-        kind = commol_rs.engine.ModelKind("compartmental")
+    def test_an_aggregate_model_accepts_initial_conditions(self) -> None:
+        kind = commol_rs.engine.ModelKind("aggregate")
 
         assert kind.value_types() == ["initial_condition"]
 
     def test_an_unknown_kind_lists_the_kinds(self) -> None:
         engine = commol_rs.engine.EngineType("DifferenceEquations")
 
-        with pytest.raises(ValueError, match="compartmental"):
+        with pytest.raises(ValueError, match="aggregate"):
             engine.check_kind("network")
 
 
 class TestBuild:
-    @pytest.mark.parametrize("name", get_args(CompartmentalEngineType))
-    def test_one_builder_builds_the_model_for_each_engine(self, name: str) -> None:
-        model = a_to_b_builder().build(engine=name)
+    @pytest.mark.parametrize("name", get_args(EngineName))
+    def test_one_process_builds_with_an_aggregate_for_each_engine(
+        self, name: EngineName
+    ) -> None:
+        builder = a_to_b_builder()
+        model = builder.build(builder.structure, engine=name)
 
         simulation = Simulation(model)
 
@@ -68,10 +113,14 @@ class TestBuild:
 
     def test_each_engine_runs_the_model_with_its_meaning_of_a_rate(self) -> None:
         builder = a_to_b_builder()
-        difference = Simulation(builder.build(engine="DifferenceEquations")).run(1)
+        difference = Simulation(
+            builder.build(builder.structure, engine="DifferenceEquations")
+        ).run(1)
         differential = Simulation(
             builder.build(
-                engine="DifferentialEquations", settings=OdeSolver(rtol=1e-10)
+                builder.structure,
+                engine="DifferentialEquations",
+                settings=OdeSolver(rtol=1e-10),
             )
         ).run(1)
 
@@ -81,22 +130,27 @@ class TestBuild:
     def test_the_engine_takes_its_settings(self) -> None:
         settings = OdeSolver(method="bdf", rtol=1e-8)
 
-        model = a_to_b_builder().build(
-            engine="DifferentialEquations", settings=settings
+        builder = a_to_b_builder()
+        model = builder.build(
+            builder.structure, engine="DifferentialEquations", settings=settings
         )
 
         assert model.engine.settings == settings
 
     def test_settings_of_another_engine_name_both_engines(self) -> None:
+        builder = a_to_b_builder()
         with pytest.raises(ValidationError) as error:
-            a_to_b_builder().build(engine="DifferenceEquations", settings=OdeSolver())
+            builder.build(
+                builder.structure, engine="DifferenceEquations", settings=OdeSolver()
+            )
 
         assert "DifferentialEquations" in str(error.value)
         assert "DifferenceEquations" in str(error.value)
 
     def test_an_unknown_engine_is_rejected(self) -> None:
+        builder = a_to_b_builder()
         with pytest.raises(ValidationError, match="DifferentialEquations"):
-            a_to_b_builder().build(engine="Stochastic")  # ty: ignore[invalid-argument-type]
+            builder.build(builder.structure, engine="Stochastic")  # ty: ignore[invalid-argument-type]
 
 
 class TestSaveAndLoad:
@@ -108,6 +162,27 @@ class TestSaveAndLoad:
         loaded = Model.from_json(path)
 
         assert loaded.engine == model.engine
+
+    @pytest.mark.parametrize(
+        ("engine", "settings"),
+        [
+            ("StochasticEvents", StochasticEventsSettings(method="tau_leaping")),
+            ("StochasticEvents", StochasticEventsSettings(rounding="random")),
+            ("StochasticSteps", StochasticStepsSettings(rounding="random")),
+        ],
+    )
+    def test_stochastic_settings_load_back_as_their_class(
+        self, tmp_path, engine: EngineName, settings: object
+    ) -> None:
+        builder = a_to_b_builder()
+        model = builder.build(builder.structure, engine=engine, settings=settings)  # ty: ignore[invalid-argument-type]
+        path = tmp_path / "model.json"
+        model.to_json(path)
+
+        loaded = Model.from_json(path)
+
+        assert loaded == model
+        assert type(loaded.engine.settings) is type(settings)
 
     def test_a_difference_model_saves_no_settings(self) -> None:
         model = build(a_to_b_builder())

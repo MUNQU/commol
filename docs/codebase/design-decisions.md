@@ -8,14 +8,14 @@ test that guards it. Read the ones of your area before you change it.
 
 | Area | Decisions |
 |---|---|
-| Model kinds | [One interface for every kind](#one-interface-for-every-model-kind), [a model by composition](#a-model-is-a-header-an-engine-and-a-structure) |
+| Model kinds | [One interface for every kind](#one-interface-for-every-model-kind), [a model by composition](#a-model-is-a-header-a-process-a-structure-and-an-engine), [neutral terms](#neutral-terms-carry-a-process-across-structures) |
 | Model structure | [Compartments](#compartments-are-labels-with-a-name), [what they hold](#state-amount-total-and-subgroup-total), [stratification order](#stratification-order-is-part-of-the-model), [outputs](#outputs-are-resolved-by-label), [variable names](#the-engine-owns-the-variable-names) |
 | Transitions and rates | [Rate semantics](#absolute-and-proportional-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
-| Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
+| Engines | [One set of flows](#every-engine-reads-one-set-of-flows), [seeds](#stochastic-engines-and-seeds), [whole units](#whole-units-in-a-stochastic-engine), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
-| Results | [Confidence intervals](#one-confidence-interval-convention), [reports](#reports), [model files](#model-files-are-written-in-full) |
+| Results | [Confidence intervals](#one-confidence-interval-convention), [descriptions](#a-description-is-data-rendered-apart), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
 
 ## Model kinds
@@ -27,19 +27,19 @@ The layers that do not depend on how a model is built (`Simulation`,
 use only `Model` and the methods of `ModelStructure`
 (`py-commol/commol/context/structure.py`), and in Rust only the
 `SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What
-only a compartmental model has (bins, stratifications, initial conditions) is
-behind them: `CompartmentalStructure` (`context/compartmental.py`), and in Rust
-`CompartmentalEngine` and `InitialConditionPlan` (`crates/commol-model/`). A
-new kind, such as an agent network, is a new `ModelStructure` subclass with its
-engines in the list; nothing that exists changes.
+only an aggregate model has (compartments, initial fractions) is behind them:
+`Aggregate` (`context/aggregate.py`), and in Rust `CompartmentalEngine` and
+`InitialConditionPlan` (`crates/commol-model/`). A new kind, such as an agent
+network, is a new `ModelStructure` subclass with its engines in the list;
+nothing that exists changes.
 
 | Part | Rule | Why, against the alternative |
 |---|---|---|
 | `ModelStructure` | An abstract base class (Pydantic's metaclass derives from `ABCMeta`). A missing method fails when the object is made and names it; optional methods have a default. | A `typing.Protocol` shows a missing method only under `ty`, or mid-run as an `AttributeError`, and gives no defaults. |
-| Engine kind | Each entry of `EngineType` names the kind it runs. `Model` asks the list (`check_kind`) when it is made, and `Engine::build` asks it again; the error names the engine and both kinds. | Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. |
-| Values calibration sets | `parameter` and `factor` are generic. Each kind declares the types of value of its own it accepts (`ModelKind::value_types`, which `ModelStructure.calibration_value_types` asks); the compartmental kind accepts `initial_condition`. The engine resolves and writes them (`SimulationEngine::plan_values`, `apply_values`). | The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it. |
-| Report sections | `ModelStructure.report_sections` adds the sections of a kind to `applied_parameters_report` (default: none); the compartmental kind adds `initial_conditions`. | A check of the kind in `reporting.py` brings back a branch per kind. |
-| Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `total`) and `output_sums` (a bin total, for a compartmental engine). | The calibration would rebuild bin totals from compartment labels. |
+| Engine kinds | An engine names a method, not a kind: each entry of `EngineType` names the kinds it runs (`EngineType::kinds`). `Model` asks the list (`check_kind`) when it is made, and `Engine::build` asks it again and picks the implementation by the pair of the engine and the kind; the error names the engine, both kinds and the engines of the kind of the model (`EngineType::engines_of`). | Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. One engine per kind would multiply the names: a stochastic engine runs every structure that implements it. |
+| Values calibration sets | `parameter` and `factor` are generic. Each kind declares the types of value of its own it accepts (`ModelKind::value_types`, which `ModelStructure.calibration_value_types` asks); the aggregate kind accepts `initial_condition`. The engine resolves and writes them (`SimulationEngine::plan_values`, `apply_values`). | The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it. |
+| Report sections | `ModelStructure.report_sections` adds the sections of a kind to `applied_parameters_report` (default: none); the aggregate kind adds `initial_conditions`. | A check of the kind in `reporting.py` brings back a branch per kind. |
+| Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `total`) and `output_sums` (a bin total, for an engine of the aggregate kind). | The calibration would rebuild bin totals from compartment labels. |
 
 The test kind (`tests/support/kinds.py`, engine `TestEngine` in
 `py-commol/src/test_kind.rs`) is written only against the interface. The
@@ -47,32 +47,94 @@ extension has it only when it is built with the cargo feature `test-kind`, as
 the tests and CI build it; a release build does not.
 
 **Guards:** `tests/model_kinds/` (a test model through a simulation, a
-calibration, a report and a plot; the kind check both ways),
+calibration, a report and a plot; the kind check both ways; a process the test
+kind cannot run),
 `crates/commol-calibration/tests/test_model_values.rs` (the calibration with
-an engine that is not compartmental: values through `plan_values` and
+an engine that is not of the aggregate kind: values through `plan_values` and
 `apply_values`, constraints through `output_sums` and `state_outputs`),
 `py-commol/src/engine.rs::an_engine_rejects_a_model_of_another_kind`,
 `crates/commol-core/src/types/engine.rs::an_engine_rejects_a_model_of_another_kind`.
 
-### A model is a header, an engine and a structure
+### A model is a header, a process, a structure and an engine
 
 `Model` (Python `context/model.py`, Rust `crates/commol-core/src/types/model.rs`)
 is one class for every kind: `name`, `description`, `version`, `step_unit`,
-`parameters`, `engine` (`{type, settings}`) and `structure`, tagged in JSON by
-`kind`. In Python it is generic in its structure class:
-`ModelBuilder.build` returns `Model[CompartmentalStructure]`, so
-`model.structure.bins` type-checks, and `Model.from_json` reads the class from
-the `kind` of the file. The engine is part of the model because it sets what a
-rate means. Transitions are held once, in the structure.
+`parameters`, `engine` (`{type, settings}`), `process` and `structure`. The
+**process** (`Process`: bins, accumulators, stratifications, transitions) is
+what changes and how, written once. The **structure** is what changes between
+kinds of model: `Aggregate` lays the process out as amounts per compartment;
+`Network` and `Agents` come with their ODDs. It is tagged in JSON by `kind`. In
+Python `Model` is generic in its structure class: `ModelBuilder.build(structure,
+engine)` returns a `Model` of the class of `structure` (a `TypeVar`, never a
+value), so `model.structure.total` type-checks, and `Model.from_json` reads the
+class from the `kind` and `variant` of the file. The engine is part of the
+model because it sets what a rate means.
 
-Inheritance (an abstract `Model` with a `CompartmentalModel`) gives direct
-access (`model.bins`) but two parallel hierarchies, of models and of builders,
-and the header repeated per kind; with composition, `Simulation` and
-`Calibrator` take one type.
+The interface of a kind stays on the structure and reads the process from the
+model (`outputs_by_source(model)`, `series_label(model, id)`); the methods of
+`Aggregate` that need the bins take the process (`initial_state(process)`).
+
+| Alternative | Why not |
+|---|---|
+| Inheritance: an abstract `Model` with a `CompartmentalModel` | Direct access (`model.bins`), but two parallel hierarchies, of models and of builders, and the header repeated per kind. With composition, `Simulation` and `Calibrator` take one type. |
+| A builder per kind (`NetworkModelBuilder`, …) | The user writes the same transitions again for each kind. |
+| One structure per kind that holds its own transitions | The same duplication, inside the model files. |
+| A setting of the engine that picks the structure | A graph or a set of agents is data of the model, not a setting; the file would not reproduce a run. |
+| A structure that holds a reference to its process | Two copies to keep equal: a model copied or changed would carry a stale process. |
+
+A structure may have **variants**: a subclass that keeps the kind, the fields
+and the engines of its structure, narrows the constructor and may add checks
+(`MarkovChain(Aggregate)`, `Network(Agents)` in later ODDs). The JSON holds the
+kind and the variant; the Python registry (`ModelStructure._kinds`) is keyed by
+`(kind, variant)`, so a model loads back as the class it was saved with. Rust
+reads the variant only to run its checks (`AggregateVariant::check`), so the
+engines do not change. A subclass with no tag would load back as its base class
+and compare unequal; a kind per narrower form would split the structures again.
+
+The fractions of `Aggregate` are mappings by id (`bin_fractions={"A": 0.99}`),
+in Python and in the file, and Rust keeps their order (`IndexMap`). A list of
+`{"bin", "fraction"}` records needs a second shape for the constructor, and
+Pydantic calls a custom `__init__` when it validates a file too.
 
 **Guards:** `crates/commol-core/src/types/model.rs` (tests),
 `tests/building/test_save_and_load.py`,
-`tests/model_kinds/test_interface.py::TestStructureInterface`.
+`tests/model_kinds/test_interface.py::TestStructureInterface`,
+`tests/model_kinds/test_interface.py::TestVariants`,
+`tests/building/test_engine.py::TestBuild`.
+
+### Neutral terms carry a process across structures
+
+A rate may read `neighbors_<bin>`, the amount of a bin among the neighbors of
+a unit, and `neighbors`, their total. They carry a process from one structure
+to another: a rate that reads them and no compartment is proportional, a rate
+per unit of its source, which a network or an agent model reads per node or
+per agent. Under `Aggregate` the structure says who the neighbors are, with no
+default:
+
+| `Aggregate.neighbors` | `neighbors_<bin>` from a compartment of category `g` | `neighbors` |
+|---|---|---|
+| `Complete()` | The bin total | `total` |
+| `Groups(stratification, weights)` | `Σ_g' w[g][g'] × (amount of the bin in g')` | `Σ_g' w[g][g'] × (amount of every bin in g')` |
+
+`plan_transition_flows` (`crates/commol-model/src/flows.rs`) decides whether a
+rate is absolute **before** `resolve_neighbors` writes the terms as the sums
+they are, found by label (`CompartmentLayout::with_category`), so
+`k1 * neighbors_B / neighbors` from `A` is the proportional flow
+`k1 × A × B / total` under `Complete()`. `check_model`
+(`crates/commol-model/src/builder.rs`) reserves the names, rejects a
+`neighbors_<id>` that names no bin and a formula parameter that reads them,
+and asks for `neighbors` when a rate reads them; `Neighbors::check` checks the
+groups and their weights.
+
+Every term is neutral: no "population", "size" or "contact", which assume
+individuals and a field. A default of `Complete()` would choose a modelling
+assumption for the user.
+
+**Guards:** `tests/transitions/test_neighbors.py`,
+`crates/commol-model/src/flows.rs` (tests `complete_neighbors_…`,
+`group_neighbors_…`, `a_rate_that_reads_the_neighbors_…`),
+`crates/commol-model/src/builder.rs` (tests `a_name_of_the_neighbors_…`,
+`a_rate_reads_the_neighbors_of_a_bin_only_when_the_structure_has_them`).
 
 ## Model structure
 
@@ -140,8 +202,8 @@ compartments exist and what they are named.
 
 ### Outputs are resolved by label
 
-`CompartmentalStructure.outputs_by_source()` maps each bin or accumulator id to its output
-names in engine order. It uses the engine expansion (`expanded_outputs`), so
+`Aggregate.outputs_by_source(model)` maps each bin or accumulator id to its
+output names in engine order. It uses the engine expansion (`expanded_outputs`), so
 `Simulation.outputs_for`, `group_outputs` and `total_series` group outputs by
 label, not by name.
 
@@ -153,13 +215,14 @@ a prefix).
 
 The engine sets one variable per expanded compartment and per subgroup total
 (`total_<categories>`, bin totals and partial bin totals).
-`check_names` in `crates/commol-model/src/builder.rs` rejects a parameter
+`check_model` in `crates/commol-model/src/builder.rs` rejects a parameter
 id that is one of those names, a parameter, bin or accumulator id that is an
-engine variable (`ENGINE_VARIABLES`: `total`, `step`, `t`, `pi`, `e`), a bin
+engine variable (`ENGINE_VARIABLES`: `total`, `step`, `t`, `pi`, `e`) or a
+name of the neighbors (`neighbors`, `neighbors_…`), a bin
 whose compartments or bin totals read as a `total_<categories>` name (two sums
 would share one slot), and a `total_…` variable in a rate or a formula
-parameter that names no subgroup total. `CompartmentalStructure.check_model`
-calls it at `build`, and `CompiledModel::try_from_model` calls it again.
+parameter that names no subgroup total. `Aggregate.check_model` calls it at
+`build`, and `CompiledModel::try_from_model` calls it again.
 `subgroup_total_names` lists the names; Python reads them through the binding
 `commol_rs.model.subgroup_total_names` (`engine_state.subgroup_total_names`)
 to check rates and give units.
@@ -191,7 +254,7 @@ is absolute or proportional:
 | Otherwise | Proportional | `rate × source` |
 
 A transition with several sources and a proportional rate is rejected, because
-it has no single source to multiply. `print_equations` shows the planned flows,
+it has no single source to multiply. `Model.describe` shows the planned flows,
 so a proportional rate prints as `k1 * A`.
 
 The name says what the flow is: proportional to its source. The name
@@ -231,8 +294,9 @@ same formula always runs the same machine code, so results are reproducible.
 The fractions of a conditional stratification are relative to the subgroup that
 its conditions select, not to the total. Subgroup totals therefore
 multiply along the chain: `total × fraction(group1) × fraction(cat1)`.
-`InitialConditions.subgroup_total` owns this; `CompartmentalStructure.subgroup_total`
-and `CompartmentalStructure.get_conditioning_categories` delegate to it.
+`Aggregate.subgroup_total` and `Aggregate.get_conditioning_categories` own
+this (`context/aggregate.py`); with per-compartment overrides,
+`subgroup_total` sums the state the engine builds.
 
 **Guard:** `tests/simulation/test_outputs.py::TestSubgroupTotal` compares the
 result with the state the engine starts from.
@@ -242,14 +306,15 @@ result with the state the engine starts from.
 `InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`
 applies calibrated values in a fixed order: bins, category splits, exact
 compartments, and then the remainder named by
-`CalibrationProblem.initial_condition_remainder`. Both compartmental engines
+`CalibrationProblem.initial_condition_remainder`. Both engines of the aggregate
+kind
 resolve and write initial conditions through it
 (`SimulationEngine::plan_values` and `apply_values`), and the calibration
 writes every value through the engine (`ValueWriter` in
 `crates/commol-calibration/src/values.rs`), so the objective, the predictions
 and the write-back (`configured_engine`, then the binding
 `calibrated_initial_state`) agree by construction.
-`CompartmentalStructure.with_calibrated_values`
+`Aggregate.with_calibrated_values`
 (`context/_model/calibration_write_back.py`) writes the values back as
 fractions, and pins as per-compartment overrides every compartment that the
 fractions cannot reproduce.
@@ -298,7 +363,10 @@ the default increment of any axis (dimension `[step]`). The check never infers
 the step unit from the parameters: a parameter in `1/meter` may be a density,
 not a rate along the axis, and inferring only from units of time gives time a
 privilege that no other axis has. Without `step_unit`, a failed check says to
-declare it. `check_equation_units` requires every flow to be **equal** to
+declare it. The check reads the flows the engine plans (`transition_flows`,
+in `UnitChecker._collect_unit_errors`), so a proportional rate is checked as
+its flow, `rate × source`, and never by a rule of its own in Python.
+`check_equation_units` requires every flow to be **equal** to
 `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not only
 convertible to it (`utils/equations.py`, `same_unit`).
 
@@ -312,7 +380,9 @@ reads it (`parse_equation_unit`); a computed number stays dimensionless.
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
 model would read a weekly rate as a daily one.
 
-**Guards:** `tests/units/test_model_units.py::TestStepUnit`,
+**Guards:** `tests/units/test_model_units.py::TestConsistentModels`
+(`test_a_proportional_rate_is_checked_as_its_flow`),
+`tests/units/test_model_units.py::TestStepUnit`,
 `tests/units/test_model_units.py::TestAxisUnit`,
 `tests/units/test_model_units.py::TestPositionOnTheAxis`.
 
@@ -440,47 +510,68 @@ every observation position and window start.
 
 `EngineType` (`crates/commol-core/src/types/engine.rs`) is the one list of
 model types. An entry is an engine, named by its type
-(`DifferenceEquations`, `DifferentialEquations`), and it names the model kind
-it runs (today only `compartmental`). Each entry validates its settings and
-says the form of its equations and the meaning of a rate (`per_step` or
+(`DifferenceEquations`, `DifferentialEquations`, `StochasticEvents`,
+`StochasticSteps`): a method, not a kind. It names the model kinds it runs
+(`EngineType::kinds`; today all four run `aggregate`). Each entry validates its settings and
+says the form of its dynamics (`DynamicsForm`: the schedule a description
+shows and the left-hand side of its equations) and the meaning of a rate (`per_step` or
 `continuous`). `Engine::build` (`py-commol/src/engine.rs`) builds the engine of
 an entry. A model holds its engine and the settings of that engine,
 `Model.engine = {type, settings}`, because the engine sets what a rate means,
 so a saved model reproduces its runs.
 
 Python asks the list (`commol_rs.engine.EngineType`): it builds the engine,
-prints the left-hand side of an equation and checks settings through it, and
-never branches on an engine name. It keeps the names of the compartmental
-engines only as the `Literal` `CompartmentalEngineType` (`context/engine.py`),
-for static typing and completion of `ModelBuilder.build`; a test checks that it
-equals the compartmental entries of the list. `ModelEngine.type` is a `str` that
-the list checks, so a model can name an engine of any kind. Generating the `Literal` from Rust would need
-a code-generation step for two names; the test catches the same drift. The
-entry names its model kind, so another kind (for example an agent network)
-adds entries, not a second meaning of the type; see
+writes the left-hand side of an equation and the schedule of a description,
+and checks settings through it, and
+never branches on an engine name. It keeps the names of the engines only as
+the `Literal` `EngineName` (`context/engine.py`), for static typing and
+completion of `ModelBuilder.build`; a test checks that it equals the entries of
+the list (`test_the_python_names_equal_the_engines_of_the_list`). `ModelEngine.type` is a `str` that
+the list checks, so a model can name an engine of any kind; its settings are read
+with the class of that engine (`ModelEngine.settings_of_the_engine`), so a model
+loads back with the class it was saved with. Generating the `Literal` from Rust would need
+a code-generation step for four names; the test catches the same drift. An
+entry names the kinds it runs, so another kind (for example an agent network)
+adds kinds to an entry or new entries, not a second meaning of the type; see
 [One interface for every model kind](#one-interface-for-every-model-kind).
 
-The builder takes the engine and its settings where it chooses the engine,
-`build(engine, settings=None)`, so one builder builds a model for each engine
-with its own settings. Settings of one engine given to another raise an error
+The builder takes the structure, the engine and its settings where it chooses
+them, `build(structure, engine, settings=None)`, so one builder builds a model
+for each structure and engine with its own settings. Settings of one engine given to another raise an error
 from the engine that names both.
 
 **Guards:** `crates/commol-core/src/types/engine.rs` (tests),
 `py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs`,
 `tests/building/test_engine.py`.
 
-### One right-hand side, two engines
+### Every engine reads one set of flows
 
-`CompiledModel::derivatives` (`crates/commol-model/src/system.rs`) computes
-every flow from one snapshot of the state: it is the right-hand side
-`dX/dt = Σ flows`. The difference engine adds it once per step
-(`X(n + 1) = X(n) + derivatives(n, X(n))`); the differential engine integrates
-it. Neither engine has flow logic of its own, so both run the same model.
-Accumulators are state components: a difference step adds the counted flows, a
-differential engine integrates them.
+A compiled model is a set of flows (`crates/commol-model/src/system.rs`):
+`CompiledModel::flow_rates` gives the value of each flow, its rate times its
+source for a proportional rate (`transition_rates` gives the rate alone), and
+`CompiledModel::flow_changes` gives the change of the state of one event of
+each flow: `−1` for each source piece, `+1` for each target piece and each
+accumulator. Every engine reads them, and none has flow logic of its own:
 
-**Guard:**
-`crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`.
+| Engine | Reads |
+|---|---|
+| `DifferenceEquations` | `derivatives`, `Σ changes × flow`, added once per step |
+| `DifferentialEquations` | `derivatives`, integrated |
+| `StochasticEvents` | `flow_rates` as propensities, and one event of `flow_changes` at a time |
+| `StochasticSteps` | `transition_rates` as per-step probabilities, and the drawn number of events of each flow |
+
+`derivatives` is `flow_changes`ᵀ · `flow_rates`, computed piece by piece in the
+order of the old right-hand side, so the deterministic runs did not change by
+a bit. The deterministic engines are the mean-field limits of the stochastic
+ones, which gives the main test oracle. The positions where a rate can jump
+come from the same model (`CompiledModel::breakpoints`), so the differential
+and the continuous-time stochastic engines stop at the same positions.
+
+**Guards:** `crates/commol-model/tests/flows.rs`,
+`crates/commol-difference/src/simulation.rs::one_step_adds_the_derivatives_exactly`,
+`crates/commol-stochastic/tests/oracles.rs`
+(`the_mean_of_many_runs_is_the_solution_of_the_ode`,
+`the_mean_of_many_chain_binomial_runs_is_the_difference_engine`).
 
 ### A difference step never leaves an amount below zero
 
@@ -528,6 +619,89 @@ there.
 `an_impulse_that_moves_more_than_its_source_holds_stops_its_step`,
 `an_accumulator_may_count_a_negative_net_flow`),
 `crates/commol-calibration/tests/test_infeasible_runs.rs`.
+
+### Stochastic engines and seeds
+
+A stochastic engine draws every random number from one generator seeded by
+`SimulationEngine::set_seed` (`crates/commol-core/src/simulation_engine.rs`);
+`reset` restores it, so a run is reproducible from its seed. The default
+`set_seed` does nothing, so the deterministic engines did not change.
+`EngineType::is_stochastic` says which engines draw: `StochasticEvents` and
+`StochasticSteps` (`crates/commol-stochastic/`). A run does not depend on the
+positions it reports at: `StochasticEvents` measures each wait from the last
+change of the state, never from a reported position, and draws the flow of an
+event only when the event happens.
+
+| Part | Rule |
+|---|---|
+| Generator | `Xoshiro256PlusPlus` of `rand_xoshiro`, seeded by four SplitMix64 numbers of the seed (`Generator` in `crates/commol-random/`). Its sequence is the same on every platform and version. |
+| Samplers | Exponential, Poisson, binomial and multinomial written in `commol-random` (`sample.rs`), not taken from `rand_distr`, whose values may change in a minor version. A test holds the first values of each for a fixed seed. |
+| Replicates | Replicate `i` of seed `s` takes `replicate_seed(s, i)`, the SplitMix64 of `s + i`. `run_replicates` runs them in parallel (`rayon`); a deterministic engine has no replicates. |
+| Calibration | Common random numbers: the same replicate seeds at every evaluation, so the loss is a deterministic function of the parameters (`CalibrationProblem::with_replicates`). The user chooses the summary (`ReplicateSummary`); `LossConfig` computes it. |
+
+Reproducibility has three levels: the same machine and commol version give
+the same run; another platform gives the same random numbers, but the rate
+functions come from the system's `libm` through the JIT
+(`math_expression/jit/libm.rs`), which can differ in the last bit, so a run
+there is equal in distribution and rarely differs draw by draw; another commol
+version may change a run, and the changelog says so.
+
+| Alternative | Why not |
+|---|---|
+| A random source passed to every call | The trait grows an argument that the deterministic engines ignore. |
+| The seed in the model file | A model is a description; the seed belongs to a run, as `CalibrationProblem.seed` does. |
+| `StdRng` or `SmallRng` | `StdRng` is slower and its security is not needed; `SmallRng` is documented as not portable. |
+| A pure-Rust `libm` in the JIT | Costs speed in every engine for a difference in the last bit; the levels above are documented instead. |
+| One run per calibration evaluation | The loss is noise, and Nelder-Mead stops anywhere. |
+| The mean as the default summary | What to fit is a modelling choice; the mean of runs where half go extinct describes no run. |
+
+**Guards:** `crates/commol-random/` (tests, with the stored first values of each
+sampler in `tests/reference_values.txt`), `py-commol/src/engine.rs`
+(`a_stochastic_engine_repeats_a_run_from_its_seed`,
+`an_aggregate_stochastic_engine_repeats_a_run_from_its_seed`,
+`a_deterministic_engine_ignores_the_seed`),
+`crates/commol-stochastic/tests/oracles.rs::a_run_depends_on_its_seed_and_not_on_where_it_reports`,
+`crates/commol-calibration/src/types.rs` (`replicate_tests`),
+`tests/model_kinds/test_stochastic.py`.
+
+### Whole units in a stochastic engine
+
+A stochastic engine moves whole units, so it starts from whole amounts.
+`check_model` (`crates/commol-model/src/builder.rs`, called by `build` and by
+every engine) rejects a total that is not whole, and initial amounts that are
+not whole unless the settings of the engine name a `Rounding`
+(`crates/commol-core/src/types/engine.rs`); the message lists both. There is no
+default:
+
+| `rounding` | Start of each run (`Units::begin` in `crates/commol-stochastic/src/units.rs`) |
+|---|---|
+| `"largest_remainder"` | The same whole amounts: each amount rounded down, the units left over to the largest remainders, the first compartment first on a tie |
+| `"random"` | A multinomial draw of the total with the fractions of the model, from the generator of the run |
+
+The engine rounds at the start of a run, not when it is built, so a value that
+calibration writes (`InitialConditionPlan`) goes through the same rounding, and
+`"random"` draws after the values are written. With no rounding, a written
+value that is not whole is an error.
+
+| Alternative | Why not |
+|---|---|
+| Largest remainder by default | With small amounts the rounding is a modelling choice: half a unit in each of ten groups starts five groups with one unit and five with none, which decides which groups can start a process at all. The library would choose it without notice. |
+| Random rounding by default | The same objection, the other way. |
+| Reject every amount that is not whole | Most stratified models would fail, with no way out but to compute whole amounts by hand. |
+
+A per-step probability of `StochasticSteps` outside `[0, 1]`, or proportional
+rates out of one compartment that sum to more than 1, are an error that names
+the compartment, the step and the flows (`SimulationError::Infeasible`), not a
+clamp: a binomial draw has no meaning outside `[0, 1]`, and a clamp would change
+the model without notice.
+
+**Guards:** `crates/commol-stochastic/tests/oracles.rs`
+(`amounts_that_are_not_whole_need_a_rounding`,
+`the_largest_remainder_starts_every_run_from_the_same_whole_amounts`,
+`a_random_rounding_starts_on_average_from_the_amounts_of_the_model`,
+`calibrated_initial_conditions_go_through_the_rounding`,
+`a_negative_rate_or_probabilities_above_one_fail_at_their_step`),
+`tests/stochastic/test_whole_units.py`.
 
 ### The solver is `diffsol`
 
@@ -598,12 +772,44 @@ members. Taking percentiles first gives a band that describes no member.
 
 **Rule:** every new interval goes through these two functions.
 
+### A description is data, rendered apart
+
+`Model.describe(layout)` returns a `ModelDescription`
+(`context/description.py`): sections with a key, a title and blocks from a
+closed set of Pydantic models (`Text`, `Table`, `Equations`, `StateGraph`,
+`Matrix`). The sections every kind shares come from `Model`
+(`context/_model/describe.py`); a kind adds its own through
+`ModelStructure.describe` (`Aggregate`: `context/_model/aggregate_description.py`).
+The renderers (`api/description.py`) read only blocks, so a new kind renders
+in every format with no new renderer. The form of the dynamics and the
+schedule come from the engine's list (`EngineType::dynamics_form`), because
+one structure runs as equations or as events depending on its engine.
+
+| Part | Rule |
+|---|---|
+| Equations | Computed by the code of the planner's flows (`transition_flows`), so a description shows what the engine simulates. The text rendering keeps the compact and expanded forms line by line. |
+| Diagrams | Mermaid in the Markdown rendering, only for a graph that is not `expanded`; Graphviz DOT for every graph in a `.dot` file. Text, LaTeX and JSON draw none. |
+| Layouts | `"default"`: overview, entities, dynamics, schedule, initialization, parameters, outputs. `"odd"`: the ODD protocol; an element commol cannot fill is marked `TO_BE_WRITTEN`. A section with no blocks is left out of every rendering. |
+
+| Alternative | Why not |
+|---|---|
+| A printer per kind and per format (the former `print_equations`) | Every kind writes every format, and no caller can read or export the description. |
+| A free-form dict | The renderers would guess its shape; typed blocks are checked by Pydantic and `ty`. |
+| An image (PNG, SVG) of a graph | Needs Graphviz or a browser at run time, a dependency for a view. |
+| TikZ in the LaTeX rendering | Needs node coordinates, so a layout algorithm; a PDF made from the DOT file does the same. |
+
+**Guards:** `tests/description/` (`test_equations*.py` check the lines of the
+equations through `equation_forms`; `test_rendering.py` checks the snapshots of
+`description/snapshots/`, parses the DOT with `pydot` and compiles the LaTeX
+with `latexmk` when they are installed), `tests/building/test_engine.py`
+(every engine gives a form).
+
 ### Reports
 
 `api/reporting.py` returns blocks of data, not documents:
 `simulation_report` (observed values, series, accumulators) and
 `applied_parameters_report` (calibrated parameters, and the sections of the
-model kind: `initial_conditions` for a compartmental model).
+model kind: `initial_conditions` for an aggregate model).
 
 - A single run and an ensemble differ only at the leaves (`ReportLeaf`).
 - The key order of each entry is part of the contract, because it changes saved

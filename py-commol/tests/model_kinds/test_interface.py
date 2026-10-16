@@ -1,37 +1,60 @@
-"""The interface of a model kind, and the check that an engine runs its kind."""
+"""The interface of a model kind, its variants, and the check that an engine
+runs its kind."""
 
 from typing import Literal, Self
 
 import pytest
 from pydantic import ValidationError
 
-from commol import CompartmentalStructure, Model, ModelStructure, Simulation
+from commol import Aggregate, Model, ModelStructure, Simulation
 from commol.context.engine import ModelEngine
-from tests.support import a_to_b_builder, build
-from tests.support.kinds import DecayStructure, decay_model
+from commol.context.process import Process
+from tests.support import a_to_b_builder, abc_builder, build
+from tests.support.kinds import DecayStructure, UnstratifiedVariant, decay_model
 
 
 class TestKindCheck:
-    def test_a_compartmental_engine_rejects_a_test_model(self) -> None:
+    def test_an_aggregate_engine_rejects_a_test_model(self) -> None:
         with pytest.raises(ValidationError) as error:
             decay_model(engine="DifferenceEquations")
 
-        for name in ("DifferenceEquations", "compartmental", "test"):
+        for name in ("DifferenceEquations", "aggregate", "test", "TestEngine"):
             assert name in str(error.value)
 
-    def test_the_test_engine_rejects_a_compartmental_model(self) -> None:
-        compartmental = build(a_to_b_builder())
+    def test_the_test_engine_rejects_an_aggregate_model_and_lists_its_engines(
+        self,
+    ) -> None:
+        aggregate = build(a_to_b_builder())
 
         with pytest.raises(ValidationError) as error:
             Model(
                 name="wrong",
-                parameters=compartmental.parameters,
+                parameters=aggregate.parameters,
                 engine=ModelEngine(type="TestEngine"),
-                structure=compartmental.structure,
+                process=aggregate.process,
+                structure=aggregate.structure,
             )
 
-        for name in ("TestEngine", "compartmental", "test"):
+        for name in (
+            "TestEngine",
+            "aggregate",
+            "test",
+            "DifferenceEquations",
+            "DifferentialEquations",
+        ):
             assert name in str(error.value)
+
+    def test_a_process_the_structure_cannot_run_fails_at_build(self) -> None:
+        aggregate = build(a_to_b_builder())
+
+        with pytest.raises(ValidationError, match="runs no process"):
+            Model(
+                name="wrong",
+                parameters=decay_model().parameters,
+                engine=ModelEngine(type="TestEngine"),
+                process=aggregate.process,
+                structure=decay_model().structure,
+            )
 
     def test_an_unknown_engine_lists_the_engines(self) -> None:
         with pytest.raises(ValidationError, match="DifferenceEquations"):
@@ -57,7 +80,7 @@ class TestStructureInterface:
             name="broken",
             parameters=model.parameters,
             engine=model.engine,
-            structure={"kind": "compartmental"},
+            structure={"kind": "aggregate"},
         )
 
         with pytest.raises(TypeError, match="not a ModelStructure"):
@@ -67,7 +90,7 @@ class TestStructureInterface:
         data = decay_model().model_dump(mode="json")
         data["structure"]["kind"] = "network"
 
-        with pytest.raises(ValidationError, match="compartmental"):
+        with pytest.raises(ValidationError, match="aggregate"):
             Model.model_validate(data)
 
     def test_a_model_reads_back_as_the_class_of_its_kind(self, tmp_path) -> None:
@@ -80,20 +103,107 @@ class TestStructureInterface:
         assert loaded == decay_model()
 
     def test_each_kind_declares_the_values_calibration_may_set(self) -> None:
-        compartmental = build(a_to_b_builder()).structure
+        aggregate = build(a_to_b_builder()).structure
 
-        assert isinstance(compartmental, CompartmentalStructure)
-        assert compartmental.calibration_value_types() == {"initial_condition"}
+        assert isinstance(aggregate, Aggregate)
+        assert aggregate.calibration_value_types() == {"initial_condition"}
         assert decay_model().structure.calibration_value_types() == frozenset()
 
-    def test_the_compartmental_queries_of_an_engine_name_its_kind(self) -> None:
+    def test_the_compartment_queries_of_an_engine_name_it(self) -> None:
         engine = Simulation(decay_model()).engine
 
-        with pytest.raises(ValueError, match="TestEngine engine runs test models"):
+        with pytest.raises(ValueError, match="TestEngine engine of this model"):
             engine.compartments
-        with pytest.raises(ValueError, match="not compartmental"):
+        with pytest.raises(ValueError, match="only an aggregate model"):
             engine.state
 
-    def test_a_kind_without_equations_says_so(self) -> None:
-        with pytest.raises(NotImplementedError, match="test model"):
-            decay_model().print_equations()
+    def test_a_kind_describes_itself_through_the_interface(self) -> None:
+        description = decay_model().describe()
+
+        assert description.section("dynamics").blocks
+        assert "dx/dt = -k * x" in description.render("text")
+
+
+class TestVariants:
+    """A variant keeps the kind, the fields and the engines of its structure."""
+
+    @staticmethod
+    def _variant() -> UnstratifiedVariant:
+        return UnstratifiedVariant(
+            total=1000, bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0}
+        )
+
+    def test_a_variant_saves_its_variant_and_loads_back_as_its_class(
+        self, tmp_path
+    ) -> None:
+        model = build_variant(self._variant())
+        path = tmp_path / "variant.json"
+        model.to_json(path)
+
+        loaded = Model.from_json(path)
+
+        assert model.model_dump(mode="json")["structure"]["variant"] == "test"
+        assert model.model_dump(mode="json")["structure"]["kind"] == "aggregate"
+        assert isinstance(loaded.structure, UnstratifiedVariant)
+        assert isinstance(loaded.structure, Aggregate)
+        assert loaded == model
+
+    @pytest.mark.parametrize("engine", ["DifferenceEquations", "DifferentialEquations"])
+    def test_a_variant_runs_every_engine_of_its_structure(self, engine: str) -> None:
+        plain = abc_builder()
+        expected = Simulation(
+            plain.build(plain.structure, engine=engine)  # ty: ignore[invalid-argument-type]
+        ).run(3)
+
+        results = Simulation(build_variant(self._variant(), engine=engine)).run(3)
+
+        assert results == expected
+
+    def test_the_engine_runs_the_checks_of_the_variant(self) -> None:
+        builder = abc_builder(stratifications={"group": {"g1": 0.5, "g2": 0.5}})
+        variant = UnstratifiedVariant(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        )
+
+        with pytest.raises(ValidationError, match="test aggregate structure"):
+            builder.build(variant, engine="DifferenceEquations")
+
+    def test_an_unknown_variant_lists_the_variants_of_the_kind(self) -> None:
+        data = build_variant(self._variant()).model_dump(mode="json")
+        data["structure"]["variant"] = "no_such_variant"
+
+        with pytest.raises(ValidationError, match="'test'"):
+            Model.model_validate(data)
+
+    def test_a_variant_needs_the_structure_of_its_kind(self) -> None:
+        with pytest.raises(TypeError, match="needs the structure of its kind"):
+
+            class Orphan(DecayStructure):
+                kind: Literal["orphan"] = "orphan"  # ty: ignore[invalid-assignment]
+                variant: Literal["v"] = "v"  # ty: ignore[invalid-assignment]
+
+
+def build_variant(
+    structure: UnstratifiedVariant, engine: str = "DifferenceEquations"
+) -> Model[UnstratifiedVariant]:
+    """The A → B → C process of ``abc_builder``, laid out by ``structure``."""
+    builder = abc_builder()
+    return builder.build(structure, engine=engine)  # ty: ignore[invalid-argument-type]
+
+
+def test_the_process_of_a_model_is_saved_apart_from_its_structure() -> None:
+    model = build(a_to_b_builder())
+
+    data = model.model_dump(mode="json")
+
+    assert set(data["process"]) == {
+        "bins",
+        "accumulators",
+        "stratifications",
+        "transitions",
+    }
+    assert "bins" not in data["structure"]
+    assert data["structure"]["total"] == 1000
+    assert Process.model_validate(data["process"]) == model.process

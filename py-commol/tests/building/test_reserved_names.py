@@ -2,8 +2,8 @@
 
 import pytest
 
-from commol import ModelBuilder, Simulation
-from tests.support import a_to_b_builder, build, abc_builder
+from commol import Aggregate, ModelBuilder, Simulation
+from tests.support import FactoryBuilder, a_to_b_builder, build, abc_builder
 
 
 def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:
@@ -25,14 +25,11 @@ def test_an_engine_variable_is_not_a_parameter_id(name: str) -> None:
 
 @pytest.mark.parametrize("name", ["total", "step", "t", "pi", "e"])
 def test_an_engine_variable_is_not_a_bin_id(name: str) -> None:
-    builder = ModelBuilder(name="Reserved", version="1.0")
+    builder = FactoryBuilder(name="Reserved", version="1.0")
     builder.add_bin(id=name, name=name).add_bin(id="B", name="B")
     builder.add_parameter(id="k", value=0.1)
     builder.add_transition(id="flow", source=[name], target=["B"], rate="k")
-    builder.set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": name, "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-    )
+    builder.set_structure(Aggregate(total=1000, bin_fractions={name: 1.0, "B": 0.0}))
 
     with pytest.raises(ValueError, match=f"bin '{name}'"):
         build(builder)
@@ -46,23 +43,19 @@ def test_an_engine_variable_is_not_an_accumulator_id() -> None:
 
 
 def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
-    builder = ModelBuilder(name="Reserved", version="1.0")
+    builder = FactoryBuilder(name="Reserved", version="1.0")
     builder.add_bin(id="total_y", name="total_y").add_bin(id="B", name="B")
     builder.add_stratification(id="group", categories=["y", "o"])
     builder.add_stratification(id="type", categories=["y", "o"])
     builder.add_parameter(id="k", value=0.1)
     builder.add_transition(id="flow", source=["total_y"], target=["B"], rate="k")
-    halves = [{"category": "y", "fraction": 0.5}, {"category": "o", "fraction": 0.5}]
-    builder.set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "total_y", "fraction": 1.0},
-            {"bin": "B", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {"stratification": "group", "fractions": halves},
-            {"stratification": "type", "fractions": halves},
-        ],
+    halves = {"y": 0.5, "o": 0.5}
+    builder.set_structure(
+        Aggregate(
+            total=1000,
+            bin_fractions={"total_y": 1.0, "B": 0.0},
+            stratification_fractions={"group": halves, "type": halves},
+        )
     )
 
     with pytest.raises(ValueError, match="'total_y_y'"):
@@ -103,17 +96,14 @@ def test_a_total_prefix_that_names_no_subgroup_is_a_valid_id() -> None:
 
 
 def test_a_bin_named_n_builds_and_runs() -> None:
-    builder = ModelBuilder(name="NPZ", version="1.0")
+    builder = FactoryBuilder(name="NPZ", version="1.0")
     for bin_id in ("N", "P"):
         builder.add_bin(id=bin_id, name=bin_id)
     builder.add_parameter(id="uptake", value=0.5)
     builder.add_transition(
         id="growth", source=["N"], target=["P"], rate="uptake * P / total"
     )
-    builder.set_initial_conditions(
-        total=2.5,
-        bin_fractions=[{"bin": "N", "fraction": 0.8}, {"bin": "P", "fraction": 0.2}],
-    )
+    builder.set_structure(Aggregate(total=2.5, bin_fractions={"N": 0.8, "P": 0.2}))
 
     result = Simulation(build(builder)).run(1)
 
