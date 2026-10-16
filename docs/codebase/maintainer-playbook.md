@@ -12,7 +12,7 @@ Use this page before you make or review a change. It turns the
 2. Find the owner in the [Repository map](repository-map.md).
 3. Read the tests next to that code before you change it.
 4. Make the change in the narrowest owner.
-5. Run both test suites (see [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md#commands)).
+5. Run both test suites (see [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md#commands)).
 6. Update the documentation as the mandatory
    [definition of done](conventions.md#documentation-definition-of-done) requires.
 

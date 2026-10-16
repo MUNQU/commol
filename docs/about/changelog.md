@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `latest` version of the documentation site is the documentation of the
+  last release, published from its tag; the `dev` version follows `main`.
+
 ## [0.4.0] - 2026-10-16
 
 ### Added

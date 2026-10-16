@@ -21,7 +21,7 @@ every rate to machine code, and runs it or fits it to your data.
 | Looking up a class or argument | [API Reference](api/index.md) | [Model Structure](advanced/model-structure.md) |
 | Contributing to Commol | [Codebase Guide](codebase/index.md) | [Development Workflow](development/workflow.md) |
 | An AI agent using Commol | <a href="llms.txt"><code>llms.txt</code></a>: an index of the site | <a href="llms-full.txt"><code>llms-full.txt</code></a>: the whole site in one file |
-| An AI agent changing Commol | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md) | [Codebase Guide](codebase/index.md) |
+| An AI agent changing Commol | [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md) | [Codebase Guide](codebase/index.md) |
 
 ## How Commol works
 

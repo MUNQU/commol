@@ -148,7 +148,7 @@ Bug reports, questions and suggestions are welcome in the
 code should first read the
 [contributing guide](https://munqu.github.io/commol/latest/development/contributing/),
 which explains how to set up the project and open a pull request. AI agents
-should begin with [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md).
+should begin with [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md).
 
 ## Citation
 

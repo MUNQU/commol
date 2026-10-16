@@ -25,10 +25,16 @@ maturin; use `cargo clippy` and the per-crate tests instead (see
 
 ## Branching Strategy
 
-We use a simplified Git Flow approach:
+Commol has one branch, `main` (trunk-based development): every pull request
+merges into it, through the merge queue, and a release is a tag on it.
 
-- **`main`**: Production-ready code. Protected branch.
-- **`develop`**: Integration branch for features. Used for staging releases.
+- **`main`**: The integration branch, always tested and releasable. Protected
+  by its ruleset: pull requests only, squash merges through the merge queue,
+  the required checks and a code-owner review.
+- **`release/X.Y`**: Only to fix a version that `main` has left behind. It is
+  cut from the tag `vX.Y.Z`, receives fixes copied from `main`
+  (`git cherry-pick`), and releases `vX.Y.(Z+1)`. A fix lands on `main` first.
+- **Short branches** for one piece of work each, from `main`, merged within days:
 - **`feature/*`**: New features, refactoring, or significant changes (e.g., `feature/add-stochastic-model`)
 - **`fix/*`**: Bug fixes (e.g., `fix/calculation-error`)
 - **`docs/*`**: Documentation-only changes (e.g., `docs/update-api-reference`)
@@ -77,9 +83,9 @@ gh issue list --milestone 0.5.0
 An issue is ready when every issue that blocks it is closed.
 
 The project adds a new issue as `Todo` and moves it to `Done` when it closes.
-`In Progress` is set by whoever starts the work: a pull request to `develop`
-does not link to its issue, because GitHub reads `Closes #N` only for the
-default branch. From a terminal:
+A pull request that says `Closes #N` links to its issue and closes it when it
+merges. `In Progress` is set by whoever starts the work, from the project or
+from a terminal:
 
 ```bash
 gh project item-list 1 --owner MUNQU                    # the items and their status
@@ -101,11 +107,11 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
 3. Set the item to `In Progress`, and create the branch from the issue, so
-   GitHub lists it under the issue: `gh issue develop <number> --base develop
+   GitHub lists it under the issue: `gh issue develop <number> --base main
    --name <type>/<name> --checkout`. Work one task after the other, the tests
    of a requirement before its code. Tick the tasks of the body as they land.
 4. Open the pull request with `Closes #N` and the evidence. The merge closes
-   the issue (`close-issues.yaml`).
+   the issue.
 
 ### Parallel work
 
@@ -130,11 +136,11 @@ To take a proposal while others run:
 1. Assign the issue to yourself (or to the agent that works on it) and set it
    to `In Progress`: an assigned issue is taken.
 2. Work in its own worktree, a sibling of the repository, with its own
-   CodeGraph index: `gh issue develop <number> --base develop --name
+   CodeGraph index: `gh issue develop <number> --base main --name
    <type>/<name> --worktree ../commol-worktrees/<name>`.
-3. Open the pull request as usual. The merge queue of `develop` tests it on
+3. Open the pull request as usual. The merge queue of `main` tests it on
    top of the pull requests queued before it, so a conflict in meaning fails
-   there and never reaches `develop`; a conflict in the lines of a shared
+   there and never reaches `main`; a conflict in the lines of a shared
    index (the changelog, `AGENTS.md`) is solved by keeping both.
 
 ## Development Process
@@ -142,9 +148,9 @@ To take a proposal while others run:
 ### 1. Starting New Work
 
 ```bash
-# Always start from the latest develop branch
-git checkout develop
-git pull origin develop
+# Always start from the latest main
+git checkout main
+git pull origin main
 
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -220,13 +226,9 @@ The branch name indicates the _primary purpose_ of the work, while commit types 
 git push origin feature/your-feature-name
 
 # Create a Pull Request on GitHub
-# - Target the 'develop' branch
+# - Target 'main'
 # - Fill in the PR template; "Closes #N" names the issue it delivers
 ```
-
-`.github/workflows/close-issues.yaml` closes the issues that the body names
-with `Closes`, `Fixes` or `Resolves` when the pull request merges into
-`develop`. GitHub does it by itself only for the default branch, `main`.
 
 ### 6. Code Review and CI
 
@@ -242,36 +244,23 @@ When you create a PR, automated checks run:
   `Build Documentation` and `Build Passed` (the whole test matrix)
 - An approving review from a code owner
 - No merge conflicts with target branch
-- For PRs into `develop`, the merge queue: it merges each pull request on top
-  of the ones queued before it, after the required checks pass on that result
+- The merge queue: it merges each pull request on top of the ones queued
+  before it, after the required checks pass on that result
 - Code coverage should be >95%
 
-### 7. Merging to Develop
+### 7. Merging
 
-Once approved:
+Once approved, add the pull request to the merge queue ("Merge when ready", or
+`gh pr merge <number> --squash`): the queue squash-merges it, the only method
+`main` allows, once the required checks pass on top of the pull requests before
+it. GitHub deletes the branch after the merge (`delete_branch_on_merge`);
+delete your local copy with `git branch -D <branch>` after `git fetch --prune`.
 
-Add the pull request to the merge queue ("Merge when ready", or `gh pr merge
-<number> --squash`): the queue squash-merges it, the only method `develop`
-allows, once the required checks pass on top of the pull requests before it.
-GitHub deletes the branch after the merge (`delete_branch_on_merge`); delete
-your local copy with `git branch -D <branch>` after `git fetch --prune`.
-
-### 8. Promoting Develop to Main
-
-To release, open a pull request from `develop` to `main` and merge it with
-**"Create a merge commit"**, never "Squash and merge".
-
-A merge commit keeps the history of `develop` inside `main`, so the next
-promotion only carries the new commits. A squash adds to `main` a commit that
-`develop` does not have, so the two histories drift apart. The next promotion
-then conflicts on any file that changed again in `develop`, and fixing it needs
-a merge pushed to `develop` with an admin bypass.
-
-`main` does not require the branch to be up to date: the CI of the pull request
-already tests the result of merging it into `main`.
+A release needs no merge between branches: it is a tag on `main` ([Release
+Process](release.md)).
 
 !!! note "Dependabot reads its configuration from `main`"
-    Changes to `.github/dependabot.yaml` take effect only once they reach `main`.
+    Changes to `.github/dependabot.yaml` take effect once they reach `main`.
     Updating the file there also triggers a version-update check right away.
 
 ## Continuous Integration Pipelines
@@ -280,10 +269,9 @@ already tests the result of merging it into `main`.
 |---|---|---|---|
 | Code Quality (`code-quality.yaml`) | Every push and pull request | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`). Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test. | `Python Code Quality`, `Rust Code Quality` |
 | Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
-| Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike on pushes to `main` (`latest`) and `develop` (`dev`). | `Build Documentation` |
+| Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
-| Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `develop` | The same required checks, on the pull request merged on top of the ones queued before it | The same |
-| Close Issues (`close-issues.yaml`) | A pull request merged into `develop` | Closes the issues its body names with `Closes`, `Fixes` or `Resolves`. | — |
+| Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `main` | The same required checks, on the pull request merged on top of the ones queued before it | The same |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 
 ## Local Development Tips
@@ -341,7 +329,7 @@ CI.
 
 Once a month, Dependabot (`.github/dependabot.yaml`, ecosystem
 `rust-toolchain`) checks for a newer stable release, and opens a pull
-request to `develop` that changes `channel`. Its CI runs the new clippy, so
+request to `main` that changes `channel`. Its CI runs the new clippy, so
 the new lints fail there, not in a feature branch. To move to a newer Rust
 by hand, or to fix the lints of that pull request:
 
@@ -384,15 +372,15 @@ Visit http://127.0.0.1:8000 to view the documentation locally.
 
 Commol maintains two documentation versions:
 
-- **`latest`**: Documentation for the current stable release from the `main` branch
-- **`dev`**: Development documentation from the `develop` branch
+- **`latest`**: Documentation of the last release, built from its tag
+- **`dev`**: Development documentation, built from `main`
 
 #### Automatic Deployment
 
-Documentation is automatically deployed when pushing to tracked branches:
+Documentation is deployed automatically:
 
-- **Push to `main`**: Deploys to `latest` version
-- **Push to `develop`**: Deploys to `dev` version
+- **A release tag `vX.Y.Z`**: deploys the `latest` version
+- **A push to `main`**: deploys the `dev` version
 - **Pull requests**: Build and validate documentation without deploying
 
 Users can switch between versions using the version selector in the documentation site.
@@ -402,12 +390,12 @@ Users can switch between versions using the version selector in the documentatio
 If you need to manually deploy documentation:
 
 ```bash
-# Deploy latest version (from main branch) - with venv activated
+# Deploy latest version (from a checkout of the release tag) - with venv activated
 cd py-commol
 mike deploy --push --update-aliases latest
 mike set-default --push latest
 
-# Deploy dev version (from develop branch)
+# Deploy dev version (from main)
 cd py-commol
 mike deploy --push dev
 

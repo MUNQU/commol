@@ -18,7 +18,7 @@ benchmark, a paper. -->
 
 ## Current state
 
-<!-- Verified on `develop` at `<sha>`, YYYY-MM-DD. What the code does today,
+<!-- Verified on `main` at `<sha>`, YYYY-MM-DD. What the code does today,
 with the paths and symbols an agent must read first:
 `crates/<crate>/src/<file>.rs` (`function`), `py-commol/commol/<module>.py`
 (`Class.method`). No overviews of the repository. -->
@@ -77,7 +77,7 @@ approved with a link to the comment that approves it. -->
 
 ## Delivery
 
-- Branch: `<type>/<name>` from `develop`
+- Branch: `<type>/<name>` from `main`
 - Breaking: yes | no
 - Release: the milestone of the issue
 - Parallel with: <!-- written by `python .github/scripts/parallel.py --write` -->

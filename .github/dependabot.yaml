@@ -12,7 +12,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    target-branch: "develop"
     groups:
       # The cranelift crates must share one version, and each 0.x release is a
       # major update; the whole family moves together. Listed first, because a
@@ -38,13 +37,11 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    target-branch: "develop"
 
   - package-ecosystem: "uv" # Python dependencies
     directory: "/py-commol"
     schedule:
       interval: "monthly"
-    target-branch: "develop"
     groups:
       python-minor-patch:
         patterns: ["*"]
@@ -54,7 +51,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    target-branch: "develop"
     groups:
       github-actions:
         patterns: ["*"]

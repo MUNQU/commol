@@ -15,7 +15,7 @@ then the commands you ran and their results. -->
 ## Documentation (mandatory)
 
 Every change ships with its documentation. See the
-[documentation definition of done](https://github.com/MUNQU/commol/blob/develop/docs/codebase/conventions.md#documentation-definition-of-done).
+[documentation definition of done](https://github.com/MUNQU/commol/blob/main/docs/codebase/conventions.md#documentation-definition-of-done).
 
 - [ ] I updated every doc the change affects (step 1 of the definition of done), or this change affects no docs because: <!-- reason -->
 - [ ] Docstrings (Python) and rustdoc (Rust) cover every new or changed public item

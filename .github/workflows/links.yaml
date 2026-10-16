@@ -4,7 +4,7 @@ name: Links
 # `mkdocs build --strict` in the Documentation workflow.
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "docs/**"
       - "README.md"

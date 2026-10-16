@@ -7,9 +7,9 @@ index for maintainers and AI agents, not an API reference: for the public API,
 see the [User Guide](../guide/core-concepts.md) and the
 [API Reference](../api/model-builder.md).
 
-!!! note "These pages describe `develop`"
-    The `dev` version of this site is built from `develop` and may describe
-    unreleased code. The `latest` version is built from `main`.
+!!! note "These pages describe `main`"
+    The `dev` version of this site is built from `main` and may describe
+    unreleased code. The `latest` version is built from the last release tag.
 
 ## Who this is for
 
@@ -18,7 +18,7 @@ see the [User Guide](../guide/core-concepts.md) and the
 | New maintainer | Build the mental model before you touch files. |
 | Contributor | Find the module that owns a behavior. |
 | Reviewer | Check that a pull request changes the right layer. |
-| AI agent | Start from [`AGENTS.md`](https://github.com/MUNQU/commol/blob/develop/AGENTS.md), then read these pages by path. |
+| AI agent | Start from [`AGENTS.md`](https://github.com/MUNQU/commol/blob/main/AGENTS.md), then read these pages by path. |
 
 ## 90-second mental model
 

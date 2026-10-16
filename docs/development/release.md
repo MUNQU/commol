@@ -68,16 +68,16 @@ release:
 
 ```bash
 git fetch --tags origin
-git log --oneline --first-parent "$(git describe --tags --abbrev=0 origin/main)"..origin/develop
+git log --oneline --first-parent "$(git describe --tags --abbrev=0 origin/main)"..origin/main
 ```
 
 Use the Version Guidelines above. The `[Unreleased]` section of
 `docs/about/changelog.md` lists the changes, and the breaking ones are marked
 **Breaking**.
 
-### Step 2: Date the Changelog in `develop`
+### Step 2: Date the Changelog
 
-On a branch from `develop`, in `docs/about/changelog.md`:
+On a branch from `main`, in `docs/about/changelog.md`:
 
 1. Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, the day you
    publish, and add an empty `## [Unreleased]` above it.
@@ -92,19 +92,13 @@ Check the notes the release will have (Step 5):
 python .github/scripts/release_notes.py X.Y.Z
 ```
 
-Open the pull request to `develop` (`docs(changelog): release X.Y.Z`) and
-merge it. `main` then carries the changelog of its own release.
+Open the pull request to `main` (`docs(changelog): release X.Y.Z`) and merge
+it through the merge queue.
 
-### Step 3: Promote `develop` to `main`
+### Step 3: Wait for the Build of `main`
 
-Open a pull request from `develop` to `main` and merge it with **"Create a
-merge commit"**, the only method the `main` ruleset allows (see
-[Development Workflow](workflow.md#8-promoting-develop-to-main)). Wait until the
-**Build** run of the push to `main` passes: it is the only run that builds the
-wheels for every target architecture.
-
-You do not need to merge `main` back into `develop`: the merge commit keeps the
-two histories together.
+Wait until the **Build** run of the push of that merge to `main` passes: it is
+the only run that builds the wheels for every target architecture.
 
 ### Step 4: Create the Tag
 
@@ -226,8 +220,7 @@ The release issue repeats this list.
 
 - [ ] Every issue of the milestone closed
 - [ ] Version chosen
-- [ ] Changelog dated in `develop`, with its opening paragraph
-- [ ] `develop` merged into `main` with a merge commit
+- [ ] Changelog dated on `main`, with its opening paragraph
 - [ ] **Build** run on `main` passed
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
 - [ ] GitHub release published with the notes of `release_notes.py`
@@ -250,7 +243,7 @@ The release issue repeats this list.
 Nothing reaches PyPI when a build job fails, because the upload job needs all
 of them.
 
-1. Fix the problem on `develop` and promote it to `main` (Step 3)
+1. Fix the problem on `main` (a pull request through the merge queue)
 2. Delete the GitHub release and the tag:
 
     ```bash
