@@ -134,7 +134,7 @@ pub(crate) fn integrate_with(
     let Some(&end) = positions.last() else {
         return Ok(());
     };
-    let breakpoints = breakpoints(model, t0, end)?;
+    let breakpoints = model.breakpoints(t0, end)?;
     let len = state.len();
     let rhs = RightHandSide {
         model: RefCell::new(model),
@@ -205,31 +205,6 @@ struct Plan<'p> {
     /// Ends of the pieces, ascending; the last one is the last position.
     breakpoints: &'p [f64],
     positions: &'p [f64],
-}
-
-/// Ends of the pieces of an integration from `t0` to `end`: the impulse
-/// positions, the values a rate compares `t` with, the points of the series
-/// read at `t` and, when the right-hand side reads `step`, the integers.
-fn breakpoints(model: &mut CompiledModel, t0: f64, end: f64) -> Result<Vec<f64>, String> {
-    let mut points: Vec<f64> = model
-        .impulse_positions(t0, end)
-        .into_iter()
-        .filter(|&position| position > t0)
-        .collect();
-    points.extend(model.time_thresholds(t0, end)?);
-    points.extend(model.series_points(t0, end));
-    if model.depends_on_step() {
-        let mut n = t0.floor() + 1.0;
-        while n < end {
-            points.push(n);
-            n += 1.0;
-        }
-    }
-    points.push(end);
-    points.sort_by(f64::total_cmp);
-    points.dedup_by(|later, earlier| same_position(*later, *earlier));
-    points.retain(|&point| !same_position(point, t0));
-    Ok(points)
 }
 
 /// Integrate every piece of `plan` with `solver`, restarting it at the start

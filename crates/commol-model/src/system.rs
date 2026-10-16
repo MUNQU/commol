@@ -7,7 +7,7 @@ use commol_core::{MathExpressionContext, SPECIAL_VAR_TOTAL};
 use crate::labels::OutputLabels;
 
 use crate::rates::{Clock, evaluate_rate};
-use crate::types::{CompiledModel, TransitionFlow};
+use crate::types::{CompiledModel, FlowChange, TransitionFlow, same_position};
 
 // Cached parameter name to avoid string allocations
 const PARAM_T: &str = "t";
@@ -112,12 +112,14 @@ impl CompiledModel {
     /// The right-hand side of the model: the net flow into each component of
     /// the state.
     ///
-    /// `state` and `out` have [`Self::state_len`] components. Every flow is
-    /// computed from the compartments of `state` (the accumulators are not
-    /// read), subtracted from its source, added to its target and added to
-    /// each accumulator that counts it. Rates see `step` and `t`: a difference
-    /// engine passes the same value for both; a differential engine passes the
-    /// step that holds `t`.
+    /// `state` and `out` have [`Self::state_len`] components. It is
+    /// `Σ changes × flow` over the flows of the model: each flow
+    /// ([`Self::flow_rates`]) is subtracted from its sources, added to its
+    /// targets and added to each accumulator that counts it
+    /// ([`Self::flow_changes`]). Every flow is computed from the compartments
+    /// of `state` (the accumulators are not read). Rates see `step` and `t`:
+    /// a difference engine passes the same value for both; a differential
+    /// engine passes the step that holds `t`.
     ///
     /// A difference step is `state += out`; a differential engine integrates
     /// `dX/dt = out`.
@@ -133,27 +135,179 @@ impl CompiledModel {
         state: &[f64],
         out: &mut [f64],
     ) -> Result<(), String> {
-        let num_compartments = self.compartments.len();
-        let amounts = &state[..num_compartments];
-        out.fill(0.0);
-        let clock = self.prepare_context(step, t, amounts)?;
+        let mut flows = std::mem::take(&mut self.flow_buffer);
+        let result = self.flow_rates(step, t, state, &mut flows);
+        if result.is_ok() {
+            out.fill(0.0);
+            for (change, &flow) in self.flow_changes.iter().zip(&flows) {
+                add_changes(change, flow, out);
+            }
+        }
+        self.flow_buffer = flows;
+        result
+    }
 
+    /// The value of each flow of the model: the term
+    /// [`Self::derivatives`] adds for it.
+    ///
+    /// `out` has one component per flow, in the order of
+    /// [`Self::flow_changes`]. A proportional flow is its rate times its
+    /// source; an absolute flow is its rate. In a stochastic engine it is the
+    /// propensity of the flow: the expected number of its events per unit of
+    /// the axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a formula parameter or a rate cannot be
+    /// evaluated.
+    pub fn flow_rates(
+        &mut self,
+        step: f64,
+        t: f64,
+        state: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), String> {
+        self.transition_rates(step, t, state, out)?;
+        let amounts = &state[..self.compartments.len()];
+        for (flow, change) in out.iter_mut().zip(&self.flow_changes) {
+            if let Some(source) = change.proportional_to {
+                *flow *= amounts[source];
+            }
+        }
+        Ok(())
+    }
+
+    /// The rate of each flow of the model, as its expression gives it: per
+    /// unit of its source for a proportional flow, the flow itself for an
+    /// absolute one.
+    ///
+    /// `out` has one component per flow, in the order of
+    /// [`Self::flow_changes`]. A chain binomial reads a proportional rate as
+    /// the probability that one unit of the source leaves in the step.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a formula parameter or a rate cannot be
+    /// evaluated.
+    pub fn transition_rates(
+        &mut self,
+        step: f64,
+        t: f64,
+        state: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), String> {
+        let amounts = &state[..self.compartments.len()];
+        let clock = self.prepare_context(step, t, amounts)?;
         // Stack buffer for the JIT input vector — most rate expressions
         // reference <= 16 variables.
         let mut jit_buf = [0.0_f64; 16];
-        let (compartment_out, accumulator_out) = out.split_at_mut(num_compartments);
-        for flow_info in &self.transition_flows {
-            let flow = flow_amount(
+        for (rate, flow_info) in out.iter_mut().zip(&self.transition_flows) {
+            *rate = evaluate_rate(
                 flow_info,
                 amounts,
                 &mut self.expression_context,
                 clock,
                 &mut jit_buf,
             )?;
-            add_flow(flow_info, flow, compartment_out, accumulator_out);
         }
-
         Ok(())
+    }
+
+    /// The change of the state of one event of each flow, in the order of
+    /// [`Self::flow_rates`].
+    pub fn flow_changes(&self) -> &[FlowChange] {
+        &self.flow_changes
+    }
+
+    /// The change of the state of one event of each impulse, in the order
+    /// [`Self::impulse_rates`] numbers them.
+    pub fn impulse_changes(&self) -> &[FlowChange] {
+        &self.impulse_changes
+    }
+
+    /// The rate of each impulse that acts at position `t`, as its expression
+    /// gives it (the fraction of its source for a proportional impulse, the
+    /// amount for an absolute one), written into `out` as `(impulse index,
+    /// rate)`, in the order of [`Self::impulse_changes`].
+    ///
+    /// Every rate is computed from `state`. Rates see `step = floor(t)` and
+    /// `t`, as in [`Self::apply_impulses`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a rate cannot be evaluated.
+    pub fn impulse_rates(
+        &mut self,
+        t: f64,
+        state: &[f64],
+        out: &mut Vec<(usize, f64)>,
+    ) -> Result<(), String> {
+        out.clear();
+        if !self
+            .impulse_flows
+            .iter()
+            .any(|impulse| impulse.schedule.fires_at(t))
+        {
+            return Ok(());
+        }
+        let amounts = &state[..self.compartments.len()];
+        let clock = self.prepare_context(t.floor(), t, amounts)?;
+        let mut jit_buf = [0.0_f64; 16];
+        for (index, impulse) in self.impulse_flows.iter().enumerate() {
+            if impulse.schedule.fires_at(t) {
+                let rate = evaluate_rate(
+                    &impulse.flow,
+                    amounts,
+                    &mut self.expression_context,
+                    clock,
+                    &mut jit_buf,
+                )?;
+                out.push((index, rate));
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether a rate can change between two breakpoints while the state
+    /// stays fixed: a rate or a formula parameter reads `t`, or a
+    /// `"linear"` series changes along it.
+    pub fn reads_time(&self) -> bool {
+        self.reads_time
+    }
+
+    /// The positions in `(from, to]` where the right-hand side can jump,
+    /// ascending and without duplicates, ending at `to`: the impulse
+    /// positions, the values a rate compares `t` with, the points of a series
+    /// read at `t` and, when a rate reads `step` or a pulse series, every
+    /// integer.
+    ///
+    /// An engine in continuous time stops at each of them, so no step crosses
+    /// a discontinuity.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when a value a rate compares `t` with cannot be
+    /// evaluated.
+    pub fn breakpoints(&mut self, from: f64, to: f64) -> Result<Vec<f64>, String> {
+        let mut points: Vec<f64> = self
+            .impulse_positions(from, to)
+            .into_iter()
+            .filter(|&position| position > from)
+            .collect();
+        points.extend(self.time_thresholds(from, to)?);
+        points.extend(self.series_points(from, to));
+        if self.depends_on_step {
+            let mut n = from.floor() + 1.0;
+            while n < to {
+                points.push(n);
+                n += 1.0;
+            }
+        }
+        points.push(to);
+        points.sort_by(f64::total_cmp);
+        points.dedup_by(|later, earlier| same_position(*later, *earlier));
+        points.retain(|&point| !same_position(point, from));
+        Ok(points)
     }
 
     /// Whether the model has impulse transitions.
@@ -272,8 +426,7 @@ impl CompiledModel {
         let clock = self.prepare_context(t.floor(), t, amounts)?;
 
         let mut jit_buf = [0.0_f64; 16];
-        let (compartment_out, accumulator_out) = state.split_at_mut(num_compartments);
-        for impulse in &self.impulse_flows {
+        for (impulse, change) in self.impulse_flows.iter().zip(&self.impulse_changes) {
             if !impulse.schedule.fires_at(t) {
                 continue;
             }
@@ -284,7 +437,7 @@ impl CompiledModel {
                 clock,
                 &mut jit_buf,
             )?;
-            add_flow(&impulse.flow, amount, compartment_out, accumulator_out);
+            add_changes(change, amount, state);
         }
         Ok(true)
     }
@@ -478,30 +631,12 @@ fn drains<'a>(
     Ok(drains)
 }
 
-/// Subtract `flow` from the sources of a flow, add it to its targets and to
-/// the accumulators that count it.
+/// Add `flow` times the change of one event to `out`: subtract it from the
+/// sources of a flow, add it to its targets and to the accumulators that
+/// count it.
 #[inline]
-fn add_flow(
-    flow_info: &TransitionFlow,
-    flow: f64,
-    compartment_out: &mut [f64],
-    accumulator_out: &mut [f64],
-) {
-    if let Some(src) = flow_info.source_index {
-        compartment_out[src] -= flow;
-    }
-    if let Some(tgt) = flow_info.target_index {
-        compartment_out[tgt] += flow;
-    }
-    for &(src, tgt) in &flow_info.extra_pieces {
-        if let Some(src) = src {
-            compartment_out[src] -= flow;
-        }
-        if let Some(tgt) = tgt {
-            compartment_out[tgt] += flow;
-        }
-    }
-    for &accumulator_idx in &flow_info.accumulator_indices {
-        accumulator_out[accumulator_idx] += flow;
+fn add_changes(change: &FlowChange, flow: f64, out: &mut [f64]) {
+    for &(index, sign) in &change.changes {
+        out[index] += sign * flow;
     }
 }

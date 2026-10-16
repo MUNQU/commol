@@ -5,7 +5,7 @@ use crate::helpers::rate_to_string;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
 use crate::types::{
-    AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp,
+    AccumulatorOutputRef, CompiledModel, FastRateExpression, FastRateOp, FlowChange,
     GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter, SubgroupTotalLayout,
     SubgroupTotalMapping, TransitionFlow, VarSlot,
 };
@@ -228,11 +228,22 @@ impl CompiledModel {
             &formula_parameters,
         );
         let depends_on_step = series_parameters.iter().any(SeriesParameter::reads_step)
-            || reads_step(
+            || reads_variable(
                 transition_flows
                     .iter()
                     .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
                 &formula_parameters,
+                SPECIAL_VAR_STEP,
+            );
+        let reads_time = series_parameters
+            .iter()
+            .any(SeriesParameter::changes_along_t)
+            || reads_variable(
+                transition_flows
+                    .iter()
+                    .chain(impulse_flows.iter().map(|impulse| &impulse.flow)),
+                &formula_parameters,
+                SPECIAL_VAR_T,
             );
         let time_thresholds = time_thresholds(
             transition_flows
@@ -264,6 +275,17 @@ impl CompiledModel {
             .chain(std::iter::repeat_n(0.0, accumulator_map.len()))
             .collect();
 
+        let num_compartments = compartments.len();
+        let flow_changes = transition_flows
+            .iter()
+            .map(|flow| FlowChange::of(flow, num_compartments))
+            .collect();
+        let impulse_changes = impulse_flows
+            .iter()
+            .map(|impulse| FlowChange::of(&impulse.flow, num_compartments))
+            .collect();
+        let flow_buffer = vec![0.0; transition_flows.len()];
+
         Ok(Self {
             compartments,
             total: aggregate.initial_conditions.total,
@@ -272,8 +294,12 @@ impl CompiledModel {
             initial_state,
             expression_context,
             transition_flows,
+            flow_changes,
+            impulse_changes,
+            flow_buffer,
             impulse_flows,
             depends_on_step,
+            reads_time,
             time_thresholds,
             subgroup_total_mappings,
             formula_parameters,
@@ -1003,16 +1029,17 @@ fn check_bin_names_against_subgroup_totals(
     ))
 }
 
-/// Whether a rate or a formula parameter reads `step`.
-fn reads_step<'a>(
+/// Whether a rate or a formula parameter reads the variable `name`.
+fn reads_variable<'a>(
     transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
     formula_parameters: &[(String, RateMathExpression)],
+    name: &str,
 ) -> bool {
     transition_flows
         .into_iter()
         .map(|flow| &flow.rate_expression)
         .chain(formula_parameters.iter().map(|(_, expression)| expression))
-        .any(|expression| expression.reads_variable(SPECIAL_VAR_STEP))
+        .any(|expression| expression.reads_variable(name))
 }
 
 /// The values that a rate or a formula parameter compares `t` with (`t < c`,

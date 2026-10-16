@@ -55,4 +55,4 @@ pub use engine::CompartmentalEngine;
 pub use flows::{FlowDescription, describe_flows};
 pub use initial_conditions::InitialConditionPlan;
 pub use labels::{OutputLabels, output_sums};
-pub use types::CompiledModel;
+pub use types::{CompiledModel, FlowChange};
