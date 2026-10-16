@@ -2,54 +2,64 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same structure from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
+A `Model` is a tree of Pydantic models. `ModelBuilder` creates it, `Model.to_json` writes it, and the Rust engine reads the same tree from JSON (`crates/commol-core/src/types/`). Most users never build these types by hand; read this page to understand model files or to work on Commol.
 
-A model has a header that every kind of model has, an engine, and a `structure`: the part of its kind, tagged in JSON by `kind`. The only kind is `compartmental`, which `ModelBuilder` builds.
+A model has a header, a **process** written once, a **structure** that lays the process out, and an **engine** that runs it. The process (bins, accumulators, stratifications, transitions) is the same for every kind of model; the structure changes between kinds and is tagged in JSON by `kind`, and by `variant` for a narrower form of a structure. The kind today is `aggregate`: amounts per compartment.
 
 ```text
 Model                      name, description, version, step_unit
 ├── parameters: [Parameter]                (a value may be a SeriesValue)
 ├── engine: ModelEngine
-│   ├── type: "DifferenceEquations" or "DifferentialEquations"
-│   └── settings: OdeSolver | None          (settings of that engine; None: its defaults)
-└── structure: CompartmentalStructure      (kind: "compartmental")
-    ├── bins: [Bin]
-    ├── accumulators: [Accumulator]
-    ├── stratifications: [Stratification]
-    │   └── conditions: [StratificationCondition]
-    ├── transitions: [Transition]          (impulse_at, impulse_every for impulses)
-    │   └── stratified_rates: [StratifiedRate]
-    │       └── conditions: [StratificationCondition]
-    └── initial_conditions: InitialConditions
-        ├── bin_fractions: [BinFraction]
-        ├── stratification_fractions: [StratificationFractions]
-        │   └── fractions: [StratificationFraction]
-        └── compartment_fractions: [CompartmentFraction]
+│   ├── type: "DifferenceEquations", "DifferentialEquations",
+│   │         "StochasticEvents" or "StochasticSteps"
+│   └── settings: OdeSolver | StochasticEventsSettings | StochasticStepsSettings | None
+│                                           (settings of that engine; None: its defaults)
+├── process: Process
+│   ├── bins: [Bin]
+│   ├── accumulators: [Accumulator]
+│   ├── stratifications: [Stratification]
+│   │   └── conditions: [StratificationCondition]
+│   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
+│       └── stratified_rates: [StratifiedRate]
+│           └── conditions: [StratificationCondition]
+└── structure: Aggregate                   (kind: "aggregate", variant: None)
+    ├── total: float
+    ├── bin_fractions: {bin: fraction | None}
+    ├── stratification_fractions: {stratification: {category: fraction}}
+    ├── compartment_fractions: {compartment: fraction}
+    └── neighbors: Complete | Groups | None
 ```
 
-In JSON the structure is an object with its `kind` and the fields of its class:
+In JSON the structure is an object with its `kind`, its `variant` and the fields of its class:
 
 ```json
 {
   "name": "Model",
   "parameters": [],
   "engine": {"type": "DifferenceEquations", "settings": null},
-  "structure": {"kind": "compartmental", "bins": [], "...": "..."},
+  "process": {"bins": [], "accumulators": [], "stratifications": [], "transitions": []},
+  "structure": {
+    "kind": "aggregate",
+    "variant": null,
+    "total": 1000.0,
+    "bin_fractions": {"A": 0.99, "B": 0.01},
+    "stratification_fractions": {},
+    "compartment_fractions": {},
+    "neighbors": null
+  },
   "step_unit": null
 }
 ```
 
-`Model` itself is documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine and both kinds.
+`Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete` and `Groups` are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md). The engine must run the kind of the structure: a model whose engine runs another kind is rejected when it is made, with an error that names the engine, both kinds and the engines of the kind of the model. A variant keeps the kind, the fields and the engines of its structure, and loads back as its own class ([Design decisions](https://munqu.github.io/commol/latest/codebase/design-decisions/#a-model-is-a-header-a-process-a-structure-and-an-engine)).
 
-## Compartmental structure
-
-`CompartmentalStructure` and `ModelStructure`, the interface every kind gives, are documented in [Model API](https://munqu.github.io/commol/latest/api/model/index.md).
+## Bins and accumulators
 
 ## Bin
 
 Bases: `BaseModel`
 
-Defines a single bin (base category) in the compartmental model.
+Defines a single bin (base category) of the process of a model.
 
 A bin represents a fundamental category before stratification. The combination of a bin with all stratifications produces the actual compartments.
 
@@ -66,7 +76,7 @@ Source code in `commol/context/bin.py`
 ```python
 class Bin(BaseModel):
     """
-    Defines a single bin (base category) in the compartmental model.
+    Defines a single bin (base category) of the process of a model.
 
     A bin represents a fundamental category before stratification. The combination
     of a bin with all stratifications produces the actual compartments.
@@ -1042,10 +1052,10 @@ The engine that runs a model, and its settings.
 
 Attributes:
 
-| Name       | Type             | Description                                                                                                                                                                    |
-| ---------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `type`     | `str`            | Name of an engine of the engine's list, such as "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). The engine must run the kind of the model. |
-| `settings` | \`EngineSettings | None\`                                                                                                                                                                         |
+| Name       | Type             | Description                                                                                                                                                                                     |
+| ---------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`     | `str`            | Name of an engine of the engine's list, such as "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). The engine must run the kind of the structure of the model. |
+| `settings` | \`EngineSettings | None\`                                                                                                                                                                                          |
 
 Source code in `commol/context/engine.py`
 
@@ -1060,10 +1070,12 @@ class ModelEngine(BaseModel):
         Name of an engine of the engine's list, such as
         ``"DifferenceEquations"`` (discrete time) or
         ``"DifferentialEquations"`` (continuous time). The engine must run the
-        kind of the model.
+        kind of the structure of the model.
     settings : EngineSettings | None
-        Settings of that engine; None uses its defaults. Only
-        ``DifferentialEquations`` takes settings (`OdeSolver`).
+        Settings of that engine; None uses its defaults.
+        ``DifferentialEquations`` takes `OdeSolver`, ``StochasticEvents``
+        takes `StochasticEventsSettings` and ``StochasticSteps`` takes
+        `StochasticStepsSettings`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1072,6 +1084,15 @@ class ModelEngine(BaseModel):
     settings: EngineSettings | None = Field(
         default=None, description="Settings of the engine; None uses its defaults."
     )
+
+    @field_validator("settings", mode="before")
+    @classmethod
+    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+        """Read settings given as a mapping with the class of their engine."""
+        settings_class = _SETTINGS.get(info.data.get("type", ""))
+        if isinstance(value, dict) and settings_class is not None:
+            return settings_class.model_validate(value)
+        return value
 
     @model_validator(mode="after")
     def check_settings(self) -> Self:
@@ -1084,6 +1105,27 @@ class ModelEngine(BaseModel):
 ```
 
 ### Methods:
+
+#### settings_of_the_engine
+
+```python
+settings_of_the_engine(value: Any, info: ValidationInfo) -> Any
+```
+
+Read settings given as a mapping with the class of their engine.
+
+Source code in `commol/context/engine.py`
+
+```python
+@field_validator("settings", mode="before")
+@classmethod
+def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    """Read settings given as a mapping with the class of their engine."""
+    settings_class = _SETTINGS.get(info.data.get("type", ""))
+    if isinstance(value, dict) and settings_class is not None:
+        return settings_class.model_validate(value)
+    return value
+```
 
 #### check_settings
 
@@ -1108,43 +1150,51 @@ def check_settings(self) -> Self:
 
 ## Initial conditions
 
+`Aggregate` holds the fields and methods of `InitialConditions`, and checks them against the process when the model is built.
+
 ## InitialConditions
 
 Bases: `BaseModel`
 
-Initial conditions for a simulation.
+How much starts where: the total and the fractions of it.
+
+`Aggregate` holds these fields and their methods; the checks against the bins and the stratifications of the process are in `Aggregate.check_model`.
 
 Attributes:
 
-| Name                       | Type                                        | Description                                                                                                                                                    |
-| -------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total`                    | `float`                                     | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                                            |
-| `bin_fractions`            | `list[BinFraction]`                         | List of bin fractions. Each item contains a bin id and its initial fractional size. Fractions can be None if they need calibration.                            |
-| `stratification_fractions` | `(list[StratificationFractions], optional)` | List of stratification fractions. Each item contains a stratification id and its category fractions.                                                           |
-| `compartment_fractions`    | `(list[CompartmentFraction], optional)`     | List of per-compartment overrides applied after the uniform expansion. Each item contains an expanded compartment name and the fraction of the total it holds. |
+| Name                       | Type                          | Description                                                                                                                                 |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total`                    | `float`                       | The sum of every compartment at the start, finite and greater than 0. It can be a count, a mass or a concentration.                         |
+| `bin_fractions`            | \`dict\[str, float            | None\]\`                                                                                                                                    |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category. A conditional stratification splits only the group its conditions select. |
+| `compartment_fractions`    | `dict[str, float]`            | Fractions of the total in single expanded compartments, by compartment name, applied after the expansion.                                   |
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
 class InitialConditions(BaseModel):
     """
-    Initial conditions for a simulation.
+    How much starts where: the total and the fractions of it.
+
+    `Aggregate` holds these fields and their methods; the checks against the
+    bins and the stratifications of the process are in
+    `Aggregate.check_model`.
 
     Attributes
     ----------
     total : float
         The sum of every compartment at the start, finite and greater than 0.
         It can be a count, a mass or a concentration.
-    bin_fractions : list[BinFraction]
-        List of bin fractions. Each item contains a bin id and
-        its initial fractional size. Fractions can be None if they need calibration.
-    stratification_fractions : list[StratificationFractions], optional
-        List of stratification fractions. Each item contains a stratification id and
-        its category fractions.
-    compartment_fractions : list[CompartmentFraction], optional
-        List of per-compartment overrides applied after the uniform expansion. Each
-        item contains an expanded compartment name and the fraction of the total
-        it holds.
+    bin_fractions : dict[str, float | None]
+        The fraction of the total in each bin, by bin id. None leaves a
+        fraction for calibration.
+    stratification_fractions : dict[str, dict[str, float]]
+        The fraction of each category, by stratification id and category.
+        A conditional stratification splits only the group its conditions
+        select.
+    compartment_fractions : dict[str, float]
+        Fractions of the total in single expanded compartments, by compartment
+        name, applied after the expansion.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1153,26 +1203,22 @@ class InitialConditions(BaseModel):
         ...,
         description="The sum of every compartment at the start, finite and > 0.",
     )
-    bin_fractions: list[BinFraction] = Field(
-        default=...,
+    bin_fractions: dict[str, float | None] = Field(
+        ...,
         description=(
-            "List of bin fractions. Each item contains a bin id and its initial "
-            "fractional size. Fractions can be None if they need calibration."
+            "The fraction of the total in each bin, by bin id. None leaves a "
+            "fraction for calibration."
         ),
     )
-    stratification_fractions: list[StratificationFractions] = Field(
-        default_factory=list,
-        description=(
-            "List of stratification fractions. Each item contains a stratification id "
-            "and its category fractions."
-        ),
+    stratification_fractions: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="The fraction of each category, by stratification id.",
     )
-    compartment_fractions: list[CompartmentFraction] = Field(
-        default_factory=list,
+    compartment_fractions: dict[str, float] = Field(
+        default_factory=dict,
         description=(
-            "List of per-compartment overrides applied after the uniform expansion. "
-            "Each item contains an expanded compartment name and the fraction of the "
-            "total it holds."
+            "Fractions of the total in single expanded compartments, applied "
+            "after the expansion."
         ),
     )
 
@@ -1189,21 +1235,15 @@ class InitialConditions(BaseModel):
             raise ValueError(f"total must be finite and greater than 0, got {value}.")
         return value
 
-    @model_validator(mode="after")
-    def validate_compartment_fractions_unique(self) -> Self:
-        """Validate that each compartment appears at most once."""
-        seen: set[str] = set()
-        duplicates: set[str] = set()
-        for compartment_fraction in self.compartment_fractions:
-            name = compartment_fraction.compartment
-            if name in seen:
-                duplicates.add(name)
-            seen.add(name)
-        if duplicates:
-            raise ValueError(
-                f"Duplicate compartment fractions found: {sorted(duplicates)}."
-            )
-        return self
+    @field_validator("compartment_fractions")
+    @classmethod
+    def validate_compartment_fraction_range(
+        cls, value: dict[str, float]
+    ) -> dict[str, float]:
+        """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
+        for compartment, fraction in value.items():
+            _check_fraction(f"compartment '{compartment}'", fraction)
+        return value
 
     @staticmethod
     def _validate_bin_fraction_total(candidate: Mapping[str, float | None]) -> None:
@@ -1257,9 +1297,7 @@ class InitialConditions(BaseModel):
         - If all fractions are calibrated (no None): must sum to exactly 1.0
         - If all fractions are None: skip validation (will be set before simulation)
         """
-        self._validate_bin_fraction_total(
-            {bf.bin: bf.fraction for bf in self.bin_fractions}
-        )
+        self._validate_bin_fraction_total(self.bin_fractions)
         return self
 
     def get_uncalibrated_bins(self) -> list[str]:
@@ -1271,7 +1309,11 @@ class InitialConditions(BaseModel):
         list[str]
             List of bin IDs with uncalibrated initial conditions.
         """
-        return [bf.bin for bf in self.bin_fractions if bf.fraction is None]
+        return [
+            bin_id
+            for bin_id, fraction in self.bin_fractions.items()
+            if fraction is None
+        ]
 
     def get_categories_with_fractions(self) -> set[str]:
         """
@@ -1285,9 +1327,9 @@ class InitialConditions(BaseModel):
             conditions is not included.
         """
         return {
-            fraction.category
-            for stratification in self.stratification_fractions
-            for fraction in stratification.fractions
+            category
+            for categories in self.stratification_fractions.values()
+            for category in categories
         }
 
     def resolve_category(self, category: str) -> tuple[str, str]:
@@ -1312,8 +1354,27 @@ class InitialConditions(BaseModel):
         ValueError
             If the category is not found or a bare name is ambiguous.
         """
-        owner, name = self._owning_stratification(category)
-        return owner.stratification, name
+        stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
+        owners = [
+            stratification
+            for stratification, categories in self.stratification_fractions.items()
+            if (not separator or stratification == stratification_id)
+            and name in categories
+        ]
+        if len(owners) > 1:
+            qualified = " or ".join(
+                f"'{owner}{CATEGORY_SEPARATOR}{name}'" for owner in owners
+            )
+            raise ValueError(
+                f"Category '{category}' is ambiguous: it is declared by "
+                f"stratifications {owners}. Qualify it as {qualified}."
+            )
+        if not owners:
+            raise ValueError(
+                f"Category '{category}' not found in initial conditions. "
+                f"Available categories: {sorted(self.get_categories_with_fractions())}"
+            )
+        return owners[0], name
 
     def category_id(self, stratification: str, category: str) -> str:
         """
@@ -1333,8 +1394,8 @@ class InitialConditions(BaseModel):
             stratification declares a category of the same name.
         """
         declaring = sum(
-            any(fraction.category == category for fraction in item.fractions)
-            for item in self.stratification_fractions
+            category in categories
+            for categories in self.stratification_fractions.values()
         )
         if declaring > 1:
             return f"{stratification}{CATEGORY_SEPARATOR}{category}"
@@ -1360,110 +1421,53 @@ class InitialConditions(BaseModel):
         ValueError
             If the category is not found or a bare name is ambiguous.
         """
-        owner, name = self._owning_stratification(category)
-        return next(
-            fraction.fraction
-            for fraction in owner.fractions
-            if fraction.category == name
-        )
+        stratification, name = self.resolve_category(category)
+        return self.stratification_fractions[stratification][name]
 
-    def subgroup_total(self, categories: Iterable[str] = ()) -> float:
+    def _fraction_subgroup_total(self, categories: Iterable[str] = ()) -> float:
         """
-        Get the initial total of a subgroup.
+        Get the initial total of a subgroup from the fractions alone.
 
         Category fractions are relative to the group their stratification
         applies to, so the fractions of a nested chain of categories multiply.
-        Passing no categories gives the total.
-
-        Parameters
-        ----------
-        categories : Iterable[str], optional
-            Category ids, bare or qualified, forming a chain from the whole
-            model down to the subgroup, outermost first.
-
-        Returns
-        -------
-        float
-            The sum of the compartments of the subgroup at step 0.
-
-        Raises
-        ------
-        ValueError
-            If a category is not found or a bare name is ambiguous.
+        Passing no categories gives the total. Per-compartment overrides are
+        not included; `Aggregate.subgroup_total` includes them.
         """
         total = self.total
         for category in categories:
             total *= self.get_category_fraction(category)
         return total
 
-    def _owning_stratification(
-        self, category: str
-    ) -> tuple[StratificationFractions, str]:
-        """
-        Return the stratification that declares a category, and its bare name.
-
-        A qualified id (``group:g1``) names the stratification. A bare name
-        must be declared by exactly one stratification.
-        """
-        stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
-        owners = [
-            stratification
-            for stratification in self.stratification_fractions
-            if (not separator or stratification.stratification == stratification_id)
-            and any(fraction.category == name for fraction in stratification.fractions)
-        ]
-        if len(owners) > 1:
-            qualified = " or ".join(
-                f"'{owner.stratification}{CATEGORY_SEPARATOR}{name}'"
-                for owner in owners
-            )
-            raise ValueError(
-                f"Category '{category}' is ambiguous: it is declared by "
-                f"stratifications {[owner.stratification for owner in owners]}. "
-                f"Qualify it as {qualified}."
-            )
-        if not owners:
-            raise ValueError(
-                f"Category '{category}' not found in initial conditions. "
-                f"Available categories: {sorted(self.get_categories_with_fractions())}"
-            )
-        return owners[0], name
-
     def _apply_stratification_update(
-        self,
-        stratification: StratificationFractions,
-        named: Mapping[str, float],
+        self, stratification: str, named: Mapping[str, float]
     ) -> None:
         """Write the fractions of a single stratification."""
-        unnamed = [
-            fraction.category
-            for fraction in stratification.fractions
-            if fraction.category not in named
-        ]
+        categories = self.stratification_fractions[stratification]
+        unnamed = [category for category in categories if category not in named]
         total = sum(named.values())
 
         if len(unnamed) > 1:
             raise ValueError(
-                f"Cannot update stratification '{stratification.stratification}': "
+                f"Cannot update stratification '{stratification}': "
                 f"categories {sorted(unnamed)} were left unnamed. At most one "
                 f"category may be omitted, so that it can take the remaining "
                 f"fraction."
             )
         if not unnamed and not math.isclose(total, 1.0, abs_tol=1e-6):
             raise ValueError(
-                f"Fractions for stratification '{stratification.stratification}' "
+                f"Fractions for stratification '{stratification}' "
                 f"must sum to 1.0, got {total:.6f}. Values: {dict(named)}"
             )
         if unnamed and total > 1.0 + 1e-6:
             raise ValueError(
-                f"Fractions for stratification '{stratification.stratification}' "
+                f"Fractions for stratification '{stratification}' "
                 f"sum to {total:.6f}, which would leave a negative fraction for "
                 f"'{unnamed[0]}'. Values: {dict(named)}"
             )
 
         remainder = max(0.0, 1.0 - total)
-        for fraction in stratification.fractions:
-            fraction.fraction = named.get(fraction.category, remainder)
+        for category in categories:
+            categories[category] = named.get(category, remainder)
 
     def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
         """
@@ -1487,62 +1491,39 @@ class InitialConditions(BaseModel):
         ------
         ValueError
             If a category is not found or is ambiguous, a value lies outside
-            [0.0, 1.0], a stratification has more than one category omitted, fully
-            specified
-            values do not sum to 1.0, or the given values exceed 1.0.
+            [0.0, 1.0], a stratification has more than one category omitted,
+            fully specified values do not sum to 1.0, or the given values
+            exceed 1.0.
         """
         for category, value in fractions.items():
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(
-                    f"Fraction for category '{category}' must be between 0.0 and "
-                    f"1.0, got {value}."
-                )
+            _check_fraction(f"category '{category}'", value)
 
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
-            owner, name = self._owning_stratification(category)
-            by_stratification.setdefault(owner.stratification, {})[name] = value
+            stratification, name = self.resolve_category(category)
+            by_stratification.setdefault(stratification, {})[name] = value
 
-        for stratification in self.stratification_fractions:
-            named = by_stratification.get(stratification.stratification)
-            if named is not None:
-                self._apply_stratification_update(stratification, named)
+        for stratification, named in by_stratification.items():
+            self._apply_stratification_update(stratification, named)
 
-    def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
+    def _upsert_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
         """
         Upsert per-compartment overrides by expanded compartment name.
 
         A compartment already present in ``compartment_fractions`` has its
         fraction replaced; a new one is appended. Compartment names and the
-        sum of the amounts depend on the model expansion, so they are validated
-        by :meth:`~commol.context.model.Model.update_compartment_fractions`
-        against the engine, not here.
-
-        Parameters
-        ----------
-        fractions : Mapping[str, float]
-            Dictionary mapping expanded compartment names to their new
-            fraction of the total. Each value must lie between
-            0.0 and 1.0.
+        sum of the amounts depend on the expansion of the process, so
+        :meth:`~commol.context.aggregate.Aggregate.update_compartment_fractions`
+        validates them against the engine, not here.
 
         Raises
         ------
         ValueError
             If a value lies outside ``[0.0, 1.0]``.
         """
-        updated = {
-            compartment: CompartmentFraction(compartment=compartment, fraction=value)
-            for compartment, value in fractions.items()
-        }
-        existing = {override.compartment for override in self.compartment_fractions}
-        self.compartment_fractions = [
-            updated.get(override.compartment, override)
-            for override in self.compartment_fractions
-        ] + [
-            override
-            for compartment, override in updated.items()
-            if compartment not in existing
-        ]
+        for compartment, value in fractions.items():
+            _check_fraction(f"compartment '{compartment}'", value)
+        self.compartment_fractions.update(fractions)
 
     def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         """
@@ -1567,23 +1548,16 @@ class InitialConditions(BaseModel):
             If a bin ID is not found in the initial conditions, or the
             resulting fractions violate the conservation rule.
         """
-        known = {bf.bin for bf in self.bin_fractions}
-        unknown = sorted(set(fractions) - known)
+        unknown = sorted(set(fractions) - set(self.bin_fractions))
         if unknown:
             raise ValueError(
                 f"Bin(s) {unknown} not found in initial conditions. "
-                f"Available bins: {[bf.bin for bf in self.bin_fractions]}"
+                f"Available bins: {list(self.bin_fractions)}"
             )
 
-        candidate = {bf.bin: bf.fraction for bf in self.bin_fractions}
-        candidate.update(fractions)
+        candidate = {**self.bin_fractions, **fractions}
         self._validate_bin_fraction_total(candidate)
-
-        for bin_id, fraction in fractions.items():
-            for bf in self.bin_fractions:
-                if bf.bin == bin_id:
-                    bf.fraction = fraction
-                    break
+        self.bin_fractions.update(fractions)
 ```
 
 ### Methods:
@@ -1615,32 +1589,26 @@ def validate_total(cls, value: float) -> float:
     return value
 ```
 
-#### validate_compartment_fractions_unique
+#### validate_compartment_fraction_range
 
 ```python
-validate_compartment_fractions_unique() -> Self
+validate_compartment_fraction_range(value: dict[str, float]) -> dict[str, float]
 ```
 
-Validate that each compartment appears at most once.
+Enforce that every compartment fraction lies within `[0.0, 1.0]`.
 
 Source code in `commol/context/initial_conditions.py`
 
 ```python
-@model_validator(mode="after")
-def validate_compartment_fractions_unique(self) -> Self:
-    """Validate that each compartment appears at most once."""
-    seen: set[str] = set()
-    duplicates: set[str] = set()
-    for compartment_fraction in self.compartment_fractions:
-        name = compartment_fraction.compartment
-        if name in seen:
-            duplicates.add(name)
-        seen.add(name)
-    if duplicates:
-        raise ValueError(
-            f"Duplicate compartment fractions found: {sorted(duplicates)}."
-        )
-    return self
+@field_validator("compartment_fractions")
+@classmethod
+def validate_compartment_fraction_range(
+    cls, value: dict[str, float]
+) -> dict[str, float]:
+    """Enforce that every compartment fraction lies within ``[0.0, 1.0]``."""
+    for compartment, fraction in value.items():
+        _check_fraction(f"compartment '{compartment}'", fraction)
+    return value
 ```
 
 #### validate_calibrated_fractions_sum_to_one
@@ -1671,9 +1639,7 @@ def validate_calibrated_fractions_sum_to_one(self) -> Self:
     - If all fractions are calibrated (no None): must sum to exactly 1.0
     - If all fractions are None: skip validation (will be set before simulation)
     """
-    self._validate_bin_fraction_total(
-        {bf.bin: bf.fraction for bf in self.bin_fractions}
-    )
+    self._validate_bin_fraction_total(self.bin_fractions)
     return self
 ```
 
@@ -1703,7 +1669,11 @@ def get_uncalibrated_bins(self) -> list[str]:
     list[str]
         List of bin IDs with uncalibrated initial conditions.
     """
-    return [bf.bin for bf in self.bin_fractions if bf.fraction is None]
+    return [
+        bin_id
+        for bin_id, fraction in self.bin_fractions.items()
+        if fraction is None
+    ]
 ```
 
 #### get_categories_with_fractions
@@ -1735,9 +1705,9 @@ def get_categories_with_fractions(self) -> set[str]:
         conditions is not included.
     """
     return {
-        fraction.category
-        for stratification in self.stratification_fractions
-        for fraction in stratification.fractions
+        category
+        for categories in self.stratification_fractions.values()
+        for category in categories
     }
 ```
 
@@ -1794,8 +1764,27 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     ValueError
         If the category is not found or a bare name is ambiguous.
     """
-    owner, name = self._owning_stratification(category)
-    return owner.stratification, name
+    stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
+    owners = [
+        stratification
+        for stratification, categories in self.stratification_fractions.items()
+        if (not separator or stratification == stratification_id)
+        and name in categories
+    ]
+    if len(owners) > 1:
+        qualified = " or ".join(
+            f"'{owner}{CATEGORY_SEPARATOR}{name}'" for owner in owners
+        )
+        raise ValueError(
+            f"Category '{category}' is ambiguous: it is declared by "
+            f"stratifications {owners}. Qualify it as {qualified}."
+        )
+    if not owners:
+        raise ValueError(
+            f"Category '{category}' not found in initial conditions. "
+            f"Available categories: {sorted(self.get_categories_with_fractions())}"
+        )
+    return owners[0], name
 ```
 
 #### category_id
@@ -1840,8 +1829,8 @@ def category_id(self, stratification: str, category: str) -> str:
         stratification declares a category of the same name.
     """
     declaring = sum(
-        any(fraction.category == category for fraction in item.fractions)
-        for item in self.stratification_fractions
+        category in categories
+        for categories in self.stratification_fractions.values()
     )
     if declaring > 1:
         return f"{stratification}{CATEGORY_SEPARATOR}{category}"
@@ -1897,73 +1886,8 @@ def get_category_fraction(self, category: str) -> float:
     ValueError
         If the category is not found or a bare name is ambiguous.
     """
-    owner, name = self._owning_stratification(category)
-    return next(
-        fraction.fraction
-        for fraction in owner.fractions
-        if fraction.category == name
-    )
-```
-
-#### subgroup_total
-
-```python
-subgroup_total(categories: Iterable[str] = ()) -> float
-```
-
-Get the initial total of a subgroup.
-
-Category fractions are relative to the group their stratification applies to, so the fractions of a nested chain of categories multiply. Passing no categories gives the total.
-
-Parameters:
-
-| Name         | Type            | Description                                                                                                  | Default |
-| ------------ | --------------- | ------------------------------------------------------------------------------------------------------------ | ------- |
-| `categories` | `Iterable[str]` | Category ids, bare or qualified, forming a chain from the whole model down to the subgroup, outermost first. | `()`    |
-
-Returns:
-
-| Type    | Description                                            |
-| ------- | ------------------------------------------------------ |
-| `float` | The sum of the compartments of the subgroup at step 0. |
-
-Raises:
-
-| Type         | Description                                             |
-| ------------ | ------------------------------------------------------- |
-| `ValueError` | If a category is not found or a bare name is ambiguous. |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-def subgroup_total(self, categories: Iterable[str] = ()) -> float:
-    """
-    Get the initial total of a subgroup.
-
-    Category fractions are relative to the group their stratification
-    applies to, so the fractions of a nested chain of categories multiply.
-    Passing no categories gives the total.
-
-    Parameters
-    ----------
-    categories : Iterable[str], optional
-        Category ids, bare or qualified, forming a chain from the whole
-        model down to the subgroup, outermost first.
-
-    Returns
-    -------
-    float
-        The sum of the compartments of the subgroup at step 0.
-
-    Raises
-    ------
-    ValueError
-        If a category is not found or a bare name is ambiguous.
-    """
-    total = self.total
-    for category in categories:
-        total *= self.get_category_fraction(category)
-    return total
+    stratification, name = self.resolve_category(category)
+    return self.stratification_fractions[stratification][name]
 ```
 
 #### update_stratification_fractions
@@ -2013,88 +1937,20 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
     ------
     ValueError
         If a category is not found or is ambiguous, a value lies outside
-        [0.0, 1.0], a stratification has more than one category omitted, fully
-        specified
-        values do not sum to 1.0, or the given values exceed 1.0.
+        [0.0, 1.0], a stratification has more than one category omitted,
+        fully specified values do not sum to 1.0, or the given values
+        exceed 1.0.
     """
     for category, value in fractions.items():
-        if not 0.0 <= value <= 1.0:
-            raise ValueError(
-                f"Fraction for category '{category}' must be between 0.0 and "
-                f"1.0, got {value}."
-            )
+        _check_fraction(f"category '{category}'", value)
 
     by_stratification: dict[str, dict[str, float]] = {}
     for category, value in fractions.items():
-        owner, name = self._owning_stratification(category)
-        by_stratification.setdefault(owner.stratification, {})[name] = value
+        stratification, name = self.resolve_category(category)
+        by_stratification.setdefault(stratification, {})[name] = value
 
-    for stratification in self.stratification_fractions:
-        named = by_stratification.get(stratification.stratification)
-        if named is not None:
-            self._apply_stratification_update(stratification, named)
-```
-
-#### update_compartment_fractions
-
-```python
-update_compartment_fractions(fractions: Mapping[str, float]) -> None
-```
-
-Upsert per-compartment overrides by expanded compartment name.
-
-A compartment already present in `compartment_fractions` has its fraction replaced; a new one is appended. Compartment names and the sum of the amounts depend on the model expansion, so they are validated by :meth:`~commol.context.model.Model.update_compartment_fractions` against the engine, not here.
-
-Parameters:
-
-| Name        | Type                  | Description                                                                                                                | Default    |
-| ----------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `fractions` | `Mapping[str, float]` | Dictionary mapping expanded compartment names to their new fraction of the total. Each value must lie between 0.0 and 1.0. | *required* |
-
-Raises:
-
-| Type         | Description                         |
-| ------------ | ----------------------------------- |
-| `ValueError` | If a value lies outside [0.0, 1.0]. |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-def update_compartment_fractions(self, fractions: Mapping[str, float]) -> None:
-    """
-    Upsert per-compartment overrides by expanded compartment name.
-
-    A compartment already present in ``compartment_fractions`` has its
-    fraction replaced; a new one is appended. Compartment names and the
-    sum of the amounts depend on the model expansion, so they are validated
-    by :meth:`~commol.context.model.Model.update_compartment_fractions`
-    against the engine, not here.
-
-    Parameters
-    ----------
-    fractions : Mapping[str, float]
-        Dictionary mapping expanded compartment names to their new
-        fraction of the total. Each value must lie between
-        0.0 and 1.0.
-
-    Raises
-    ------
-    ValueError
-        If a value lies outside ``[0.0, 1.0]``.
-    """
-    updated = {
-        compartment: CompartmentFraction(compartment=compartment, fraction=value)
-        for compartment, value in fractions.items()
-    }
-    existing = {override.compartment for override in self.compartment_fractions}
-    self.compartment_fractions = [
-        updated.get(override.compartment, override)
-        for override in self.compartment_fractions
-    ] + [
-        override
-        for compartment, override in updated.items()
-        if compartment not in existing
-    ]
+    for stratification, named in by_stratification.items():
+        self._apply_stratification_update(stratification, named)
 ```
 
 #### update_bin_fractions
@@ -2145,223 +2001,14 @@ def update_bin_fractions(self, fractions: Mapping[str, float | None]) -> None:
         If a bin ID is not found in the initial conditions, or the
         resulting fractions violate the conservation rule.
     """
-    known = {bf.bin for bf in self.bin_fractions}
-    unknown = sorted(set(fractions) - known)
+    unknown = sorted(set(fractions) - set(self.bin_fractions))
     if unknown:
         raise ValueError(
             f"Bin(s) {unknown} not found in initial conditions. "
-            f"Available bins: {[bf.bin for bf in self.bin_fractions]}"
+            f"Available bins: {list(self.bin_fractions)}"
         )
 
-    candidate = {bf.bin: bf.fraction for bf in self.bin_fractions}
-    candidate.update(fractions)
+    candidate = {**self.bin_fractions, **fractions}
     self._validate_bin_fraction_total(candidate)
-
-    for bin_id, fraction in fractions.items():
-        for bf in self.bin_fractions:
-            if bf.bin == bin_id:
-                bf.fraction = fraction
-                break
-```
-
-## BinFraction
-
-Bases: `BaseModel`
-
-Fraction for a single bin.
-
-Attributes:
-
-| Name       | Type    | Description |
-| ---------- | ------- | ----------- |
-| `bin`      | `str`   | The bin id. |
-| `fraction` | \`float | None\`      |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-class BinFraction(BaseModel):
-    """
-    Fraction for a single bin.
-
-    Attributes
-    ----------
-    bin : str
-        The bin id.
-    fraction : float | None
-        The fractional size of this bin. Set to None if this initial condition
-        needs to be calibrated.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    bin: str = Field(default=..., description="The bin id.")
-    fraction: float | None = Field(
-        default=...,
-        description=(
-            "The fractional size of this bin. "
-            "Set to None if this initial condition needs to be calibrated."
-        ),
-    )
-
-    def is_calibrated(self) -> bool:
-        """Check if this bin fraction has a calibrated value (not None)."""
-        return self.fraction is not None
-```
-
-### Methods:
-
-#### is_calibrated
-
-```python
-is_calibrated() -> bool
-```
-
-Check if this bin fraction has a calibrated value (not None).
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-def is_calibrated(self) -> bool:
-    """Check if this bin fraction has a calibrated value (not None)."""
-    return self.fraction is not None
-```
-
-## StratificationFractions
-
-Bases: `BaseModel`
-
-Fractions for a stratification.
-
-Attributes:
-
-| Name             | Type                           | Description                                         |
-| ---------------- | ------------------------------ | --------------------------------------------------- |
-| `stratification` | `str`                          | The stratification id.                              |
-| `fractions`      | `list[StratificationFraction]` | List of category fractions for this stratification. |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-class StratificationFractions(BaseModel):
-    """
-    Fractions for a stratification.
-
-    Attributes
-    ----------
-    stratification : str
-        The stratification id.
-    fractions : list[StratificationFraction]
-        List of category fractions for this stratification.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    stratification: str = Field(..., description="The stratification id.")
-    fractions: list[StratificationFraction] = Field(
-        default=..., description="List of category fractions for this stratification."
-    )
-```
-
-## StratificationFraction
-
-Bases: `BaseModel`
-
-Fractions for a single stratification category.
-
-Attributes:
-
-| Name       | Type    | Description                           |
-| ---------- | ------- | ------------------------------------- |
-| `category` | `str`   | The stratification category name.     |
-| `fraction` | `float` | The fractional size of this category. |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-class StratificationFraction(BaseModel):
-    """
-    Fractions for a single stratification category.
-
-    Attributes
-    ----------
-    category : str
-        The stratification category name.
-    fraction : float
-        The fractional size of this category.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    category: str = Field(default=..., description="The stratification category name.")
-    fraction: float = Field(
-        default=..., description="The fractional size of this category."
-    )
-```
-
-## CompartmentFraction
-
-Bases: `BaseModel`
-
-Fraction for a single expanded compartment.
-
-Attributes:
-
-| Name          | Type    | Description                                                         |
-| ------------- | ------- | ------------------------------------------------------------------- |
-| `compartment` | `str`   | The expanded compartment name, for example A_g1 or B_g2_t1.         |
-| `fraction`    | `float` | The fraction of the total in this compartment, between 0.0 and 1.0. |
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-class CompartmentFraction(BaseModel):
-    """
-    Fraction for a single expanded compartment.
-
-    Attributes
-    ----------
-    compartment : str
-        The expanded compartment name, for example ``A_g1`` or ``B_g2_t1``.
-    fraction : float
-        The fraction of the total in this compartment, between 0.0 and 1.0.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    compartment: str = Field(default=..., description="The expanded compartment name.")
-    fraction: float = Field(
-        default=...,
-        description="The fraction of the total in this compartment.",
-    )
-
-    @field_validator("fraction")
-    @classmethod
-    def validate_fraction_range(cls, value: float) -> float:
-        """Enforce that the fraction lies within ``[0.0, 1.0]``."""
-        if not 0.0 <= value <= 1.0:
-            raise ValueError(f"Fraction must be between 0.0 and 1.0, got {value}.")
-        return value
-```
-
-### Methods:
-
-#### validate_fraction_range
-
-```python
-validate_fraction_range(value: float) -> float
-```
-
-Enforce that the fraction lies within `[0.0, 1.0]`.
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@field_validator("fraction")
-@classmethod
-def validate_fraction_range(cls, value: float) -> float:
-    """Enforce that the fraction lies within ``[0.0, 1.0]``."""
-    if not 0.0 <= value <= 1.0:
-        raise ValueError(f"Fraction must be between 0.0 and 1.0, got {value}.")
-    return value
+    self.bin_fractions.update(fractions)
 ```

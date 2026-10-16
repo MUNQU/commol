@@ -18,6 +18,7 @@ Calibration finds the parameter values (and, if you want, initial conditions and
 
 ```python
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -27,7 +28,7 @@ from commol import (
     Simulation,
 )
 
-def basic_model(k1: float | None, k2: float | None):
+def basic_model(k1: float | None, k2: float | None, engine="DifferenceEquations"):
     return (
         ModelBuilder(name="Basic Model")
         .add_bin(id="A", name="State A")
@@ -37,15 +38,13 @@ def basic_model(k1: float | None, k2: float | None):
         .add_parameter(id="k2", value=k2)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine=engine,
         )
-        .build(engine="DifferenceEquations")
     )
 
 # Observations generated from k1 = 0.4, k2 = 0.1
@@ -124,7 +123,7 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 | `"initial_condition"` | A bin, a category, or an expanded compartment         | A fraction of the total; see [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
 | `"factor"`            | Any new id, used by observations through `factor_id`  | A factor on the predictions; not part of the model                                                                                                 |
 
-`"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): a compartmental model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
+`"parameter"` and `"factor"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`.
 
 ## Losses
 
@@ -141,6 +140,47 @@ Every loss uses a weight the same way: `weight=2.0` makes an observation count t
 With `normalize_observations=True`, each residual is first divided by the RMS of the observations of its series (its `label`).
 
 A run the model does not allow gets a penalty instead of a loss: a run with values that are not finite, or a difference step that leaves an amount below zero (`InfeasibleStateError`, see [Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)). The penalty is much larger than any fit, and the run is not recorded in the history, so the optimizer moves away from it and goes on. Any other error of a run, such as a rate that cannot be evaluated, stops the calibration with its message (`CalibrationProblem::cost` in `crates/commol-calibration/src/calibration_problem.rs`).
+
+## Stochastic engines
+
+With a stochastic engine, one run per evaluation would make the loss change from one evaluation to the next for the same parameters, and Nelder-Mead and particle swarm would chase the noise. So each evaluation runs `replicates` replicates with **common random numbers**: the same replicate seeds at every evaluation, derived from `seed`. The loss is then a deterministic function of the parameters (`CalibrationProblem::with_replicates` in `crates/commol-calibration/src/calibration_problem.rs`).
+
+You choose what each observation is compared with; there is no default, because what to fit is a modelling choice:
+
+| `replicate_summary` | Compared with each observation               | Loss                                         |
+| ------------------- | -------------------------------------------- | -------------------------------------------- |
+| `"mean"`            | The mean of the replicates                   | `loss_function`                              |
+| `"median"`          | The median                                   | `loss_function`                              |
+| `Quantile(q)`       | The quantile `q`                             | `loss_function`                              |
+| `"crps"`            | The empirical distribution of the replicates | The continuous ranked probability score, \`E |
+
+```python
+stochastic = basic_model(None, 0.1, engine="StochasticSteps")
+runs = Simulation(basic_model(0.4, 0.1)).run(num_steps=50)
+problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=step, output="B", value=runs["B"][step])
+        for step in range(5, 51, 5)
+    ],
+    parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=200),
+    replicates=50,
+    replicate_summary="crps",  # or "mean", "median", Quantile(0.9)
+    seed=7,
+)
+result = Calibrator(Simulation(stochastic), problem).run()
+print(round(result.best_parameters["k1"], 1))  # 0.4
+```
+
+| Rule                                                                                                                                         | Where                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`  |
+| A deterministic engine does not use `replicates` and `replicate_summary`                                                                     | The same                                                                 |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                   | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
+| A constraint at positions is checked on every replicate                                                                                      | `CalibrationProblem::replicate_cost`                                     |
+
+With one replicate the CRPS is the absolute error. A probabilistic calibration runs the same objective: its ensemble holds parameter sets, and `Simulation.replicates` gives the stochastic spread of a member.
 
 ## Results
 

@@ -46,6 +46,7 @@ class Calibrator:
         )
 
         # Validate calibration parameters against model
+        self._build_loss_config()
         self._validate_calibration_parameters()
         self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
@@ -198,20 +199,10 @@ class Calibrator:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
-        """Convert Python loss function to Rust LossConfig."""
-        loss_func = self.problem.loss_function
-
-        if loss_func == LossFunction.SSE:
-            loss_config = rust_calibration.LossConfig.sse()
-        elif loss_func == LossFunction.RMSE:
-            loss_config = rust_calibration.LossConfig.rmse()
-        elif loss_func == LossFunction.MAE:
-            loss_config = rust_calibration.LossConfig.mae()
-        else:
-            raise ValueError(f"Unsupported loss function: {loss_func}.")
-
-        # Per-series normalization is orthogonal to the chosen metric.
-        return loss_config.normalized(self.problem.normalize_observations)
+        """The Rust loss, with the replicates of a stochastic engine."""
+        return engine_state.rust_loss_config(
+            self.problem, self.simulation.model_definition.engine.type
+        )
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -527,6 +518,7 @@ def __init__(
     )
 
     # Validate calibration parameters against model
+    self._build_loss_config()
     self._validate_calibration_parameters()
     self._validate_observed_data()
     self._warn_constraint_positions_beyond_observations()
@@ -795,6 +787,8 @@ Attributes:
 | `optimization_config`         | `OptimizationConfig`             | Configuration for the optimization algorithm                                                                               |
 | `initial_condition_remainder` | \`str                            | None\`                                                                                                                     |
 | `probabilistic_config`        | \`ProbabilisticCalibrationConfig | None\`                                                                                                                     |
+| `replicates`                  | \`int                            | None\`                                                                                                                     |
+| `replicate_summary`           | \`{mean, median, crps}           | Quantile                                                                                                                   |
 | `seed`                        | \`int                            | None\`                                                                                                                     |
 
 Source code in `commol/context/calibration.py`
@@ -835,9 +829,23 @@ class CalibrationProblem(BaseModel):
         Optional configuration for probabilistic calibration (default: None).
         When provided, enables ensemble-based parameter estimation with
         uncertainty quantification instead of single-point optimization.
+    replicates : int | None
+        For a stochastic engine: how many replicates each evaluation runs,
+        with common random numbers (the same seeds, derived from ``seed``, at
+        every evaluation), so the loss is a deterministic function of the
+        parameters. Required with a stochastic engine; a deterministic engine
+        does not use it.
+    replicate_summary : {"mean", "median", "crps"} | Quantile | None
+        For a stochastic engine: what each observation is compared with. The
+        mean, the median or a `Quantile` of the replicates, with
+        ``loss_function``; or ``"crps"``, the continuous ranked probability
+        score of their distribution, whose loss is the weighted mean score.
+        Required with a stochastic engine, with no default: what to fit is a
+        modelling choice.
     seed : int | None
         Random seed for reproducibility across all stochastic processes
-        (default: None, uses system entropy).
+        (default: None, uses system entropy). Required with a stochastic
+        engine.
         Controls randomness in:
         - Optimization algorithms (e.g., Particle Swarm initialization)
         - Probabilistic calibration runs
@@ -885,6 +893,15 @@ class CalibrationProblem(BaseModel):
         default=None,
         description="Optional configuration for probabilistic calibration",
     )
+    replicates: int | None = Field(
+        default=None,
+        ge=1,
+        description="Replicates per evaluation of a stochastic engine.",
+    )
+    replicate_summary: ReplicateSummary | None = Field(
+        default=None,
+        description="What the observations are compared with, for a stochastic engine.",
+    )
     seed: int | None = Field(
         default=None,
         ge=0,
@@ -895,6 +912,7 @@ class CalibrationProblem(BaseModel):
     )
 
     @field_validator("loss_function")
+    @classmethod
     def validate_loss_function(cls, v: str) -> str:
         if v not in LossFunction:
             raise ValueError(
@@ -933,6 +951,84 @@ def validate_unique_parameter_ids(self) -> Self:
         duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
         raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
     return self
+```
+
+## Quantile
+
+Bases: `BaseModel`
+
+A quantile of the replicates of a stochastic engine, for `CalibrationProblem.replicate_summary`.
+
+Attributes:
+
+| Name    | Type    | Description                                             |
+| ------- | ------- | ------------------------------------------------------- |
+| `level` | `float` | The level, between 0 and 1, such as 0.5 for the median. |
+
+Source code in `commol/context/calibration.py`
+
+```python
+class Quantile(BaseModel):
+    """
+    A quantile of the replicates of a stochastic engine, for
+    ``CalibrationProblem.replicate_summary``.
+
+    Attributes
+    ----------
+    level : float
+        The level, between 0 and 1, such as 0.5 for the median.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+
+    def __init__(self, level: float, **data: object) -> None:
+        """
+        A quantile of the replicates.
+
+        Parameters
+        ----------
+        level : float
+            The level, between 0 and 1.
+        **data : object
+            The other fields, as JSON holds them.
+        """
+        super().__init__(level=level, **data)
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(level: float, **data: object) -> None
+```
+
+A quantile of the replicates.
+
+Parameters:
+
+| Name     | Type     | Description                           | Default    |
+| -------- | -------- | ------------------------------------- | ---------- |
+| `level`  | `float`  | The level, between 0 and 1.           | *required* |
+| `**data` | `object` | The other fields, as JSON holds them. | `{}`       |
+
+Source code in `commol/context/calibration.py`
+
+```python
+def __init__(self, level: float, **data: object) -> None:
+    """
+    A quantile of the replicates.
+
+    Parameters
+    ----------
+    level : float
+        The level, between 0 and 1.
+    **data : object
+        The other fields, as JSON holds them.
+    """
+    super().__init__(level=level, **data)
 ```
 
 ## ObservedDataPoint
@@ -1175,6 +1271,7 @@ class CalibrationParameter(BaseModel):
     )
 
     @field_validator("parameter_type")
+    @classmethod
     def validate_parameter_type(cls, v: str) -> str:
         if v not in CalibrationParameterType:
             raise ValueError(
@@ -1660,6 +1757,7 @@ class ParticleSwarmConfig(BaseModel):
     _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
 
     @field_validator("initialization")
+    @classmethod
     def validate_initialization(cls, v: str) -> str:
         if v not in PSOInitializationStrategy:
             raise ValueError(

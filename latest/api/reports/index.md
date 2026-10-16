@@ -12,11 +12,11 @@ applied_parameters_report(model: Model, result: CalibrationResult | Probabilisti
 
 Report every parameter of a calibrated model, and the values of its kind.
 
-Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); a compartmental model adds `initial_conditions`.
+Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_conditions`.
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-Initial conditions of a compartmental model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
+Initial conditions of an aggregate model carry the effective `value` the engine builds from the uniform expansion plus the declared compartment overrides, its `fraction` as that value over the declared total, and the `group` it belongs to: `total` for bins and unconditional stratifications, and the conditioning categories for a conditional one. The `total` row is the declared total, with fraction 1.0. A bin left uncalibrated keeps a `None` fraction and `None` value as its "needs calibration" marker even when overrides touch some of its compartments.
 
 For a probabilistic result each entry gains an `interval` holding the ensemble spread. A parameter is in the unit it was calibrated in. An initial-condition entry is in the fraction the row reports: a conditional stratification's category is calibrated as a group fraction but reported over the total, so its interval is rescaled by the group's share of the total and brackets the reported fraction.
 
@@ -32,9 +32,9 @@ Parameters:
 
 Returns:
 
-| Type                      | Description                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for a compartmental model), preceded by confidence_level when there is one. |
+| Type                      | Description                                                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppliedParametersReport` | Key parameters and the sections of the kind (initial_conditions for an aggregate model), preceded by confidence_level when there is one. |
 
 Source code in `commol/api/reporting.py`
 
@@ -52,7 +52,7 @@ def applied_parameters_report(
     Each entry carries the value the model holds and whether calibration set
     it, so entries the calibration left alone appear alongside the fitted ones.
     The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); a compartmental model adds
+    (`ModelStructure.report_sections`); an aggregate model adds
     ``initial_conditions``.
 
     Parameters that are not a single number, such as a formula or a
@@ -60,7 +60,7 @@ def applied_parameters_report(
     ``factor`` parameters have no place in the model, so they are reported from
     `problem` when it is given.
 
-    Initial conditions of a compartmental model carry the effective
+    Initial conditions of an aggregate model carry the effective
     ``value`` the engine builds
     from the uniform expansion plus the declared compartment overrides, its
     ``fraction`` as that value over the declared total, and the
@@ -97,7 +97,7 @@ def applied_parameters_report(
     -------
     AppliedParametersReport
         Key ``parameters`` and the sections of the kind (``initial_conditions``
-        for a compartmental model), preceded by ``confidence_level`` when there
+        for an aggregate model), preceded by ``confidence_level`` when there
         is one.
     """
     calibrated = calibrated_values(result)

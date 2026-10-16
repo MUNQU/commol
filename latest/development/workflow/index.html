@@ -816,7 +816,35 @@
   <span class="md-ellipsis">
     
   
-    Units and Equations
+    Units
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/describing-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Describing a Model
   
 
     
@@ -872,6 +900,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../guide/stochastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stochastic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -886,10 +942,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
         
           
-          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
             
   
   
@@ -907,8 +963,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2051,6 +2107,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-rust-toolchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Rust toolchain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#debugging-rust-from-python" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2558,6 +2625,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-rust-toolchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Rust toolchain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#debugging-rust-from-python" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2861,7 +2939,7 @@ Updating the file there also triggers a version-update check right away.</p>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Rust, from the repository root</span>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w"> </span>--<span class="w"> </span>--check
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--workspace<span class="w"> </span>--all-targets<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol-random<span class="w"> </span>-p<span class="w"> </span>commol-stochastic<span class="w"> </span>-p<span class="w"> </span>commol
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol<span class="w"> </span>--features<span class="w"> </span>test-kind<span class="w">   </span><span class="c1"># the engine of the test model kind</span>
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
 </span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="c1"># Documentation, from the repository root</span>
@@ -2907,6 +2985,25 @@ Updating the file there also triggers a version-update check right away.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="the-rust-toolchain">The Rust toolchain<a class="headerlink" href="#the-rust-toolchain" title="Permanent link">&para;</a></h3>
+<p><code>rust-toolchain.toml</code> pins one Rust version, with <code>clippy</code> and <code>rustfmt</code>.
+<code>rustup</code> installs and uses it in the repository, so your builds, the
+pre-commit hooks and CI (<code>rustup toolchain install</code>, and <code>maturin-action</code>,
+which reads the file) run the same compiler and the same lints. A floating
+<code>stable</code> would let a lint of a newer clippy pass on your machine and fail in
+CI.</p>
+<p>Once a month, Dependabot (<code>.github/dependabot.yaml</code>, ecosystem
+<code>rust-toolchain</code>) checks for a newer stable release, and opens a pull
+request to <code>develop</code> that changes <code>channel</code>. Its CI runs the new clippy, so
+the new lints fail there, not in a feature branch. To move to a newer Rust
+by hand, or to fix the lints of that pull request:</p>
+<ol>
+<li>Change <code>channel</code> in <code>rust-toolchain.toml</code>.</li>
+<li>Run <code>cargo clippy --workspace --all-targets --all-features -- -D warnings</code>,
+   the Rust tests and <code>cargo doc</code> (see <a href="#quick-commands">Quick Commands</a>),
+   and fix what the new lints find.</li>
+<li>Rebuild the extension and run <code>pytest</code>.</li>
+</ol>
 <h3 id="debugging-rust-from-python">Debugging Rust from Python<a class="headerlink" href="#debugging-rust-from-python" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Build with debug symbols (with virtual environment activated)</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol

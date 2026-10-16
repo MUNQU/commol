@@ -6,12 +6,12 @@ Build, run, check and calibrate your first compartment model in five minutes. Th
 
 ## Quick path
 
-1. Build a model with `ModelBuilder`.
+1. Write the process with `ModelBuilder`, and build it with a structure (`Aggregate`) and an engine.
 1. Run it with `Simulation`.
 1. Read the results by compartment name.
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Basic Model", version="1.0")
@@ -22,15 +22,13 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -45,16 +43,15 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## What each call does
 
-| Call                                              | What it does                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder(name=..., version=...)`             | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
-| `.add_bin(id="A", name="State A")`                | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
-| `.add_parameter(id="k1", value=0.3)`              | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
-| `.add_transition(..., rate="k1 * A * B / total")` | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
-| `.add_transition(..., rate="k2")`                 | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
-| `.set_initial_conditions(...)`                    | Sets the total and the fraction of it that starts in each bin. The fractions must sum to 1.                                                                                                                                                                                                       |
-| `.build(engine="DifferenceEquations")`            | Validates the definition and returns a `Model`.                                                                                                                                                                                                                                                   |
-| `Simulation(model).run(num_steps=100)`            | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
+| Call                                                   | What it does                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder(name=..., version=...)`                  | Starts a model definition. Every method returns the builder, so calls chain.                                                                                                                                                                                                                      |
+| `.add_bin(id="A", name="State A")`                     | Adds a compartment (a *bin*): a state that holds an amount: a part of the total.                                                                                                                                                                                                                  |
+| `.add_parameter(id="k1", value=0.3)`                   | Adds a named constant for rate formulas. `value=None` marks it for calibration.                                                                                                                                                                                                                   |
+| `.add_transition(..., rate="k1 * A * B / total")`      | Moves an amount from `source` to `target` along the axis. This rate names compartments, so it is the flow itself (*absolute*). A `DifferenceEquations` model moves the flow once per step; see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means). |
+| `.add_transition(..., rate="k2")`                      | This rate names no compartment, so it is *proportional*: the flow is `k2 × B`.                                                                                                                                                                                                                    |
+| `.build(Aggregate(...), engine="DifferenceEquations")` | Joins what you wrote, the *process*, with a *structure* and an engine, validates it and returns a `Model`. `Aggregate` holds an amount per compartment: `total` and the fraction of it that starts in each bin. The fractions must sum to 1.                                                      |
+| `Simulation(model).run(num_steps=100)`                 | Runs the Rust engine and returns the results.                                                                                                                                                                                                                                                     |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md) for bins, transitions and the two kinds of rate.
 
@@ -72,15 +69,13 @@ model_with_units = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 model_with_units.check_unit_consistency()  # raises UnitConsistencyError on a mismatch
@@ -110,15 +105,13 @@ calibration_model = (
     .add_parameter(id="k2", value=None)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
@@ -173,11 +166,12 @@ See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/
 
 ## Next steps
 
-| To learn                        | Read                                                                                                      |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| The concepts behind models      | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
-| Every builder option            | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
-| What rate formulas can contain  | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Running and reading simulations | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
-| Calibration in depth            | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
-| Complete models                 | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |
+| To learn                         | Read                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| The concepts behind models       | [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md)                       |
+| Every builder option             | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)                   |
+| What rate formulas can contain   | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
+| Running and reading simulations  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
+| Runs at random, with whole units | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                  |
+| Calibration in depth             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
+| Complete models                  | [Examples](https://munqu.github.io/commol/latest/guide/examples/index.md)                                 |

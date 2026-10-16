@@ -42,7 +42,7 @@ class Simulation:
             raise TypeError(
                 f"The structure of model '{model.name}' is a "
                 f"{type(model.structure).__name__}, not a ModelStructure. A model "
-                "holds the structure of its kind, such as a CompartmentalStructure."
+                "holds the structure of its kind, such as an Aggregate."
             )
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
@@ -100,24 +100,45 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def run(self, num_steps: int) -> SimulationResults:
+    @property
+    def is_stochastic(self) -> bool:
+        """Whether the engine of the model draws random numbers."""
+        return commol_rs.engine.EngineType(
+            self.model_definition.engine.type
+        ).is_stochastic
+
+    def _seed_run(self, seed: int | None) -> int | None:
+        """Seed the engine of a stochastic model; None for a deterministic one."""
+        if not self.is_stochastic:
+            return None
+        seed = draw_seed() if seed is None else check_seed(seed)
+        self._engine.set_seed(seed)
+        return seed
+
+    def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
         Runs the simulation from the initial state on its default grid.
 
         Every call starts at position 0 with the current ``model_definition``,
-        so two calls with the same model give the same result. To continue a
-        run, call ``simulation.engine.step()``.
+        so two calls with the same model, and the same seed for a stochastic
+        engine, give the same result. To continue a run, call
+        ``simulation.engine.step()``.
 
         Parameters
         ----------
         num_steps : int
             The number of steps: the results hold the positions
             ``0, 1, ..., num_steps``.
+        seed : int | None, optional
+            The seed of a stochastic engine, a whole number from 0 to
+            ``2**64 - 1``. None draws one, which ``results.seed`` keeps, so
+            every run can be repeated. A deterministic engine ignores it.
 
         Returns
         -------
         SimulationResults
-            One value per position for each output, and the positions.
+            One value per position for each output, the positions, and the
+            seed of a stochastic run.
 
         Raises
         ------
@@ -125,18 +146,24 @@ class Simulation:
             If a step leaves an amount below zero; the message names the
             compartment, the step and the flows out of it.
         ValueError
-            If a parameter or initial condition has no value.
+            If a parameter or initial condition has no value, or the seed is
+            not a whole number from 0 to ``2**64 - 1``.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
+        used_seed = self._seed_run(seed)
         self._engine.reset()
         logging.info(f"Running simulation for {num_steps} steps.")
         start = time.time()
         positions, rows = self._engine.run(num_steps)
         logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
-        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+        return SimulationResults.from_rows(
+            positions, self._simulation_outputs, rows, seed=used_seed
+        )
 
-    def run_at(self, at: Sequence[float]) -> SimulationResults:
+    def run_at(
+        self, at: Sequence[float], *, seed: int | None = None
+    ) -> SimulationResults:
         """
         Runs the simulation from the initial state and reports at given positions.
 
@@ -150,11 +177,14 @@ class Simulation:
         ----------
         at : Sequence[float]
             Sorted, unique positions to report at.
+        seed : int | None, optional
+            The seed of a stochastic engine; see `run`.
 
         Returns
         -------
         SimulationResults
-            One value per position for each output, and the positions.
+            One value per position for each output, the positions, and the
+            seed of a stochastic run.
 
         Raises
         ------
@@ -169,9 +199,50 @@ class Simulation:
         positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
+        used_seed = self._seed_run(seed)
         self._engine.reset()
         rows = self._engine.run_at(positions)
-        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+        return SimulationResults.from_rows(
+            positions, self._simulation_outputs, rows, seed=used_seed
+        )
+
+    def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+        """
+        Replicates of the runs of a stochastic engine.
+
+        The returned object has ``run`` and ``run_at``, as `Simulation`, and
+        they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+        run in parallel in the engine. Replicate ``i`` takes the seed derived
+        from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
+        the same run however many replicates run.
+
+        Parameters
+        ----------
+        n : int
+            How many replicates, at least 1.
+        seed : int | None, optional
+            The seed the replicate seeds derive from, a whole number from 0 to
+            ``2**64 - 1``. None draws one, which the replicates keep.
+
+        Returns
+        -------
+        ReplicateRuns
+            The runner of the replicates.
+
+        Raises
+        ------
+        ValueError
+            If the engine is deterministic (every replicate would be equal),
+            ``n`` is below 1, or the seed is not valid.
+        """
+        if not self.is_stochastic:
+            raise ValueError(
+                f"The {self.model_definition.engine.type} engine is deterministic: "
+                "every replicate would be equal. Replicates need a stochastic engine."
+            )
+        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+            raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
+        return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -196,7 +267,7 @@ class Simulation:
         Names of the outputs a source id expands into.
 
         The structure of the model groups its outputs by source
-        (`ModelStructure.outputs_by_source`): for a compartmental model, by
+        (`ModelStructure.outputs_by_source`): for an aggregate model, by
         bin and accumulator.
 
         Parameters
@@ -214,7 +285,8 @@ class Simulation:
         KeyError
             If `id` is not a source of the model.
         """
-        outputs = self.model_definition.structure.outputs_by_source()
+        model = self.model_definition
+        outputs = model.structure.outputs_by_source(model)
         if id not in outputs:
             raise KeyError(
                 f"'{id}' is not a bin or accumulator of model "
@@ -325,6 +397,14 @@ class Simulation:
 
 ### Attributes
 
+#### is_stochastic
+
+```python
+is_stochastic: bool
+```
+
+Whether the engine of the model draws random numbers.
+
 #### engine
 
 ```python
@@ -388,7 +468,7 @@ def __init__(self, model: Model):
         raise TypeError(
             f"The structure of model '{model.name}' is a "
             f"{type(model.structure).__name__}, not a ModelStructure. A model "
-            "holds the structure of its kind, such as a CompartmentalStructure."
+            "holds the structure of its kind, such as an Aggregate."
         )
     logging.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
@@ -398,53 +478,60 @@ def __init__(self, model: Model):
 #### run
 
 ```python
-run(num_steps: int) -> SimulationResults
+run(num_steps: int, *, seed: int | None = None) -> SimulationResults
 ```
 
 Runs the simulation from the initial state on its default grid.
 
-Every call starts at position 0 with the current `model_definition`, so two calls with the same model give the same result. To continue a run, call `simulation.engine.step()`.
+Every call starts at position 0 with the current `model_definition`, so two calls with the same model, and the same seed for a stochastic engine, give the same result. To continue a run, call `simulation.engine.step()`.
 
 Parameters:
 
-| Name        | Type  | Description                                                               | Default    |
-| ----------- | ----- | ------------------------------------------------------------------------- | ---------- |
-| `num_steps` | `int` | The number of steps: the results hold the positions 0, 1, ..., num_steps. | *required* |
+| Name        | Type  | Description                                                               | Default                                                                                                                                                                           |
+| ----------- | ----- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `num_steps` | `int` | The number of steps: the results hold the positions 0, 1, ..., num_steps. | *required*                                                                                                                                                                        |
+| `seed`      | \`int | None\`                                                                    | The seed of a stochastic engine, a whole number from 0 to 2\*\*64 - 1. None draws one, which results.seed keeps, so every run can be repeated. A deterministic engine ignores it. |
 
 Returns:
 
-| Type                | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `SimulationResults` | One value per position for each output, and the positions. |
+| Type                | Description                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, the positions, and the seed of a stochastic run. |
 
 Raises:
 
 | Type                   | Description                                                                                                 |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `InfeasibleStateError` | If a step leaves an amount below zero; the message names the compartment, the step and the flows out of it. |
-| `ValueError`           | If a parameter or initial condition has no value.                                                           |
+| `ValueError`           | If a parameter or initial condition has no value, or the seed is not a whole number from 0 to 2\*\*64 - 1.  |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def run(self, num_steps: int) -> SimulationResults:
+def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
     """
     Runs the simulation from the initial state on its default grid.
 
     Every call starts at position 0 with the current ``model_definition``,
-    so two calls with the same model give the same result. To continue a
-    run, call ``simulation.engine.step()``.
+    so two calls with the same model, and the same seed for a stochastic
+    engine, give the same result. To continue a run, call
+    ``simulation.engine.step()``.
 
     Parameters
     ----------
     num_steps : int
         The number of steps: the results hold the positions
         ``0, 1, ..., num_steps``.
+    seed : int | None, optional
+        The seed of a stochastic engine, a whole number from 0 to
+        ``2**64 - 1``. None draws one, which ``results.seed`` keeps, so
+        every run can be repeated. A deterministic engine ignores it.
 
     Returns
     -------
     SimulationResults
-        One value per position for each output, and the positions.
+        One value per position for each output, the positions, and the
+        seed of a stochastic run.
 
     Raises
     ------
@@ -452,22 +539,26 @@ def run(self, num_steps: int) -> SimulationResults:
         If a step leaves an amount below zero; the message names the
         compartment, the step and the flows out of it.
     ValueError
-        If a parameter or initial condition has no value.
+        If a parameter or initial condition has no value, or the seed is
+        not a whole number from 0 to ``2**64 - 1``.
     """
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
+    used_seed = self._seed_run(seed)
     self._engine.reset()
     logging.info(f"Running simulation for {num_steps} steps.")
     start = time.time()
     positions, rows = self._engine.run(num_steps)
     logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
-    return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+    return SimulationResults.from_rows(
+        positions, self._simulation_outputs, rows, seed=used_seed
+    )
 ```
 
 #### run_at
 
 ```python
-run_at(at: Sequence[float]) -> SimulationResults
+run_at(at: Sequence[float], *, seed: int | None = None) -> SimulationResults
 ```
 
 Runs the simulation from the initial state and reports at given positions.
@@ -476,15 +567,16 @@ The positions are on the axis, the independent variable of the model. The engine
 
 Parameters:
 
-| Name | Type              | Description                            | Default    |
-| ---- | ----------------- | -------------------------------------- | ---------- |
-| `at` | `Sequence[float]` | Sorted, unique positions to report at. | *required* |
+| Name   | Type              | Description                            | Default                                   |
+| ------ | ----------------- | -------------------------------------- | ----------------------------------------- |
+| `at`   | `Sequence[float]` | Sorted, unique positions to report at. | *required*                                |
+| `seed` | \`int             | None\`                                 | The seed of a stochastic engine; see run. |
 
 Returns:
 
-| Type                | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `SimulationResults` | One value per position for each output, and the positions. |
+| Type                | Description                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `SimulationResults` | One value per position for each output, the positions, and the seed of a stochastic run. |
 
 Raises:
 
@@ -496,7 +588,9 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def run_at(self, at: Sequence[float]) -> SimulationResults:
+def run_at(
+    self, at: Sequence[float], *, seed: int | None = None
+) -> SimulationResults:
     """
     Runs the simulation from the initial state and reports at given positions.
 
@@ -510,11 +604,14 @@ def run_at(self, at: Sequence[float]) -> SimulationResults:
     ----------
     at : Sequence[float]
         Sorted, unique positions to report at.
+    seed : int | None, optional
+        The seed of a stochastic engine; see `run`.
 
     Returns
     -------
     SimulationResults
-        One value per position for each output, and the positions.
+        One value per position for each output, the positions, and the
+        seed of a stochastic run.
 
     Raises
     ------
@@ -529,9 +626,83 @@ def run_at(self, at: Sequence[float]) -> SimulationResults:
     positions = [float(position) for position in at]
     self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
+    used_seed = self._seed_run(seed)
     self._engine.reset()
     rows = self._engine.run_at(positions)
-    return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+    return SimulationResults.from_rows(
+        positions, self._simulation_outputs, rows, seed=used_seed
+    )
+```
+
+#### replicates
+
+```python
+replicates(n: int, *, seed: int | None = None) -> ReplicateRuns
+```
+
+Replicates of the runs of a stochastic engine.
+
+The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `n` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of `seed + i`), so it gives the same run however many replicates run.
+
+Parameters:
+
+| Name   | Type  | Description                      | Default                                                                                                                    |
+| ------ | ----- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `n`    | `int` | How many replicates, at least 1. | *required*                                                                                                                 |
+| `seed` | \`int | None\`                           | The seed the replicate seeds derive from, a whole number from 0 to 2\*\*64 - 1. None draws one, which the replicates keep. |
+
+Returns:
+
+| Type            | Description                   |
+| --------------- | ----------------------------- |
+| `ReplicateRuns` | The runner of the replicates. |
+
+Raises:
+
+| Type         | Description                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the engine is deterministic (every replicate would be equal), n is below 1, or the seed is not valid. |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+    """
+    Replicates of the runs of a stochastic engine.
+
+    The returned object has ``run`` and ``run_at``, as `Simulation`, and
+    they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+    run in parallel in the engine. Replicate ``i`` takes the seed derived
+    from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
+    the same run however many replicates run.
+
+    Parameters
+    ----------
+    n : int
+        How many replicates, at least 1.
+    seed : int | None, optional
+        The seed the replicate seeds derive from, a whole number from 0 to
+        ``2**64 - 1``. None draws one, which the replicates keep.
+
+    Returns
+    -------
+    ReplicateRuns
+        The runner of the replicates.
+
+    Raises
+    ------
+    ValueError
+        If the engine is deterministic (every replicate would be equal),
+        ``n`` is below 1, or the seed is not valid.
+    """
+    if not self.is_stochastic:
+        raise ValueError(
+            f"The {self.model_definition.engine.type} engine is deterministic: "
+            "every replicate would be equal. Replicates need a stochastic engine."
+        )
+    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+        raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
+    return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
 ```
 
 #### outputs_for
@@ -542,7 +713,7 @@ outputs_for(id: str) -> list[str]
 
 Names of the outputs a source id expands into.
 
-The structure of the model groups its outputs by source (`ModelStructure.outputs_by_source`): for a compartmental model, by bin and accumulator.
+The structure of the model groups its outputs by source (`ModelStructure.outputs_by_source`): for an aggregate model, by bin and accumulator.
 
 Parameters:
 
@@ -570,7 +741,7 @@ def outputs_for(self, id: str) -> list[str]:
     Names of the outputs a source id expands into.
 
     The structure of the model groups its outputs by source
-    (`ModelStructure.outputs_by_source`): for a compartmental model, by
+    (`ModelStructure.outputs_by_source`): for an aggregate model, by
     bin and accumulator.
 
     Parameters
@@ -588,7 +759,8 @@ def outputs_for(self, id: str) -> list[str]:
     KeyError
         If `id` is not a source of the model.
     """
-    outputs = self.model_definition.structure.outputs_by_source()
+    model = self.model_definition
+    outputs = model.structure.outputs_by_source(model)
     if id not in outputs:
         raise KeyError(
             f"'{id}' is not a bin or accumulator of model "
@@ -805,6 +977,7 @@ Attributes:
 | Name        | Type          | Description                                                                              |
 | ----------- | ------------- | ---------------------------------------------------------------------------------------- |
 | `positions` | `list[float]` | Positions on the axis, ascending. results[name][i] is the value of name at positions[i]. |
+| `seed`      | \`int         | None\`                                                                                   |
 
 Source code in `commol/api/results.py`
 
@@ -823,14 +996,19 @@ class SimulationResults(dict[str, list[float]]):
     positions : list[float]
         Positions on the axis, ascending. ``results[name][i]`` is the value of
         ``name`` at ``positions[i]``.
+    seed : int | None
+        The seed of the run of a stochastic engine, which repeats it; None for
+        a deterministic engine, whose runs depend on no seed.
     """
 
     positions: list[float]
+    seed: int | None
 
     def __init__(
         self,
         positions: Iterable[float],
         values: Mapping[str, Sequence[float]] | None = None,
+        seed: int | None = None,
     ):
         """
         Results at the given positions.
@@ -841,6 +1019,8 @@ class SimulationResults(dict[str, list[float]]):
             Positions on the axis, ascending.
         values : Mapping[str, Sequence[float]] | None, optional
             One value per position for each output.
+        seed : int | None, optional
+            The seed of the run, or None when it depends on no seed.
 
         Raises
         ------
@@ -851,6 +1031,7 @@ class SimulationResults(dict[str, list[float]]):
             {name: list(series) for name, series in (values or {}).items()}
         )
         self.positions = [float(position) for position in positions]
+        self.seed = seed
         for name, series in self.items():
             if len(series) != len(self.positions):
                 raise ValueError(
@@ -864,6 +1045,7 @@ class SimulationResults(dict[str, list[float]]):
         positions: Sequence[float],
         names: Sequence[str],
         rows: Sequence[Sequence[float]],
+        seed: int | None = None,
     ) -> "SimulationResults":
         """
         Results from one row of output values per position.
@@ -876,6 +1058,8 @@ class SimulationResults(dict[str, list[float]]):
             Output names, in the order of each row.
         rows : Sequence[Sequence[float]]
             One row per position.
+        seed : int | None, optional
+            The seed of the run, or None when it depends on no seed.
 
         Returns
         -------
@@ -883,7 +1067,7 @@ class SimulationResults(dict[str, list[float]]):
             One series per output name.
         """
         columns = list(zip(*rows)) if rows else [() for _ in names]
-        return cls(positions, dict(zip(names, columns, strict=True)))
+        return cls(positions, dict(zip(names, columns, strict=True)), seed=seed)
 
     def rows(self) -> list[list[float]]:
         """
@@ -899,8 +1083,12 @@ class SimulationResults(dict[str, list[float]]):
         return [list(row) for row in zip(*self.values())] if self else []
 
     def __repr__(self) -> str:
-        """The positions and the values."""
-        return f"SimulationResults(positions={self.positions!r}, {dict.__repr__(self)})"
+        """The positions, the seed and the values."""
+        seed = "" if self.seed is None else f"seed={self.seed!r}, "
+        return (
+            f"SimulationResults(positions={self.positions!r}, {seed}"
+            f"{dict.__repr__(self)})"
+        )
 ```
 
 ### Methods:
@@ -908,17 +1096,18 @@ class SimulationResults(dict[str, list[float]]):
 #### __init__
 
 ```python
-__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None)
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None)
 ```
 
 Results at the given positions.
 
 Parameters:
 
-| Name        | Type                              | Description                       | Default                                 |
-| ----------- | --------------------------------- | --------------------------------- | --------------------------------------- |
-| `positions` | `Iterable[float]`                 | Positions on the axis, ascending. | *required*                              |
-| `values`    | \`Mapping\[str, Sequence[float]\] | None\`                            | One value per position for each output. |
+| Name        | Type                              | Description                       | Default                                                  |
+| ----------- | --------------------------------- | --------------------------------- | -------------------------------------------------------- |
+| `positions` | `Iterable[float]`                 | Positions on the axis, ascending. | *required*                                               |
+| `values`    | \`Mapping\[str, Sequence[float]\] | None\`                            | One value per position for each output.                  |
+| `seed`      | \`int                             | None\`                            | The seed of the run, or None when it depends on no seed. |
 
 Raises:
 
@@ -933,6 +1122,7 @@ def __init__(
     self,
     positions: Iterable[float],
     values: Mapping[str, Sequence[float]] | None = None,
+    seed: int | None = None,
 ):
     """
     Results at the given positions.
@@ -943,6 +1133,8 @@ def __init__(
         Positions on the axis, ascending.
     values : Mapping[str, Sequence[float]] | None, optional
         One value per position for each output.
+    seed : int | None, optional
+        The seed of the run, or None when it depends on no seed.
 
     Raises
     ------
@@ -953,6 +1145,7 @@ def __init__(
         {name: list(series) for name, series in (values or {}).items()}
     )
     self.positions = [float(position) for position in positions]
+    self.seed = seed
     for name, series in self.items():
         if len(series) != len(self.positions):
             raise ValueError(
@@ -964,18 +1157,19 @@ def __init__(
 #### from_rows
 
 ```python
-from_rows(positions: Sequence[float], names: Sequence[str], rows: Sequence[Sequence[float]]) -> SimulationResults
+from_rows(positions: Sequence[float], names: Sequence[str], rows: Sequence[Sequence[float]], seed: int | None = None) -> SimulationResults
 ```
 
 Results from one row of output values per position.
 
 Parameters:
 
-| Name        | Type                        | Description                             | Default    |
-| ----------- | --------------------------- | --------------------------------------- | ---------- |
-| `positions` | `Sequence[float]`           | Positions on the axis, ascending.       | *required* |
-| `names`     | `Sequence[str]`             | Output names, in the order of each row. | *required* |
-| `rows`      | `Sequence[Sequence[float]]` | One row per position.                   | *required* |
+| Name        | Type                        | Description                             | Default                                                  |
+| ----------- | --------------------------- | --------------------------------------- | -------------------------------------------------------- |
+| `positions` | `Sequence[float]`           | Positions on the axis, ascending.       | *required*                                               |
+| `names`     | `Sequence[str]`             | Output names, in the order of each row. | *required*                                               |
+| `rows`      | `Sequence[Sequence[float]]` | One row per position.                   | *required*                                               |
+| `seed`      | \`int                       | None\`                                  | The seed of the run, or None when it depends on no seed. |
 
 Returns:
 
@@ -992,6 +1186,7 @@ def from_rows(
     positions: Sequence[float],
     names: Sequence[str],
     rows: Sequence[Sequence[float]],
+    seed: int | None = None,
 ) -> "SimulationResults":
     """
     Results from one row of output values per position.
@@ -1004,6 +1199,8 @@ def from_rows(
         Output names, in the order of each row.
     rows : Sequence[Sequence[float]]
         One row per position.
+    seed : int | None, optional
+        The seed of the run, or None when it depends on no seed.
 
     Returns
     -------
@@ -1011,7 +1208,7 @@ def from_rows(
         One series per output name.
     """
     columns = list(zip(*rows)) if rows else [() for _ in names]
-    return cls(positions, dict(zip(names, columns, strict=True)))
+    return cls(positions, dict(zip(names, columns, strict=True)), seed=seed)
 ```
 
 #### rows
@@ -1051,14 +1248,728 @@ def rows(self) -> list[list[float]]:
 __repr__() -> str
 ```
 
-The positions and the values.
+The positions, the seed and the values.
 
 Source code in `commol/api/results.py`
 
 ```python
 def __repr__(self) -> str:
-    """The positions and the values."""
-    return f"SimulationResults(positions={self.positions!r}, {dict.__repr__(self)})"
+    """The positions, the seed and the values."""
+    seed = "" if self.seed is None else f"seed={self.seed!r}, "
+    return (
+        f"SimulationResults(positions={self.positions!r}, {seed}"
+        f"{dict.__repr__(self)})"
+    )
+```
+
+## ReplicateRuns
+
+Runs replicates of a stochastic model; `Simulation.replicates` makes it.
+
+Attributes:
+
+| Name         | Type         | Description                                    |
+| ------------ | ------------ | ---------------------------------------------- |
+| `simulation` | `Simulation` | The simulation whose model the replicates run. |
+| `n`          | `int`        | How many replicates.                           |
+| `seed`       | `int`        | The seed the replicate seeds derive from.      |
+
+Source code in `commol/api/simulation.py`
+
+```python
+class ReplicateRuns:
+    """
+    Runs replicates of a stochastic model; `Simulation.replicates` makes it.
+
+    Attributes
+    ----------
+    simulation : Simulation
+        The simulation whose model the replicates run.
+    n : int
+        How many replicates.
+    seed : int
+        The seed the replicate seeds derive from.
+    """
+
+    def __init__(self, simulation: Simulation, n: int, seed: int):
+        """
+        The replicates of a simulation.
+
+        Parameters
+        ----------
+        simulation : Simulation
+            The simulation whose model the replicates run.
+        n : int
+            How many replicates.
+        seed : int
+            The seed the replicate seeds derive from.
+        """
+        self.simulation = simulation
+        self.n = n
+        self.seed = seed
+
+    def _replicates(
+        self, num_steps: int | None, positions: list[float] | None
+    ) -> SimulationReplicates:
+        simulation = self.simulation
+        simulation._validate_all_parameters_calibrated(simulation.model_definition)
+        engine = simulation.engine
+        grid, seeds, runs = engine.run_replicates(
+            self.seed, self.n, num_steps=num_steps, positions=positions
+        )
+        outputs = simulation.simulation_outputs
+        return SimulationReplicates(
+            (
+                SimulationResults.from_rows(grid, outputs, rows, seed=replicate_seed)
+                for replicate_seed, rows in zip(seeds, runs, strict=True)
+            ),
+            seed=self.seed,
+            positions=grid,
+        )
+
+    def run(self, num_steps: int) -> SimulationReplicates:
+        """
+        Every replicate from the initial state, on the default grid.
+
+        Parameters
+        ----------
+        num_steps : int
+            The number of steps: each replicate holds the positions
+            ``0, 1, ..., num_steps``.
+
+        Returns
+        -------
+        SimulationReplicates
+            One `SimulationResults` per replicate, each with its seed.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a replicate leaves the values the model allows.
+        ValueError
+            If a parameter or a value of the model has no value.
+        """
+        return self._replicates(num_steps, None)
+
+    def run_at(self, at: Sequence[float]) -> SimulationReplicates:
+        """
+        Every replicate from the initial state, reported at given positions.
+
+        Parameters
+        ----------
+        at : Sequence[float]
+            Sorted, unique positions to report at.
+
+        Returns
+        -------
+        SimulationReplicates
+            One `SimulationResults` per replicate, each with its seed.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a replicate leaves the values the model allows.
+        ValueError
+            If a parameter has no value, the positions are not sorted and
+            unique, or the engine does not report at one of them.
+        """
+        return self._replicates(None, [float(position) for position in at])
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(simulation: Simulation, n: int, seed: int)
+```
+
+The replicates of a simulation.
+
+Parameters:
+
+| Name         | Type         | Description                                    | Default    |
+| ------------ | ------------ | ---------------------------------------------- | ---------- |
+| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required* |
+| `n`          | `int`        | How many replicates.                           | *required* |
+| `seed`       | `int`        | The seed the replicate seeds derive from.      | *required* |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def __init__(self, simulation: Simulation, n: int, seed: int):
+    """
+    The replicates of a simulation.
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The simulation whose model the replicates run.
+    n : int
+        How many replicates.
+    seed : int
+        The seed the replicate seeds derive from.
+    """
+    self.simulation = simulation
+    self.n = n
+    self.seed = seed
+```
+
+#### run
+
+```python
+run(num_steps: int) -> SimulationReplicates
+```
+
+Every replicate from the initial state, on the default grid.
+
+Parameters:
+
+| Name        | Type  | Description                                                                   | Default    |
+| ----------- | ----- | ----------------------------------------------------------------------------- | ---------- |
+| `num_steps` | `int` | The number of steps: each replicate holds the positions 0, 1, ..., num_steps. | *required* |
+
+Returns:
+
+| Type                   | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| `SimulationReplicates` | One SimulationResults per replicate, each with its seed. |
+
+Raises:
+
+| Type                   | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `InfeasibleStateError` | If a replicate leaves the values the model allows.   |
+| `ValueError`           | If a parameter or a value of the model has no value. |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def run(self, num_steps: int) -> SimulationReplicates:
+    """
+    Every replicate from the initial state, on the default grid.
+
+    Parameters
+    ----------
+    num_steps : int
+        The number of steps: each replicate holds the positions
+        ``0, 1, ..., num_steps``.
+
+    Returns
+    -------
+    SimulationReplicates
+        One `SimulationResults` per replicate, each with its seed.
+
+    Raises
+    ------
+    InfeasibleStateError
+        If a replicate leaves the values the model allows.
+    ValueError
+        If a parameter or a value of the model has no value.
+    """
+    return self._replicates(num_steps, None)
+```
+
+#### run_at
+
+```python
+run_at(at: Sequence[float]) -> SimulationReplicates
+```
+
+Every replicate from the initial state, reported at given positions.
+
+Parameters:
+
+| Name | Type              | Description                            | Default    |
+| ---- | ----------------- | -------------------------------------- | ---------- |
+| `at` | `Sequence[float]` | Sorted, unique positions to report at. | *required* |
+
+Returns:
+
+| Type                   | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| `SimulationReplicates` | One SimulationResults per replicate, each with its seed. |
+
+Raises:
+
+| Type                   | Description                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `InfeasibleStateError` | If a replicate leaves the values the model allows.                                                                  |
+| `ValueError`           | If a parameter has no value, the positions are not sorted and unique, or the engine does not report at one of them. |
+
+Source code in `commol/api/simulation.py`
+
+```python
+def run_at(self, at: Sequence[float]) -> SimulationReplicates:
+    """
+    Every replicate from the initial state, reported at given positions.
+
+    Parameters
+    ----------
+    at : Sequence[float]
+        Sorted, unique positions to report at.
+
+    Returns
+    -------
+    SimulationReplicates
+        One `SimulationResults` per replicate, each with its seed.
+
+    Raises
+    ------
+    InfeasibleStateError
+        If a replicate leaves the values the model allows.
+    ValueError
+        If a parameter has no value, the positions are not sorted and
+        unique, or the engine does not report at one of them.
+    """
+    return self._replicates(None, [float(position) for position in at])
+```
+
+## SimulationReplicates
+
+Bases: `list[SimulationResults]`
+
+Replicates of a run of a stochastic engine, one `SimulationResults` each.
+
+A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them as `ci_percentiles` requires.
+
+Attributes:
+
+| Name        | Type          | Description                                       |
+| ----------- | ------------- | ------------------------------------------------- |
+| `seed`      | `int`         | The seed the replicate seeds derive from.         |
+| `positions` | `list[float]` | Positions on the axis, shared by every replicate. |
+
+Source code in `commol/api/results.py`
+
+```python
+class SimulationReplicates(list[SimulationResults]):
+    """
+    Replicates of a run of a stochastic engine, one `SimulationResults` each.
+
+    A ``list`` of runs at the same positions, each with its own seed:
+    ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
+    replicates position by position, and `member_statistics` reduces them as
+    ``ci_percentiles`` requires.
+
+    Attributes
+    ----------
+    seed : int
+        The seed the replicate seeds derive from.
+    positions : list[float]
+        Positions on the axis, shared by every replicate.
+    """
+
+    seed: int
+    positions: list[float]
+
+    def __init__(
+        self, runs: Iterable[SimulationResults], seed: int, positions: Sequence[float]
+    ):
+        """
+        Replicates of one run.
+
+        Parameters
+        ----------
+        runs : Iterable[SimulationResults]
+            One run per replicate, at `positions`.
+        seed : int
+            The seed the replicate seeds derive from.
+        positions : Sequence[float]
+            Positions on the axis, ascending.
+
+        Raises
+        ------
+        ValueError
+            If a run is not at `positions`.
+        """
+        super().__init__(runs)
+        self.seed = seed
+        self.positions = [float(position) for position in positions]
+        for index, run in enumerate(self):
+            if run.positions != self.positions:
+                raise ValueError(
+                    f"Replicate {index} is at other positions than the replicates."
+                )
+
+    @property
+    def seeds(self) -> list[int]:
+        """The seed of each replicate, in order."""
+        return [run.seed for run in self if run.seed is not None]
+
+    def _values(self, name: str) -> np.ndarray:
+        if not self:
+            raise ValueError("There are no replicates.")
+        return np.asarray([run[name] for run in self], dtype=float)
+
+    def mean(self) -> SimulationResults:
+        """
+        The mean of the replicates at each position, for each output.
+
+        Returns
+        -------
+        SimulationResults
+            One series of means per output, with no seed.
+
+        Raises
+        ------
+        ValueError
+            If there are no replicates.
+        """
+        names = list(self[0]) if self else []
+        if not names:
+            raise ValueError("There are no replicates.")
+        return SimulationResults(
+            self.positions,
+            {name: self._values(name).mean(axis=0).tolist() for name in names},
+        )
+
+    def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
+        """
+        Quantiles of the replicates at each position, for each output.
+
+        Parameters
+        ----------
+        levels : Sequence[float]
+            Quantile levels, each between 0 and 1, such as ``[0.05, 0.5,
+            0.95]``.
+
+        Returns
+        -------
+        dict[float, SimulationResults]
+            The results of each level.
+
+        Raises
+        ------
+        ValueError
+            If a level is outside ``[0, 1]`` or there are no replicates.
+        """
+        for level in levels:
+            if not 0.0 <= level <= 1.0:
+                raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+        if not self:
+            raise ValueError("There are no replicates.")
+        names = list(self[0])
+        return {
+            level: SimulationResults(
+                self.positions,
+                {
+                    name: np.quantile(self._values(name), level, axis=0).tolist()
+                    for name in names
+                },
+            )
+            for level in levels
+        }
+
+    def member_statistics(
+        self, output: str, confidence_level: float
+    ) -> dict[str, list[float]]:
+        """
+        The spread of one output across the replicates, at each position.
+
+        Parameters
+        ----------
+        output : str
+            An output name.
+        confidence_level : float
+            Confidence level of the interval, strictly between 0 and 1.
+
+        Returns
+        -------
+        dict[str, list[float]]
+            Keys ``mean``, ``median``, ``ci_lower``, ``ci_upper``, ``min`` and
+            ``max``, one value per position (`member_statistics`).
+
+        Raises
+        ------
+        KeyError
+            If no replicate has the output.
+        ValueError
+            If the confidence level is out of range or there are no
+            replicates.
+        """
+        from commol.api.probabilistic.intervals import member_statistics
+
+        if self and output not in self[0]:
+            raise KeyError(
+                f"'{output}' is not an output of the replicates. "
+                f"Outputs: {sorted(self[0])}"
+            )
+        return member_statistics([run[output] for run in self], confidence_level)
+
+    def __repr__(self) -> str:
+        """The number of replicates, their seed and their positions."""
+        return (
+            f"SimulationReplicates({len(self)} replicates, seed={self.seed!r}, "
+            f"positions={self.positions!r})"
+        )
+```
+
+### Attributes
+
+#### seeds
+
+```python
+seeds: list[int]
+```
+
+The seed of each replicate, in order.
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float])
+```
+
+Replicates of one run.
+
+Parameters:
+
+| Name        | Type                          | Description                               | Default    |
+| ----------- | ----------------------------- | ----------------------------------------- | ---------- |
+| `runs`      | `Iterable[SimulationResults]` | One run per replicate, at positions.      | *required* |
+| `seed`      | `int`                         | The seed the replicate seeds derive from. | *required* |
+| `positions` | `Sequence[float]`             | Positions on the axis, ascending.         | *required* |
+
+Raises:
+
+| Type         | Description                   |
+| ------------ | ----------------------------- |
+| `ValueError` | If a run is not at positions. |
+
+Source code in `commol/api/results.py`
+
+```python
+def __init__(
+    self, runs: Iterable[SimulationResults], seed: int, positions: Sequence[float]
+):
+    """
+    Replicates of one run.
+
+    Parameters
+    ----------
+    runs : Iterable[SimulationResults]
+        One run per replicate, at `positions`.
+    seed : int
+        The seed the replicate seeds derive from.
+    positions : Sequence[float]
+        Positions on the axis, ascending.
+
+    Raises
+    ------
+    ValueError
+        If a run is not at `positions`.
+    """
+    super().__init__(runs)
+    self.seed = seed
+    self.positions = [float(position) for position in positions]
+    for index, run in enumerate(self):
+        if run.positions != self.positions:
+            raise ValueError(
+                f"Replicate {index} is at other positions than the replicates."
+            )
+```
+
+#### mean
+
+```python
+mean() -> SimulationResults
+```
+
+The mean of the replicates at each position, for each output.
+
+Returns:
+
+| Type                | Description                                   |
+| ------------------- | --------------------------------------------- |
+| `SimulationResults` | One series of means per output, with no seed. |
+
+Raises:
+
+| Type         | Description                 |
+| ------------ | --------------------------- |
+| `ValueError` | If there are no replicates. |
+
+Source code in `commol/api/results.py`
+
+```python
+def mean(self) -> SimulationResults:
+    """
+    The mean of the replicates at each position, for each output.
+
+    Returns
+    -------
+    SimulationResults
+        One series of means per output, with no seed.
+
+    Raises
+    ------
+    ValueError
+        If there are no replicates.
+    """
+    names = list(self[0]) if self else []
+    if not names:
+        raise ValueError("There are no replicates.")
+    return SimulationResults(
+        self.positions,
+        {name: self._values(name).mean(axis=0).tolist() for name in names},
+    )
+```
+
+#### quantiles
+
+```python
+quantiles(levels: Sequence[float]) -> dict[float, SimulationResults]
+```
+
+Quantiles of the replicates at each position, for each output.
+
+Parameters:
+
+| Name     | Type              | Description                                                       | Default    |
+| -------- | ----------------- | ----------------------------------------------------------------- | ---------- |
+| `levels` | `Sequence[float]` | Quantile levels, each between 0 and 1, such as [0.05, 0.5, 0.95]. | *required* |
+
+Returns:
+
+| Type                             | Description                |
+| -------------------------------- | -------------------------- |
+| `dict[float, SimulationResults]` | The results of each level. |
+
+Raises:
+
+| Type         | Description                                              |
+| ------------ | -------------------------------------------------------- |
+| `ValueError` | If a level is outside [0, 1] or there are no replicates. |
+
+Source code in `commol/api/results.py`
+
+```python
+def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
+    """
+    Quantiles of the replicates at each position, for each output.
+
+    Parameters
+    ----------
+    levels : Sequence[float]
+        Quantile levels, each between 0 and 1, such as ``[0.05, 0.5,
+        0.95]``.
+
+    Returns
+    -------
+    dict[float, SimulationResults]
+        The results of each level.
+
+    Raises
+    ------
+    ValueError
+        If a level is outside ``[0, 1]`` or there are no replicates.
+    """
+    for level in levels:
+        if not 0.0 <= level <= 1.0:
+            raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+    if not self:
+        raise ValueError("There are no replicates.")
+    names = list(self[0])
+    return {
+        level: SimulationResults(
+            self.positions,
+            {
+                name: np.quantile(self._values(name), level, axis=0).tolist()
+                for name in names
+            },
+        )
+        for level in levels
+    }
+```
+
+#### member_statistics
+
+```python
+member_statistics(output: str, confidence_level: float) -> dict[str, list[float]]
+```
+
+The spread of one output across the replicates, at each position.
+
+Parameters:
+
+| Name               | Type    | Description                                                 | Default    |
+| ------------------ | ------- | ----------------------------------------------------------- | ---------- |
+| `output`           | `str`   | An output name.                                             | *required* |
+| `confidence_level` | `float` | Confidence level of the interval, strictly between 0 and 1. | *required* |
+
+Returns:
+
+| Type                     | Description                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `dict[str, list[float]]` | Keys mean, median, ci_lower, ci_upper, min and max, one value per position (member_statistics). |
+
+Raises:
+
+| Type         | Description                                                         |
+| ------------ | ------------------------------------------------------------------- |
+| `KeyError`   | If no replicate has the output.                                     |
+| `ValueError` | If the confidence level is out of range or there are no replicates. |
+
+Source code in `commol/api/results.py`
+
+```python
+def member_statistics(
+    self, output: str, confidence_level: float
+) -> dict[str, list[float]]:
+    """
+    The spread of one output across the replicates, at each position.
+
+    Parameters
+    ----------
+    output : str
+        An output name.
+    confidence_level : float
+        Confidence level of the interval, strictly between 0 and 1.
+
+    Returns
+    -------
+    dict[str, list[float]]
+        Keys ``mean``, ``median``, ``ci_lower``, ``ci_upper``, ``min`` and
+        ``max``, one value per position (`member_statistics`).
+
+    Raises
+    ------
+    KeyError
+        If no replicate has the output.
+    ValueError
+        If the confidence level is out of range or there are no
+        replicates.
+    """
+    from commol.api.probabilistic.intervals import member_statistics
+
+    if self and output not in self[0]:
+        raise KeyError(
+            f"'{output}' is not an output of the replicates. "
+            f"Outputs: {sorted(self[0])}"
+        )
+    return member_statistics([run[output] for run in self], confidence_level)
+```
+
+#### __repr__
+
+```python
+__repr__() -> str
+```
+
+The number of replicates, their seed and their positions.
+
+Source code in `commol/api/results.py`
+
+```python
+def __repr__(self) -> str:
+    """The number of replicates, their seed and their positions."""
+    return (
+        f"SimulationReplicates({len(self)} replicates, seed={self.seed!r}, "
+        f"positions={self.positions!r})"
+    )
 ```
 
 ## OdeSolver
@@ -1100,6 +2011,100 @@ class OdeSolver(BaseModel):
     )
     rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
     atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+```
+
+## StochasticEventsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticEvents` engine.
+
+Attributes:
+
+| Name        | Type                               | Description                                                                                                                                                                                 |
+| ----------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`    | `Literal['direct', 'tau_leaping']` | "direct": Gillespie's direct method, one event at a time, exact. "tau_leaping": a Poisson number of events of each flow in each leap, an approximation that is faster when events are many. |
+| `tau`       | \`float                            | None\`                                                                                                                                                                                      |
+| `epsilon`   | `float`                            | How much a propensity may change in one chosen leap, relative to its value.                                                                                                                 |
+| `tolerance` | `float`                            | Relative tolerance of the time of an event when a rate reads t.                                                                                                                             |
+| `rounding`  | \`Rounding                         | None\`                                                                                                                                                                                      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticEventsSettings(BaseModel):
+    """
+    Settings of the ``StochasticEvents`` engine.
+
+    Attributes
+    ----------
+    method : Literal["direct", "tau_leaping"]
+        ``"direct"``: Gillespie's direct method, one event at a time, exact.
+        ``"tau_leaping"``: a Poisson number of events of each flow in each
+        leap, an approximation that is faster when events are many.
+    tau : float | None
+        The length of a leap of ``"tau_leaping"``. None chooses each leap as
+        Cao, Gillespie and Petzold (2006) do, from `epsilon`.
+    epsilon : float
+        How much a propensity may change in one chosen leap, relative to its
+        value.
+    tolerance : float
+        Relative tolerance of the time of an event when a rate reads ``t``.
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["direct", "tau_leaping"] = Field(
+        default="direct", description="Simulation method."
+    )
+    tau: float | None = Field(
+        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+    )
+    epsilon: float = Field(
+        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+    )
+    tolerance: float = Field(
+        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+    )
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
+```
+
+## StochasticStepsSettings
+
+Bases: `BaseModel`
+
+Settings of the `StochasticSteps` engine.
+
+Attributes:
+
+| Name       | Type       | Description |
+| ---------- | ---------- | ----------- |
+| `rounding` | \`Rounding | None\`      |
+
+Source code in `commol/context/engine.py`
+
+```python
+class StochasticStepsSettings(BaseModel):
+    """
+    Settings of the ``StochasticSteps`` engine.
+
+    Attributes
+    ----------
+    rounding : Rounding | None
+        How to make whole the initial amounts that are not. None requires
+        whole amounts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rounding: Rounding | None = Field(
+        default=None, description="How to make the initial amounts whole."
+    )
 ```
 
 ## InfeasibleStateError
