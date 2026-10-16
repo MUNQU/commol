@@ -12,6 +12,7 @@ from statistics import NormalDist
 import pytest
 
 from commol import (
+    NoNoise,
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
@@ -74,7 +75,7 @@ class TestClosedForms:
         y = dist.mean + offset * dist.stdev
         expected = float(_interval(dist, 0.9)[0] <= y <= _interval(dist, 0.9)[1])
 
-        score = scores.coverage(predictive, [_observation(y)], 0.9)
+        score = scores.coverage(predictive, [_observation(y)], NoNoise(), 0.9)
 
         assert score.per_observation == [expected]
 
@@ -85,7 +86,7 @@ class TestClosedForms:
         predictive, dist = normal
         y = dist.mean + offset * dist.stdev
 
-        score = scores.interval_score(predictive, [_observation(y)], 0.8)
+        score = scores.interval_score(predictive, [_observation(y)], NoNoise(), 0.8)
 
         assert score.mean == pytest.approx(_interval_score(dist, 0.8, y), rel=1e-3)
 
@@ -100,7 +101,9 @@ class TestClosedForms:
             + sum((1 - c) / 2 * _interval_score(dist, c, y) for c in levels)
         ) / (len(levels) + 0.5)
 
-        score = scores.weighted_interval_score(predictive, [_observation(y)], levels)
+        score = scores.weighted_interval_score(
+            predictive, [_observation(y)], NoNoise(), levels
+        )
 
         assert score.mean == pytest.approx(expected, rel=1e-3)
 
@@ -115,7 +118,7 @@ class TestClosedForms:
             z * (2 * STANDARD.cdf(z) - 1) + 2 * STANDARD.pdf(z) - 1 / math.sqrt(math.pi)
         )
 
-        score = scores.crps(predictive, [_observation(y)])
+        score = scores.crps(predictive, [_observation(y)], NoNoise())
 
         assert score.mean == pytest.approx(expected, rel=1e-3)
 
@@ -126,7 +129,10 @@ class TestClosedForms:
         predictive, dist = normal
 
         score = scores.pit(
-            predictive, [_observation(dist.mean + offset * dist.stdev)], seed=1
+            predictive,
+            [_observation(dist.mean + offset * dist.stdev)],
+            NoNoise(),
+            seed=1,
         )
 
         assert score.mean == pytest.approx(STANDARD.cdf(offset), abs=1e-3)
@@ -142,7 +148,7 @@ class TestSeries:
             at=10, output="B", value=dist.mean * 3, factor_id="f", label="far"
         )
 
-        score = scores.coverage(predictive, [inside, outside, inside], 0.9)
+        score = scores.coverage(predictive, [inside, outside, inside], NoNoise(), 0.9)
 
         assert score.per_observation == [1.0, 0.0, 1.0]
         assert score.per_series == {"B": 1.0, "far": 0.0}
@@ -165,6 +171,8 @@ class TestSeries:
             - 0.5 * sum(abs(a - b) for a in draws for b in draws) / 16
         )
 
-        score = scores.crps(Predictive(calibrator, sample, [10]), [_observation(y)])
+        score = scores.crps(
+            Predictive(calibrator, sample, [10]), [_observation(y)], NoNoise()
+        )
 
         assert score.mean == pytest.approx(expected, rel=1e-12)

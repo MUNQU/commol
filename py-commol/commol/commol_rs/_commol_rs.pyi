@@ -449,7 +449,68 @@ class CalibrationProblemProtocol(Protocol):
         self,
         sample: ParameterSampleProtocol,
         observations: list[ObservedDataPointProtocol],
+        seed: int,
+        residual_noise: tuple[list[float], int, str] | None = None,
     ) -> ObservationDrawsProtocol: ...
+    def bootstrap(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        method: str,
+        replicates: int,
+        block_length: int | None,
+        starts: int,
+        seed: int,
+        residual_scale: str | None = None,
+        scheme: str | None = None,
+        multipliers: str | None = None,
+    ) -> BootstrapRunProtocol: ...
+    def jackknife(
+        self,
+        config: OptimizationConfigProtocol,
+        fit: list[float],
+        block_length: int | None,
+        starts: int,
+        seed: int,
+    ) -> JackknifeRunProtocol: ...
+
+class BootstrapRunProtocol(Protocol):
+    @property
+    def values(self) -> list[list[float]]: ...
+    @property
+    def groups(self) -> list[int]: ...
+    @property
+    def failed(self) -> list[tuple[int, str]]: ...
+    @property
+    def not_converged(self) -> int: ...
+    @property
+    def negative_values(self) -> int: ...
+    @property
+    def block_length(self) -> int: ...
+    @property
+    def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
+
+class JackknifeRunProtocol(Protocol):
+    @property
+    def spans(self) -> list[tuple[float, float]]: ...
+    @property
+    def estimate(self) -> list[float]: ...
+    @property
+    def bias(self) -> list[float]: ...
+    @property
+    def standard_error(self) -> list[float]: ...
+    @property
+    def pseudo_values(self) -> list[list[float]]: ...
+    @property
+    def influence(self) -> list[list[float]]: ...
+    @property
+    def failed(self) -> list[tuple[tuple[float, float], str]]: ...
+    @property
+    def not_converged(self) -> int: ...
+    @property
+    def block_length(self) -> int: ...
+    @property
+    def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
 class ParameterSampleProtocol(Protocol):
     def __init__(
@@ -573,6 +634,11 @@ class InferenceModule(Protocol):
     ParameterSample: type[ParameterSampleProtocol]
     Predictive: type[PredictiveProtocol]
     ObservationDraws: type[ObservationDrawsProtocol]
+    BootstrapRun: type[BootstrapRunProtocol]
+    JackknifeRun: type[JackknifeRunProtocol]
+    def quantile_error(
+        self, values: list[float], level: float
+    ) -> tuple[float, float]: ...
     def weighted_quantiles(
         self, values: list[float], weights: list[float], levels: list[float]
     ) -> list[float]: ...

@@ -164,6 +164,58 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         Ok(self)
     }
 
+    /// A copy of the problem that compares predictions with other observed
+    /// values and weights, one of each per observation in problem order.
+    ///
+    /// Everything else stays: the engine, the parameters, the observation
+    /// operator, the feasibility, the loss and its settings. The discrepancy
+    /// is built as [`Self::new`] builds it, so with normalization on its
+    /// factors come from the new values. A resampling method makes each
+    /// replicate with it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the observation when a value is not
+    /// finite or a weight is negative or not finite, or when the numbers of
+    /// values or weights are not the number of observations, or every weight
+    /// is zero.
+    pub fn with_data(&self, values: &[f64], weights: &[f64]) -> Result<Self, String> {
+        let n = self.observed_data.len();
+        if values.len() != n || weights.len() != n {
+            return Err(format!(
+                "Other data need one value and one weight per observation: {n} \
+                 observations, {} values, {} weights",
+                values.len(),
+                weights.len()
+            ));
+        }
+        for ((obs, &value), &weight) in self.observed_data.iter().zip(values).zip(weights) {
+            if !value.is_finite() {
+                return Err(format!(
+                    "Observation '{}' at {} gets the value {value}; a value must be finite",
+                    obs.label, obs.at
+                ));
+            }
+            if !(weight.is_finite() && weight >= 0.0) {
+                return Err(format!(
+                    "Observation '{}' at {} gets the weight {weight}; a weight must be \
+                     finite and not negative",
+                    obs.label, obs.at
+                ));
+            }
+        }
+        if weights.iter().all(|&weight| weight == 0.0) {
+            return Err("Every weight is zero; at least one observation needs weight".to_string());
+        }
+        let mut problem = self.clone();
+        for ((obs, &value), &weight) in problem.observed_data.iter_mut().zip(values).zip(weights) {
+            obs.value = value;
+            obs.weight = weight;
+        }
+        problem.discrepancy = self.discrepancy.with_data(&problem.observed_data);
+        Ok(problem)
+    }
+
     /// The forward model.
     pub fn forward(&self) -> &ForwardModel<E> {
         &self.forward

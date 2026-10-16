@@ -31,7 +31,13 @@ from .oracles import (
     settled,
     total_at,
 )
-from .problems import bounded, initial_condition_problem, observed
+from .problems import (
+    bounded,
+    flow_calibrator,
+    flow_observations,
+    initial_condition_problem,
+    observed,
+)
 from .reference import ABC_START, reference_run, abc_flows, total
 from .simulation import initial_state, run
 
@@ -55,6 +61,8 @@ __all__ = [
     "build_ode",
     "conditional_pathway_builder",
     "final_size",
+    "flow_calibrator",
+    "flow_observations",
     "flow_model",
     "growth_ratio",
     "increments",

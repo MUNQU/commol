@@ -5,8 +5,8 @@ on top of Rust engines (`crates/`): a model compiler (`commol-model`), a
 difference engine and an ODE engine on `diffsol`, two stochastic engines of
 whole units (`commol-stochastic`), reproducible random numbers for stochastic
 engines (`commol-random`), the calibration problem and its optimizers
-(`commol-calibration`), the parameter sample, predictive and scores of the
-uncertainty methods (`commol-inference`), joined by PyO3 bindings
+(`commol-calibration`), the uncertainty methods with their parameter sample,
+predictive and scores (`commol-inference`), joined by PyO3 bindings
 (`py-commol/src/`). This file is an index. The details live in `docs/`, and
 the code is the final authority.
 
@@ -85,6 +85,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change calibration | `crates/commol-calibration/src/calibration_problem.rs` and its layers (`forward.rs`, `observation.rs`, `feasibility.rs`, `discrepancy.rs`, `objective.rs`, `starts.rs`) | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py`, `py-commol/src/inference.rs` (`CalibrationProblem`) |
 | Add an uncertainty method | `crates/commol-inference/` | `py-commol/src/inference.rs`, `py-commol/commol/context/inference/`, `api/inference/registry.py`, the [checklist](docs/codebase/maintainer-playbook.md#uncertainty-method) |
 | Change sensitivities or identifiability | `crates/commol-inference/src/sensitivity/`, `crates/commol-inference/src/identifiability/` | `crates/commol-core/src/simulation_engine.rs` (`output_accuracy`), `py-commol/src/identifiability.rs`, `py-commol/commol/context/inference/identifiability.py`, `api/inference/identifiability.py`, `docs/guide/uncertainty/identifiability.md` |
+| Change a bootstrap, the jackknife, blocks or residual noise | `crates/commol-inference/src/resampling/` | `crates/commol-calibration/src/calibration_problem.rs` (`with_data`), `py-commol/src/inference.rs` (`bootstrap`, `jackknife`), `py-commol/commol/context/inference/resampling.py`, `api/inference/resampling.py`, `docs/guide/uncertainty/resampling.md` |
 | Change the parameter sample, the predictive, the scores or the quantile | `crates/commol-inference/src/` (`sample.rs`, `predictive.rs`, `scores.rs`, `statistics.rs`) | `py-commol/commol/context/inference/sample.py`, `api/inference/`, `docs/guide/uncertainty/index.md` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |

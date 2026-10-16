@@ -122,6 +122,18 @@ class Calibrator:
         return self._rust_problem
 
     @property
+    def rust_optimizer(self) -> "OptimizationConfigProtocol":
+        """
+        The optimizer built in Rust, for the runners of methods.
+
+        Returns
+        -------
+        OptimizationConfigProtocol
+            The optimizer of ``problem.optimization_config``.
+        """
+        return self._build_optimization_config()
+
+    @property
     def seed(self) -> int:
         """
         The seed of the calibration's random numbers.

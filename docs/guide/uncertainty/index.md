@@ -23,10 +23,13 @@ A **band of the model** is the spread of the model's output across the draws of
 the parameters. It says where the model curve lies, not where the next
 observation will fall: an observation also carries measurement noise. A
 **prediction interval** adds that noise to every draw before it reduces them
-(the `ObservationNoise` port of `commol-inference`). A method that has no noise
-model gives a band of the model, and this page says so wherever it shows one.
-Comparing a band of the model with data underestimates the spread, so its
-coverage of the data is below its level.
+(the `ObservationNoise` port of `commol-inference`). Every reader of
+observations takes the noise as an argument with no default: `NoNoise()` gives
+a band of the model, and `ResidualNoise(...)` adds residuals of a fit, which
+gives a prediction interval with no noise model
+([Resampling](resampling.md#prediction-intervals)). Comparing a band of the
+model with data underestimates the spread, so its coverage of the data is below
+its level.
 
 ## Which method answers which question
 
@@ -37,9 +40,13 @@ coverage of the data is below its level.
 | `Collinearity` | Which parameters can be fitted together | No | [Identifiability](identifiability.md#collinearity) |
 | `SampleIdentifiability` | Which parameters a sample determines: contraction, correlations, modes | No | [Identifiability](identifiability.md#a-sample) |
 | `StartsIdentifiability` | Which parameters differ between starts of equal loss | No | [Identifiability](identifiability.md#starts) |
+| `BayesianBootstrap` | How far the parameters move when the data are reweighted by blocks | No | [Resampling](resampling.md#bayesian-bootstrap) |
+| `ResidualBootstrap` | How far the parameters move when the residuals of the fit are resampled by blocks | No | [Resampling](resampling.md#residual-block-bootstrap) |
+| `WildBootstrap` | The same, when the size of the noise changes along the series | No | [Resampling](resampling.md#wild-block-bootstrap) |
+| `BlockJackknife` | The standard error and bias of each parameter, and which block of data moves it most | No | [Resampling](resampling.md#block-jackknife) |
+| `ResidualNoise` | Where the next observations fall: a prediction interval | No | [Resampling](resampling.md#prediction-intervals) |
 
 Each uncertainty method adds its row here when it lands.
-
 ## Quick path
 
 ```python
@@ -50,6 +57,7 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
+    NoNoise,
     ObservedDataPoint,
     ParameterSample,
     Predictive,
@@ -111,9 +119,9 @@ predictive = Predictive(calibrator, sample, positions=list(range(61)))
 band = predictive.band(confidence_level=0.9)
 print(band.lower["B"][50] <= truth["B"][50] <= band.upper["B"][50])  # True
 
-# Scores on the held-out observations.
-print(scores.coverage(predictive, held_out, confidence_level=0.9).mean)
-print(scores.crps(predictive, held_out).per_series)
+# Scores of the band of the model on the held-out observations.
+print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)
+print(scores.crps(predictive, held_out, NoNoise()).per_series)
 ```
 
 ## The parameter sample
@@ -178,7 +186,7 @@ of the predictive, with an equal share of its weight.
 |---|---|
 | `band(confidence_level)` | The weighted mean, median and central interval of every output at every position (`PredictiveBand`) |
 | `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first |
-| `at_observations(observed_data)` | Every draw's value of each observation, read through the observation operator the loss uses: sums, windows and factors (`ObservationDraws`) |
+| `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()` or `ResidualNoise(...)` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
 
 `SimulationPlotter.plot_series` and `plot_cumulative` draw the band of a
@@ -191,16 +199,18 @@ its draws with their weights when it is the `ensemble_runs`.
 
 The functions of `commol.scores` compare a predictive with observations, and
 return a `Score`: the value of each observation, the mean of each series and
-the overall mean. Which observations to score is an argument with no default:
-score data the method did not see, such as the held-out positions above.
+the overall mean. Which observations to score and the observation noise are
+arguments with no default: score data the method did not see, such as the
+held-out positions above, and say whether you score a band of the model
+(`NoNoise()`) or a prediction interval (`ResidualNoise(...)`).
 
 | Function | Score | Better |
 |---|---|---|
-| `coverage(predictive, observations, confidence_level)` | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level |
-| `interval_score(predictive, observations, confidence_level)` | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c` | Lower |
-| `weighted_interval_score(predictive, observations, confidence_levels)` | The weighted interval score of Bracher et al. (2021) | Lower |
-| `crps(predictive, observations)` | `Σ wᵢ|xᵢ − y| − ½ Σᵢⱼ wᵢwⱼ|xᵢ − xⱼ|`, the CRPS of a stochastic calibration's loss | Lower |
-| `pit(predictive, observations, seed)` | `F(y)`, randomized where draws tie with `y` | Uniform |
+| `coverage(predictive, observations, noise, confidence_level)` | 1 inside the central interval, 0 outside; the mean is the empirical coverage | Close to the level |
+| `interval_score(predictive, observations, noise, confidence_level)` | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c` | Lower |
+| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021) | Lower |
+| `crps(predictive, observations, noise)` | `Σ wᵢ|xᵢ − y| − ½ Σᵢⱼ wᵢwⱼ|xᵢ − xⱼ|`, the CRPS of a stochastic calibration's loss | Lower |
+| `pit(predictive, observations, noise, seed)` | `F(y)`, randomized where draws tie with `y` | Uniform |
 
 ## The entry point
 
@@ -217,9 +227,11 @@ The identifiability methods run through their own entry point,
 `InferenceMethod[R]` and share one registry; each entry point refuses the
 other kind with a `TypeError` that names the right one.
 
-<!-- doc-test: skip: no method ships yet; shows the call -->
 ```python
-result = calibrator.uncertainty(SomeMethod(...))
+from commol import BayesianBootstrap
+
+result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
+print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 ```
 
 ## Checklist
@@ -232,6 +244,7 @@ result = calibrator.uncertainty(SomeMethod(...))
 
 | To learn | Read |
 |---|---|
+| Bootstraps, the jackknife and prediction intervals with no noise model | [Resampling](resampling.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Which parameters the data determine | [Identifiability](identifiability.md) |
 | Reports of a sample | [Reports](../reports.md) |

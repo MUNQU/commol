@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from commol.api.results import SimulationResults
 from commol.context._model import engine_state
 from commol.context.calibration import ObservedDataPoint
+from commol.context.inference.noise import ObservationNoise, ResidualNoise
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
@@ -293,18 +294,25 @@ class Predictive:
         )
 
     def at_observations(
-        self, observed_data: Sequence[ObservedDataPoint]
+        self,
+        observed_data: Sequence[ObservedDataPoint],
+        noise: ObservationNoise,
     ) -> ObservationDraws:
         """
-        Every draw's value of each observation.
+        Every draw's value of each observation, with observation noise.
 
         The observations need not be the ones the problem was fitted to: held
         out data are read the same way, through the observation operator.
+        The noise is drawn from the calibrator's seed.
 
         Parameters
         ----------
         observed_data : Sequence[ObservedDataPoint]
             The observations.
+        noise : NoNoise | ResidualNoise
+            What an observation shows around a draw's prediction, with no
+            default: ``NoNoise()`` gives a band of the model,
+            ``ResidualNoise(...)`` a prediction interval.
 
         Returns
         -------
@@ -314,12 +322,25 @@ class Predictive:
         Raises
         ------
         ValueError
-            If an observation names an unknown output or factor.
+            If an observation names an unknown output or factor, or a series
+            the residual noise has no residuals of.
         InfeasibleStateError
             If a draw leaves the values its model allows.
         """
+        residual_noise = None
+        if isinstance(noise, ResidualNoise):
+            residual_noise = (
+                [
+                    noise.fit.best_parameters[name]
+                    for name in self.calibrator.parameter_names
+                ],
+                noise.block_length,
+                noise.residual_scale,
+            )
         draws = self.calibrator.rust_problem.observation_draws(
             self.sample.rust_sample,
             engine_state.rust_observed_data(list(observed_data)),
+            self.calibrator.seed,
+            residual_noise=residual_noise,
         )
         return ObservationDraws(observed_data, draws)

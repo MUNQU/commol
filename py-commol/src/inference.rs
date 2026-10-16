@@ -10,9 +10,14 @@ use commol_calibration::{
     CalibrationProblem, EvaluationError, StartOutcome, Violation, Workspace, optimize_starts,
     optimize_with_history,
 };
+use commol_inference::resampling::{
+    BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, ReplicateRunner, Resampler,
+    ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals, WildBootstrap,
+    automatic_block_length, block_jackknife, bootstrap,
+};
 use commol_inference::{
-    NoNoise, ObservationDraws, ParameterSample, Predictive, PredictiveError, observation_draws,
-    scores, statistics,
+    NoNoise, ObservationDraws, ObservationNoise, ParameterSample, Predictive, PredictiveError,
+    observation_draws, scores, statistics,
 };
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -263,23 +268,339 @@ impl PyCalibrationProblem {
     }
 
     /// Every draw's value of `observations`, read through the observation
-    /// operator, without observation noise
+    /// operator, with observation noise drawn from `seed`
+    ///
+    /// Args:
+    ///     sample: The draws
+    ///     observations: The observations, which need not be the problem's
+    ///     seed: Seed of the noise
+    ///     residual_noise: `(fit, block_length, residual_scale)` to add
+    ///         blocks of residuals of the fit at `fit`, or None for no noise
     ///
     /// Raises:
-    ///     ValueError: If the sample's parameters are not the problem's, or
-    ///         an observation names an unknown output or factor
+    ///     ValueError: If the sample's parameters are not the problem's, an
+    ///         observation names an unknown output or factor or a series the
+    ///         fit has no residuals of, or the residual noise is not valid
     ///     InfeasibleStateError: If a draw leaves the values its model allows
+    #[pyo3(signature = (sample, observations, seed, residual_noise=None))]
     fn observation_draws(
         &self,
         py: Python<'_>,
         sample: &PyParameterSample,
         observations: Vec<PyObservedDataPoint>,
+        seed: u64,
+        residual_noise: Option<(Vec<f64>, usize, String)>,
     ) -> PyResult<PyObservationDraws> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
-        py.detach(|| observation_draws(&self.inner, &sample.inner, &observations, &NoNoise, 0))
-            .map(|inner| PyObservationDraws { inner })
-            .map_err(predictive_error)
+        let noise: Box<dyn ObservationNoise> = match residual_noise {
+            None => Box::new(NoNoise),
+            Some((fit, length, scale)) => {
+                let residuals = Residuals::new(&self.inner, &fit, residual_scale(&scale)?)
+                    .map_err(value_error)?;
+                Box::new(
+                    ResidualNoise::new(self.inner.observed_data(), &residuals, length)
+                        .map_err(value_error)?,
+                )
+            }
+        };
+        py.detach(|| {
+            observation_draws(
+                &self.inner,
+                &sample.inner,
+                &observations,
+                noise.as_ref(),
+                seed,
+            )
+        })
+        .map(|inner| PyObservationDraws { inner })
+        .map_err(predictive_error)
     }
+
+    /// Fit replicates of reweighted or resampled data, from the fit
+    ///
+    /// Args:
+    ///     config: The optimizer
+    ///     fit: The fitted values, in problem order
+    ///     method: "bayesian", "residual" or "wild"
+    ///     replicates: Number of replicates
+    ///     block_length: Positions per block, or None for the automatic
+    ///         length
+    ///     starts: Starts per replicate, the fit first
+    ///     seed: Seed of the replicates
+    ///     residual_scale: "additive" or "multiplicative", for "residual"
+    ///     scheme: "moving" or "stationary", for "residual"
+    ///     multipliers: "rademacher" or "mammen", for "wild"
+    ///
+    /// Raises:
+    ///     ValueError: If a setting is not valid, the block length does not
+    ///         fit the positions, or the residuals cannot be taken on their
+    ///         scale
+    ///     RuntimeError: If every replicate fails
+    #[pyo3(signature = (config, fit, method, replicates, block_length, starts, seed, residual_scale=None, scheme=None, multipliers=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn bootstrap(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: Vec<f64>,
+        method: &str,
+        replicates: usize,
+        block_length: Option<usize>,
+        starts: usize,
+        seed: u64,
+        residual_scale: Option<String>,
+        scheme: Option<String>,
+        multipliers: Option<String>,
+    ) -> PyResult<PyBootstrapRun> {
+        if replicates == 0 {
+            return Err(value_error(
+                "A bootstrap needs at least one replicate".to_string(),
+            ));
+        }
+        let observed = self.inner.observed_data();
+        let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
+            .map_err(value_error)?;
+        let fit = runner.fit().to_vec();
+        let (resampler, chosen): (Box<dyn Resampler>, BlockLength) = match method {
+            "bayesian" => {
+                let residuals = Residuals::new(&self.inner, &fit, ResidualScale::Additive)
+                    .map_err(value_error)?;
+                let chosen = BlockLength::resolve(
+                    observed,
+                    &residuals,
+                    block_length,
+                    BlockDrawing::NonOverlapping,
+                )?;
+                let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+                (Box::new(BayesianBootstrap::new(observed, &scheme)), chosen)
+            }
+            "residual" => {
+                let scale = residual_scale_of(residual_scale.as_deref())?;
+                let blocks = match scheme.as_deref() {
+                    Some("moving") => ResidualBlocks::Moving,
+                    Some("stationary") => ResidualBlocks::Stationary,
+                    other => {
+                        return Err(value_error(format!(
+                            "scheme is {other:?}; it must be \"moving\" or \"stationary\""
+                        )));
+                    }
+                };
+                let drawing = match blocks {
+                    ResidualBlocks::Moving => BlockDrawing::Moving,
+                    ResidualBlocks::Stationary => BlockDrawing::Stationary,
+                };
+                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(value_error)?;
+                let chosen = BlockLength::resolve(observed, &residuals, block_length, drawing)?;
+                let block_scheme =
+                    BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+                (
+                    Box::new(ResidualBootstrap::new(
+                        observed,
+                        residuals,
+                        &block_scheme,
+                        blocks,
+                    )),
+                    chosen,
+                )
+            }
+            "wild" => {
+                let multipliers = match multipliers.as_deref() {
+                    Some("rademacher") => Multipliers::Rademacher,
+                    Some("mammen") => Multipliers::Mammen,
+                    other => {
+                        return Err(value_error(format!(
+                            "multipliers is {other:?}; it must be \"rademacher\" or \"mammen\""
+                        )));
+                    }
+                };
+                let residuals = Residuals::new(&self.inner, &fit, ResidualScale::Additive)
+                    .map_err(value_error)?;
+                let chosen = BlockLength::resolve(
+                    observed,
+                    &residuals,
+                    block_length,
+                    BlockDrawing::NonOverlapping,
+                )?;
+                let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+                (
+                    Box::new(WildBootstrap::new(residuals, &scheme, multipliers)),
+                    chosen,
+                )
+            }
+            other => {
+                return Err(value_error(format!(
+                    "Unknown resampling method {other:?}; one of \"bayesian\", \"residual\", \"wild\""
+                )));
+            }
+        };
+        let run = py
+            .detach(|| bootstrap(&runner, resampler.as_ref(), replicates))
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+        Ok(PyBootstrapRun {
+            values: run.sample.values().to_vec(),
+            groups: run
+                .sample
+                .groups()
+                .map(<[usize]>::to_vec)
+                .unwrap_or_default(),
+            failed: run.failed,
+            not_converged: run.not_converged,
+            negative_values: run.negative_values,
+            block_length: chosen.length,
+            block_length_estimates: chosen.estimates,
+        })
+    }
+
+    /// Fit once per block left out, from the fit
+    ///
+    /// Args:
+    ///     config: The optimizer
+    ///     fit: The fitted values, in problem order
+    ///     block_length: Positions per block, or None for the automatic
+    ///         length
+    ///     starts: Starts per fit, the fit first
+    ///     seed: Seed of the starts
+    ///
+    /// Raises:
+    ///     ValueError: If the block length does not fit the positions or
+    ///         makes fewer than two blocks
+    ///     RuntimeError: If fewer than two fits succeed
+    fn jackknife(
+        &self,
+        py: Python<'_>,
+        config: &PyOptimizationConfig,
+        fit: Vec<f64>,
+        block_length: Option<usize>,
+        starts: usize,
+        seed: u64,
+    ) -> PyResult<PyJackknifeRun> {
+        let observed = self.inner.observed_data();
+        let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
+            .map_err(value_error)?;
+        let residuals = Residuals::new(&self.inner, runner.fit(), ResidualScale::Additive)
+            .map_err(value_error)?;
+        let chosen = BlockLength::resolve(
+            observed,
+            &residuals,
+            block_length,
+            BlockDrawing::NonOverlapping,
+        )?;
+        let scheme = BlockScheme::new(observed, chosen.length).map_err(value_error)?;
+        if scheme.len() < 2 {
+            return Err(value_error(format!(
+                "block_length {} makes {} block; a jackknife needs at least two",
+                scheme.length(),
+                scheme.len()
+            )));
+        }
+        let jackknife = py
+            .detach(|| block_jackknife(&runner, &scheme))
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+        let spans = scheme.spans();
+        Ok(PyJackknifeRun {
+            spans: jackknife.blocks.iter().map(|&b| spans[b]).collect(),
+            estimate: jackknife.statistics.estimate,
+            bias: jackknife.statistics.bias,
+            standard_error: jackknife.statistics.standard_error,
+            pseudo_values: jackknife.statistics.pseudo_values,
+            influence: jackknife.statistics.influence,
+            failed: jackknife
+                .failed
+                .into_iter()
+                .map(|(block, reason)| (spans[block], reason))
+                .collect(),
+            not_converged: jackknife.not_converged,
+            block_length: chosen.length,
+            block_length_estimates: chosen.estimates,
+        })
+    }
+}
+
+/// The block length a method runs with, and the estimates of `"auto"`.
+struct BlockLength {
+    length: usize,
+    estimates: Option<Vec<(String, f64)>>,
+}
+
+impl BlockLength {
+    fn resolve(
+        observed: &[commol_calibration::ObservedDataPoint],
+        residuals: &Residuals,
+        requested: Option<usize>,
+        drawing: BlockDrawing,
+    ) -> PyResult<Self> {
+        Ok(match requested {
+            Some(length) => Self {
+                length,
+                estimates: None,
+            },
+            None => {
+                let automatic = automatic_block_length(observed, residuals.residuals(), drawing);
+                Self {
+                    length: automatic.length,
+                    estimates: Some(automatic.estimates),
+                }
+            }
+        })
+    }
+}
+
+fn residual_scale(name: &str) -> PyResult<ResidualScale> {
+    residual_scale_of(Some(name))
+}
+
+fn residual_scale_of(name: Option<&str>) -> PyResult<ResidualScale> {
+    match name {
+        Some("additive") => Ok(ResidualScale::Additive),
+        Some("multiplicative") => Ok(ResidualScale::Multiplicative),
+        other => Err(value_error(format!(
+            "residual_scale is {other:?}; it must be \"additive\" or \"multiplicative\""
+        ))),
+    }
+}
+
+/// The replicates of a bootstrap, as the runner returns them
+#[pyclass(name = "BootstrapRun", frozen, get_all)]
+pub struct PyBootstrapRun {
+    /// One row per replicate that did not fail, in problem order
+    values: Vec<Vec<f64>>,
+    /// The replicate of each row
+    groups: Vec<usize>,
+    /// The index and reason of each replicate that failed
+    failed: Vec<(usize, String)>,
+    /// Replicates kept although their optimizer did not converge
+    not_converged: usize,
+    /// Synthetic observed values below zero, over every replicate
+    negative_values: usize,
+    /// The block length used
+    block_length: usize,
+    /// The estimate of each series, with the automatic length
+    block_length_estimates: Option<Vec<(String, f64)>>,
+}
+
+/// A block jackknife, as the runner returns it
+#[pyclass(name = "JackknifeRun", frozen, get_all)]
+pub struct PyJackknifeRun {
+    /// The first and last position of each block that fitted
+    spans: Vec<(f64, f64)>,
+    /// The bias-corrected estimate of each parameter
+    estimate: Vec<f64>,
+    /// The jackknife bias of each parameter
+    bias: Vec<f64>,
+    /// The jackknife standard error of each parameter
+    standard_error: Vec<f64>,
+    /// One row of pseudo-values per block that fitted
+    pseudo_values: Vec<Vec<f64>>,
+    /// One row of influences per block that fitted
+    influence: Vec<Vec<f64>>,
+    /// The span and reason of each block whose fit failed
+    failed: Vec<((f64, f64), String)>,
+    /// Fits kept although their optimizer did not converge
+    not_converged: usize,
+    /// The block length used
+    block_length: usize,
+    /// The estimate of each series, with the automatic length
+    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 fn value_error(message: String) -> PyErr {
@@ -544,6 +865,18 @@ fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> PyResult<f64> {
     Ok(statistics::mean(&values, &weights))
 }
 
+/// The Monte Carlo error of the quantile at `level` of equally weighted
+/// `values`: an order-statistic interval of about 95 %
+#[pyfunction]
+fn quantile_error(values: Vec<f64>, level: f64) -> PyResult<(f64, f64)> {
+    if values.is_empty() || !(0.0..=1.0).contains(&level) {
+        return Err(value_error(
+            "A quantile error needs values and a level in [0, 1]".to_string(),
+        ));
+    }
+    Ok(statistics::quantile_error(&values, level))
+}
+
 /// The mean of `values` per series named by `labels`, in order of first
 /// appearance
 #[pyfunction]
@@ -560,6 +893,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyParameterSample>()?;
     m.add_class::<PyPredictive>()?;
     m.add_class::<PyObservationDraws>()?;
+    m.add_class::<PyBootstrapRun>()?;
+    m.add_class::<PyJackknifeRun>()?;
+    m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;

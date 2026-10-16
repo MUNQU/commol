@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from commol import (
+    NoNoise,
     Calibrator,
     ParameterSample,
     Predictive,
@@ -95,7 +96,7 @@ class TestObservations:
         sample = _sample([[0.1, 0.05], [0.12, 0.06]])
         predictive = Predictive(calibrator, sample, POSITIONS)
 
-        draws = predictive.at_observations(calibrator.problem.observed_data)
+        draws = predictive.at_observations(calibrator.problem.observed_data, NoNoise())
         expected = calibrator.rust_problem.predict_observations(sample.values)
 
         np.testing.assert_allclose(draws.values, [per_set[0] for per_set in expected])
@@ -105,7 +106,7 @@ class TestObservations:
     ) -> None:
         predictive = Predictive(calibrator, _sample([[0.1, 0.05]]), POSITIONS)
 
-        draws = predictive.at_observations(calibrator.problem.observed_data)
+        draws = predictive.at_observations(calibrator.problem.observed_data, NoNoise())
 
         assert draws.values[0] == pytest.approx(draws.observed)
         # The window of C from 20 to 40 is read as an increment.
