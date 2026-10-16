@@ -48,8 +48,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Quantile(q)` or `"crps"` (the continuous ranked probability score). A
   stochastic engine needs them and a `seed`; there is no default summary.
 - The crate `commol-random`: a portable generator (`Xoshiro256PlusPlus`), the
-  derivation of replicate seeds, samplers and a sum tree of rates, for the
-  stochastic engines to come.
+  derivation of replicate seeds, samplers and a sum tree of rates, for every
+  stochastic engine.
+- Two stochastic engines of an aggregate model, in the crate
+  `commol-stochastic`, that run the process of any model as whole units moved
+  at random, with no change to it: `"StochasticEvents"` (continuous time:
+  Gillespie's direct method, exact also when a rate reads `t`, or
+  `method="tau_leaping"`) and `"StochasticSteps"` (the chain binomial, with
+  per-step probabilities). Their settings are `StochasticEventsSettings` and
+  `StochasticStepsSettings`. A total must be whole, and initial amounts that
+  are not whole need `rounding="largest_remainder"` or `"random"`, with no
+  default. A per-step probability outside `[0, 1]`, or probabilities out of
+  one compartment that sum to more than 1, raise `InfeasibleStateError`. See
+  [Stochastic Simulation](../guide/stochastic.md).
+- The `dynamics` section of a stochastic model is an event table: each flow,
+  the change of one event and its propensity or its draw; the `schedule`
+  section lists the settings of the engine.
 
 ### Changed
 

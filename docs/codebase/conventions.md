@@ -170,6 +170,7 @@ kind that is not aggregate through every generic layer.
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |
+| `stochastic/` | The stochastic engines of an aggregate model through the layers: their means against the deterministic engines, whole units, calibration with replicates (the closed forms are in `crates/commol-stochastic/tests/oracles.rs`) | [Stochastic Simulation](../guide/stochastic.md) |
 | `units/` | Unit checks | [Units](../guide/units-and-equations.md) |
 | `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
@@ -195,7 +196,9 @@ topic inside its package.
   (`builder.structure`, which `set_structure` replaces). A keyword overrides
   one part of the default model, so a test names only what it changes. `build` builds for difference
   equations; `build_ode` builds for differential equations, with the tight
-  solver settings `TIGHT` by default; `run` builds and simulates.
+  solver settings `TIGHT` by default; `build_stochastic` builds for a
+  stochastic engine (`STOCHASTIC_ENGINES`, and `MEAN_FIELD`, the deterministic
+  engine of each); `run` builds and simulates.
 - Build a model by hand only when one test needs it and no factory keyword
   expresses it. A model that a second file needs goes to `support/`.
 - Test models use abstract names, as examples do: bins `A`, `B`, `C`,

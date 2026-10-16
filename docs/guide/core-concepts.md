@@ -146,14 +146,17 @@ print([b.id for b in model.process.bins])   # ['A', 'B', 'C']
 print(model.structure.total)                # 1000.0
 ```
 
-Two engines run an aggregate model, with the same process and structure:
+Four engines run an aggregate model, with the same process and structure:
 
 | Engine | Time | Crate |
 |---|---|---|
 | `DifferenceEquations` | Advances in whole steps; each step applies every flow once. | `commol-difference` |
 | `DifferentialEquations` | Continuous: the engine integrates `dX/dt = Σ flows` with an ODE solver. | `commol-differential` |
+| `StochasticEvents` | Continuous, at random: whole units move one event at a time. | `commol-stochastic` |
+| `StochasticSteps` | Whole steps, at random: each step draws how many units each flow moves. | `commol-stochastic` |
 
-See [Differential equations](simulations.md#differential-equations).
+See [Differential equations](simulations.md#differential-equations) and
+[Stochastic Simulation](stochastic.md).
 
 ### What a rate means
 
@@ -165,6 +168,8 @@ list, `EngineType` in `crates/commol-core/src/types/engine.rs`):
 |---|---|---|---|
 | `DifferenceEquations` | `per_step` | Moves `f` in one step: the flow of an absolute rate, or `f × source` for a proportional rate | `X(n+1) = X(n) + Σ flows` |
 | `DifferentialEquations` | `continuous` | Is the instantaneous rate of change: over a short span `Δ` it moves about `f × Δ` | `dX/dt = Σ flows` |
+| `StochasticEvents` | `continuous` | Is the propensity of its events: the expected number of units it moves per unit of the axis | `dX/dt = Σ flows`, in the mean |
+| `StochasticSteps` | `per_step` | Is the expected number of units it moves in one step; a proportional rate is the probability that one unit moves | `X(n+1) = X(n) + Σ flows`, in the mean |
 
 So one rate gives two different dynamics: a proportional rate `k` keeps
 `(1 - k)^n` of its source after `n` steps in a difference model, and

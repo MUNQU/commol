@@ -181,5 +181,6 @@ constraints, scale factors and the optimizers.
 | Every builder option | [Building Models](../guide/building-models.md) |
 | What rate formulas can contain | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | Running and reading simulations | [Running Simulations](../guide/simulations.md) |
+| Runs at random, with whole units | [Stochastic Simulation](../guide/stochastic.md) |
 | Calibration in depth | [Model Calibration](../guide/calibration.md) |
 | Complete models | [Examples](../guide/examples.md) |
