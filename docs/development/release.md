@@ -54,12 +54,48 @@ Do not commit version bumps. The tag is the version.
 A release is always made from `main`. Publishing a GitHub release starts the
 **Release to PyPI** workflow (`.github/workflows/release.yaml`), which
 publishes to PyPI immediately: the `pypi` environment has no approval step.
+The release issue (label `release`) holds the checklist of this page, and the
+milestone of the release lists the issues it ships.
 
 !!! warning "A published version is final"
     PyPI never accepts the same version number twice, even after you delete
     it. Check the tag and the commit before you publish.
 
-### Step 1: Promote `develop` to `main`
+### Step 1: Choose the Version
+
+When every issue of the milestone is closed, list the changes since the last
+release:
+
+```bash
+git fetch --tags origin
+git log --oneline --first-parent "$(git describe --tags --abbrev=0 origin/main)"..origin/develop
+```
+
+Use the Version Guidelines above. The `[Unreleased]` section of
+`docs/about/changelog.md` lists the changes, and the breaking ones are marked
+**Breaking**.
+
+### Step 2: Date the Changelog in `develop`
+
+On a branch from `develop`, in `docs/about/changelog.md`:
+
+1. Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, the day you
+   publish, and add an empty `## [Unreleased]` above it.
+2. Start the section with a short paragraph that says what the release is
+   about and what a user must read before upgrading. It opens the release
+   notes.
+3. Add the version to the Version History list.
+
+Check the notes the release will have (Step 5):
+
+```bash
+python .github/scripts/release_notes.py X.Y.Z
+```
+
+Open the pull request to `develop` (`docs(changelog): release X.Y.Z`) and
+merge it. `main` then carries the changelog of its own release.
+
+### Step 3: Promote `develop` to `main`
 
 Open a pull request from `develop` to `main` and merge it with **"Create a
 merge commit"**, the only method the `main` ruleset allows (see
@@ -67,20 +103,10 @@ merge commit"**, the only method the `main` ruleset allows (see
 **Build** run of the push to `main` passes: it is the only run that builds the
 wheels for every target architecture.
 
-### Step 2: Choose the Version
+You do not need to merge `main` back into `develop`: the merge commit keeps the
+two histories together.
 
-List the changes since the last release:
-
-```bash
-git fetch --tags origin
-git log --oneline --first-parent "$(git describe --tags --abbrev=0 origin/main)"..origin/main
-```
-
-Use the Version Guidelines above. The `[Unreleased]` section of
-`docs/about/changelog.md` lists the changes, and the breaking ones are marked
-**Breaking**.
-
-### Step 3: Create the Tag
+### Step 4: Create the Tag
 
 Tag the commit at the top of `main` with an annotated tag:
 
@@ -93,48 +119,21 @@ git push origin vX.Y.Z
 
 The tag must start with `v`. Pushing a tag does not publish anything.
 
-### Step 4: Publish the GitHub Release
+### Step 5: Publish the GitHub Release
 
-Write the release notes from the changelog. Include only the changes since the
-previous release:
-
-```markdown
-## What's New in X.Y.Z
-
-### New Features
-
-- Feature description
-
-## Breaking Changes
-
-- What changed and what users must do
-
-## Bug Fixes
-
-- Fix description
-
-## Dependencies
-
-- Updated dependencies
-
-## Installation
-
-pip install --upgrade commol==X.Y.Z
-
-## Full Changelog
-
-https://github.com/MUNQU/commol/compare/vPREVIOUS...vX.Y.Z
-```
-
-Then publish the release, from the GitHub [Releases page](https://github.com/MUNQU/commol/releases)
-("Draft a new release", tag `vX.Y.Z`, title `Version X.Y.Z`) or with the
-GitHub CLI:
+The notes come from the changelog of `main`, never by hand: its section
+`[X.Y.Z]`, with the links turned into links to the site, the install command
+and the comparison with the previous release
+(`.github/scripts/release_notes.py`). Then publish the release, from the
+GitHub [Releases page](https://github.com/MUNQU/commol/releases) ("Draft a new
+release", tag `vX.Y.Z`, title `Version X.Y.Z`) or with the GitHub CLI:
 
 ```bash
+python .github/scripts/release_notes.py X.Y.Z > notes.md
 gh release create vX.Y.Z --verify-tag --title "Version X.Y.Z" --notes-file notes.md --latest
 ```
 
-### Step 5: Watch the PyPI Publication
+### Step 6: Watch the PyPI Publication
 
 The **Release to PyPI** workflow:
 
@@ -149,7 +148,7 @@ Watch it in the [Actions tab](https://github.com/MUNQU/commol/actions) or with:
 gh run watch "$(gh run list --workflow release.yaml --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
-### Step 6: Verify the Release
+### Step 7: Verify the Release
 
 Check that the version appears at <https://pypi.org/project/commol/>. Then
 install it in a clean environment and run a model:
@@ -186,15 +185,7 @@ results = Simulation(model).run(num_steps=100)
 print(f"Final C: {results['C'][-1]:.0f}")
 ```
 
-### Step 7: Update the Changelog
-
-On a branch from `develop`, rename `## [Unreleased]` in
-`docs/about/changelog.md` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty
-`## [Unreleased]` above it, and update the Version History list. Open a pull
-request to `develop`.
-
-You do not need to merge `main` back into `develop`: the merge commit of
-Step 1 already keeps the two histories together.
+Then close the release issue and the milestone of the release.
 
 ## Pre-release Versions
 
@@ -231,14 +222,18 @@ publisher on PyPI first, or the upload fails.
 
 ## Release Checklist
 
+The release issue repeats this list.
+
+- [ ] Every issue of the milestone closed
+- [ ] Version chosen
+- [ ] Changelog dated in `develop`, with its opening paragraph
 - [ ] `develop` merged into `main` with a merge commit
 - [ ] **Build** run on `main` passed
-- [ ] Version chosen
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
-- [ ] GitHub release published with notes
+- [ ] GitHub release published with the notes of `release_notes.py`
 - [ ] **Release to PyPI** workflow passed
 - [ ] Version visible on PyPI and tested in a clean environment
-- [ ] Changelog updated in `develop`
+- [ ] Release issue and milestone closed
 
 ## Troubleshooting
 
@@ -255,7 +250,7 @@ publisher on PyPI first, or the upload fails.
 Nothing reaches PyPI when a build job fails, because the upload job needs all
 of them.
 
-1. Fix the problem on `develop` and promote it to `main`
+1. Fix the problem on `develop` and promote it to `main` (Step 3)
 2. Delete the GitHub release and the tag:
 
     ```bash

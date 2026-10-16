@@ -84,7 +84,8 @@ Use this page when you know what to change but not where it belongs.
 | `py-commol/tests/` | Python tests: one package per page of the user guide (`building/`, `transitions/`, `rates/`, `axis_patterns/`, `initial_conditions/`, `simulation/`, `stochastic/`, `units/`, `calibration/`, `probabilistic/`, `reporting/`, `plotting/`, `docs/`); `reference_models/`, published models checked against their stated results; `model_kinds/`, the test model kind through every generic layer; and `support/` with the shared model factories, the test kind (`kinds.py`), the flow models, the reference solver, the oracles and the assertions. See [Tests](conventions.md#tests). |
 | `crates/*/tests/`, `#[cfg(test)]` modules | Rust tests. |
 | `docs/` | This site. `docs/codebase/` is for maintainers; the rest is for users. |
-| `odd/` | Task records and review ledgers of past work. History, not specification. The name is unrelated to the `"odd"` layout of `Model.describe`, which follows the ODD protocol for describing models (Grimm et al. 2006, 2010, 2020). |
+| `odd/` | The task documents (ODDs): one file per piece of work, planned or delivered, that never moves; their GitHub issues (label `odd`) hold the status, the order and the pull request. `odd/README.md` explains the workflow and the order; `odd/judgment-day/` holds review ledgers. The name is unrelated to the `"odd"` layout of `Model.describe`, which follows the ODD protocol for describing models (Grimm et al. 2006, 2010, 2020). |
+| `.github/scripts/release_notes.py` | The notes of a GitHub release, from its section of the changelog. |
 | `.github/workflows/` | CI: code quality, build, docs, release. |
 
 ## If you need to…

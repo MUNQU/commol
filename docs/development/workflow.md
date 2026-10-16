@@ -35,6 +35,26 @@ We use a simplified Git Flow approach:
 - **`test/*`**: Test additions or improvements (e.g., `test/add-conditional-stratification-tests`)
 - **`chore/*`**: Maintenance tasks, dependencies (e.g., `chore/update-dependencies`)
 
+## Planning
+
+Planned work is written as task documents (ODDs) and tracked on GitHub:
+
+| What | Where |
+|---|---|
+| The specification of one piece of work | `odd/<name>.md`, a file that never moves |
+| Its status, order and dependencies | Its issue, label `odd`, with its blockers ("blocked by") |
+| A release | Its issue, label `release`, with the release checklist, and its milestone |
+
+[`odd/README.md`](https://github.com/MUNQU/commol/blob/develop/odd/README.md)
+explains the lifecycle of an ODD and why the work runs in its order. To find
+the next piece of work:
+
+```bash
+gh issue list --label odd --state open
+```
+
+An issue is ready when every issue that blocks it is closed.
+
 ## Development Process
 
 ### 1. Starting New Work
@@ -119,12 +139,12 @@ git push origin feature/your-feature-name
 
 # Create a Pull Request on GitHub
 # - Target the 'develop' branch
-# - Fill in the PR template with:
-#   - Description of changes
-#   - Related issues
-#   - Testing performed
-#   - Screenshots (if UI changes)
+# - Fill in the PR template; "Closes #N" names the issue it delivers
 ```
+
+`.github/workflows/close-issues.yaml` closes the issues that the body names
+with `Closes`, `Fixes` or `Resolves` when the pull request merges into
+`develop`. GitHub does it by itself only for the default branch, `main`.
 
 ### 6. Code Review and CI
 
@@ -147,10 +167,9 @@ When you create a PR, automated checks run:
 
 Once approved:
 
-```bash
-# Merge using "Squash and merge" on GitHub (the only method develop allows)
-# Delete the feature branch after merging
-```
+Merge with "Squash and merge" on GitHub, the only method `develop` allows.
+GitHub deletes the branch after the merge (`delete_branch_on_merge`); delete
+your local copy with `git branch -D <branch>` after `git fetch --prune`.
 
 ### 8. Promoting Develop to Main
 
@@ -178,6 +197,7 @@ already tests the result of merging it into `main`.
 | Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
 | Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike on pushes to `main` (`latest`) and `develop` (`dev`). | `Build Documentation` |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
+| Close Issues (`close-issues.yaml`) | A pull request merged into `develop` | Closes the issues its body names with `Closes`, `Fixes` or `Resolves`. | — |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 
 ## Local Development Tips
