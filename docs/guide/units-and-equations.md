@@ -9,7 +9,7 @@ equations that the engine simulates, as text or LaTeX. Both work on a built
 ## Quick path
 
 ```python
-from commol import ModelBuilder
+from commol import Aggregate, ModelBuilder
 
 model = (
     ModelBuilder(name="Model with Units", bin_unit="item", step_unit="day")
@@ -20,15 +20,13 @@ model = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 model.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
@@ -102,11 +100,13 @@ along_a_line = (
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.01, unit="1/meter")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
+        engine="DifferentialEquations",
     )
-    .build(engine="DifferentialEquations")
 )
 along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
 ```
@@ -147,11 +147,13 @@ wrong_units = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="k2 * sin(B) * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 try:

@@ -363,7 +363,7 @@ def check_model_values(
         Calibration parameters, in problem order.
     remainder : str | None
         The id that takes what the values leave of the total the kind keeps,
-        such as a compartment or bin of a compartmental model.
+        such as a compartment or bin of an aggregate model.
 
     Raises
     ------

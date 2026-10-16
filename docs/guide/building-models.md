@@ -2,12 +2,17 @@
 
 [Back to Home](../index.md)
 
-`ModelBuilder` turns a model description into a validated `Model`. This page
-documents every builder method except transitions, which have their own page:
+`ModelBuilder` writes the **process** of a model: its bins, parameters,
+stratifications, accumulators and transitions. `build` joins the process with a
+**structure**, which lays it out, and an **engine**, which runs it, and returns
+a validated `Model`. The process is written once; the structure is what changes
+between kinds of model. Today the structure is `Aggregate`: amounts per
+compartment. This page documents every builder method except transitions,
+which have their own page:
 
 | Topic | Page |
 |---|---|
-| Bins, parameters, stratifications, accumulators, initial conditions, build, save and load | This page |
+| Bins, parameters, stratifications, accumulators, the structure (`Aggregate`), build, save and load | This page |
 | Transitions and their rates | [Transitions](transitions.md) |
 | Units and printing equations | [Units and Equations](units-and-equations.md) |
 | What the concepts mean | [Core Concepts](core-concepts.md) |
@@ -15,7 +20,7 @@ documents every builder method except transitions, which have their own page:
 ## Quick path
 
 ```python
-from commol import Model, ModelBuilder, Simulation
+from commol import Aggregate, Model, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Four-State Model", version="1.0")
@@ -29,16 +34,13 @@ model = (
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
     .add_transition(id="t_cd", source=["C"], target=["D"], rate="k3")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
-            {"bin": "C", "fraction": 0.0},
-            {"bin": "D", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0, "D": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=200)
@@ -46,9 +48,9 @@ results = Simulation(model).run(num_steps=200)
 
 1. Create a builder.
 2. Add bins, parameters and transitions, and optionally stratifications and
-   accumulators.
-3. Set the initial conditions.
-4. Call `build`.
+   accumulators: the process.
+3. Call `build` with a structure, such as `Aggregate` with the total and the
+   fraction of it in each bin, and an engine.
 
 ## The builder
 
@@ -68,14 +70,14 @@ builder = ModelBuilder(
 | `version` | `str \| None` | `None` | A version label for your own tracking. |
 | `bin_unit` | `str \| None` | `None` | The default unit of every bin. It enables [unit checking](units-and-equations.md#unit-checking). |
 
-Every `add_*` and `set_*` method returns the builder, so calls chain. The other
-methods:
+Every `add_*` method returns the builder, so calls chain. The other methods:
 
 | Method | Returns | What it does |
 |---|---|---|
-| `build(engine, settings=None)` | `Model` | Validates the definition and returns the model for an engine: `"DifferenceEquations"` (discrete time) or `"DifferentialEquations"` (continuous time). `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`); None uses its defaults. One builder can build the model for each engine. See [Differential equations](simulations.md#differential-equations). |
+| `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time) or `"DifferentialEquations"` (continuous time) run `Aggregate`. `settings` are the settings of that engine (`OdeSolver` for `"DifferentialEquations"`); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](simulations.md#differential-equations). |
+| `process()` | `Process` | The bins, accumulators, stratifications and transitions written so far. |
 | `clone()` | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model. |
-| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions, parameters and initial conditions; keeps the name, description, version and `bin_unit`. |
+| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version and `bin_unit`. |
 | `get_summary()` | `dict` | The name, description, version and the ids added so far. |
 
 ```python
@@ -133,18 +135,19 @@ builder = (
 ### Names the engine sets
 
 The engine sets these variables, so `build` rejects a parameter with one of
-these ids (`CompartmentalStructure.check_model` and `check_names` in
+these ids (`Aggregate.check_model` and `check_model` in
 `crates/commol-model/src/builder.rs`):
 
 | Name | Example |
 |---|---|
 | `total`, `step`, `t`, `pi`, `e` | `total` |
+| `neighbors` and `neighbors_<bin>`, the [neighbors of a unit](#neighbors) | `neighbors_A` |
 | A bin id | `A` |
 | An expanded compartment | `A_g1` |
 | A subgroup total | `total_g1`, `A_t1` (with two stratifications) |
 
-A bin or an accumulator cannot take an id of the first row either, because the
-engine variable would hide it. A bin whose names read as a subgroup total is
+A bin or an accumulator cannot take an id of the first two rows either, because
+the engine variable would hide it. A bin whose names read as a subgroup total is
 rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]`
 expands into `total_y_y`, which is also the total of the `y` of both
 stratifications.
@@ -183,10 +186,13 @@ def inflow_per_step(mode: str) -> list[float]:
         .add_bin(id="A", name="State A")
         .add_parameter(id="k_in", value=[(2, 1.0), (5, 4.0)], mode=mode)
         .add_transition(id="inflow", source=[], target=["A"], rate="k_in")
-        .set_initial_conditions(
-            total=100, bin_fractions=[{"bin": "A", "fraction": 1.0}]
+        .build(
+            Aggregate(
+                total=100,
+                bin_fractions={"A": 1.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
     series = Simulation(model).run(num_steps=7)["A"]
     return np.diff(series).round(3).tolist()
@@ -255,15 +261,13 @@ counted = (
         id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["cum_ab", "total_out"]
     )
     .add_transition(id="t_ac", source=["A"], target=["C"], rate="k2", accumulators=["total_out"])
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 1.0},
-            {"bin": "B", "fraction": 0.0},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(counted).run(num_steps=10)
@@ -279,55 +283,103 @@ A transition adds its flow to every accumulator in its `accumulators` list, and
 several transitions can share one accumulator. With stratifications, an
 accumulator expands like a bin.
 
-## Initial conditions
+## The structure: `Aggregate`
+
+`Aggregate` lays the process out as amounts per compartment: the bins expand
+over the stratifications into compartments, and each compartment holds an
+amount. It says how much starts where and who the neighbors of a unit are.
 
 ```python
-builder = builder.set_initial_conditions(
+structure = Aggregate(
     total=10000,
-    bin_fractions=[
-        {"bin": "A", "fraction": 0.9},
-        {"bin": "B", "fraction": 0.1},
-    ],
-    stratification_fractions=[
-        {
-            "stratification": "group",
-            "fractions": [
-                {"category": "g1", "fraction": 0.3},
-                {"category": "g2", "fraction": 0.7},
-            ],
-        },
-        {
-            "stratification": "subtype",
-            "fractions": [
-                {"category": "s1", "fraction": 0.8},
-                {"category": "s2", "fraction": 0.2},
-            ],
-        },
-    ],
-    compartment_fractions=[{"compartment": "B_g1", "fraction": 0.0}],
+    bin_fractions={"A": 0.9, "B": 0.1},
+    stratification_fractions={
+        "group": {"g1": 0.3, "g2": 0.7},
+        "subtype": {"s1": 0.8, "s2": 0.2},
+    },
+    compartment_fractions={"B_g1": 0.0},
 )
 ```
 
 | Argument | Type | Default | Meaning |
 |---|---|---|---|
 | `total` | `float` | required | The sum of every compartment at the start: a count, a mass or a concentration. It must be finite and greater than 0. |
-| `bin_fractions` | `list[{"bin", "fraction"}]` | required | The fraction of the total in each bin. A fraction may be `None` when calibration finds it. |
-| `stratification_fractions` | `list[{"stratification", "fractions"}] \| None` | `None` | For each stratification, the fraction in each category. For a conditional stratification, fractions of the subgroup it splits. |
-| `compartment_fractions` | `list[{"compartment", "fraction"}] \| None` | `None` | Keyword-only. Overrides single expanded compartments with a fraction of the total. |
+| `bin_fractions` | `dict[str, float \| None]` | required | The fraction of the total in each bin. A fraction may be `None` when calibration finds it. |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}` | For each stratification, the fraction in each category. For a conditional stratification, fractions of the subgroup it splits. |
+| `compartment_fractions` | `dict[str, float]` | `{}` | Overrides single expanded compartments with a fraction of the total. |
+| `neighbors` | `Complete \| Groups \| None` | `None` | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them. |
 
 | Rule | Checked when |
 |---|---|
-| `total` finite and `> 0`; each fraction in `[0.0, 1.0]`; override names unique | `set_initial_conditions` |
-| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0 | `set_initial_conditions` |
-| Every bin has a fraction | `build` |
-| Every stratification has fractions that sum to 1.0 | `build` |
+| `total` finite and `> 0`; each compartment fraction in `[0.0, 1.0]` | `Aggregate(...)` |
+| The bin fractions sum to 1.0; with `None` fractions, the given ones sum to less than 1.0 | `Aggregate(...)` |
+| Every bin has a fraction, and no other id | `build` |
+| Every stratification has fractions for its categories that sum to 1.0 | `build` |
 | Override names are expanded compartments; the initial amounts do not sum to more than `total` | `build` |
 
 The initial amount of a compartment is
 `total × bin fraction × the fraction of each of its categories`,
-unless an override names it. `CompartmentalStructure.initial_state()` shows the result. To change
-fractions on a built model, see
+unless an override names it. `model.structure.initial_state(model.process)`
+shows the result. To change fractions on a built model, see
 [Core Concepts](core-concepts.md#updating-fractions-after-building).
+
+### Neighbors
+
+A rate may read the neighbors of a unit: `neighbors_<bin>` is the amount of a
+bin among them, and `neighbors` is their total. A rate that reads them and no
+compartment is **proportional**, a rate per unit of its source, so the same
+process carries over to structures where units have their own neighbors. Under
+`Aggregate`, the structure says who they are (`resolve_neighbors` in
+`crates/commol-model/src/flows.rs`):
+
+| `neighbors=` | `neighbors_<bin>` in a compartment of category `g` | `neighbors` |
+|---|---|---|
+| `Complete()` | The bin total: every unit is a neighbor of every other | `total` |
+| `Groups(stratification, weights=None)` | `Σ_g' w[g][g'] × (amount of the bin in g')` | `Σ_g' w[g][g'] × (amount of every bin in g')` |
+
+`weights[g][g']` is the weight of category `g'` for a unit in `g`: one number of
+at least 0 for every pair of categories. No weights is the identity: a unit
+sees only its own category. A rate that reads the neighbors needs `neighbors`;
+there is no default, and `build` lists the options.
+
+Here `B` starts only in `g1` (the override pins `B_g2` to 0), and the flow
+into `B_g2` depends on whom the units of `g2` see:
+
+```python
+from commol import Complete, Groups
+
+def into_b_g2(neighbors: Complete | Groups) -> list[float]:
+    model = (
+        ModelBuilder(name="Neighbors")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_stratification(id="group", categories=["g1", "g2"])
+        .add_parameter(id="k1", value=0.3)
+        .add_transition(
+            id="t_ab", source=["A"], target=["B"], rate="k1 * neighbors_B / neighbors"
+        )
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01},
+                stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+                compartment_fractions={"B_g2": 0.0},
+                neighbors=neighbors,
+            ),
+            engine="DifferenceEquations",
+        )
+    )
+    return [round(value, 3) for value in Simulation(model).run(num_steps=3)["B_g2"]]
+
+half = {"g1": {"g1": 1.0, "g2": 0.5}, "g2": {"g1": 0.5, "g2": 1.0}}
+print(into_b_g2(Complete()))                       # [0.0, 0.746, 1.714, 2.967]
+print(into_b_g2(Groups("group")))                  # [0.0, 0.0, 0.0, 0.0]
+print(into_b_g2(Groups("group", weights=half)))    # [0.0, 0.498, 1.194, 2.151]
+```
+
+Under `Complete()`, `k1 * neighbors_B / neighbors` from `A` moves
+`k1 × A × B / total`, the flow of the absolute rate `k1 * A * B / total`.
+Under `Groups("group")`, a unit of `g2` sees only `g2`, where there is no `B`.
 
 ## Build
 
@@ -337,9 +389,9 @@ builder = (
     .add_parameter(id="k_out", value=0.05)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k_out")
 )
-stratified_model = builder.build(engine="DifferenceEquations")
+stratified_model = builder.build(structure, engine="DifferenceEquations")
 
-print([c.name for c in stratified_model.structure.initial_state()])
+print([c.name for c in stratified_model.structure.initial_state(stratified_model.process)])
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
@@ -348,11 +400,12 @@ the definition is not valid:
 
 | Check | Example of a rejected definition |
 |---|---|
-| Initial conditions are set | `build` called before `set_initial_conditions` |
+| The engine runs the kind of the structure | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate` |
 | At least one bin and one transition | A model with no transition |
-| Initial conditions follow the rules above | Bin fractions that sum to 0.9 |
+| The structure follows the rules above | Bin fractions that sum to 0.9 |
 | Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1` |
 | Every `total_…` variable names a subgroup total | `total_t1_g1` when `group` is declared before `type` |
+| A rate that reads the neighbors has them | `k1 * neighbors_B` with no `neighbors=` |
 | Every rate expression passes the security check | A formula with `__import__` |
 | Every transition can be planned by the engine | See [Transitions](transitions.md#what-building-checks) |
 
@@ -366,7 +419,7 @@ print(reloaded == stratified_model)  # True
 
 | Method | What it does |
 |---|---|
-| `Model.to_json(file_path, indent=2)` | Writes every field, including nulls, so an uncalibrated model reloads too. Long numeric arrays are written on one line. |
+| `Model.to_json(file_path, indent=2)` | Writes every field, including nulls, so an uncalibrated model reloads too: the header, the `process` and the `structure`, with its `kind` and `variant`. Long numeric arrays are written on one line. |
 | `Model.from_json(file_path)` | Reads and validates a model file. |
 
 ## Next steps

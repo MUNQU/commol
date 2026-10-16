@@ -25,7 +25,7 @@ shows one technique:
 A simple model with three states and two transitions:
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Three-State Model", version="1.0")
@@ -36,15 +36,13 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -68,16 +66,13 @@ model = (
     .add_transition(id="flow_AM", source=["A"], target=["M"], rate="k1 * A * B / total")
     .add_transition(id="flow_MB", source=["M"], target=["B"], rate="k2")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k3")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.999},
-            {"bin": "M", "fraction": 0.0},
-            {"bin": "B", "fraction": 0.001},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.999, "M": 0.0, "B": 0.001, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -104,15 +99,13 @@ model = (
         rate="k_mean * (1 + k_amp * sin(2 * pi * step / 365)) * A * B / total"
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -159,25 +152,14 @@ model = (
             },
         ]
     )
-    .set_initial_conditions(
-        total=10000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.25},
-                    {"category": "g2", "fraction": 0.55},
-                    {"category": "g3", "fraction": 0.20},
-                ]
-            }
-        ]
+    .build(
+        Aggregate(
+            total=10000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            stratification_fractions={"group": {"g1": 0.25, "g2": 0.55, "g3": 0.2}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -204,15 +186,13 @@ model = (
     .add_transition(id="flow_AB", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
     .add_transition(id="return_CA", source=["C"], target=["A"], rate="k3")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -241,15 +221,13 @@ model = (
         target=["C"],
         rate="k2_max * B * max(0, 1 - C / capacity)"
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.95},
-            {"bin": "B", "fraction": 0.05},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.95, "B": 0.05, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -288,31 +266,17 @@ model = (
         per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.6},
-                    {"category": "g2", "fraction": 0.4},
-                ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            stratification_fractions={
+                "group": {"g1": 0.6, "g2": 0.4},
+                "type": {"t1": 0.8, "t2": 0.2},
             },
-            {
-                "stratification": "type",
-                "fractions": [
-                    {"category": "t1", "fraction": 0.8},
-                    {"category": "t2", "fraction": 0.2},
-                ]
-            }
-        ]
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -349,24 +313,14 @@ model = (
         per_compartment=True,
     )
     .add_transition(id="flow_BC", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.5},
-                    {"category": "g2", "fraction": 0.5},
-                ]
-            }
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -420,31 +374,17 @@ model = (
             },
         ]
     )
-    .set_initial_conditions(
-        total=10000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.6},
-                    {"category": "g2", "fraction": 0.4},
-                ]
+    .build(
+        Aggregate(
+            total=10000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            stratification_fractions={
+                "group": {"g1": 0.6, "g2": 0.4},
+                "subtype": {"s1": 0.7, "s2": 0.3},
             },
-            {
-                "stratification": "subtype",
-                "fractions": [
-                    {"category": "s1", "fraction": 0.7},
-                    {"category": "s2", "fraction": 0.3},
-                ]
-            }
-        ]
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 # Generated compartments:
@@ -494,15 +434,13 @@ model = (
         target=["C"],
         rate="k2 * B"
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.99},
-            {"bin": "B", "fraction": 0.01},
-            {"bin": "C", "fraction": 0.0},
-        ]
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 observed_data = [
@@ -578,14 +516,13 @@ model = (
     .add_bin("A", "Source")
     .add_bin("B", "Sink")
     .add_transition("flow", ["A"], ["B"], rate=rate)
-    .set_initial_conditions(
-        total=10_000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 1.0},
-            {"bin": "B", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=10000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
+        "DifferenceEquations",
     )
-    .build("DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=365)
@@ -617,23 +554,14 @@ model = (
     .add_bin("B", "Sink")
     .add_stratification("group", ["cat1", "cat2"])
     .add_transition("flow", ["A"], ["B"], rate=rate)
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 1.0},
-            {"bin": "B", "fraction": 0.0},
-        ],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "cat1", "fraction": 0.5},
-                    {"category": "cat2", "fraction": 0.5},
-                ],
-            }
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+            stratification_fractions={"group": {"cat1": 0.5, "cat2": 0.5}},
+        ),
+        "DifferenceEquations",
     )
-    .build("DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=60)

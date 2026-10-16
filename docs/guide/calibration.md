@@ -21,6 +21,7 @@ describe the observations and the unknowns in a `CalibrationProblem`, and a
 
 ```python
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -40,15 +41,13 @@ def basic_model(k1: float | None, k2: float | None):
         .add_parameter(id="k2", value=k2)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 # Observations generated from k1 = 0.4, k2 = 0.1
@@ -132,7 +131,7 @@ also when it was created while a parameter was `None`. See
 
 `"parameter"` and `"factor"` work with every kind of model. The other types are
 values of the model kind, and the kind declares which it accepts
-(`model.structure.calibration_value_types()`): a compartmental model accepts
+(`model.structure.calibration_value_types()`): an aggregate model accepts
 `"initial_condition"`. A type the kind does not accept raises a `ValueError`
 that names the kind when you create the `Calibrator`.
 

@@ -11,6 +11,7 @@ positions between integers, and how to weigh them.
 
 ```python
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -33,15 +34,13 @@ def model(k1: float | None):
             id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model(0.4)).run(num_steps=70)
@@ -208,11 +207,13 @@ def ode_model(k1: float | None):
         .add_bin(id="B", name="State B")
         .add_parameter(id="k1", value=k1)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 1.0, "B": 0.0},
+            ),
+            engine="DifferentialEquations",
         )
-        .build(engine="DifferentialEquations")
     )
 
 positions = [0.5, 1.75, 3.25, 6.5]

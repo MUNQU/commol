@@ -11,6 +11,7 @@ compartment keeps the sum of the amounts at `total`.
 
 ```python
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -31,15 +32,13 @@ def model_with_b(b_fraction: float | None):
         .add_parameter(id="k2", value=0.1)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": a_fraction},
-                {"bin": "B", "fraction": b_fraction},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": a_fraction, "B": b_fraction, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(model_with_b(0.02)).run(num_steps=40)
@@ -64,7 +63,7 @@ result = Calibrator(Simulation(model), problem).run()
 print(round(result.best_parameters["B"], 4))  # 0.02
 
 model.apply_calibration_parameters(result, problem)
-print({c.name: round(c.amount, 1) for c in model.structure.initial_state()})
+print({c.name: round(c.amount, 1) for c in model.structure.initial_state(model.process)})
 # {'A': 980.0, 'B': 20.0, 'C': 0.0}
 ```
 
@@ -137,29 +136,17 @@ def stratified(b_g1: float | None):
         .add_stratification(id="group", categories=["g1", "g2"])
         .add_parameter(id="k1", value=0.2)
         .add_transition(id="t_ba", source=["B"], target=["A"], rate="k1")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
-            stratification_fractions=[
-                {
-                    "stratification": "group",
-                    "fractions": [
-                        {"category": "g1", "fraction": 0.5},
-                        {"category": "g2", "fraction": 0.5},
-                    ],
-                }
-            ],
-            # The true state: B_g1 holds b_g1, and A_g1 holds the rest of g1
-            compartment_fractions=(
-                []
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.9, "B": 0.1},
+                stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+                compartment_fractions={}
                 if b_g1 is None
-                else [
-                    {"compartment": "B_g1", "fraction": b_g1},
-                    {"compartment": "A_g1", "fraction": 0.5 - b_g1},
-                ]
+                else {"B_g1": b_g1, "A_g1": 0.5 - b_g1},
             ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 truth = Simulation(stratified(0.01)).run(num_steps=20)
@@ -186,7 +173,7 @@ result = Calibrator(Simulation(composite), problem).run()
 print(round(result.best_parameters["B_g1"], 4))  # 0.01
 
 composite.apply_calibration_parameters(result, problem)
-print({c.name: round(c.amount, 1) for c in composite.structure.initial_state()})
+print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(composite.process)})
 # {'A_g1': 490.0, 'A_g2': 450.0, 'B_g1': 10.0, 'B_g2': 50.0}
 ```
 
@@ -217,6 +204,6 @@ its complement the rest.
 
 | To learn | Read |
 |---|---|
-| The rules of initial conditions | [Building Models](building-models.md#initial-conditions) |
+| The rules of initial conditions | [Building Models](building-models.md#the-structure-aggregate) |
 | Reporting fitted initial conditions | [Reports](reports.md) |
 | The design behind this page | [Per-compartment initial conditions](../development/design-per-compartment-initial-conditions.md) |

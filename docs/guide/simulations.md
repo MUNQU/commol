@@ -11,7 +11,7 @@ plotting them.
 ## Quick path
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Basic Model")
@@ -25,15 +25,13 @@ model = (
         id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
     )
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 simulation = Simulation(model)
@@ -134,27 +132,17 @@ stratified = (
     .add_accumulator(id="cum_ab", name="Total moved from A to B")
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k", accumulators=["cum_ab"])
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.5},
-                    {"category": "g2", "fraction": 0.5},
-                ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+            stratification_fractions={
+                "group": {"g1": 0.5, "g2": 0.5},
+                "type": {"t1": 0.5, "t2": 0.5},
             },
-            {
-                "stratification": "type",
-                "fractions": [
-                    {"category": "t1", "fraction": 0.5},
-                    {"category": "t2", "fraction": 0.5},
-                ],
-            },
-        ],
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 stratified_simulation = Simulation(stratified)
@@ -185,12 +173,13 @@ print(round(total_ab[-1]))  # 1000: A and B hold the whole total
 ### Totals by category
 
 To select compartments by category, use their labels from
-`CompartmentalStructure.initial_state()`: each entry has `name`, `bin` and `categories`.
+`model.structure.initial_state(model.process)`: each entry has `name`, `bin`
+and `categories`.
 
 ```python
 in_g1 = [
     compartment.name
-    for compartment in stratified.structure.initial_state()
+    for compartment in stratified.structure.initial_state(stratified.process)
     if compartment.categories.get("group") == "g1"
 ]
 print(in_g1)  # ['A_g1_t1', 'A_g1_t2', 'B_g1_t1', 'B_g1_t2']
@@ -264,11 +253,11 @@ ode_model = (
     .add_parameter(id="k1", value=0.1)
     .add_accumulator(id="moved", name="Moved from A to B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1", accumulators=["moved"])
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-    )
     .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
         engine="DifferentialEquations",
         settings=OdeSolver(method="tsit45", rtol=1e-8, atol=1e-8),
     )
@@ -338,12 +327,11 @@ pulse_model = (
     .add_bin(id="A", name="A")
     .add_bin(id="B", name="B")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate=AxisPattern.pulse(at=2, value=0.2))
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-    )
 )
-ode_pulse = Simulation(pulse_model.build(engine="DifferentialEquations")).run(num_steps=3)
+all_in_a = Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
+ode_pulse = Simulation(
+    pulse_model.build(all_in_a, engine="DifferentialEquations")
+).run(num_steps=3)
 print(round(ode_pulse["A"][2] - ode_pulse["A"][3], 1))  # 181.3 = 1000 (1 − e^−0.2)
 ```
 
