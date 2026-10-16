@@ -19,7 +19,7 @@ flowchart TB
     API["Python: api/<br/>ModelBuilder, Simulation, Calibrator"]
     CTX["Python: context/<br/>Model: validated data"]
     BR["Bridge: py-commol/src<br/>PyO3 module commol_rs"]
-    RS["Rust: crates/<br/>compiler, engines, calibration"]
+    RS["Rust: crates/<br/>compiler, engines, calibration, inference"]
     U --> API
     API --> CTX
     CTX -->|model as JSON| BR
@@ -31,7 +31,7 @@ flowchart TB
 |---|---|---|
 | Python | `py-commol/commol/` | The public API (`api/`) and the model as validated data (`context/`). |
 | Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3). |
-| Rust | `crates/` | Every rule about how a model becomes numbers. |
+| Rust | `crates/` | Every rule about how a model becomes numbers, how it is calibrated, and how the uncertainty of a calibration is measured. |
 
 **Golden rule:** Python never computes how a model expands or runs. It asks
 Rust.
