@@ -42,6 +42,10 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: py-commol/uv.lock
 
+            # The toolchain of rust-toolchain.toml (maturin-action reads it too).
+            - name: Set up Rust
+              run: rustup toolchain install
+
             - name: Install Python dependencies
               working-directory: ./py-commol
               run: uv sync --locked --extra dev --python ${{ matrix.python-version }}

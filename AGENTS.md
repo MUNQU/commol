@@ -51,6 +51,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Commits | `type(scope): description`: scope required, one short phrase, no period, no body, no co-author or AI attribution lines. |
 | Local files | Never stage or commit `CLAUDE.md` or `AGENT.md`; they are local context files. |
 | Branches | Work on a branch from `develop`. PRs to `develop` are squash-merged; `develop` → `main` uses a merge commit. See [Development workflow](docs/development/workflow.md). |
+| Rust toolchain | `rust-toolchain.toml` pins the one Rust version of local builds, hooks and CI. Never use a floating `stable` in a workflow; Dependabot proposes each newer stable release in its own PR: [The Rust toolchain](docs/development/workflow.md#the-rust-toolchain). |
 | Tests | Run the Rust and the Python suites before you call a change done. Put a Python test in the package of its guide page, build models with `tests/support/`, and check a result: [Tests](docs/codebase/conventions.md#tests). |
 | Comments | Describe the code as it is, never how it came to be. See [Conventions](docs/codebase/conventions.md). |
 | Docs | **Mandatory.** Every change ships with its documentation, in the agreed format and quality: the [documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done). |
