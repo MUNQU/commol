@@ -1,16 +1,19 @@
 name: Build
 
 on:
-    push:
-        branches: [main]
     pull_request:
         branches: [main]
-    # The merge queue of main tests each pull request on top of the others.
+    # The merge queue of main tests each pull request on top of the others, so
+    # the tree that reaches main is the tree it tested: a push to main does not
+    # run the tests again.
     merge_group:
+    # Once a week main runs the whole matrix again, against the latest runner
+    # images and dependencies; the badge of the README shows this run.
+    schedule:
+        - cron: "0 5 * * 1" # Every Monday at 05:00 UTC
+    workflow_dispatch:
 
-# A new commit on a pull request cancels the runs of its earlier commits. Push
-# runs are never cancelled while running; a newer push only replaces a run that
-# is still waiting.
+# A new commit on a pull request cancels the runs of its earlier commits.
 concurrency:
     group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -19,10 +22,45 @@ env:
     FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+    # Whether the change touches more than the documentation and the planning
+    # files, which compile nothing. A scheduled or manual run tests everything.
+    changes:
+        name: Changed files
+        runs-on: ubuntu-latest
+        outputs:
+            code: ${{ steps.diff.outputs.code }}
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
+
+            - name: Find files outside the documentation
+              id: diff
+              env:
+                  EVENT: ${{ github.event_name }}
+                  QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
+              run: |
+                  case "$EVENT" in
+                      # The checkout is the merge commit; its first parent is main.
+                      pull_request) base="HEAD^1" ;;
+                      merge_group) base="$QUEUE_BASE" ;;
+                      *) echo "code=true" >> "$GITHUB_OUTPUT"; exit 0 ;;
+                  esac
+                  files=$(git diff --name-only "$base" HEAD)
+                  printf '%s\n' "$files"
+                  pattern='^(docs/|overrides/|\.github/ISSUE_TEMPLATE/|\.github/scripts/|\.github/PULL_REQUEST_TEMPLATE\.md$|mkdocs\.yaml$|[^/]*\.md$|AUTHORS$|LICENSE$)'
+                  if printf '%s\n' "$files" | grep -v -E "$pattern" | grep -q .; then
+                      echo "code=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "code=false" >> "$GITHUB_OUTPUT"
+                  fi
+
     # Tests run on the runner's own architecture, so the target architecture
     # does not change them: one job per operating system and Python version.
     test:
         name: Test on ${{ matrix.os }} (Python ${{ matrix.python-version }})
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
@@ -62,58 +100,25 @@ jobs:
               working-directory: ./py-commol
               run: uv run pytest -m "not docs"
 
-    # Wheels are validated for every target architecture on pushes to main.
-    # Releases build their own wheels (release.yaml); pull requests rely on the
-    # test jobs, which already compile the extension on every operating system.
-    build-wheels:
-        name: Build wheel on ${{ matrix.os }} ${{ matrix.target }} (Python ${{ matrix.python-version }})
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        runs-on: ${{ matrix.os }}
-        strategy:
-            fail-fast: false
-            matrix:
-                os: [ubuntu-latest, windows-latest, macos-latest]
-                target: [x86_64, aarch64]
-                python-version: ["3.12", "3.13", "3.14"]
-                exclude:
-                    - os: windows-latest
-                      target: aarch64
-
-        steps:
-            - uses: actions/checkout@v7
-
-            - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v7
-              with:
-                  python-version: ${{ matrix.python-version }}
-
-            - name: Build distribution wheel (validates wheel builds correctly)
-              uses: PyO3/maturin-action@v1
-              with:
-                  target: ${{ matrix.target }}
-                  args: --release --out dist --manifest-path py-commol/Cargo.toml --interpreter ${{ matrix.python-version }}
-                  sccache: "true"
-                  manylinux: ${{ matrix.os == 'ubuntu-latest' && 'auto' || '' }}
-
-            - name: Upload wheel artifacts
-              uses: actions/upload-artifact@v7
-              with:
-                  name: wheels-${{ matrix.os }}-${{ matrix.target }}-py${{ matrix.python-version }}
-                  path: dist/*.whl
-
-    # Single required status check for the whole workflow, so the branch
-    # rulesets do not have to list every job. The wheel jobs only run on pushes
-    # to main, so they count as passed when skipped.
+    # Single required status check for the whole workflow, so the ruleset does
+    # not have to list every job. When only the documentation or the planning
+    # files change, the tests are skipped and count as passed.
     build-passed:
         name: Build Passed
         if: always()
-        needs: [test, build-wheels]
+        needs: [changes, test]
         runs-on: ubuntu-latest
         steps:
-            - name: Fail unless the tests passed and the wheels did not fail
+            - name: Fail unless the tests passed, or were skipped for a change of documentation
+              env:
+                  CHANGES: ${{ needs.changes.result }}
+                  CODE: ${{ needs.changes.outputs.code }}
+                  TESTS: ${{ needs.test.result }}
               run: |
-                  tests="${{ needs.test.result }}"
-                  wheels="${{ needs.build-wheels.result }}"
-                  echo "test: $tests, build-wheels: $wheels"
-                  test "$tests" = "success"
-                  test "$wheels" = "success" -o "$wheels" = "skipped"
+                  echo "changes: $CHANGES, code: $CODE, test: $TESTS"
+                  test "$CHANGES" = "success"
+                  if [ "$CODE" = "true" ]; then
+                      test "$TESTS" = "success"
+                  else
+                      test "$TESTS" = "skipped"
+                  fi

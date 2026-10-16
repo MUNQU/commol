@@ -30,7 +30,7 @@ merges into it, through the merge queue, and a release is a tag on it.
 
 - **`main`**: The integration branch, always tested and releasable. Protected
   by its ruleset: pull requests only, squash merges through the merge queue,
-  the required checks and a code-owner review.
+  and the required checks. A review is welcome and not required.
 - **`release/X.Y`**: Only to fix a version that `main` has left behind. It is
   cut from the tag `vX.Y.Z`, receives fixes copied from `main`
   (`git cherry-pick`), and releases `vX.Y.(Z+1)`. A fix lands on `main` first.
@@ -242,7 +242,6 @@ When you create a PR, automated checks run:
 
 - The required checks must pass: `Python Code Quality`, `Rust Code Quality`,
   `Build Documentation` and `Build Passed` (the whole test matrix)
-- An approving review from a code owner
 - No merge conflicts with target branch
 - The merge queue: it merges each pull request on top of the ones queued
   before it, after the required checks pass on that result
@@ -250,7 +249,7 @@ When you create a PR, automated checks run:
 
 ### 7. Merging
 
-Once approved, add the pull request to the merge queue ("Merge when ready", or
+Once its checks pass, add the pull request to the merge queue ("Merge when ready", or
 `gh pr merge <number> --squash`): the queue squash-merges it, the only method
 `main` allows, once the required checks pass on top of the pull requests before
 it. GitHub deletes the branch after the merge (`delete_branch_on_merge`);
@@ -267,11 +266,11 @@ Process](release.md)).
 
 | Workflow | Runs on | Checks | Required check |
 |---|---|---|---|
-| Code Quality (`code-quality.yaml`) | Every push and pull request | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`). Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test. | `Python Code Quality`, `Rust Code Quality` |
-| Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
-| Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
+| Code Quality (`code-quality.yaml`) | Pull requests, the merge queue and on demand | Python: Ruff (lint, format, docstrings `D1`/`D417`), Ty, Pytest with the documentation checks (`pytest -m docs`). Rust: rustfmt, Clippy (`-D warnings`, so `missing_docs` too), rustdoc without broken links, cargo test. | `Python Code Quality`, `Rust Code Quality` |
+| Build (`build.yaml`) | Pull requests, the merge queue, every Monday on `main` and on demand | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. A change of only documentation or planning files (`docs/`, Markdown at the root, `mkdocs.yaml`, `.github/ISSUE_TEMPLATE/`, `.github/scripts/`) skips the tests. The wheels of every architecture are built by the release (`release.yaml`). | `Build Passed` |
+| Documentation (`docs.yaml`) | Pull requests, the merge queue, pushes to `main` and release tags | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike: a release tag as `latest`, a push to `main` as `dev`. | `Build Documentation` |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
-| Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `main` | The same required checks, on the pull request merged on top of the ones queued before it | The same |
+| Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `main` | The same required checks, on the pull request merged on top of the ones queued before it, at most 2 groups at a time and up to 5 pull requests per group. The tree that reaches `main` is the tree the queue tested, so a push to `main` runs no tests again. | The same |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 
 ## Local Development Tips

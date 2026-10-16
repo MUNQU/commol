@@ -86,7 +86,7 @@ On a branch from `main`, in `docs/about/changelog.md`:
    notes.
 3. Add the version to the Version History list.
 
-Check the notes the release will have (Step 5):
+Check the notes the release will have (Step 4):
 
 ```bash
 python .github/scripts/release_notes.py X.Y.Z
@@ -95,12 +95,7 @@ python .github/scripts/release_notes.py X.Y.Z
 Open the pull request to `main` (`docs(changelog): release X.Y.Z`) and merge
 it through the merge queue.
 
-### Step 3: Wait for the Build of `main`
-
-Wait until the **Build** run of the push of that merge to `main` passes: it is
-the only run that builds the wheels for every target architecture.
-
-### Step 4: Create the Tag
+### Step 3: Create the Tag
 
 Tag the commit at the top of `main` with an annotated tag:
 
@@ -113,7 +108,7 @@ git push origin vX.Y.Z
 
 The tag must start with `v`. Pushing a tag does not publish anything.
 
-### Step 5: Publish the GitHub Release
+### Step 4: Publish the GitHub Release
 
 The notes come from the changelog of `main`, never by hand: its section
 `[X.Y.Z]`, with the links turned into links to the site, the install command
@@ -127,7 +122,7 @@ python .github/scripts/release_notes.py X.Y.Z > notes.md
 gh release create vX.Y.Z --verify-tag --title "Version X.Y.Z" --notes-file notes.md --latest
 ```
 
-### Step 6: Watch the PyPI Publication
+### Step 5: Watch the PyPI Publication
 
 The **Release to PyPI** workflow:
 
@@ -142,7 +137,7 @@ Watch it in the [Actions tab](https://github.com/MUNQU/commol/actions) or with:
 gh run watch "$(gh run list --workflow release.yaml --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
-### Step 7: Verify the Release
+### Step 6: Verify the Release
 
 Check that the version appears at <https://pypi.org/project/commol/>. Then
 install it in a clean environment and run a model:
@@ -221,7 +216,6 @@ The release issue repeats this list.
 - [ ] Every issue of the milestone closed
 - [ ] Version chosen
 - [ ] Changelog dated on `main`, with its opening paragraph
-- [ ] **Build** run on `main` passed
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
 - [ ] GitHub release published with the notes of `release_notes.py`
 - [ ] **Release to PyPI** workflow passed
