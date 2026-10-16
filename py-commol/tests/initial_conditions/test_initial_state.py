@@ -87,7 +87,7 @@ class TestInitialState:
         model = build(conditional_pathway_builder())
         engine = Simulation(model).engine
 
-        state = model.structure.initial_state()
+        state = model.structure.initial_state(model.process)
 
         assert [compartment.name for compartment in state] == engine.compartments
         assert [compartment.amount for compartment in state] == pytest.approx(
@@ -100,11 +100,12 @@ class TestInitialState:
 
     def test_the_binding_reports_bins_and_categories(self) -> None:
         model = build(conditional_pathway_builder())
-        rust_structure = commol_rs.core.CompartmentalStructure.from_json(
+        rust_process = commol_rs.core.Process.from_json(model.process.model_dump_json())
+        rust_structure = commol_rs.core.Aggregate.from_json(
             model.structure.model_dump_json()
         )
 
-        state = commol_rs.model.initial_state(rust_structure)
+        state = commol_rs.model.initial_state(rust_process, rust_structure)
 
         assert state[0] == ("A_g1", "A", [("group", "g1")], 450.0)
         assert [name for name, _, _, _ in state] == Simulation(
@@ -125,13 +126,13 @@ class TestInitialConditionsBinding:
         )
         model = core.Model(
             name="LowLevel",
-            structure=core.CompartmentalStructure(
+            process=core.Process(
                 bins=[core.Bin(id="A", name="A")],
                 stratifications=[
                     core.Stratification(id="group", categories=["g1", "g2"])
                 ],
-                initial_conditions=initial_conditions,
             ),
+            structure=core.Aggregate(initial_conditions=initial_conditions),
             parameters=[],
             engine="DifferenceEquations",
         )

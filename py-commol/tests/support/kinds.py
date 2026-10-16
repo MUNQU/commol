@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
-from commol import Model, ModelStructure
+from commol import Aggregate, Model, ModelStructure
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.structure import ReportSections, SeriesLabel
 from commol.context.parameter import Parameter
@@ -50,7 +50,12 @@ class DecayStructure(ModelStructure):
     outputs: list[DecayOutput]
 
     def check_model(self, model: "Model[Self]") -> None:
-        """Every rate names a parameter of the model."""
+        """The process is empty, and every rate names a parameter of the model."""
+        if not model.process.is_empty():
+            raise ValueError(
+                "A test model runs no process: its outputs decay on their own. "
+                "Leave the process empty."
+            )
         parameter_ids = {parameter.id for parameter in model.parameters}
         unknown = sorted(
             output.rate for output in self.outputs if output.rate not in parameter_ids
@@ -58,11 +63,18 @@ class DecayStructure(ModelStructure):
         if unknown:
             raise ValueError(f"Unknown rate parameters: {unknown}")
 
-    def outputs_by_source(self) -> dict[str, list[str]]:
+    def outputs_by_source(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+    ) -> dict[str, list[str]]:
         """Each output is its own source."""
         return {output.id: [output.id] for output in self.outputs}
 
-    def series_label(self, series_id: str) -> SeriesLabel:
+    def series_label(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+        series_id: str,
+    ) -> SeriesLabel:
         """Outputs are named "Output <id>" and measured in "unit"."""
         return SeriesLabel(f"Output {series_id}", "unit")
 
@@ -100,6 +112,15 @@ def decay_model(
             outputs=[DecayOutput(id="x", initial=initial, rate="k")]
         ),
     )
+
+
+class UnstratifiedVariant(Aggregate):
+    """
+    The variant of the tests: an aggregate structure of a process with no
+    stratifications, which the engine checks (``AggregateVariant::Test``).
+    """
+
+    variant: Literal["test"] = "test"
 
 
 def decay(initial: float, rate: float, position: float) -> float:

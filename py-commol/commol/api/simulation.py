@@ -46,7 +46,7 @@ class Simulation:
             raise TypeError(
                 f"The structure of model '{model.name}' is a "
                 f"{type(model.structure).__name__}, not a ModelStructure. A model "
-                "holds the structure of its kind, such as a CompartmentalStructure."
+                "holds the structure of its kind, such as an Aggregate."
             )
         logging.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
@@ -200,7 +200,7 @@ class Simulation:
         Names of the outputs a source id expands into.
 
         The structure of the model groups its outputs by source
-        (`ModelStructure.outputs_by_source`): for a compartmental model, by
+        (`ModelStructure.outputs_by_source`): for an aggregate model, by
         bin and accumulator.
 
         Parameters
@@ -218,7 +218,8 @@ class Simulation:
         KeyError
             If `id` is not a source of the model.
         """
-        outputs = self.model_definition.structure.outputs_by_source()
+        model = self.model_definition
+        outputs = model.structure.outputs_by_source(model)
         if id not in outputs:
             raise KeyError(
                 f"'{id}' is not a bin or accumulator of model "

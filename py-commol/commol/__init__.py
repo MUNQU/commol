@@ -21,7 +21,14 @@ from commol.api import (
     windowed_totals,
 )
 from commol.commol_rs._commol_rs import engine as _engine
-from commol.context import CompartmentalStructure, Model, ModelStructure
+from commol.context import (
+    Aggregate,
+    Complete,
+    Groups,
+    Model,
+    ModelStructure,
+    Process,
+)
 from commol.context.axis_units import AxisUnits
 from commol.context.engine import OdeSolver
 from commol.context.calibration import (
@@ -78,7 +85,9 @@ __all__ = [
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
-    "CompartmentalStructure",
+    "Aggregate",
+    "Complete",
+    "Groups",
     "Model",
     "ModelBuilder",
     "ModelStructure",
@@ -88,6 +97,7 @@ __all__ = [
     "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",
+    "Process",
     "ProbabilisticCalibrationConfig",
     "ProbabilisticCalibrationResult",
     "ProbClusteringConfig",

@@ -16,7 +16,8 @@ use commol_core::math_expression::preprocessing::{
     SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
-    CompartmentalStructure, MathExpression, MathExpressionContext, Model, RateMathExpression,
+    Aggregate, MathExpression, MathExpressionContext, Model, NEIGHBORS, NEIGHBORS_PREFIX, Process,
+    RateMathExpression,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -45,18 +46,19 @@ impl CompiledModel {
     /// when a transition cannot be planned, or when an initial-condition
     /// override is not valid for the expansion.
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
-        let structure = model.compartmental()?;
-        check_names(model)?;
+        let aggregate = model.aggregate()?;
+        let process = &model.process;
+        check_model(model)?;
 
         // Generate all compartment and accumulator output combinations
-        let layout = CompartmentLayout::new(structure);
+        let layout = CompartmentLayout::new(process);
         let compartments: Vec<String> = layout.names().to_vec();
         let compartment_map: HashMap<String, usize> = compartments
             .iter()
             .enumerate()
             .map(|(index, name)| (name.clone(), index))
             .collect();
-        let accumulator_outputs = generate_accumulators(structure);
+        let accumulator_outputs = generate_accumulators(process);
         let accumulator_names: Vec<String> = accumulator_outputs
             .iter()
             .map(|output| output.name.clone())
@@ -74,7 +76,7 @@ impl CompiledModel {
 
         // Initial amount of each compartment, in the same order as
         // `compartments`
-        let state = initial_state(structure)?;
+        let state = initial_state(process, aggregate)?;
         debug_assert!(
             state
                 .iter()
@@ -89,7 +91,7 @@ impl CompiledModel {
             .iter()
             .cloned()
             .chain(
-                expand_accumulators(structure)
+                expand_accumulators(process)
                     .into_iter()
                     .map(|output| OutputLabels {
                         source: output.source,
@@ -143,7 +145,7 @@ impl CompiledModel {
         // Pre-compute the subgroup total mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subgroup total names)
-        let subgroup_total_layout = build_subgroup_total_mappings(&layout, structure);
+        let subgroup_total_layout = build_subgroup_total_mappings(&layout, process);
 
         let subgroup_total_param_names: HashSet<String> = subgroup_total_layout
             .iter()
@@ -198,12 +200,13 @@ impl CompiledModel {
 
         // Plan the transition flows and compile them
         let planned_flows = plan_transition_flows(
-            structure,
+            process,
+            aggregate.neighbors.as_ref(),
             &layout,
             &accumulator_map,
             &subgroup_total_param_names,
         )?;
-        let schedules = impulse_schedules(structure)?;
+        let schedules = impulse_schedules(process)?;
         let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
             .into_iter()
             .partition(|flow| schedules.contains_key(&flow.transition_id));
@@ -263,7 +266,7 @@ impl CompiledModel {
 
         Ok(Self {
             compartments,
-            total: structure.initial_conditions.total,
+            total: aggregate.initial_conditions.total,
             output_labels,
             output_names,
             initial_state,
@@ -289,11 +292,9 @@ impl CompiledModel {
 /// Returns a message that names the transition when it sets both
 /// `impulse_at` and `impulse_every`, when a position is not finite or is
 /// negative, or when the period is not positive.
-fn impulse_schedules(
-    structure: &CompartmentalStructure,
-) -> Result<HashMap<String, ImpulseSchedule>, String> {
+fn impulse_schedules(process: &Process) -> Result<HashMap<String, ImpulseSchedule>, String> {
     let mut schedules = HashMap::new();
-    for transition in &structure.transitions {
+    for transition in &process.transitions {
         let schedule = match (&transition.impulse_at, transition.impulse_every) {
             (None, None) => continue,
             (Some(_), Some(_)) => {
@@ -373,7 +374,7 @@ pub struct ExpandedOutput {
 /// outputs whose already-applied categories satisfy all of them; the others are
 /// kept as-is, so the result is a non-uniform Cartesian product.
 fn expand<'a>(
-    structure: &CompartmentalStructure,
+    process: &Process,
     source_ids: impl IntoIterator<Item = &'a str>,
 ) -> Vec<(ExpandedOutput, HashMap<String, String>)> {
     // Each element: (source, name, applied categories by stratification id)
@@ -382,7 +383,7 @@ fn expand<'a>(
         .map(|id| (id.to_string(), id.to_string(), HashMap::new()))
         .collect();
 
-    for stratification in &structure.stratifications {
+    for stratification in &process.stratifications {
         let mut new_partials = Vec::with_capacity(partials.len());
         for (source, name, applied) in partials {
             if stratification_conditions_met(&stratification.conditions, &applied) {
@@ -401,7 +402,7 @@ fn expand<'a>(
     partials
         .into_iter()
         .map(|(source, name, applied)| {
-            let categories = structure
+            let categories = process
                 .stratifications
                 .iter()
                 .filter_map(|s| applied.get(&s.id).map(|c| (s.id.clone(), c.clone())))
@@ -418,23 +419,20 @@ fn expand<'a>(
         .collect()
 }
 
-/// Expanded compartments of a structure, in engine order.
-pub fn expand_compartments(structure: &CompartmentalStructure) -> Vec<ExpandedOutput> {
-    expand(structure, structure.bins.iter().map(|b| b.id.as_str()))
+/// Expanded compartments of a process, in engine order.
+pub fn expand_compartments(process: &Process) -> Vec<ExpandedOutput> {
+    expand(process, process.bins.iter().map(|b| b.id.as_str()))
         .into_iter()
         .map(|(output, _)| output)
         .collect()
 }
 
-/// Expanded accumulator outputs of a structure, in engine order.
-pub fn expand_accumulators(structure: &CompartmentalStructure) -> Vec<ExpandedOutput> {
-    expand(
-        structure,
-        structure.accumulators.iter().map(|a| a.id.as_str()),
-    )
-    .into_iter()
-    .map(|(output, _)| output)
-    .collect()
+/// Expanded accumulator outputs of a process, in engine order.
+pub fn expand_accumulators(process: &Process) -> Vec<ExpandedOutput> {
+    expand(process, process.accumulators.iter().map(|a| a.id.as_str()))
+        .into_iter()
+        .map(|(output, _)| output)
+        .collect()
 }
 
 pub(crate) fn accumulator_output_ref(
@@ -451,19 +449,14 @@ pub(crate) fn accumulator_output_ref(
     }
 }
 
-pub(crate) fn generate_accumulators(
-    structure: &CompartmentalStructure,
-) -> Vec<GeneratedAccumulatorOutput> {
-    expand(
-        structure,
-        structure.accumulators.iter().map(|a| a.id.as_str()),
-    )
-    .into_iter()
-    .map(|(output, applied)| GeneratedAccumulatorOutput {
-        name: output.name,
-        output_ref: accumulator_output_ref(output.source, &applied, &structure.stratifications),
-    })
-    .collect()
+pub(crate) fn generate_accumulators(process: &Process) -> Vec<GeneratedAccumulatorOutput> {
+    expand(process, process.accumulators.iter().map(|a| a.id.as_str()))
+        .into_iter()
+        .map(|(output, applied)| GeneratedAccumulatorOutput {
+            name: output.name,
+            output_ref: accumulator_output_ref(output.source, &applied, &process.stratifications),
+        })
+        .collect()
 }
 
 /// One expanded compartment of a model and the amount it starts with.
@@ -485,7 +478,7 @@ pub struct InitialCompartment {
 /// amounts within the total.
 const TOTAL_TOLERANCE: f64 = 1e-9;
 
-/// Expand a structure into its compartments and their initial amounts.
+/// Expand a process into its compartments and their initial amounts.
 ///
 /// This is the single source of truth for the initial state of a
 /// compartmental model. Bins
@@ -505,9 +498,10 @@ const TOTAL_TOLERANCE: f64 = 1e-9;
 /// names a compartment twice, holds a fraction outside `[0.0, 1.0]`, or makes
 /// the sum of the initial amounts exceed the total.
 pub fn initial_state(
-    structure: &CompartmentalStructure,
+    process: &Process,
+    aggregate: &Aggregate,
 ) -> Result<Vec<InitialCompartment>, String> {
-    let initial_conditions = &structure.initial_conditions;
+    let initial_conditions = &aggregate.initial_conditions;
     let total = initial_conditions.total;
     if !total.is_finite() || total <= 0.0 {
         return Err(format!(
@@ -515,37 +509,16 @@ pub fn initial_state(
         ));
     }
 
-    let bin_fraction_map: HashMap<&str, Option<f64>> = initial_conditions
-        .bin_fractions
-        .iter()
-        .map(|bf| (bf.bin.as_str(), bf.fraction))
-        .collect();
-    let category_fraction_map: HashMap<(&str, &str), f64> = structure
-        .stratifications
-        .iter()
-        .filter_map(|stratification| {
-            initial_conditions
-                .stratification_fractions
-                .iter()
-                .find(|sf| sf.stratification == stratification.id)
-        })
-        .flat_map(|item| {
-            item.fractions.iter().map(|fraction| {
-                (
-                    (item.stratification.as_str(), fraction.category.as_str()),
-                    fraction.fraction,
-                )
-            })
-        })
-        .collect();
+    let bin_fractions = &initial_conditions.bin_fractions;
+    let stratification_fractions = &initial_conditions.stratification_fractions;
 
     // Each compartment holds its bin's share of the total, split by the
     // fraction of every category applied to it. An uncalibrated bin or an
     // undeclared category counts as zero.
-    let mut state: Vec<InitialCompartment> = expand_compartments(structure)
+    let mut state: Vec<InitialCompartment> = expand_compartments(process)
         .into_iter()
         .map(|output| {
-            let bin_fraction = bin_fraction_map
+            let bin_fraction = bin_fractions
                 .get(output.source.as_str())
                 .and_then(|f| *f)
                 .unwrap_or(0.0);
@@ -555,8 +528,9 @@ pub fn initial_state(
                     .iter()
                     .fold(total * bin_fraction, |amount, (id, cat)| {
                         amount
-                            * category_fraction_map
-                                .get(&(id.as_str(), cat.as_str()))
+                            * stratification_fractions
+                                .get(id.as_str())
+                                .and_then(|fractions| fractions.get(cat.as_str()))
                                 .copied()
                                 .unwrap_or(0.0)
                     });
@@ -582,32 +556,24 @@ pub fn initial_state(
 
     // Validate every override before applying any of them, so a rejected
     // configuration names the first offending entry.
-    let mut seen_compartments: HashSet<&str> = HashSet::new();
-    for compartment_fraction in overrides {
-        if !compartment_index.contains_key(&compartment_fraction.compartment) {
+    for (compartment, &fraction) in overrides {
+        if !compartment_index.contains_key(compartment) {
             let available: Vec<&str> = state.iter().map(|c| c.name.as_str()).collect();
             return Err(format!(
-                "Unknown compartment '{}' in initial conditions. Available compartments: {:?}",
-                compartment_fraction.compartment, available
+                "Unknown compartment '{compartment}' in initial conditions. Available \
+                 compartments: {available:?}"
             ));
         }
-        if !seen_compartments.insert(compartment_fraction.compartment.as_str()) {
+        if !(0.0..=1.0).contains(&fraction) {
             return Err(format!(
-                "Duplicate compartment '{}' in initial conditions.",
-                compartment_fraction.compartment
-            ));
-        }
-        if !(0.0..=1.0).contains(&compartment_fraction.fraction) {
-            return Err(format!(
-                "Fraction for compartment '{}' must be between 0.0 and 1.0, got {}.",
-                compartment_fraction.compartment, compartment_fraction.fraction
+                "Fraction for compartment '{compartment}' must be between 0.0 and 1.0, got \
+                 {fraction}."
             ));
         }
     }
 
-    for compartment_fraction in overrides {
-        let index = compartment_index[&compartment_fraction.compartment];
-        state[index].amount = total * compartment_fraction.fraction;
+    for (compartment, fraction) in overrides {
+        state[compartment_index[compartment]].amount = total * fraction;
     }
 
     let sum: f64 = state.iter().map(|c| c.amount).sum();
@@ -660,7 +626,7 @@ enum TotalSource {
     Bin,
 }
 
-/// Every subgroup total of a structure, one entry per contributing
+/// Every subgroup total of a process, one entry per contributing
 /// compartment: its name, where the name comes from and the compartment index.
 ///
 /// The entries are:
@@ -671,13 +637,13 @@ enum TotalSource {
 /// Every entry is built from the compartment labels.
 fn subgroup_total_entries(
     layout: &CompartmentLayout,
-    structure: &CompartmentalStructure,
+    process: &Process,
 ) -> Vec<(String, TotalSource, usize)> {
     let mut entries = Vec::new();
-    if structure.stratifications.is_empty() {
+    if process.stratifications.is_empty() {
         return entries;
     }
-    let partial_bin_totals = structure.stratifications.len() >= 2;
+    let partial_bin_totals = process.stratifications.len() >= 2;
 
     for (compartment_index, label) in layout.labels().iter().enumerate() {
         let categories: Vec<&str> = label
@@ -725,10 +691,10 @@ fn subgroup_total_entries(
 /// name of [`subgroup_total_entries`].
 fn build_subgroup_total_mappings(
     layout: &CompartmentLayout,
-    structure: &CompartmentalStructure,
+    process: &Process,
 ) -> Vec<SubgroupTotalLayout> {
     let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
-    for (name, _, compartment_index) in subgroup_total_entries(layout, structure) {
+    for (name, _, compartment_index) in subgroup_total_entries(layout, process) {
         totals.entry(name).or_default().push(compartment_index);
     }
     totals
@@ -745,40 +711,49 @@ fn build_subgroup_total_mappings(
 /// Names of the subgroup totals a rate expression may reference.
 pub(crate) fn subgroup_total_name_set(
     layout: &CompartmentLayout,
-    structure: &CompartmentalStructure,
+    process: &Process,
 ) -> HashSet<String> {
-    build_subgroup_total_mappings(layout, structure)
+    build_subgroup_total_mappings(layout, process)
         .into_iter()
         .map(|mapping| mapping.parameter_name)
         .collect()
 }
 
-/// Names of the subgroup totals a rate expression of a structure may read,
+/// Names of the subgroup totals a rate expression of a process may read,
 /// sorted.
 ///
 /// They are the `total_<categories>` names, the bin totals and the partial bin
 /// totals. Category suffixes follow the declaration order of the
 /// stratifications, and a conditional stratification adds its categories only
-/// to the compartments it expands. A structure without stratifications has
+/// to the compartments it expands. A process without stratifications has
 /// none.
-pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
-    let mut names: Vec<String> =
-        subgroup_total_name_set(&CompartmentLayout::new(structure), structure)
-            .into_iter()
-            .collect();
+pub fn subgroup_total_names(process: &Process) -> Vec<String> {
+    let mut names: Vec<String> = subgroup_total_name_set(&CompartmentLayout::new(process), process)
+        .into_iter()
+        .collect();
     names.sort_unstable();
     names
 }
 
-/// Check the names a model uses against the names the engine provides.
+/// Check an aggregate model: the checks of its structure
+/// ([`Aggregate::check`]), the variables its rates read, and the names it
+/// uses against the names the engine provides.
 ///
 /// The engine provides one variable per expanded compartment and one per
 /// subgroup total: `total_<categories>`, bin totals and partial bin totals.
+/// A transition rate may also read the neighbors of a unit, `neighbors_<bin>`
+/// and `neighbors`, which the structure resolves ([`commol_core::Neighbors`]).
 /// This function returns an error when:
 ///
+/// - the variant or the neighbors of the structure do not fit the process;
 /// - a parameter, bin or accumulator id is a variable the engine provides in
 ///   every expression ([`ENGINE_VARIABLES`]: `total`, `step`, `t`, `pi`, `e`),
-///   because the engine variable would hide it;
+///   because the engine variable would hide it, or it is `neighbors` or
+///   starts with `neighbors_`;
+/// - a transition rate reads `neighbors_<bin>` for an id that is not a bin,
+///   or reads the neighbors and the structure does not say who they are;
+///   a formula parameter reads the neighbors, which only a transition rate
+///   has;
 /// - a name built from a bin (a compartment, a bin total or a partial bin
 ///   total) is also a `total_<categories>` subgroup total, as for a bin
 ///   `total_y` stratified by `group = [y, o]` and `type = [y, o]`: `total_y_y`
@@ -793,15 +768,18 @@ pub fn subgroup_total_names(structure: &CompartmentalStructure) -> Vec<String> {
 ///
 /// # Errors
 ///
-/// Returns a message when the model is not compartmental, or a message that
-/// names each conflict and lists the valid subgroup total names.
-pub fn check_names(model: &Model) -> Result<(), String> {
-    let structure = model.compartmental()?;
-    check_engine_variable_ids(model, structure)?;
-    let layout = CompartmentLayout::new(structure);
-    check_bin_names_against_subgroup_totals(&layout, structure)?;
+/// Returns a message when the model is not aggregate, or a message that
+/// names each conflict and lists the valid names.
+pub fn check_model(model: &Model) -> Result<(), String> {
+    let aggregate = model.aggregate()?;
+    let process = &model.process;
+    aggregate.check(process)?;
+    check_engine_variable_ids(model, process)?;
+    check_neighbor_terms(model, aggregate)?;
+    let layout = CompartmentLayout::new(process);
+    check_bin_names_against_subgroup_totals(&layout, process)?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
-    let subgroup_totals = subgroup_total_name_set(&layout, structure);
+    let subgroup_totals = subgroup_total_name_set(&layout, process);
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
 
     let mut reserved: Vec<String> = model
@@ -828,7 +806,7 @@ pub fn check_names(model: &Model) -> Result<(), String> {
     }
 
     let mut used: HashSet<String> = HashSet::new();
-    for transition in &structure.transitions {
+    for transition in &process.transitions {
         if let Some(rate) = &transition.rate {
             // A deserialized rate is a `Parameter` until it is parsed again.
             used.extend(RateMathExpression::from_string(rate_to_string(rate)).get_variables());
@@ -876,44 +854,127 @@ pub fn check_names(model: &Model) -> Result<(), String> {
     ))
 }
 
+/// The variables a rate reads that name the neighbors of a unit:
+/// `neighbors` and `neighbors_<bin>`.
+pub(crate) fn neighbor_terms(rate: &str) -> Vec<String> {
+    let mut terms: Vec<String> = RateMathExpression::from_string(rate.to_string())
+        .get_variables()
+        .into_iter()
+        .filter(|name| is_neighbor_term(name))
+        .collect();
+    terms.sort_unstable();
+    terms.dedup();
+    terms
+}
+
+/// Whether a name is `neighbors` or starts with `neighbors_`.
+fn is_neighbor_term(name: &str) -> bool {
+    name == NEIGHBORS || name.starts_with(NEIGHBORS_PREFIX)
+}
+
+/// The message for a rate that reads the neighbors of a unit when the
+/// structure does not say who they are.
+pub(crate) fn missing_neighbors(transition_id: &str, term: &str) -> String {
+    format!(
+        "Transition '{transition_id}' reads '{term}', so the structure must say who the \
+         neighbors of a unit are: neighbors=Complete() (every unit is a neighbor of every \
+         other) or neighbors=Groups(stratification, weights=None) (units are neighbors by \
+         the categories of one stratification)"
+    )
+}
+
+/// Reject a read of the neighbors that the model cannot resolve: a
+/// `neighbors_<bin>` that names no bin, a rate that reads the neighbors when
+/// the structure has none, and a formula parameter that reads them.
+fn check_neighbor_terms(model: &Model, aggregate: &Aggregate) -> Result<(), String> {
+    let process = &model.process;
+    for transition in &process.transitions {
+        let rates = transition.rate.iter().map(rate_to_string).chain(
+            transition
+                .stratified_rates
+                .iter()
+                .flatten()
+                .map(|stratified| stratified.rate.clone()),
+        );
+        for rate in rates {
+            for term in neighbor_terms(&rate) {
+                if let Some(bin) = term.strip_prefix(NEIGHBORS_PREFIX)
+                    && !process.bins.iter().any(|candidate| candidate.id == bin)
+                {
+                    let bins: Vec<&str> = process.bins.iter().map(|b| b.id.as_str()).collect();
+                    return Err(format!(
+                        "Transition '{}' reads '{term}', but '{bin}' is not a bin; \
+                         `{NEIGHBORS_PREFIX}<bin>` names a bin of {bins:?}",
+                        transition.id
+                    ));
+                }
+                if aggregate.neighbors.is_none() {
+                    return Err(missing_neighbors(&transition.id, &term));
+                }
+            }
+        }
+    }
+    for parameter in &model.parameters {
+        if let Some(commol_core::ParameterValue::Formula(formula)) = &parameter.value
+            && let Some(term) = neighbor_terms(formula).first()
+        {
+            return Err(format!(
+                "Parameter '{}' reads '{term}'; only a transition rate reads the \
+                 neighbors of a unit, which depend on the compartment it starts from",
+                parameter.id
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Reject a parameter, bin or accumulator id that is a variable the engine
-/// provides in every expression.
-fn check_engine_variable_ids(
-    model: &Model,
-    structure: &CompartmentalStructure,
-) -> Result<(), String> {
+/// provides in every expression, or a name of the neighbors of a unit.
+fn check_engine_variable_ids(model: &Model, process: &Process) -> Result<(), String> {
     let ids = model
         .parameters
         .iter()
         .map(|parameter| ("parameter", parameter.id.as_str()))
-        .chain(structure.bins.iter().map(|bin| ("bin", bin.id.as_str())))
+        .chain(process.bins.iter().map(|bin| ("bin", bin.id.as_str())))
         .chain(
-            structure
+            process
                 .accumulators
                 .iter()
                 .map(|accumulator| ("accumulator", accumulator.id.as_str())),
         );
-    let conflicts: Vec<String> = ids
-        .filter(|(_, id)| ENGINE_VARIABLES.contains(id))
-        .map(|(kind, id)| format!("{kind} '{id}'"))
-        .collect();
-    if conflicts.is_empty() {
-        return Ok(());
+    let (neighbor_names, conflicts): (Vec<_>, Vec<_>) = ids
+        .filter(|(_, id)| ENGINE_VARIABLES.contains(id) || is_neighbor_term(id))
+        .partition(|(_, id)| is_neighbor_term(id));
+    let describe = |ids: Vec<(&str, &str)>| {
+        ids.into_iter()
+            .map(|(kind, id)| format!("{kind} '{id}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if !conflicts.is_empty() {
+        return Err(format!(
+            "Ids cannot be variables the engine provides ({}): {}. Rename them.",
+            ENGINE_VARIABLES.join(", "),
+            describe(conflicts)
+        ));
     }
-    Err(format!(
-        "Ids cannot be variables the engine provides ({}): {}. Rename them.",
-        ENGINE_VARIABLES.join(", "),
-        conflicts.join(", ")
-    ))
+    if !neighbor_names.is_empty() {
+        return Err(format!(
+            "Ids cannot be '{NEIGHBORS}' or start with '{NEIGHBORS_PREFIX}', the names of \
+             the neighbors of a unit: {}. Rename them.",
+            describe(neighbor_names)
+        ));
+    }
+    Ok(())
 }
 
 /// Reject a compartment, bin total or partial bin total whose name is also a
 /// `total_<categories>` subgroup total.
 fn check_bin_names_against_subgroup_totals(
     layout: &CompartmentLayout,
-    structure: &CompartmentalStructure,
+    process: &Process,
 ) -> Result<(), String> {
-    let entries = subgroup_total_entries(layout, structure);
+    let entries = subgroup_total_entries(layout, process);
     let by_categories: HashSet<&str> = entries
         .iter()
         .filter(|(_, source, _)| *source == TotalSource::Categories)
@@ -1408,7 +1469,7 @@ mod tests {
     ///
     /// Returns a tuple of (compartments vector, compartment_map for lookups).
     fn generate_compartments(model: &Model) -> (Vec<String>, HashMap<String, usize>) {
-        let compartments: Vec<String> = expand_compartments(model.compartmental().unwrap())
+        let compartments: Vec<String> = expand_compartments(&model.process)
             .into_iter()
             .map(|output| output.name)
             .collect();
@@ -1422,23 +1483,27 @@ mod tests {
         (compartments, compartment_map)
     }
     use commol_core::{
-        Bin, BinFraction, CompartmentFraction, EngineType, InitialConditions, ModelEngine,
-        ModelStructure, Stratification, StratificationCondition, StratificationFraction,
-        StratificationFractions,
+        Bin, EngineType, InitialConditions, ModelEngine, ModelStructure, Stratification,
+        StratificationCondition,
     };
 
-    /// The compartmental structure of a test model.
-    fn structure(model: &Model) -> &CompartmentalStructure {
-        model.compartmental().unwrap()
+    /// The aggregate structure of a test model.
+    fn aggregate(model: &Model) -> &Aggregate {
+        model.aggregate().unwrap()
     }
 
-    fn structure_mut(model: &mut Model) -> &mut CompartmentalStructure {
-        model.compartmental_mut().unwrap()
+    fn aggregate_mut(model: &mut Model) -> &mut Aggregate {
+        model.aggregate_mut().unwrap()
+    }
+
+    /// The initial state of a test model.
+    fn model_initial_state(model: &Model) -> Result<Vec<InitialCompartment>, String> {
+        initial_state(&model.process, aggregate(model))
     }
 
     /// Initial amount of each compartment, in the order of `compartments`.
     fn initial_amounts(model: &Model, compartments: &[String]) -> Result<Vec<f64>, String> {
-        let state = initial_state(structure(model))?;
+        let state = model_initial_state(model)?;
         let amounts: HashMap<&str, f64> = state
             .iter()
             .map(|compartment| (compartment.name.as_str(), compartment.amount))
@@ -1449,13 +1514,6 @@ mod tests {
             .collect())
     }
 
-    fn bin_fraction(bin: &str, fraction: f64) -> BinFraction {
-        BinFraction {
-            bin: bin.to_string(),
-            fraction: Some(fraction),
-        }
-    }
-
     fn group_stratification() -> Stratification {
         Stratification {
             id: "group".to_string(),
@@ -1464,42 +1522,21 @@ mod tests {
         }
     }
 
-    fn group_fractions(g1: f64, g2: f64) -> StratificationFractions {
-        StratificationFractions {
-            stratification: "group".to_string(),
-            fractions: vec![
-                StratificationFraction {
-                    category: "g1".to_string(),
-                    fraction: g1,
-                },
-                StratificationFraction {
-                    category: "g2".to_string(),
-                    fraction: g2,
-                },
-            ],
-        }
+    /// The fractions of a stratification, as `make_model` takes them.
+    type Fractions = (&'static str, [(&'static str, f64); 2]);
+
+    fn group_fractions(g1: f64, g2: f64) -> Fractions {
+        ("group", [("g1", g1), ("g2", g2)])
     }
 
-    fn sub_fractions(s1: f64, s2: f64) -> StratificationFractions {
-        StratificationFractions {
-            stratification: "sub".to_string(),
-            fractions: vec![
-                StratificationFraction {
-                    category: "s1".to_string(),
-                    fraction: s1,
-                },
-                StratificationFraction {
-                    category: "s2".to_string(),
-                    fraction: s2,
-                },
-            ],
-        }
+    fn sub_fractions(s1: f64, s2: f64) -> Fractions {
+        ("sub", [("s1", s1), ("s2", s2)])
     }
 
     fn make_model(
         stratifications: Vec<Stratification>,
-        stratification_fractions: Vec<StratificationFractions>,
-        compartment_fractions: Vec<CompartmentFraction>,
+        stratification_fractions: Vec<Fractions>,
+        compartment_fractions: Vec<(&str, f64)>,
     ) -> Model {
         Model {
             name: "test".to_string(),
@@ -1507,7 +1544,7 @@ mod tests {
             version: None,
             parameters: vec![],
             engine: ModelEngine::new(EngineType::DifferenceEquations),
-            structure: ModelStructure::Compartmental(CompartmentalStructure {
+            process: Process {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -1521,12 +1558,30 @@ mod tests {
                 accumulators: vec![],
                 stratifications,
                 transitions: vec![],
+            },
+            structure: ModelStructure::Aggregate(Aggregate {
+                variant: None,
                 initial_conditions: InitialConditions {
                     total: 1000.0,
-                    bin_fractions: vec![bin_fraction("A", 1.0), bin_fraction("B", 0.0)],
-                    stratification_fractions,
-                    compartment_fractions,
+                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
+                        .into_iter()
+                        .collect(),
+                    stratification_fractions: stratification_fractions
+                        .into_iter()
+                        .map(|(id, fractions)| {
+                            let fractions = fractions
+                                .into_iter()
+                                .map(|(category, fraction)| (category.to_string(), fraction))
+                                .collect();
+                            (id.to_string(), fractions)
+                        })
+                        .collect(),
+                    compartment_fractions: compartment_fractions
+                        .into_iter()
+                        .map(|(name, fraction)| (name.to_string(), fraction))
+                        .collect(),
                 },
+                neighbors: None,
             }),
         }
     }
@@ -1564,10 +1619,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![CompartmentFraction {
-                compartment: "A_g2".to_string(),
-                fraction: 0.25,
-            }],
+            vec![("A_g2", 0.25)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1590,10 +1642,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification(), sub],
             vec![group_fractions(0.7, 0.3), sub_fractions(0.5, 0.5)],
-            vec![CompartmentFraction {
-                compartment: "A_g2".to_string(),
-                fraction: 0.1,
-            }],
+            vec![("A_g2", 0.1)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1607,14 +1656,7 @@ mod tests {
 
     #[test]
     fn unknown_compartment_override_is_a_build_error() {
-        let model = make_model(
-            vec![],
-            vec![],
-            vec![CompartmentFraction {
-                compartment: "Missing".to_string(),
-                fraction: 0.1,
-            }],
-        );
+        let model = make_model(vec![], vec![], vec![("Missing", 0.1)]);
         let (compartments, _) = generate_compartments(&model);
         let error = initial_amounts(&model, &compartments).unwrap_err();
 
@@ -1626,16 +1668,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![
-                CompartmentFraction {
-                    compartment: "A_g1".to_string(),
-                    fraction: 0.4,
-                },
-                CompartmentFraction {
-                    compartment: "A_g2".to_string(),
-                    fraction: 0.6,
-                },
-            ],
+            vec![("A_g1", 0.4), ("A_g2", 0.6)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1649,10 +1682,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![CompartmentFraction {
-                compartment: "A_g1".to_string(),
-                fraction: -0.5,
-            }],
+            vec![("A_g1", -0.5)],
         );
         let (compartments, _) = generate_compartments(&model);
         let error = initial_amounts(&model, &compartments).unwrap_err();
@@ -1665,10 +1695,7 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![CompartmentFraction {
-                compartment: "A_g1".to_string(),
-                fraction: 1.5,
-            }],
+            vec![("A_g1", 1.5)],
         );
         let (compartments, _) = generate_compartments(&model);
         let error = initial_amounts(&model, &compartments).unwrap_err();
@@ -1677,42 +1704,11 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_compartment_override_is_a_build_error() {
-        let model = make_model(
-            vec![group_stratification()],
-            vec![group_fractions(0.6, 0.4)],
-            vec![
-                CompartmentFraction {
-                    compartment: "A_g1".to_string(),
-                    fraction: 0.1,
-                },
-                CompartmentFraction {
-                    compartment: "A_g1".to_string(),
-                    fraction: 0.2,
-                },
-            ],
-        );
-        let (compartments, _) = generate_compartments(&model);
-        let error = initial_amounts(&model, &compartments).unwrap_err();
-
-        assert!(error.contains("Duplicate compartment 'A_g1'"), "{error}");
-    }
-
-    #[test]
     fn boundary_compartment_fractions_are_accepted() {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![
-                CompartmentFraction {
-                    compartment: "A_g1".to_string(),
-                    fraction: 0.0,
-                },
-                CompartmentFraction {
-                    compartment: "A_g2".to_string(),
-                    fraction: 1.0,
-                },
-            ],
+            vec![("A_g1", 0.0), ("A_g2", 1.0)],
         );
         let (compartments, _) = generate_compartments(&model);
         let amounts = initial_amounts(&model, &compartments).unwrap();
@@ -1725,12 +1721,9 @@ mod tests {
         let model = make_model(
             vec![group_stratification()],
             vec![group_fractions(0.6, 0.4)],
-            vec![CompartmentFraction {
-                compartment: "B_g1".to_string(),
-                fraction: 0.5,
-            }],
+            vec![("B_g1", 0.5)],
         );
-        let error = initial_state(structure(&model)).unwrap_err();
+        let error = model_initial_state(&model).unwrap_err();
 
         assert!(error.contains("exceed the total"), "{error}");
     }
@@ -1751,7 +1744,7 @@ mod tests {
             vec![group_fractions(0.6, 0.4), sub_fractions(0.5, 0.5)],
             vec![],
         );
-        let state = initial_state(structure(&model)).unwrap();
+        let state = model_initial_state(&model).unwrap();
         let a_g1_s2 = &state[1];
         let a_g2 = &state[2];
 
@@ -1790,7 +1783,7 @@ mod tests {
             value: Some(ParameterValue::Constant(0.1)),
             description: None,
         }];
-        structure_mut(&mut model).transitions = vec![Transition {
+        model.process.transitions = vec![Transition {
             id: "ab".to_string(),
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
@@ -1815,7 +1808,7 @@ mod tests {
 
     #[test]
     fn subgroup_total_names_follow_the_declaration_order() {
-        let names = subgroup_total_names(structure(&model_with_rate("k")));
+        let names = subgroup_total_names(&model_with_rate("k").process);
 
         for name in ["total_g1", "total_s2", "total_g1_s1", "A", "A_g1", "B_s2"] {
             assert!(names.contains(&name.to_string()), "{name}: {names:?}");
@@ -1870,19 +1863,19 @@ mod tests {
             ("A", "a subgroup total"),
         ] {
             let error =
-                check_names(&model_with_parameter(id)).expect_err("a reserved id must be rejected");
+                check_model(&model_with_parameter(id)).expect_err("a reserved id must be rejected");
             assert!(error.contains(&format!("'{id}' ({kind})")), "{error}");
         }
-        assert!(check_names(&model_with_parameter("total_max")).is_ok());
+        assert!(check_model(&model_with_parameter("total_max")).is_ok());
     }
 
     #[test]
     fn an_engine_variable_is_not_a_parameter_bin_or_accumulator_id() {
         let parameter = model_with_parameter("step");
         let mut bin = model_with_rate("k");
-        structure_mut(&mut bin).bins[1].id = "t".to_string();
+        bin.process.bins[1].id = "t".to_string();
         let mut accumulator = model_with_rate("k");
-        structure_mut(&mut accumulator).accumulators = vec![commol_core::Accumulator {
+        accumulator.process.accumulators = vec![commol_core::Accumulator {
             id: "total".to_string(),
             name: "total".to_string(),
         }];
@@ -1892,9 +1885,59 @@ mod tests {
             (bin, "bin 't'"),
             (accumulator, "accumulator 'total'"),
         ] {
-            let error = check_names(&model).expect_err("an engine variable must be rejected");
+            let error = check_model(&model).expect_err("an engine variable must be rejected");
             assert!(error.contains(conflict), "{error}");
         }
+    }
+
+    #[test]
+    fn a_name_of_the_neighbors_is_not_a_parameter_bin_or_accumulator_id() {
+        let parameter = model_with_parameter("neighbors_A");
+        let mut bin = model_with_rate("k");
+        bin.process.bins[1].id = "neighbors".to_string();
+
+        for (model, conflict) in [
+            (parameter, "parameter 'neighbors_A'"),
+            (bin, "bin 'neighbors'"),
+        ] {
+            let error = check_model(&model).expect_err("a name of the neighbors is reserved");
+            assert!(error.contains(conflict), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_rate_reads_the_neighbors_of_a_bin_only_when_the_structure_has_them() {
+        let unknown = model_with_rate("k * neighbors_C");
+        let error = check_model(&unknown).unwrap_err();
+        assert!(error.contains("'C' is not a bin"), "{error}");
+
+        let mut model = model_with_rate("k * neighbors_B / neighbors");
+        let error = check_model(&model).unwrap_err();
+        assert!(
+            error.contains("Complete()") && error.contains("Groups("),
+            "{error}"
+        );
+
+        aggregate_mut(&mut model).neighbors = Some(commol_core::Neighbors::Complete);
+        assert_eq!(check_model(&model), Ok(()));
+    }
+
+    #[test]
+    fn a_formula_parameter_does_not_read_the_neighbors() {
+        use commol_core::{Parameter, ParameterValue};
+        let mut model = model_with_rate("k");
+        aggregate_mut(&mut model).neighbors = Some(commol_core::Neighbors::Complete);
+        model.parameters.push(Parameter {
+            id: "f".to_string(),
+            value: Some(ParameterValue::Formula("k * neighbors".to_string())),
+            description: None,
+        });
+
+        let error = check_model(&model).unwrap_err();
+        assert!(
+            error.contains("'f'") && error.contains("transition rate"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1910,18 +1953,18 @@ mod tests {
             conditions: None,
         };
         let mut model = make_model(vec![group, kind], vec![], vec![]);
-        structure_mut(&mut model).bins[0].id = "total_y".to_string();
+        model.process.bins[0].id = "total_y".to_string();
 
-        let error = check_names(&model).expect_err("total_y_y names two sums");
+        let error = check_model(&model).expect_err("total_y_y names two sums");
         assert!(error.contains("'total_y_y'"), "{error}");
     }
 
     #[test]
     fn a_bin_that_starts_with_the_prefix_but_names_no_subgroup_builds() {
         let mut model = make_model(vec![group_stratification()], vec![], vec![]);
-        structure_mut(&mut model).bins[0].id = "total_x".to_string();
+        model.process.bins[0].id = "total_x".to_string();
 
-        assert!(check_names(&model).is_ok());
+        assert!(check_model(&model).is_ok());
     }
 
     #[test]
@@ -1931,8 +1974,8 @@ mod tests {
             vec![group_fractions(0.6, 0.4)],
             vec![],
         );
-        structure_mut(&mut model).initial_conditions.total = 2.5;
-        let state = initial_state(structure(&model)).unwrap();
+        aggregate_mut(&mut model).initial_conditions.total = 2.5;
+        let state = model_initial_state(&model).unwrap();
 
         let sum: f64 = state.iter().map(|compartment| compartment.amount).sum();
         assert!((sum - 2.5).abs() < 1e-12, "{sum}");
@@ -1943,8 +1986,8 @@ mod tests {
     fn a_total_that_is_not_finite_and_positive_is_a_build_error() {
         for total in [0.0, -1.0, f64::NAN, f64::INFINITY] {
             let mut model = make_model(vec![], vec![], vec![]);
-            structure_mut(&mut model).initial_conditions.total = total;
-            let error = initial_state(structure(&model)).unwrap_err();
+            aggregate_mut(&mut model).initial_conditions.total = total;
+            let error = model_initial_state(&model).unwrap_err();
 
             assert!(error.contains("finite and greater than 0"), "{error}");
         }

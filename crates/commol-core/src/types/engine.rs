@@ -1,18 +1,18 @@
 //! The list of model types: the engines a model can name.
 //!
-//! [`EngineType`] is the one list of engines. Each entry names the model kind
-//! it runs, validates its settings, and says the form of its equations and
-//! the meaning of a rate. A model names its engine and the settings of that
+//! [`EngineType`] is the one list of engines. An engine names a method, not
+//! a kind: each entry names the model kinds it runs, validates its settings,
+//! and says the form of its equations and the meaning of a rate. A model names its engine and the settings of that
 //! engine in [`ModelEngine`].
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The kind of model an engine runs.
+/// The kind of model an engine runs: the kind of its structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModelKind {
-    /// Bins expanded over stratifications, joined by transitions with rates.
-    Compartmental,
+    /// Amounts per compartment: bins expanded over stratifications.
+    Aggregate,
     /// The model kind of the tests (`types::test_kind`).
     #[cfg(feature = "test-kind")]
     Test,
@@ -21,7 +21,7 @@ pub enum ModelKind {
 impl ModelKind {
     /// Every kind.
     pub const ALL: &'static [Self] = &[
-        Self::Compartmental,
+        Self::Aggregate,
         #[cfg(feature = "test-kind")]
         Self::Test,
     ];
@@ -29,7 +29,7 @@ impl ModelKind {
     /// Name of the kind, as the `kind` of a model structure.
     pub fn name(self) -> &'static str {
         match self {
-            Self::Compartmental => "compartmental",
+            Self::Aggregate => "aggregate",
             #[cfg(feature = "test-kind")]
             Self::Test => "test",
         }
@@ -55,7 +55,7 @@ impl ModelKind {
     /// parameters and factors.
     pub fn value_types(self) -> &'static [ModelValueType] {
         match self {
-            Self::Compartmental => &[ModelValueType::InitialCondition],
+            Self::Aggregate => &[ModelValueType::InitialCondition],
             #[cfg(feature = "test-kind")]
             Self::Test => &[],
         }
@@ -209,30 +209,51 @@ impl EngineType {
             })
     }
 
-    /// The kind of model the engine runs.
-    pub fn kind(self) -> ModelKind {
+    /// The kinds of model the engine runs.
+    pub fn kinds(self) -> &'static [ModelKind] {
         match self {
-            Self::DifferenceEquations | Self::DifferentialEquations => ModelKind::Compartmental,
+            Self::DifferenceEquations | Self::DifferentialEquations => &[ModelKind::Aggregate],
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => ModelKind::Test,
+            Self::TestEngine => &[ModelKind::Test],
         }
+    }
+
+    /// Whether the engine runs a model kind.
+    pub fn runs(self, kind: ModelKind) -> bool {
+        self.kinds().contains(&kind)
+    }
+
+    /// The engines that run a model kind, in the order of the list.
+    pub fn engines_of(kind: ModelKind) -> Vec<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .filter(|engine| engine.runs(kind))
+            .collect()
     }
 
     /// Check that the engine runs a model kind.
     ///
     /// # Errors
     ///
-    /// Returns a message that names the engine, the kind it runs and the
-    /// given kind.
+    /// Returns a message that names the engine, the kinds it runs, the given
+    /// kind and the engines that run it.
     pub fn check_kind(self, kind: ModelKind) -> Result<(), String> {
-        if self.kind() == kind {
+        if self.runs(kind) {
             return Ok(());
         }
+        let kinds: Vec<&str> = self.kinds().iter().map(|kind| kind.name()).collect();
+        let engines: Vec<&str> = Self::engines_of(kind)
+            .into_iter()
+            .map(|engine| engine.name())
+            .collect();
         Err(format!(
-            "The {} engine runs {} models, not {} models",
+            "The {} engine runs {} models, not {} models; the engines of {} models are {:?}",
             self.name(),
-            self.kind().name(),
-            kind.name()
+            kinds.join(" and "),
+            kind.name(),
+            kind.name(),
+            engines
         ))
     }
 
@@ -515,14 +536,24 @@ mod tests {
     }
 
     #[test]
-    fn every_entry_names_its_kind_and_rate_meaning() {
+    fn every_entry_names_its_kinds_and_rate_meaning() {
+        for &engine in EngineType::ALL {
+            assert!(!engine.kinds().is_empty(), "{engine:?} runs no kind");
+        }
         assert_eq!(
-            EngineType::DifferenceEquations.kind(),
-            ModelKind::Compartmental
+            EngineType::DifferenceEquations.kinds(),
+            &[ModelKind::Aggregate]
         );
         assert_eq!(
-            EngineType::DifferentialEquations.kind(),
-            ModelKind::Compartmental
+            EngineType::DifferentialEquations.kinds(),
+            &[ModelKind::Aggregate]
+        );
+        assert_eq!(
+            EngineType::engines_of(ModelKind::Aggregate),
+            vec![
+                EngineType::DifferenceEquations,
+                EngineType::DifferentialEquations
+            ]
         );
         assert_eq!(
             EngineType::DifferenceEquations.rate_meaning(),
@@ -624,18 +655,23 @@ mod tests {
     #[test]
     fn an_engine_rejects_a_model_of_another_kind() {
         assert_eq!(
-            EngineType::DifferenceEquations.check_kind(ModelKind::Compartmental),
+            EngineType::DifferenceEquations.check_kind(ModelKind::Aggregate),
             Ok(())
         );
         for &kind in ModelKind::ALL {
             for &engine in EngineType::ALL {
-                if engine.kind() == kind {
+                if engine.runs(kind) {
                     continue;
                 }
                 let error = engine.check_kind(kind).unwrap_err();
                 assert!(error.contains(engine.name()), "{error}");
-                assert!(error.contains(engine.kind().name()), "{error}");
+                for own in engine.kinds() {
+                    assert!(error.contains(own.name()), "{error}");
+                }
                 assert!(error.contains(kind.name()), "{error}");
+                for other in EngineType::engines_of(kind) {
+                    assert!(error.contains(other.name()), "{error}");
+                }
             }
         }
     }
@@ -646,9 +682,9 @@ mod tests {
             assert_eq!(ModelKind::from_name(kind.name()), Ok(kind));
         }
         let error = ModelKind::from_name("network").unwrap_err();
-        assert!(error.contains("compartmental"), "{error}");
+        assert!(error.contains("aggregate"), "{error}");
         assert_eq!(
-            ModelKind::Compartmental.value_types(),
+            ModelKind::Aggregate.value_types(),
             &[ModelValueType::InitialCondition]
         );
     }

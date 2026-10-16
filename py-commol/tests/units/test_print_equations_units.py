@@ -2,9 +2,9 @@
 
 import pytest
 
-from commol import ModelBuilder
 from commol.context.model import Model
-from tests.support import build, abc_builder
+from tests.support import FactoryBuilder, build, build_ode, abc_builder
+from commol import Aggregate
 
 DAILY = {"k1": "1/day", "k2": "1/day"}
 
@@ -30,9 +30,10 @@ def _ab_into_b(**options) -> Model:
 
 class TestUnits:
     def test_print_equations_latex_with_units(self, capsys) -> None:
-        model = abc_builder(
-            name="ABC Model with Units", bin_unit="item", units=DAILY
-        ).build(engine="DifferentialEquations")
+        model = build_ode(
+            abc_builder(name="ABC Model with Units", bin_unit="item", units=DAILY),
+            settings=None,
+        )
 
         output = _printed(model, capsys, format="latex")
 
@@ -165,7 +166,7 @@ class TestUnits:
 
     def test_print_equations_compact_with_different_bin_units(self, capsys) -> None:
         model = build(
-            ModelBuilder(name="Mole Units", version="1.0", bin_unit="mol")
+            FactoryBuilder(name="Mole Units", version="1.0", bin_unit="mol")
             .add_bin(id="A", name="A")
             .add_bin(id="B", name="B")
             .add_bin(id="C", name="C")
@@ -175,13 +176,8 @@ class TestUnits:
                 id="forward", source=["A", "B"], target=["C", "C"], rate="k1 * A * B"
             )
             .add_transition(id="backward", source=["C"], target=["A"], rate="k2 * C")
-            .set_initial_conditions(
-                total=100,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 0.4},
-                    {"bin": "B", "fraction": 0.4},
-                    {"bin": "C", "fraction": 0.2},
-                ],
+            .set_structure(
+                Aggregate(total=100, bin_fractions={"A": 0.4, "B": 0.4, "C": 0.2})
             )
         )
 

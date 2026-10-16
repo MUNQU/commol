@@ -369,7 +369,9 @@ class SimulationPlotter:
             return self.simulation.outputs_for(series_id)
         except KeyError:
             sources = sorted(
-                self.simulation.model_definition.structure.outputs_by_source()
+                self.simulation.model_definition.structure.outputs_by_source(
+                    self.simulation.model_definition
+                )
             )
             raise ValueError(
                 f"'{series_id}' is neither an output nor a bin or accumulator id. "
@@ -671,7 +673,8 @@ class SimulationPlotter:
                 legend=show_legend,
             )
 
-        label = self.simulation.model_definition.structure.series_label(bin_id)
+        model = self.simulation.model_definition
+        label = model.structure.series_label(model, bin_id)
         unit_str = label.unit or ""
         bin_name = label.name
 
@@ -825,7 +828,8 @@ class SimulationPlotter:
                 legend=show_legend,
             )
 
-        label = self.simulation.model_definition.structure.series_label(bin_id)
+        model = self.simulation.model_definition
+        label = model.structure.series_label(model, bin_id)
         unit_str = label.unit or ""
         bin_name = label.name
 
@@ -911,7 +915,8 @@ class SimulationPlotter:
                 zorder=5,
             )
 
-        label = self.simulation.model_definition.structure.series_label(bin_id)
+        model = self.simulation.model_definition
+        label = model.structure.series_label(model, bin_id)
         unit_str = label.unit or ""
         bin_name = label.name
 
@@ -1009,7 +1014,8 @@ class SimulationPlotter:
                 zorder=5,
             )
 
-        label = self.simulation.model_definition.structure.series_label(bin_id)
+        model = self.simulation.model_definition
+        label = model.structure.series_label(model, bin_id)
         unit_str = label.unit or ""
         bin_name = label.name
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from commol.context.model import Model
-from tests.support import build, abcd_builder, abc_builder
+from tests.support import build, build_ode, abcd_builder, abc_builder
 
 
 def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
@@ -200,7 +200,7 @@ class TestLatex:
         assert "$A \\to B: \\frac{\\alpha \\cdot A \\cdot B}{total}$" in output
 
     def test_print_equations_latex_to_file(self, tmp_path: Path) -> None:
-        model = abc_builder(name="ABC Model").build(engine="DifferentialEquations")
+        model = build_ode(abc_builder(name="ABC Model"), settings=None)
         output_file = tmp_path / "equations_latex.txt"
 
         model.print_equations(output_file=str(output_file), format="latex")

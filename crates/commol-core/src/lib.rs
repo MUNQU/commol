@@ -14,7 +14,8 @@
 //! - [`SimulationEngine`]: Trait for implementing simulation engines
 //! - [`Model`]: Complete model definition: its header, engine and structure
 //! - [`EngineType`]: The list of engines a model can name
-//! - [`types`]: All data structures for defining compartment models
+//! - [`types`]: All data structures for defining a model: its process and
+//!   its structure
 
 #![warn(missing_docs)]
 
@@ -36,11 +37,10 @@ pub use simulation_engine::{
 
 // Re-export all public types from the types module for convenient access
 pub use types::{
-    Accumulator, Bin, BinFraction, CompartmentFraction, CompartmentalStructure, EngineSettings,
-    EngineType, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure, ModelValueType,
-    OdeMethod, OdeSolver, Parameter, ParameterValue, RateMeaning, SeriesMode, Stratification,
-    StratificationCondition, StratificationFraction, StratificationFractions, StratifiedRate,
-    Transition,
+    Accumulator, Aggregate, AggregateVariant, Bin, EngineSettings, EngineType, InitialConditions,
+    Model, ModelEngine, ModelKind, ModelStructure, ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX,
+    Neighbors, OdeMethod, OdeSolver, Parameter, ParameterValue, Process, RateMeaning, SeriesMode,
+    Stratification, StratificationCondition, StratifiedRate, Transition,
 };
 #[cfg(feature = "test-kind")]
 pub use types::{DecayOutput, TestStructure};

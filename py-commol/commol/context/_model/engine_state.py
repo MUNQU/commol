@@ -1,4 +1,4 @@
-"""The engine of a model, and what it says about a compartmental structure.
+"""The engine of a model, and what it says about an aggregate model.
 
 The engine is the single source of truth for how bins expand over
 stratifications, how fractions become amounts, how per-compartment
@@ -23,16 +23,18 @@ if TYPE_CHECKING:
         CalibrationParameterTypeProtocol,
         EngineProtocol,
         ObservedDataPointProtocol,
-        RustCompartmentalStructureProtocol,
+        RustAggregateProtocol,
         RustModelProtocol,
+        RustProcessProtocol,
     )
     from commol.context.calibration import (
         CalibrationConstraint,
         CalibrationParameter,
         ObservedDataPoint,
     )
-    from commol.context.compartmental import CompartmentalStructure
+    from commol.context.aggregate import Aggregate
     from commol.context.model import Model
+    from commol.context.process import Process
 
 
 class InitialCompartment(NamedTuple):
@@ -82,10 +84,12 @@ def _rust_model(model: "Model") -> "RustModelProtocol":
     return commol_rs.core.Model.from_json(model.model_dump_json())
 
 
-def _rust_structure(
-    structure: "CompartmentalStructure",
-) -> "RustCompartmentalStructureProtocol":
-    return commol_rs.core.CompartmentalStructure.from_json(structure.model_dump_json())
+def _rust_process(process: "Process") -> "RustProcessProtocol":
+    return commol_rs.core.Process.from_json(process.model_dump_json())
+
+
+def _rust_structure(structure: "Aggregate") -> "RustAggregateProtocol":
+    return commol_rs.core.Aggregate.from_json(structure.model_dump_json())
 
 
 def build_engine(model: "Model | str") -> "EngineProtocol":
@@ -111,14 +115,18 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
     return commol_rs.engine.Engine(commol_rs.core.Model.from_json(model_json))
 
 
-def initial_state(structure: "CompartmentalStructure") -> list[InitialCompartment]:
+def initial_state(
+    process: "Process", structure: "Aggregate"
+) -> list[InitialCompartment]:
     """
-    Expand a structure into its compartments and their initial amounts.
+    Expand a process into its compartments and their initial amounts.
 
     Parameters
     ----------
-    structure : CompartmentalStructure
-        The structure of a compartmental model.
+    process : Process
+        The process of the model.
+    structure : Aggregate
+        The aggregate structure, which says how much starts where.
 
     Returns
     -------
@@ -135,21 +143,21 @@ def initial_state(structure: "CompartmentalStructure") -> list[InitialCompartmen
     return [
         InitialCompartment(name, bin_id, dict(categories), amount)
         for name, bin_id, categories, amount in commol_rs.model.initial_state(
-            _rust_structure(structure)
+            _rust_process(process), _rust_structure(structure)
         )
     ]
 
 
 def expanded_outputs(
-    structure: "CompartmentalStructure",
+    process: "Process",
 ) -> tuple[list[ExpandedOutput], list[ExpandedOutput]]:
     """
-    Expand the bins and accumulators of a structure over its stratifications.
+    Expand the bins and accumulators of a process over its stratifications.
 
     Parameters
     ----------
-    structure : CompartmentalStructure
-        The structure of a compartmental model.
+    process : Process
+        The process of the model.
 
     Returns
     -------
@@ -157,7 +165,7 @@ def expanded_outputs(
         The expanded compartments and accumulator outputs, in engine order.
     """
     compartments, accumulators = commol_rs.model.expanded_outputs(
-        _rust_structure(structure)
+        _rust_process(process)
     )
     return (
         [
@@ -205,14 +213,19 @@ class TransitionFlow(NamedTuple):
         return f"{self.rate} * {self.proportional_to}"
 
 
-def transition_flows(structure: "CompartmentalStructure") -> list[TransitionFlow]:
+def transition_flows(
+    process: "Process", structure: "Aggregate"
+) -> list[TransitionFlow]:
     """
-    Every transition flow of a structure, exactly as the engine simulates it.
+    Every transition flow of a process, exactly as the engine simulates it.
 
     Parameters
     ----------
-    structure : CompartmentalStructure
-        The structure of a compartmental model, whatever its engine.
+    process : Process
+        The process of the model.
+    structure : Aggregate
+        The aggregate structure, whose neighbors resolve ``neighbors_<bin>``
+        and ``neighbors``, whatever the engine of the model.
 
     Returns
     -------
@@ -222,12 +235,15 @@ def transition_flows(structure: "CompartmentalStructure") -> list[TransitionFlow
     Raises
     ------
     ValueError
-        If a transition mixes bins and categories, or a category transition
-        has no source or no target.
+        If a transition mixes bins and categories, a category transition has
+        no source or no target, or a rate reads the neighbors and the
+        structure has none.
     """
     return [
         TransitionFlow(*flow)
-        for flow in commol_rs.model.transition_flows(_rust_structure(structure))
+        for flow in commol_rs.model.transition_flows(
+            _rust_process(process), _rust_structure(structure)
+        )
     ]
 
 
@@ -395,7 +411,7 @@ class CalibratedInitialState(NamedTuple):
     covered: list[str]
 
 
-def calibrated_initial_state[S: "CompartmentalStructure"](
+def calibrated_initial_state[S: "Aggregate"](
     model: "Model[S]",
     parameters: Sequence["CalibrationParameter"],
     values: Sequence[float],
@@ -411,7 +427,7 @@ def calibrated_initial_state[S: "CompartmentalStructure"](
 
     Parameters
     ----------
-    model : Model[CompartmentalStructure]
+    model : Model[Aggregate]
         The model definition the calibration problem was built on.
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
@@ -445,40 +461,46 @@ def calibrated_initial_state[S: "CompartmentalStructure"](
     )
 
 
-def check_names(model: "Model") -> None:
+def check_model(model: "Model") -> None:
     """
-    Check the names a model uses against the names the engine provides.
+    Check an aggregate model in the engine.
+
+    The engine checks the variant and the neighbors of the structure, the
+    variables the rates read, and the names the model uses against the names
+    the engine provides.
 
     Parameters
     ----------
     model : Model
-        A compartmental model.
+        An aggregate model.
 
     Raises
     ------
     ValueError
-        If a parameter id is an expanded compartment or a subgroup total,
-        or a rate or formula parameter uses a ``total_…`` name that is not a
-        subgroup total of the model.
+        If the variant or the neighbors do not fit the process, a parameter
+        id is an expanded compartment, a subgroup total or a name of the
+        neighbors, a rate or formula parameter uses a ``total_…`` name that
+        is not a subgroup total of the model, or a rate reads neighbors the
+        model cannot resolve.
     """
-    commol_rs.model.check_names(_rust_model(model))
+    commol_rs.model.check_model(_rust_model(model))
 
 
-def subgroup_total_names(structure: "CompartmentalStructure") -> list[str]:
+def subgroup_total_names(process: "Process") -> list[str]:
     """
-    Names of the subgroup totals a rate of a structure may read.
+    Names of the subgroup totals a rate of a process may read.
 
     They are the ``total_<categories>`` names, the bin totals and the partial
     bin totals, as the engine provides them.
 
     Parameters
     ----------
-    structure : CompartmentalStructure
-        The structure of a compartmental model.
+    process : Process
+        The process of the model.
 
     Returns
     -------
     list[str]
-        The names, sorted. A structure without stratifications has none.
+        The names, sorted. A process without stratifications has none.
     """
-    return commol_rs.model.subgroup_total_names(_rust_structure(structure))
+    return commol_rs.model.subgroup_total_names(_rust_process(process))

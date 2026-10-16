@@ -13,14 +13,11 @@ fn decay_model(engine: &str) -> Model {
     let json = format!(
         r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],
         "engine":{{"type":"{engine}"}},
-        "structure":{{"kind":"compartmental",
-        "bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
         "accumulators":[],"stratifications":[],
         "transitions":[{{"id":"ab","source":["A"],
-        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}],
-        "initial_conditions":{{"total":1000,"bin_fractions":[
-        {{"bin":"A","fraction":1.0}},{{"bin":"B","fraction":0.0}}],
-        "stratification_fractions":[]}}}}}}"#
+        "target":["B"],"rate":"k","stratified_rates":null,"per_compartment":null}}]}},
+        "structure":{{"kind":"aggregate","total":1000,"bin_fractions":{{"A":1.0,"B":0.0}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }

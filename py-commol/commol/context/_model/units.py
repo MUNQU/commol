@@ -105,7 +105,7 @@ class UnitChecker:
                 f"to allow automatic unit inference."
             )
 
-        bins_without_unit = [b.id for b in self._model.structure.bins if not b.unit]
+        bins_without_unit = [b.id for b in self._model.process.bins if not b.unit]
         if bins_without_unit:
             raise UnitConsistencyError(
                 f"Cannot perform unit consistency check. The following bins have "
@@ -117,7 +117,7 @@ class UnitChecker:
         """Collect unit consistency errors from all transitions."""
         errors: list[str] = []
 
-        for transition in self._model.structure.transitions:
+        for transition in self._model.process.transitions:
             if transition.rate:
                 is_consistent, error_msg = self._check_transition_rate_units(
                     transition.rate,
@@ -184,7 +184,7 @@ class UnitChecker:
 
         bin_unit = self._get_transition_bin_unit(transition_id)
         if not bin_unit:
-            bin_unit = self._model.structure.bins[0].unit
+            bin_unit = self._model.process.bins[0].unit
 
         expected_unit = (
             str(bin_unit) if is_impulse else f"{bin_unit}/{self._step_unit()}"
@@ -204,12 +204,12 @@ class UnitChecker:
 
     def _get_transition_bin_unit(self, transition_id: str) -> str | None:
         """Get the bin unit for a specific transition."""
-        for transition in self._model.structure.transitions:
+        for transition in self._model.process.transitions:
             if transition.id == transition_id:
                 bin_ids = transition.source + transition.target
 
                 for bin_id in bin_ids:
-                    for bin_obj in self._model.structure.bins:
+                    for bin_obj in self._model.process.bins:
                         if bin_obj.id == bin_id and bin_obj.unit:
                             return bin_obj.unit
                 break

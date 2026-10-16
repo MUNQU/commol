@@ -9,31 +9,24 @@ from commol.context._model.engine_state import (
     initial_state,
 )
 from commol.context.constants import CalibrationParameterType
-from commol.context.initial_conditions import CATEGORY_SEPARATOR, InitialConditions
+from commol.context.initial_conditions import CATEGORY_SEPARATOR
 
 if TYPE_CHECKING:
+    from commol.context.aggregate import Aggregate
     from commol.context.calibration import CalibrationProblem
-    from commol.context.compartmental import CompartmentalStructure
     from commol.context.model import Model
 
 # Relative tolerance under which a rebuilt amount matches the scored one.
 _MATCH_TOLERANCE = 1e-9
 
 
-def with_initial_conditions(
-    structure: "CompartmentalStructure", initial_conditions: InitialConditions
-) -> "CompartmentalStructure":
-    """Shallow copy of a structure that holds other initial conditions."""
-    return structure.model_copy(update={"initial_conditions": initial_conditions})
-
-
-def calibrated_initial_conditions[S: "CompartmentalStructure"](
+def calibrated_structure[S: "Aggregate"](
     model: "Model[S]",
     problem: "CalibrationProblem",
     values: Mapping[str, float],
-) -> InitialConditions:
+) -> S:
     """
-    Initial conditions that rebuild the state the engine scored.
+    An aggregate structure that rebuilds the state the engine scored.
 
     The engine computes the calibrated initial state. The declared
     fractions are first updated so the definition stays readable: each
@@ -46,7 +39,7 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
 
     Parameters
     ----------
-    model : Model[CompartmentalStructure]
+    model : Model[Aggregate]
         The model the calibration problem was built on. It is not modified.
     problem : CalibrationProblem
         The calibration problem, for its parameters and remainder.
@@ -55,8 +48,9 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
 
     Returns
     -------
-    InitialConditions
-        A new initial-conditions block.
+    Aggregate
+        A copy of the structure of the model with the calibrated initial
+        conditions.
 
     Raises
     ------
@@ -65,7 +59,7 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
         or the initial amounts exceed the total.
     """
     structure = model.structure
-    current = structure.initial_conditions
+    process = model.process
     parameters = [
         param
         for param in problem.parameters
@@ -73,7 +67,7 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
         and param.id in values
     ]
     if not parameters:
-        return current.model_copy(deep=True)
+        return structure.model_copy(deep=True)
 
     scored = calibrated_initial_state(
         model,
@@ -83,17 +77,17 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
     )
 
     candidate = _declared_fraction_update(
-        structure, scored.values, scored.state, scored.covered
+        model, scored.values, scored.state, scored.covered
     )
     try:
-        rebuilt = initial_state(with_initial_conditions(structure, candidate))
+        rebuilt = initial_state(process, candidate)
     except ValueError:
         # The declared updates combined with the existing overrides do not
         # build; pin the scored state on the current definition instead.
-        candidate = current.model_copy(deep=True)
-        rebuilt = initial_state(with_initial_conditions(structure, candidate))
+        candidate = structure.model_copy(deep=True)
+        rebuilt = initial_state(process, candidate)
 
-    total = current.total
+    total = structure.total
     target = scored.state
     pins = {
         compartment.name: min(1.0, max(0.0, target[compartment.name] / total))
@@ -106,29 +100,29 @@ def calibrated_initial_conditions[S: "CompartmentalStructure"](
         )
     }
     if pins:
-        candidate.update_compartment_fractions(pins)
+        candidate._upsert_compartment_fractions(pins)
     return candidate
 
 
-def _declared_fraction_update(
-    structure: "CompartmentalStructure",
+def _declared_fraction_update[S: "Aggregate"](
+    model: "Model[S]",
     applied: Mapping[str, float],
     scored: Mapping[str, float],
     covered: Sequence[str],
-) -> InitialConditions:
+) -> S:
     """
-    Copy of the initial conditions with bin and category values written back.
+    Copy of the structure with bin and category values written back.
 
     Every bin a calibrated value or the remainder covers takes the share of the
     total the engine gave it; every calibrated category takes the split
     the engine applied. A group of updates that the definition rejects is
     skipped; the pins that follow cover the compartments it would have set.
     """
-    candidate = structure.initial_conditions.model_copy(deep=True)
+    candidate = model.structure.model_copy(deep=True)
     total = candidate.total
-    bin_ids = {bin_item.id for bin_item in structure.bins}
+    bin_ids = {bin_item.id for bin_item in model.process.bins}
     categories = candidate.get_categories_with_fractions()
-    state = initial_state(structure)
+    state = initial_state(model.process, model.structure)
 
     bin_totals: dict[str, float] = {}
     for compartment in state:

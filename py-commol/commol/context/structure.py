@@ -1,10 +1,15 @@
-"""The part of a model that depends on its kind, and what every kind gives.
+"""How the process of a model is laid out, and what every kind gives.
 
-A `Model` holds a name, parameters, a step unit, an engine and one
-`ModelStructure`. The generic layers (simulation, calibration, ensembles,
-reports, plots) use only `Model` and the methods of `ModelStructure`, so a new
-kind of model is a new subclass with its engines in the engine's list
-(``commol_rs.engine.EngineType``).
+A `Model` holds a header, a `Process` written once, an engine and one
+`ModelStructure`, which changes between kinds of model. The generic layers
+(simulation, calibration, ensembles, reports, plots) use only `Model` and the
+methods of `ModelStructure`, so a new kind of model is a new subclass with its
+engines in the engine's list (``commol_rs.engine.EngineType``).
+
+A structure may have variants: a subclass that keeps the kind, the fields
+and the engines of its structure, narrows the constructor and may add checks.
+Its ``variant`` is a ``Literal`` default; the registry holds one class per
+``(kind, variant)``, so a model loads back as the class it was saved with.
 """
 
 import inspect
@@ -49,64 +54,86 @@ class SeriesLabel(NamedTuple):
 
 class ModelStructure(BaseModel, ABC):
     """
-    The part of a model that depends on its kind.
+    How the process of a model is laid out: the part that depends on its kind.
 
     Each kind subclasses it and sets ``kind`` to a ``Literal`` default, its
-    name in the engine's list of kinds. A subclass that does not implement an
-    abstract method cannot be made: the error names the method.
+    name in the engine's list of kinds. A variant subclasses the structure of
+    its kind and sets ``variant`` to a ``Literal`` default. A subclass that
+    does not implement an abstract method cannot be made: the error names
+    the method.
 
     Attributes
     ----------
     kind : str
         Name of the model kind, the tag of the structure in JSON.
+    variant : str | None
+        Name of the variant, or None for the structure of the kind itself.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     kind: str
+    variant: str | None = None
 
-    _kinds: ClassVar[dict[str, type["ModelStructure"]]] = {}
+    _kinds: ClassVar[dict[tuple[str, str | None], type["ModelStructure"]]] = {}
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: object) -> None:
-        """Register a concrete subclass under its ``kind``."""
+        """Register a concrete subclass under its ``kind`` and ``variant``."""
         super().__pydantic_init_subclass__(**kwargs)
         kind = cls.model_fields["kind"].default
+        variant = cls.model_fields["variant"].default
         if inspect.isabstract(cls) or not isinstance(kind, str):
             return
-        known = ModelStructure._kinds.get(kind)
+        key = (kind, variant)
+        known = ModelStructure._kinds.get(key)
         if known is not None and known.__qualname__ != cls.__qualname__:
             raise TypeError(
-                f"Model kind '{kind}' is already the kind of {known.__qualname__}"
+                f"Model kind '{kind}' with variant {variant!r} is already the "
+                f"structure of {known.__qualname__}"
             )
-        ModelStructure._kinds[kind] = cls
+        if variant is not None and (kind, None) not in ModelStructure._kinds:
+            raise TypeError(
+                f"The variant {variant!r} of {cls.__qualname__} needs the "
+                f"structure of its kind '{kind}' first"
+            )
+        ModelStructure._kinds[key] = cls
 
     @classmethod
-    def of_kind(cls, kind: str) -> type["ModelStructure"]:
+    def of_kind(cls, kind: str, variant: str | None = None) -> type["ModelStructure"]:
         """
-        The structure class of a model kind.
+        The structure class of a model kind, or of one of its variants.
 
         Parameters
         ----------
         kind : str
-            Name of the kind, such as ``"compartmental"``.
+            Name of the kind, such as ``"aggregate"``.
+        variant : str | None, default=None
+            Name of a variant of the kind, or None for the kind itself.
 
         Returns
         -------
         type[ModelStructure]
-            The subclass registered for it.
+            The subclass registered for them.
 
         Raises
         ------
         ValueError
-            If no structure class has that kind.
+            If no structure class has that kind and variant.
         """
-        structure = cls._kinds.get(kind)
-        if structure is None:
-            raise ValueError(
-                f"Unknown model kind '{kind}'. Known kinds: {sorted(cls._kinds)}"
-            )
-        return structure
+        structure = cls._kinds.get((kind, variant))
+        if structure is not None:
+            return structure
+        kinds = sorted({known for known, _ in cls._kinds})
+        if kind not in kinds:
+            raise ValueError(f"Unknown model kind '{kind}'. Known kinds: {kinds}")
+        variants = sorted(
+            known for known_kind, known in cls._kinds if known_kind == kind and known
+        )
+        raise ValueError(
+            f"Unknown variant {variant!r} of the {kind} kind. Known variants: "
+            f"{variants}"
+        )
 
     @abstractmethod
     def check_model(self, model: "Model[Self]") -> None:
@@ -128,11 +155,16 @@ class ModelStructure(BaseModel, ABC):
         """
 
     @abstractmethod
-    def outputs_by_source(self) -> dict[str, list[str]]:
+    def outputs_by_source(self, model: "Model[Self]") -> dict[str, list[str]]:
         """
         The output names of the model, grouped by the id they come from.
 
         Reports and plots name a group of outputs by this id and sum them.
+
+        Parameters
+        ----------
+        model : Model
+            The model that holds this structure.
 
         Returns
         -------
@@ -140,12 +172,18 @@ class ModelStructure(BaseModel, ABC):
             Each id mapped to its output names, in engine order.
         """
 
-    def series_label(self, series_id: str) -> SeriesLabel:
+    def series_label(
+        self,
+        model: "Model[Self]",  # noqa: ARG002
+        series_id: str,
+    ) -> SeriesLabel:
         """
         How a plot names a series and its unit.
 
         Parameters
         ----------
+        model : Model
+            The model that holds this structure.
         series_id : str
             An output name or an id of `outputs_by_source`.
 
@@ -166,7 +204,7 @@ class ModelStructure(BaseModel, ABC):
         Returns
         -------
         frozenset[CalibrationParameterType]
-            For example ``{"initial_condition"}`` for a compartmental model.
+            For example ``{"initial_condition"}`` for an aggregate model.
         """
         return frozenset(
             CalibrationParameterType(name)

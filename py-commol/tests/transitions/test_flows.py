@@ -5,10 +5,16 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from commol import ModelBuilder
+from commol import Aggregate, ModelBuilder
 from commol.context._model.engine_state import transition_flows
 from commol.context.model import Model
-from tests.support import a_to_b_builder, assert_total_conserved, build, run
+from tests.support import (
+    FactoryBuilder,
+    a_to_b_builder,
+    assert_total_conserved,
+    build,
+    run,
+)
 
 
 def _group_model() -> Model:
@@ -36,7 +42,9 @@ class TestCategoryTransitions:
     def test_printed_flows_are_the_simulated_ones(self) -> None:
         flows = {
             (flow.transition, flow.source, flow.target, flow.term)
-            for flow in transition_flows(_group_model().structure)
+            for flow in transition_flows(
+                _group_model().process, _group_model().structure
+            )
         }
 
         assert ("move", "A_g1", "A_g2", "a * A_g1") in flows
@@ -46,19 +54,18 @@ class TestCategoryTransitions:
 class TestBinsSharingAPrefix:
     def test_a_transition_moves_only_its_own_bin(self) -> None:
         model = build(
-            ModelBuilder(name="Prefix", version="1.0")
+            FactoryBuilder(name="Prefix", version="1.0")
             .add_bin(id="A", name="A")
             .add_bin(id="AB", name="AB")
             .add_bin(id="B", name="B")
             .add_bin(id="BB", name="BB")
             .add_parameter(id="k", value=0.5)
             .add_transition(id="t", source=["A"], target=["B"], rate="k")
-            .set_initial_conditions(
-                total=1000,
-                bin_fractions=[
-                    {"bin": bin_id, "fraction": 0.25}
-                    for bin_id in ("A", "AB", "B", "BB")
-                ],
+            .set_structure(
+                Aggregate(
+                    total=1000,
+                    bin_fractions={bin_id: 0.25 for bin_id in ("A", "AB", "B", "BB")},
+                )
             )
         )
 
@@ -73,7 +80,7 @@ class TestBinsSharingAPrefix:
 class TestSeveralSourcesAndTargets:
     def test_every_source_loses_and_every_target_gains_the_flow(self) -> None:
         model = build(
-            ModelBuilder(name="Merge", version="1.0")
+            FactoryBuilder(name="Merge", version="1.0")
             .add_bin(id="A", name="A")
             .add_bin(id="B", name="B")
             .add_bin(id="C", name="C")
@@ -81,13 +88,8 @@ class TestSeveralSourcesAndTargets:
             .add_transition(
                 id="forward", source=["A", "B"], target=["C", "C"], rate="k * A * B"
             )
-            .set_initial_conditions(
-                total=100,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 0.5},
-                    {"bin": "B", "fraction": 0.5},
-                    {"bin": "C", "fraction": 0.0},
-                ],
+            .set_structure(
+                Aggregate(total=100, bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0})
             )
         )
 
@@ -101,7 +103,7 @@ class TestSeveralSourcesAndTargets:
 
 class TestNoTransitionConditions:
     def test_add_transition_has_no_condition_argument(self) -> None:
-        builder = ModelBuilder(name="No condition").add_bin(id="A", name="A")
+        builder = FactoryBuilder(name="No condition").add_bin(id="A", name="A")
 
         with pytest.raises(TypeError, match="condition"):
             builder.add_transition(  # type: ignore[call-arg]
@@ -114,7 +116,7 @@ class TestNoTransitionConditions:
     def test_a_model_file_with_a_condition_key_names_it(self, tmp_path) -> None:
         model = _group_model()
         data = model.model_dump(mode="json")
-        data["structure"]["transitions"][0]["condition"] = {
+        data["process"]["transitions"][0]["condition"] = {
             "logic": "and",
             "rules": [{"variable": "state:A", "operator": "gt", "value": 0}],
         }

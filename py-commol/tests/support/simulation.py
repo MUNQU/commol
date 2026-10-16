@@ -1,19 +1,19 @@
 """Run a model in one call."""
 
-from commol import CompartmentalStructure, ModelBuilder, Simulation
+from commol import Aggregate, Simulation
 from commol.context.model import Model
 
-from .models import build
+from .models import FactoryBuilder, build
 
 
-def run(model: Model | ModelBuilder, steps: int) -> dict[str, list[float]]:
+def run(model: Model | FactoryBuilder, steps: int) -> dict[str, list[float]]:
     """Simulate ``steps`` steps; a builder is built first."""
-    if isinstance(model, ModelBuilder):
+    if isinstance(model, FactoryBuilder):
         model = build(model)
     return Simulation(model).run(steps)
 
 
-def initial_state(model: Model[CompartmentalStructure]) -> dict[str, float]:
+def initial_state(model: Model[Aggregate]) -> dict[str, float]:
     """The amount of each compartment the engine starts from."""
     engine = Simulation(model).engine
     return dict(zip(engine.compartments, engine.state, strict=True))

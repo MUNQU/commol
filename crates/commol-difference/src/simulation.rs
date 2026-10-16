@@ -400,8 +400,8 @@ impl CompartmentalEngine for DifferenceEquations {
 mod tests {
     use super::*;
     use commol_core::{
-        Bin, BinFraction, CompartmentalStructure, EngineType, InitialConditions, Model,
-        ModelEngine, ModelStructure, RateMathExpression, SimulationEngine, Transition,
+        Aggregate, Bin, EngineType, InitialConditions, Model, ModelEngine, ModelStructure, Process,
+        RateMathExpression, SimulationEngine, Transition,
     };
 
     /// One difference step is exactly `state + derivatives(n, state)`.
@@ -434,7 +434,7 @@ mod tests {
             description: None,
             version: None,
             parameters: vec![],
-            structure: ModelStructure::Compartmental(CompartmentalStructure {
+            process: Process {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -460,21 +460,18 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
+            },
+            structure: ModelStructure::Aggregate(Aggregate {
+                variant: None,
                 initial_conditions: InitialConditions {
                     total: 1000.0,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(1.0),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
+                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
+                        .into_iter()
+                        .collect(),
+                    stratification_fractions: Default::default(),
+                    compartment_fractions: Default::default(),
                 },
+                neighbors: None,
             }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
@@ -486,7 +483,7 @@ mod tests {
             description: None,
             version: None,
             parameters: vec![],
-            structure: ModelStructure::Compartmental(CompartmentalStructure {
+            process: Process {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -510,21 +507,18 @@ mod tests {
                     impulse_at: None,
                     impulse_every: None,
                 }],
+            },
+            structure: ModelStructure::Aggregate(Aggregate {
+                variant: None,
                 initial_conditions: InitialConditions {
                     total: 1000.0,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(1.0),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
+                    bin_fractions: [("A".to_string(), Some(1.0)), ("B".to_string(), Some(0.0))]
+                        .into_iter()
+                        .collect(),
+                    stratification_fractions: Default::default(),
+                    compartment_fractions: Default::default(),
                 },
+                neighbors: None,
             }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
@@ -613,7 +607,7 @@ mod tests {
                     description: None,
                 },
             ],
-            structure: ModelStructure::Compartmental(CompartmentalStructure {
+            process: Process {
                 bins: vec![
                     Bin {
                         id: "A".to_string(),
@@ -656,25 +650,22 @@ mod tests {
                         impulse_every: None,
                     },
                 ],
+            },
+            structure: ModelStructure::Aggregate(Aggregate {
+                variant: None,
                 initial_conditions: InitialConditions {
                     total: 1000.0,
-                    bin_fractions: vec![
-                        BinFraction {
-                            bin: "A".to_string(),
-                            fraction: Some(0.99),
-                        },
-                        BinFraction {
-                            bin: "B".to_string(),
-                            fraction: Some(0.01),
-                        },
-                        BinFraction {
-                            bin: "C".to_string(),
-                            fraction: Some(0.0),
-                        },
-                    ],
-                    stratification_fractions: vec![],
-                    compartment_fractions: vec![],
+                    bin_fractions: [
+                        ("A".to_string(), Some(0.99)),
+                        ("B".to_string(), Some(0.01)),
+                        ("C".to_string(), Some(0.0)),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    stratification_fractions: Default::default(),
+                    compartment_fractions: Default::default(),
                 },
+                neighbors: None,
             }),
             engine: ModelEngine::new(EngineType::DifferenceEquations),
         }
@@ -719,7 +710,7 @@ mod tests {
 
     fn ab_model_with_rate(rate: &str) -> Model {
         let mut model = make_three_bin_model();
-        model.compartmental_mut().unwrap().transitions = vec![Transition {
+        model.process.transitions = vec![Transition {
             id: "a_to_b".to_string(),
             source: vec!["A".to_string()],
             target: vec!["B".to_string()],
@@ -758,7 +749,7 @@ mod tests {
     /// The three-bin model (`A` = 990, `B` = 10, `C` = 0) with `transitions`.
     fn three_bins_with(transitions: Vec<Transition>) -> Model {
         let mut model = make_three_bin_model();
-        model.compartmental_mut().unwrap().transitions = transitions;
+        model.process.transitions = transitions;
         model
     }
 
@@ -853,7 +844,7 @@ mod tests {
             accumulators: vec!["moved".to_string()],
             ..transition("a_to_b", "A", "B", "-0.001", &[])
         }]);
-        model.compartmental_mut().unwrap().accumulators = vec![commol_core::Accumulator {
+        model.process.accumulators = vec![commol_core::Accumulator {
             id: "moved".to_string(),
             name: "Moved".to_string(),
         }];

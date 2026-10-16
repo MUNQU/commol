@@ -5,10 +5,17 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import AxisUnits, ModelBuilder, Simulation
+from commol import Aggregate, AxisUnits, Simulation
 from commol.utils.equations import UnitConsistencyError
 
-from tests.support import TIGHT, a_to_b_builder, assert_close, build, build_ode
+from tests.support import (
+    FactoryBuilder,
+    TIGHT,
+    a_to_b_builder,
+    assert_close,
+    build,
+    build_ode,
+)
 
 
 class TestSteps:
@@ -55,17 +62,11 @@ class TestSteps:
 
 class TestModelAxisUnits:
     def test_a_model_gives_its_step_unit_and_engine(self) -> None:
-        builder = ModelBuilder(name="Daily", step_unit="day")
+        builder = FactoryBuilder(name="Daily", step_unit="day")
         builder.add_bin(id="A", name="A")
         builder.add_bin(id="B", name="B")
         builder.add_transition(id="ab", source=["A"], target=["B"], rate=0.1)
-        builder.set_initial_conditions(
-            total=1,
-            bin_fractions=[
-                {"bin": "A", "fraction": 1.0},
-                {"bin": "B", "fraction": 0.0},
-            ],
-        )
+        builder.set_structure(Aggregate(total=1, bin_fractions={"A": 1.0, "B": 0.0}))
 
         units = build_ode(builder).axis_units()
 
@@ -138,7 +139,7 @@ def _outflow(units: AxisUnits, rate: float):
     builder = a_to_b_builder(parameters={"k": rate})
     if units.engine == "DifferenceEquations":
         return build(builder)
-    return builder.build(engine="DifferentialEquations", settings=TIGHT)
+    return build_ode(builder, TIGHT)
 
 
 class TestRatesMoveTheBinInBothEngines:

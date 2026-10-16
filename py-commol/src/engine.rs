@@ -49,8 +49,8 @@ pub enum Engine {
 /// The values of the model kind of an [`Engine`], resolved by it.
 #[derive(Clone, Debug)]
 pub enum EngineValuePlan {
-    /// Initial conditions of a compartmental model.
-    Compartmental(InitialConditionPlan),
+    /// Initial conditions of an aggregate model.
+    Aggregate(InitialConditionPlan),
     /// The test model kind has none.
     #[cfg(feature = "test-kind")]
     Test(TestValuePlan),
@@ -59,7 +59,7 @@ pub enum EngineValuePlan {
 impl ValuePlan for EngineValuePlan {
     fn infeasibility(&self, excess: f64) -> String {
         match self {
-            Self::Compartmental(plan) => plan.infeasibility(excess),
+            Self::Aggregate(plan) => plan.infeasibility(excess),
             #[cfg(feature = "test-kind")]
             Self::Test(plan) => plan.infeasibility(excess),
         }
@@ -67,23 +67,41 @@ impl ValuePlan for EngineValuePlan {
 }
 
 impl Engine {
-    /// Build the engine the model names.
+    /// Build the engine the model names, for the kind of its structure.
+    ///
+    /// An engine names a method; the implementation is picked by the pair
+    /// of the engine and the kind of the structure.
     ///
     /// # Errors
     ///
     /// Returns a message when the engine does not run the kind of the model
-    /// (it names the engine and both kinds), or cannot compile the model.
+    /// (it names the engine, both kinds and the engines of the kind of the
+    /// model), or cannot compile the model.
     pub fn build(model: &commol_core::Model) -> Result<Self, String> {
         model.check_kind()?;
-        match model.engine.engine_type() {
-            EngineType::DifferenceEquations => {
+        match (model.engine.engine_type(), model.structure.kind()) {
+            (EngineType::DifferenceEquations, ModelKind::Aggregate) => {
                 DifferenceEquations::try_from_model(model).map(Self::Difference)
             }
-            EngineType::DifferentialEquations => {
+            (EngineType::DifferentialEquations, ModelKind::Aggregate) => {
                 DifferentialEquations::try_from_model(model).map(Self::Differential)
             }
             #[cfg(feature = "test-kind")]
-            EngineType::TestEngine => TestEngine::try_from_model(model).map(Self::Test),
+            (EngineType::TestEngine, ModelKind::Test) => {
+                TestEngine::try_from_model(model).map(Self::Test)
+            }
+            #[allow(unreachable_patterns)]
+            (engine, kind) => Err(format!(
+                "The {} engine has no implementation for {} models; the engines of {} \
+                 models are {:?}",
+                engine.name(),
+                kind.name(),
+                kind.name(),
+                EngineType::engines_of(kind)
+                    .into_iter()
+                    .map(EngineType::name)
+                    .collect::<Vec<_>>()
+            )),
         }
     }
 
@@ -111,7 +129,7 @@ macro_rules! dispatch {
 }
 
 /// Call `$body` with `$engine` bound to the compartmental engine inside an
-/// [`Engine`], or return an error that names the kind of the engine.
+/// [`Engine`], or return an error that names the engine.
 macro_rules! compartmental {
     ($self:expr, $engine:ident => $body:expr) => {
         match $self {
@@ -119,9 +137,9 @@ macro_rules! compartmental {
             Engine::Differential($engine) => Ok::<_, String>($body),
             #[cfg(feature = "test-kind")]
             other => Err(format!(
-                "The {} engine runs {} models, not compartmental models",
+                "The {} engine of this model has no compartments; only an aggregate model \
+                 has them",
                 other.engine_type().name(),
-                other.engine_type().kind().name()
             )),
         }
     };
@@ -132,16 +150,17 @@ macro_rules! compartmental {
 ///
 /// # Errors
 ///
-/// Returns a message when the engine or the plan is not compartmental.
+/// Returns a message when the engine or the plan is not of an aggregate
+/// model.
 pub fn compartmental_state(
     engine: &Engine,
     plan: &EngineValuePlan,
 ) -> Result<(Vec<f64>, Vec<usize>), String> {
     let state = compartmental!(engine, engine => engine.state())?;
     match plan {
-        EngineValuePlan::Compartmental(plan) => Ok((state, plan.covered_compartments())),
+        EngineValuePlan::Aggregate(plan) => Ok((state, plan.covered_compartments())),
         #[cfg(feature = "test-kind")]
-        EngineValuePlan::Test(_) => Err("The plan is not of a compartmental model".to_string()),
+        EngineValuePlan::Test(_) => Err("The plan is not of an aggregate model".to_string()),
     }
 }
 
@@ -200,10 +219,10 @@ impl SimulationEngine for Engine {
         match self {
             Self::Difference(engine) => engine
                 .plan_values(values, remainder)
-                .map(EngineValuePlan::Compartmental),
+                .map(EngineValuePlan::Aggregate),
             Self::Differential(engine) => engine
                 .plan_values(values, remainder)
-                .map(EngineValuePlan::Compartmental),
+                .map(EngineValuePlan::Aggregate),
             #[cfg(feature = "test-kind")]
             Self::Test(engine) => engine
                 .plan_values(values, remainder)
@@ -213,10 +232,10 @@ impl SimulationEngine for Engine {
 
     fn apply_values(&mut self, plan: &EngineValuePlan, values: &[f64]) -> Result<f64, String> {
         match (self, plan) {
-            (Self::Difference(engine), EngineValuePlan::Compartmental(plan)) => {
+            (Self::Difference(engine), EngineValuePlan::Aggregate(plan)) => {
                 engine.apply_values(plan, values)
             }
-            (Self::Differential(engine), EngineValuePlan::Compartmental(plan)) => {
+            (Self::Differential(engine), EngineValuePlan::Aggregate(plan)) => {
                 engine.apply_values(plan, values)
             }
             #[cfg(feature = "test-kind")]
@@ -327,20 +346,20 @@ impl PyEngine {
         SimulationEngine::step(&mut self.inner).map_err(simulation_error)
     }
 
-    /// Current amount of each compartment of a compartmental model
+    /// Current amount of each compartment of an aggregate model
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models
+    ///     ValueError: If the model is not aggregate
     #[getter]
     fn state(&self) -> PyResult<Vec<f64>> {
         compartmental!(&self.inner, engine => engine.state()).map_err(PyValueError::new_err)
     }
 
-    /// Names of the compartments of a compartmental model (e.g., ["A",
+    /// Names of the compartments of an aggregate model (e.g., ["A",
     /// "B_g1", "C_g2"])
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models
+    ///     ValueError: If the model is not aggregate
     #[getter]
     fn compartments(&self) -> PyResult<Vec<String>> {
         compartmental!(&self.inner, engine => engine.compartments()).map_err(PyValueError::new_err)
@@ -385,8 +404,8 @@ impl PyEngine {
     ///     value: The new initial amount
     ///
     /// Raises:
-    ///     ValueError: If the engine does not run compartmental models,
-    ///         compartment_index is invalid or value is negative
+    ///     ValueError: If the model is not aggregate, compartment_index is
+    ///         invalid or value is negative
     fn set_initial_condition(&mut self, compartment_index: usize, value: f64) -> PyResult<()> {
         compartmental!(&mut self.inner, engine => engine.set_initial_condition(compartment_index, value))
             .and_then(|result| result)
@@ -444,10 +463,10 @@ impl PyEngineType {
         self.inner.name()
     }
 
-    /// The kind of model the engine runs, for example "compartmental"
+    /// The kinds of model the engine runs, for example ["aggregate"]
     #[getter]
-    fn kind(&self) -> &'static str {
-        self.inner.kind().name()
+    fn kinds(&self) -> Vec<&'static str> {
+        self.inner.kinds().iter().map(|kind| kind.name()).collect()
     }
 
     /// What a rate means to the engine: "per_step" (the amount or fraction
@@ -525,11 +544,12 @@ impl PyEngineType {
     ///
     /// Args:
     ///     kind: Name of the kind of a model structure, for example
-    ///         "compartmental"
+    ///         "aggregate"
     ///
     /// Raises:
-    ///     ValueError: If the kind is unknown, or the engine runs another
-    ///         kind; the message names the engine and both kinds
+    ///     ValueError: If the kind is unknown, or the engine does not run
+    ///         it; the message names the engine, the kinds and the engines
+    ///         of the kind
     fn check_kind(&self, kind: &str) -> PyResult<()> {
         let kind = ModelKind::from_name(kind).map_err(PyValueError::new_err)?;
         self.inner.check_kind(kind).map_err(PyValueError::new_err)
@@ -551,7 +571,7 @@ impl PyModelKind {
     /// The kind with a name
     ///
     /// Args:
-    ///     name: Name of the kind, for example "compartmental"
+    ///     name: Name of the kind, for example "aggregate"
     ///
     /// Raises:
     ///     ValueError: If no kind has the name; the message lists them all
@@ -566,6 +586,14 @@ impl PyModelKind {
     #[staticmethod]
     fn names() -> Vec<&'static str> {
         ModelKind::ALL.iter().map(|kind| kind.name()).collect()
+    }
+
+    /// Names of the engines that run the kind, in the order of the list
+    fn engines(&self) -> Vec<&'static str> {
+        EngineType::engines_of(self.inner)
+            .into_iter()
+            .map(EngineType::name)
+            .collect()
     }
 
     /// Name of the kind
@@ -610,14 +638,11 @@ mod tests {
     fn decay_model(engine: EngineType) -> Model {
         let mut model: Model = serde_json::from_str(
             r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},
-            "structure":{"kind":"compartmental",
-            "bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+            "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
             "accumulators":[],"stratifications":[],
             "transitions":[{"id":"ab","source":["A"],"target":["B"],
-            "rate":"0.1","stratified_rates":null,"per_compartment":null}],
-            "initial_conditions":{"total":1000,"bin_fractions":[
-            {"bin":"A","fraction":1.0},{"bin":"B","fraction":0.0}],
-            "stratification_fractions":[]}}}"#,
+            "rate":"0.1","stratified_rates":null,"per_compartment":null}]},
+            "structure":{"kind":"aggregate","total":1000,"bin_fractions":{"A":1.0,"B":0.0}}}"#,
         )
         .expect("valid model JSON");
         model.engine = ModelEngine::new(engine);
@@ -627,7 +652,7 @@ mod tests {
     #[test]
     fn every_entry_builds_its_engine_and_runs() {
         for &engine_type in EngineType::ALL {
-            if engine_type.kind() != commol_core::ModelKind::Compartmental {
+            if !engine_type.runs(ModelKind::Aggregate) {
                 continue;
             }
             let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
@@ -668,16 +693,20 @@ mod tests {
         let mut test_model = test_model();
         test_model.engine = ModelEngine::new(EngineType::DifferenceEquations);
         let error = Engine::build(&test_model).err().expect("a kind mismatch");
-        for name in ["DifferenceEquations", "compartmental", "test"] {
+        for name in ["DifferenceEquations", "aggregate", "test", "TestEngine"] {
             assert!(error.contains(name), "{error}");
         }
 
-        let mut compartmental = decay_model(EngineType::DifferenceEquations);
-        compartmental.engine = ModelEngine::new(EngineType::TestEngine);
-        let error = Engine::build(&compartmental)
-            .err()
-            .expect("a kind mismatch");
-        for name in ["TestEngine", "compartmental", "test"] {
+        let mut aggregate = decay_model(EngineType::DifferenceEquations);
+        aggregate.engine = ModelEngine::new(EngineType::TestEngine);
+        let error = Engine::build(&aggregate).err().expect("a kind mismatch");
+        for name in [
+            "TestEngine",
+            "aggregate",
+            "test",
+            "DifferenceEquations",
+            "DifferentialEquations",
+        ] {
             assert!(error.contains(name), "{error}");
         }
     }

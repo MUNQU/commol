@@ -8,6 +8,7 @@ from .assertions import (
 )
 from .flows import Flow, flow_model, increments
 from .models import (
+    FactoryBuilder,
     a_to_b_builder,
     TIGHT,
     build,
@@ -33,6 +34,7 @@ from .simulation import initial_state, run
 
 __all__ = [
     "ENGINE_REL",
+    "FactoryBuilder",
     "Flow",
     "ODE_REL",
     "ABC_START",

@@ -4,7 +4,7 @@ import pytest
 
 from commol import ModelBuilder
 from commol.context.model import Model
-from tests.support import build, abc_builder
+from tests.support import build, build_ode, abc_builder
 
 
 def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
@@ -422,9 +422,7 @@ class TestText:
 
 class TestLatex:
     def test_print_equations_latex_with_stratification(self, capsys) -> None:
-        model = _move("Group-Stratified ABC Model").build(
-            engine="DifferentialEquations"
-        )
+        model = build_ode(_move("Group-Stratified ABC Model"), settings=None)
 
         output = _printed(model, capsys, format="latex")
 

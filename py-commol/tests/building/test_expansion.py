@@ -11,7 +11,7 @@ from tests.support import a_to_b_builder, build, conditional_pathway_builder
 class TestEngineExpansion:
     def test_equation_helper_uses_the_engine_expansion(self) -> None:
         model = build(conditional_pathway_builder())
-        compartments, accumulators = expanded_outputs(model.structure)
+        compartments, accumulators = expanded_outputs(model.process)
         helper = ModelCompartmentHelper(model)
 
         assert helper.generate_compartments() == [
@@ -31,7 +31,7 @@ class TestEngineExpansion:
         )
         # A category-less condition is permitted by the engine but rejected by
         # the Pydantic validator, so the stratification is built without it.
-        model.structure.stratifications.append(
+        model.process.stratifications.append(
             Stratification.model_construct(
                 id="type",
                 categories=["t1", "t2"],
@@ -51,6 +51,7 @@ class TestEngineExpansion:
         ]
 
         assert helper_names == [
-            compartment.name for compartment in model.structure.initial_state()
+            compartment.name
+            for compartment in model.structure.initial_state(model.process)
         ]
         assert "A_g2_t2" in helper_names

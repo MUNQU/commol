@@ -171,6 +171,7 @@ class CalibrationParameter(BaseModel):
     )
 
     @field_validator("parameter_type")
+    @classmethod
     def validate_parameter_type(cls, v: str) -> str:
         if v not in CalibrationParameterType:
             raise ValueError(
@@ -574,6 +575,7 @@ class PSOMutationConfig(BaseModel):
     )
 
     @field_validator("strategy")
+    @classmethod
     def validate_strategy(cls, v: str) -> str:
         if v not in PSOMutationStrategy:
             raise ValueError(
@@ -582,6 +584,7 @@ class PSOMutationConfig(BaseModel):
         return v
 
     @field_validator("application")
+    @classmethod
     def validate_application(cls, v: str) -> str:
         if v not in PSOMutationApplication:
             raise ValueError(
@@ -687,6 +690,7 @@ class ParticleSwarmConfig(BaseModel):
     _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
 
     @field_validator("initialization")
+    @classmethod
     def validate_initialization(cls, v: str) -> str:
         if v not in PSOInitializationStrategy:
             raise ValueError(
@@ -1067,6 +1071,7 @@ class CalibrationProblem(BaseModel):
     )
 
     @field_validator("loss_function")
+    @classmethod
     def validate_loss_function(cls, v: str) -> str:
         if v not in LossFunction:
             raise ValueError(

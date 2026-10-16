@@ -35,7 +35,8 @@ impl TestEngine {
     ///
     /// # Errors
     ///
-    /// Returns a message when the model is not a test model.
+    /// Returns a message when the model is not a test model, or its process
+    /// is not empty: a test model runs no process.
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
         let ModelStructure::Test(structure) = &model.structure else {
             return Err(format!(
@@ -44,6 +45,12 @@ impl TestEngine {
                 model.structure.kind().name()
             ));
         };
+        if !model.process.is_empty() {
+            return Err(format!(
+                "Model '{}' is a test model, which runs no process; its process must be empty",
+                model.name
+            ));
+        }
         let parameters = model
             .parameters
             .iter()

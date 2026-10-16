@@ -2,8 +2,9 @@
 
 import pytest
 
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 from tests.support import (
+    FactoryBuilder,
     ENGINE_REL,
     assert_close,
     build,
@@ -27,7 +28,7 @@ class TestExpansion:
         )
 
         assert [
-            (t.id, t.source, t.target, t.rate) for t in model.structure.transitions
+            (t.id, t.source, t.target, t.rate) for t in model.process.transitions
         ] == [
             ("out__A", ["A"], [], "d * A"),
             ("out__B", ["B"], [], "d * B"),
@@ -36,7 +37,7 @@ class TestExpansion:
 
     def test_a_single_target_receives_from_each_source(self) -> None:
         builder = (
-            ModelBuilder(name="Merge")
+            FactoryBuilder(name="Merge")
             .add_bin(id="B1", name="B1")
             .add_bin(id="B2", name="B2")
             .add_bin(id="C", name="C")
@@ -47,20 +48,15 @@ class TestExpansion:
                 target=["C"],
                 rate="k * $compartment",
             )
-            .set_initial_conditions(
-                total=1000,
-                bin_fractions=[
-                    {"bin": "B1", "fraction": 0.6},
-                    {"bin": "B2", "fraction": 0.3},
-                    {"bin": "C", "fraction": 0.1},
-                ],
+            .set_structure(
+                Aggregate(total=1000, bin_fractions={"B1": 0.6, "B2": 0.3, "C": 0.1})
             )
         )
 
         model = build(builder)
 
         assert [
-            (t.id, t.source, t.target, t.rate) for t in model.structure.transitions
+            (t.id, t.source, t.target, t.rate) for t in model.process.transitions
         ] == [
             ("bc__B1", ["B1"], ["C"], "k * B1"),
             ("bc__B2", ["B2"], ["C"], "k * B2"),
@@ -78,7 +74,7 @@ class TestExpansion:
             )
         )
 
-        assert [t.rate for t in model.structure.transitions] == [
+        assert [t.rate for t in model.process.transitions] == [
             "d * A * (1 + 0.1 * A / K)",
             "d * B * (1 + 0.1 * B / K)",
         ]
@@ -108,7 +104,7 @@ class TestExpansion:
             )
         )
 
-        transitions = model.structure.transitions
+        transitions = model.process.transitions
         assert [t.rate for t in transitions] == ["d_base * A", "d_base * B"]
         assert [
             [rate.rate for rate in t.stratified_rates or []] for t in transitions
@@ -117,7 +113,7 @@ class TestExpansion:
 
 class TestErrors:
     def test_a_single_source_is_rejected(self) -> None:
-        builder = ModelBuilder(name="Single").add_bin(id="A", name="A")
+        builder = FactoryBuilder(name="Single").add_bin(id="A", name="A")
 
         with pytest.raises(ValueError) as error:
             builder.add_transition(
@@ -130,7 +126,7 @@ class TestErrors:
         assert "use the compartment name directly" in str(error.value)
 
     def test_several_sources_and_several_targets_are_rejected(self) -> None:
-        builder = ModelBuilder(name="Ambiguous")
+        builder = FactoryBuilder(name="Ambiguous")
         for bin_id in ("A", "B", "R1", "R2"):
             builder.add_bin(id=bin_id, name=bin_id)
 

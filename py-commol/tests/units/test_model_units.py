@@ -2,10 +2,17 @@
 
 import pytest
 
-from commol import ModelBuilder
 from commol.context.model import Model
 from commol.utils.equations import UnitConsistencyError
-from tests.support import a_to_b_builder, build, build_ode, abcd_builder, abc_builder
+from tests.support import (
+    FactoryBuilder,
+    a_to_b_builder,
+    build,
+    build_ode,
+    abcd_builder,
+    abc_builder,
+)
+from commol import Aggregate
 
 DAILY = {"k1": "1/day", "k2": "1/day"}
 FAILED = "Unit consistency check failed"
@@ -48,7 +55,7 @@ def _per_group_ab(*rates: str, **options) -> Model:
 def _with_v(rate: str, threshold_unit: str = "item") -> Model:
     """A, V, B, C: A moves to V at ``rate`` besides the flows of ``abc_builder``."""
     return build(
-        ModelBuilder(name="AVBC", bin_unit="item", step_unit="day")
+        FactoryBuilder(name="AVBC", bin_unit="item", step_unit="day")
         .add_bin(id="A", name="A")
         .add_bin(id="V", name="V")
         .add_bin(id="B", name="B")
@@ -60,14 +67,10 @@ def _with_v(rate: str, threshold_unit: str = "item") -> Model:
         .add_transition(id="av", source=["A"], target=["V"], rate=rate)
         .add_transition(id="ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.98},
-                {"bin": "V", "fraction": 0.0},
-                {"bin": "B", "fraction": 0.02},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .set_structure(
+            Aggregate(
+                total=1000, bin_fractions={"A": 0.98, "V": 0.0, "B": 0.02, "C": 0.0}
+            )
         )
     )
 
@@ -367,7 +370,7 @@ def _two_rates(
 ) -> Model:
     """A → B → C, each transition with its own rate parameter."""
     return (build_ode if ode else build)(
-        ModelBuilder(name="Step unit", bin_unit=bin_unit, step_unit=step_unit)
+        FactoryBuilder(name="Step unit", bin_unit=bin_unit, step_unit=step_unit)
         .add_bin(id="A", name="A")
         .add_bin(id="B", name="B")
         .add_bin(id="C", name="C")
@@ -375,13 +378,8 @@ def _two_rates(
         .add_parameter(id="k2", value=0.1, unit=k2_unit)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 1.0},
-                {"bin": "B", "fraction": 0.0},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .set_structure(
+            Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0, "C": 0.0})
         )
     )
 
@@ -467,19 +465,15 @@ class TestAxisUnit:
     def test_an_impulse_moves_an_amount_of_the_bin_unit(self) -> None:
         def impulse(unit: str) -> Model:
             return build(
-                ModelBuilder(name="impulse", bin_unit="item")
+                FactoryBuilder(name="impulse", bin_unit="item")
                 .add_bin(id="A", name="A")
                 .add_bin(id="B", name="B")
                 .add_parameter(id="p", value=0.1, unit=unit)
                 .add_transition(
                     id="t_ab", source=["A"], target=["B"], rate="p * A", impulse_at=[1]
                 )
-                .set_initial_conditions(
-                    total=1000,
-                    bin_fractions=[
-                        {"bin": "A", "fraction": 1.0},
-                        {"bin": "B", "fraction": 0.0},
-                    ],
+                .set_structure(
+                    Aggregate(total=1000, bin_fractions={"A": 1.0, "B": 0.0})
                 )
             )
 

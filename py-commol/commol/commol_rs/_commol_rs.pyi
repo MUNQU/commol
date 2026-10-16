@@ -49,27 +49,34 @@ class InitialConditionsProtocol(Protocol):
     stratification_fractions: list[tuple[str, list[tuple[str, float]]]]
     compartment_fractions: list[tuple[str, float]]
 
-class RustCompartmentalStructureProtocol(Protocol):
-    """The structure of a compartmental model."""
+class RustProcessProtocol(Protocol):
+    """The process of a model: bins, accumulators, stratifications and transitions."""
 
     def __init__(
         self,
         bins: list[BinProtocol],
         stratifications: list[StratificationProtocol],
-        initial_conditions: InitialConditionsProtocol,
         transitions: list[TransitionProtocol] | None = None,
         accumulators: list[object] | None = None,
     ) -> None: ...
     @staticmethod
-    def from_json(json_str: str) -> RustCompartmentalStructureProtocol: ...
+    def from_json(json_str: str) -> RustProcessProtocol: ...
+
+class RustAggregateProtocol(Protocol):
+    """The aggregate structure: amounts per compartment."""
+
+    def __init__(self, initial_conditions: InitialConditionsProtocol) -> None: ...
+    @staticmethod
+    def from_json(json_str: str) -> RustAggregateProtocol: ...
 
 class RustModelProtocol(Protocol):
-    """A model of any kind: its header, engine and structure."""
+    """A model of any kind: its header, process, structure and engine."""
 
     def __init__(
         self,
         name: str,
-        structure: RustCompartmentalStructureProtocol,
+        process: RustProcessProtocol,
+        structure: RustAggregateProtocol,
         parameters: list[ParameterProtocol],
         engine: str,
         description: str | None = None,
@@ -109,7 +116,7 @@ class EngineTypeProtocol(Protocol):
     @property
     def name(self) -> str: ...
     @property
-    def kind(self) -> str: ...
+    def kinds(self) -> list[str]: ...
     @property
     def rate_meaning(self) -> str: ...
     def rate_from_mean_span(self, span: float) -> float: ...
@@ -127,6 +134,7 @@ class ModelKindProtocol(Protocol):
     @property
     def name(self) -> str: ...
     def value_types(self) -> list[str]: ...
+    def engines(self) -> list[str]: ...
 
 class InfeasibleStateError(ValueError):
     """A run left the values its model allows, such as an amount below zero."""
@@ -138,18 +146,18 @@ class EngineModule(Protocol):
     ModelKind: type[ModelKindProtocol]
 
 class ModelModule(Protocol):
+    NEIGHBORS: str
+    NEIGHBORS_PREFIX: str
     def initial_state(
-        self, structure: RustCompartmentalStructureProtocol
+        self, process: RustProcessProtocol, structure: RustAggregateProtocol
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
     def transition_flows(
-        self, structure: RustCompartmentalStructureProtocol
+        self, process: RustProcessProtocol, structure: RustAggregateProtocol
     ) -> list[tuple[str, str | None, str | None, str, str | None]]: ...
-    def check_names(self, model: RustModelProtocol) -> None: ...
-    def subgroup_total_names(
-        self, structure: RustCompartmentalStructureProtocol
-    ) -> list[str]: ...
+    def check_model(self, model: RustModelProtocol) -> None: ...
+    def subgroup_total_names(self, process: RustProcessProtocol) -> list[str]: ...
     def expanded_outputs(
-        self, structure: RustCompartmentalStructureProtocol
+        self, process: RustProcessProtocol
     ) -> tuple[
         list[tuple[str, str, list[tuple[str, str]]]],
         list[tuple[str, str, list[tuple[str, str]]]],
@@ -562,7 +570,8 @@ class RateMathExpressionProtocol(Protocol):
 
 class CoreModule(Protocol):
     Model: type[RustModelProtocol]
-    CompartmentalStructure: type[RustCompartmentalStructureProtocol]
+    Process: type[RustProcessProtocol]
+    Aggregate: type[RustAggregateProtocol]
     Bin: type[BinProtocol]
     Stratification: type[StratificationProtocol]
     StratificationCondition: type[StratificationConditionProtocol]
