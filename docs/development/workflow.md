@@ -49,21 +49,45 @@ Planned work lives in GitHub issues, written from the templates of
 | What | Where |
 |---|---|
 | The specification of a change | The body of its issue |
-| Decisions and findings during the work | Comments of the issue (`L<n> (user|implementation): …`), and the Decisions table of the body |
+| Decisions and findings during the work | Comments of the issue (`L<n> (decision|implementation): …`), and the Decisions table of the body |
 | Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
+| Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
 | What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
 
-To find the next piece of work:
+To find the next piece of work, in one call and one line:
+
+```bash
+.github/scripts/next.sh        # the next proposal; .github/scripts/next.sh 3 for three
+```
+
+It lists the open proposals that no open issue blocks and nobody has taken,
+by the field `Order` of the project, not by issue number: the dependencies set
+what must come first, and `Order` the preference among the proposals that are
+ready. A new proposal gets an `Order` between those of its neighbours; the
+values go in steps of 10 so one fits in without renumbering. To see the whole
+plan:
 
 ```bash
 gh issue list --label proposal --state open
 gh issue list --milestone 0.5.0
-gh api repos/MUNQU/commol/issues/<number>/dependencies/blocked_by --jq '.[].number'
 ```
 
 An issue is ready when every issue that blocks it is closed.
+
+The project adds a new issue as `Todo` and moves it to `Done` when it closes.
+`In Progress` is set by whoever starts the work: a pull request to `develop`
+does not link to its issue, because GitHub reads `Closes #N` only for the
+default branch. From a terminal:
+
+```bash
+gh project item-list 1 --owner MUNQU                    # the items and their status
+item=$(gh project item-list 1 --owner MUNQU --format json \
+  --jq '.items[] | select(.content.number == <number>) | .id')
+gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
+  --field-id PVTSSF_lADODcfAw84BnXyozhl8usw --single-select-option-id 47fc9ee4  # In Progress
+```
 
 ### Lifecycle of a proposal
 
@@ -71,19 +95,47 @@ An issue is ready when every issue that blocks it is closed.
    paths and symbols, one requirement per behavior (`The <component> SHALL …`,
    with `WHEN … THEN …` scenarios), each scenario with the test that checks
    it. Add `breaking` when it breaks the public API, the milestone of its
-   release and its blockers. A large proposal splits into sub-issues.
+   release, its blockers and its `Order` in the project. A large proposal
+   splits into sub-issues.
 2. Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
-3. Work on a branch from `develop`, one task after the other, the tests of a
-   requirement before its code. Tick the tasks of the body as they land.
+3. Set the item to `In Progress`, and create the branch from the issue, so
+   GitHub lists it under the issue: `gh issue develop <number> --base develop
+   --name <type>/<name> --checkout`. Work one task after the other, the tests
+   of a requirement before its code. Tick the tasks of the body as they land.
 4. Open the pull request with `Closes #N` and the evidence. The merge closes
    the issue (`close-issues.yaml`).
 
-The proposals run one after the other, each from `develop` after the previous
-pull request merges, so each is written against the merged code of the one
-before. Two proposals that touch different modules may run in parallel on two
-branches; their issues say so.
+### Parallel work
+
+Two proposals can run at the same time when no chain of "blocked by" links
+joins them and neither changes what the other changes or adds. Each proposal
+says what it touches (section Touches of the template):
+
+| Kind | What it is | Conflicts with |
+|---|---|---|
+| Changes | An edit to what exists: a behavior, a signature, a contract other code implements (a required method of `SimulationEngine`) | Any Changes or Adds of the same item |
+| Adds | New code next to what exists: a module, a method of a shared class, a variant, a registry entry | Only a Changes of the same item: two Adds to one class merge by keeping both |
+
+An item is a path or `path::Symbol`; a path that ends in `/` is a directory.
+`.github/scripts/parallel.py` reads the Touches and the links of the open
+issues, prints the proposals ready now and the ones each can run with, and
+with `--write` keeps the line "Parallel with" of each Delivery up to date; run
+it after a proposal is added or its Touches change. The `area:` labels filter
+the same zones (`gh issue list --label area:inference -s open`).
+
+To take a proposal while others run:
+
+1. Assign the issue to yourself (or to the agent that works on it) and set it
+   to `In Progress`: an assigned issue is taken.
+2. Work in its own worktree, a sibling of the repository, with its own
+   CodeGraph index: `gh issue develop <number> --base develop --name
+   <type>/<name> --worktree ../commol-worktrees/<name>`.
+3. Open the pull request as usual. The merge queue of `develop` tests it on
+   top of the pull requests queued before it, so a conflict in meaning fails
+   there and never reaches `develop`; a conflict in the lines of a shared
+   index (the changelog, `AGENTS.md`) is solved by keeping both.
 
 ## Development Process
 
@@ -190,14 +242,17 @@ When you create a PR, automated checks run:
   `Build Documentation` and `Build Passed` (the whole test matrix)
 - An approving review from a code owner
 - No merge conflicts with target branch
-- For PRs into `develop`, the branch must be up to date with `develop`
+- For PRs into `develop`, the merge queue: it merges each pull request on top
+  of the ones queued before it, after the required checks pass on that result
 - Code coverage should be >95%
 
 ### 7. Merging to Develop
 
 Once approved:
 
-Merge with "Squash and merge" on GitHub, the only method `develop` allows.
+Add the pull request to the merge queue ("Merge when ready", or `gh pr merge
+<number> --squash`): the queue squash-merges it, the only method `develop`
+allows, once the required checks pass on top of the pull requests before it.
 GitHub deletes the branch after the merge (`delete_branch_on_merge`); delete
 your local copy with `git branch -D <branch>` after `git fetch --prune`.
 
@@ -227,6 +282,7 @@ already tests the result of merging it into `main`.
 | Build (`build.yaml`) | Every push and pull request | Tests on Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14, except the documentation checks. On pushes to `main`, wheels for every target architecture. | `Build Passed` |
 | Documentation (`docs.yaml`) | Every push and pull request | `mkdocs build --strict`: no broken internal link or anchor. Deploys the site with mike on pushes to `main` (`latest`) and `develop` (`dev`). | `Build Documentation` |
 | Links (`links.yaml`) | Pull requests that change `docs/`, `README.md` or `AGENTS.md`; every Monday; on demand | External links, with lychee. | None: a site that is down for a while must not block a pull request |
+| Merge queue (`merge_group` in Code Quality, Build and Documentation) | A pull request queued for `develop` | The same required checks, on the pull request merged on top of the ones queued before it | The same |
 | Close Issues (`close-issues.yaml`) | A pull request merged into `develop` | Closes the issues its body names with `Closes`, `Fixes` or `Resolves`. | — |
 | Release (`release.yaml`) | A published GitHub release | Builds wheels and the sdist, and publishes them to PyPI. See [Release Process](release.md). | — |
 

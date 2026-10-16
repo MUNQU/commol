@@ -5,6 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # The merge queue of develop tests each pull request on top of the others.
+  merge_group:
 
 # A new commit on a pull request cancels the runs of its earlier commits. Push
 # runs are never cancelled while running; a newer push only replaces a run that
