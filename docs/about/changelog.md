@@ -83,6 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   equations.
 - Python names follow PEP 8: ruff checks them (`N` rules).
 
+### Fixed
+
+- The unit check reads the flows the engine plans, so a proportional rate is
+  checked as its flow, the rate times its source: `k2` in `1/day` from a bin in
+  `item` passes as `item/day` instead of failing as `1/day`.
+
 ### Removed
 
 - **Breaking:** `Model.print_equations`, `ModelStructure.print_equations` and

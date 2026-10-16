@@ -40,8 +40,12 @@ unit `<bin unit>`, and that every function receives a plain number. It checks
 `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate
 is per unit of the axis, and only what its value means differs (see
 [What a rate means](core-concepts.md#what-a-rate-means)).
-It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every
-transition that fails.
+It reads the flows the engine plans (`transition_flows`), so a proportional
+rate is checked as its flow, the rate times its source: `k2` in `1/day` from a
+bin in `item` gives `item/day`. A rate that reads the
+[neighbors of a unit](building-models.md#neighbors) is checked as the sums
+they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and
+lists every transition that fails.
 
 ### What needs a unit
 

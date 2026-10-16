@@ -12,7 +12,7 @@ from tests.support import (
     abcd_builder,
     abc_builder,
 )
-from commol import Aggregate
+from commol import Aggregate, Complete
 
 DAILY = {"k1": "1/day", "k2": "1/day"}
 FAILED = "Unit consistency check failed"
@@ -83,6 +83,28 @@ class TestConsistentModels:
         _per_group_ab(
             "k1 * A * B / total_g1", "k1 * A * B / total_g2"
         ).check_unit_consistency()
+
+    def test_a_proportional_rate_is_checked_as_its_flow(self) -> None:
+        _abc(bc="k2").check_unit_consistency()
+
+    def test_a_proportional_rate_in_the_unit_of_a_flow_fails(self) -> None:
+        model = _abc(bc="k2", units={"k1": "1/day", "k2": "item/day"})
+
+        with pytest.raises(UnitConsistencyError, match="k2 \\* B"):
+            model.check_unit_consistency()
+
+    def test_the_neighbors_of_a_unit_have_the_bin_unit(self) -> None:
+        builder = abc_builder(
+            bin_unit="item",
+            units=DAILY,
+            step_unit="day",
+            ab="k1 * neighbors_B / neighbors",
+        )
+        builder.structure = builder.structure.model_copy(
+            update={"neighbors": Complete()}
+        )
+
+        build(builder).check_unit_consistency()
 
     def test_a_dimensionless_parameter(self) -> None:
         _abc(

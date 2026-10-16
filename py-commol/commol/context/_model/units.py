@@ -1,3 +1,4 @@
+from commol.context._model import engine_state
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
     DEFAULT_STEP_UNIT,
@@ -114,30 +115,31 @@ class UnitChecker:
             )
 
     def _collect_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
-        """Collect unit consistency errors from all transitions."""
+        """
+        Collect unit consistency errors from every flow the engine plans.
+
+        The engine plans the flows (``engine_state.transition_flows``), so a
+        proportional rate is checked as its flow, the rate times its source,
+        and a read of the neighbors of a unit as the sums it is.
+        """
         errors: list[str] = []
-
-        for transition in self._model.process.transitions:
-            if transition.rate:
-                is_consistent, error_msg = self._check_transition_rate_units(
-                    transition.rate,
-                    transition.id,
-                    variable_units,
-                    transition.is_impulse,
-                )
-                if not is_consistent and error_msg:
-                    errors.append(error_msg)
-
-            if transition.stratified_rates:
-                for idx, strat_rate in enumerate(transition.stratified_rates):
-                    is_consistent, error_msg = self._check_transition_rate_units(
-                        strat_rate.rate,
-                        f"{transition.id} (stratified rate {idx + 1})",
-                        variable_units,
-                        transition.is_impulse,
-                    )
-                    if not is_consistent and error_msg:
-                        errors.append(error_msg)
+        impulses = {t.id for t in self._model.process.transitions if t.is_impulse}
+        checked: set[tuple[str, str]] = set()
+        flows = engine_state.transition_flows(
+            self._model.process, self._model.structure
+        )
+        for flow in flows:
+            if (flow.transition, flow.term) in checked:
+                continue
+            checked.add((flow.transition, flow.term))
+            is_consistent, error_msg = self._check_transition_rate_units(
+                flow.term,
+                flow.transition,
+                variable_units,
+                flow.transition in impulses,
+            )
+            if not is_consistent and error_msg:
+                errors.append(error_msg)
 
         return errors
 
@@ -162,7 +164,7 @@ class UnitChecker:
         is_impulse: bool = False,
     ) -> tuple[bool, str | None]:
         """
-        Check units for a single transition rate.
+        Check the units of one flow of a transition.
 
         A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
         at once.

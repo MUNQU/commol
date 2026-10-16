@@ -363,7 +363,10 @@ the default increment of any axis (dimension `[step]`). The check never infers
 the step unit from the parameters: a parameter in `1/meter` may be a density,
 not a rate along the axis, and inferring only from units of time gives time a
 privilege that no other axis has. Without `step_unit`, a failed check says to
-declare it. `check_equation_units` requires every flow to be **equal** to
+declare it. The check reads the flows the engine plans (`transition_flows`,
+in `UnitChecker._collect_unit_errors`), so a proportional rate is checked as
+its flow, `rate × source`, and never by a rule of its own in Python.
+`check_equation_units` requires every flow to be **equal** to
 `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not only
 convertible to it (`utils/equations.py`, `same_unit`).
 
@@ -377,7 +380,9 @@ reads it (`parse_equation_unit`); a computed number stays dimensionless.
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
 model would read a weekly rate as a daily one.
 
-**Guards:** `tests/units/test_model_units.py::TestStepUnit`,
+**Guards:** `tests/units/test_model_units.py::TestConsistentModels`
+(`test_a_proportional_rate_is_checked_as_its_flow`),
+`tests/units/test_model_units.py::TestStepUnit`,
 `tests/units/test_model_units.py::TestAxisUnit`,
 `tests/units/test_model_units.py::TestPositionOnTheAxis`.
 
