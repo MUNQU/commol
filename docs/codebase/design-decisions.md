@@ -777,10 +777,14 @@ is the only code that clones, resets, writes values to or runs the engine;
 is built once and has no interior mutability; the buffers of an evaluation are
 a `Workspace` per thread.
 
-**Rule:** Python never transforms a prediction: windows, sums, factors,
-normalization, quantiles and scores come from Rust. `Calibrator` builds the
-Rust problem once (`commol_rs.inference.CalibrationProblem`) and every call
-reads it.
+**Rule:** Python never transforms a prediction of a calibration problem or of
+a sample: their windows, sums, factors, normalization, quantiles and scores
+come from Rust. `Calibrator` builds the Rust problem once
+(`commol_rs.inference.CalibrationProblem`) and every call reads it. The
+helpers that present results already computed, such as `windowed_totals`
+(`api/windows.py`) for a run or its replicates, are not predictions; they
+must agree with the operator, which
+`tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` checks.
 
 **Guards:** `observation::tests`,
 `crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,
