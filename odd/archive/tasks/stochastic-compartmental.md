@@ -58,7 +58,7 @@ gives the main test oracle.
 
 ## Specs
 
-Every spec follows the [documentation definition of done](../../docs/codebase/conventions.md#documentation-definition-of-done).
+Every spec follows the [documentation definition of done](../../../docs/codebase/conventions.md#documentation-definition-of-done).
 
 ### S1 — The rates of every flow, not only their sum
 
@@ -186,14 +186,14 @@ Each row says why the recommendation beats each alternative.
 
 | ID | Specs | Task | Route | Commit |
 |---|---|---|---|---|
-| T1 | S1 | `flow_rates` and `flow_changes`; `derivatives` on them | direct | |
-| T2 | S4 | Whole initial amounts | direct | |
-| T3 | S2 | `commol-stochastic`: direct method, tau-leaping, impulses, outputs at positions; registry entry, bindings | direct | |
-| T4 | S3 | Chain binomial; the check of per-step probabilities | direct | |
-| T5 | S5 | Description of the event table | direct | |
-| T6 | S6 | Calibration and replicates against the oracles; reference models | direct | |
-| T7 | S7 | Documentation | direct | |
-| T8 | all | Final audit: every runner | direct | |
+| T1 | S1 | `flow_rates` and `flow_changes`; `derivatives` on them | direct | `924753e` |
+| T2 | S4 | Whole initial amounts | direct | `987507f` |
+| T3 | S2 | `commol-stochastic`: direct method, tau-leaping, impulses, outputs at positions; registry entry, bindings | direct | `987507f` |
+| T4 | S3 | Chain binomial; the check of per-step probabilities | direct | `987507f` |
+| T5 | S5 | Description of the event table | direct | `0f363bd` |
+| T6 | S6 | Calibration and replicates against the oracles; reference models | direct | `0f363bd` |
+| T7 | S7 | Documentation | direct | `0707a34` |
+| T8 | all | Final audit: every runner | direct | the archive commit |
 
 ## Delivery
 
@@ -204,7 +204,23 @@ Each row says why the recommendation beats each alternative.
 
 ## Evidence
 
-(Filled during implementation.)
+Verified 2026-10-16 on `feat/stochastic-compartmental`, every runner of
+`AGENTS.md`: Rust 332 tests (336 with `cargo test --all-features
+--workspace`), `cargo fmt --check`, `clippy -D warnings` (with and without
+`--all-features`), `rustdoc -D warnings` with `commol-stochastic`; Python 1157
+tests (1 skipped: `pydot` is not installed), 74 docs tests, `ruff`, `ty`,
+`vulture`; `mkdocs build --strict`. The 17 oracle tests of
+`crates/commol-stochastic/tests/oracles.rs` run in about 5 s in a debug build.
+
+| Spec | Evidence |
+|---|---|
+| S1 | `CompiledModel::{flow_rates, transition_rates, flow_changes, impulse_rates, impulse_changes, breakpoints, reads_time}` and `FlowChange` (`crates/commol-model/src/{system,types}.rs`); the differential engine reads `breakpoints` (`solve.rs`). Tests: `crates/commol-model/tests/flows.rs` (`derivatives_are_the_changes_of_one_event_times_each_flow` on four models with proportional, absolute, multi-piece, inflow, outflow, category and accumulator flows, and a rate of `t`); every deterministic test unchanged. |
+| S2 | `StochasticEvents` (`crates/commol-stochastic/src/events.rs`); `EngineType::StochasticEvents`, `StochasticEventsSettings`, `EventMethod` (`crates/commol-core/src/types/engine.rs`); `Engine` (`py-commol/src/engine.rs`). Tests (`oracles.rs`): `a_pure_death_goes_extinct_after_the_sum_of_its_mean_waits`, `a_rate_that_reads_t_keeps_each_unit_with_its_integrated_hazard` (five units at `k (1 + sin t)`), `a_rate_that_switches_on_at_a_threshold_waits_for_it`, `a_birth_death_process_goes_extinct_with_the_probability_of_kendall`, `the_mean_of_many_runs_is_the_solution_of_the_ode`, `tau_leaping_agrees_with_the_direct_method_in_distribution` (two-sample Kolmogorov–Smirnov at 0.001, adaptive and `tau = 0.01`), `a_run_depends_on_its_seed_and_not_on_where_it_reports`, `impulses_move_whole_units_at_their_positions`, `an_impulse_that_is_not_a_probability_or_a_whole_number_fails`. |
+| S3 | `StochasticSteps` (`crates/commol-stochastic/src/steps.rs`). Tests: `the_mean_of_many_chain_binomial_runs_is_the_difference_engine`, `one_step_of_an_outflow_has_the_binomial_variance`, `a_unit_never_leaves_twice_and_an_absolute_flow_is_capped`, `a_negative_rate_or_probabilities_above_one_fail_at_their_step`; `tests/stochastic/test_engines.py::TestProbabilities`. |
+| S4 | `check_whole_units` and `as_whole` (`crates/commol-model/src/builder.rs`), `Rounding` (`engine.rs`), `Units` (`crates/commol-stochastic/src/units.rs`). Tests: `oracles.rs` (`amounts_that_are_not_whole_need_a_rounding`, `whole_amounts_need_no_rounding_and_a_total_must_be_whole`, `the_largest_remainder_starts_every_run_from_the_same_whole_amounts`, `a_random_rounding_starts_on_average_from_the_amounts_of_the_model`, `calibrated_initial_conditions_go_through_the_rounding`), `units.rs` tests, `tests/stochastic/test_whole_units.py`. |
+| S5 | `DynamicsDescription.events` (`context/_model/equations.py`), `schedule_blocks` (`context/_model/describe.py`), `EngineType::schedule`, `FlowDescription::flow`. Tests: `tests/description/test_events.py`. |
+| S6 | `tests/stochastic/test_calibration.py` (one rate from the mean of 200 runs, `"mean"` and `"crps"`, both engines; one seed gives one result), `tests/stochastic/test_engines.py` (means against the deterministic engines, plots and reports of replicates). |
+| S7 | `docs/guide/stochastic.md`; `design-decisions.md` ("Every engine reads one set of flows", "Whole units in a stochastic engine"); `repository-map.md`, `mental-model.md`, `conventions.md`, `AGENTS.md`, `core-concepts.md`, `building-models.md`, `describing-models.md`, `simulations.md` and `calibration.md` (their skipped stochastic examples now run), `model-structure.md`, `docs/api/simulation.md`, changelog. |
 
 ## Log
 
@@ -231,3 +247,43 @@ Each row says why the recommendation beats each alternative.
 - L7 (user, 2026-10-14): approved D6 as revised: the rounding of amounts that
   are not whole is a modelling choice, so the user names it, with no default
   (largest remainder was the first recommendation).
+- L8 (implementation, 2026-10-16): `derivatives` adds `changes × flow` piece by
+  piece, in the order of the old right-hand side, so every deterministic run
+  is the same to the bit. `transition_rates` gives the rate alone, which the
+  chain binomial needs as a probability. The breakpoints of the ODE engine
+  moved to `CompiledModel::breakpoints`, so both continuous-time engines stop
+  at the same positions.
+- L9 (implementation): a run of `StochasticEvents` does not depend on the
+  positions it reports at: each wait is measured from the last change of the
+  state (an event, a leap or a breakpoint), never from a reported position,
+  the flow of an event is drawn only when it happens, and a leap past the end
+  of a run is kept for the next. When a rate reads `t`, the integral grows in
+  pieces from the mean wait at the last change, which do not depend on the end.
+- L10 (implementation): in continuous time a flow has no events while a
+  source holds fewer units than an event takes; without it an absolute rate
+  that does not vanish with its source would take units it does not have. An
+  impulse moves at most what its sources still hold, and an absolute impulse
+  that is not a whole number of units, or a proportional one that is not a
+  probability, is `SimulationError::Infeasible`; a negative propensity too.
+- L11 (implementation): an adaptive leap bounds the change of every
+  compartment, with the order 2 of Cao, Gillespie and Petzold (2006), since a
+  formula has no known order; a leap of fewer than ten events is one exact
+  event, and a leap that leaves an amount below zero is halved up to 30 times.
+  A fixed `tau` of 0.05 failed the two-sample test against the direct method
+  on the chain model: its bias is of first order; the test uses 0.01.
+- L12 (implementation): the whole-unit check is in `check_model`, so `build`
+  raises, not only the engine; an amount is whole within a relative `1e-9`,
+  the rounding of a fraction times the total. The engine makes the start whole
+  at the first run after a reset, not when it is built, so the values
+  calibration writes go through the rounding and `"random"` draws after them.
+- L13 (implementation): the engine recomputes every propensity after each
+  event, because a rate may read any compartment through a total, so it picks
+  the event by a linear scan; the `SumTree` of `commol-random` pays only with
+  a dependency graph of the rates, out of scope here.
+- L14 (implementation): the settings of `ModelEngine` are read with the class
+  of its engine (`settings_of_the_engine`), since `{"rounding": "random"}`
+  fits both stochastic classes and a model must load back as the class it was
+  saved with. `transition_flows` gives each piece the index of its flow, so
+  the event table groups the pieces of one event; its `Change` column lists
+  the compartments, not the accumulators, which Python cannot expand per flow.
+- L15 (implementation): delivered on `feat/stochastic-compartmental`.

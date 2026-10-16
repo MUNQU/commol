@@ -12,7 +12,7 @@ missing is a way to choose it as a modelling, a check, an analysis and the
 documentation that shows it.
 Branch: `feat/markov-chains` from `develop`, after
 `odd/archive/tasks/model-kind-foundation.md` and
-`odd/tasks/stochastic-compartmental.md` are merged. S1 to S4 need only the
+`odd/archive/tasks/stochastic-compartmental.md` are merged. S1 to S4 need only the
 foundation and could go first; S5 needs the stochastic engines.
 Engram mirror: topic `odd/markov-chains/tasks` (project `commol`).
 Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
@@ -46,7 +46,7 @@ Runners: the Rust tests, clippy and rustdoc (from the root), `maturin develop
   `commol-model/src/flows.rs`) but cannot give the transition matrix, the
   stationary distribution or the absorption probabilities.
 - **No trajectories.** One path of a unit through the chain is a stochastic
-  run, which `odd/tasks/stochastic-compartmental.md` adds.
+  run, which `odd/archive/tasks/stochastic-compartmental.md` adds.
 - **No way to choose it.** A chain is not a modelling the user can pick, and
   a chain of ten states needs one transition per entry of its matrix in
   `ModelBuilder`.

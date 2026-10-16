@@ -2,7 +2,7 @@
 
 Goal: the code that every model kind shares can describe a model in a
 readable, exportable form, run a stochastic engine, and calibrate it, so that
-the ODDs of new kinds and engines (`odd/tasks/stochastic-compartmental.md`,
+the ODDs of new kinds and engines (`odd/archive/tasks/stochastic-compartmental.md`,
 `odd/tasks/markov-chains.md`, `odd/tasks/network-models.md`,
 `odd/tasks/agent-based-models.md`) only add their own parts.
 Motivation: the user noted that `print_equations` only makes sense for a model
