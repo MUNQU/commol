@@ -52,6 +52,7 @@ Planned work lives in GitHub issues, written from the templates of
 | Decisions and findings during the work | Comments of the issue (`L<n> (user|implementation): …`), and the Decisions table of the body |
 | Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
+| Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
 | Evidence of the delivery | The body of the pull request: each requirement and the tests that pass |
 | What lasts after the delivery | The guide, [Design decisions](../codebase/design-decisions.md) and the changelog, as the [definition of done](../codebase/conventions.md#documentation-definition-of-done) requires |
 
@@ -65,6 +66,19 @@ gh api repos/MUNQU/commol/issues/<number>/dependencies/blocked_by --jq '.[].numb
 
 An issue is ready when every issue that blocks it is closed.
 
+The project adds a new issue as `Todo` and moves it to `Done` when it closes.
+`In Progress` is set by whoever starts the work: a pull request to `develop`
+does not link to its issue, because GitHub reads `Closes #N` only for the
+default branch. From a terminal:
+
+```bash
+gh project item-list 1 --owner MUNQU                    # the items and their status
+item=$(gh project item-list 1 --owner MUNQU --format json \
+  --jq '.items[] | select(.content.number == <number>) | .id')
+gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
+  --field-id PVTSSF_lADODcfAw84BnXyozhl8usw --single-select-option-id 47fc9ee4  # In Progress
+```
+
 ### Lifecycle of a proposal
 
 1. Open the issue from the template: a scoped goal, the current state with
@@ -75,8 +89,10 @@ An issue is ready when every issue that blocks it is closed.
 2. Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
-3. Work on a branch from `develop`, one task after the other, the tests of a
-   requirement before its code. Tick the tasks of the body as they land.
+3. Set the item to `In Progress`, and create the branch from the issue, so
+   GitHub lists it under the issue: `gh issue develop <number> --base develop
+   --name <type>/<name> --checkout`. Work one task after the other, the tests
+   of a requirement before its code. Tick the tasks of the body as they land.
 4. Open the pull request with `Closes #N` and the evidence. The merge closes
    the issue (`close-issues.yaml`).
 
