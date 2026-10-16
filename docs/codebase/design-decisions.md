@@ -63,7 +63,7 @@ is one class for every kind: `name`, `description`, `version`, `step_unit`,
 **process** (`Process`: bins, accumulators, stratifications, transitions) is
 what changes and how, written once. The **structure** is what changes between
 kinds of model: `Aggregate` lays the process out as amounts per compartment;
-`Network` and `Agents` come with their ODDs. It is tagged in JSON by `kind`. In
+`Network` and `Agents` come with their proposals ([#144](https://github.com/MUNQU/commol/issues/144), [#145](https://github.com/MUNQU/commol/issues/145)). It is tagged in JSON by `kind`. In
 Python `Model` is generic in its structure class: `ModelBuilder.build(structure,
 engine)` returns a `Model` of the class of `structure` (a `TypeVar`, never a
 value), so `model.structure.total` type-checks, and `Model.from_json` reads the
@@ -84,7 +84,7 @@ model (`outputs_by_source(model)`, `series_label(model, id)`); the methods of
 
 A structure may have **variants**: a subclass that keeps the kind, the fields
 and the engines of its structure, narrows the constructor and may add checks
-(`MarkovChain(Aggregate)`, `Network(Agents)` in later ODDs). The JSON holds the
+(`MarkovChain(Aggregate)`, `Network(Agents)` in later proposals, [#142](https://github.com/MUNQU/commol/issues/142) and [#144](https://github.com/MUNQU/commol/issues/144)). The JSON holds the
 kind and the variant; the Python registry (`ModelStructure._kinds`) is keyed by
 `(kind, variant)`, so a model loads back as the class it was saved with. Rust
 reads the variant only to run its checks (`AggregateVariant::check`), so the

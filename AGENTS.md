@@ -56,7 +56,8 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Tests | Run the Rust and the Python suites before you call a change done. Put a Python test in the package of its guide page, build models with `tests/support/`, and check a result: [Tests](docs/codebase/conventions.md#tests). |
 | Comments | Describe the code as it is, never how it came to be. See [Conventions](docs/codebase/conventions.md). |
 | Docs | **Mandatory.** Every change ships with its documentation, in the agreed format and quality: the [documentation definition of done](docs/codebase/conventions.md#documentation-definition-of-done). |
-| Releases | Follow [Release process](docs/development/release.md). A published PyPI version is final. |
+| Planning | Work is a GitHub issue written from `.github/ISSUE_TEMPLATE/`: a proposal (label `proposal`) holds the requirements with their tests, the decisions and the tasks; its blockers and milestone set the order and the release. A pull request says `Closes #N`. See [Planning](docs/development/workflow.md#planning). |
+| Releases | Follow [Release process](docs/development/release.md): a release issue (label `release`) holds the checklist, and the notes come from the changelog (`.github/scripts/release_notes.py`). A published PyPI version is final. |
 
 ## If you need to…
 
