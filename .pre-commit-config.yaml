@@ -25,17 +25,24 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0
-    hooks:
+      # ruff runs from uv.lock, as CI does (`uv run ruff …` in
+      # code-quality.yaml), so Dependabot updates the version of both. It
+      # covers the same files as CI: everything under py-commol/, README.md
+      # included through its symlink.
       - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
-        types_or: [python, pyi, jupyter, markdown]
-        # Scoped to what CI's `ruff format --check .` covers. README.md is listed
-        # explicitly because py-commol/README.md is a symlink to it: CI checks it
-        # through the symlink, so edits at the root must be checked here too.
+        name: ruff check
+        entry: bash -c "cd py-commol && uv run ruff check --fix ."
+        language: system
+        pass_filenames: false
         files: ^(py-commol/|README\.md$)
+        types_or: [python, pyi, jupyter, markdown]
+      - id: ruff-format
+        name: ruff format
+        entry: bash -c "cd py-commol && uv run ruff format ."
+        language: system
+        pass_filenames: false
+        files: ^(py-commol/|README\.md$)
+        types_or: [python, pyi, jupyter, markdown]
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.11.33
     hooks:
