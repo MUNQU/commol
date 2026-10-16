@@ -2922,8 +2922,8 @@ plan:</p>
 <p>An issue is ready when every issue that blocks it is closed.</p>
 <p>The project adds a new issue as <code>Todo</code> and moves it to <code>Done</code> when it closes.
 A pull request that says <code>Closes #N</code> links to its issue and closes it when it
-merges. <code>In Progress</code> is set by whoever starts the work, from the project or
-from a terminal:</p>
+merges. <code>In Progress</code> is set when the work starts, by <code>.github/scripts/start.sh</code>
+(see below), or by hand from the project or a terminal:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>project<span class="w"> </span>item-list<span class="w"> </span><span class="m">1</span><span class="w"> </span>--owner<span class="w"> </span>MUNQU<span class="w">                    </span><span class="c1"># the items and their status</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">item</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>project<span class="w"> </span>item-list<span class="w"> </span><span class="m">1</span><span class="w"> </span>--owner<span class="w"> </span>MUNQU<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--jq<span class="w"> </span><span class="s1">&#39;.items[] | select(.content.number == &lt;number&gt;) | .id&#39;</span><span class="k">)</span>
@@ -2941,13 +2941,18 @@ from a terminal:</p>
 <li>Settle its decisions when its implementation starts, not before. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.</li>
-<li>Set the item to <code>In Progress</code>, and create the branch from the issue, so
-   GitHub lists it under the issue: <code>gh issue develop &lt;number&gt; --base main
-   --name &lt;type&gt;/&lt;name&gt; --checkout</code>. Work one task after the other, the tests
-   of a requirement before its code. Tick the tasks of the body as they land.</li>
-<li>Open the pull request with <code>Closes #N</code> and the evidence. The merge closes
-   the issue.</li>
+<li>Start it with one command, which takes it, sets it to <code>In Progress</code> and
+   creates its branch from <code>main</code>, linked to the issue, in a sibling worktree:</li>
 </ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>.github/scripts/start.sh<span class="w"> </span>&lt;number&gt;<span class="w"> </span>&lt;type&gt;/&lt;name&gt;<span class="w">   </span><span class="c1"># --here: in this checkout</span>
+</span></code></pre></div>
+<p>It refuses an issue that is closed, blocked by an open issue, or taken by
+   someone else, and <code>--dry-run</code> shows what it would do. Never start by hand:
+   a started issue that is not <code>In Progress</code> and assigned looks free to the
+   next one who runs <code>next.sh</code>. Work one task after the other, the tests of a
+   requirement before its code. Tick the tasks of the body as they land.
+4. Open the pull request with <code>Closes #N</code> and the evidence. The merge closes
+   the issue.</p>
 <h3 id="parallel-work">Parallel work<a class="headerlink" href="#parallel-work" title="Permanent link">&para;</a></h3>
 <p>Two proposals can run at the same time when no chain of "blocked by" links
 joins them and neither changes what the other changes or adds. Each proposal
@@ -2981,11 +2986,10 @@ it after a proposal is added or its Touches change. The <code>area:</code> label
 the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <p>To take a proposal while others run:</p>
 <ol>
-<li>Assign the issue to yourself (or to the agent that works on it) and set it
-   to <code>In Progress</code>: an assigned issue is taken.</li>
-<li>Work in its own worktree, a sibling of the repository, with its own
-   CodeGraph index: <code>gh issue develop &lt;number&gt; --base main --name
-   &lt;type&gt;/&lt;name&gt; --worktree ../commol-worktrees/&lt;name&gt;</code>.</li>
+<li>Start it with <code>.github/scripts/start.sh &lt;number&gt; &lt;type&gt;/&lt;name&gt;</code>: it assigns
+   the issue (an assigned issue is taken), sets it to <code>In Progress</code> and
+   creates its worktree, a sibling of the repository, which needs its own
+   CodeGraph index.</li>
 <li>Open the pull request as usual. The merge queue of <code>main</code> tests it on
    top of the pull requests queued before it, so a conflict in meaning fails
    there and never reaches <code>main</code>; a conflict in the lines of a shared
@@ -2993,44 +2997,44 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 </ol>
 <h2 id="development-process">Development Process<a class="headerlink" href="#development-process" title="Permanent link">&para;</a></h2>
 <h3 id="1-starting-new-work">1. Starting New Work<a class="headerlink" href="#1-starting-new-work" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Always start from the latest main</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>main
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># Create a feature branch</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/your-feature-name
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Always start from the latest main</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>main
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Create a feature branch</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/your-feature-name
 </span></code></pre></div>
 <h3 id="2-making-changes">2. Making Changes<a class="headerlink" href="#2-making-changes" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Make your changes to the code</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Run quality checks before committing (with virtual environment activated)</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--fix<span class="w">         </span><span class="c1"># Auto-fix Python linting issues</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>ruff<span class="w"> </span>format<span class="w"> </span>.<span class="w">              </span><span class="c1"># Format Python code</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>ty<span class="w"> </span>check<span class="w"> </span>commol<span class="w">            </span><span class="c1"># Type checking</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">cd</span><span class="w"> </span>..
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w">                       </span><span class="c1"># Format Rust code</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--all-targets<span class="w"> </span>--fix<span class="w">      </span><span class="c1"># Fix Rust linting issues</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Make your changes to the code</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Run quality checks before committing (with virtual environment activated)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--fix<span class="w">         </span><span class="c1"># Auto-fix Python linting issues</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>ruff<span class="w"> </span>format<span class="w"> </span>.<span class="w">              </span><span class="c1"># Format Python code</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>ty<span class="w"> </span>check<span class="w"> </span>commol<span class="w">            </span><span class="c1"># Type checking</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nb">cd</span><span class="w"> </span>..
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w">                       </span><span class="c1"># Format Rust code</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--all-targets<span class="w"> </span>--fix<span class="w">      </span><span class="c1"># Fix Rust linting issues</span>
 </span></code></pre></div>
 <h3 id="3-testing-your-changes">3. Testing Your Changes<a class="headerlink" href="#3-testing-your-changes" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Run Python tests (with virtual environment activated)</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>pytest<span class="w"> </span>-v
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># Run Rust tests</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="nb">cd</span><span class="w"> </span>..
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--workspace
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Run Python tests (with virtual environment activated)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>pytest<span class="w"> </span>-v
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Run Rust tests</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nb">cd</span><span class="w"> </span>..
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--workspace
 </span></code></pre></div>
 <h3 id="4-committing-changes">4. Committing Changes<a class="headerlink" href="#4-committing-changes" title="Permanent link">&para;</a></h3>
 <p>We follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> for commit messages. The scope is required, and a message is one short phrase with no body; see <a href="../../codebase/conventions/#commits">Commits</a>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Commit format: &lt;type&gt;(&lt;scope&gt;): &lt;description&gt;</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>git<span class="w"> </span>add<span class="w"> </span>.
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat(transitions): add rate patterns&quot;</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;fix(simulation): correct the total of a subgroup&quot;</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;docs(readme): update installation instructions&quot;</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;test(models): add tests for stratified models&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Commit format: &lt;type&gt;(&lt;scope&gt;): &lt;description&gt;</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>git<span class="w"> </span>add<span class="w"> </span>.
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat(transitions): add rate patterns&quot;</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;fix(simulation): correct the total of a subgroup&quot;</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;docs(readme): update installation instructions&quot;</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;test(models): add tests for stratified models&quot;</span>
 </span></code></pre></div>
 <p><strong>Commit Types</strong>:</p>
 <ul>
@@ -3053,12 +3057,12 @@ the same zones (<code>gh issue list --label area:inference -s open</code>).</p>
 <li>A <code>docs/*</code> branch is documentation-only, so all commits should use <code>docs</code> type</li>
 </ul>
 <h3 id="5-pushing-and-creating-pull-requests">5. Pushing and Creating Pull Requests<a class="headerlink" href="#5-pushing-and-creating-pull-requests" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Push your branch</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature/your-feature-name
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Create a Pull Request on GitHub</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># - Target &#39;main&#39;</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># - Fill in the PR template; &quot;Closes #N&quot; names the issue it delivers</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Push your branch</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature/your-feature-name
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Create a Pull Request on GitHub</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># - Target &#39;main&#39;</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># - Fill in the PR template; &quot;Closes #N&quot; names the issue it delivers</span>
 </span></code></pre></div>
 <h3 id="6-code-review-and-ci">6. Code Review and CI<a class="headerlink" href="#6-code-review-and-ci" title="Permanent link">&para;</a></h3>
 <p>When you create a PR, automated checks run:</p>
@@ -3140,23 +3144,23 @@ Updating the file there also triggers a version-update check right away.</p>
 </table>
 <h2 id="local-development-tips">Local Development Tips<a class="headerlink" href="#local-development-tips" title="Permanent link">&para;</a></h2>
 <h3 id="quick-commands">Quick Commands<a class="headerlink" href="#quick-commands" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Python, from py-commol/ with the virtual environment active</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>commol
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>vulture<span class="w"> </span>commol<span class="w"> </span>.vulture_allowlist.py<span class="w"> </span>--min-confidence<span class="w"> </span><span class="m">80</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pytest
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Rust, from the repository root</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w"> </span>--<span class="w"> </span>--check
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--workspace<span class="w"> </span>--all-targets<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol-random<span class="w"> </span>-p<span class="w"> </span>commol-stochastic<span class="w"> </span>-p<span class="w"> </span>commol
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol<span class="w"> </span>--features<span class="w"> </span>test-kind<span class="w">   </span><span class="c1"># the engine of the test model kind</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># Documentation, from the repository root</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Python, from py-commol/ with the virtual environment active</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>ruff<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>commol
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>vulture<span class="w"> </span>commol<span class="w"> </span>.vulture_allowlist.py<span class="w"> </span>--min-confidence<span class="w"> </span><span class="m">80</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pytest
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Rust, from the repository root</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>cargo<span class="w"> </span>fmt<span class="w"> </span>--all<span class="w"> </span>--<span class="w"> </span>--check
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>cargo<span class="w"> </span>clippy<span class="w"> </span>--workspace<span class="w"> </span>--all-targets<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol-core<span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>-p<span class="w"> </span>commol-difference<span class="w"> </span>-p<span class="w"> </span>commol-differential<span class="w"> </span>-p<span class="w"> </span>commol-calibration<span class="w"> </span>-p<span class="w"> </span>commol-random<span class="w"> </span>-p<span class="w"> </span>commol-stochastic<span class="w"> </span>-p<span class="w"> </span>commol
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>commol<span class="w"> </span>--features<span class="w"> </span>test-kind<span class="w">   </span><span class="c1"># the engine of the test model kind</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># Documentation, from the repository root</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
 </span></code></pre></div>
 <h3 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h3>
 <p>Install pre-commit hooks to automatically check code before committing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>pre-commit<span class="w"> </span>install
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pre-commit<span class="w"> </span>install
 </span></code></pre></div>
 <p>On every commit, the hooks in <code>.pre-commit-config.yaml</code> run:</p>
 <table>
@@ -3220,24 +3224,24 @@ by hand, or to fix the lints of that pull request:</p>
 <li>Rebuild the extension and run <code>pytest</code>.</li>
 </ol>
 <h3 id="debugging-rust-from-python">Debugging Rust from Python<a class="headerlink" href="#debugging-rust-from-python" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Build with debug symbols (with virtual environment activated)</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>maturin<span class="w"> </span>develop
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># Run Python</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>python<span class="w"> </span>-m<span class="w"> </span>your_test_script.py
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Build with debug symbols (with virtual environment activated)</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>maturin<span class="w"> </span>develop
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Run Python</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>python<span class="w"> </span>-m<span class="w"> </span>your_test_script.py
 </span></code></pre></div>
 <h2 id="building-documentation">Building Documentation<a class="headerlink" href="#building-documentation" title="Permanent link">&para;</a></h2>
 <p>The project uses MkDocs Material for documentation with multi-version support via Mike:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Install documentation dependencies (with virtual environment activated)</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Serve documentation locally</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>mkdocs<span class="w"> </span>serve
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># Build documentation</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>mkdocs<span class="w"> </span>build
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Install documentation dependencies (with virtual environment activated)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1"># Serve documentation locally</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>mkdocs<span class="w"> </span>serve
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1"># Build documentation</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>mkdocs<span class="w"> </span>build
 </span></code></pre></div>
 <p>Visit http://127.0.0.1:8000 to view the documentation locally.</p>
 <h3 id="documentation-versioning">Documentation Versioning<a class="headerlink" href="#documentation-versioning" title="Permanent link">&para;</a></h3>
@@ -3256,20 +3260,20 @@ by hand, or to fix the lints of that pull request:</p>
 <p>Users can switch between versions using the version selector in the documentation site.</p>
 <h4 id="manual-deployment-if-needed">Manual Deployment (if needed)<a class="headerlink" href="#manual-deployment-if-needed" title="Permanent link">&para;</a></h4>
 <p>If you need to manually deploy documentation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Deploy latest version (from a checkout of the release tag) - with venv activated</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>mike<span class="w"> </span>deploy<span class="w"> </span>--push<span class="w"> </span>--update-aliases<span class="w"> </span>latest
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>mike<span class="w"> </span>set-default<span class="w"> </span>--push<span class="w"> </span>latest
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="c1"># Deploy dev version (from main)</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="nb">cd</span><span class="w"> </span>py-commol
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>mike<span class="w"> </span>deploy<span class="w"> </span>--push<span class="w"> </span>dev
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1"># List all deployed versions</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>mike<span class="w"> </span>list
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="c1"># Delete a version</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>mike<span class="w"> </span>delete<span class="w"> </span>&lt;version-name&gt;<span class="w"> </span>--push
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Deploy latest version (from a checkout of the release tag) - with venv activated</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>mike<span class="w"> </span>deploy<span class="w"> </span>--push<span class="w"> </span>--update-aliases<span class="w"> </span>latest
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>mike<span class="w"> </span>set-default<span class="w"> </span>--push<span class="w"> </span>latest
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="c1"># Deploy dev version (from main)</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="nb">cd</span><span class="w"> </span>py-commol
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>mike<span class="w"> </span>deploy<span class="w"> </span>--push<span class="w"> </span>dev
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># List all deployed versions</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>mike<span class="w"> </span>list
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># Delete a version</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>mike<span class="w"> </span>delete<span class="w"> </span>&lt;version-name&gt;<span class="w"> </span>--push
 </span></code></pre></div>
 <h4 id="version-management-tips">Version Management Tips<a class="headerlink" href="#version-management-tips" title="Permanent link">&para;</a></h4>
 <ul>
