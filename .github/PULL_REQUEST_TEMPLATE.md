@@ -20,6 +20,6 @@ Every change ships with its documentation. See the
 - [ ] I updated every doc the change affects (step 1 of the definition of done), or this change affects no docs because: <!-- reason -->
 - [ ] Docstrings (Python) and rustdoc (Rust) cover every new or changed public item
 - [ ] Examples use abstract names and run top to bottom within their page
-- [ ] `AGENTS.md` and `docs/codebase/` still describe the code (commands, ownership, design decisions)
+- [ ] `AGENTS.md` and `docs/codebase/` still describe the code (commands, ownership, design decisions, the diagrams of `architecture.md`)
 - [ ] User-visible changes are in `docs/about/changelog.md` under `[Unreleased]`
 - [ ] `mkdocs build --strict` passes

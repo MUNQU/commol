@@ -122,4 +122,4 @@ Place code at the narrowest owner that can hold it:
 
 ## Navigation
 
-Previous: [Mental model](mental-model.md) | Next: [Design decisions](design-decisions.md)
+Previous: [Architecture](architecture.md) | Next: [Design decisions](design-decisions.md)

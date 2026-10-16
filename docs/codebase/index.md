@@ -22,7 +22,7 @@ see the [User Guide](../guide/core-concepts.md) and the
 
 ## 90-second mental model
 
-Commol has three layers. The user writes a model in Python. Python validates
+Commol has three layers ([Architecture](architecture.md) draws them). The user writes a model in Python. Python validates
 it and serializes it to JSON. The Rust engine builds and runs it.
 
 ```text
@@ -55,6 +55,7 @@ it asks the engine through a binding. It never re-implements the rule.
 | Page | Job |
 |---|---|
 | [Mental model](mental-model.md) | What Commol is, what it is not, and the invariants every change must keep. |
+| [Architecture](architecture.md) | Diagrams of the two halves, the Rust crates, and the path of a simulation and a calibration. |
 | [Repository map](repository-map.md) | Which module owns which behavior, and where new code goes. |
 | [Design decisions](design-decisions.md) | The rules that are not obvious from the code, and the tests that guard them. |
 | [Conventions](conventions.md) | How code, comments, docs and commits are written. |
@@ -63,9 +64,10 @@ it asks the engine through a binding. It never re-implements the rule.
 ## Recommended reading path
 
 1. [Mental model](mental-model.md).
-2. [Repository map](repository-map.md) before you edit code.
-3. The [Design decisions](design-decisions.md) of the area you change.
-4. [Maintainer playbook](maintainer-playbook.md) before you open or review a
+2. [Architecture](architecture.md) for the picture of the code.
+3. [Repository map](repository-map.md) before you edit code.
+4. The [Design decisions](design-decisions.md) of the area you change.
+5. [Maintainer playbook](maintainer-playbook.md) before you open or review a
    pull request.
 
 ## Related pages

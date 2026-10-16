@@ -54,3 +54,20 @@ def test_site_links_point_to_existing_pages(source: str) -> None:
         if not any(candidate.is_file() for candidate in candidates):
             missing.append(match.group(0))
     assert not missing, f"{source} links to pages that do not exist: {missing}"
+
+
+ARCHITECTURE_PAGE = REPO_ROOT / "docs" / "codebase" / "architecture.md"
+
+
+@pytest.mark.docs
+@pytest.mark.parametrize(
+    "crate",
+    sorted(path.parent.name for path in (REPO_ROOT / "crates").glob("*/Cargo.toml")),
+)
+def test_crate_is_on_the_architecture_page(crate: str) -> None:
+    """Every crate under ``crates/`` is named on the architecture page."""
+    text = ARCHITECTURE_PAGE.read_text(encoding="utf-8")
+    assert f"`{crate}`" in text, (
+        f"{crate} is not named in docs/codebase/architecture.md: add it to "
+        "the diagrams and tables of that page"
+    )

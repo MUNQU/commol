@@ -19,7 +19,8 @@ agreed quality. Before you call a change done, follow the
 
 ## Before you change code
 
-1. Read [Mental model](docs/codebase/mental-model.md) (5 minutes).
+1. Read [Mental model](docs/codebase/mental-model.md) (5 minutes) and look at
+   the diagrams of [Architecture](docs/codebase/architecture.md).
 2. Find the owner of the behavior in [Repository map](docs/codebase/repository-map.md).
 3. Read the [Design decisions](docs/codebase/design-decisions.md) that touch it.
 4. Follow the checklist for your change in the [Maintainer playbook](docs/codebase/maintainer-playbook.md).

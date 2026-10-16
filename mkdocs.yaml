@@ -161,6 +161,7 @@ nav:
       - Codebase Guide:
           - Codebase Guide: codebase/index.md
           - Mental Model: codebase/mental-model.md
+          - Architecture: codebase/architecture.md
           - Repository Map: codebase/repository-map.md
           - Design Decisions: codebase/design-decisions.md
           - Conventions: codebase/conventions.md

@@ -113,6 +113,8 @@ To add an engine to the list:
 - [ ] Say what a rate means for it in the guides, and add it to
       [Model structure](../advanced/model-structure.md) and
       [Running simulations](../guide/simulations.md).
+- [ ] Add the engine to [Inside Rust](architecture.md#inside-rust): a box in
+      the diagram and a row in the table.
 
 ### Model kind
 
@@ -156,6 +158,8 @@ To add a kind of model, such as an agent network (see
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the
       [Mental model](mental-model.md#model-kind-and-engine) and a guide page.
+- [ ] Update [Architecture](architecture.md) if the kind adds a crate or
+      changes the path of a simulation or a calibration.
 
 ### PyO3 bindings
 
@@ -191,6 +195,7 @@ To add a kind of model, such as an agent network (see
 - [ ] The change meets the [documentation definition of done](conventions.md#documentation-definition-of-done):
       the affected docs are updated, in the agreed format, and the doc checks pass.
 - [ ] Every new claim in the docs names a file, function or test.
+- [ ] The diagrams of [Architecture](architecture.md) still describe the code.
 - [ ] The tests that guard the touched [design decisions](design-decisions.md) still pass.
 
 ## Navigation
