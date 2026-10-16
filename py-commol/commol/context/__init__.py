@@ -1,15 +1,18 @@
 """The Pydantic model definition: validation, serialization and updates."""
 
-from .compartmental import CompartmentalStructure
-from .initial_conditions import CompartmentFraction
+from .aggregate import Aggregate
 from .model import Model
+from .neighbors import Complete, Groups
+from .process import Process
 from .structure import ModelStructure, SeriesLabel
 
 
 __all__ = [
-    "CompartmentFraction",
-    "CompartmentalStructure",
+    "Aggregate",
+    "Complete",
+    "Groups",
     "Model",
     "ModelStructure",
+    "Process",
     "SeriesLabel",
 ]

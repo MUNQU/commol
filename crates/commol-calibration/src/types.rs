@@ -265,6 +265,154 @@ impl LossConfig {
     }
 }
 
+impl LossConfig {
+    /// Loss of observations against the replicates of a stochastic engine.
+    ///
+    /// Each item is `(observed, predictions, weight, normalization)`, with one
+    /// prediction per replicate. With [`ReplicateSummary::Crps`] the loss is
+    /// the weighted mean of the continuous ranked probability scores,
+    /// `Σ w·crps / Σ w`, whatever the configured loss; with any other summary
+    /// it is this loss of the residuals `(observed - summary) × normalization`.
+    /// The predictions are reordered.
+    pub fn replicate_loss<'a>(
+        self,
+        summary: ReplicateSummary,
+        observations: impl IntoIterator<Item = (f64, &'a mut [f64], f64, f64)>,
+    ) -> f64 {
+        match summary {
+            ReplicateSummary::Crps => {
+                let (sum, weight_sum) = observations.into_iter().fold(
+                    (0.0, 0.0),
+                    |(sum, weight_sum), (observed, predictions, weight, normalization)| {
+                        let score = crps(predictions, observed) * normalization;
+                        (sum + weight * score, weight_sum + weight)
+                    },
+                );
+                if weight_sum > 0.0 {
+                    sum / weight_sum
+                } else {
+                    0.0
+                }
+            }
+            summary => self.aggregate(observations.into_iter().map(
+                |(observed, predictions, weight, normalization)| {
+                    (
+                        (observed - summary.summarize(predictions)) * normalization,
+                        weight,
+                    )
+                },
+            )),
+        }
+    }
+}
+
+/// What the observations are compared with when each evaluation runs several
+/// replicates of a stochastic engine. The user chooses it; there is no
+/// default.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ReplicateSummary {
+    /// The mean of the replicates.
+    Mean,
+    /// The median of the replicates.
+    Median,
+    /// A quantile of the replicates, in `[0, 1]`, linearly interpolated
+    /// between order statistics.
+    Quantile(f64),
+    /// The empirical distribution of the replicates, scored by the
+    /// continuous ranked probability score ([`crps`]).
+    Crps,
+}
+
+impl ReplicateSummary {
+    /// The summary of a set of replicate values, which are reordered.
+    ///
+    /// # Panics
+    ///
+    /// Panics on [`Self::Crps`], which scores a distribution instead of
+    /// summarizing it, and when `values` is empty.
+    pub fn summarize(self, values: &mut [f64]) -> f64 {
+        assert!(!values.is_empty(), "a summary of no replicates");
+        match self {
+            Self::Mean => values.iter().sum::<f64>() / values.len() as f64,
+            Self::Median => quantile(values, 0.5),
+            Self::Quantile(level) => quantile(values, level),
+            Self::Crps => panic!("the CRPS scores a distribution; use `crps`"),
+        }
+    }
+}
+
+/// The quantile `level` of `values`, with linear interpolation between order
+/// statistics (the default of NumPy). The values are sorted.
+fn quantile(values: &mut [f64], level: f64) -> f64 {
+    values.sort_by(f64::total_cmp);
+    let position = (values.len() - 1) as f64 * level.clamp(0.0, 1.0);
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    values[lower] + (position - lower as f64) * (values[upper] - values[lower])
+}
+
+/// The continuous ranked probability score of the empirical distribution of
+/// `predictions` at `observed`: `E|X - y| - ½ E|X - X'|`, with `X` and `X'`
+/// drawn from the predictions. A proper scoring rule; with one prediction it
+/// is the absolute error. The predictions are sorted.
+pub fn crps(predictions: &mut [f64], observed: f64) -> f64 {
+    let n = predictions.len();
+    if n == 0 {
+        return 0.0;
+    }
+    predictions.sort_by(f64::total_cmp);
+    let count = n as f64;
+    let to_observed = predictions
+        .iter()
+        .map(|value| (value - observed).abs())
+        .sum::<f64>()
+        / count;
+    // Σ_ij |x_i - x_j| = 2 Σ_i (2i - n + 1) x_(i) for the sorted values.
+    let pairs: f64 = predictions
+        .iter()
+        .enumerate()
+        .map(|(index, value)| (2.0 * index as f64 - count + 1.0) * value)
+        .sum::<f64>()
+        * 2.0;
+    to_observed - 0.5 * pairs / (count * count)
+}
+
+/// The replicates of each evaluation of a stochastic engine: common random
+/// numbers, so the loss is a deterministic function of the parameters.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Replicates {
+    /// The seed of each replicate, the same at every evaluation.
+    pub seeds: Vec<u64>,
+    /// What the observations are compared with.
+    pub summary: ReplicateSummary,
+}
+
+impl Replicates {
+    /// `count` replicates seeded from `seed`
+    /// ([`commol_random::replicate_seed`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when `count` is 0 or a quantile level is outside
+    /// `[0, 1]`.
+    pub fn new(count: usize, seed: u64, summary: ReplicateSummary) -> Result<Self, String> {
+        if count == 0 {
+            return Err("A stochastic calibration needs at least one replicate".to_string());
+        }
+        if let ReplicateSummary::Quantile(level) = summary {
+            if !(0.0..=1.0).contains(&level) {
+                return Err(format!("A quantile level is between 0 and 1, got {level}"));
+            }
+        }
+        Ok(Self {
+            seeds: (0..count as u64)
+                .map(|index| commol_random::replicate_seed(seed, index))
+                .collect(),
+            summary,
+        })
+    }
+}
+
 impl std::fmt::Display for LossConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -552,5 +700,95 @@ mod loss_tests {
             0.0
         );
         assert_eq!(LossConfig::MeanAbsoluteError.aggregate([]), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod replicate_tests {
+    use super::{crps, LossConfig, ReplicateSummary, Replicates};
+
+    #[test]
+    fn the_crps_of_one_replicate_is_the_absolute_error() {
+        assert_eq!(crps(&mut [7.0], 4.5), 2.5);
+        assert_eq!(crps(&mut [-1.0], 2.0), 3.0);
+    }
+
+    #[test]
+    fn the_crps_of_a_known_ensemble_is_its_closed_form() {
+        let values: [f64; 4] = [1.0, 4.0, 2.0, 8.0];
+        let observed: f64 = 3.0;
+        let n = values.len() as f64;
+        let to_observed: f64 = values.iter().map(|x| (x - observed).abs()).sum::<f64>() / n;
+        let between: f64 = values
+            .iter()
+            .flat_map(|x| values.iter().map(move |y| (x - y).abs()))
+            .sum::<f64>()
+            / (n * n);
+        let expected = to_observed - 0.5 * between;
+
+        let mut predictions = values;
+        assert!((crps(&mut predictions, observed) - expected).abs() < 1e-12);
+        assert!((expected - 0.8125).abs() < 1e-12);
+    }
+
+    #[test]
+    fn summaries_reduce_the_replicates() {
+        let values = [5.0, 1.0, 3.0, 2.0, 4.0];
+        assert_eq!(ReplicateSummary::Mean.summarize(&mut values.clone()), 3.0);
+        assert_eq!(ReplicateSummary::Median.summarize(&mut values.clone()), 3.0);
+        assert_eq!(
+            ReplicateSummary::Quantile(0.25).summarize(&mut values.clone()),
+            2.0
+        );
+        assert_eq!(
+            ReplicateSummary::Quantile(0.1).summarize(&mut values.clone()),
+            1.4
+        );
+        assert_eq!(
+            ReplicateSummary::Quantile(1.0).summarize(&mut values.clone()),
+            5.0
+        );
+    }
+
+    #[test]
+    fn a_replicate_loss_compares_the_summary_with_each_observation() {
+        let mut first = [1.0, 3.0];
+        let mut second = [10.0, 14.0];
+        let loss = LossConfig::SumSquaredError.replicate_loss(
+            ReplicateSummary::Mean,
+            [
+                (4.0, first.as_mut_slice(), 2.0, 1.0),
+                (12.0, second.as_mut_slice(), 1.0, 1.0),
+            ],
+        );
+        // Means 2 and 12: residuals 2 and 0, weighted 2 and 1.
+        assert_eq!(loss, 8.0);
+    }
+
+    #[test]
+    fn the_crps_loss_is_the_weighted_mean_score() {
+        let mut first = [7.0];
+        let mut second = [1.0, 4.0, 2.0, 8.0];
+        let loss = LossConfig::SumSquaredError.replicate_loss(
+            ReplicateSummary::Crps,
+            [
+                (4.5, first.as_mut_slice(), 1.0, 1.0),
+                (3.0, second.as_mut_slice(), 3.0, 1.0),
+            ],
+        );
+        assert!((loss - (2.5 + 3.0 * 0.8125) / 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn replicates_take_fixed_seeds_and_reject_bad_input() {
+        let replicates = Replicates::new(3, 9, ReplicateSummary::Median).unwrap();
+        assert_eq!(replicates.seeds.len(), 3);
+        assert_eq!(
+            replicates.seeds,
+            Replicates::new(3, 9, ReplicateSummary::Mean).unwrap().seeds
+        );
+        assert_eq!(replicates.seeds[1], commol_random::replicate_seed(9, 1));
+        assert!(Replicates::new(0, 9, ReplicateSummary::Mean).is_err());
+        assert!(Replicates::new(2, 9, ReplicateSummary::Quantile(1.5)).is_err());
     }
 }

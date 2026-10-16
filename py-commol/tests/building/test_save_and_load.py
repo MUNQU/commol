@@ -23,7 +23,7 @@ def _model(k: float | None = 0.1, fraction: float | None = 1.0) -> Model:
 
 
 class TestToJson:
-    def test_the_file_holds_the_header_the_engine_and_the_structure(
+    def test_the_file_holds_the_header_the_process_and_the_structure(
         self, tmp_path: Path
     ) -> None:
         path = tmp_path / "model.json"
@@ -37,11 +37,25 @@ class TestToJson:
             "version",
             "parameters",
             "engine",
+            "process",
             "structure",
             "step_unit",
         ]
-        assert data["structure"]["kind"] == "compartmental"
-        assert len(data["structure"]["transitions"]) == 1
+        assert data["structure"]["kind"] == "aggregate"
+        assert data["structure"]["variant"] is None
+        assert len(data["process"]["transitions"]) == 1
+        assert data["structure"]["bin_fractions"] == {"A": 1.0, "B": 0.0}
+
+    def test_a_file_of_the_compartmental_kind_lists_the_kinds(
+        self, tmp_path: Path
+    ) -> None:
+        data = _model().model_dump(mode="json")
+        data["structure"]["kind"] = "compartmental"
+        path = tmp_path / "old.json"
+        path.write_text(json.dumps(data))
+
+        with pytest.raises(ValidationError, match="aggregate"):
+            Model.from_json(path)
 
     def test_a_file_with_population_and_dynamics_names_them(
         self, tmp_path: Path
@@ -49,7 +63,7 @@ class TestToJson:
         data = _model().model_dump(mode="json")
         structure = data.pop("structure")
         structure.pop("kind")
-        data["dynamics"] = {"transitions": structure["transitions"]}
+        data["dynamics"] = {"transitions": data.pop("process")["transitions"]}
         data["population"] = structure
         path = tmp_path / "old.json"
         path.write_text(json.dumps(data))
@@ -62,7 +76,7 @@ class TestToJson:
 
     def test_a_file_with_population_size_names_it(self, tmp_path: Path) -> None:
         data = _model().model_dump(mode="json")
-        conditions = data["structure"]["initial_conditions"]
+        conditions = data["structure"]
         conditions["population_size"] = conditions.pop("total")
         path = tmp_path / "old.json"
         path.write_text(json.dumps(data))

@@ -8,7 +8,9 @@ from commol.api import (
     ModelBuilder,
     Simulation,
     SimulationPlotter,
+    SimulationReplicates,
     SimulationResults,
+    ReplicateRuns,
     AxisPattern,
     applied_parameters_report,
     ci_percentiles,
@@ -21,8 +23,16 @@ from commol.api import (
     windowed_totals,
 )
 from commol.commol_rs._commol_rs import engine as _engine
-from commol.context import CompartmentalStructure, Model, ModelStructure
+from commol.context import (
+    Aggregate,
+    Complete,
+    Groups,
+    Model,
+    ModelStructure,
+    Process,
+)
 from commol.context.axis_units import AxisUnits
+from commol.context.description import ModelDescription
 from commol.context.engine import OdeSolver
 from commol.context.calibration import (
     CalibrationConstraint,
@@ -32,6 +42,7 @@ from commol.context.calibration import (
     NelderMeadConfig,
     ObservedDataPoint,
     ParticleSwarmConfig,
+    Quantile,
 )
 from commol.context.probabilistic_calibration import (
     CalibrationEvaluation,
@@ -78,9 +89,12 @@ __all__ = [
     "CalibrationProblem",
     "CalibrationResult",
     "Calibrator",
-    "CompartmentalStructure",
+    "Aggregate",
+    "Complete",
+    "Groups",
     "Model",
     "ModelBuilder",
+    "ModelDescription",
     "ModelStructure",
     "NelderMeadConfig",
     "ObservedDataPoint",
@@ -88,6 +102,7 @@ __all__ = [
     "ParameterSetStatistics",
     "ParticleSwarmConfig",
     "PlotConfig",
+    "Process",
     "ProbabilisticCalibrationConfig",
     "ProbabilisticCalibrationResult",
     "ProbClusteringConfig",
@@ -95,9 +110,12 @@ __all__ = [
     "ProbGreedyLocalSearchConfig",
     "ProbNsga2Config",
     "ProbRepresentativeConfig",
+    "Quantile",
     "Simulation",
     "SimulationPlotter",
     "SimulationResults",
+    "SimulationReplicates",
+    "ReplicateRuns",
     "AxisPattern",
     "AxisUnits",
     "applied_parameters_report",

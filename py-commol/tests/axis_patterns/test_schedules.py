@@ -4,9 +4,9 @@ from typing import cast
 
 import pytest
 
-from commol import ModelBuilder, AxisPattern
+from commol import Aggregate, AxisPattern
 from commol.api.patterns import ConditionDict
-from tests.support import a_to_b_builder, run
+from tests.support import FactoryBuilder, a_to_b_builder, run
 from tests.axis_patterns.conditions import condition, rate_string, stratified_rates
 
 
@@ -237,22 +237,16 @@ class TestScheduleIntegration:
         )
 
         model = (
-            ModelBuilder("A_status")
+            FactoryBuilder("A_status")
             .add_bin("A", "Compartment")
             .add_stratification("status", ["s0", "s1"])
             .add_transition("flow", ["A"], ["A"], rate=rate)
-            .set_initial_conditions(
-                total=1000,
-                bin_fractions=[{"bin": "A", "fraction": 1.0}],
-                stratification_fractions=[
-                    {
-                        "stratification": "status",
-                        "fractions": [
-                            {"category": "s0", "fraction": 1.0},
-                            {"category": "s1", "fraction": 0.0},
-                        ],
-                    }
-                ],
+            .set_structure(
+                Aggregate(
+                    total=1000,
+                    bin_fractions={"A": 1.0},
+                    stratification_fractions={"status": {"s0": 1.0, "s1": 0.0}},
+                )
             )
         )
         result = run(model, 10)
@@ -267,7 +261,7 @@ class TestScheduleIntegration:
     def test_target_only_override_without_category_routes_flow(self):
         """A target-only condition can match without filtering source categories."""
         model = (
-            ModelBuilder("target_only")
+            FactoryBuilder("target_only")
             .add_bin("A", "Source")
             .add_bin("B", "Target")
             .add_stratification("group", ["g1", "g2"])
@@ -282,21 +276,12 @@ class TestScheduleIntegration:
                     }
                 ],
             )
-            .set_initial_conditions(
-                total=1000,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-                stratification_fractions=[
-                    {
-                        "stratification": "group",
-                        "fractions": [
-                            {"category": "g1", "fraction": 0.5},
-                            {"category": "g2", "fraction": 0.5},
-                        ],
-                    }
-                ],
+            .set_structure(
+                Aggregate(
+                    total=1000,
+                    bin_fractions={"A": 1.0, "B": 0.0},
+                    stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+                )
             )
         )
 

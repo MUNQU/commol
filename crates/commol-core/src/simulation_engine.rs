@@ -2,6 +2,8 @@
 //! model.
 
 use std::collections::HashMap;
+
+use rayon::prelude::*;
 use std::fmt::{self, Debug, Display};
 
 use crate::types::ModelValueType;
@@ -224,7 +226,19 @@ pub trait SimulationEngine: Clone {
     ///
     /// This is essential for calibration workflows where the same model
     /// is simulated multiple times with different parameters.
+    ///
+    /// A stochastic engine also restores the generator of its seed
+    /// ([`Self::set_seed`]), so a run after a reset repeats the run before it.
     fn reset(&mut self);
+
+    /// Seed the random numbers of the engine, and restore its generator.
+    ///
+    /// A stochastic engine draws every random number from one generator
+    /// seeded here (`commol_random::Generator`), and [`Self::reset`] restores
+    /// it, so a run is reproducible from its seed. The default does nothing:
+    /// a deterministic engine draws no random number, and gives the same run
+    /// for every seed.
+    fn set_seed(&mut self, _seed: u64) {}
 
     /// Update a parameter value by its identifier.
     ///
@@ -298,4 +312,29 @@ pub trait SimulationEngine: Clone {
     ///
     /// Returns a message when the engine rejects a value.
     fn apply_values(&mut self, plan: &Self::ValuePlan, values: &[f64]) -> Result<f64, String>;
+}
+
+/// Run one replicate per seed of a stochastic engine, in parallel.
+///
+/// Each replicate clones `engine`, seeds it ([`SimulationEngine::set_seed`]),
+/// resets it and runs it at `positions`, so replicate `i` gives the same rows
+/// however many replicates run and in whatever order the threads take them.
+///
+/// # Errors
+///
+/// Returns the error of the first replicate, in seed order, that fails.
+pub fn run_replicates<E: SimulationEngine + Send + Sync>(
+    engine: &E,
+    positions: &[f64],
+    seeds: &[u64],
+) -> Result<Vec<Vec<Vec<f64>>>, SimulationError> {
+    seeds
+        .par_iter()
+        .map(|&seed| {
+            let mut replicate = engine.clone();
+            replicate.set_seed(seed);
+            replicate.reset();
+            replicate.run_at(positions)
+        })
+        .collect()
 }

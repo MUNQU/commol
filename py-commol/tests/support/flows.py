@@ -10,11 +10,10 @@ one state, so a test can compare it with the equations of its source.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
-from commol import ModelBuilder, OdeSolver, Simulation
-from commol.context.compartmental import CompartmentalStructure
+from commol import Aggregate, OdeSolver, Simulation
 from commol.context.model import Model
 
-from .models import TIGHT, build, build_ode
+from .models import TIGHT, FactoryBuilder, build, build_ode
 
 FINE = OdeSolver(rtol=TIGHT.rtol, atol=1e-12)
 """
@@ -48,7 +47,7 @@ def flow_model(
     ode: bool = True,
     settings: OdeSolver = FINE,
     accumulators: Sequence[str] = (),
-) -> Model[CompartmentalStructure]:
+) -> Model[Aggregate]:
     """
     Build a model from the initial value of each bin and its flows.
 
@@ -71,10 +70,10 @@ def flow_model(
 
     Returns
     -------
-    Model[CompartmentalStructure]
+    Model[Aggregate]
         The built model.
     """
-    builder = ModelBuilder(name="reference", version="1.0")
+    builder = FactoryBuilder(name="reference", version="1.0")
     for bin_id in values:
         builder.add_bin(id=bin_id, name=bin_id)
     for accumulator in accumulators:
@@ -91,12 +90,11 @@ def flow_model(
             accumulators=list(flow.accumulators) or None,
         )
     total = sum(values.values())
-    builder.set_initial_conditions(
+    builder.structure = Aggregate(
         total=total,
-        bin_fractions=[
-            {"bin": bin_id, "fraction": value / total if total else 0.0}
-            for bin_id, value in values.items()
-        ],
+        bin_fractions={
+            bin_id: value / total if total else 0.0 for bin_id, value in values.items()
+        },
     )
     return build_ode(builder, settings) if ode else build(builder)
 

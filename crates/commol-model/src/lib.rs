@@ -1,8 +1,10 @@
-//! Compilation of compartment models, shared by every engine.
+//! Compilation of aggregate models into compartments, shared by every
+//! engine of the aggregate kind.
 //!
-//! This crate expands a [`commol_core::Model`] into its compartments and
-//! accumulators, plans its transition flows, compiles their rates (fast path,
-//! JIT, evalexpr fallback) and exposes the result as a [`CompiledModel`]. Its
+//! This crate expands the process of a [`commol_core::Model`] into its
+//! compartments and accumulators, plans its transition flows, compiles their
+//! rates (fast path, JIT, evalexpr fallback) and exposes the result as a
+//! [`CompiledModel`]. Its
 //! [`CompiledModel::derivatives`] is the right-hand side `dX/dt = Σ flows`:
 //! the difference engine (`commol-difference`) adds it once per step, the
 //! differential engine (`commol-differential`) integrates it.
@@ -46,7 +48,7 @@ mod system;
 mod types;
 
 pub use builder::{
-    ExpandedOutput, InitialCompartment, check_names, expand_accumulators, expand_compartments,
+    ExpandedOutput, InitialCompartment, check_model, expand_accumulators, expand_compartments,
     initial_state, subgroup_total_names,
 };
 pub use engine::CompartmentalEngine;

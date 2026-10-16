@@ -121,7 +121,8 @@ indent-width = 4
 
 [tool.ruff.lint]
 # D1 and D417: every public module, class, function and argument is documented.
-select = ["E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417"]
+# N: names follow PEP 8 (pep8-naming).
+select = ["E", "F", "C90", "ARG", "ERA", "B007", "D1", "D417", "N"]
 fixable = ["ALL"]
 unfixable = []
 ignore = [

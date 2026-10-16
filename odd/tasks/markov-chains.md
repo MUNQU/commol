@@ -11,7 +11,7 @@ Motivation: the user asked to add Markov chains to the kinds of modelling
 missing is a way to choose it as a modelling, a check, an analysis and the
 documentation that shows it.
 Branch: `feat/markov-chains` from `develop`, after
-`odd/tasks/model-kind-foundation.md` and
+`odd/archive/tasks/model-kind-foundation.md` and
 `odd/tasks/stochastic-compartmental.md` are merged. S1 to S4 need only the
 foundation and could go first; S5 needs the stochastic engines.
 Engram mirror: topic `odd/markov-chains/tasks` (project `commol`).

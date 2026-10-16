@@ -160,7 +160,7 @@ of X". A pure-Python helper (`utils/security.py`, `context/axis_units.py`,
 `api/probabilistic/`) goes in the package of its feature. The exceptions are
 `reference_models/`, which checks published models across features (see
 [Reference models](#reference-models)), and `model_kinds/`, which runs a model
-kind that is not compartmental through every generic layer.
+kind that is not aggregate through every generic layer.
 
 | Package | Tests of | Guide page |
 |---|---|---|
@@ -168,16 +168,17 @@ kind that is not compartmental through every generic layer.
 | `transitions/` | Flows, `$compartment`, stratified rates, impulses | [Transitions](../guide/transitions.md) |
 | `rates/` | Formulas, functions, variables, expression security | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
-| `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#initial-conditions) |
+| `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |
-| `units/` | Unit checks and `print_equations` | [Units and Equations](../guide/units-and-equations.md) |
+| `units/` | Unit checks | [Units](../guide/units-and-equations.md) |
+| `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
 | `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
 | `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
 | `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |
 | `reference_models/` | Published models against their stated results, one module per model family | — (across features) |
-| `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind. It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](design-decisions.md#one-interface-for-every-model-kind)) |
+| `model_kinds/` | The test model kind (`support/kinds.py`) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (`UnstratifiedVariant`). It needs the extension built with `--features test-kind`. | — (across features; [Design decisions](design-decisions.md#one-interface-for-every-model-kind)) |
 | `support/` | No tests: the code the tests share | — |
 
 Keep a test module under about 600 lines. When it grows past that, split it by
@@ -189,8 +190,10 @@ topic inside its package.
   `abc_builder` (A → B → C), `abcd_builder` (A → B → C → D) and
   `a_to_b_builder`, and the special models
   `override_builder`, `shared_category_builder` and
-  `conditional_pathway_builder`. A keyword overrides one part of the default
-  model, so a test names only what it changes. `build` builds for difference
+  `conditional_pathway_builder`. A factory returns a `FactoryBuilder`: a
+  `ModelBuilder` of the process and the `Aggregate` that lays it out
+  (`builder.structure`, which `set_structure` replaces). A keyword overrides
+  one part of the default model, so a test names only what it changes. `build` builds for difference
   equations; `build_ode` builds for differential equations, with the tight
   solver settings `TIGHT` by default; `run` builds and simulates.
 - Build a model by hand only when one test needs it and no factory keyword

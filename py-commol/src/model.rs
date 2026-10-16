@@ -1,16 +1,17 @@
-//! Python bindings for commol-model: what a compartmental structure expands
-//! into, whatever engine runs it.
+//! Python bindings for commol-model: what the process of an aggregate model
+//! expands into, whatever engine runs it.
 
-use crate::core::{PyCompartmentalStructure, PyModel};
+use crate::core::{PyAggregate, PyModel, PyProcess};
 use pyo3::prelude::*;
 
-/// Expand a structure into its compartments and their initial amounts
+/// Expand a process into its compartments and their initial amounts
 ///
-/// This is the authority for the initial state of a compartmental model,
+/// This is the authority for the initial state of an aggregate model,
 /// including per-compartment overrides.
 ///
 /// Args:
-///     structure: The compartmental structure
+///     process: The process of the model
+///     structure: The aggregate structure
 ///
 /// Returns:
 ///     One `(name, bin, categories, amount)` tuple per expanded compartment,
@@ -24,9 +25,10 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn initial_state(
-    structure: &PyCompartmentalStructure,
+    process: &PyProcess,
+    structure: &PyAggregate,
 ) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64)>> {
-    let state = commol_model::initial_state(&structure.inner)
+    let state = commol_model::initial_state(&process.inner, &structure.inner)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(state
         .into_iter()
@@ -41,12 +43,12 @@ fn initial_state(
         .collect())
 }
 
-/// Expand the bins and accumulators of a structure over its stratifications
+/// Expand the bins and accumulators of a process over its stratifications
 ///
-/// This is the authority for the names a compartmental model expands into.
+/// This is the authority for the names an aggregate model expands into.
 ///
 /// Args:
-///     structure: The compartmental structure
+///     process: The process of the model
 ///
 /// Returns:
 ///     A `(compartments, accumulators)` tuple. Each holds one
@@ -56,7 +58,7 @@ fn initial_state(
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn expanded_outputs(
-    structure: &PyCompartmentalStructure,
+    process: &PyProcess,
 ) -> (
     Vec<(String, String, Vec<(String, String)>)>,
     Vec<(String, String, Vec<(String, String)>)>,
@@ -68,15 +70,17 @@ fn expanded_outputs(
             .collect()
     };
     (
-        as_tuples(commol_model::expand_compartments(&structure.inner)),
-        as_tuples(commol_model::expand_accumulators(&structure.inner)),
+        as_tuples(commol_model::expand_compartments(&process.inner)),
+        as_tuples(commol_model::expand_accumulators(&process.inner)),
     )
 }
 
-/// Every transition flow of a structure, exactly as the engine simulates it
+/// Every transition flow of a process, exactly as the engine simulates it
 ///
 /// Args:
-///     structure: The compartmental structure, whatever the engine of its
+///     process: The process of the model
+///     structure: The aggregate structure, whose neighbors resolve
+///         `neighbors_<bin>` and `neighbors`, whatever the engine of its
 ///         model
 ///
 /// Returns:
@@ -87,12 +91,14 @@ fn expanded_outputs(
 ///     flow; the pieces of a transition with several sources share it.
 ///
 /// Raises:
-///     ValueError: If a transition mixes bins and categories, or a category
-///         transition has no source or no target
+///     ValueError: If a transition mixes bins and categories, a category
+///         transition has no source or no target, or a rate reads the
+///         neighbors and the structure has none
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn transition_flows(
-    structure: &PyCompartmentalStructure,
+    process: &PyProcess,
+    structure: &PyAggregate,
 ) -> PyResult<
     Vec<(
         String,
@@ -102,7 +108,7 @@ fn transition_flows(
         Option<String>,
     )>,
 > {
-    let flows = commol_model::describe_flows(&structure.inner)
+    let flows = commol_model::describe_flows(&process.inner, structure.inner.neighbors.as_ref())
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(flows
         .into_iter()
@@ -118,34 +124,37 @@ fn transition_flows(
         .collect())
 }
 
-/// Check the names a model uses against the names the engine provides
+/// Check an aggregate model: its variant and neighbors, the variables its
+/// rates read, and its names against the names the engine provides
 ///
 /// Args:
-///     model: A compartmental model
+///     model: An aggregate model
 ///
 /// Raises:
-///     ValueError: If the model is not compartmental, a parameter id is an
-///         expanded compartment or a subgroup total, or a rate uses a
-///         `total_…` name that is not a subgroup total of the model
+///     ValueError: If the model is not aggregate, its variant or neighbors
+///         do not fit the process, a parameter id is an expanded compartment,
+///         a subgroup total or a name of the neighbors, a rate uses a
+///         `total_…` name that is not a subgroup total of the model, or a
+///         rate reads neighbors the model cannot resolve
 #[pyfunction]
-fn check_names(model: &PyModel) -> PyResult<()> {
-    commol_model::check_names(&model.inner).map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+fn check_model(model: &PyModel) -> PyResult<()> {
+    commol_model::check_model(&model.inner).map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
-/// Names of the subgroup totals a rate of a structure may read, sorted
+/// Names of the subgroup totals a rate of a process may read, sorted
 ///
 /// This is the authority for those names: the `total_<categories>` names,
 /// the bin totals and the partial bin totals. Category suffixes follow the
 /// declaration order of the stratifications.
 ///
 /// Args:
-///     structure: The compartmental structure
+///     process: The process of the model
 ///
 /// Returns:
-///     The names, sorted. A structure without stratifications has none.
+///     The names, sorted. A process without stratifications has none.
 #[pyfunction]
-fn subgroup_total_names(structure: &PyCompartmentalStructure) -> Vec<String> {
-    commol_model::subgroup_total_names(&structure.inner)
+fn subgroup_total_names(process: &PyProcess) -> Vec<String> {
+    commol_model::subgroup_total_names(&process.inner)
 }
 
 /// Register the model helpers with the Python module
@@ -153,7 +162,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(expanded_outputs, m)?)?;
     m.add_function(wrap_pyfunction!(transition_flows, m)?)?;
-    m.add_function(wrap_pyfunction!(check_names, m)?)?;
+    m.add_function(wrap_pyfunction!(check_model, m)?)?;
     m.add_function(wrap_pyfunction!(subgroup_total_names, m)?)?;
+    m.add("NEIGHBORS", commol_core::NEIGHBORS)?;
+    m.add("NEIGHBORS_PREFIX", commol_core::NEIGHBORS_PREFIX)?;
     Ok(())
 }

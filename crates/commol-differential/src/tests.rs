@@ -26,7 +26,7 @@ fn model(
         .collect();
     let fractions: Vec<String> = bins
         .iter()
-        .map(|(id, amount)| format!(r#"{{"bin":"{id}","fraction":{}}}"#, amount / total))
+        .map(|(id, amount)| format!(r#""{id}":{}"#, amount / total))
         .collect();
     let parameter_json: Vec<String> = parameters
         .iter()
@@ -39,10 +39,9 @@ fn model(
     let json = format!(
         r#"{{"name":"m","parameters":[{}],
         "engine":{{"type":"{engine_type}"{settings}}},
-        "structure":{{"kind":"compartmental","bins":[{}],"accumulators":[{}],
-        "stratifications":[],"transitions":[{}],
-        "initial_conditions":{{"total":{total},"bin_fractions":[{}],
-        "stratification_fractions":[]}}}}}}"#,
+        "process":{{"bins":[{}],"accumulators":[{}],
+        "stratifications":[],"transitions":[{}]}},
+        "structure":{{"kind":"aggregate","total":{total},"bin_fractions":{{{}}}}}}}"#,
         parameter_json.join(","),
         bin_json.join(","),
         accumulator_json.join(","),
@@ -651,25 +650,19 @@ fn stiff_chain(n: usize) -> Model {
 fn coupled_groups(groups: usize, method: &str) -> Model {
     let categories: Vec<String> = (0..groups).map(|g| format!(r#""g{g}""#)).collect();
     let fractions: Vec<String> = (0..groups)
-        .map(|g| {
-            format!(
-                r#"{{"category":"g{g}","fraction":{}}}"#,
-                1.0 / groups as f64
-            )
-        })
+        .map(|g| format!(r#""g{g}":{}"#, 1.0 / groups as f64))
         .collect();
     let json = format!(
         r#"{{"name":"m",
         "parameters":[{{"id":"k1","value":0.3}},{{"id":"k2","value":0.1}}],
         "engine":{{"type":"DifferentialEquations",
         "settings":{{"method":"{method}","rtol":1e-6,"atol":1e-6}}}},
-        "structure":{{"kind":"compartmental",
-        "bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
         {{"id":"C","name":"C"}}],"accumulators":[],
-        "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[{},{}],
-        "initial_conditions":{{"total":10000,"bin_fractions":[
-        {{"bin":"A","fraction":0.99}},{{"bin":"B","fraction":0.01}},{{"bin":"C","fraction":0.0}}],
-        "stratification_fractions":[{{"stratification":"group","fractions":[{}]}}]}}}}}}"#,
+        "stratifications":[{{"id":"group","categories":[{}]}}],"transitions":[{},{}]}},
+        "structure":{{"kind":"aggregate","total":10000,
+        "bin_fractions":{{"A":0.99,"B":0.01,"C":0.0}},
+        "stratification_fractions":{{"group":{{{}}}}}}}}}"#,
         categories.join(","),
         transition("ab", &["A"], &["B"], "k1 * B / total", ""),
         transition("bc", &["B"], &["C"], "k2", ""),

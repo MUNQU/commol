@@ -5,34 +5,34 @@
 //!
 //! - `parameters`: Model parameters
 //! - `engine`: The list of engines, their settings and what they mean
-//! - `structure`: The part of a model that depends on its kind
-//! - `compartmental`: The structure of a compartmental model
-//! - `transitions`: Transitions of a compartmental model and their rates
+//! - `process`: What changes and how, written once for every structure
+//! - `structure`: How the process is laid out, which changes between kinds
+//! - `aggregate`: The aggregate structure: amounts per compartment
+//! - `transitions`: Transitions of a process and their rates
 //! - `model`: Top-level model definition
 
-pub mod compartmental;
+pub mod aggregate;
 /// The list of engines a model can name.
 pub mod engine;
 /// The top-level model definition.
 pub mod model;
 /// Parameters and their values.
 pub mod parameters;
+pub mod process;
 pub mod structure;
 #[cfg(feature = "test-kind")]
 pub mod test_kind;
 pub mod transitions;
 
 // Re-export all public types for convenient access
-pub use compartmental::{
-    Accumulator, Bin, BinFraction, CompartmentFraction, CompartmentalStructure, InitialConditions,
-    Stratification, StratificationFraction, StratificationFractions,
-};
+pub use aggregate::{Aggregate, AggregateVariant, InitialConditions, Neighbors};
 pub use engine::{
-    EngineSettings, EngineType, ModelEngine, ModelKind, ModelValueType, OdeMethod, OdeSolver,
-    RateMeaning,
+    DynamicsForm, EngineSettings, EngineType, ModelEngine, ModelKind, ModelValueType, OdeMethod,
+    OdeSolver, RateMeaning,
 };
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};
+pub use process::{Accumulator, Bin, NEIGHBORS, NEIGHBORS_PREFIX, Process, Stratification};
 pub use structure::ModelStructure;
 #[cfg(feature = "test-kind")]
 pub use test_kind::{DecayOutput, TestStructure};

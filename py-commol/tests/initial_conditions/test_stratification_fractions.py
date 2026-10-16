@@ -24,10 +24,7 @@ def _stratified_model() -> Model:
 
 
 def _fractions_of(model: Model, stratification_id: str) -> dict[str, float]:
-    for stratification in model.structure.initial_conditions.stratification_fractions:
-        if stratification.stratification == stratification_id:
-            return {f.category: f.fraction for f in stratification.fractions}
-    raise AssertionError(f"stratification '{stratification_id}' not found")
+    return dict(model.structure.stratification_fractions[stratification_id])
 
 
 class TestUpdateStratificationFractions:
@@ -146,28 +143,30 @@ class TestQualifiedCategoryReads:
         model = build(shared_category_builder())
 
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.subgroup_total(["c1"])
+            model.structure.subgroup_total(model.process, ["c1"])
         with pytest.raises(ValueError, match="ambiguous"):
-            model.structure.initial_conditions.get_category_fraction("c1")
+            model.structure.get_category_fraction("c1")
 
     def test_qualified_name_selects_its_stratification(self) -> None:
         model = build(shared_category_builder())
         model.structure.update_stratification_fractions({"level:c1": 0.8})
 
-        assert model.structure.subgroup_total(["level:c1"]) == pytest.approx(800.0)
-        assert model.structure.subgroup_total(["group:c1"]) == pytest.approx(500.0)
+        assert model.structure.subgroup_total(
+            model.process, ["level:c1"]
+        ) == pytest.approx(800.0)
+        assert model.structure.subgroup_total(
+            model.process, ["group:c1"]
+        ) == pytest.approx(500.0)
 
     def test_qualified_name_with_overrides_sums_the_engine_state(self) -> None:
-        model = build(
-            shared_category_builder(
-                compartment_fractions=[{"compartment": "A_c1_c1", "fraction": 0.0}]
-            )
-        )
+        model = build(shared_category_builder(compartment_fractions={"A_c1_c1": 0.0}))
 
         # A_c1_c1 is pinned to 0, so only A_c2_c1 holds level:c1.
-        assert model.structure.subgroup_total(["level:c1"]) == pytest.approx(250.0)
         assert model.structure.subgroup_total(
-            ["group:c2", "level:c1"]
+            model.process, ["level:c1"]
+        ) == pytest.approx(250.0)
+        assert model.structure.subgroup_total(
+            model.process, ["group:c2", "level:c1"]
         ) == pytest.approx(250.0)
 
     def test_conditioning_categories_are_qualified_when_shared(self) -> None:
@@ -182,5 +181,9 @@ class TestQualifiedCategoryReads:
             )
         )
 
-        assert model.structure.get_conditioning_categories("type") == ("level:c1",)
-        assert model.structure.subgroup_total(("level:c1",)) == pytest.approx(500.0)
+        assert model.structure.get_conditioning_categories(model.process, "type") == (
+            "level:c1",
+        )
+        assert model.structure.subgroup_total(
+            model.process, ("level:c1",)
+        ) == pytest.approx(500.0)

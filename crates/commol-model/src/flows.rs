@@ -9,9 +9,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use commol_core::{CompartmentalStructure, RateMathExpression, Stratification, Transition};
+use commol_core::{
+    NEIGHBORS_PREFIX, Neighbors, Process, RateMathExpression, SPECIAL_VAR_TOTAL, Stratification,
+    Transition,
+};
 
-use crate::builder::{accumulator_output_ref, generate_accumulators, subgroup_total_name_set};
+use crate::builder::{
+    accumulator_output_ref, generate_accumulators, missing_neighbors, neighbor_terms,
+    subgroup_total_name_set,
+};
 use crate::helpers::{
     category_overrides, get_rate_string_for_compartment, replace_bin_in_rate, target_categories,
 };
@@ -48,17 +54,17 @@ enum TransitionKind<'a> {
 }
 
 fn transition_kind<'a>(
-    structure: &'a CompartmentalStructure,
+    process: &'a Process,
     transition: &Transition,
 ) -> Result<TransitionKind<'a>, String> {
     let ids: Vec<&String> = transition.source.iter().chain(&transition.target).collect();
     if ids
         .iter()
-        .all(|id| structure.bins.iter().any(|bin| &bin.id == *id))
+        .all(|id| process.bins.iter().any(|bin| &bin.id == *id))
     {
         return Ok(TransitionKind::Bins);
     }
-    let stratification = structure
+    let stratification = process
         .stratifications
         .iter()
         .find(|strat| ids.iter().all(|id| strat.categories.contains(id)))
@@ -119,12 +125,13 @@ fn driving_compartments(
 /// transition with several sources has a proportional rate, or when a flow ends
 /// in categories no compartment has.
 pub(crate) fn plan_transition_flows(
-    structure: &CompartmentalStructure,
+    process: &Process,
+    neighbors: Option<&Neighbors>,
     layout: &CompartmentLayout,
     accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
     subgroup_total_names: &HashSet<String>,
 ) -> Result<Vec<PlannedFlow>, String> {
-    let stratifications = &structure.stratifications;
+    let stratifications = &process.stratifications;
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
     let is_absolute = |rate: &str, explicit: Option<bool>| {
         explicit.unwrap_or_else(|| {
@@ -136,11 +143,11 @@ pub(crate) fn plan_transition_flows(
     };
 
     let mut flows = Vec::new();
-    for transition in &structure.transitions {
+    for transition in &process.transitions {
         if transition.source.is_empty() && transition.target.is_empty() {
             continue;
         }
-        let kind = transition_kind(structure, transition)?;
+        let kind = transition_kind(process, transition)?;
         let driving = driving_compartments(transition, kind, layout);
         check_stratified_rates_match(transition, &driving, layout)?;
 
@@ -211,6 +218,7 @@ pub(crate) fn plan_transition_flows(
 
             let explicit_absolute = matched.stratified_rate.and_then(|sr| sr.absolute);
             let absolute = sources.is_empty() || is_absolute(&rate, explicit_absolute);
+            let rate = resolve_neighbors(&rate, start, &transition.id, process, neighbors, layout)?;
             if !absolute && sources.len() > 1 {
                 return Err(format!(
                     "Transition '{}' has several sources and a proportional rate, which \
@@ -250,6 +258,106 @@ pub(crate) fn plan_transition_flows(
     }
 
     Ok(flows)
+}
+
+/// A rate with its reads of the neighbors of a unit (`neighbors_<bin>`,
+/// `neighbors`) written as the sums they are for the compartment `start`.
+///
+/// Under [`Neighbors::Complete`], `neighbors_<bin>` is the bin total and
+/// `neighbors` is `total`. Under [`Neighbors::Groups`], they are the weighted
+/// sums of the compartments of each category of its stratification, found by
+/// label. Whether the rate is absolute is decided before, so a rate that
+/// reads the neighbors and no compartment stays proportional.
+///
+/// # Errors
+///
+/// Returns a message when the rate reads the neighbors and the structure
+/// has none, or `start` carries no category of the stratification of
+/// `Groups`.
+fn resolve_neighbors(
+    rate: &str,
+    start: usize,
+    transition_id: &str,
+    process: &Process,
+    neighbors: Option<&Neighbors>,
+    layout: &CompartmentLayout,
+) -> Result<String, String> {
+    let terms = neighbor_terms(rate);
+    let Some(first) = terms.first() else {
+        return Ok(rate.to_string());
+    };
+    let Some(neighbors) = neighbors else {
+        return Err(missing_neighbors(transition_id, first));
+    };
+    let mut resolved = rate.to_string();
+    for term in &terms {
+        let bin = term.strip_prefix(NEIGHBORS_PREFIX);
+        let sum = match neighbors {
+            Neighbors::Complete => match bin {
+                Some(bin) => bin.to_string(),
+                None => SPECIAL_VAR_TOTAL.to_string(),
+            },
+            Neighbors::Groups { stratification, .. } => {
+                let Some(own) = layout.labels()[start].category(stratification) else {
+                    return Err(format!(
+                        "Transition '{transition_id}' reads '{term}' from '{}', which has no \
+                         category of '{stratification}', the stratification the neighbors \
+                         group by",
+                        layout.name(start)
+                    ));
+                };
+                let categories = process
+                    .stratifications
+                    .iter()
+                    .find(|candidate| &candidate.id == stratification)
+                    .map(|found| found.categories.as_slice())
+                    .unwrap_or_default();
+                group_sum(neighbors, stratification, own, categories, bin, layout)
+            }
+        };
+        resolved = replace_bin_in_rate(&resolved, term, &format!("({sum})"));
+    }
+    Ok(resolved)
+}
+
+/// `Σ_g' w[own][g'] × (the compartments of category g', of `bin` or of
+/// every bin)`, as an expression; `0` when every weight is 0.
+fn group_sum(
+    neighbors: &Neighbors,
+    stratification: &str,
+    own: &str,
+    categories: &[String],
+    bin: Option<&str>,
+    layout: &CompartmentLayout,
+) -> String {
+    let terms: Vec<String> = categories
+        .iter()
+        .filter_map(|category| {
+            let weight = neighbors.weight(own, category);
+            let compartments: Vec<&str> = layout
+                .with_category(stratification, category)
+                .filter(|&idx| bin.is_none_or(|bin| layout.labels()[idx].source == bin))
+                .map(|idx| layout.name(idx))
+                .collect();
+            if weight == 0.0 || compartments.is_empty() {
+                return None;
+            }
+            let amount = match compartments.as_slice() {
+                [one] => (*one).to_string(),
+                many => format!("({})", many.join(" + ")),
+            };
+            Some(if weight == 1.0 {
+                amount
+            } else {
+                format!("{weight} * {amount}")
+            })
+        })
+        .collect();
+    if terms.is_empty() {
+        "0".to_string()
+    } else {
+        terms.join(" + ")
+    }
 }
 
 /// Reject a stratified rate whose category conditions hold for none of the
@@ -315,25 +423,30 @@ pub struct FlowDescription {
     pub proportional_to: Option<String>,
 }
 
-/// Every transition flow of a compartmental structure, exactly as the engine
-/// simulates it.
+/// Every transition flow of a process laid out in compartments, exactly as
+/// the engine simulates it, with the reads of the neighbors of a unit
+/// resolved by `neighbors`.
 ///
-/// It does not depend on the engine of the model, so any structure can be
+/// It does not depend on the engine of the model, so any process can be
 /// described.
 ///
 /// # Errors
 ///
-/// Returns a message when a transition mixes bins and categories, or when a
-/// category transition has no source or no target.
-pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDescription>, String> {
-    let layout = CompartmentLayout::new(structure);
-    let accumulator_map: HashMap<AccumulatorOutputRef, usize> = generate_accumulators(structure)
+/// Returns a message when a transition mixes bins and categories, when a
+/// category transition has no source or no target, or when a rate reads the
+/// neighbors and `neighbors` is `None`.
+pub fn describe_flows(
+    process: &Process,
+    neighbors: Option<&Neighbors>,
+) -> Result<Vec<FlowDescription>, String> {
+    let layout = CompartmentLayout::new(process);
+    let accumulator_map: HashMap<AccumulatorOutputRef, usize> = generate_accumulators(process)
         .into_iter()
         .enumerate()
         .map(|(idx, output)| (output.output_ref, idx))
         .collect();
-    let names = subgroup_total_name_set(&layout, structure);
-    let flows = plan_transition_flows(structure, &layout, &accumulator_map, &names)?;
+    let names = subgroup_total_name_set(&layout, process);
+    let flows = plan_transition_flows(process, neighbors, &layout, &accumulator_map, &names)?;
     let name = |idx: Option<usize>| idx.map(|idx| layout.name(idx).to_string());
     Ok(flows
         .into_iter()
@@ -361,36 +474,30 @@ pub fn describe_flows(structure: &CompartmentalStructure) -> Result<Vec<FlowDesc
 mod tests {
     use super::*;
 
-    /// A structure with the given bins, stratifications and transitions.
-    fn model(bins: &[&str], stratifications: &str, transitions: &str) -> CompartmentalStructure {
+    /// A process with the given bins, stratifications and transitions.
+    fn model(bins: &[&str], stratifications: &str, transitions: &str) -> Process {
         let bins: Vec<String> = bins
             .iter()
             .map(|id| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
             .collect();
-        let fractions: Vec<String> = bins
-            .iter()
-            .enumerate()
-            .map(|(idx, _)| {
-                let id = bins[idx].split('"').nth(3).unwrap();
-                format!(r#"{{"bin":"{id}","fraction":null}}"#)
-            })
-            .collect();
         let json = format!(
-            r#"{{"bins":[{}],"stratifications":[{}],
-            "transitions":[{}],"initial_conditions":{{"total":100.0,
-            "bin_fractions":[{}],"stratification_fractions":[]}}}}"#,
+            r#"{{"bins":[{}],"stratifications":[{}],"transitions":[{}]}}"#,
             bins.join(","),
             stratifications,
             transitions,
-            fractions.join(",")
         );
-        serde_json::from_str(&json).expect("valid structure JSON")
+        serde_json::from_str(&json).expect("valid process JSON")
     }
 
-    fn flows(
-        model: &CompartmentalStructure,
+    fn flows(model: &Process) -> Vec<(Option<String>, Option<String>, String, bool)> {
+        flows_with(model, None)
+    }
+
+    fn flows_with(
+        model: &Process,
+        neighbors: Option<&Neighbors>,
     ) -> Vec<(Option<String>, Option<String>, String, bool)> {
-        describe_flows(model)
+        describe_flows(model, neighbors)
             .unwrap()
             .into_iter()
             .map(|flow| {
@@ -471,7 +578,7 @@ mod tests {
             r#"{"id":"bad","source":["A"],"target":["g2"],"rate":"a"}"#,
         );
 
-        assert!(describe_flows(&model).unwrap_err().contains("bad"));
+        assert!(describe_flows(&model, None).unwrap_err().contains("bad"));
     }
 
     #[test]
@@ -499,7 +606,11 @@ mod tests {
             r#"{"id":"out","source":["A","B"],"target":[],"rate":"k"}"#,
         );
 
-        assert!(describe_flows(&model).unwrap_err().contains("$compartment"));
+        assert!(
+            describe_flows(&model, None)
+                .unwrap_err()
+                .contains("$compartment")
+        );
     }
 
     #[test]
@@ -515,7 +626,7 @@ mod tests {
                 "rate":"a"}]}"#,
         );
 
-        let error = describe_flows(&model).unwrap_err();
+        let error = describe_flows(&model, None).unwrap_err();
 
         assert!(error.contains("use 'to'"), "{error}");
     }
@@ -557,7 +668,7 @@ mod tests {
         );
 
         assert!(
-            describe_flows(&bare)
+            describe_flows(&bare, None)
                 .unwrap_err()
                 .contains("'to' condition")
         );
@@ -565,5 +676,122 @@ mod tests {
             flows(&routed),
             vec![(some("A_g1"), some("A_g2_t1"), "a".to_string(), false)]
         );
+    }
+
+    fn groups(weights: Option<&str>) -> Neighbors {
+        let weights = weights.unwrap_or("null");
+        serde_json::from_str(&format!(
+            r#"{{"type":"groups","stratification":"group","weights":{weights}}}"#
+        ))
+        .unwrap()
+    }
+
+    const AB_GROUPS: &str = r#"{"id":"group","categories":["g1","g2"]}"#;
+
+    #[test]
+    fn complete_neighbors_read_the_bin_total_and_the_total() {
+        let process = model(
+            &["A", "B"],
+            "",
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B / neighbors"}"#,
+        );
+
+        assert_eq!(
+            flows_with(&process, Some(&Neighbors::Complete)),
+            vec![(
+                some("A"),
+                some("B"),
+                "k1 * (B) / (total)".to_string(),
+                false
+            )]
+        );
+    }
+
+    #[test]
+    fn group_neighbors_sum_the_weighted_compartments_of_each_category() {
+        let process = model(
+            &["A", "B"],
+            AB_GROUPS,
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B / neighbors"}"#,
+        );
+        let weights = r#"{"g1":{"g1":1.0,"g2":0.5},"g2":{"g1":0.25,"g2":1.0}}"#;
+
+        assert_eq!(
+            flows_with(&process, Some(&groups(Some(weights)))),
+            vec![
+                (
+                    some("A_g1"),
+                    some("B_g1"),
+                    "k1 * (B_g1 + 0.5 * B_g2) / ((A_g1 + B_g1) + 0.5 * (A_g2 + B_g2))".to_string(),
+                    false
+                ),
+                (
+                    some("A_g2"),
+                    some("B_g2"),
+                    "k1 * (0.25 * B_g1 + B_g2) / (0.25 * (A_g1 + B_g1) + (A_g2 + B_g2))"
+                        .to_string(),
+                    false
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn group_neighbors_without_weights_see_their_own_category() {
+        let process = model(
+            &["A", "B"],
+            AB_GROUPS,
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B"}"#,
+        );
+
+        let rates: Vec<String> = flows_with(&process, Some(&groups(None)))
+            .into_iter()
+            .map(|(_, _, rate, _)| rate)
+            .collect();
+        assert_eq!(rates, ["k1 * (B_g1)", "k1 * (B_g2)"]);
+    }
+
+    #[test]
+    fn a_rate_that_reads_the_neighbors_and_a_compartment_is_absolute() {
+        let process = model(
+            &["A", "B"],
+            "",
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * A * neighbors_B / neighbors"}"#,
+        );
+
+        assert!(flows_with(&process, Some(&Neighbors::Complete))[0].3);
+    }
+
+    #[test]
+    fn a_rate_that_reads_the_neighbors_needs_them() {
+        let process = model(
+            &["A", "B"],
+            "",
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B"}"#,
+        );
+
+        let error = describe_flows(&process, None).unwrap_err();
+        assert!(
+            error.contains("'ab'") && error.contains("neighbors_B"),
+            "{error}"
+        );
+        assert!(
+            error.contains("Complete()") && error.contains("Groups("),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_compartment_with_no_category_of_the_groups_names_it() {
+        let process = model(
+            &["A", "B"],
+            r#"{"id":"level","categories":["l1","l2"]},
+               {"id":"group","categories":["g1","g2"],
+                "conditions":[{"stratification":"level","category":"l2"}]}"#,
+            r#"{"id":"ab","source":["A"],"target":["B"],"rate":"k1 * neighbors_B"}"#,
+        );
+
+        let error = describe_flows(&process, Some(&groups(None))).unwrap_err();
+        assert!(error.contains("A_l1") && error.contains("group"), "{error}");
     }
 }

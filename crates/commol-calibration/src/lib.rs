@@ -89,7 +89,8 @@ pub use probabilistic::{
 };
 pub use probabilistic::{CalibrationError, CalibrationResult as CalibrationResultType};
 pub use types::{
-    CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
-    CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
+    crps, CalibrationConstraint, CalibrationEvaluation, CalibrationParameter,
+    CalibrationParameterType, CalibrationResult, CalibrationResultWithHistory, LossConfig,
+    ObservedDataPoint, ReplicateSummary, Replicates,
 };
 pub use values::{check_model_values, configured_engine};

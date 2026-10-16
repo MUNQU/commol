@@ -1,4 +1,4 @@
-//! Transitions of a compartmental model and their stratified rates.
+//! Transitions of a process and their stratified rates.
 
 use serde::{Deserialize, Serialize};
 

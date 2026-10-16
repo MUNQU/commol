@@ -31,10 +31,13 @@ Use this page before you make or review a change. It turns the
 
 ## Checklists by type of change
 
-### Model structure (bins, stratifications, accumulators)
+### Process (bins, stratifications, accumulators) and the aggregate structure
 
-- [ ] Change the Rust type in `crates/commol-core/src/types/` and the Pydantic
-      model in `py-commol/commol/context/` together.
+- [ ] Change the Rust type in `crates/commol-core/src/types/` (`process.rs`,
+      `aggregate.rs`) and the Pydantic model in `py-commol/commol/context/`
+      (`process.py`, `aggregate.py`) together. A check of the process by
+      itself goes in `Process`; a check against the structure goes in
+      `Aggregate.check_model`.
 - [ ] Update the PyO3 binding and `_commol_rs.pyi` if the type crosses the
       boundary.
 - [ ] Update expansion in `builder.rs` (`expand`) if compartments change.
@@ -46,7 +49,8 @@ Use this page before you make or review a change. It turns the
 
 - [ ] Plan the flows in `flows.rs`; reject what cannot be simulated.
 - [ ] Check the [rate semantics](design-decisions.md#absolute-and-proportional-rates).
-- [ ] Add a case to `tests/transitions/test_flows.py`, and check `print_equations`.
+- [ ] Add a case to `tests/transitions/test_flows.py`, and check the `dynamics`
+      section of `Model.describe` (`tests/description/`).
 - [ ] Update [Building models](../guide/building-models.md).
 
 ### Expressions (functions, variables)
@@ -60,7 +64,7 @@ Use this page before you make or review a change. It turns the
 
 - [ ] Change the Pydantic validation in `context/initial_conditions.py` and the
       engine rule in `builder.rs` (`initial_state`).
-- [ ] Check that `CompartmentalStructure.initial_state()` reports the new state.
+- [ ] Check that `Aggregate.initial_state(process)` reports the new state.
 - [ ] If calibration can set it, update `initial_conditions.rs` in
       `commol-model` (`InitialConditionPlan`) and the write-back
       (`context/_model/calibration_write_back.py`).
@@ -85,19 +89,24 @@ To add an engine to the list:
 
 - [ ] Add the entry to `EngineType` in `crates/commol-core/src/types/engine.rs`
       and to `ALL`. The compiler then names every `match` to complete in that
-      file: its name, its model kind, its settings (`EngineSettings`, parsed
-      and validated with `deny_unknown_fields`), the left-hand side of its
-      equations and the meaning of a rate.
+      file: its name, the model kinds it runs (`kinds`), whether it is
+      stochastic (`is_stochastic`), its settings (`EngineSettings`, parsed
+      and validated with `deny_unknown_fields`), the form of its dynamics
+      (`dynamics_form`: the schedule a description shows and the left-hand
+      side of its equations) and the meaning of a rate.
 - [ ] Write the engine in its own crate and implement `SimulationEngine`
-      (for a compartmental engine, also `CompartmentalEngine` from
-      `commol-model`); `try_from_model` rejects a model of another engine.
-- [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: its arm in
-      `build`, `engine_type`, `dispatch!`, `plan_values` and `apply_values`
-      (and `compartmental!` for a compartmental engine). Add the crate to
+      (for an engine of the aggregate kind, also `CompartmentalEngine` from
+      `commol-model`); `try_from_model` rejects a model of another engine. A
+      stochastic engine draws every random number from one
+      `commol_random::Generator`, implements `set_seed`, and restores the
+      generator in `reset`, so a run repeats from its seed.
+- [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: one arm in
+      `build` per kind it runs (the pair of the engine and the kind),
+      `engine_type`, `dispatch!`, `plan_values` and `apply_values` (and
+      `compartmental!` for an engine of the aggregate kind). Add the crate to
       `py-commol/Cargo.toml`.
-- [ ] For a compartmental engine, add the name to the `CompartmentalEngineType`
-      `Literal` in `context/engine.py`; if the engine has settings, add their
-      Pydantic class to `EngineSettings`.
+- [ ] Add the name to the `EngineName` `Literal` in `context/engine.py`; if the
+      engine has settings, add their Pydantic class to `EngineSettings`.
 - [ ] Run the tests of `crates/commol-core/src/types/engine.rs`,
       `py-commol/src/engine.rs` and `tests/building/test_engine.py`; they run
       every entry of the list.
@@ -115,9 +124,11 @@ To add a kind of model, such as an agent network (see
       (`value_types`).
 - [ ] Add the structure of the kind to `crates/commol-core/src/types/` and a
       variant to `ModelStructure` (`structure.rs`). The compiler names every
-      `match` to complete, such as `Model::compartmental`.
+      `match` to complete, such as `Model::aggregate`. The structure reads
+      the process of the model; it does not hold bins or transitions.
 - [ ] Add its engines to the list, as in
-      [Model type (engine)](#model-type-engine); each names the new kind.
+      [Model type (engine)](#model-type-engine), or add the new kind to the
+      `kinds` of an engine that runs it.
       Each engine implements `SimulationEngine`: `plan_values` and
       `apply_values` resolve and write the values of the kind, and
       `state_outputs` and `output_sums` name what an expression reads.
@@ -125,13 +136,22 @@ To add a kind of model, such as an agent network (see
 - [ ] Write a `ModelStructure` subclass in `py-commol/commol/context/`, with
       `kind` as a `Literal` default. Implement `check_model` and
       `outputs_by_source`; override `series_label`, `uncalibrated_values`,
-      `with_calibrated_values`, `report_sections`, `print_equations` and
-      `check_unit_consistency` when the kind has them. Import the module in
-      `context/__init__.py`, so `Model.from_json` reads the kind.
-- [ ] Give the kind a builder in `api/` that returns `Model[YourStructure]`.
-      Do not change `Simulation`, `Calibrator`, the reports or the plotter:
-      if one of them needs something of the kind, add a method to
+      `with_calibrated_values`, `report_sections`, `describe` and
+      `check_unit_consistency` when the kind has them. Reject in
+      `check_model` a feature of the process the kind cannot run, and name
+      the form that carries over. Import the module in `context/__init__.py`,
+      so `Model.from_json` reads the kind.
+- [ ] Do not write a builder: `ModelBuilder.build(structure, engine)` builds
+      every kind. Do not change `Simulation`, `Calibrator`, the reports or the
+      plotter: if one of them needs something of the kind, add a method to
       `ModelStructure` with a default.
+- [ ] For a variant of a structure, subclass it with `variant` as a `Literal`
+      default, and add the variant and its checks to Rust
+      (`AggregateVariant` for `Aggregate`).
+- [ ] Give the description of the kind: override `ModelStructure.describe`
+      with the sections it fills (`entities`, `dynamics`, `initialization`,
+      `design_concepts`), built from the blocks of
+      `context/description.py`; the renderers need no change.
 - [ ] Copy the tests of `tests/model_kinds/` for the new kind, and run the
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the

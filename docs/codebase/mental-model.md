@@ -5,19 +5,22 @@
 Commol builds compartment models from a declarative definition and runs them
 as difference equations or as ordinary differential equations. Python owns the
 user-facing API and validation; Rust owns every rule about how a model becomes
-numbers. A model has a **kind** (today only `compartmental`) and an **engine**
-that runs that kind; the generic layers work with any kind.
+numbers. A model has a **process** written once (bins, stratifications,
+transitions), a **structure** that lays it out and sets its **kind** (today
+`aggregate`: amounts per compartment), and an **engine** that runs it; the
+generic layers work with any kind.
 
 ## What Commol is
 
 | It is | Evidence |
 |---|---|
-| A Python library with a fluent builder | `py-commol/commol/api/model_builder.py` |
-| A validated, serializable model definition: a header, an engine and the structure of its kind | `py-commol/commol/context/` (Pydantic): `model.py`, `structure.py`, `compartmental.py` |
+| A Python library with a fluent builder of the process | `py-commol/commol/api/model_builder.py` |
+| A validated, serializable model definition: a header, a process, a structure and an engine | `py-commol/commol/context/` (Pydantic): `model.py`, `process.py`, `structure.py`, `aggregate.py` |
 | Generic layers that work with any model kind | `Simulation`, `Calibrator`, reports and plots use only `ModelStructure`; Rust calibration uses only `SimulationEngine` (see [Design decisions](design-decisions.md#one-interface-for-every-model-kind)) |
 | One model compiler for both engines: expansion, flows, rates, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
 | A Rust ODE engine on `diffsol` | `crates/commol-differential/` |
+| Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
 | A calibration toolkit: optimizers, constraints, ensembles | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py`, `probabilistic_calibrator.py` |
 
@@ -34,38 +37,45 @@ that runs that kind; the generic layers work with any kind.
 
 | Term | What it is | Where |
 |---|---|---|
-| Model kind | How a model is built: its `structure`. `compartmental`: bins expanded over stratifications, joined by transitions. | `ModelKind` (`crates/commol-core/src/types/engine.rs`); `ModelStructure` and its subclasses in Python |
-| Engine | How a model of a kind advances along the axis, and what a rate means: `DifferenceEquations`, `DifferentialEquations`. | `EngineType`, the one list (`engine.rs`); `Model.engine` |
+| Process | What changes and how, written once for every kind: bins, accumulators, stratifications, transitions. | `Process` (`crates/commol-core/src/types/process.rs`, `context/process.py`); `Model.process` |
+| Model kind | How the process is laid out: the kind of its `structure`. `aggregate`: the bins expanded over the stratifications into compartments, each holding an amount. A **variant** is a narrower form of a structure with the same kind and engines. | `ModelKind` (`crates/commol-core/src/types/engine.rs`); `ModelStructure` and its subclasses in Python |
+| Engine | A method: how a model advances along the axis, and what a rate means: `DifferenceEquations`, `DifferentialEquations`. | `EngineType`, the one list (`engine.rs`); `Model.engine` |
 
-Each engine runs one kind. A model whose engine runs another kind is rejected
-when it is made.
+Each engine runs some kinds (`EngineType::kinds`). A model whose engine does
+not run its kind is rejected when it is made, and the error lists the engines
+of its kind.
 
 ## How a model flows through the layers
 
 ```text
-ModelBuilder ... .build(engine)    -> commol.context.Model[CompartmentalStructure]
+ModelBuilder ... .build(Aggregate(...), engine)
+                                   -> commol.context.Model[Aggregate]
                                       (Pydantic validation; the engine's list
-                                      checks model.engine and its kind)
+                                      checks model.engine and its kind; the
+                                      structure checks itself against the process)
 Simulation(model)                  -> engine_state.build_engine(model JSON)
                                    -> commol_rs.core.Model.from_json(...)
-                                   -> commol_rs.engine.Engine(...): the engine
-                                      model.engine.type names (EngineType list),
-                                      after it checks the kind of model.structure
-                                   every compartmental engine compiles it with commol-model (CompiledModel):
-                                        expand bins and stratifications into compartments
+                                   -> commol_rs.engine.Engine(...): the implementation of
+                                      the engine model.engine.type names (EngineType list)
+                                      for the kind of model.structure
+                                   every engine of the aggregate kind compiles it with commol-model (CompiledModel):
+                                        expand the bins of the process over its stratifications
                                         build the initial state
-                                        plan the transition flows and compile the rates
+                                        plan the transition flows, resolve the neighbors, compile the rates
                                         derivatives(step, t, X) = Σ flows
 Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per step
                                       differential: diffsol integrates derivatives
+                                      (a stochastic engine: set_seed, then reset)
+Simulation.replicates(n).run(…)    -> Engine.run_replicates: one seed per replicate,
+                                      run in parallel (run_replicates, rayon)
 Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...):
                                       parameters by id; values of the kind, such as
                                       initial conditions, through the engine
 ```
 
-The same model functions also answer questions about a compartmental structure
-without a simulation:
-`CompartmentalStructure.initial_state()`, `print_equations` and the unit checker call
+The same model functions also answer questions about a process and its
+aggregate structure without a simulation:
+`Aggregate.initial_state(process)`, `Model.describe` and the unit checker call
 `initial_state`, `transition_flows` and `expanded_outputs` of `commol_rs.model`
 through `py-commol/commol/context/_model/engine_state.py`.
 
@@ -86,8 +96,12 @@ discussion first.
 - **Stratification declaration order is part of the model.** Stratifications
   expand in declaration order, and a conditional stratification may only
   reference stratifications declared before it.
-- **Results are reproducible.** The same formula always runs the same compiled
-  code (global JIT cache), and calibrations accept a `seed`.
+- **A run is reproducible from its model and its seed, on one platform and one
+  commol version.** The same formula always runs the same compiled code
+  (global JIT cache); a stochastic engine draws every random number from one
+  generator seeded by `SimulationEngine::set_seed`, which `reset` restores;
+  calibrations accept a `seed`. See
+  [Stochastic engines and seeds](design-decisions.md#stochastic-engines-and-seeds).
 - **What the user saves, the engine reloads.** `Model.to_json` writes every
   field, and calibrated values written back to a model reproduce the
   state the optimizer scored.

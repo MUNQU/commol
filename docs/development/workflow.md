@@ -192,7 +192,7 @@ vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 # Rust, from the repository root
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol
+cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol
 cargo test -p commol --features test-kind   # the engine of the test model kind
 
 # Documentation, from the repository root
@@ -218,6 +218,27 @@ On every commit, the hooks in `.pre-commit-config.yaml` run:
 | `ruff-check` | Python lints, including docstrings (`D1`, `D417`) |
 | `ruff-format` | Python formatting |
 | `uv-lock` | `uv.lock` matches `pyproject.toml` |
+
+### The Rust toolchain
+
+`rust-toolchain.toml` pins one Rust version, with `clippy` and `rustfmt`.
+`rustup` installs and uses it in the repository, so your builds, the
+pre-commit hooks and CI (`rustup toolchain install`, and `maturin-action`,
+which reads the file) run the same compiler and the same lints. A floating
+`stable` would let a lint of a newer clippy pass on your machine and fail in
+CI.
+
+Once a month, Dependabot (`.github/dependabot.yaml`, ecosystem
+`rust-toolchain`) checks for a newer stable release, and opens a pull
+request to `develop` that changes `channel`. Its CI runs the new clippy, so
+the new lints fail there, not in a feature branch. To move to a newer Rust
+by hand, or to fix the lints of that pull request:
+
+1. Change `channel` in `rust-toolchain.toml`.
+2. Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
+   the Rust tests and `cargo doc` (see [Quick Commands](#quick-commands)),
+   and fix what the new lints find.
+3. Rebuild the extension and run `pytest`.
 
 ### Debugging Rust from Python
 

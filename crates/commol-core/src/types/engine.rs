@@ -1,18 +1,19 @@
 //! The list of model types: the engines a model can name.
 //!
-//! [`EngineType`] is the one list of engines. Each entry names the model kind
-//! it runs, validates its settings, and says the form of its equations and
-//! the meaning of a rate. A model names its engine and the settings of that
+//! [`EngineType`] is the one list of engines. An engine names a method, not
+//! a kind: each entry names the model kinds it runs, validates its settings,
+//! and says the form of its dynamics ([`DynamicsForm`]) and the meaning of a
+//! rate. A model names its engine and the settings of that
 //! engine in [`ModelEngine`].
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The kind of model an engine runs.
+/// The kind of model an engine runs: the kind of its structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModelKind {
-    /// Bins expanded over stratifications, joined by transitions with rates.
-    Compartmental,
+    /// Amounts per compartment: bins expanded over stratifications.
+    Aggregate,
     /// The model kind of the tests (`types::test_kind`).
     #[cfg(feature = "test-kind")]
     Test,
@@ -21,7 +22,7 @@ pub enum ModelKind {
 impl ModelKind {
     /// Every kind.
     pub const ALL: &'static [Self] = &[
-        Self::Compartmental,
+        Self::Aggregate,
         #[cfg(feature = "test-kind")]
         Self::Test,
     ];
@@ -29,7 +30,7 @@ impl ModelKind {
     /// Name of the kind, as the `kind` of a model structure.
     pub fn name(self) -> &'static str {
         match self {
-            Self::Compartmental => "compartmental",
+            Self::Aggregate => "aggregate",
             #[cfg(feature = "test-kind")]
             Self::Test => "test",
         }
@@ -55,7 +56,7 @@ impl ModelKind {
     /// parameters and factors.
     pub fn value_types(self) -> &'static [ModelValueType] {
         match self {
-            Self::Compartmental => &[ModelValueType::InitialCondition],
+            Self::Aggregate => &[ModelValueType::InitialCondition],
             #[cfg(feature = "test-kind")]
             Self::Test => &[],
         }
@@ -160,6 +161,82 @@ impl RateMeaning {
     }
 }
 
+/// How an engine advances the state, as a description of a model shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DynamicsForm {
+    /// One equation per state component, applied once per step.
+    DifferenceEquation,
+    /// One equation per state component, integrated in continuous time.
+    DifferentialEquation,
+    /// An event table: each event, its change of the state and its
+    /// propensity.
+    StochasticEvents,
+    /// Rules that each unit applies.
+    Rules,
+}
+
+impl DynamicsForm {
+    /// Every form.
+    pub const ALL: &'static [Self] = &[
+        Self::DifferenceEquation,
+        Self::DifferentialEquation,
+        Self::StochasticEvents,
+        Self::Rules,
+    ];
+
+    /// Name of the form, as Python shows it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::DifferenceEquation => "difference_equation",
+            Self::DifferentialEquation => "differential_equation",
+            Self::StochasticEvents => "stochastic_events",
+            Self::Rules => "rules",
+        }
+    }
+
+    /// How the engine advances, in words: the `schedule` section of a
+    /// description.
+    pub fn schedule(self) -> &'static str {
+        match self {
+            Self::DifferenceEquation => {
+                "Each step applies every flow once, computed from the state at the start of \
+                 the step: X(n + 1) = X(n) + sum of the flows. The impulses of a step act \
+                 first, and its flows run from the new state."
+            }
+            Self::DifferentialEquation => {
+                "The solver integrates dX/dt = sum of the flows in continuous time: a rate \
+                 is an instantaneous rate per unit of the axis. The integration stops and \
+                 restarts at each impulse and at each position where a rate jumps."
+            }
+            Self::StochasticEvents => {
+                "Events happen one at a time, at random times: each event changes the \
+                 state by its change, with a probability per unit of the axis given by its \
+                 propensity."
+            }
+            Self::Rules => {
+                "Each step, every unit applies the rules of the model to its own state and \
+                 to its neighbors."
+            }
+        }
+    }
+
+    /// Left-hand side of the equation of a variable, in plain text or in
+    /// LaTeX, or `None` when the form has no equations.
+    pub fn equation_lhs(self, variable: &str, latex: bool) -> Option<String> {
+        Some(match (self, latex) {
+            (Self::DifferenceEquation, false) => {
+                format!("[{variable}(t+Dt) - {variable}(t)] / Dt")
+            }
+            (Self::DifferenceEquation, true) => {
+                format!("\\frac{{{variable}(t+\\Delta t) - {variable}(t)}}{{\\Delta t}}")
+            }
+            (Self::DifferentialEquation, false) => format!("d{variable}/dt"),
+            (Self::DifferentialEquation, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+            (Self::StochasticEvents | Self::Rules, _) => return None,
+        })
+    }
+}
+
 /// The list of engines a model can name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EngineType {
@@ -172,6 +249,10 @@ pub enum EngineType {
     /// (`types::test_kind`).
     #[cfg(feature = "test-kind")]
     TestEngine,
+    /// The stochastic engine of the test model kind: each unit of an output
+    /// leaves after an exponential time.
+    #[cfg(feature = "test-kind")]
+    TestStochasticEngine,
 }
 
 impl EngineType {
@@ -181,6 +262,8 @@ impl EngineType {
         Self::DifferentialEquations,
         #[cfg(feature = "test-kind")]
         Self::TestEngine,
+        #[cfg(feature = "test-kind")]
+        Self::TestStochasticEngine,
     ];
 
     /// Name of the engine, as a model names it.
@@ -190,6 +273,8 @@ impl EngineType {
             Self::DifferentialEquations => "DifferentialEquations",
             #[cfg(feature = "test-kind")]
             Self::TestEngine => "TestEngine",
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => "TestStochasticEngine",
         }
     }
 
@@ -209,30 +294,63 @@ impl EngineType {
             })
     }
 
-    /// The kind of model the engine runs.
-    pub fn kind(self) -> ModelKind {
+    /// The kinds of model the engine runs.
+    pub fn kinds(self) -> &'static [ModelKind] {
         match self {
-            Self::DifferenceEquations | Self::DifferentialEquations => ModelKind::Compartmental,
+            Self::DifferenceEquations | Self::DifferentialEquations => &[ModelKind::Aggregate],
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => ModelKind::Test,
+            Self::TestEngine | Self::TestStochasticEngine => &[ModelKind::Test],
         }
+    }
+
+    /// Whether the engine draws random numbers: a run depends on its seed
+    /// ([`crate::SimulationEngine::set_seed`]).
+    pub fn is_stochastic(self) -> bool {
+        match self {
+            Self::DifferenceEquations | Self::DifferentialEquations => false,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => false,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => true,
+        }
+    }
+
+    /// Whether the engine runs a model kind.
+    pub fn runs(self, kind: ModelKind) -> bool {
+        self.kinds().contains(&kind)
+    }
+
+    /// The engines that run a model kind, in the order of the list.
+    pub fn engines_of(kind: ModelKind) -> Vec<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .filter(|engine| engine.runs(kind))
+            .collect()
     }
 
     /// Check that the engine runs a model kind.
     ///
     /// # Errors
     ///
-    /// Returns a message that names the engine, the kind it runs and the
-    /// given kind.
+    /// Returns a message that names the engine, the kinds it runs, the given
+    /// kind and the engines that run it.
     pub fn check_kind(self, kind: ModelKind) -> Result<(), String> {
-        if self.kind() == kind {
+        if self.runs(kind) {
             return Ok(());
         }
+        let kinds: Vec<&str> = self.kinds().iter().map(|kind| kind.name()).collect();
+        let engines: Vec<&str> = Self::engines_of(kind)
+            .into_iter()
+            .map(|engine| engine.name())
+            .collect();
         Err(format!(
-            "The {} engine runs {} models, not {} models",
+            "The {} engine runs {} models, not {} models; the engines of {} models are {:?}",
             self.name(),
-            self.kind().name(),
-            kind.name()
+            kinds.join(" and "),
+            kind.name(),
+            kind.name(),
+            engines
         ))
     }
 
@@ -242,26 +360,20 @@ impl EngineType {
             Self::DifferenceEquations => RateMeaning::PerStep,
             Self::DifferentialEquations => RateMeaning::Continuous,
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => RateMeaning::Continuous,
+            Self::TestEngine | Self::TestStochasticEngine => RateMeaning::Continuous,
         }
     }
 
-    /// Left-hand side of the equation of a variable, in plain text or in
-    /// LaTeX.
-    pub fn equation_lhs(self, variable: &str, latex: bool) -> String {
-        match (self, latex) {
-            (Self::DifferenceEquations, false) => {
-                format!("[{variable}(t+Dt) - {variable}(t)] / Dt")
-            }
-            (Self::DifferenceEquations, true) => {
-                format!("\\frac{{{variable}(t+\\Delta t) - {variable}(t)}}{{\\Delta t}}")
-            }
-            (Self::DifferentialEquations, false) => format!("d{variable}/dt"),
-            (Self::DifferentialEquations, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+    /// How the engine advances the state: the form of the dynamics a
+    /// description of the model shows.
+    pub fn dynamics_form(self) -> DynamicsForm {
+        match self {
+            Self::DifferenceEquations => DynamicsForm::DifferenceEquation,
+            Self::DifferentialEquations => DynamicsForm::DifferentialEquation,
             #[cfg(feature = "test-kind")]
-            (Self::TestEngine, false) => format!("d{variable}/dt"),
+            Self::TestEngine => DynamicsForm::DifferentialEquation,
             #[cfg(feature = "test-kind")]
-            (Self::TestEngine, true) => format!("\\frac{{d{variable}}}{{dt}}"),
+            Self::TestStochasticEngine => DynamicsForm::StochasticEvents,
         }
     }
 
@@ -303,6 +415,8 @@ impl EngineType {
             }
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineSettings::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => EngineSettings::TestStochasticEngine,
         }
     }
 
@@ -312,7 +426,7 @@ impl EngineType {
             Self::DifferenceEquations => false,
             Self::DifferentialEquations => true,
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => false,
+            Self::TestEngine | Self::TestStochasticEngine => false,
         }
     }
 
@@ -325,6 +439,8 @@ impl EngineType {
             Self::DifferenceEquations => no_settings(EngineSettings::DifferenceEquations),
             #[cfg(feature = "test-kind")]
             Self::TestEngine => no_settings(EngineSettings::TestEngine),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => no_settings(EngineSettings::TestStochasticEngine),
             Self::DifferentialEquations => {
                 let solver: OdeSolver =
                     serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
@@ -345,6 +461,9 @@ pub enum EngineSettings {
     /// The engine of the test model kind has no settings.
     #[cfg(feature = "test-kind")]
     TestEngine,
+    /// The stochastic engine of the test model kind has no settings.
+    #[cfg(feature = "test-kind")]
+    TestStochasticEngine,
 }
 
 impl EngineSettings {
@@ -355,6 +474,8 @@ impl EngineSettings {
             Self::DifferentialEquations(_) => EngineType::DifferentialEquations,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineType::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => EngineType::TestStochasticEngine,
         }
     }
 
@@ -364,7 +485,7 @@ impl EngineSettings {
             Self::DifferenceEquations => None,
             Self::DifferentialEquations(solver) => serde_json::to_value(solver).ok(),
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => None,
+            Self::TestEngine | Self::TestStochasticEngine => None,
         }
     }
 }
@@ -515,14 +636,24 @@ mod tests {
     }
 
     #[test]
-    fn every_entry_names_its_kind_and_rate_meaning() {
+    fn every_entry_names_its_kinds_and_rate_meaning() {
+        for &engine in EngineType::ALL {
+            assert!(!engine.kinds().is_empty(), "{engine:?} runs no kind");
+        }
         assert_eq!(
-            EngineType::DifferenceEquations.kind(),
-            ModelKind::Compartmental
+            EngineType::DifferenceEquations.kinds(),
+            &[ModelKind::Aggregate]
         );
         assert_eq!(
-            EngineType::DifferentialEquations.kind(),
-            ModelKind::Compartmental
+            EngineType::DifferentialEquations.kinds(),
+            &[ModelKind::Aggregate]
+        );
+        assert_eq!(
+            EngineType::engines_of(ModelKind::Aggregate),
+            vec![
+                EngineType::DifferenceEquations,
+                EngineType::DifferentialEquations
+            ]
         );
         assert_eq!(
             EngineType::DifferenceEquations.rate_meaning(),
@@ -578,19 +709,48 @@ mod tests {
     }
 
     #[test]
-    fn every_entry_prints_its_equations() {
+    fn every_entry_gives_a_form_of_its_dynamics() {
         for &engine in EngineType::ALL {
+            let form = engine.dynamics_form();
+            assert!(DynamicsForm::ALL.contains(&form));
+            assert!(!form.schedule().is_empty());
+        }
+        assert_eq!(
+            EngineType::DifferenceEquations.dynamics_form(),
+            DynamicsForm::DifferenceEquation
+        );
+        assert_eq!(
+            EngineType::DifferentialEquations.dynamics_form(),
+            DynamicsForm::DifferentialEquation
+        );
+    }
+
+    #[test]
+    fn the_engines_of_a_release_are_deterministic() {
+        assert!(!EngineType::DifferenceEquations.is_stochastic());
+        assert!(!EngineType::DifferentialEquations.is_stochastic());
+    }
+
+    #[test]
+    fn a_form_with_equations_gives_their_left_hand_side() {
+        for &form in DynamicsForm::ALL {
             for latex in [false, true] {
-                assert!(engine.equation_lhs("A", latex).contains('A'));
+                match form.equation_lhs("A", latex) {
+                    Some(lhs) => assert!(lhs.contains('A'), "{lhs}"),
+                    None => assert!(matches!(
+                        form,
+                        DynamicsForm::StochasticEvents | DynamicsForm::Rules
+                    )),
+                }
             }
         }
         assert_eq!(
-            EngineType::DifferentialEquations.equation_lhs("A", false),
-            "dA/dt"
+            DynamicsForm::DifferentialEquation.equation_lhs("A", false),
+            Some("dA/dt".to_string())
         );
         assert_eq!(
-            EngineType::DifferenceEquations.equation_lhs("A", false),
-            "[A(t+Dt) - A(t)] / Dt"
+            DynamicsForm::DifferenceEquation.equation_lhs("A", false),
+            Some("[A(t+Dt) - A(t)] / Dt".to_string())
         );
     }
 
@@ -624,18 +784,23 @@ mod tests {
     #[test]
     fn an_engine_rejects_a_model_of_another_kind() {
         assert_eq!(
-            EngineType::DifferenceEquations.check_kind(ModelKind::Compartmental),
+            EngineType::DifferenceEquations.check_kind(ModelKind::Aggregate),
             Ok(())
         );
         for &kind in ModelKind::ALL {
             for &engine in EngineType::ALL {
-                if engine.kind() == kind {
+                if engine.runs(kind) {
                     continue;
                 }
                 let error = engine.check_kind(kind).unwrap_err();
                 assert!(error.contains(engine.name()), "{error}");
-                assert!(error.contains(engine.kind().name()), "{error}");
+                for own in engine.kinds() {
+                    assert!(error.contains(own.name()), "{error}");
+                }
                 assert!(error.contains(kind.name()), "{error}");
+                for other in EngineType::engines_of(kind) {
+                    assert!(error.contains(other.name()), "{error}");
+                }
             }
         }
     }
@@ -646,9 +811,9 @@ mod tests {
             assert_eq!(ModelKind::from_name(kind.name()), Ok(kind));
         }
         let error = ModelKind::from_name("network").unwrap_err();
-        assert!(error.contains("compartmental"), "{error}");
+        assert!(error.contains("aggregate"), "{error}");
         assert_eq!(
-            ModelKind::Compartmental.value_types(),
+            ModelKind::Aggregate.value_types(),
             &[ModelValueType::InitialCondition]
         );
     }

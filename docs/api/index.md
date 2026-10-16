@@ -8,12 +8,12 @@ explain how to use them; these pages list every argument, attribute and error.
 | Page | Names |
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder` |
-| [Model](model.md) | `Model`, `InitialCompartment`, `UnitConsistencyError` |
-| [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `OdeSolver`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals` |
+| [Model](model.md) | `Model`, `Process`, `ModelStructure`, `Aggregate`, `Complete`, `Groups`, `ModelDescription`, `InitialCompartment`, `UnitConsistencyError` |
+| [Simulation](simulation.md) | `Simulation`, `SimulationResults`, `ReplicateRuns`, `SimulationReplicates`, `OdeSolver`, `InfeasibleStateError`, `window_start`, `window_end`, `window_index`, `window_ends`, `windowed_totals` |
 | [Plotting](plotting.md) | `SimulationPlotter`, `PlotConfig` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [AxisUnits](axis-units.md) | `AxisUnits` |
-| [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `LossFunction`, `OptimizationAlgorithm` |
+| [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `CalibrationResult`, `LossFunction`, `OptimizationAlgorithm` |
 | [Probabilistic Calibration](probabilistic-calibrator.md) | `ProbabilisticCalibrationConfig`, `ProbEvaluationFilterConfig`, `ProbClusteringConfig`, `ProbRepresentativeConfig`, `ProbNsga2Config`, `ProbGreedyLocalSearchConfig`, `ProbabilisticCalibrationResult`, `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics`, `CalibrationEvaluation`, `ci_percentiles`, `member_statistics` |
 | [Reports](reports.md) | `applied_parameters_report`, `simulation_report` |
 

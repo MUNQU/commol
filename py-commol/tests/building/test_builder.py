@@ -2,6 +2,7 @@
 
 from commol.context.model import Model
 from tests.support import a_to_b_builder, build, abc_builder
+from commol import Aggregate
 
 
 class TestBuild:
@@ -11,10 +12,10 @@ class TestBuild:
         assert isinstance(model, Model)
         assert model.name == "TestModel"
         assert model.version == "1.0"
-        assert [bin_.id for bin_ in model.structure.bins] == ["A", "B", "C"]
+        assert [bin_.id for bin_ in model.process.bins] == ["A", "B", "C"]
         assert [parameter.id for parameter in model.parameters] == ["k1", "k2"]
-        assert [t.id for t in model.structure.transitions] == ["ab", "bc"]
-        assert model.structure.initial_conditions.total == 1000
+        assert [t.id for t in model.process.transitions] == ["ab", "bc"]
+        assert model.structure.total == 1000
 
 
 class TestCloneAndReset:
@@ -31,7 +32,7 @@ class TestCloneAndReset:
 
         clone.add_accumulator(id="other", name="Other")
 
-        accumulators = build(original).structure.accumulators
+        accumulators = build(original).process.accumulators
         assert [accumulator.id for accumulator in accumulators] == ["moved"]
 
     def test_reset_removes_every_accumulator(self) -> None:
@@ -42,13 +43,7 @@ class TestCloneAndReset:
             .add_bin(id="B", name="B")
             .add_parameter(id="k", value=0.1)
             .add_transition(id="t_ab", source=["A"], target=["B"], rate="k")
-            .set_initial_conditions(
-                total=100,
-                bin_fractions=[
-                    {"bin": "A", "fraction": 1.0},
-                    {"bin": "B", "fraction": 0.0},
-                ],
-            )
+            .set_structure(Aggregate(total=100, bin_fractions={"A": 1.0, "B": 0.0}))
         )
 
-        assert model.structure.accumulators == []
+        assert model.process.accumulators == []

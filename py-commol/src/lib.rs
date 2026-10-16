@@ -8,7 +8,7 @@
 //!
 //! ## Modules
 //!
-//! - `core`: Core data structures (Model, CompartmentalStructure, etc.)
+//! - `core`: Core data structures (Model, Process, Aggregate, etc.)
 //! - `model`: What a model expands into (compartments, flows, initial state)
 //! - `engine`: The list of engines, and the engine a model names
 //! - `calibration`: Parameter calibration and optimization
@@ -52,7 +52,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     core_module.add(
         "__doc__",
         "Core data structures for compartment models.\n\n\
-         Includes Model, CompartmentalStructure, Bin, Transition, and related types.",
+         Includes Model, Process, Aggregate, Bin, Transition, and related types.",
     )?;
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;

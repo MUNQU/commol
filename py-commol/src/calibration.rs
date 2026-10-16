@@ -200,6 +200,8 @@ pub struct PyLossConfig {
     pub inner: commol_calibration::LossConfig,
     /// Whether to apply per-series observation normalization to the metric.
     pub normalize_observations: bool,
+    /// The replicates of each evaluation of a stochastic engine, or `None`.
+    pub replicates: Option<commol_calibration::Replicates>,
 }
 
 #[pymethods]
@@ -210,6 +212,7 @@ impl PyLossConfig {
         Self {
             inner: commol_calibration::LossConfig::SumSquaredError,
             normalize_observations: false,
+            replicates: None,
         }
     }
 
@@ -219,6 +222,7 @@ impl PyLossConfig {
         Self {
             inner: commol_calibration::LossConfig::RootMeanSquaredError,
             normalize_observations: false,
+            replicates: None,
         }
     }
 
@@ -228,6 +232,7 @@ impl PyLossConfig {
         Self {
             inner: commol_calibration::LossConfig::MeanAbsoluteError,
             normalize_observations: false,
+            replicates: None,
         }
     }
 
@@ -239,9 +244,54 @@ impl PyLossConfig {
     #[pyo3(signature = (enabled=true))]
     fn normalized(&self, enabled: bool) -> Self {
         Self {
-            inner: self.inner,
             normalize_observations: enabled,
+            ..self.clone()
         }
+    }
+
+    /// Return a copy that runs replicates of a stochastic engine at each
+    /// evaluation, with common random numbers
+    ///
+    /// Each evaluation runs `count` replicates, the same seeds at every
+    /// evaluation (derived from `seed`), and compares the observations with
+    /// their summary.
+    ///
+    /// Args:
+    ///     count: How many replicates, at least 1
+    ///     seed: The seed the replicate seeds derive from
+    ///     summary: "mean", "median", "quantile" or "crps"
+    ///     quantile: The level of a "quantile" summary, in [0, 1]
+    ///
+    /// Raises:
+    ///     ValueError: If count is 0, the summary is unknown, or the quantile
+    ///         level is missing or outside [0, 1]
+    #[pyo3(signature = (count, seed, summary, quantile=None))]
+    fn with_replicates(
+        &self,
+        count: usize,
+        seed: u64,
+        summary: &str,
+        quantile: Option<f64>,
+    ) -> PyResult<Self> {
+        use commol_calibration::ReplicateSummary;
+        let summary = match (summary, quantile) {
+            ("mean", None) => ReplicateSummary::Mean,
+            ("median", None) => ReplicateSummary::Median,
+            ("crps", None) => ReplicateSummary::Crps,
+            ("quantile", Some(level)) => ReplicateSummary::Quantile(level),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unknown replicate summary '{summary}' with quantile {quantile:?}; the \
+                     summaries are 'mean', 'median', 'crps' and 'quantile' with a level"
+                )));
+            }
+        };
+        let replicates = commol_calibration::Replicates::new(count, seed, summary)
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+        Ok(Self {
+            replicates: Some(replicates),
+            ..self.clone()
+        })
     }
 
     /// Whether per-series observation normalization is enabled.
@@ -1099,7 +1149,8 @@ fn calibrate(
         loss_config.inner,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations);
+    .with_observation_normalization(loss_config.normalize_observations)
+    .with_replicates(loss_config.replicates.clone());
     let problem = with_remainder(problem, initial_condition_remainder)?;
 
     // Check if verbose mode is enabled
@@ -1170,7 +1221,8 @@ fn calibrate_with_history(
         loss_config.inner,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations);
+    .with_observation_normalization(loss_config.normalize_observations)
+    .with_replicates(loss_config.replicates.clone());
     let problem = with_remainder(problem, initial_condition_remainder)?;
 
     // Run optimization with history tracking
@@ -1231,7 +1283,8 @@ fn run_multiple_calibrations(
         loss_config.inner,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations);
+    .with_observation_normalization(loss_config.normalize_observations)
+    .with_replicates(loss_config.replicates.clone());
     let base_problem = with_remainder(base_problem, initial_condition_remainder)?;
 
     let evaluation_retention = match evaluation_retention {
@@ -1372,7 +1425,8 @@ fn generate_calibrated_predictions_parallel(
         loss_config.inner,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations);
+    .with_observation_normalization(loss_config.normalize_observations)
+    .with_replicates(loss_config.replicates.clone());
     let problem = with_remainder(problem, initial_condition_remainder)?;
 
     let predictions = commol_calibration::generate_calibrated_predictions_parallel(
@@ -1527,7 +1581,8 @@ fn generate_calibrated_predictions_at_points_parallel(
         loss_config.inner,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?
-    .with_observation_normalization(loss_config.normalize_observations);
+    .with_observation_normalization(loss_config.normalize_observations)
+    .with_replicates(loss_config.replicates.clone());
     let problem = with_remainder(problem, initial_condition_remainder)?;
 
     let predictions = commol_calibration::generate_calibrated_predictions_at_points_parallel(

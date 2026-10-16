@@ -5,16 +5,17 @@ import time
 import pytest
 
 from commol import (
+    Aggregate,
     CalibrationProblem,
     CalibrationResult,
     Model,
-    ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
     ParameterSetStatistics,
     applied_parameters_report,
 )
 from tests.support import (
+    FactoryBuilder,
     a_to_b_builder,
     bounded,
     build,
@@ -209,7 +210,7 @@ class TestCompartmentOverrides:
                 rate="k * A",
                 fractions={"A": None, "B": 0.5},
                 stratifications={"group": {"g1": 0.5, "g2": 0.5}},
-                compartment_fractions=[{"compartment": "A_g1", "fraction": 0.3}],
+                compartment_fractions={"A_g1": 0.3},
             )
         )
 
@@ -264,10 +265,7 @@ class TestCompartmentOverrides:
         model = build(override_builder(0.3))
 
         model.apply_calibration_parameters({"A": 0.6}, initial_condition_problem("A"))
-        names = [
-            override.compartment
-            for override in model.structure.initial_conditions.compartment_fractions
-        ]
+        names = list(model.structure.compartment_fractions)
 
         assert names == sorted(names)
 
@@ -362,7 +360,7 @@ class TestResultObjects:
 class TestReportPerformance:
     def test_report_with_many_compartments_and_overrides_is_bounded(self) -> None:
         builder = (
-            ModelBuilder(name="Large", version="1.0")
+            FactoryBuilder(name="Large", version="1.0")
             .add_bin(id="A", name="A")
             .add_parameter(id="k", value=0.1)
             .add_transition(
@@ -370,19 +368,24 @@ class TestReportPerformance:
             )
         )
         model = build(
-            builder.set_initial_conditions(
-                total=1000,
-                bin_fractions=[{"bin": "A", "fraction": 1.0}],
-                stratification_fractions=stratify(
-                    builder,
-                    {f"s{i}": {f"g{i}a": 0.5, f"g{i}b": 0.5} for i in range(8)},
-                ),
+            builder.set_structure(
+                Aggregate(
+                    total=1000,
+                    bin_fractions={"A": 1.0},
+                    stratification_fractions=stratify(
+                        builder,
+                        {f"s{i}": {f"g{i}a": 0.5, f"g{i}b": 0.5} for i in range(8)},
+                    ),
+                )
             )
         )
-        names = [compartment.name for compartment in model.structure.initial_state()]
+        names = [
+            compartment.name
+            for compartment in model.structure.initial_state(model.process)
+        ]
         assert len(names) == 256
         model.structure.update_compartment_fractions(
-            {name: 1 / 256 for name in names[:128]}
+            model.process, {name: 1 / 256 for name in names[:128]}
         )
 
         start = time.perf_counter()

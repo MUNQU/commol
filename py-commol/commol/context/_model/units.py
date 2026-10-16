@@ -1,3 +1,4 @@
+from commol.context._model import engine_state
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
     DEFAULT_STEP_UNIT,
@@ -105,7 +106,7 @@ class UnitChecker:
                 f"to allow automatic unit inference."
             )
 
-        bins_without_unit = [b.id for b in self._model.structure.bins if not b.unit]
+        bins_without_unit = [b.id for b in self._model.process.bins if not b.unit]
         if bins_without_unit:
             raise UnitConsistencyError(
                 f"Cannot perform unit consistency check. The following bins have "
@@ -114,30 +115,31 @@ class UnitChecker:
             )
 
     def _collect_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
-        """Collect unit consistency errors from all transitions."""
+        """
+        Collect unit consistency errors from every flow the engine plans.
+
+        The engine plans the flows (``engine_state.transition_flows``), so a
+        proportional rate is checked as its flow, the rate times its source,
+        and a read of the neighbors of a unit as the sums it is.
+        """
         errors: list[str] = []
-
-        for transition in self._model.structure.transitions:
-            if transition.rate:
-                is_consistent, error_msg = self._check_transition_rate_units(
-                    transition.rate,
-                    transition.id,
-                    variable_units,
-                    transition.is_impulse,
-                )
-                if not is_consistent and error_msg:
-                    errors.append(error_msg)
-
-            if transition.stratified_rates:
-                for idx, strat_rate in enumerate(transition.stratified_rates):
-                    is_consistent, error_msg = self._check_transition_rate_units(
-                        strat_rate.rate,
-                        f"{transition.id} (stratified rate {idx + 1})",
-                        variable_units,
-                        transition.is_impulse,
-                    )
-                    if not is_consistent and error_msg:
-                        errors.append(error_msg)
+        impulses = {t.id for t in self._model.process.transitions if t.is_impulse}
+        checked: set[tuple[str, str]] = set()
+        flows = engine_state.transition_flows(
+            self._model.process, self._model.structure
+        )
+        for flow in flows:
+            if (flow.transition, flow.term) in checked:
+                continue
+            checked.add((flow.transition, flow.term))
+            is_consistent, error_msg = self._check_transition_rate_units(
+                flow.term,
+                flow.transition,
+                variable_units,
+                flow.transition in impulses,
+            )
+            if not is_consistent and error_msg:
+                errors.append(error_msg)
 
         return errors
 
@@ -162,7 +164,7 @@ class UnitChecker:
         is_impulse: bool = False,
     ) -> tuple[bool, str | None]:
         """
-        Check units for a single transition rate.
+        Check the units of one flow of a transition.
 
         A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
         at once.
@@ -184,7 +186,7 @@ class UnitChecker:
 
         bin_unit = self._get_transition_bin_unit(transition_id)
         if not bin_unit:
-            bin_unit = self._model.structure.bins[0].unit
+            bin_unit = self._model.process.bins[0].unit
 
         expected_unit = (
             str(bin_unit) if is_impulse else f"{bin_unit}/{self._step_unit()}"
@@ -204,12 +206,12 @@ class UnitChecker:
 
     def _get_transition_bin_unit(self, transition_id: str) -> str | None:
         """Get the bin unit for a specific transition."""
-        for transition in self._model.structure.transitions:
+        for transition in self._model.process.transitions:
             if transition.id == transition_id:
                 bin_ids = transition.source + transition.target
 
                 for bin_id in bin_ids:
-                    for bin_obj in self._model.structure.bins:
+                    for bin_obj in self._model.process.bins:
                         if bin_obj.id == bin_id and bin_obj.unit:
                             return bin_obj.unit
                 break

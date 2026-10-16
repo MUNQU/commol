@@ -13,7 +13,6 @@ from commol.context.calibration import (
 )
 from commol.context.constants import (
     CalibrationParameterType,
-    LossFunction,
 )
 
 if TYPE_CHECKING:
@@ -154,20 +153,10 @@ class CalibrationRunner:
             raise ValueError(f"Unknown parameter type: {param_type}")
 
     def _build_loss_config(self) -> "LossConfigProtocol":
-        """Convert Python loss function to Rust LossConfig."""
-        loss_func = self.problem.loss_function
-
-        if loss_func == LossFunction.SSE:
-            loss_config = commol_rs.calibration.LossConfig.sse()
-        elif loss_func == LossFunction.RMSE:
-            loss_config = commol_rs.calibration.LossConfig.rmse()
-        elif loss_func == LossFunction.MAE:
-            loss_config = commol_rs.calibration.LossConfig.mae()
-        else:
-            raise ValueError(f"Unsupported loss function: {loss_func}")
-
-        # Per-series normalization is orthogonal to the chosen metric.
-        return loss_config.normalized(self.problem.normalize_observations)
+        """The Rust loss, with the replicates of a stochastic engine."""
+        return engine_state.rust_loss_config(
+            self.problem, self.simulation.model_definition.engine.type
+        )
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""

@@ -1,6 +1,5 @@
 """Python helpers expand a model exactly as the engine does."""
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model.engine_state import expanded_outputs
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.stratification import Stratification
@@ -11,7 +10,7 @@ from tests.support import a_to_b_builder, build, conditional_pathway_builder
 class TestEngineExpansion:
     def test_equation_helper_uses_the_engine_expansion(self) -> None:
         model = build(conditional_pathway_builder())
-        compartments, accumulators = expanded_outputs(model.structure)
+        compartments, accumulators = expanded_outputs(model.process)
         helper = ModelCompartmentHelper(model)
 
         assert helper.generate_compartments() == [
@@ -31,7 +30,7 @@ class TestEngineExpansion:
         )
         # A category-less condition is permitted by the engine but rejected by
         # the Pydantic validator, so the stratification is built without it.
-        model.structure.stratifications.append(
+        model.process.stratifications.append(
             Stratification.model_construct(
                 id="type",
                 categories=["t1", "t2"],
@@ -46,11 +45,12 @@ class TestEngineExpansion:
         helper = ModelCompartmentHelper(model)
 
         helper_names = [
-            helper.compartment_to_string(compartment, PrintEquationsOutputFormat.TEXT)
+            helper.compartment_to_string(compartment)
             for compartment in helper.generate_compartments()
         ]
 
         assert helper_names == [
-            compartment.name for compartment in model.structure.initial_state()
+            compartment.name
+            for compartment in model.structure.initial_state(model.process)
         ]
         assert "A_g2_t2" in helper_names

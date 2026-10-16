@@ -31,6 +31,15 @@ updates:
         exclude-patterns: ["pyo3*", "cranelift*"]
         update-types: ["major"]
 
+  # The Rust version of rust-toolchain.toml: a pull request for each newer
+  # stable release, whose CI runs the new clippy lints before they reach a
+  # feature branch.
+  - package-ecosystem: "rust-toolchain"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "develop"
+
   - package-ecosystem: "uv" # Python dependencies
     directory: "/py-commol"
     schedule:

@@ -1,15 +1,9 @@
-"""print_equations of stratified models: one line per expanded flow."""
-
-import pytest
+"""The equations of the description of stratified models: one line per expanded flow."""
 
 from commol import ModelBuilder
 from commol.context.model import Model
-from tests.support import build, abc_builder
-
-
-def _printed(model: Model, capsys: pytest.CaptureFixture[str], **options) -> str:
-    model.print_equations(**options)
-    return capsys.readouterr().out
+from tests.support.description import equation_forms
+from tests.support import build, build_ode, abc_builder
 
 
 def _move(name: str) -> ModelBuilder:
@@ -75,23 +69,10 @@ def _status_model() -> Model:
 
 
 class TestText:
-    def test_print_equations_with_stratification(self, capsys) -> None:
-        output = _printed(build(_move("Group-Stratified ABC")), capsys)
+    def test_with_stratification(self) -> None:
+        output = equation_forms(build(_move("Group-Stratified ABC")))
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Group-Stratified ABC\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 1\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 3\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -126,11 +107,11 @@ class TestText:
             "(k3 * B_g1)\n"
             "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B) - (k3 * "
             "C_g1)\n"
-            "[C_g2(t+Dt) - C_g2(t)] / Dt = (k2 * B) + (k3 * C_g1)\n"
+            "[C_g2(t+Dt) - C_g2(t)] / Dt = (k2 * B) + (k3 * C_g1)"
         )
         assert output == expected
 
-    def test_print_equations_with_multiple_stratifications(self, capsys) -> None:
+    def test_with_multiple_stratifications(self) -> None:
         """
         Rates differ by category, use the totals ``total_g1`` and ``total_g2``, and
         fall back to the transition rate for an unlisted category.
@@ -202,23 +183,9 @@ class TestText:
             )
         )
 
-        output = _printed(model, capsys)
+        output = equation_forms(model)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Group-Type Stratified ABC\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 2\n"
-            "Number of Parameters: 7\n"
-            "Number of Transitions: 4\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "  - type: [t1, t2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -289,32 +256,18 @@ class TestText:
             "[C_g2_t1(t+Dt) - C_g2_t1(t)] / Dt = (0.1 * B) + (k3 * "
             "C_g1_t1) - (k4_g2 * C_g2_t1)\n"
             "[C_g2_t2(t+Dt) - C_g2_t2(t)] / Dt = (0.1 * B) + (k3 * "
-            "C_g1_t2) + (k4_g2 * C_g2_t1)\n"
+            "C_g1_t2) + (k4_g2 * C_g2_t1)"
         )
         assert output == expected
 
-    def test_print_equations_conditional_stratification_text(self, capsys) -> None:
+    def test_conditional_stratification_text(self) -> None:
         """
         ``status`` splits only ``group=g2``, and the move transition moves ``A_g1``
         to ``A_g2_s1`` through its ``to`` overrides.
         """
-        output = _printed(_status_model(), capsys, format="text")
+        output = equation_forms(_status_model())
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Conditional\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 2\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 3\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "  - status: [s1, s2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -349,34 +302,20 @@ class TestText:
             "(k2 * B_g2_s2)\n"
             "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B_g1)\n"
             "[C_g2_s1(t+Dt) - C_g2_s1(t)] / Dt = (k2 * B_g2_s1)\n"
-            "[C_g2_s2(t+Dt) - C_g2_s2(t)] / Dt = (k2 * B_g2_s2)\n"
+            "[C_g2_s2(t+Dt) - C_g2_s2(t)] / Dt = (k2 * B_g2_s2)"
         )
         assert output == expected
 
-    def test_print_equations_cross_category_multiple_targets(self, capsys) -> None:
+    def test_cross_category_multiple_targets(self) -> None:
         """The move from ``g1`` splits between the two categories of ``level``."""
         builder = _per_compartment_abc(_conditional("level", ("l1", "l2")))
         builder.add_parameter(id="p_l2", value=0.2)
         builder = _move_to(builder, "move_l1", "k3 * (1 - p_l2) * A_g1", "level", "l1")
         builder = _move_to(builder, "move_l2", "k3 * p_l2 * A_g1", "level", "l2")
 
-        output = _printed(build(builder), capsys, format="text")
+        output = equation_forms(build(builder))
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Conditional\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 2\n"
-            "Number of Parameters: 4\n"
-            "Number of Transitions: 4\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "  - level: [l1, l2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -415,33 +354,18 @@ class TestText:
             "(k2 * B_g2_l2)\n"
             "[C_g1(t+Dt) - C_g1(t)] / Dt = (k2 * B_g1)\n"
             "[C_g2_l1(t+Dt) - C_g2_l1(t)] / Dt = (k2 * B_g2_l1)\n"
-            "[C_g2_l2(t+Dt) - C_g2_l2(t)] / Dt = (k2 * B_g2_l2)\n"
+            "[C_g2_l2(t+Dt) - C_g2_l2(t)] / Dt = (k2 * B_g2_l2)"
         )
         assert output == expected
 
 
 class TestLatex:
-    def test_print_equations_latex_with_stratification(self, capsys) -> None:
-        model = _move("Group-Stratified ABC Model").build(
-            engine="DifferentialEquations"
-        )
+    def test_latex_with_stratification(self) -> None:
+        model = build_ode(_move("Group-Stratified ABC Model"), settings=None)
 
-        output = _printed(model, capsys, format="latex")
+        output = equation_forms(model, latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: Group-Stratified ABC Model\n"
-            "Model Type: DifferentialEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 1\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 3\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -479,28 +403,14 @@ class TestLatex:
             "\\[\\frac{dC_{g1}}{dt} = (k2 \\cdot B) - (k3 \\cdot "
             "C_{g1})\\]\n"
             "\\[\\frac{dC_{g2}}{dt} = (k2 \\cdot B) + (k3 \\cdot "
-            "C_{g1})\\]\n"
+            "C_{g1})\\]"
         )
         assert output == expected
 
-    def test_print_equations_conditional_stratification_latex(self, capsys) -> None:
-        output = _printed(_status_model(), capsys, format="latex")
+    def test_conditional_stratification_latex(self) -> None:
+        output = equation_forms(_status_model(), latex=True)
 
         expected = (
-            "========================================\n"
-            "MODEL INFORMATION\n"
-            "========================================\n"
-            "Model: ABC Conditional\n"
-            "Model Type: DifferenceEquations\n"
-            "Number of Bins: 3\n"
-            "Number of Stratifications: 2\n"
-            "Number of Parameters: 3\n"
-            "Number of Transitions: 3\n"
-            "Bins: A, B, C\n"
-            "Stratifications:\n"
-            "  - group: [g1, g2]\n"
-            "  - status: [s1, s2]\n"
-            "\n"
             "========================================\n"
             "COMPACT FORM\n"
             "========================================\n"
@@ -548,6 +458,6 @@ class TestLatex:
             "(k2 \\cdot "
             "B_{g2,s1})\\]\n"
             "\\[\\frac{C_{g2,s2}(t+\\Delta t) - C_{g2,s2}(t)}{\\Delta t} = (k2 \\cdot "
-            "B_{g2,s2})\\]\n"
+            "B_{g2,s2})\\]"
         )
         assert output == expected

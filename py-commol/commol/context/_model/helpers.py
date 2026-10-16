@@ -1,7 +1,7 @@
 import re
 
-from commol.constants import PrintEquationsOutputFormat
 from commol.context._model import engine_state
+from commol.context.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
 from commol.utils.equations import (
     DEFAULT_STEP_UNIT,
     UnitConsistencyError,
@@ -12,7 +12,7 @@ from commol.utils.security import get_expression_variables
 
 
 class ModelCompartmentHelper:
-    """Utilities shared by EquationPrinter and UnitChecker."""
+    """Utilities shared by the description of the dynamics and UnitChecker."""
 
     def __init__(self, model) -> None:
         self._model = model
@@ -31,7 +31,7 @@ class ModelCompartmentHelper:
         """Compartments and accumulator outputs, as the engine expands them."""
         if self._expanded is None:
             compartments, accumulators = engine_state.expanded_outputs(
-                self._model.structure
+                self._model.process
             )
             self._expanded = (
                 [(output.source, output.categories) for output in compartments],
@@ -58,18 +58,18 @@ class ModelCompartmentHelper:
         return self._expanded_outputs()[1]
 
     def compartment_to_string(
-        self, compartment: tuple[str, dict[str, str]], format: str
+        self, compartment: tuple[str, dict[str, str]], latex: bool = False
     ) -> str:
         """Convert compartment tuple to display string."""
         bin_id, applied = compartment
         parts = [bin_id] + [
             applied[s.id]
-            for s in self._model.structure.stratifications
+            for s in self._model.process.stratifications
             if s.id in applied
         ]
         name = "_".join(parts)
 
-        if format == PrintEquationsOutputFormat.LATEX:
+        if latex:
             from commol.context._model.equations import latex_variable
 
             return latex_variable(name)
@@ -81,7 +81,7 @@ class ModelCompartmentHelper:
 
     def has_all_units(self) -> bool:
         """Check if all units are defined. Raises error if partial units."""
-        has_any_bin_unit = any(b.unit for b in self._model.structure.bins)
+        has_any_bin_unit = any(b.unit for b in self._model.process.bins)
         has_any_param_unit = any(
             p.unit for p in self._model.parameters if not isinstance(p.value, str)
         )
@@ -89,7 +89,7 @@ class ModelCompartmentHelper:
         if not has_any_bin_unit and not has_any_param_unit:
             return False
 
-        if not all(b.unit for b in self._model.structure.bins):
+        if not all(b.unit for b in self._model.process.bins):
             raise ValueError("Some bins have units but not all")
         if any(
             p.unit is None
@@ -121,43 +121,48 @@ class ModelCompartmentHelper:
                 variable_units[param.id] = param.unit
 
     def _add_bin_units(self, variable_units: dict[str, str]) -> None:
-        for state in self._model.structure.bins:
+        for state in self._model.process.bins:
             if state.unit:
                 variable_units[state.id] = state.unit
 
     def _add_stratification_category_units(
         self, variable_units: dict[str, str]
     ) -> None:
-        if not self._model.structure.bins or not self._model.structure.bins[0].unit:
+        if not self._model.process.bins or not self._model.process.bins[0].unit:
             return
-        bin_unit = self._model.structure.bins[0].unit
-        for strat in self._model.structure.stratifications:
+        bin_unit = self._model.process.bins[0].unit
+        for strat in self._model.process.stratifications:
             for category in strat.categories:
                 variable_units[category] = bin_unit
 
     def _add_compartment_units(self, variable_units: dict[str, str]) -> None:
-        if not self._model.structure.stratifications:
+        if not self._model.process.stratifications:
             return
         compartments = self.generate_compartments()
         for compartment in compartments:
-            compartment_str = self.compartment_to_string(
-                compartment, format=PrintEquationsOutputFormat.TEXT
-            )
+            compartment_str = self.compartment_to_string(compartment)
             bin_id = compartment[0]
             bin_obj = next(
-                (b for b in self._model.structure.bins if b.id == bin_id), None
+                (b for b in self._model.process.bins if b.id == bin_id), None
             )
             if bin_obj and bin_obj.unit:
                 variable_units[compartment_str] = bin_obj.unit
 
     def _add_predefined_variable_units(self, variable_units: dict[str, str]) -> None:
         bin_unit = (
-            self._model.structure.bins[0].unit if self._model.structure.bins else None
+            self._model.process.bins[0].unit if self._model.process.bins else None
         )
         predefined_units = get_predefined_variable_units(
-            engine_state.subgroup_total_names(self._model.structure), bin_unit
+            engine_state.subgroup_total_names(self._model.process), bin_unit
         )
         variable_units.update(predefined_units)
+        if bin_unit is not None:
+            # The amounts among the neighbors of a unit are amounts of bins.
+            variable_units[NEIGHBORS_VARIABLE] = bin_unit
+            for bin_item in self._model.process.bins:
+                variable_units[f"{NEIGHBORS_PREFIX}{bin_item.id}"] = (
+                    bin_item.unit or bin_unit
+                )
 
     def _add_special_variable_units(self, variable_units: dict[str, str]) -> None:
         # `t` is a position on the axis; `step` counts increments.
@@ -245,15 +250,13 @@ class ModelCompartmentHelper:
         rate: str | None,
         variable_units: dict[str, str] | None = None,
         show_units: bool = True,
-        format: str = PrintEquationsOutputFormat.TEXT,
+        latex: bool = False,
     ) -> str:
         """Format a rate expression with variable units and final unit annotation."""
         if not rate:
-            return (
-                "None" if format == PrintEquationsOutputFormat.TEXT else "\\text{None}"
-            )
+            return "\\text{None}" if latex else "None"
 
-        if format == PrintEquationsOutputFormat.LATEX:
+        if latex:
             from commol.context._model.equations import latex_rate_expression
 
             if not show_units:
@@ -275,7 +278,7 @@ class ModelCompartmentHelper:
 
     def register_custom_units(self) -> None:
         """Define the units of the bins, parameters and step that pint lacks."""
-        units = [b.unit for b in self._model.structure.bins if b.unit]
+        units = [b.unit for b in self._model.process.bins if b.unit]
         units += [p.unit for p in self._model.parameters if p.unit]
         if self._model.step_unit:
             units.append(self._model.step_unit)

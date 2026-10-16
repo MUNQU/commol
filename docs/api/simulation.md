@@ -8,6 +8,10 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.api.results.SimulationResults
 
+::: commol.api.simulation.ReplicateRuns
+
+::: commol.api.results.SimulationReplicates
+
 ::: commol.context.engine.OdeSolver
 
 ::: commol.InfeasibleStateError
