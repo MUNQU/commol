@@ -2,10 +2,12 @@ name: Documentation
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
+    # A release tag publishes the documentation of that release as `latest`.
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   pull_request:
-    branches: [main, develop]
-  # The merge queue of develop tests each pull request on top of the others.
+    branches: [main]
+  # The merge queue of main tests each pull request on top of the others.
   merge_group:
 
 # A new commit on a pull request cancels the runs of its earlier commits. Push
@@ -60,7 +62,7 @@ jobs:
     name: Deploy Documentation
     needs: build-docs
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
 
     steps:
       - uses: actions/checkout@v7
@@ -87,15 +89,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy latest documentation (main branch)
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy latest documentation (release tag)
+        if: startsWith(github.ref, 'refs/tags/v')
         working-directory: ./py-commol
         run: |
           uv run --no-sync mike deploy --push --update-aliases latest --config-file ../mkdocs.yaml
           uv run --no-sync mike set-default --push latest --config-file ../mkdocs.yaml
 
-      - name: Deploy development documentation (develop branch)
-        if: github.ref == 'refs/heads/develop'
+      - name: Deploy development documentation (main branch)
+        if: github.ref == 'refs/heads/main'
         working-directory: ./py-commol
         run: |
           uv run --no-sync mike deploy --push --update-aliases dev --config-file ../mkdocs.yaml

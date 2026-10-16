@@ -2,10 +2,10 @@ name: Build
 
 on:
     push:
-        branches: [main, develop]
+        branches: [main]
     pull_request:
-        branches: [main, develop]
-    # The merge queue of develop tests each pull request on top of the others.
+        branches: [main]
+    # The merge queue of main tests each pull request on top of the others.
     merge_group:
 
 # A new commit on a pull request cancels the runs of its earlier commits. Push
