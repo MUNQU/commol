@@ -3,8 +3,8 @@
 The order in which the open PR and the ODDs in `odd/tasks/` run, and why.
 Each row is one branch and one PR to `develop`, unless it says otherwise.
 Written 2026-10-13 on `develop` at `34d75eb`; reordered 2026-10-15 at
-`20a61a6` for the uncertainty and identifiability program. Update it when an
-ODD is added, merged or archived.
+`20a61a6` for the uncertainty and identifiability program; releases split
+2026-10-16 at `707c501`. Update it when an ODD is added, merged or archived.
 
 ## Order
 
@@ -20,28 +20,30 @@ ODD is added, merged or archived.
 | 7 | `odd/archive/tasks/axis-scale-refactor.md` | delivered by PR #112 | 6 | Yes |
 | 8 | `odd/archive/tasks/difference-negative-amounts.md` | delivered by PR #113 | 7 | Yes |
 | 9 | Release 0.3.0 (`docs/development/release.md`) | released 2026-10-15 (PR #114, tag `v0.3.0`, PyPI) | 2–8 | — |
-| 10 | `odd/archive/tasks/model-kind-foundation.md` | delivered on `refactor/model-kind-foundation` (2026-10-16) | 9 | Yes |
+| 10 | `odd/archive/tasks/model-kind-foundation.md` | delivered by PR #117 | 9 | Yes |
 | 11 | `odd/archive/tasks/stochastic-compartmental.md` | delivered by PR #118 | 10 | No |
-| 12 | `odd/tasks/inference-foundation.md` | T0 → T9 | 10, 11 | Yes |
-| 13 | `odd/tasks/identifiability.md` | T1 → T7 | 12 | No |
-| 14 | `odd/tasks/resampling-uncertainty.md` | T1 → T8 | 12 | No |
-| 15 | `odd/tasks/conformal-prediction.md` | T1 → T7 | 14 | No |
-| 16 | `odd/tasks/smc-inference.md` | T1 → T6 | 11, 13, 14 | No |
-| 17 | `odd/tasks/observation-models.md` | T1 → T8 | 14, 16 | No |
-| 18 | `odd/tasks/profile-likelihood.md` | T1 → T6 | 13, 14, 17 | No |
-| 19 | `odd/tasks/local-approximations.md` | T1 → T6 | 13, 14, 16, 17 | No |
-| 20 | `odd/tasks/mcmc-samplers.md` | T1 → T7 | 16, 17, 19 | No |
-| 21 | `odd/tasks/gradient-inference.md` | T1 → T8 | 13, 19, 20 | No |
-| 22 | `odd/tasks/state-space-inference.md` | T1 → T8 | 11, 17, 20 | No |
-| 23 | `odd/tasks/sensitivity-analysis.md` | T1 → T8 | 12, 16 | No |
-| 24 | `odd/tasks/model-comparison.md` | T1 → T6 | 16, 17, 19, 20 | No |
-| 25 | `odd/tasks/emulation-discrepancy.md` | T1 → T6 | 13, 17, 20, 23 | No |
-| 26 | Release 0.4.0 (`docs/development/release.md`) | — | 10–25 | — |
-| 27 | `odd/tasks/library-benchmark.md` | T1 → T5 | 26 | No |
-| 28 | `odd/tasks/markov-chains.md` | T1 → T8 | 10 (S1–S4), 11 (S5) | No |
-| 29 | `odd/tasks/integral-outputs.md` | T1 → T7 | 11, 28 | No |
-| 30 | `odd/tasks/network-models.md` | T1 → T8 | 10, 11, 29 | No |
-| 31 | `odd/tasks/agent-based-models.md` | T1 → T8 | 30 | No |
+| 12 | Release 0.4.0 (`docs/development/release.md`) | — | 10, 11 | — |
+| 13 | `odd/tasks/inference-foundation.md` | T0 → T9 | 10, 11, 12 | Yes |
+| 14 | `odd/tasks/identifiability.md` | T1 → T7 | 13 | No |
+| 15 | `odd/tasks/resampling-uncertainty.md` | T1 → T8 | 13 | No |
+| 16 | Release 0.5.0 (`docs/development/release.md`) | — | 13–15 | — |
+| 17 | `odd/tasks/conformal-prediction.md` | T1 → T7 | 15 | No |
+| 18 | `odd/tasks/smc-inference.md` | T1 → T6 | 11, 14, 15 | No |
+| 19 | `odd/tasks/observation-models.md` | T1 → T8 | 15, 18 | No |
+| 20 | `odd/tasks/profile-likelihood.md` | T1 → T6 | 14, 15, 19 | No |
+| 21 | `odd/tasks/local-approximations.md` | T1 → T6 | 14, 15, 18, 19 | No |
+| 22 | `odd/tasks/mcmc-samplers.md` | T1 → T7 | 18, 19, 21 | No |
+| 23 | `odd/tasks/gradient-inference.md` | T1 → T8 | 14, 21, 22 | No |
+| 24 | `odd/tasks/state-space-inference.md` | T1 → T8 | 11, 19, 22 | No |
+| 25 | `odd/tasks/sensitivity-analysis.md` | T1 → T8 | 13, 18 | No |
+| 26 | `odd/tasks/model-comparison.md` | T1 → T6 | 18, 19, 21, 22 | No |
+| 27 | `odd/tasks/emulation-discrepancy.md` | T1 → T6 | 14, 19, 22, 25 | No |
+| 28 | Release 0.6.0 (`docs/development/release.md`) | — | 17–27 | — |
+| 29 | `odd/tasks/library-benchmark.md` | T1 → T5 | 28 | No |
+| 30 | `odd/tasks/markov-chains.md` | T1 → T8 | 10 (S1–S4), 11 (S5) | No |
+| 31 | `odd/tasks/integral-outputs.md` | T1 → T7 | 11, 30 | No |
+| 32 | `odd/tasks/network-models.md` | T1 → T8 | 10, 11, 31 | No |
+| 33 | `odd/tasks/agent-based-models.md` | T1 → T8 | 32 | No |
 
 ## Why this order
 
@@ -80,7 +82,7 @@ ODD is added, merged or archived.
   0.3.0 with the other breaks; it touches `tests/support/` and the guide,
   which steps 2–7 change, so it runs after them. The stochastic and Markov
   ODDs reuse its error.
-- **One release for every break.** Steps 2–8 all break the API; commol is
+- **One release for steps 2–8.** Steps 2–8 all break the API; commol is
   alpha, so the break is no cost, and one 0.3.0 release with one changelog
   mapping is easier to read than four.
 - **Foundation before any new kind, engine or inference method.**
@@ -117,11 +119,18 @@ ODD is added, merged or archived.
   needs only the distributions and the predictive; model comparison needs the
   evidence, pointwise likelihood, PSIS and kernels; emulation needs the
   quantities of interest and the chains.
-- **One release, then the benchmark.** Steps 10–25 break the API in two
-  places (the foundation's builder and the removal of the ensemble). One 0.4.0
-  release gathers them, and the benchmark runs on that release, as the user
-  asked (`library-benchmark` L7). A release after step 14 is allowed if a
-  user needs it earlier.
+- **Three releases, one per break.** Steps 10–27 break the API in two places:
+  the foundation's builder (step 10) and the removal of the ensemble
+  (step 13). Unlike steps 2–8, they are far apart, with sixteen ODDs between
+  the first and the last, so one release would hold the first break back for
+  all of them. 0.4.0 ships the foundation and the stochastic engine before
+  step 13 starts, because `inference-foundation` D2 allows no release from
+  step 13 until step 15 merges. 0.5.0 ships the second break with the first
+  uncertainty methods. 0.6.0 ships the rest of the program. Cost: three
+  changelogs and migration guides instead of one; commol is alpha, so a
+  release costs little.
+- **The benchmark after 0.6.0.** It runs on the release that closes the
+  program, as the user asked (`library-benchmark` L7).
 - **Benchmark before the other modelling ODDs.** The user kept the benchmark
   before new kinds of modelling (Markov chains, networks, agents); only the
   stochastic engine moves ahead of it, because the inference program needs
@@ -140,7 +149,7 @@ ODD is added, merged or archived.
 
 ## When decisions are made
 
-The decisions of an ODD of the uncertainty program (steps 12–25) are settled
+The decisions of an ODD of the uncertainty program (steps 13–27) are settled
 when its implementation starts, not before (user, 2026-10-15). A decision
 that changes what an earlier ODD built, or the architecture of
 `inference-foundation.md` (its D1, D3, D4, D7), updates the later ODDs that
@@ -150,9 +159,9 @@ depend on it in the same PR, with a line in their Log.
 
 Steps 1–8 change the same tests and modules (`tests/support/`,
 `api/reporting.py`, `context/`), so they run one after the other. Each starts
-from `develop` after the previous PR merges. Steps 10–25 and 28–31 also run
+from `develop` after the previous PR merges. Steps 10–27 and 30–33 also run
 one after the other, in the order of the table: each builds on the
-interfaces the one before adds. Inside the program (12–25), steps 13 and 14,
-and steps 23 and 22, touch different modules and could run in parallel on two
+interfaces the one before adds. Inside the program (13–27), steps 14 and 15,
+and steps 25 and 24, touch different modules and could run in parallel on two
 branches; the table keeps one order so each ODD is written against the merged
 code of the one before.
