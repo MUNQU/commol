@@ -20,6 +20,7 @@ commol-model = { path = "../crates/commol-model" }
 commol-difference = { path = "../crates/commol-difference" }
 commol-differential = { path = "../crates/commol-differential" }
 commol-calibration = { path = "../crates/commol-calibration" }
+commol-random = { path = "../crates/commol-random" }
 
 # Required for custom argmin observer
 argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }

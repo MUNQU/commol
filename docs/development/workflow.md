@@ -192,7 +192,7 @@ vulture commol .vulture_allowlist.py --min-confidence 80 && pytest
 # Rust, from the repository root
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol
+cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol
 cargo test -p commol --features test-kind   # the engine of the test model kind
 
 # Documentation, from the repository root

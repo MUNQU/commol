@@ -9,7 +9,7 @@ use std::sync::RwLock;
 
 use crate::types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
-    LossConfig, ObservedDataPoint,
+    LossConfig, ObservedDataPoint, Replicates,
 };
 use crate::values::{clamp_to_bounds, configure_engine, ValueWriter};
 
@@ -89,6 +89,10 @@ pub struct CalibrationProblem<E: SimulationEngine> {
     /// Loss function configuration
     loss_config: LossConfig,
 
+    /// The replicates each evaluation runs, for a stochastic engine; `None`
+    /// runs the engine once.
+    replicates: Option<Replicates>,
+
     /// Pre-allocated buffer for simulation results (reused across evaluations)
     /// Wrapped in RwLock to allow thread-safe mutation in cost() method
     result_buffer: RwLock<Vec<Vec<f64>>>,
@@ -142,6 +146,7 @@ impl<E: SimulationEngine> Clone for CalibrationProblem<E> {
             observed_factor_indices: self.observed_factor_indices.clone(),
             observed_normalization: self.observed_normalization.clone(),
             loss_config: self.loss_config,
+            replicates: self.replicates.clone(),
             result_buffer: RwLock::new(result_buffer),
             constraints: self.constraints.clone(),
             compiled_constraints: self.compiled_constraints.clone(),
@@ -460,6 +465,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             observed_factor_indices,
             observed_normalization,
             loss_config,
+            replicates: None,
             result_buffer: RwLock::new(result_buffer),
             constraints,
             compiled_constraints,
@@ -484,6 +490,18 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     pub fn with_observation_normalization(mut self, enabled: bool) -> Self {
         self.observed_normalization =
             compute_observation_normalization(&self.observed_data, enabled);
+        self
+    }
+
+    /// Run `replicates` at each evaluation, for a stochastic engine.
+    ///
+    /// Each evaluation runs one replicate per seed, the same seeds at every
+    /// evaluation (common random numbers), so the loss is a deterministic
+    /// function of the parameters and the optimizers keep working. The
+    /// observations are compared with the summary of the replicates
+    /// ([`LossConfig::replicate_loss`]). `None` runs the engine once.
+    pub fn with_replicates(mut self, replicates: Option<Replicates>) -> Self {
+        self.replicates = replicates;
         self
     }
 
@@ -560,59 +578,113 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         clamp_to_bounds(&self.parameters, param_values)
     }
 
+    /// The prediction of each observation from a sparse result matrix whose
+    /// rows are aligned with `self.observed_positions`: the sum of its
+    /// outputs, its increment over its window, times its factor.
+    fn predictions(&self, observed_results: &[Vec<f64>], param_values: &[f64]) -> Vec<f64> {
+        self.observed_output_indices
+            .iter()
+            .zip(&self.observed_factor_indices)
+            .zip(&self.observed_row_indices)
+            .zip(&self.observed_previous_row_indices)
+            .map(
+                |(((output_indices, &factor_idx), &row_idx), &previous_row_idx)| {
+                    let sum_at = |row: usize| -> f64 {
+                        observed_results
+                            .get(row)
+                            .map(|step_data| {
+                                output_indices
+                                    .iter()
+                                    .filter_map(|&idx| step_data.get(idx))
+                                    .copied()
+                                    .sum()
+                            })
+                            .unwrap_or(0.0)
+                    };
+                    let current = sum_at(row_idx);
+                    let predicted = match previous_row_idx {
+                        Some(previous_row_idx) => current - sum_at(previous_row_idx),
+                        None => current,
+                    };
+                    match factor_idx {
+                        Some(param_idx) => predicted * param_values[param_idx],
+                        None => predicted,
+                    }
+                },
+            )
+            .collect()
+    }
+
     /// Calculate loss from a sparse result matrix whose rows are aligned with
     /// `self.observed_positions`.
     fn calculate_sparse_loss(&self, observed_results: &[Vec<f64>], param_values: &[f64]) -> f64 {
-        let observation_iter = || {
-            self.observed_data
-                .iter()
-                .zip(&self.observed_output_indices)
-                .zip(&self.observed_factor_indices)
-                .zip(&self.observed_row_indices)
-                .zip(&self.observed_previous_row_indices)
-                .zip(&self.observed_normalization)
-                .filter_map(
-                    |(
-                        ((((obs, output_indices), &factor_idx), &row_idx), &previous_row_idx),
-                        &normalization,
-                    )| {
-                        observed_results.get(row_idx).map(|step_data| {
-                            let current: f64 =
-                                output_indices.iter().map(|&idx| step_data[idx]).sum();
-                            let predicted = if let Some(previous_row_idx) = previous_row_idx {
-                                let previous: f64 = observed_results
-                                    .get(previous_row_idx)
-                                    .map(|row| {
-                                        output_indices
-                                            .iter()
-                                            .filter_map(|&idx| row.get(idx))
-                                            .copied()
-                                            .sum()
-                                    })
-                                    .unwrap_or(0.0);
-                                current - previous
-                            } else {
-                                current
-                            };
-                            let scaled_predicted = if let Some(param_idx) = factor_idx {
-                                predicted * param_values[param_idx]
-                            } else {
-                                predicted
-                            };
-                            (obs, scaled_predicted, normalization)
-                        })
-                    },
-                )
-        };
-
         // `normalization` is the per-series factor (1.0 unless observation
         // normalization is enabled). It scales every residual, so series of very
         // different magnitudes contribute comparably to any loss. The weight is
         // applied by `LossConfig::term`.
-        self.loss_config
-            .aggregate(observation_iter().map(|(obs, predicted, normalization)| {
-                ((obs.value - predicted) * normalization, obs.weight)
-            }))
+        let predictions = self.predictions(observed_results, param_values);
+        self.loss_config.aggregate(
+            self.observed_data
+                .iter()
+                .zip(predictions)
+                .zip(&self.observed_normalization)
+                .map(|((obs, predicted), &normalization)| {
+                    ((obs.value - predicted) * normalization, obs.weight)
+                }),
+        )
+    }
+
+    /// Loss of the replicates of one evaluation, each a sparse result matrix
+    /// whose rows are aligned with `self.observed_positions`.
+    fn calculate_replicate_loss(
+        &self,
+        replicates: &Replicates,
+        results: &[Vec<Vec<f64>>],
+        param_values: &[f64],
+    ) -> f64 {
+        let per_replicate: Vec<Vec<f64>> = results
+            .iter()
+            .map(|rows| self.predictions(rows, param_values))
+            .collect();
+        let mut per_observation: Vec<Vec<f64>> = (0..self.observed_data.len())
+            .map(|index| per_replicate.iter().map(|values| values[index]).collect())
+            .collect();
+        self.loss_config.replicate_loss(
+            replicates.summary,
+            self.observed_data
+                .iter()
+                .zip(per_observation.iter_mut())
+                .zip(&self.observed_normalization)
+                .map(|((obs, predictions), &normalization)| {
+                    (
+                        obs.value,
+                        predictions.as_mut_slice(),
+                        obs.weight,
+                        normalization,
+                    )
+                }),
+        )
+    }
+
+    /// The result matrix of each replicate of a configured engine: one run
+    /// per seed, from the initial state.
+    fn run_replicates(
+        &self,
+        replicates: &Replicates,
+        configured: &E,
+    ) -> Result<Vec<Vec<Vec<f64>>>, SimulationError> {
+        replicates
+            .seeds
+            .iter()
+            .map(|&seed| {
+                let mut engine = configured.clone();
+                engine.set_seed(seed);
+                engine.reset();
+                let mut rows = Vec::with_capacity(self.observed_positions.len());
+                engine.run_at_positions_into_buffer(&self.observed_positions, &mut rows)?;
+                Ok(rows)
+            })
+            .collect()
     }
 
     /// Clamp parameter values to their defined bounds
@@ -804,6 +876,56 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 }
 
+impl<E: SimulationEngine> CalibrationProblem<E> {
+    /// The cost of one evaluation of a stochastic engine: one run per
+    /// replicate seed, constraints at positions checked on every replicate,
+    /// and the loss of the summary of the replicates.
+    fn replicate_cost(
+        &self,
+        replicates: &Replicates,
+        configured: &E,
+        clamped_params: Vec<f64>,
+    ) -> Result<f64, Error> {
+        let results = match self.run_replicates(replicates, configured) {
+            Ok(results) => results,
+            Err(SimulationError::Infeasible { .. }) => return Ok(self.calculate_base_penalty()),
+            Err(SimulationError::Failed(error)) => {
+                return Err(Error::msg(format!("Simulation failed: {error}")));
+            }
+        };
+        if results
+            .iter()
+            .flatten()
+            .any(|step| step.iter().any(|value| !value.is_finite()))
+        {
+            return Ok(self.calculate_base_penalty());
+        }
+        let mut constraint_penalty = 0.0;
+        for rows in &results {
+            constraint_penalty += self
+                .evaluate_position_constraints(&clamped_params, rows)
+                .map_err(Error::msg)?;
+        }
+        if constraint_penalty > 0.0 {
+            let base_penalty = self.calculate_base_penalty();
+            return Ok(base_penalty + constraint_penalty * base_penalty);
+        }
+        let loss = self.calculate_replicate_loss(replicates, &results, &clamped_params);
+        if !loss.is_finite() {
+            return Ok(self.calculate_base_penalty());
+        }
+        self.evaluations
+            .write()
+            .expect("Failed to acquire write lock on evaluations")
+            .push(CalibrationEvaluation {
+                parameters: clamped_params,
+                loss,
+                predictions: vec![],
+            });
+        Ok(loss)
+    }
+}
+
 /// Implement argmin's CostFunction trait - model-agnostic implementation
 ///
 /// This works with any model type that implements SimulationEngine.
@@ -846,6 +968,10 @@ impl<E: SimulationEngine> CostFunction for CalibrationProblem<E> {
             // The values make the starting state infeasible
             let base_penalty = self.calculate_base_penalty();
             return Ok(base_penalty * (1.0 + excess * 100.0));
+        }
+
+        if let Some(replicates) = &self.replicates {
+            return self.replicate_cost(replicates, &engine, clamped_params);
         }
 
         // Run simulation using pre-allocated buffer to avoid allocations

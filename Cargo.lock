@@ -202,6 +202,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-model",
+ "commol-random",
  "pyo3",
  "serde_json",
 ]
@@ -216,6 +217,7 @@ dependencies = [
  "commol-core",
  "commol-difference",
  "commol-differential",
+ "commol-random",
  "rand 0.10.3",
  "rayon",
  "serde",
@@ -233,6 +235,7 @@ dependencies = [
  "cranelift-module",
  "evalexpr",
  "indexmap",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -264,6 +267,14 @@ version = "0.1.0"
 dependencies = [
  "commol-core",
  "serde_json",
+]
+
+[[package]]
+name = "commol-random"
+version = "0.1.0"
+dependencies = [
+ "rand_core 0.10.1",
+ "rand_xoshiro",
 ]
 
 [[package]]

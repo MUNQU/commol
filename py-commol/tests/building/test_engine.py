@@ -9,14 +9,16 @@ from pydantic import ValidationError
 from commol import Model, OdeSolver, Simulation
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine import EngineName
-from tests.support.kinds import TEST_ENGINE
+from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
 from tests.support import a_to_b_builder, assert_close, build, build_ode
 
 
 class TestEngineList:
     def test_the_python_names_equal_the_engines_of_the_list(self) -> None:
         engines = [
-            name for name in commol_rs.engine.EngineType.names() if name != TEST_ENGINE
+            name
+            for name in commol_rs.engine.EngineType.names()
+            if name not in {TEST_ENGINE, TEST_STOCHASTIC_ENGINE}
         ]
 
         assert list(get_args(EngineName)) == engines

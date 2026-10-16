@@ -5,8 +5,8 @@ from .model_builder import ModelBuilder
 from .plotter import SimulationPlotter
 from .probabilistic.intervals import ci_percentiles, member_statistics
 from .reporting import applied_parameters_report, simulation_report
-from .results import SimulationResults
-from .simulation import Simulation
+from .results import SimulationReplicates, SimulationResults
+from .simulation import ReplicateRuns, Simulation
 from .patterns import AxisPattern
 from .windows import (
     window_end,
@@ -23,6 +23,8 @@ __all__ = [
     "SimulationPlotter",
     "Simulation",
     "SimulationResults",
+    "SimulationReplicates",
+    "ReplicateRuns",
     "AxisPattern",
     "ci_percentiles",
     "member_statistics",

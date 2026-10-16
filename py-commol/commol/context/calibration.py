@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Mapping
-from typing import Self, overload, override
+from typing import Literal, Self, overload, override
 
 from pydantic import (
     BaseModel,
@@ -976,6 +976,40 @@ class CalibrationResult(BaseModel):
         )
 
 
+class Quantile(BaseModel):
+    """
+    A quantile of the replicates of a stochastic engine, for
+    ``CalibrationProblem.replicate_summary``.
+
+    Attributes
+    ----------
+    level : float
+        The level, between 0 and 1, such as 0.5 for the median.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+
+    def __init__(self, level: float, **data: object) -> None:
+        """
+        A quantile of the replicates.
+
+        Parameters
+        ----------
+        level : float
+            The level, between 0 and 1.
+        **data : object
+            The other fields, as JSON holds them.
+        """
+        super().__init__(level=level, **data)
+
+
+type ReplicateSummary = Literal["mean", "median", "crps"] | Quantile
+"""What the observations are compared with: the mean, the median or a
+`Quantile` of the replicates, or their whole distribution (``"crps"``)."""
+
+
 class CalibrationProblem(BaseModel):
     """
     Defines a complete calibration problem.
@@ -1011,9 +1045,23 @@ class CalibrationProblem(BaseModel):
         Optional configuration for probabilistic calibration (default: None).
         When provided, enables ensemble-based parameter estimation with
         uncertainty quantification instead of single-point optimization.
+    replicates : int | None
+        For a stochastic engine: how many replicates each evaluation runs,
+        with common random numbers (the same seeds, derived from ``seed``, at
+        every evaluation), so the loss is a deterministic function of the
+        parameters. Required with a stochastic engine; a deterministic engine
+        does not use it.
+    replicate_summary : {"mean", "median", "crps"} | Quantile | None
+        For a stochastic engine: what each observation is compared with. The
+        mean, the median or a `Quantile` of the replicates, with
+        ``loss_function``; or ``"crps"``, the continuous ranked probability
+        score of their distribution, whose loss is the weighted mean score.
+        Required with a stochastic engine, with no default: what to fit is a
+        modelling choice.
     seed : int | None
         Random seed for reproducibility across all stochastic processes
-        (default: None, uses system entropy).
+        (default: None, uses system entropy). Required with a stochastic
+        engine.
         Controls randomness in:
         - Optimization algorithms (e.g., Particle Swarm initialization)
         - Probabilistic calibration runs
@@ -1060,6 +1108,15 @@ class CalibrationProblem(BaseModel):
     probabilistic_config: ProbabilisticCalibrationConfig | None = Field(
         default=None,
         description="Optional configuration for probabilistic calibration",
+    )
+    replicates: int | None = Field(
+        default=None,
+        ge=1,
+        description="Replicates per evaluation of a stochastic engine.",
+    )
+    replicate_summary: ReplicateSummary | None = Field(
+        default=None,
+        description="What the observations are compared with, for a stochastic engine.",
     )
     seed: int | None = Field(
         default=None,

@@ -164,6 +164,49 @@ rate that cannot be evaluated, stops the calibration with its message
 (`CalibrationProblem::cost` in
 `crates/commol-calibration/src/calibration_problem.rs`).
 
+## Stochastic engines
+
+With a stochastic engine, one run per evaluation would make the loss change
+from one evaluation to the next for the same parameters, and Nelder-Mead and
+particle swarm would chase the noise. So each evaluation runs `replicates`
+replicates with **common random numbers**: the same replicate seeds at every
+evaluation, derived from `seed`. The loss is then a deterministic function of
+the parameters (`CalibrationProblem::with_replicates` in
+`crates/commol-calibration/src/calibration_problem.rs`).
+
+You choose what each observation is compared with; there is no default,
+because what to fit is a modelling choice:
+
+| `replicate_summary` | Compared with each observation | Loss |
+|---|---|---|
+| `"mean"` | The mean of the replicates | `loss_function` |
+| `"median"` | The median | `loss_function` |
+| `Quantile(q)` | The quantile `q` | `loss_function` |
+| `"crps"` | The empirical distribution of the replicates | The continuous ranked probability score, `E|X − y| − ½ E|X − X'|`, a proper scoring rule; its loss is the weighted mean score, whatever `loss_function` is |
+
+<!-- doc-test: skip: needs a stochastic engine; the engines of this release are deterministic -->
+```python
+problem = CalibrationProblem(
+    observed_data=observed,
+    parameters=[CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0)],
+    optimization_config=NelderMeadConfig(),
+    replicates=50,
+    replicate_summary="crps",  # or "mean", "median", Quantile(0.9)
+    seed=7,
+)
+```
+
+| Rule | Where |
+|---|---|
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py` |
+| A deterministic engine does not use `replicates` and `replicate_summary` | The same |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
+| A constraint at positions is checked on every replicate | `CalibrationProblem::replicate_cost` |
+
+With one replicate the CRPS is the absolute error. A probabilistic
+calibration runs the same objective: its ensemble holds parameter sets, and
+`Simulation.replicates` gives the stochastic spread of a member.
+
 ## Results
 
 `Calibrator(simulation, problem)` checks the problem against the model, and

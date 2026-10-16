@@ -8,6 +8,8 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.context.calibration.CalibrationProblem
 
+::: commol.context.calibration.Quantile
+
 ::: commol.context.calibration.ObservedDataPoint
 
 ::: commol.context.calibration.CalibrationParameter

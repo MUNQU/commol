@@ -9,6 +9,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Model.describe(layout="default")` returns a `ModelDescription`: the model
+  as data, sections of tables, equations, state graphs and text, for every
+  kind of model. `render(format)` gives text, Markdown (with the state graph
+  as a Mermaid diagram), a LaTeX document, JSON or Graphviz DOT, and
+  `save(path)` writes it in the format of the suffix (`.txt`, `.md`, `.tex`,
+  `.json`, `.dot`). In a notebook it shows as Markdown. See
+  [Describing a Model](../guide/describing-models.md).
+- `layout="odd"`: the description follows the ODD protocol for describing
+  individual- and agent-based models (Grimm et al. 2006, 2010, 2020), and
+  marks what commol cannot fill "To be written by the modeller.".
+- `EngineType.dynamics_form` and `EngineType.schedule`: how an engine advances
+  (`difference_equation`, `differential_equation`, `stochastic_events`,
+  `rules`), as a description shows it.
+- The process of a model apart from its structure: `Model.process`
+  (`Process`: bins, accumulators, stratifications, transitions) is written
+  once, and `Model.structure` lays it out. `Aggregate` is the structure of
+  amounts per compartment, the kind `aggregate`.
+- `neighbors_<bin>` and `neighbors` in a transition rate: the amount of a bin
+  among the neighbors of a unit and their total. A rate that reads them and no
+  compartment is proportional. `Aggregate(neighbors=Complete())` makes every
+  unit a neighbor of every other; `Groups(stratification, weights)` makes units
+  neighbors by the categories of a stratification. A rate that reads them
+  needs `neighbors`, with no default.
+- Variants of a structure: a subclass with the same kind, fields and engines,
+  saved with its `variant` and loaded back as its own class.
+- Seeds and replicates for stochastic engines: `Simulation.run(…, seed=)` and
+  `run_at(…, seed=)` (`SimulationResults.seed` keeps the seed, drawn when none
+  is given), `Simulation.replicates(n, seed=)` with `run` and `run_at` that
+  return `SimulationReplicates` (runs in parallel, one seed each; `mean`,
+  `quantiles`, `member_statistics`), `Simulation.is_stochastic`, and
+  `EngineType.is_stochastic`. `SimulationPlotter` draws the mean and a band of
+  replicates, and `simulation_report` takes them as `ensemble_runs`.
+- `CalibrationProblem(replicates=…, replicate_summary=…)` calibrates a
+  stochastic engine with common random numbers: `"mean"`, `"median"`,
+  `Quantile(q)` or `"crps"` (the continuous ranked probability score). A
+  stochastic engine needs them and a `seed`; there is no default summary.
+- The crate `commol-random`: a portable generator (`Xoshiro256PlusPlus`), the
+  derivation of replicate seeds, samplers and a sum tree of rates, for the
+  stochastic engines to come.
+
+### Changed
+
+- **Breaking:** a model is built from a process and a structure.
+  `ModelBuilder` writes the process, and `build(structure, engine,
+  settings=None)` joins it with a structure; the model is a `Model` of the
+  class of the structure.
+
+  | Before | Now |
+  |---|---|
+  | `builder.set_initial_conditions(total=…, bin_fractions=[{"bin": "A", "fraction": 0.9}, …], stratification_fractions=[…], compartment_fractions=[…])` then `builder.build(engine=…)` | `builder.build(Aggregate(total=…, bin_fractions={"A": 0.9, …}, stratification_fractions={"group": {"g1": 0.5, …}}, compartment_fractions={"A_g1": 0.0}), engine=…)` |
+  | `CompartmentalStructure`, `Model[CompartmentalStructure]` | `Aggregate`, `Model[Aggregate]` |
+  | `model.structure.bins`, `stratifications`, `transitions`, `accumulators` | `model.process.bins`, … |
+  | `model.structure.initial_conditions.total`, `bin_fractions`, … | `model.structure.total`, `bin_fractions`, … (mappings by id) |
+  | `model.structure.initial_state()`, `subgroup_total(…)`, `get_conditioning_categories(…)`, `update_compartment_fractions(…)` | The same methods, with the process first: `model.structure.initial_state(model.process)`, … |
+  | `model.structure.update_initial_conditions(…)` | `model.structure.update_bin_fractions(…)` |
+  | `model.structure.outputs_by_source()`, `series_label(id)` | `outputs_by_source(model)`, `series_label(model, id)` |
+  | `CompartmentFraction`, `BinFraction`, `StratificationFraction(s)` | Mappings in `Aggregate` |
+  | `CompartmentalEngineType` | `EngineName` |
+
+- **Breaking:** the model file has `process` and `structure`, the structure has
+  `kind: "aggregate"` and `variant`, and the fractions are objects keyed by
+  id. A file of 0.3 does not load; rebuild the model and save it again.
+- **Breaking:** an engine names a method, not a kind: `EngineType.kinds`
+  replaces `EngineType.kind`, and the error of an engine that does not run a
+  kind lists the engines of that kind.
+- **Breaking:** `neighbors` and the names that start with `neighbors_` are
+  reserved: no parameter, bin or accumulator may take them.
+- `EngineType.equation_lhs` comes from the form of the dynamics of the engine
+  (`DynamicsForm` in Rust), and returns `None` for an engine without
+  equations.
+- Python names follow PEP 8: ruff checks them (`N` rules).
+
+### Removed
+
+- **Breaking:** `Model.print_equations`, `ModelStructure.print_equations` and
+  `PrintEquationsOutputFormat`. `model.describe().render("text")` shows the
+  same compact and expanded forms, and `render("latex")` writes them in LaTeX;
+  a description with some units missing shows none instead of raising.
+
 ## [0.3.0] - 2026-10-15
 
 ### Added

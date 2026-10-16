@@ -46,8 +46,10 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | Member | Returns | What it does |
 |---|---|---|
 | `Simulation(model)` | — | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run. |
-| `run(num_steps)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, and `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)). |
-| `run_at(at)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
+| `run(num_steps, *, seed=None)` | `SimulationResults` | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter is still `None`, and `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](transitions.md#amounts-below-zero)). |
+| `run_at(at, *, seed=None)` | `SimulationResults` | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` model any non-negative position, such as `0.5`; a `DifferenceEquations` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations). |
+| `replicates(n, *, seed=None)` | `ReplicateRuns` | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `n` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates). |
+| `is_stochastic` | `bool` | Whether the engine draws random numbers. |
 | `simulation_outputs` | `list[str]` | The output names, in engine order: compartments first, then accumulators. |
 | `outputs_for(id)` | `list[str]` | The outputs of one bin or accumulator. |
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
@@ -105,6 +107,59 @@ print(len(rows))              # 101
 print(len(rows[0]))           # 4: A, B, C and cum_ab
 print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 ```
+
+## Randomness, seeds and replicates
+
+A stochastic engine draws random numbers, so its runs depend on a seed; a
+deterministic engine, such as `DifferenceEquations` and
+`DifferentialEquations`, gives the same run for every seed
+(`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).
+
+| Call | Deterministic engine | Stochastic engine |
+|---|---|---|
+| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None` | One run from seed `s`; `results.seed` is `s` |
+| `run(n)` without a seed | `results.seed` is `None` | Draws a seed from the operating system and keeps it in `results.seed`, so the run can be repeated |
+| `replicates(n, seed=s).run(…)` | Raises `ValueError` that names the engine: every replicate would be equal | `n` runs, in parallel in the engine, each with its own seed |
+
+```python
+print(simulation.is_stochastic)                # False: a difference engine
+print(simulation.run(num_steps=5, seed=1).seed)  # None: the run depends on no seed
+try:
+    simulation.replicates(10)
+except ValueError as error:
+    print(error)  # The DifferenceEquations engine is deterministic: ...
+```
+
+Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of
+`seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a
+replicate gives the same run however many replicates run, and
+`simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates`
+(`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
+
+| Member | Returns |
+|---|---|
+| `replicates[i]`, `len(replicates)` | One run, with its `seed`; the number of runs |
+| `seed`, `seeds`, `positions` | The seed the replicate seeds derive from, the seed of each replicate, the positions |
+| `mean()` | `SimulationResults` of the mean of every output at each position |
+| `quantiles(levels)` | `{level: SimulationResults}`, at each position |
+| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate as [`ci_percentiles`](../codebase/design-decisions.md#one-confidence-interval-convention) requires |
+
+<!-- doc-test: skip: needs a stochastic engine; the engines of this release are deterministic -->
+```python
+replicates = simulation.replicates(200, seed=42).run(num_steps=50)
+mean = replicates.mean()
+band = replicates.member_statistics("B", confidence_level=0.9)
+SimulationPlotter(simulation, replicates).plot_series()  # the mean and a 95 % band
+```
+
+A run is reproducible from its model and its seed, on one platform and one
+commol version:
+
+| Where | The same seed gives |
+|---|---|
+| The same machine and commol version | The same run |
+| Another platform, the same commol version | The same random numbers (`Xoshiro256PlusPlus` and samplers written in commol, `crates/commol-random/`), but the rate functions (`exp`, `sin`, `log`, …) come from the system's math library, which can differ in the last bit between operating systems; a run there is equal in distribution and rarely differs draw by draw |
+| Another commol version | A run that may change; the changelog says so |
 
 ## Accumulators
 
@@ -359,7 +414,10 @@ print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
 ## Plotting
 
 `SimulationPlotter(simulation, results)` draws one subplot per output with
-seaborn, and returns the matplotlib `Figure`:
+seaborn, and returns the matplotlib `Figure`. With the `SimulationReplicates`
+of a stochastic engine, `plot_series` draws their mean and a band of
+`confidence_level` (default 0.95), each replicate reduced to the plotted
+series first:
 
 ```python
 from commol import PlotConfig, SimulationPlotter

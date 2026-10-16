@@ -1,20 +1,69 @@
 """Simulation of a model with the Rust engine, and access to its outputs."""
 
 import logging
+import secrets
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
+try:
+    from commol.commol_rs import _commol_rs as commol_rs
+except ImportError as e:
+    raise ImportError(f"Error importing Rust extension: {e}") from e
+
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
 
-from commol.api.results import SimulationResults
+from commol.api.results import SimulationReplicates, SimulationResults
 from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
 from commol.context.model import Model
 from commol.context.structure import ModelStructure
 
 logger = logging.getLogger(__name__)
+
+SEED_LIMIT = 2**64
+"""Seeds are whole numbers from 0 to ``2**64 - 1``."""
+
+
+def draw_seed() -> int:
+    """
+    A seed drawn from the randomness of the operating system.
+
+    Returns
+    -------
+    int
+        A whole number from 0 to ``2**64 - 1``.
+    """
+    return secrets.randbits(64)
+
+
+def check_seed(seed: int) -> int:
+    """
+    Check that a seed is a whole number from 0 to ``2**64 - 1``.
+
+    Parameters
+    ----------
+    seed : int
+        The seed.
+
+    Returns
+    -------
+    int
+        The seed.
+
+    Raises
+    ------
+    ValueError
+        If the seed is not such a number.
+    """
+    if (
+        isinstance(seed, bool)
+        or not isinstance(seed, int)
+        or not 0 <= seed < SEED_LIMIT
+    ):
+        raise ValueError(f"A seed is a whole number from 0 to 2**64 - 1, got {seed!r}.")
+    return seed
 
 
 class Simulation:
@@ -104,24 +153,45 @@ class Simulation:
                 f"Please calibrate these values before running a simulation."
             )
 
-    def run(self, num_steps: int) -> SimulationResults:
+    @property
+    def is_stochastic(self) -> bool:
+        """Whether the engine of the model draws random numbers."""
+        return commol_rs.engine.EngineType(
+            self.model_definition.engine.type
+        ).is_stochastic
+
+    def _seed_run(self, seed: int | None) -> int | None:
+        """Seed the engine of a stochastic model; None for a deterministic one."""
+        if not self.is_stochastic:
+            return None
+        seed = draw_seed() if seed is None else check_seed(seed)
+        self._engine.set_seed(seed)
+        return seed
+
+    def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
         Runs the simulation from the initial state on its default grid.
 
         Every call starts at position 0 with the current ``model_definition``,
-        so two calls with the same model give the same result. To continue a
-        run, call ``simulation.engine.step()``.
+        so two calls with the same model, and the same seed for a stochastic
+        engine, give the same result. To continue a run, call
+        ``simulation.engine.step()``.
 
         Parameters
         ----------
         num_steps : int
             The number of steps: the results hold the positions
             ``0, 1, ..., num_steps``.
+        seed : int | None, optional
+            The seed of a stochastic engine, a whole number from 0 to
+            ``2**64 - 1``. None draws one, which ``results.seed`` keeps, so
+            every run can be repeated. A deterministic engine ignores it.
 
         Returns
         -------
         SimulationResults
-            One value per position for each output, and the positions.
+            One value per position for each output, the positions, and the
+            seed of a stochastic run.
 
         Raises
         ------
@@ -129,18 +199,24 @@ class Simulation:
             If a step leaves an amount below zero; the message names the
             compartment, the step and the flows out of it.
         ValueError
-            If a parameter or initial condition has no value.
+            If a parameter or initial condition has no value, or the seed is
+            not a whole number from 0 to ``2**64 - 1``.
         """
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
+        used_seed = self._seed_run(seed)
         self._engine.reset()
         logging.info(f"Running simulation for {num_steps} steps.")
         start = time.time()
         positions, rows = self._engine.run(num_steps)
         logging.info(f"Simulation complete. It took {time.time() - start} seconds.")
-        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+        return SimulationResults.from_rows(
+            positions, self._simulation_outputs, rows, seed=used_seed
+        )
 
-    def run_at(self, at: Sequence[float]) -> SimulationResults:
+    def run_at(
+        self, at: Sequence[float], *, seed: int | None = None
+    ) -> SimulationResults:
         """
         Runs the simulation from the initial state and reports at given positions.
 
@@ -154,11 +230,14 @@ class Simulation:
         ----------
         at : Sequence[float]
             Sorted, unique positions to report at.
+        seed : int | None, optional
+            The seed of a stochastic engine; see `run`.
 
         Returns
         -------
         SimulationResults
-            One value per position for each output, and the positions.
+            One value per position for each output, the positions, and the
+            seed of a stochastic run.
 
         Raises
         ------
@@ -173,9 +252,50 @@ class Simulation:
         positions = [float(position) for position in at]
         self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
+        used_seed = self._seed_run(seed)
         self._engine.reset()
         rows = self._engine.run_at(positions)
-        return SimulationResults.from_rows(positions, self._simulation_outputs, rows)
+        return SimulationResults.from_rows(
+            positions, self._simulation_outputs, rows, seed=used_seed
+        )
+
+    def replicates(self, n: int, *, seed: int | None = None) -> "ReplicateRuns":
+        """
+        Replicates of the runs of a stochastic engine.
+
+        The returned object has ``run`` and ``run_at``, as `Simulation`, and
+        they return `SimulationReplicates`: ``n`` runs, each with its own seed,
+        run in parallel in the engine. Replicate ``i`` takes the seed derived
+        from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
+        the same run however many replicates run.
+
+        Parameters
+        ----------
+        n : int
+            How many replicates, at least 1.
+        seed : int | None, optional
+            The seed the replicate seeds derive from, a whole number from 0 to
+            ``2**64 - 1``. None draws one, which the replicates keep.
+
+        Returns
+        -------
+        ReplicateRuns
+            The runner of the replicates.
+
+        Raises
+        ------
+        ValueError
+            If the engine is deterministic (every replicate would be equal),
+            ``n`` is below 1, or the seed is not valid.
+        """
+        if not self.is_stochastic:
+            raise ValueError(
+                f"The {self.model_definition.engine.type} engine is deterministic: "
+                "every replicate would be equal. Replicates need a stochastic engine."
+            )
+        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+            raise ValueError(f"The number of replicates is at least 1, got {n!r}.")
+        return ReplicateRuns(self, n, draw_seed() if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -326,3 +446,102 @@ class Simulation:
         return windowed_totals(
             self.total_series(results, ids), results.positions, window, at
         )
+
+
+class ReplicateRuns:
+    """
+    Runs replicates of a stochastic model; `Simulation.replicates` makes it.
+
+    Attributes
+    ----------
+    simulation : Simulation
+        The simulation whose model the replicates run.
+    n : int
+        How many replicates.
+    seed : int
+        The seed the replicate seeds derive from.
+    """
+
+    def __init__(self, simulation: Simulation, n: int, seed: int):
+        """
+        The replicates of a simulation.
+
+        Parameters
+        ----------
+        simulation : Simulation
+            The simulation whose model the replicates run.
+        n : int
+            How many replicates.
+        seed : int
+            The seed the replicate seeds derive from.
+        """
+        self.simulation = simulation
+        self.n = n
+        self.seed = seed
+
+    def _replicates(
+        self, num_steps: int | None, positions: list[float] | None
+    ) -> SimulationReplicates:
+        simulation = self.simulation
+        simulation._validate_all_parameters_calibrated(simulation.model_definition)
+        engine = simulation.engine
+        grid, seeds, runs = engine.run_replicates(
+            self.seed, self.n, num_steps=num_steps, positions=positions
+        )
+        outputs = simulation.simulation_outputs
+        return SimulationReplicates(
+            (
+                SimulationResults.from_rows(grid, outputs, rows, seed=replicate_seed)
+                for replicate_seed, rows in zip(seeds, runs, strict=True)
+            ),
+            seed=self.seed,
+            positions=grid,
+        )
+
+    def run(self, num_steps: int) -> SimulationReplicates:
+        """
+        Every replicate from the initial state, on the default grid.
+
+        Parameters
+        ----------
+        num_steps : int
+            The number of steps: each replicate holds the positions
+            ``0, 1, ..., num_steps``.
+
+        Returns
+        -------
+        SimulationReplicates
+            One `SimulationResults` per replicate, each with its seed.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a replicate leaves the values the model allows.
+        ValueError
+            If a parameter or a value of the model has no value.
+        """
+        return self._replicates(num_steps, None)
+
+    def run_at(self, at: Sequence[float]) -> SimulationReplicates:
+        """
+        Every replicate from the initial state, reported at given positions.
+
+        Parameters
+        ----------
+        at : Sequence[float]
+            Sorted, unique positions to report at.
+
+        Returns
+        -------
+        SimulationReplicates
+            One `SimulationResults` per replicate, each with its seed.
+
+        Raises
+        ------
+        InfeasibleStateError
+            If a replicate leaves the values the model allows.
+        ValueError
+            If a parameter has no value, the positions are not sorted and
+            unique, or the engine does not report at one of them.
+        """
+        return self._replicates(None, [float(position) for position in at])

@@ -33,6 +33,7 @@ pub use math_expression::{
 // Re-export simulation engine trait
 pub use simulation_engine::{
     ModelValue, SimulationEngine, SimulationError, Trajectory, ValuePlan, check_positions,
+    run_replicates,
 };
 
 // Re-export all public types from the types module for convenient access

@@ -20,6 +20,7 @@ generic layers work with any kind.
 | One model compiler for both engines: expansion, flows, rates, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
 | A Rust ODE engine on `diffsol` | `crates/commol-differential/` |
+| Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
 | A calibration toolkit: optimizers, constraints, ensembles | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py`, `probabilistic_calibrator.py` |
 
@@ -64,6 +65,9 @@ Simulation(model)                  -> engine_state.build_engine(model JSON)
                                         derivatives(step, t, X) = Σ flows
 Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per step
                                       differential: diffsol integrates derivatives
+                                      (a stochastic engine: set_seed, then reset)
+Simulation.replicates(n).run(…)    -> Engine.run_replicates: one seed per replicate,
+                                      run in parallel (run_replicates, rayon)
 Calibrator(simulation, problem)    -> commol_rs.calibration.calibrate(engine, ...):
                                       parameters by id; values of the kind, such as
                                       initial conditions, through the engine
@@ -92,8 +96,12 @@ discussion first.
 - **Stratification declaration order is part of the model.** Stratifications
   expand in declaration order, and a conditional stratification may only
   reference stratifications declared before it.
-- **Results are reproducible.** The same formula always runs the same compiled
-  code (global JIT cache), and calibrations accept a `seed`.
+- **A run is reproducible from its model and its seed, on one platform and one
+  commol version.** The same formula always runs the same compiled code
+  (global JIT cache); a stochastic engine draws every random number from one
+  generator seeded by `SimulationEngine::set_seed`, which `reset` restores;
+  calibrations accept a `seed`. See
+  [Stochastic engines and seeds](design-decisions.md#stochastic-engines-and-seeds).
 - **What the user saves, the engine reloads.** `Model.to_json` writes every
   field, and calibrated values written back to a model reproduce the
   state the optimizer scored.

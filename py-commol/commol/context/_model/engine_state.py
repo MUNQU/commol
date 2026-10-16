@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         CalibrationParameterProtocol,
         CalibrationParameterTypeProtocol,
         EngineProtocol,
+        LossConfigProtocol,
         ObservedDataPointProtocol,
         RustAggregateProtocol,
         RustModelProtocol,
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     from commol.context.calibration import (
         CalibrationConstraint,
         CalibrationParameter,
+        CalibrationProblem,
         ObservedDataPoint,
     )
     from commol.context.aggregate import Aggregate
@@ -504,3 +506,74 @@ def subgroup_total_names(process: "Process") -> list[str]:
         The names, sorted. A process without stratifications has none.
     """
     return commol_rs.model.subgroup_total_names(_rust_process(process))
+
+
+REPLICATE_SUMMARIES = ('"mean"', '"median"', "Quantile(level)", '"crps"')
+"""The options of ``CalibrationProblem.replicate_summary``, as a message lists them."""
+
+
+def rust_loss_config(
+    problem: "CalibrationProblem", engine_type: str
+) -> "LossConfigProtocol":
+    """
+    The Rust loss of a problem, with the replicates of a stochastic engine.
+
+    Parameters
+    ----------
+    problem : CalibrationProblem
+        The calibration problem.
+    engine_type : str
+        The engine of the model. A stochastic engine runs
+        ``problem.replicates`` replicates at each evaluation; a deterministic
+        one does not use them.
+
+    Returns
+    -------
+    LossConfigProtocol
+        The loss, its normalization and its replicates.
+
+    Raises
+    ------
+    ValueError
+        If the loss function is unknown, or the engine is stochastic and the
+        problem has no ``replicates``, no ``replicate_summary`` (the message
+        lists the options) or no ``seed``.
+    """
+    from commol.context.calibration import Quantile
+    from commol.context.constants import LossFunction
+
+    builders = {
+        LossFunction.SSE: commol_rs.calibration.LossConfig.sse,
+        LossFunction.RMSE: commol_rs.calibration.LossConfig.rmse,
+        LossFunction.MAE: commol_rs.calibration.LossConfig.mae,
+    }
+    builder = builders.get(LossFunction(problem.loss_function))
+    if builder is None:
+        raise ValueError(f"Unsupported loss function: {problem.loss_function}.")
+    # Per-series normalization is orthogonal to the chosen metric.
+    loss_config = builder().normalized(problem.normalize_observations)
+    if not commol_rs.engine.EngineType(engine_type).is_stochastic:
+        return loss_config
+    if problem.replicate_summary is None:
+        raise ValueError(
+            f"The {engine_type} engine is stochastic, so the calibration compares "
+            "the observations with its replicates: set replicate_summary to one of "
+            f"{', '.join(REPLICATE_SUMMARIES)}. There is no default: what to fit "
+            "is a modelling choice."
+        )
+    if problem.replicates is None:
+        raise ValueError(
+            f"The {engine_type} engine is stochastic: set replicates, how many "
+            "replicates each evaluation runs."
+        )
+    if problem.seed is None:
+        raise ValueError(
+            f"The {engine_type} engine is stochastic: set seed, so the replicates "
+            "and the calibration are reproducible."
+        )
+    summary = problem.replicate_summary
+    if isinstance(summary, Quantile):
+        return loss_config.with_replicates(
+            problem.replicates, problem.seed, "quantile", summary.level
+        )
+    return loss_config.with_replicates(problem.replicates, problem.seed, summary)

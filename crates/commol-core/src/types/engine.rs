@@ -249,6 +249,10 @@ pub enum EngineType {
     /// (`types::test_kind`).
     #[cfg(feature = "test-kind")]
     TestEngine,
+    /// The stochastic engine of the test model kind: each unit of an output
+    /// leaves after an exponential time.
+    #[cfg(feature = "test-kind")]
+    TestStochasticEngine,
 }
 
 impl EngineType {
@@ -258,6 +262,8 @@ impl EngineType {
         Self::DifferentialEquations,
         #[cfg(feature = "test-kind")]
         Self::TestEngine,
+        #[cfg(feature = "test-kind")]
+        Self::TestStochasticEngine,
     ];
 
     /// Name of the engine, as a model names it.
@@ -267,6 +273,8 @@ impl EngineType {
             Self::DifferentialEquations => "DifferentialEquations",
             #[cfg(feature = "test-kind")]
             Self::TestEngine => "TestEngine",
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => "TestStochasticEngine",
         }
     }
 
@@ -291,7 +299,19 @@ impl EngineType {
         match self {
             Self::DifferenceEquations | Self::DifferentialEquations => &[ModelKind::Aggregate],
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => &[ModelKind::Test],
+            Self::TestEngine | Self::TestStochasticEngine => &[ModelKind::Test],
+        }
+    }
+
+    /// Whether the engine draws random numbers: a run depends on its seed
+    /// ([`crate::SimulationEngine::set_seed`]).
+    pub fn is_stochastic(self) -> bool {
+        match self {
+            Self::DifferenceEquations | Self::DifferentialEquations => false,
+            #[cfg(feature = "test-kind")]
+            Self::TestEngine => false,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => true,
         }
     }
 
@@ -340,7 +360,7 @@ impl EngineType {
             Self::DifferenceEquations => RateMeaning::PerStep,
             Self::DifferentialEquations => RateMeaning::Continuous,
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => RateMeaning::Continuous,
+            Self::TestEngine | Self::TestStochasticEngine => RateMeaning::Continuous,
         }
     }
 
@@ -352,6 +372,8 @@ impl EngineType {
             Self::DifferentialEquations => DynamicsForm::DifferentialEquation,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => DynamicsForm::DifferentialEquation,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => DynamicsForm::StochasticEvents,
         }
     }
 
@@ -393,6 +415,8 @@ impl EngineType {
             }
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineSettings::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => EngineSettings::TestStochasticEngine,
         }
     }
 
@@ -402,7 +426,7 @@ impl EngineType {
             Self::DifferenceEquations => false,
             Self::DifferentialEquations => true,
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => false,
+            Self::TestEngine | Self::TestStochasticEngine => false,
         }
     }
 
@@ -415,6 +439,8 @@ impl EngineType {
             Self::DifferenceEquations => no_settings(EngineSettings::DifferenceEquations),
             #[cfg(feature = "test-kind")]
             Self::TestEngine => no_settings(EngineSettings::TestEngine),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => no_settings(EngineSettings::TestStochasticEngine),
             Self::DifferentialEquations => {
                 let solver: OdeSolver =
                     serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
@@ -435,6 +461,9 @@ pub enum EngineSettings {
     /// The engine of the test model kind has no settings.
     #[cfg(feature = "test-kind")]
     TestEngine,
+    /// The stochastic engine of the test model kind has no settings.
+    #[cfg(feature = "test-kind")]
+    TestStochasticEngine,
 }
 
 impl EngineSettings {
@@ -445,6 +474,8 @@ impl EngineSettings {
             Self::DifferentialEquations(_) => EngineType::DifferentialEquations,
             #[cfg(feature = "test-kind")]
             Self::TestEngine => EngineType::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochasticEngine => EngineType::TestStochasticEngine,
         }
     }
 
@@ -454,7 +485,7 @@ impl EngineSettings {
             Self::DifferenceEquations => None,
             Self::DifferentialEquations(solver) => serde_json::to_value(solver).ok(),
             #[cfg(feature = "test-kind")]
-            Self::TestEngine => None,
+            Self::TestEngine | Self::TestStochasticEngine => None,
         }
     }
 }
@@ -692,6 +723,12 @@ mod tests {
             EngineType::DifferentialEquations.dynamics_form(),
             DynamicsForm::DifferentialEquation
         );
+    }
+
+    #[test]
+    fn the_engines_of_a_release_are_deterministic() {
+        assert!(!EngineType::DifferenceEquations.is_stochastic());
+        assert!(!EngineType::DifferentialEquations.is_stochastic());
     }
 
     #[test]

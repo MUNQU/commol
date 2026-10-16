@@ -16,7 +16,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 #[cfg(feature = "test-kind")]
-use crate::test_kind::{TestEngine, TestValuePlan};
+use crate::test_kind::{TestEngine, TestStochasticEngine, TestValuePlan};
 
 pyo3::create_exception!(
     commol,
@@ -44,6 +44,9 @@ pub enum Engine {
     /// The engine of the test model kind.
     #[cfg(feature = "test-kind")]
     Test(TestEngine),
+    /// The stochastic engine of the test model kind.
+    #[cfg(feature = "test-kind")]
+    TestStochastic(TestStochasticEngine),
 }
 
 /// The values of the model kind of an [`Engine`], resolved by it.
@@ -90,6 +93,10 @@ impl Engine {
             (EngineType::TestEngine, ModelKind::Test) => {
                 TestEngine::try_from_model(model).map(Self::Test)
             }
+            #[cfg(feature = "test-kind")]
+            (EngineType::TestStochasticEngine, ModelKind::Test) => {
+                TestStochasticEngine::try_from_model(model).map(Self::TestStochastic)
+            }
             #[allow(unreachable_patterns)]
             (engine, kind) => Err(format!(
                 "The {} engine has no implementation for {} models; the engines of {} \
@@ -112,6 +119,8 @@ impl Engine {
             Self::Differential(_) => EngineType::DifferentialEquations,
             #[cfg(feature = "test-kind")]
             Self::Test(_) => EngineType::TestEngine,
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(_) => EngineType::TestStochasticEngine,
         }
     }
 }
@@ -124,6 +133,8 @@ macro_rules! dispatch {
             Engine::Differential($engine) => $body,
             #[cfg(feature = "test-kind")]
             Engine::Test($engine) => $body,
+            #[cfg(feature = "test-kind")]
+            Engine::TestStochastic($engine) => $body,
         }
     };
 }
@@ -199,6 +210,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.reset())
     }
 
+    fn set_seed(&mut self, seed: u64) {
+        dispatch!(self, engine => engine.set_seed(seed))
+    }
+
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
         dispatch!(self, engine => engine.set_parameter(parameter_id, value))
     }
@@ -227,6 +242,10 @@ impl SimulationEngine for Engine {
             Self::Test(engine) => engine
                 .plan_values(values, remainder)
                 .map(EngineValuePlan::Test),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(engine) => engine
+                .plan_values(values, remainder)
+                .map(EngineValuePlan::Test),
         }
     }
 
@@ -240,6 +259,10 @@ impl SimulationEngine for Engine {
             }
             #[cfg(feature = "test-kind")]
             (Self::Test(engine), EngineValuePlan::Test(plan)) => engine.apply_values(plan, values),
+            #[cfg(feature = "test-kind")]
+            (Self::TestStochastic(engine), EngineValuePlan::Test(plan)) => {
+                engine.apply_values(plan, values)
+            }
             #[cfg(feature = "test-kind")]
             (engine, _) => Err(format!(
                 "The plan of values is not a plan of the {} engine",
@@ -296,6 +319,68 @@ impl PyEngine {
         let trajectory =
             SimulationEngine::run(&mut self.inner, num_steps).map_err(simulation_error)?;
         Ok((trajectory.positions, trajectory.rows))
+    }
+
+    /// Run replicates of a stochastic engine in parallel, each from the
+    /// initial state with a seed of its own
+    ///
+    /// Replicate `i` takes the seed `replicate_seed(seed, i)`, the SplitMix64
+    /// of `seed + i`, so it gives the same run however many replicates run.
+    ///
+    /// Args:
+    ///     seed: The seed of the replicates, from 0 to 2**64 - 1
+    ///     count: How many replicates to run
+    ///     num_steps: Run on the default grid of this many steps, or
+    ///     positions: report at these sorted, unique positions instead
+    ///
+    /// Returns:
+    ///     The positions, the seed of each replicate, and one list of output
+    ///     rows per replicate
+    ///
+    /// Raises:
+    ///     ValueError: If the engine is not stochastic, both or neither of
+    ///         num_steps and positions are given, or a position is not valid
+    ///         for the engine
+    ///     InfeasibleStateError: If a replicate leaves the values the model
+    ///         allows
+    ///     RuntimeError: If a replicate fails for another reason
+    #[pyo3(signature = (seed, count, num_steps=None, positions=None))]
+    #[allow(clippy::type_complexity)]
+    fn run_replicates(
+        &self,
+        py: Python<'_>,
+        seed: u64,
+        count: u64,
+        num_steps: Option<u32>,
+        positions: Option<Vec<f64>>,
+    ) -> PyResult<(Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
+        let engine_type = self.inner.engine_type();
+        if !engine_type.is_stochastic() {
+            return Err(PyValueError::new_err(format!(
+                "The {} engine is deterministic: every replicate would be equal",
+                engine_type.name()
+            )));
+        }
+        let mut start = self.inner.clone();
+        start.reset();
+        let positions = match (num_steps, positions) {
+            (Some(num_steps), None) => start.grid(num_steps),
+            (None, Some(positions)) => positions,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Give num_steps or positions, not both",
+                ));
+            }
+        };
+        commol_core::check_positions(&positions, 0.0, |position| start.check_position(position))
+            .map_err(PyValueError::new_err)?;
+        let seeds: Vec<u64> = (0..count)
+            .map(|index| commol_random::replicate_seed(seed, index))
+            .collect();
+        let runs = py
+            .detach(|| commol_core::run_replicates(&start, &positions, &seeds))
+            .map_err(simulation_error)?;
+        Ok((positions, seeds, runs))
     }
 
     /// Run through the last of the given positions on the axis
@@ -372,8 +457,21 @@ impl PyEngine {
     }
 
     /// Reset the simulation to initial conditions
+    ///
+    /// A stochastic engine also restores the generator of its seed, so a run
+    /// after a reset repeats the run before it.
     fn reset(&mut self) {
         self.inner.reset();
+    }
+
+    /// Seed the random numbers of the engine, and restore its generator
+    ///
+    /// A deterministic engine ignores the seed.
+    ///
+    /// Args:
+    ///     seed: The seed, from 0 to 2**64 - 1
+    fn set_seed(&mut self, seed: u64) {
+        self.inner.set_seed(seed);
     }
 
     /// Set a parameter value
@@ -467,6 +565,12 @@ impl PyEngineType {
     #[getter]
     fn kinds(&self) -> Vec<&'static str> {
         self.inner.kinds().iter().map(|kind| kind.name()).collect()
+    }
+
+    /// Whether the engine draws random numbers, so a run depends on its seed
+    #[getter]
+    fn is_stochastic(&self) -> bool {
+        self.inner.is_stochastic()
     }
 
     /// What a rate means to the engine: "per_step" (the amount or fraction
@@ -733,5 +837,69 @@ mod tests {
         assert_eq!(rows[0], vec![10.0]);
         assert!((rows[1][0] - 10.0 * (-1.0f64).exp()).abs() < 1e-12);
         assert!(engine.plan_values(&[], Some("x")).is_err());
+    }
+
+    /// A stochastic test model: 100 units of `x` leave at rate `k`.
+    #[cfg(feature = "test-kind")]
+    fn stochastic_model() -> Model {
+        let mut model = test_model();
+        model.engine = ModelEngine::new(EngineType::TestStochasticEngine);
+        if let commol_core::ModelStructure::Test(structure) = &mut model.structure {
+            structure.outputs[0].initial = 100.0;
+        }
+        model
+    }
+
+    #[cfg(feature = "test-kind")]
+    fn stochastic_run(engine: &mut Engine, seed: u64) -> Vec<Vec<f64>> {
+        engine.set_seed(seed);
+        engine.reset();
+        engine.run_at(&[0.5, 1.0, 2.0, 4.0]).unwrap()
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_stochastic_engine_repeats_a_run_from_its_seed() {
+        let mut engine = Engine::build(&stochastic_model()).unwrap();
+        assert!(engine.engine_type().is_stochastic());
+
+        let first = stochastic_run(&mut engine, 7);
+        let again = stochastic_run(&mut engine, 7);
+        let other = stochastic_run(&mut engine, 8);
+
+        assert_eq!(first, again);
+        assert_ne!(first, other);
+        engine.reset();
+        assert_eq!(engine.run_at(&[0.5, 1.0, 2.0, 4.0]).unwrap(), other);
+    }
+
+    #[cfg(feature = "test-kind")]
+    #[test]
+    fn a_stochastic_run_does_not_depend_on_where_it_reports() {
+        let mut engine = Engine::build(&stochastic_model()).unwrap();
+        engine.set_seed(3);
+        engine.reset();
+        let coarse = engine.run_at(&[4.0]).unwrap();
+        engine.reset();
+        let fine = engine.run_at(&[1.0, 2.0, 3.0, 4.0]).unwrap();
+
+        assert_eq!(coarse[0], fine[3]);
+    }
+
+    #[test]
+    fn a_deterministic_engine_ignores_the_seed() {
+        for &engine_type in EngineType::ALL {
+            if !engine_type.runs(ModelKind::Aggregate) {
+                continue;
+            }
+            let mut engine = Engine::build(&decay_model(engine_type)).unwrap();
+            assert!(!engine_type.is_stochastic());
+            engine.set_seed(1);
+            let first = SimulationEngine::run(&mut engine, 3).unwrap().rows;
+            engine.set_seed(2);
+            engine.reset();
+            let second = SimulationEngine::run(&mut engine, 3).unwrap().rows;
+            assert_eq!(first, second);
+        }
     }
 }

@@ -14,7 +14,8 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
-from commol.api.results import SimulationResults, same_position
+from commol.api.probabilistic.intervals import member_statistics
+from commol.api.results import SimulationReplicates, SimulationResults, same_position
 from commol.api.simulation import Simulation
 from commol.api.windows import window_ends, windowed_totals
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
@@ -36,13 +37,19 @@ class SimulationPlotter:
     simulation : Simulation
         The simulation instance that generated the results.
     results : SimulationResults
-        Simulation results, with their positions on the axis.
+        Simulation results, with their positions on the axis; for replicates,
+        their mean.
+    replicates : SimulationReplicates | None
+        The replicates of a stochastic run, or None for one run.
+    confidence_level : float
+        Confidence level of the band of the replicates.
     """
 
     def __init__(
         self,
         simulation: Simulation,
-        results: SimulationResults,
+        results: SimulationResults | SimulationReplicates,
+        confidence_level: float = 0.95,
     ):
         """
         Initialize the SimulationPlotter.
@@ -51,13 +58,26 @@ class SimulationPlotter:
         ----------
         simulation : Simulation
             The simulation instance that generated the results.
-        results : SimulationResults
+        results : SimulationResults | SimulationReplicates
             Simulation results, such as those of ``Simulation.run`` or
-            ``Simulation.run_at``. The x axis shows their positions.
+            ``Simulation.run_at``. The x axis shows their positions. For the
+            replicates of a stochastic run (``Simulation.replicates``),
+            ``plot_series`` draws their mean and a band of
+            ``confidence_level``, reduced replicate by replicate
+            (`member_statistics`).
+        confidence_level : float, default=0.95
+            Confidence level of the band of the replicates, strictly between
+            0 and 1.
         """
         self.simulation = simulation
-        self.results = results
-        self.bins = list(results.keys())
+        self.confidence_level = confidence_level
+        if isinstance(results, SimulationReplicates):
+            self.replicates: SimulationReplicates | None = results
+            self.results = results.mean()
+        else:
+            self.replicates = None
+            self.results = results
+        self.bins = list(self.results.keys())
 
         logger.info(
             f"SimulationPlotter initialized with {len(self.bins)} bins "
@@ -639,23 +659,25 @@ class SimulationPlotter:
         else:
             positions = self.results.positions
             values = series
-        values = self._apply_factor_to_series(
-            values,
-            self._model_factor_for_observed(observed, factor_values),
-        )
+        factor = self._model_factor_for_observed(observed, factor_values)
+        values = self._apply_factor_to_series(values, factor)
 
         # Build parameters for lineplot
         params = {
             "x": positions,
             "y": values,
             "ax": ax,
-            "label": "Simulation",
+            "label": "Simulation"
+            if self.replicates is None
+            else f"Mean of {len(self.replicates)} replicates",
             "legend": show_legend,
         }
         params.update(plot_kwargs)
 
         # Plot simulation results as line
         sns.lineplot(**params)
+        if self.replicates is not None:
+            self._plot_replicate_band(ax, component_ids, observed, factor)
 
         # Overlay observed data if available
         if observed:
@@ -686,6 +708,35 @@ class SimulationPlotter:
         if show_legend:
             ax.legend()
         ax.grid(True, alpha=0.3)
+
+    def _plot_replicate_band(
+        self,
+        ax: "Axes",
+        component_ids: list[str],
+        observed: list[ObservedDataPoint],
+        factor: float,
+    ) -> None:
+        """
+        The band of the replicates: each replicate reduced to the plotted
+        series first, then the interval across them (`member_statistics`).
+        """
+        assert self.replicates is not None
+        per_replicate = []
+        positions: list[float] = self.results.positions
+        for replicate in self.replicates:
+            series = self._sum_series(replicate, component_ids)
+            windowed = self._apply_windows(series, replicate.positions, observed)
+            if windowed is not None:
+                positions, series = windowed
+            per_replicate.append(self._apply_factor_to_series(series, factor))
+        statistics = member_statistics(per_replicate, self.confidence_level)
+        ax.fill_between(
+            positions,
+            statistics["ci_lower"],
+            statistics["ci_upper"],
+            alpha=0.3,
+            label=f"{self.confidence_level:.0%} of the replicates",
+        )
 
     def _plot_bin_series_probabilistic(
         self,

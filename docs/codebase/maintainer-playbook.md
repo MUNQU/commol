@@ -89,12 +89,17 @@ To add an engine to the list:
 
 - [ ] Add the entry to `EngineType` in `crates/commol-core/src/types/engine.rs`
       and to `ALL`. The compiler then names every `match` to complete in that
-      file: its name, the model kinds it runs (`kinds`), its settings (`EngineSettings`, parsed
-      and validated with `deny_unknown_fields`), the left-hand side of its
-      equations and the meaning of a rate.
+      file: its name, the model kinds it runs (`kinds`), whether it is
+      stochastic (`is_stochastic`), its settings (`EngineSettings`, parsed
+      and validated with `deny_unknown_fields`), the form of its dynamics
+      (`dynamics_form`: the schedule a description shows and the left-hand
+      side of its equations) and the meaning of a rate.
 - [ ] Write the engine in its own crate and implement `SimulationEngine`
-      (for a compartmental engine, also `CompartmentalEngine` from
-      `commol-model`); `try_from_model` rejects a model of another engine.
+      (for an engine of the aggregate kind, also `CompartmentalEngine` from
+      `commol-model`); `try_from_model` rejects a model of another engine. A
+      stochastic engine draws every random number from one
+      `commol_random::Generator`, implements `set_seed`, and restores the
+      generator in `reset`, so a run repeats from its seed.
 - [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: one arm in
       `build` per kind it runs (the pair of the engine and the kind),
       `engine_type`, `dispatch!`, `plan_values` and `apply_values` (and
@@ -143,6 +148,10 @@ To add a kind of model, such as an agent network (see
 - [ ] For a variant of a structure, subclass it with `variant` as a `Literal`
       default, and add the variant and its checks to Rust
       (`AggregateVariant` for `Aggregate`).
+- [ ] Give the description of the kind: override `ModelStructure.describe`
+      with the sections it fills (`entities`, `dynamics`, `initialization`,
+      `design_concepts`), built from the blocks of
+      `context/description.py`; the renderers need no change.
 - [ ] Copy the tests of `tests/model_kinds/` for the new kind, and run the
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the

@@ -2,7 +2,8 @@
 
 Commol is a compartment-modeling library: a Python API (`py-commol/commol/`)
 on top of Rust engines (`crates/`): a model compiler (`commol-model`), a
-difference engine and an ODE engine on `diffsol`, joined by PyO3 bindings
+difference engine and an ODE engine on `diffsol`, reproducible random numbers
+for stochastic engines (`commol-random`), joined by PyO3 bindings
 (`py-commol/src/`). This file is an index. The details live in `docs/`, and
 the code is the final authority.
 
@@ -34,10 +35,10 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
 | Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
-| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol && cargo test -p commol --features test-kind` |
+| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol && cargo test -p commol --features test-kind` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
-| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration` |
+| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random` |
 
 Rebuild the extension after every Rust change, before you run `pytest`.
 `cargo build --workspace` does not link the PyO3 crate outside `maturin`; use
@@ -71,6 +72,7 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/probabilistic/statistics_calculator.py` |
 | Add a function or variable to rate expressions | `crates/commol-core/src/math_expression/` | `py-commol/commol/utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `py-commol/commol/context/aggregate.py`, `docs/guide/building-models.md` |
+| Add or change a stochastic engine, seeds or samplers | `crates/commol-random/` | `crates/commol-core/src/simulation_engine.rs` (`set_seed`, `run_replicates`), `engine.rs` (`is_stochastic`), `py-commol/commol/api/simulation.py` (`replicates`) |
 | Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |
 | Change probabilistic calibration | `py-commol/commol/api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |

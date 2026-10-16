@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     from commol.context.probabilistic_calibration import ParameterSetStatistics
 
 TEST_ENGINE = "TestEngine"
+TEST_STOCHASTIC_ENGINE = "TestStochasticEngine"
+"""Each unit of an output leaves after an exponential time; a run depends on
+its seed, and its mean is the curve of `TEST_ENGINE`."""
 
 
 def require_test_kind() -> None:

@@ -13,7 +13,7 @@ test that guards it. Read the ones of your area before you change it.
 | Transitions and rates | [Rate semantics](#absolute-and-proportional-rates), [stratified rates](#the-most-specific-stratified-rate-wins), [formula parameters](#formula-parameters-are-evaluated-every-step-in-order), [JIT cache](#compiled-expressions-are-cached-globally) |
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
-| Engines | [One right-hand side](#one-right-hand-side-two-engines), [solver](#the-solver-is-diffsol) |
+| Engines | [One right-hand side](#one-right-hand-side-two-engines), [seeds](#stochastic-engines-and-seeds), [solver](#the-solver-is-diffsol) |
 | Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [descriptions](#a-description-is-data-rendered-apart), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
@@ -596,6 +596,44 @@ there.
 `an_impulse_that_moves_more_than_its_source_holds_stops_its_step`,
 `an_accumulator_may_count_a_negative_net_flow`),
 `crates/commol-calibration/tests/test_infeasible_runs.rs`.
+
+### Stochastic engines and seeds
+
+A stochastic engine draws every random number from one generator seeded by
+`SimulationEngine::set_seed` (`crates/commol-core/src/simulation_engine.rs`);
+`reset` restores it, so a run is reproducible from its seed. The default
+`set_seed` does nothing, so the deterministic engines did not change.
+`EngineType::is_stochastic` says which engines draw.
+
+| Part | Rule |
+|---|---|
+| Generator | `Xoshiro256PlusPlus` of `rand_xoshiro`, seeded by four SplitMix64 numbers of the seed (`Generator` in `crates/commol-random/`). Its sequence is the same on every platform and version. |
+| Samplers | Exponential, Poisson, binomial and multinomial written in `commol-random` (`sample.rs`), not taken from `rand_distr`, whose values may change in a minor version. A test holds the first values of each for a fixed seed. |
+| Replicates | Replicate `i` of seed `s` takes `replicate_seed(s, i)`, the SplitMix64 of `s + i`. `run_replicates` runs them in parallel (`rayon`); a deterministic engine has no replicates. |
+| Calibration | Common random numbers: the same replicate seeds at every evaluation, so the loss is a deterministic function of the parameters (`CalibrationProblem::with_replicates`). The user chooses the summary (`ReplicateSummary`); `LossConfig` computes it. |
+
+Reproducibility has three levels: the same machine and commol version give
+the same run; another platform gives the same random numbers, but the rate
+functions come from the system's `libm` through the JIT
+(`math_expression/jit/libm.rs`), which can differ in the last bit, so a run
+there is equal in distribution and rarely differs draw by draw; another commol
+version may change a run, and the changelog says so.
+
+| Alternative | Why not |
+|---|---|
+| A random source passed to every call | The trait grows an argument that the deterministic engines ignore. |
+| The seed in the model file | A model is a description; the seed belongs to a run, as `CalibrationProblem.seed` does. |
+| `StdRng` or `SmallRng` | `StdRng` is slower and its security is not needed; `SmallRng` is documented as not portable. |
+| A pure-Rust `libm` in the JIT | Costs speed in every engine for a difference in the last bit; the levels above are documented instead. |
+| One run per calibration evaluation | The loss is noise, and Nelder-Mead stops anywhere. |
+| The mean as the default summary | What to fit is a modelling choice; the mean of runs where half go extinct describes no run. |
+
+**Guards:** `crates/commol-random/` (tests, with the stored first values of each
+sampler in `tests/reference_values.txt`), `py-commol/src/engine.rs`
+(`a_stochastic_engine_repeats_a_run_from_its_seed`,
+`a_deterministic_engine_ignores_the_seed`),
+`crates/commol-calibration/src/types.rs` (`replicate_tests`),
+`tests/model_kinds/test_stochastic.py`.
 
 ### The solver is `diffsol`
 

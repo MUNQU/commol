@@ -150,7 +150,7 @@ model reports at non-integer positions once the results hold them
 | `window`, `num_windows` | The window axis of `observed` and `windowed`. |
 | `observed_data` | The observations to report next to the run. |
 | `accumulators` | The accumulator ids to report. |
-| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
+| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member, or the `SimulationReplicates` of a stochastic engine. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
 
 The report holds only these blocks. Add your own envelope around them, such as
 a run label or summary figures in your domain's terms:
