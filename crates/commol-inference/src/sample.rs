@@ -57,14 +57,14 @@ impl ParameterSample {
                 log_weights.len()
             ));
         }
-        if let Some(groups) = &groups {
-            if groups.len() != values.len() {
-                return Err(format!(
-                    "A sample has one group per draw: {} draws, {} groups",
-                    values.len(),
-                    groups.len()
-                ));
-            }
+        if let Some(groups) = &groups
+            && groups.len() != values.len()
+        {
+            return Err(format!(
+                "A sample has one group per draw: {} draws, {} groups",
+                values.len(),
+                groups.len()
+            ));
         }
         for (index, draw) in values.iter().enumerate() {
             if draw.len() != names.len() {

@@ -6,7 +6,7 @@ use commol_calibration::{
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
-use commol_inference::{observation_draws, NoNoise, ParameterSample, Predictive};
+use commol_inference::{NoNoise, ParameterSample, Predictive, observation_draws};
 
 /// A → B at the proportional rate `k`, in discrete steps from A = 1000.
 fn problem() -> CalibrationProblem<DifferenceEquations> {

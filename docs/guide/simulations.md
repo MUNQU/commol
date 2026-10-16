@@ -141,8 +141,8 @@ replicate gives the same run however many replicates run, and
 | `replicates[i]`, `len(replicates)` | One run, with its `seed`; the number of runs |
 | `seed`, `seeds`, `positions` | The seed the replicate seeds derive from, the seed of each replicate, the positions |
 | `mean()` | `SimulationResults` of the mean of every output at each position |
-| `quantiles(levels)` | `{level: SimulationResults}`, at each position |
-| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate as [`ci_percentiles`](../codebase/design-decisions.md#one-confidence-interval-convention) requires |
+| `quantiles(levels)` | `{level: SimulationResults}`, at each position, by [the one quantile](../codebase/design-decisions.md#one-confidence-interval-convention) (NumPy's `method="hazen"`) |
+| `member_statistics(output, confidence_level)` | `mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max` of one output at each position, reduced replicate by replicate with [the one quantile](../codebase/design-decisions.md#one-confidence-interval-convention) |
 
 ```python
 from commol.api.plotter import SimulationPlotter
@@ -456,7 +456,7 @@ plotter.plot_series(
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
 | `series` | `None` (every output) | What to plot, one subplot each: an output name (`B_g1`) or a bin or accumulator id (`B`), which plots the sum of its outputs (`Simulation.outputs_for`). An exact output name wins. An unknown entry raises `ValueError`. |
 | `observed_data` | `None` | `ObservedDataPoint`s to draw on the subplot of their `label`, at their positions (a differential model may observe between integers). An observation with a `window` draws the windowed line, which reads the results at every window end and start (`ValueError` when the results do not hold one). |
-| `calibration_result` | `None` | With a probabilistic result, draws the median and the confidence band; factor parameters are applied to the observations. |
+| `calibration_result` | `None` | A `CalibrationResult` gives the factor values that scale the model. A [`Predictive`](uncertainty/index.md#the-predictive) draws the weighted median of its draws and their band of `confidence_level`, each draw read through the observation operator (sums, windows, factors). |
 | `config` | `PlotConfig()` | Figure size, dpi, layout and seaborn style. |
 | `show_legend` | `True` | `plot_series` only. |
 | `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot_series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. |

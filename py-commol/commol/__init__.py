@@ -44,7 +44,6 @@ from commol.api.inference import (
     Predictive,
     PredictiveBand,
     SeriesBand,
-    scores,
 )
 from commol.context.calibration import (
     CalibrationConstraint,
@@ -131,7 +130,6 @@ __all__ = [
     "applied_parameters_report",
     "ci_percentiles",
     "member_statistics",
-    "scores",
     "simulation_report",
     "window_end",
     "window_ends",

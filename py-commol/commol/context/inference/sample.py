@@ -1,7 +1,7 @@
 """The weighted parameter sample that every method with draws returns."""
 
-from collections.abc import Iterator
-from typing import Any, Self
+from collections.abc import Iterator, Mapping
+from typing import TYPE_CHECKING, Self
 
 from pydantic import (
     BaseModel,
@@ -13,6 +13,9 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
+
+if TYPE_CHECKING:
+    from commol.commol_rs._commol_rs import ParameterSampleProtocol
 
 
 class SampleMethod(BaseModel):
@@ -114,13 +117,13 @@ class ParameterSample(BaseModel):
     groups: list[int] | None = Field(default=None, description="Group of each draw.")
     method: SampleMethod = Field(description="What made the sample.")
 
-    _rust: Any = PrivateAttr()
+    _rust: "ParameterSampleProtocol" = PrivateAttr()
 
     @model_validator(mode="before")
     @classmethod
-    def normalize_log_weights(cls, data: Any) -> Any:  # noqa: ANN401
+    def normalize_log_weights(cls, data: object) -> object:
         """Check the invariants in Rust and normalize the log weights."""
-        if not isinstance(data, dict):
+        if not isinstance(data, Mapping):
             return data
         rust = commol_rs.inference.ParameterSample(
             list(data.get("names", [])),
@@ -187,7 +190,7 @@ class ParameterSample(BaseModel):
         )
 
     @property
-    def rust_sample(self) -> Any:  # noqa: ANN401
+    def rust_sample(self) -> "ParameterSampleProtocol":
         """The sample in Rust, for the runners of methods and the predictive."""
         return self._rust
 

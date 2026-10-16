@@ -15,7 +15,7 @@ describe the observations and the unknowns in a `CalibrationProblem`, and a
 | Nelder-Mead and particle swarm settings | [Optimizers](calibration-optimizers.md) |
 | Relations the result must respect | [Constraints](calibration-constraints.md) |
 | Reports of a calibrated model and run | [Reports](reports.md) |
-| Ensembles and confidence intervals | [Probabilistic Calibration](probabilistic-calibration.md) |
+| Samples, predictive bands and scores | [Uncertainty](uncertainty/index.md) |
 
 ## Quick path
 
@@ -98,7 +98,6 @@ also when it was created while a parameter was `None`. See
 | `constraints` | `list[CalibrationConstraint]` | `[]` | Relations the result must respect. See [Constraints](calibration-constraints.md). |
 | `normalize_observations` | `bool` | `False` | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. |
 | `initial_condition_remainder` | `str \| None` | `None` | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](calibration-initial-conditions.md). |
-| `probabilistic_config` | `ProbabilisticCalibrationConfig \| None` | `None` | Turns the problem into an ensemble calibration. See [Probabilistic Calibration](probabilistic-calibration.md). |
 | `seed` | `int \| None` | `None` | Makes every random choice reproducible. |
 
 ### Observations
@@ -148,8 +147,8 @@ that names the kind when you create the `Calibrator`.
     count twice as much as one with weight 1.0. With every weight at its
     default of 1.0, the losses are the plain sum of squares, root mean square
     and mean absolute error. `LossConfig` in
-    `crates/commol-calibration/src/types.rs` computes them, for the optimizer
-    and for the ensemble central loss.
+    `crates/commol-calibration/src/types.rs` computes them; the discrepancy
+    (`crates/commol-calibration/src/discrepancy.rs`) applies them.
 
 With `normalize_observations=True`, each residual is first divided by the RMS
 of the observations of its series (its `label`).
@@ -161,8 +160,8 @@ zero (`InfeasibleStateError`, see
 larger than any fit, and the run is not recorded in the history, so the
 optimizer moves away from it and goes on. Any other error of a run, such as a
 rate that cannot be evaluated, stops the calibration with its message
-(`CalibrationProblem::cost` in
-`crates/commol-calibration/src/calibration_problem.rs`).
+(`OptimizationObjective` in `crates/commol-calibration/src/objective.rs`, the
+only place that turns an infeasible point into a penalty).
 
 ## Stochastic engines
 
@@ -208,11 +207,11 @@ print(round(result.best_parameters["k1"], 1))  # 0.4
 | A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py` |
 | A deterministic engine does not use `replicates` and `replicate_summary` | The same |
 | The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
-| A constraint at positions is checked on every replicate | `CalibrationProblem::replicate_cost` |
+| A constraint at positions is checked on every replicate | `CalibrationProblem::evaluate` |
 
-With one replicate the CRPS is the absolute error. A probabilistic
-calibration runs the same objective: its ensemble holds parameter sets, and
-`Simulation.replicates` gives the stochastic spread of a member.
+With one replicate the CRPS is the absolute error. The
+[predictive](uncertainty/index.md#the-predictive) of a sample runs every
+replicate of each draw.
 
 ## Results
 
@@ -221,11 +220,12 @@ calibration runs the same objective: its ensemble holds parameter sets, and
 
 | `CalibrationResult` field | Meaning |
 |---|---|
-| `best_parameters` | `dict[str, float]`: the best value of every unknown |
+| `best_parameters` | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters` |
 | `final_loss` | The loss at `best_parameters` |
 | `iterations` | The optimizer iterations performed |
 | `converged` | `True` only when the optimizer met its convergence test or `target_cost`; a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
+| `starts`, `failed_runs` | Every start that finished, and why each failed one did. See [Several starts](calibration-optimizers.md#several-starts). |
 
 ```python
 print(result.converged, result.termination_reason)
@@ -234,9 +234,9 @@ print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 
 | `Calibrator` member | What it does |
 |---|---|
-| `run()` | Runs the optimizer and returns a `CalibrationResult`. |
-| `run_with_history()` | Also returns every evaluation the optimizer made. |
-| `run_probabilistic()` | Runs an ensemble calibration; needs `probabilistic_config`. |
+| `run(starts=1)` | Runs the optimizer from `starts` start points and returns the best `CalibrationResult`. See [Several starts](calibration-optimizers.md#several-starts). |
+| `run_with_history()` | Returns a `CalibrationHistory`: the result and every evaluation of a feasible point. |
+| `uncertainty(method)` | Runs an uncertainty method. See [Uncertainty](uncertainty/index.md#the-entry-point). |
 | `num_observations`, `num_parameters`, `parameter_names` | Facts about the problem. |
 
 ## Writing the result back
@@ -250,8 +250,9 @@ value into the model, routed by its `parameter_type`:
 | `"initial_condition"` | The initial conditions, so the model rebuilds exactly the state the optimizer scored |
 | `"factor"` | Nothing: it describes the observations, not the model |
 
-It accepts a `CalibrationResult`, a `ProbabilisticCalibrationResult` (it then
-applies the ensemble's `point_parameters`) or a plain `{id: value}` mapping. It
+It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one
+of `sample.draws()`; a `ParameterSample` has no single set of values and raises
+`TypeError`. It
 computes the new definition first, so a rejected value leaves the model
 unchanged. To set values by hand, use `Model.update_parameters({...})`.
 
@@ -270,4 +271,4 @@ unchanged. To set values by hand, use `Model.update_parameters({...})`.
 | Fitting initial conditions | [Calibrating Initial Conditions](calibration-initial-conditions.md) |
 | Fitting several or partial observations | [Observations](calibration-observations.md) |
 | Tuning the optimizer | [Optimizers](calibration-optimizers.md) |
-| Uncertainty | [Probabilistic Calibration](probabilistic-calibration.md) |
+| Uncertainty | [Uncertainty](uncertainty/index.md) |

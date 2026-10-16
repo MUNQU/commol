@@ -14,7 +14,8 @@ test that guards it. Read the ones of your area before you change it.
 | Initial conditions | [Subgroup totals](#subgroup-totals-compose-down-the-condition-chain), [calibrated values](#calibrated-initial-conditions-are-applied-in-layers) |
 | Time | [Physical units](#physical-units-are-not-in-the-model), [step unit](#one-step-unit-in-the-unit-check), [time inside a step](#time-inside-a-step), [impulses](#impulses-come-before-the-flows-of-their-step), [windowed observations](#windowed-observations) |
 | Engines | [One set of flows](#every-engine-reads-one-set-of-flows), [seeds](#stochastic-engines-and-seeds), [whole units](#whole-units-in-a-stochastic-engine), [solver](#the-solver-is-diffsol) |
-| Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model) |
+| Calibration | [Weights](#one-meaning-of-an-observation-weight), [Nelder-Mead bounds](#nelder-mead-searches-inside-the-bounds), [simulations](#a-simulation-follows-its-model), [one observation operator](#one-observation-operator), [constraints bound the support](#constraints-bound-the-support) |
+| Uncertainty | [A sample carries its weights](#a-sample-carries-its-weights), [one entry point](#methods-plug-into-one-entry-point) |
 | Results | [Confidence intervals](#one-confidence-interval-convention), [descriptions](#a-description-is-data-rendered-apart), [reports](#reports), [model files](#model-files-are-written-in-full) |
 | Security | [Expressions](#every-user-expression-is-validated) |
 
@@ -23,7 +24,7 @@ test that guards it. Read the ones of your area before you change it.
 ### One interface for every model kind
 
 The layers that do not depend on how a model is built (`Simulation`,
-`Calibrator`, `ProbabilisticCalibrator`, the reports and `SimulationPlotter`)
+`Calibrator`, the uncertainty methods, the reports and `SimulationPlotter`)
 use only `Model` and the methods of `ModelStructure`
 (`py-commol/commol/context/structure.py`), and in Rust only the
 `SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What
@@ -453,8 +454,9 @@ impulse step and restarts from the new state, so `diffsol` needs no event.
 
 An observation at `at` with `window = W` is compared with
 `output(at) - output(at - W)`, anchored at its own position. The Rust loss and
-`windowed_totals` (`api/windows.py`) must give the same number, and so must the
-ensemble statistics (`StatisticsCalculator._member_window_value`). Window `w`
+`windowed_totals` (`api/windows.py`) must give the same number, and the
+predictive reads windows through the observation operator
+([One observation operator](#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 `max(ceil(at / W) − 1, 0)`, and `observed_report` calls it.
 
@@ -462,7 +464,7 @@ covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 the generating parameters is zero),
 `tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index`
 and
-`tests/probabilistic/test_calibrator.py::test_windowed_bands_are_taken_at_the_observation_positions`.
+`tests/plotting/test_plotter.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run`.
 
 ### The engine owns positions
 
@@ -493,16 +495,14 @@ checks whether a model type accepts a position.
 (`api/results.py`): a `dict` from output name to values, with the positions in
 `positions` and the rows in `rows()`. A `dict` keeps `results["A"]`,
 `json.dumps` and `pandas.DataFrame(results)` working; a reserved key could clash
-with an output name. Windows, reports, plots and ensemble statistics read a
-value at a position (`index_at`, which matches within a relative `1e-9`), never
-at a list index, so a model type that reports between integers fits them. The
-ensemble trajectories hold `StatisticsCalculator.positions`: the unit grid and
-every observation position and window start.
+with an output name. Windows, reports and plots read a value at a position
+(`index_at`, which matches within a relative `1e-9`), never at a list index, so
+a model type that reports between integers fits them. A predictive holds the
+positions it was asked for (`Predictive.positions`).
 
 **Guards:** `tests/simulation/test_runs.py::TestResults`,
 `tests/reporting/test_simulation_report.py::TestNonIntegerPositions`,
-`tests/plotting/test_plotter.py::TestDifferentialModel`,
-`tests/probabilistic/test_differential.py`.
+`tests/plotting/test_plotter.py::TestDifferentialModel`.
 
 ## Engines
 
@@ -598,13 +598,15 @@ An error, for every cause, and not:
 Calibration tells such a run from a failure by its type, not by its message.
 `SimulationEngine` returns `SimulationError`: `Infeasible { position, message }`
 for a state outside the values the model allows, and `Failed(String)` for every
-other error. `CalibrationProblem::cost` gives an infeasible run the base
-penalty, as it does for values that are not finite, and records nothing in the
-history; a failed run still stops the calibration, so a rate that cannot be
-evaluated does not hide behind a poor fit. An optimizer that explores the
-bounds of a rate would otherwise stop on the first infeasible point, though the
-fit lies elsewhere. The predictions of an ensemble return the type as
-`CalibrationError::Infeasible`. Python receives `InfeasibleStateError`, a
+other error. The forward model turns an infeasible run into a
+`Violation::InfeasibleRun` and a failed one into `EvaluationError::Failed`
+(`forward.rs`); the optimization objective gives a violation a penalty and
+records nothing in the history; a failed run still stops the calibration, so a
+rate that cannot be evaluated does not hide behind a poor fit. An optimizer
+that explores the bounds of a rate would otherwise stop on the first infeasible
+point, though the fit lies elsewhere. A prediction of an infeasible draw raises
+`InfeasibleStateError` (`prediction_error` in `py-commol/src/inference.rs`).
+Python receives `InfeasibleStateError`, a
 `ValueError` (`simulation_error` in `py-commol/src/engine.rs`); a failed run
 stays a `RuntimeError`.
 
@@ -725,17 +727,13 @@ model reproduces a run.
 
 `LossConfig::term` and `LossConfig::finish` in
 `crates/commol-calibration/src/types.rs` compute every loss: `sse` is
-`Σ w·r²`, `rmse` is `√(Σ w·r² / Σ w)`, `mae` is `Σ w·|r| / Σ w`. The optimizer
-(`calibration_problem.rs`), the ensemble central loss
-(`probabilistic/ensemble/mod.rs`) and Python (`central_fit_loss`, through
-`LossConfig.aggregate`) all call them.
+`Σ w·r²`, `rmse` is `√(Σ w·r² / Σ w)`, `mae` is `Σ w·|r| / Σ w`. The
+discrepancy (`discrepancy.rs`) calls them for the optimizer and for every
+method that reads the loss.
 
-**Rule:** never write a loss formula elsewhere. The central-fit gate compares
-the ensemble loss with the optimizer loss, so both must measure the same way.
+**Rule:** never write a loss formula elsewhere.
 
-**Guards:** `types.rs` `loss_tests`;
-`ensemble::tests::central_loss_uses_observation_weights_in_every_metric`;
-`tests/probabilistic/test_selection.py::test_central_fit_loss_uses_weights_in_every_metric`.
+**Guards:** `types.rs` `loss_tests`; `discrepancy::tests`.
 
 ### Nelder-Mead searches inside the bounds
 
@@ -744,10 +742,13 @@ and a simplex that crosses a bound collapses there. Nelder-Mead therefore
 searches an unbounded `u` and scores `x = lo + (hi − lo)·(sin u + 1)/2`
 (`SineTransform` and `BoundedProblem` in `optimization.rs`). Its evaluations
 and its result are recorded in `x`. `converged` is true only for
-`SolverConverged` and `TargetCostReached` (`optimization::converged`).
+`SolverConverged` and `TargetCostReached` (`optimization::converged`). The
+initial simplex is scored before argmin runs, because argmin's Nelder-Mead
+unwraps the cost of each initial vertex: an error there returns as an error,
+not a panic.
 
 **Rule:** report and record values in `x`, never in `u`. Every optimizer run,
-the verbose one included, goes through `optimize_observed`.
+the verbose one included, goes through `optimization::run`.
 
 **Guards:** `optimization::tests`; `tests/calibration/test_optimizers.py`.
 
@@ -761,16 +762,119 @@ the property, not only in `run`.
 
 **Guard:** `tests/simulation/test_runs.py`.
 
+### One observation operator
+
+`ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the
+only code that turns a run into observed quantities: the row of each
+observation, the sum of its outputs, its increment over its window and its
+factor. The loss, the predictions of `PyCalibrationProblem`, the predictive's
+`at_observations` and every score read it, and the plotter reads a windowed or
+scaled series of a predictive through it. The calibration problem is split
+into one layer per job, each in its own module: `ForwardModel` (`forward.rs`)
+is the only code that clones, resets, writes values to or runs the engine;
+`Feasibility` (`feasibility.rs`) checks bounds and constraints; `Discrepancy`
+(`discrepancy.rs`) compares predictions with data; `OptimizationObjective`
+(`objective.rs`) is the argmin cost function. `CalibrationProblem` holds them,
+is built once and has no interior mutability; the buffers of an evaluation are
+a `Workspace` per thread.
+
+**Rule:** Python never transforms a prediction: windows, sums, factors,
+normalization, quantiles and scores come from Rust. `Calibrator` builds the
+Rust problem once (`commol_rs.inference.CalibrationProblem`) and every call
+reads it.
+
+**Guards:** `observation::tests`,
+`crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,
+`tests/uncertainty/test_predictive.py::TestObservations`.
+
+### Constraints bound the support
+
+A point is feasible, or it violates the problem by an amount: a bound, a
+constraint, an infeasible start or run, or a value that is not finite
+(`Violation` in `feasibility.rs`). Only `OptimizationObjective` turns a
+violation into a penalty, `base × (1 + amount)`, where `base` scales with the
+largest observed value. An inference method sees the same violation as the
+edge of the support: its log density is `−∞` (`discrepancy_in_support` in
+`crates/commol-inference/src/target.rs`).
+
+| Alternative | Why not |
+|---|---|
+| The penalty for every method | Its scale is arbitrary, so a sampler would give weight to infeasible points. |
+| Reject and draw again, with no value | A profile or a Laplace fit needs the value at the edge. |
+
+**Guards:** `feasibility::tests`,
+`crates/commol-calibration/tests/test_infeasible_runs.rs`.
+
+## Uncertainty
+
+### A sample carries its weights
+
+A method with draws returns its own result type, which holds a
+`ParameterSample` (`crates/commol-inference/src/sample.rs`,
+`py-commol/commol/context/inference/sample.py`): names, bounds, values, log
+weights normalized to sum to 1, optional groups and the method that made it.
+Plots, reports, the predictive and the scores read the sample, never the
+result of one method. Every statistic is weighted and computed in Rust; equal
+weights give the unweighted statistic.
+
+| Alternative | Why not |
+|---|---|
+| One generic result for every method | Profiles, conformal intervals and jackknife estimates are not draws. |
+| A union of result types | Every caller narrows it. |
+
+**Guards:** `crates/commol-inference/src/sample.rs` tests,
+`tests/uncertainty/test_sample.py`.
+
+### Methods plug into one entry point
+
+`Calibrator.uncertainty(method: UncertaintyMethod[R]) -> R` runs every method.
+A method is three parts: a configuration that subclasses `UncertaintyMethod`
+with its result type (`context/inference/`), a runner in Rust bound in
+`py-commol/src/inference.rs`, and a result (`context/inference/`). It registers
+its runner in `api/inference/registry.py`; the entry point looks the runner up
+by the configuration's type and knows no method. A static type checker infers
+`R` from the configuration's type.
+
+| Alternative | Why not |
+|---|---|
+| One `Calibrator` method per technique | A class with thirty methods that every method edits. |
+| Free functions | Each repeats the simulation and problem arguments. |
+| `method.run(calibrator)` | The configuration, in `context/`, would import `api/`. |
+
+Every random number of a method comes from the `commol-random` generator,
+seeded from `CalibrationProblem.seed` (`replicate_seed`). Coverage studies
+(`tests/support/coverage.py`, marker `coverage_study`) check that a method's
+intervals cover the truth at their level; they run weekly
+(`.github/workflows/coverage.yaml`).
+
+**Guards:** `tests/uncertainty/test_entry_point.py`,
+`tests/uncertainty/test_coverage.py`.
+
 ## Results
 
 ### One confidence-interval convention
 
-`ci_percentiles` (`api/probabilistic/intervals.py`) is the only place that turns
-a confidence level into percentiles. `member_statistics` reduces each ensemble
-member to the quantity of interest **first**, and then takes percentiles across
-members. Taking percentiles first gives a band that describes no member.
+Every interval is a weighted quantile: the inverse of the weighted empirical
+distribution, interpolated between the midpoints of the cumulative weights
+(`statistics::quantiles` in `crates/commol-inference/src/statistics.rs`). With
+equal weights it equals NumPy's `method="hazen"`; a weight of zero removes a
+value. `ci_percentiles` (`api/inference/intervals.py`) turns a confidence level
+into the two percentile points. `member_statistics` reduces each member to the
+quantity of interest **first**, and then takes weighted quantiles across
+members; taking quantiles first gives a band that describes no member. The
+replicates of a stochastic run (`SimulationReplicates.quantiles`), a sample
+and a predictive use the same quantile.
 
-**Rule:** every new interval goes through these two functions.
+| Alternative | Why not |
+|---|---|
+| NumPy's default (`linear`) with equal weights and another rule with weights | Two conventions: a sample would change its interval when it gains weights. |
+| Harrell–Davis | Smoother, but with no simple weighted form, and slower. |
+
+**Rule:** every new interval goes through `weighted_quantiles` or
+`member_statistics`.
+
+**Guards:** `crates/commol-inference/src/statistics.rs` tests,
+`tests/uncertainty/test_intervals.py`.
 
 ### A description is data, rendered apart
 
@@ -811,7 +915,8 @@ with `latexmk` when they are installed), `tests/building/test_engine.py`
 `applied_parameters_report` (calibrated parameters, and the sections of the
 model kind: `initial_conditions` for an aggregate model).
 
-- A single run and an ensemble differ only at the leaves (`ReportLeaf`).
+- A single run and an ensemble (replicates or a `Predictive`) differ only at
+  the leaves (`ReportLeaf`); a predictive's members carry their weights.
 - The key order of each entry is part of the contract, because it changes saved
   JSON files.
 - Labels and summary figures belong to the caller, because they carry domain

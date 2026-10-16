@@ -13,6 +13,7 @@ CalibrationParameterTypeProtocol
 CalibrationConstraintProtocol
 ObservedDataPointProtocol
 CalibrationProblemProtocol
+ParameterSampleProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 LossConfigProtocol

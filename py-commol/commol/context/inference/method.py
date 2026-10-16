@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-ResultT = TypeVar("ResultT", bound=BaseModel)
+ResultT = TypeVar("ResultT", bound=BaseModel, covariant=True)
 
 
 class UncertaintyMethod(BaseModel, Generic[ResultT]):

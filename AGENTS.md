@@ -4,7 +4,9 @@ Commol is a compartment-modeling library: a Python API (`py-commol/commol/`)
 on top of Rust engines (`crates/`): a model compiler (`commol-model`), a
 difference engine and an ODE engine on `diffsol`, two stochastic engines of
 whole units (`commol-stochastic`), reproducible random numbers for stochastic
-engines (`commol-random`), joined by PyO3 bindings
+engines (`commol-random`), the calibration problem and its optimizers
+(`commol-calibration`), the parameter sample, predictive and scores of the
+uncertainty methods (`commol-inference`), joined by PyO3 bindings
 (`py-commol/src/`). This file is an index. The details live in `docs/`, and
 the code is the final authority.
 
@@ -36,11 +38,12 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Build the extension | `source .venv/bin/activate && maturin develop --release --features test-kind` (the tests need the test model kind; a release never has it) |
 | Python tests | `pytest` |
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
+| Coverage studies of the uncertainty methods (slow; weekly in CI) | `pytest -m coverage_study` |
 | Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
-| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
+| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
-| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic` |
+| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic` |
 
 Rebuild the extension after every Rust change, before you run `pytest`.
 `cargo build --workspace` does not link the PyO3 crate outside `maturin`; use
@@ -73,13 +76,14 @@ Rebuild the extension after every Rust change, before you run `pytest`.
 | Change how a rate reads the neighbors of a unit | `crates/commol-model/src/flows.rs` (`resolve_neighbors`) | `crates/commol-core/src/types/aggregate.rs` (`Neighbors`), `builder.rs` (`check_model`), `py-commol/commol/context/neighbors.py` |
 | Change impulses | `crates/commol-model/src/system.rs` (`apply_impulses`) | both engines, `py-commol/commol/context/transition.py` |
 | Change which positions a model type accepts | `crates/commol-core/src/simulation_engine.rs` (`check_position`) | each engine's `check_position`, `crates/commol-calibration/src/calibration_problem.rs` (`check_positions`) |
-| Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/probabilistic/statistics_calculator.py` |
+| Change how results, windows or reports read positions | `py-commol/commol/api/results.py` | `api/windows.py`, `api/reporting.py`, `api/plotter.py`, `api/inference/predictive.py` |
 | Add a function or variable to rate expressions | `crates/commol-core/src/math_expression/` | `py-commol/commol/utils/security.py`, `docs/guide/mathematical-expressions.md` |
 | Change initial conditions | `py-commol/commol/context/initial_conditions.py` | `crates/commol-model/src/builder.rs` (`initial_state`), `py-commol/commol/context/aggregate.py`, `docs/guide/building-models.md` |
 | Change a stochastic engine of the aggregate kind (events, chain binomial, whole units) | `crates/commol-stochastic/src/` (`events.rs`, `steps.rs`, `units.rs`) | `crates/commol-core/src/types/engine.rs` (`StochasticEventsSettings`, `Rounding`), `crates/commol-model/src/system.rs` (`flow_changes`, `breakpoints`), `py-commol/commol/context/engine.py`, `docs/guide/stochastic.md` |
 | Add or change a stochastic engine, seeds or samplers | `crates/commol-random/` | `crates/commol-core/src/simulation_engine.rs` (`set_seed`, `run_replicates`), `engine.rs` (`is_stochastic`), `py-commol/commol/api/simulation.py` (`replicates`) |
-| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py` |
-| Change probabilistic calibration | `py-commol/commol/api/probabilistic_calibrator.py` | `api/probabilistic/`, `crates/commol-calibration/src/probabilistic/` |
+| Change calibration | `crates/commol-calibration/src/calibration_problem.rs` and its layers (`forward.rs`, `observation.rs`, `feasibility.rs`, `discrepancy.rs`, `objective.rs`, `starts.rs`) | `values.rs`, `crates/commol-model/src/initial_conditions.rs`, `py-commol/commol/api/calibrator.py`, `py-commol/src/inference.rs` (`CalibrationProblem`) |
+| Add an uncertainty method | `crates/commol-inference/` | `py-commol/src/inference.rs`, `py-commol/commol/context/inference/`, `api/inference/registry.py`, the [checklist](docs/codebase/maintainer-playbook.md#uncertainty-method) |
+| Change the parameter sample, the predictive, the scores or the quantile | `crates/commol-inference/src/` (`sample.rs`, `predictive.rs`, `scores.rs`, `statistics.rs`) | `py-commol/commol/context/inference/sample.py`, `api/inference/`, `docs/guide/uncertainty/index.md` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/` (`engine.rs` for a function that takes an engine) | `py-commol/commol/commol_rs/_commol_rs.pyi` |
 | Change how a model is described | `py-commol/commol/context/description.py` (blocks), `context/_model/describe.py` (layouts) | `ModelStructure.describe`, `context/_model/aggregate_description.py`, `api/description.py` (renderers), `docs/guide/describing-models.md` |

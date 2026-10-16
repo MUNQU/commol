@@ -17,7 +17,7 @@ every rate to machine code, and runs it or fits it to your data.
 |---|---|---|
 | New to Commol | [Quick Start](getting-started/quickstart.md) | [Core Concepts](guide/core-concepts.md) |
 | Building a model | [Building Models](guide/building-models.md) | [Transitions](guide/transitions.md), [Mathematical Expressions](guide/mathematical-expressions.md) |
-| Fitting a model to data | [Model Calibration](guide/calibration.md) | [Probabilistic Calibration](guide/probabilistic-calibration.md) |
+| Fitting a model to data | [Model Calibration](guide/calibration.md) | [Uncertainty](guide/uncertainty/index.md) |
 | Looking up a class or argument | [API Reference](api/index.md) | [Model Structure](advanced/model-structure.md) |
 | Contributing to Commol | [Codebase Guide](codebase/index.md) | [Development Workflow](development/workflow.md) |
 | An AI agent using Commol | <a href="llms.txt"><code>llms.txt</code></a>: an index of the site | <a href="llms-full.txt"><code>llms-full.txt</code></a>: the whole site in one file |
@@ -81,7 +81,7 @@ results = Simulation(model).run(num_steps=100)
 | One process run as difference equations, differential equations or a stochastic process of whole units | [Stochastic Simulation](guide/stochastic.md) |
 | A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](guide/describing-models.md) |
 | Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
-| Ensembles and prediction intervals | [Probabilistic Calibration](guide/probabilistic-calibration.md) |
+| Parameter samples, predictive bands and scores | [Uncertainty](guide/uncertainty/index.md) |
 | JSON-ready reports and seaborn plots | [Reports](guide/reports.md), [Plotting](guide/simulations.md#plotting) |
 
 ## License and authors

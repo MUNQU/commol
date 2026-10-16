@@ -43,7 +43,8 @@ crates/commol-core/          model types, expressions (Cranelift JIT), Simulatio
 crates/commol-model/         expansion, initial state, flow planning, rates, derivatives
 crates/commol-difference/    the discrete step: X += derivatives
 crates/commol-differential/  the ODE engine: diffsol integrates derivatives
-crates/commol-calibration/   loss, optimizers (argmin fork), ensembles
+crates/commol-calibration/   the problem in layers, optimizers (argmin fork), starts
+crates/commol-inference/     parameter sample, predictive, scores, quantiles
 ```
 
 **Golden rule: the Rust engine is the single source of truth.** When Python

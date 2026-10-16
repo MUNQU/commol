@@ -82,8 +82,8 @@ total.
 A category name that two stratifications declare must be qualified with its
 stratification, as in `"group:g1"`; a bare name is rejected as ambiguous.
 
-The engine resolves every id when you create the `Calibrator` or the
-`ProbabilisticCalibrator` (`InitialConditionPlan` in
+The engine resolves every id when you create the `Calibrator`
+(`InitialConditionPlan` in
 `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before
 the optimization starts:
 

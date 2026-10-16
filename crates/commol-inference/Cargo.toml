@@ -1,10 +1,12 @@
 [package]
 name = "commol-inference"
-version = "0.1.0"
-edition = "2021"
-authors = ["Commol Contributors"]
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
 description = "Uncertainty and identifiability methods for Commol calibration problems"
-license = "MIT"
 
 [lib]
 name = "commol_inference"

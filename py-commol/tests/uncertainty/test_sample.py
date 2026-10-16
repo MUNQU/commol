@@ -130,7 +130,7 @@ class TestNoSingleParameterSet:
         )
 
         with pytest.raises(TypeError, match=r"sample\.draws\(\)"):
-            model.apply_calibration_parameters(sample, _k1_problem())  # type: ignore[arg-type]
+            model.apply_calibration_parameters(sample, _k1_problem())  # ty: ignore[invalid-argument-type]
 
     def test_a_draw_can_be_applied_to_a_model(self) -> None:
         model = build(abc_builder())

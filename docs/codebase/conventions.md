@@ -30,7 +30,10 @@ check some of these rules. The rest depend on the author and the reviewer.
   may use a one-line docstring.
 - Context data structures are Pydantic v2 models.
 - `ModelBuilder` methods return `Self`, so calls chain.
-- Log with the standard `logging` module.
+- Log with the standard `logging` module. Library code never writes to the
+  standard error of the process: a failure is part of the result and the
+  caller logs it (`CalibrationResult.failed_runs`). Output the user asks for,
+  such as a verbose optimizer's table, goes to Python's `sys.stdout`.
 
 ## Rust
 
@@ -39,6 +42,8 @@ check some of these rules. The rest depend on the author and the reviewer.
   summary.
 - Hot paths avoid allocation: reuse buffers, access by index, keep evaluation
   contexts alive.
+- No `println!` or `eprintln!` in library code: return the information to the
+  caller.
 
 ## Comments and docstrings
 
@@ -68,7 +73,7 @@ Design reasons and invariants that cross components go to
 |---|---|
 | Adds or changes a public Python name, argument, default or error | Its docstring; a `::: path` entry in `docs/api/` for a new name in `commol.__all__`; the guide page that uses it |
 | Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
-| Changes calibration or ensembles | `guide/calibration.md` or `guide/probabilistic-calibration.md` |
+| Changes calibration or uncertainty | `guide/calibration.md` and its sub-pages, or `guide/uncertainty/` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
 | Moves code, adds a module, or changes who owns what | [Repository map](repository-map.md); `AGENTS.md` if a "If you need to…" row changes |
 | Adds or removes a crate, an engine or a layer, or changes the path of a simulation or a calibration | The diagrams and tables of [Architecture](architecture.md) |
@@ -160,7 +165,7 @@ The tests live in `py-commol/tests/`.
 A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
 of X". A pure-Python helper (`utils/security.py`, `context/axis_units.py`,
-`api/probabilistic/`) goes in the package of its feature. The exceptions are
+`api/inference/intervals.py`) goes in the package of its feature. The exceptions are
 `reference_models/`, which checks published models across features (see
 [Reference models](#reference-models)), and `model_kinds/`, which runs a model
 kind that is not aggregate through every generic layer.
@@ -176,8 +181,8 @@ kind that is not aggregate through every generic layer.
 | `stochastic/` | The stochastic engines of an aggregate model through the layers: their means against the deterministic engines, whole units, calibration with replicates (the closed forms are in `crates/commol-stochastic/tests/oracles.rs`) | [Stochastic Simulation](../guide/stochastic.md) |
 | `units/` | Unit checks | [Units](../guide/units-and-equations.md) |
 | `description/` | `Model.describe`, its sections and blocks, the renderers and their snapshots (`description/snapshots/`), the equations of the dynamics (`equation_forms` in `support/description.py`) | [Describing a Model](../guide/describing-models.md) |
-| `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
-| `probabilistic/` | Ensembles, their selection and intervals | [Probabilistic Calibration](../guide/probabilistic-calibration.md) |
+| `calibration/` | One file per calibration page: `test_problem.py`, `test_optimizers.py`, `test_starts.py`, `test_constraints.py`, `test_observations.py`, `test_initial_conditions.py`, `test_write_back.py` | [Model Calibration](../guide/calibration.md) and its sub-pages |
+| `uncertainty/` | The parameter sample, the one quantile, the predictive, the scores, the entry point `Calibrator.uncertainty`, and the coverage harness (`test_coverage.py`, marker `coverage_study`) | [Uncertainty](../guide/uncertainty/index.md) |
 | `reporting/` | Reports | [Reports](../guide/reports.md) |
 | `plotting/` | `SimulationPlotter` | [Running Simulations](../guide/simulations.md#plotting) |
 | `docs/` | The documentation examples and the API coverage (marker `docs`) | — |

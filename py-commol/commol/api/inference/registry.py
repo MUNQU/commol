@@ -5,7 +5,7 @@ finds it with `run_method`. The entry point knows no method.
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -14,10 +14,12 @@ from commol.context.inference.method import UncertaintyMethod
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
 
-MethodT = TypeVar("MethodT", bound=UncertaintyMethod[Any])
+MethodT = TypeVar("MethodT", bound=UncertaintyMethod[BaseModel])
 ResultT = TypeVar("ResultT", bound=BaseModel)
 
-_RUNNERS: dict[type[UncertaintyMethod[Any]], Callable[["Calibrator", Any], Any]] = {}
+type Runner = Callable[["Calibrator", UncertaintyMethod[BaseModel]], BaseModel]
+
+_RUNNERS: dict[type[UncertaintyMethod[BaseModel]], Runner] = {}
 
 
 def register(
@@ -41,7 +43,7 @@ def register(
     """
     if method_type in _RUNNERS:
         raise ValueError(f"{method_type.__name__} already has a runner.")
-    _RUNNERS[method_type] = runner
+    _RUNNERS[method_type] = cast("Runner", runner)
 
 
 def registered() -> list[str]:

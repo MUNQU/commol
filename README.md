@@ -28,8 +28,9 @@ problem needs. This structure is common in epidemiology, pharmacokinetics,
 ecology and chemical kinetics, and Commol assumes none of them.
 
 Models are deterministic and evolve along a single variable, usually time.
-Calibration is based on optimization, with ensembles of good fits to measure
-uncertainty; Commol has no stochastic engine and no Bayesian inference.
+Calibration is based on optimization from one or several starts; the
+uncertainty methods share one weighted parameter sample, its predictive and
+its scores.
 
 ## Installation
 
@@ -124,9 +125,9 @@ print(f"B at 60: {results['B'][-1]:.1f}")
 - **[Calibration](https://munqu.github.io/commol/latest/guide/calibration/).**
   Fit parameters and initial conditions to observations of single outputs,
   sums or counts per window, under constraints.
-- **[Uncertainty](https://munqu.github.io/commol/latest/guide/probabilistic-calibration/).**
-  Build ensembles of good fits and read prediction intervals and parameter
-  spreads from them.
+- **[Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/).**
+  Read a weighted sample of the parameters, the band of its predictive, and
+  scores of the predictive against held-out data.
 - **[Checks and output](https://munqu.github.io/commol/latest/guide/units-and-equations/).**
   Check units, print the equations as text or LaTeX, and save models and
   reports as JSON.

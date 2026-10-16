@@ -26,8 +26,8 @@ pub mod statistics;
 pub mod target;
 
 pub use predictive::{
-    observation_draws, Band, NoNoise, ObservationDraws, ObservationNoise, Predictive,
-    PredictiveError, SeriesBand,
+    Band, NoNoise, ObservationDraws, ObservationNoise, Predictive, PredictiveError, SeriesBand,
+    observation_draws,
 };
 pub use sample::ParameterSample;
-pub use target::{discrepancy_in_support, Target};
+pub use target::{Target, discrepancy_in_support};

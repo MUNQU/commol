@@ -38,7 +38,7 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Vec<f64> {
     let mut members: Vec<(f64, f64)> = values
         .iter()
         .zip(weights)
-        .filter(|(_, &w)| w > 0.0)
+        .filter(|(_, w)| **w > 0.0)
         .map(|(&v, &w)| (v, w))
         .collect();
     assert!(!members.is_empty(), "a quantile needs a positive weight");
