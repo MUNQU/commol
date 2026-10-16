@@ -7,14 +7,14 @@ labels: proposal
 
 ## Goal
 
-<!-- One paragraph: what the user can do when this is done, in the present
+<!-- One paragraph: what becomes possible when this is done, in the present
 tense. Keep the whole issue short and scoped: split a large proposal into
 sub-issues, one per group of requirements. -->
 
 ## Why
 
-<!-- Who asked, which problem it solves, and the evidence: an issue, a
-discussion, a benchmark, a paper. -->
+<!-- Which problem it solves, and the evidence: an issue, a discussion, a
+benchmark, a paper. -->
 
 ## Current state
 
@@ -44,7 +44,7 @@ The <component> SHALL <behavior>.
 
 ## Decisions
 
-<!-- The user's to make, settled when the implementation starts. Each row
+<!-- To settle when the implementation starts. Each row
 says why the recommendation beats each alternative. Status: proposed, or
 approved with a link to the comment that approves it. -->
 
@@ -67,6 +67,6 @@ approved with a link to the comment that approves it. -->
 - Breaking: yes | no
 - Release: the milestone of the issue
 
-<!-- Log: each user decision or implementation finding is a comment,
-"L<n> (user|implementation): …". Evidence: the body of the pull request,
+<!-- Log: each decision or implementation finding is a comment,
+"L<n> (decision|implementation): …". Evidence: the body of the pull request,
 with each requirement and the tests that pass. -->

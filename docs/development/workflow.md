@@ -49,7 +49,7 @@ Planned work lives in GitHub issues, written from the templates of
 | What | Where |
 |---|---|
 | The specification of a change | The body of its issue |
-| Decisions and findings during the work | Comments of the issue (`L<n> (user|implementation): …`), and the Decisions table of the body |
+| Decisions and findings during the work | Comments of the issue (`L<n> (decision|implementation): …`), and the Decisions table of the body |
 | Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
 | Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
