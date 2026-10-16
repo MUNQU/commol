@@ -57,6 +57,9 @@ jobs:
 
     # Tests run on the runner's own architecture, so the target architecture
     # does not change them: one job per operating system and Python version.
+    # A pull request runs one job, Ubuntu with the oldest Python, for a fast
+    # answer; the merge queue, which tests the tree that reaches main, runs
+    # the whole matrix, and so do the weekly and the manual runs.
     test:
         name: Test on ${{ matrix.os }} (Python ${{ matrix.python-version }})
         needs: changes
@@ -65,8 +68,8 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, windows-latest, macos-latest]
-                python-version: ["3.12", "3.13", "3.14"]
+                os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "windows-latest", "macos-latest"]') }}
+                python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13", "3.14"]') }}
 
         steps:
             - uses: actions/checkout@v7
@@ -95,10 +98,11 @@ jobs:
               # The test model kind is for the tests only; wheels never have it.
               run: uv run maturin develop --release --features test-kind
 
-            # The documentation examples run once, in the Code Quality workflow.
+            # The documentation examples run once, in the Code Quality workflow,
+            # and the coverage studies weekly, in the Coverage Studies workflow.
             - name: Run tests
               working-directory: ./py-commol
-              run: uv run pytest -m "not docs"
+              run: uv run pytest -m "not docs and not coverage_study"
 
     # Single required status check for the whole workflow, so the ruleset does
     # not have to list every job. When only the documentation or the planning
