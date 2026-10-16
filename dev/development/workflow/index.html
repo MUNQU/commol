@@ -2974,6 +2974,10 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 <td>Comments of the issue (<code>L&lt;n&gt; (decision|implementation): …</code>), and the Decisions table of the body</td>
 </tr>
 <tr>
+<td>What a change does to other work</td>
+<td>The bodies and comments of the open issues it affects; work it leaves undone, in an open issue</td>
+</tr>
+<tr>
 <td>Order and dependencies</td>
 <td>"Blocked by" links between issues; "Why here" in the Delivery of a proposal</td>
 </tr>
@@ -3039,7 +3043,13 @@ merges. <code>In Progress</code> is set when the work starts, by <code>.github/s
    a started issue that is not <code>In Progress</code> and assigned looks free to the
    next one who runs <code>next.sh</code>. Work one task after the other, the tests of a
    requirement before its code. Tick the tasks of the body as they land.
-4. Open the pull request with <code>Closes #N</code> and the evidence. The merge closes
+4. Update every open issue the change affects, before the pull request
+   merges: edit the body of an issue whose current state, paths or
+   assumptions the change alters, and add a comment that says what changed.
+   Work the change leaves undone goes to an open issue (the one that will do
+   it, or a new one from a template), never only to a comment of the issue
+   that closes: a closed issue is not read again.
+5. Open the pull request with <code>Closes #N</code> and the evidence. The merge closes
    the issue.</p>
 <h3 id="parallel-work">Parallel work<a class="headerlink" href="#parallel-work" title="Permanent link">&para;</a></h3>
 <p>Two proposals can run at the same time when no chain of "blocked by" links

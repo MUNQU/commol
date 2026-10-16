@@ -4460,10 +4460,14 @@ is the only code that clones, resets, writes values to or runs the engine;
 (<code>objective.rs</code>) is the argmin cost function. <code>CalibrationProblem</code> holds them,
 is built once and has no interior mutability; the buffers of an evaluation are
 a <code>Workspace</code> per thread.</p>
-<p><strong>Rule:</strong> Python never transforms a prediction: windows, sums, factors,
-normalization, quantiles and scores come from Rust. <code>Calibrator</code> builds the
-Rust problem once (<code>commol_rs.inference.CalibrationProblem</code>) and every call
-reads it.</p>
+<p><strong>Rule:</strong> Python never transforms a prediction of a calibration problem or of
+a sample: their windows, sums, factors, normalization, quantiles and scores
+come from Rust. <code>Calibrator</code> builds the Rust problem once
+(<code>commol_rs.inference.CalibrationProblem</code>) and every call reads it. The
+helpers that present results already computed, such as <code>windowed_totals</code>
+(<code>api/windows.py</code>) for a run or its replicates, are not predictions; they
+must agree with the operator, which
+<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> checks.</p>
 <p><strong>Guards:</strong> <code>observation::tests</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>.</p>
