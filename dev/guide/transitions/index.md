@@ -7,7 +7,7 @@ A transition moves an amount at every step: from its `source` compartments to it
 ## Quick path
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Transitions")
@@ -18,18 +18,16 @@ model = (
     .add_parameter(id="k2", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
-model.print_equations()  # shows every flow as the engine computes it
+print(model.describe().render("text"))  # every flow, as the engine computes it
 ```
 
 ## `add_transition`
@@ -68,7 +66,7 @@ The engine decides for each flow whether its rate is the flow itself or a rate p
 | `"k1 * A * B / total"`   | Absolute     | `k1 * A * B / total`    |
 | `"0.5"` with `source=[]` | Absolute     | `0.5` enters the target |
 
-`print_equations()` prints every flow after this decision, so a proportional rate appears multiplied by its source.
+The [description](https://munqu.github.io/commol/latest/guide/describing-models/index.md) of the model shows every flow after this decision, so a proportional rate appears multiplied by its source.
 
 ### Rates that change along the axis
 
@@ -86,11 +84,13 @@ periodic = (
         target=["B"],
         rate="k1 * (1 + 0.3 * sin(2 * pi * step / 365)) * A * B / total",
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 ```
 
@@ -108,17 +108,15 @@ merge = (
     .add_bin(id="C", name="State C")
     .add_parameter(id="k", value=0.001)
     .add_transition(id="t1", source=["A", "B"], target=["C", "C"], rate="k * A * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.5},
-            {"bin": "B", "fraction": 0.5},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.5, "B": 0.5, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
-merge.print_equations()
+print(merge.describe().render("text"))
 # A loses k * A * B, B loses k * A * B, C gains 2 * (k * A * B)
 ```
 
@@ -139,18 +137,16 @@ outflow = (
         target=[],
         rate="mu * $compartment * (1 + 0.1 * $compartment / total)",
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.4},
-            {"bin": "B", "fraction": 0.3},
-            {"bin": "C", "fraction": 0.3},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.4, "B": 0.3, "C": 0.3},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
-for transition in outflow.structure.transitions:
+for transition in outflow.process.transitions:
     print(transition.id, transition.rate)
 # outflow__A mu * A * (1 + 0.1 * A / total)
 # outflow__B mu * B * (1 + 0.1 * B / total)
@@ -177,22 +173,16 @@ moving = (
     .add_stratification(id="group", categories=["g1", "g2"])
     .add_parameter(id="k", value=0.1)
     .add_transition(id="move", source=["g1"], target=["g2"], rate="k")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.5},
-                    {"category": "g2", "fraction": 0.5},
-                ],
-            }
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.5, "B": 0.5},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
-moving.print_equations()
+print(moving.describe().render("text"))
 # move (g1 -> g2):  A_g1 -> A_g2: k * A_g1   and   B_g1 -> B_g2: k * B_g1
 ```
 
@@ -215,22 +205,16 @@ own_compartment = (
     .add_stratification(id="group", categories=["g1", "g2"])
     .add_parameter(id="k", value=0.1)
     .add_transition(id="t", source=["A"], target=["B"], rate="k * A", per_compartment=True)
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.5},
-                    {"category": "g2", "fraction": 0.5},
-                ],
-            }
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.5, "B": 0.5},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
-own_compartment.print_equations()
+print(own_compartment.describe().render("text"))
 # A_g1 -> B_g1: k * A_g1   and   A_g2 -> B_g2: k * A_g2
 ```
 
@@ -259,23 +243,16 @@ group_rates = (
             {"conditions": [{"stratification": "group", "category": "g2"}], "rate": "k_g2"},
         ],
     )
-    .set_initial_conditions(
-        total=900,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.3},
-                    {"category": "g2", "fraction": 0.3},
-                    {"category": "g3", "fraction": 0.4},
-                ],
-            }
-        ],
+    .build(
+        Aggregate(
+            total=900,
+            bin_fractions={"A": 1.0, "B": 0.0},
+            stratification_fractions={"group": {"g1": 0.3, "g2": 0.3, "g3": 0.4}},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
-group_rates.print_equations()
+print(group_rates.describe().render("text"))
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
 ```
 
@@ -321,29 +298,19 @@ redirect = (
         target=["g2"],
         stratified_rates=[{"conditions": [{"stratification": "subtype", "to": "s1"}], "rate": "k"}],
     )
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.5}, {"bin": "B", "fraction": 0.5}],
-        stratification_fractions=[
-            {
-                "stratification": "group",
-                "fractions": [
-                    {"category": "g1", "fraction": 0.5},
-                    {"category": "g2", "fraction": 0.5},
-                ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.5, "B": 0.5},
+            stratification_fractions={
+                "group": {"g1": 0.5, "g2": 0.5},
+                "subtype": {"s1": 0.5, "s2": 0.5},
             },
-            {
-                "stratification": "subtype",
-                "fractions": [
-                    {"category": "s1", "fraction": 0.5},
-                    {"category": "s2", "fraction": 0.5},
-                ],
-            },
-        ],
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
-redirect.print_equations()
+print(redirect.describe().render("text"))
 # A_g1 -> A_g2_s1: k * A_g1   and   B_g1 -> B_g2_s1: k * B_g1
 ```
 
@@ -365,11 +332,13 @@ impulse_model = (
     .add_parameter(id="k", value=0.1)
     .add_transition(id="jump", source=["A"], target=["B"], rate="p", impulse_at=[1], accumulators=["moved"])
     .add_transition(id="flow", source=["A"], target=["B"], rate="k")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 jumped = Simulation(impulse_model).run(num_steps=2)
@@ -382,8 +351,8 @@ print(jumped["moved"][2])  # 225.0: a quarter of the 900 left at step 1
 | Order                        | At step `n` the state jumps first; then the flows of the step run from the new state. The output at `n` shows the state after the jump (`CompiledModel::apply_impulses` in `crates/commol-model/src/system.rs`).   |
 | Several impulses at one step | Every jump is computed from the state before any of them.                                                                                                                                                          |
 | Steps                        | A `DifferentialEquations` model takes any steps, such as `0.5`: the engine stops there, applies the jump and restarts. A `DifferenceEquations` model needs integer steps (`ValidationError` names the transition). |
-| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                         |
-| `print_equations`            | Lists impulses apart from the equations, with their steps.                                                                                                                                                         |
+| Units                        | The rate of an impulse is an amount, `<bin unit>`, not a flow per step ([Units](https://munqu.github.io/commol/latest/guide/units-and-equations/#impulses)).                                                       |
+| `describe()`                 | Lists impulses apart from the equations, with their steps ([Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations)).                                                    |
 
 An impulse is not a pulse rate. A [`AxisPattern.pulse`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) is a rate: a difference model applies it for one step with the other flows, and a differential model applies it as a constant rate for one unit of the axis, so it moves `1 − e^(−p)` of its source. An impulse moves exactly `p` of its source in both engines.
 
@@ -400,11 +369,13 @@ too_fast = (
     .add_bin(id="B", name="State B")
     .add_parameter(id="k", value=1.5)
     .add_transition(id="t", source=["A"], target=["B"], rate="k")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 try:
@@ -444,4 +415,5 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Rates that change along the axis | [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md)                       |
 | Everything a formula can contain | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Units and equation output        | [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)           |
+| Units                            | [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md)                         |
+| The equations of a model         | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)              |

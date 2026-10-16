@@ -10,6 +10,7 @@ A single calibration gives one parameter set. A probabilistic calibration gives 
 import random
 
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -31,15 +32,13 @@ def model(k1: float | None, k2: float | None):
         .add_parameter(id="k2", value=k2)
         .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 # Noisy observations of a model with k1 = 0.4, k2 = 0.1

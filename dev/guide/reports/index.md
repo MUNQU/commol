@@ -10,6 +10,7 @@ Two functions turn a calibrated model and a run into plain dictionaries, ready f
 import json
 
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -35,15 +36,13 @@ def model(k1: float | None):
             id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total", accumulators=["cum_ab"]
         )
         .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[
-                {"bin": "A", "fraction": 0.99},
-                {"bin": "B", "fraction": 0.01},
-                {"bin": "C", "fraction": 0.0},
-            ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.99, "B": 0.01, "C": 0.0},
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
 
 ends = [7, 14, 21, 28]
@@ -83,7 +82,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 ## `applied_parameters_report`
 
-`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). A compartmental model adds `initial_conditions`:
+`applied_parameters_report(model, result, problem=None, parameter_statistics=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_conditions`:
 
 ```json
 {
@@ -129,14 +128,14 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `g
 | `series`       | Each compartment output sampled at `at`                                                                                                                                                                                                                         |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `at`); each reading as a `total` and `by_output`                                       |
 
-| Argument                            | Meaning                                                                                                                                               |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                             |
-| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                      |
-| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                         |
-| `observed_data`                     | The observations to report next to the run.                                                                                                           |
-| `accumulators`                      | The accumulator ids to report.                                                                                                                        |
-| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
+| Argument                            | Meaning                                                                                                                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results`                           | `SimulationResults` of `run` or `run_at`.                                                                                                                                                                   |
+| `at`                                | The positions where series and cumulative readings are sampled; each must be a position of the results (`ValueError` otherwise).                                                                            |
+| `window`, `num_windows`             | The window axis of `observed` and `windowed`.                                                                                                                                                               |
+| `observed_data`                     | The observations to report next to the run.                                                                                                                                                                 |
+| `accumulators`                      | The accumulator ids to report.                                                                                                                                                                              |
+| `ensemble_runs`, `confidence_level` | One `SimulationResults` per ensemble member, or the `SimulationReplicates` of a stochastic engine. Every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block; the layout does not change. |
 
 The report holds only these blocks. Add your own envelope around them, such as a run label or summary figures in your domain's terms:
 

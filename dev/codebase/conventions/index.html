@@ -816,7 +816,35 @@
   <span class="md-ellipsis">
     
   
-    Units and Equations
+    Units
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/describing-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Describing a Model
   
 
     
@@ -2829,7 +2857,7 @@ of X". A pure-Python helper (<code>utils/security.py</code>, <code>context/axis_
 <code>api/probabilistic/</code>) goes in the package of its feature. The exceptions are
 <code>reference_models/</code>, which checks published models across features (see
 <a href="#reference-models">Reference models</a>), and <code>model_kinds/</code>, which runs a model
-kind that is not compartmental through every generic layer.</p>
+kind that is not aggregate through every generic layer.</p>
 <table>
 <thead>
 <tr>
@@ -2862,7 +2890,7 @@ kind that is not compartmental through every generic layer.</p>
 <tr>
 <td><code>initial_conditions/</code></td>
 <td>Bin, stratification and compartment fractions; the initial state</td>
-<td><a href="../../guide/building-models/#initial-conditions">Building Models</a></td>
+<td><a href="../../guide/building-models/#the-structure-aggregate">Building Models</a></td>
 </tr>
 <tr>
 <td><code>simulation/</code></td>
@@ -2871,8 +2899,13 @@ kind that is not compartmental through every generic layer.</p>
 </tr>
 <tr>
 <td><code>units/</code></td>
-<td>Unit checks and <code>print_equations</code></td>
-<td><a href="../../guide/units-and-equations/">Units and Equations</a></td>
+<td>Unit checks</td>
+<td><a href="../../guide/units-and-equations/">Units</a></td>
+</tr>
+<tr>
+<td><code>description/</code></td>
+<td><code>Model.describe</code>, its sections and blocks, the renderers and their snapshots (<code>description/snapshots/</code>), the equations of the dynamics (<code>equation_forms</code> in <code>support/description.py</code>)</td>
+<td><a href="../../guide/describing-models/">Describing a Model</a></td>
 </tr>
 <tr>
 <td><code>calibration/</code></td>
@@ -2906,7 +2939,7 @@ kind that is not compartmental through every generic layer.</p>
 </tr>
 <tr>
 <td><code>model_kinds/</code></td>
-<td>The test model kind (<code>support/kinds.py</code>) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind. It needs the extension built with <code>--features test-kind</code>.</td>
+<td>The test model kind (<code>support/kinds.py</code>) through a simulation, a calibration, a report and a plot; the check that an engine runs its kind; the variants of a structure (<code>UnstratifiedVariant</code>). It needs the extension built with <code>--features test-kind</code>.</td>
 <td>— (across features; <a href="../design-decisions/#one-interface-for-every-model-kind">Design decisions</a>)</td>
 </tr>
 <tr>
@@ -2924,8 +2957,10 @@ topic inside its package.</p>
   <code>abc_builder</code> (A → B → C), <code>abcd_builder</code> (A → B → C → D) and
   <code>a_to_b_builder</code>, and the special models
   <code>override_builder</code>, <code>shared_category_builder</code> and
-  <code>conditional_pathway_builder</code>. A keyword overrides one part of the default
-  model, so a test names only what it changes. <code>build</code> builds for difference
+  <code>conditional_pathway_builder</code>. A factory returns a <code>FactoryBuilder</code>: a
+  <code>ModelBuilder</code> of the process and the <code>Aggregate</code> that lays it out
+  (<code>builder.structure</code>, which <code>set_structure</code> replaces). A keyword overrides
+  one part of the default model, so a test names only what it changes. <code>build</code> builds for difference
   equations; <code>build_ode</code> builds for differential equations, with the tight
   solver settings <code>TIGHT</code> by default; <code>run</code> builds and simulates.</li>
 <li>Build a model by hand only when one test needs it and no factory keyword

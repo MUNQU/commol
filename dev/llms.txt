@@ -13,12 +13,13 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 
 ## User guide
 
-- [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, stratifications, transitions, rates and initial conditions, with runnable examples
+- [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md): Compartments, stratifications, transitions, rates, the process and the structure, with runnable examples
 - [Model Builder](https://munqu.github.io/commol/latest/guide/building-models/index.md): Every ModelBuilder method and argument, series parameters, validation rules, save and load
 - [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md): Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, what build checks
 - [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md): Operators, variables, subgroup totals, functions and security limits of rate formulas
 - [Axis Patterns](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md): AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
-- [Units and Equations](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking and print_equations (text and LaTeX)
+- [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md): Unit checking of rates, impulses and the step unit
+- [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md): Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
 - [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md): Simulation.run, output formats, totals by bin and category, windowed totals, plotting
 - [Calibration Basics](https://munqu.github.io/commol/latest/guide/calibration/index.md): CalibrationProblem, observations, unknowns, losses, results and writing results back
 - [Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md): Calibrating bins, categories and compartments, the remainder and the order of application

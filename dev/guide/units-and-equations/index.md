@@ -1,13 +1,13 @@
-# Units and Equations
+# Units
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-Commol can check that every rate has the right units, and can print the equations that the engine simulates, as text or LaTeX. Both work on a built `Model`.
+Commol checks that every rate of a built `Model` has the right units. To see the equations the engine simulates, with their units, see [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md).
 
 ## Quick path
 
 ```python
-from commol import ModelBuilder
+from commol import Aggregate, ModelBuilder
 
 model = (
     ModelBuilder(name="Model with Units", bin_unit="item", step_unit="day")
@@ -18,24 +18,21 @@ model = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_bc", source=["B"], target=["C"], rate="k2 * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[
-            {"bin": "A", "fraction": 0.9},
-            {"bin": "B", "fraction": 0.1},
-            {"bin": "C", "fraction": 0.0},
-        ],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1, "C": 0.0},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 model.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
-model.print_equations()
 ```
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks `DifferenceEquations` and `DifferentialEquations` models alike: in both, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -78,11 +75,13 @@ along_a_line = (
     .add_bin(id="B", name="State B")
     .add_parameter(id="k1", value=0.01, unit="1/meter")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 1.0}, {"bin": "B", "fraction": 0.0}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 1.0, "B": 0.0},
+        ),
+        engine="DifferentialEquations",
     )
-    .build(engine="DifferentialEquations")
 )
 along_a_line.check_unit_consistency(verbose=True)  # Unit consistency check passed successfully.
 ```
@@ -112,11 +111,13 @@ wrong_units = (
     .add_parameter(id="k2", value=0.1, unit="1/day")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="k2 * sin(B) * B")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.9}, {"bin": "B", "fraction": 0.1}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.9, "B": 0.1},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 try:
@@ -136,47 +137,10 @@ except UnitConsistencyError as error:
 
 To pass a quantity to a function, make it dimensionless first, for example `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in `"dimensionless"`, or `sin(2 * pi * t / period)` with `period` in the step unit.
 
-## Printing equations
-
-`Model.print_equations(output_file=None, format="text")` prints the flows that the engine plans, after it has decided which rates are proportional (see [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates)). It has three parts:
-
-| Part              | Content                                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Model information | Name, engine, and the number of bins, stratifications, parameters and transitions                                                 |
-| Compact form      | Each transition and its flows, `source -> target: rate`. With units, each symbol shows its unit and each flow its resulting unit. |
-| Expanded form     | One difference equation per compartment: `[A(t+Dt) - A(t)] / Dt = …`                                                              |
-
-For the model above, the compact form is:
-
-```text
-t_ab (A -> B):
-  A -> B: k1(1/day) * A(item) * B(item) / total(item) [item / day]
-t_bc (B -> C):
-  B -> C: k2(1/day) * B(item) [item / day]
-```
-
-and the expanded form is:
-
-```text
-[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)
-[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)
-[C(t+Dt) - C(t)] / Dt = (k2 * B)
-```
-
-| Argument      | Values                        | Effect                                                                                          |
-| ------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
-| `format`      | `"text"` (default), `"latex"` | LaTeX writes inline math for the compact form and display math (`\[…\]`) for the expanded form. |
-| `output_file` | `None` (default) or a path    | Writes to the file instead of printing.                                                         |
-
-```python
-model.print_equations(format="latex", output_file="equations.tex")
-```
-
-Units appear only when every bin and every constant parameter has one. If only some parameters have a unit, `print_equations` raises `ValueError` ("Some parameters have units but not all").
-
 ## Next steps
 
-| To learn                   | Read                                                                                                      |
-| -------------------------- | --------------------------------------------------------------------------------------------------------- |
-| What a formula can contain | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
-| Running the model          | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
+| To learn                           | Read                                                                                                      |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| The equations the engine simulates | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)              |
+| What a formula can contain         | [Mathematical Expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) |
+| Running the model                  | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |

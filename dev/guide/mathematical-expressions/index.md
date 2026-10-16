@@ -7,7 +7,7 @@ Rates and formula parameters are written as expressions, such as `"k1 * A * B / 
 ## Quick path
 
 ```python
-from commol import ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation
 
 model = (
     ModelBuilder(name="Expressions")
@@ -17,11 +17,13 @@ model = (
     .add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1_periodic * A * B / total")
     .add_transition(id="t_ba", source=["B"], target=["A"], rate="if(step > 30, 0.05, 0)")
-    .set_initial_conditions(
-        total=1000,
-        bin_fractions=[{"bin": "A", "fraction": 0.99}, {"bin": "B", "fraction": 0.01}],
+    .build(
+        Aggregate(
+            total=1000,
+            bin_fractions={"A": 0.99, "B": 0.01},
+        ),
+        engine="DifferenceEquations",
     )
-    .build(engine="DifferenceEquations")
 )
 
 results = Simulation(model).run(num_steps=60)
@@ -59,16 +61,17 @@ outside = "if(step < 10, 0.05, if(step > 20, 0.05, 0))"    # 0.05 outside that w
 
 ## Variables
 
-| Variable                           | Value                                                                                                                                                                                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A parameter id                     | The parameter's value at this step                                                                                                                                                                                                   |
-| A bin id, without stratifications  | The bin's amount                                                                                                                                                                                                                     |
-| A compartment name, such as `A_g1` | That compartment's amount                                                                                                                                                                                                            |
-| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                    |
-| `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                       |
-| `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                        |
-| `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step) |
-| `pi`, `e`                          | π and e                                                                                                                                                                                                                              |
+| Variable                           | Value                                                                                                                                                                                                                                                                              |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A parameter id                     | The parameter's value at this step                                                                                                                                                                                                                                                 |
+| A bin id, without stratifications  | The bin's amount                                                                                                                                                                                                                                                                   |
+| A compartment name, such as `A_g1` | That compartment's amount                                                                                                                                                                                                                                                          |
+| A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                                  |
+| `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                     |
+| `neighbors_<bin>`, `neighbors`     | In a transition rate only: the amount of a bin among the neighbors of a unit, and their total. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
+| `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                      |
+| `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                               |
+| `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                            |
 
 ### Subgroup totals
 
@@ -93,27 +96,17 @@ def value_of(expression: str) -> float:
         .add_stratification(id="type", categories=["t1", "t2"])
         .add_parameter(id="probe", value=expression)
         .add_transition(id="probe_flow", source=[], target=["B"], rate="probe")
-        .set_initial_conditions(
-            total=1000,
-            bin_fractions=[{"bin": "A", "fraction": 0.6}, {"bin": "B", "fraction": 0.4}],
-            stratification_fractions=[
-                {
-                    "stratification": "group",
-                    "fractions": [
-                        {"category": "g1", "fraction": 0.25},
-                        {"category": "g2", "fraction": 0.75},
-                    ],
+        .build(
+            Aggregate(
+                total=1000,
+                bin_fractions={"A": 0.6, "B": 0.4},
+                stratification_fractions={
+                    "group": {"g1": 0.25, "g2": 0.75},
+                    "type": {"t1": 0.5, "t2": 0.5},
                 },
-                {
-                    "stratification": "type",
-                    "fractions": [
-                        {"category": "t1", "fraction": 0.5},
-                        {"category": "t2", "fraction": 0.5},
-                    ],
-                },
-            ],
+            ),
+            engine="DifferenceEquations",
         )
-        .build(engine="DifferenceEquations")
     )
     results = Simulation(model).run(num_steps=1)
     inflow = sum(series[1] - series[0] for series in results.values())
