@@ -73,15 +73,38 @@ Use this page before you make or review a change. It turns the
 
 ### Calibration
 
-- [ ] Keep the loss and the constraints in `calibration_problem.rs`, and use
-      only `SimulationEngine` there: a rule of one model kind goes behind
+- [ ] Put the change in its layer of `crates/commol-calibration/`: running the
+      engine in `forward.rs`, reading observations in `observation.rs`,
+      bounds and constraints in `feasibility.rs`, the loss in
+      `discrepancy.rs`, penalties only in `objective.rs`. Use only
+      `SimulationEngine`: a rule of one model kind goes behind
       `plan_values`, `apply_values` or `output_sums` of its engines.
-- [ ] Convert new options in `api/calibrator.py` and
-      `api/probabilistic/calibration_runner.py`.
+- [ ] Convert new options once, in `api/calibrator.py`.
 - [ ] Check that `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` still
       passes if the loss changes.
-- [ ] Update [Calibration](../guide/calibration.md) and, for ensembles,
-      [Probabilistic calibration](../guide/probabilistic-calibration.md).
+- [ ] Update [Calibration](../guide/calibration.md).
+
+### Uncertainty method
+
+A method is three parts, and plugs into `Calibrator.uncertainty` without
+changing it ([Design decisions](design-decisions.md#methods-plug-into-one-entry-point)):
+
+- [ ] The algorithm in `crates/commol-inference/`. It runs the engine only
+      through `ForwardModel`, reads observations only through
+      `ObservationOperator`, sees a `Violation` as outside the support
+      (`discrepancy_in_support`), and draws every random number from a
+      `commol_random::Generator` seeded from the problem's seed.
+- [ ] The runner, bound in `py-commol/src/inference.rs`, and its stub in
+      `_commol_rs.pyi`.
+- [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
+      the result, in `context/inference/`; a result with draws holds a
+      `ParameterSample`.
+- [ ] `register(YourMethod, runner)` in `api/inference/registry.py` (import it
+      from `commol.api.inference`).
+- [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)
+      that shows its intervals cover at their level.
+- [ ] A guide page under `docs/guide/uncertainty/`, a row in the table
+      "Which method answers which question" of its index, and an API entry.
 
 ### Model type (engine)
 
@@ -173,7 +196,8 @@ To add a kind of model, such as an agent network (see
 - [ ] Keep the key order of existing entries.
 - [ ] Put a section that only one model kind has in its
       `ModelStructure.report_sections`, not in `api/reporting.py`.
-- [ ] Use `member_statistics` and `ci_percentiles` for ensemble values.
+- [ ] Use `member_statistics` (with the weights of a `Predictive`) for values
+      across members, and `ParameterSample.summary` for parameters.
 - [ ] Update `tests/reporting/`.
 
 ### Dependencies

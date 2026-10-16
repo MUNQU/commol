@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from commol.context.calibration import CalibrationProblem
     from commol.context.description import Section
     from commol.context.model import Model
-    from commol.context.probabilistic_calibration import ParameterSetStatistics
+    from commol.context.inference.sample import ParameterSummary
 
 
 class Aggregate(ModelStructure, InitialConditions):
@@ -223,7 +223,7 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """
         The ``initial_conditions`` section of a report of applied values.
@@ -236,8 +236,8 @@ class Aggregate(ModelStructure, InitialConditions):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSetStatistics] | None
-            Ensemble spread per id, or None without an ensemble.
+        parameter_statistics : Mapping[str, ParameterSummary] | None
+            Statistics of each id from a sample, or None without one.
 
         Returns
         -------

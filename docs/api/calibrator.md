@@ -22,6 +22,12 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.context.calibration.CalibrationResult
 
+::: commol.context.calibration.StartSummary
+
+::: commol.context.calibration.CalibrationHistory
+
+::: commol.context.calibration.CalibrationEvaluation
+
 ::: commol.context.calibration.LossFunction
 
 ::: commol.context.calibration.OptimizationAlgorithm

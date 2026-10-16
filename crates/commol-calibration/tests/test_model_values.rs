@@ -8,6 +8,7 @@ use argmin::core::CostFunction;
 use commol_calibration::{
     check_model_values, configured_engine, CalibrationConstraint, CalibrationParameter,
     CalibrationParameterType, CalibrationProblem, LossConfig, ObservedDataPoint,
+    OptimizationObjective,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -201,8 +202,9 @@ fn a_value_the_engine_does_not_resolve_stops_the_problem() {
 fn an_infeasible_state_is_penalized_and_its_reason_comes_from_the_engine() {
     let problem = problem(vec![]).unwrap();
 
-    let feasible = problem.cost(&vec![1.0, 0.5, 1.0]).unwrap();
-    let infeasible = problem.cost(&vec![1.0, 1.5, 1.0]).unwrap();
+    let objective = OptimizationObjective::new(&problem);
+    let feasible = objective.cost(&vec![1.0, 0.5, 1.0]).unwrap();
+    let infeasible = objective.cost(&vec![1.0, 1.5, 1.0]).unwrap();
     assert_eq!(feasible, 0.0);
     assert!(infeasible > 1e9, "{infeasible}");
 
@@ -214,14 +216,15 @@ fn an_infeasible_state_is_penalized_and_its_reason_comes_from_the_engine() {
 fn a_constraint_reads_the_sums_and_the_state_total_the_engine_names() {
     // At k = 1 and start = 0.5: x = 0.5, y = 2, xy = 2.5 and total = x = 0.5.
     let penalty = |expression: &str| {
-        problem(vec![CalibrationConstraint::new(
+        let problem = problem(vec![CalibrationConstraint::new(
             "c".to_string(),
             expression.to_string(),
         )
         .with_positions(vec![1.0])])
-        .unwrap()
-        .cost(&vec![1.0, 0.5, 1.0])
-        .unwrap()
+        .unwrap();
+        OptimizationObjective::new(&problem)
+            .cost(&vec![1.0, 0.5, 1.0])
+            .unwrap()
     };
 
     assert_eq!(penalty("2.5 - xy"), 0.0);

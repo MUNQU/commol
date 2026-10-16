@@ -9,10 +9,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Calibrator.run(starts=n)` runs the optimizer from `n` start points in
+  parallel and returns the best: the initial guess, then rows of a Latin
+  hypercube over the bounds drawn from the problem's `seed`.
+  `CalibrationResult.starts` lists every start (`StartSummary`: start, end,
+  loss, converged); distinct ends with equal losses show that the data do not
+  identify the parameters. See
+  [Several starts](../guide/calibration-optimizers.md#several-starts).
+- `CalibrationResult.failed_runs`: why each failed start failed, also logged as
+  a warning.
+- `ParameterSample`: weighted draws of the parameters of a problem, with their
+  invariants checked at construction and weighted statistics computed in Rust
+  (`mean`, `covariance`, `correlation`, `quantiles`, `interval`,
+  `effective_size`, `draws`, `resample`, `summary`). It saves to JSON and loads
+  back equal.
+- `Predictive(calibrator, sample, positions)`: the run of every draw, in
+  parallel, its band (`band`, `series_band`) and every draw's value of a set
+  of observations through the observation operator of the loss
+  (`at_observations`). `SimulationPlotter` and `simulation_report` take a
+  predictive.
+- `commol.scores`: empirical coverage, interval score, weighted interval score,
+  the CRPS of a weighted sample and PIT values of a predictive, per
+  observation and per series.
+- `Calibrator.uncertainty(method)`: one entry point for every uncertainty
+  method. A method's configuration subclasses `UncertaintyMethod[R]` and
+  registers its runner; the result type follows the configuration's type.
+- `weighted_quantiles`, and a `weights` argument for `member_statistics`.
+- `CalibrationHistory` and `CalibrationEvaluation`, returned by
+  `Calibrator.run_with_history()`.
+- The crate `commol-inference`: the parameter sample, the one quantile, the
+  predictive and the scores. See [Uncertainty](../guide/uncertainty/index.md).
+
 ### Changed
 
 - The `latest` version of the documentation site is the documentation of the
   last release, published from its tag; the `dev` version follows `main`.
+- **Breaking:** every interval uses one quantile: the weighted inverse of the
+  empirical distribution between the midpoints of the cumulative weights,
+  NumPy's `method="hazen"` with equal weights. `member_statistics` and
+  `SimulationReplicates.quantiles` used NumPy's `linear`; their intervals move
+  slightly.
+- **Breaking:** `CalibrationResult.best_parameters` keeps the order of
+  `CalibrationProblem.parameters`.
+- **Breaking:** `Calibrator.run_with_history()` returns a `CalibrationHistory`
+  instead of the extension's object.
+- **Breaking:** `applied_parameters_report(..., sample=, confidence_level=)`
+  reads the statistics of a `ParameterSample`; `parameter_statistics` is gone.
+- **Breaking (Rust):** `CalibrationProblem` is split into layers
+  (`ForwardModel`, `ObservationOperator`, `Feasibility`, `Discrepancy`,
+  `OptimizationObjective`); `optimize` takes the problem by reference, and the
+  optimizer configurations have no `verbose` field. `CalibrationEvaluation` has
+  no `predictions`.
+- A verbose optimizer writes its table to Python's `sys.stdout` only, and needs
+  one start; the library never writes to the standard error.
+
+### Fixed
+
+- Several starts of Nelder-Mead began at the same point: each start now comes
+  from the run seed.
+- A parameter value could land on another parameter when results were read by
+  name from an unordered mapping.
+- A failed run of a multi-start optimization was written to the standard error
+  and dropped; it is now part of the result.
+- An error of the model at a vertex of the initial Nelder-Mead simplex made
+  the optimizer panic; it now stops the calibration with its message (the
+  argmin fork returns the error).
+
+### Removed
+
+- **Breaking:** the ensemble calibration: `Calibrator.run_probabilistic`,
+  `ProbabilisticCalibrator`, `CalibrationProblem.probabilistic_config`,
+  `ProbabilisticCalibrationConfig`, `ProbabilisticCalibrationResult`,
+  `EnsembleSolution`, `EnsembleSelectionSummary`, `ParameterSetStatistics` and
+  their settings classes. Its intervals had no statistical meaning: its members
+  were points the optimizer visited, and the selection maximized the coverage
+  of the data it was fitted to. The closest replacement with no noise model is
+  `Calibrator.uncertainty(BayesianBootstrap(...))`, in the next release.
+- The dependency on `scikit-learn`.
 
 ## [0.4.0] - 2026-10-16
 

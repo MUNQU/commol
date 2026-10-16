@@ -19,7 +19,7 @@ flowchart TB
     API["Python: api/<br/>ModelBuilder, Simulation, Calibrator"]
     CTX["Python: context/<br/>Model: validated data"]
     BR["Bridge: py-commol/src<br/>PyO3 module commol_rs"]
-    RS["Rust: crates/<br/>compiler, engines, calibration"]
+    RS["Rust: crates/<br/>compiler, engines, calibration, inference"]
     U --> API
     API --> CTX
     CTX -->|model as JSON| BR
@@ -31,7 +31,7 @@ flowchart TB
 |---|---|---|
 | Python | `py-commol/commol/` | The public API (`api/`) and the model as validated data (`context/`). |
 | Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3). |
-| Rust | `crates/` | Every rule about how a model becomes numbers. |
+| Rust | `crates/` | Every rule about how a model becomes numbers, how it is calibrated, and how the uncertainty of a calibration is measured. |
 
 **Golden rule:** Python never computes how a model expands or runs. It asks
 Rust.
@@ -40,7 +40,8 @@ Rust.
 
 One compiler reads the model. Each engine runs the compiled model with its own
 method and gives one series per output. Calibration runs an engine many times
-and compares the series with the observations. The arrows show this flow, from
+and compares the series with the observations. Inference reads the
+calibration problem to measure uncertainty. The arrows show this flow, from
 top to bottom. The dashed box is the base that every box uses.
 
 ```mermaid
@@ -51,13 +52,15 @@ flowchart TB
     E2["Differential<br/>ODE solver"]
     E3["Stochastic<br/>random events"]
     O[/one series per output/]
-    C["Calibration<br/>runs an engine many times"]
+    C["Calibration<br/>the problem in layers, optimizers"]
+    I["Inference<br/>parameter sample, predictive, scores"]
     F["Base: commol-core, commol-random<br/>used by every box"]
     J --> M
     M --> E1 & E2 & E3
     E1 & E2 & E3 --> O
     O --> C
-    C ~~~ F
+    C --> I
+    I ~~~ F
     classDef base stroke-dasharray: 5 5
     class F base
 ```
@@ -68,12 +71,15 @@ flowchart TB
 | Difference | `commol-difference` | Adds the change of each step: `X += derivatives`. |
 | Differential | `commol-differential` | Integrates the ODEs with `diffsol`. |
 | Stochastic | `commol-stochastic` | Moves whole units by random events. |
-| Calibration | `commol-calibration` | Finds the values that make an engine match observations. |
+| Calibration | `commol-calibration` | The calibration problem in layers (forward model, observation operator, feasibility, discrepancy, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts. |
+| Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the one quantile, the predictive of a sample and its scores. It depends on calibration, never the reverse. |
 
 Every box uses `commol-core` (shared types, rate formulas, the
 `SimulationEngine` trait). The stochastic engines and calibration also use
-`commol-random` (random numbers). Calibration works through the
-`SimulationEngine` trait, so it does not depend on a specific engine.
+`commol-random` (random numbers), and so does inference. Calibration works
+through the `SimulationEngine` trait, so it does not depend on a specific
+engine; inference reaches an engine only through the forward model of a
+calibration problem.
 
 ## The path of a simulation and a calibration
 
@@ -85,9 +91,13 @@ flowchart TB
     K --> R[Rust: run the engine]
     R --> SR[SimulationResults]
     K --> CAL[Calibrator]
-    CAL --> L[Rust: optimizer loop]
+    CAL -->|problem, once| P[Rust: calibration problem]
+    P --> L[Rust: optimizer loop, one or more starts]
     L --> CR[CalibrationResult]
     CR -.->|apply_calibration_parameters| B
+    P --> U[Rust: uncertainty method]
+    U --> PS[ParameterSample]
+    PS --> PR[Predictive: bands, scores]
 ```
 
 1. `ModelBuilder` (`api/model_builder.py`) collects the model, and `build`
@@ -98,9 +108,15 @@ flowchart TB
    (`api/results.py`).
 
 4. `Calibrator` (`api/calibrator.py`) takes the compiled engine of a
-   `Simulation` and gives it to Rust with the problem. The optimizer loop
-   runs in Rust and returns a `CalibrationResult`.
+   `Simulation` and builds the calibration problem in Rust once
+   (`commol_rs.inference.CalibrationProblem`, `py-commol/src/inference.rs`).
+   `run(starts=n)` runs the optimizer loop in Rust from each start and
+   returns the best `CalibrationResult`.
 5. `apply_calibration_parameters` writes the result back into the `Model`.
+6. `Calibrator.uncertainty(method)` runs a method on the same problem. A method
+   with draws returns a `ParameterSample`; a `Predictive`
+   (`api/inference/predictive.py`) runs its draws, and `commol.scores` checks
+   them against observations.
 
 ## Checklist
 

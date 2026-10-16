@@ -9,7 +9,7 @@ from commol.context.report_entry import Interval, entry_interval
 
 if TYPE_CHECKING:
     from commol.context.aggregate import Aggregate
-    from commol.context.probabilistic_calibration import ParameterSetStatistics
+    from commol.context.inference.sample import ParameterSummary
     from commol.context.process import Process
 
 WHOLE_GROUP = "total"
@@ -36,7 +36,7 @@ def _entry(
     fraction: float | None,
     value: float | None,
     calibrated_ids: set[str],
-    statistics: "Mapping[str, ParameterSetStatistics] | None",
+    statistics: "Mapping[str, ParameterSummary] | None",
     interval_scale: float = 1.0,
 ) -> InitialConditionEntry:
     """One reported initial condition, with its interval when there is one."""
@@ -98,7 +98,7 @@ def initial_conditions_report(
     process: "Process",
     structure: "Aggregate",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+    parameter_statistics: "Mapping[str, ParameterSummary] | None",
 ) -> dict[str, InitialConditionEntry]:
     """
     Every bin fraction, stratification category and compartment override.

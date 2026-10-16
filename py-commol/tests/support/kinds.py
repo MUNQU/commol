@@ -25,7 +25,7 @@ from commol.context.parameter import Parameter
 from commol.context.engine import ModelEngine
 
 if TYPE_CHECKING:
-    from commol.context.probabilistic_calibration import ParameterSetStatistics
+    from commol.context.inference.sample import ParameterSummary
 
 TEST_ENGINE = "TestEngine"
 TEST_STOCHASTIC_ENGINE = "TestStochasticEngine"
@@ -120,7 +120,7 @@ class DecayStructure(ModelStructure):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSetStatistics] | None",
+        parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """A section ``outputs`` with the initial value of each output."""
         return {

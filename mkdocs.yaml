@@ -81,7 +81,7 @@ plugins:
           - guide/calibration-observations.md: Several outputs, sums of outputs, weights, scale factors and windowed observations
           - guide/calibration-optimizers.md: Nelder-Mead and particle swarm settings, reproducibility, troubleshooting
           - guide/calibration-constraints.md: Constraints on unknowns and outputs, and how violations count
-          - guide/probabilistic-calibration.md: Ensembles, every configuration field, reading results, member statistics
+          - guide/uncertainty/index.md: The three questions, bands and prediction intervals, which method answers which question, the parameter sample, the predictive, scores and the entry point
           - guide/reports.md: applied_parameters_report and simulation_report
           - guide/examples.md: Complete models
         API reference:
@@ -142,8 +142,9 @@ nav:
           - Observations: guide/calibration-observations.md
           - Optimizers: guide/calibration-optimizers.md
           - Constraints: guide/calibration-constraints.md
-          - Probabilistic Calibration: guide/probabilistic-calibration.md
           - Reports: guide/reports.md
+      - Uncertainty:
+          - Uncertainty: guide/uncertainty/index.md
       - Examples: guide/examples.md
   - API Reference:
       - API Overview: api/index.md
@@ -154,7 +155,7 @@ nav:
       - AxisPattern: api/axis-patterns.md
       - AxisUnits: api/axis-units.md
       - Calibration: api/calibrator.md
-      - Probabilistic Calibration: api/probabilistic-calibrator.md
+      - Uncertainty: api/uncertainty.md
       - Reports: api/reports.md
       - Model Structure: advanced/model-structure.md
   - Development:

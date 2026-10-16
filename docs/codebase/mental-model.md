@@ -24,7 +24,8 @@ generic layers work with any kind.
 | Two Rust stochastic engines of whole units: events in continuous time (direct method, tau-leaping) and the chain binomial | `crates/commol-stochastic/` |
 | Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
-| A calibration toolkit: optimizers, constraints, ensembles | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py`, `probabilistic_calibrator.py` |
+| A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py` |
+| What every uncertainty method returns or reads: a weighted parameter sample, its predictive, scores, one entry point | `crates/commol-inference/`, `py-commol/commol/api/inference/`, `py-commol/commol/context/inference/` |
 
 ## What Commol is not
 

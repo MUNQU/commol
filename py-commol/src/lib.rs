@@ -11,7 +11,8 @@
 //! - `core`: Core data structures (Model, Process, Aggregate, etc.)
 //! - `model`: What a model expands into (compartments, flows, initial state)
 //! - `engine`: The list of engines, and the engine a model names
-//! - `calibration`: Parameter calibration and optimization
+//! - `calibration`: The types of a calibration problem and its optimizers
+//! - `inference`: A calibration problem built once, and the methods that read it
 //!
 //! ## Example
 //!
@@ -36,6 +37,7 @@ use pyo3::prelude::*;
 mod calibration;
 mod core;
 mod engine;
+mod inference;
 mod model;
 pub(crate) mod python_observer;
 #[cfg(feature = "test-kind")]
@@ -89,6 +91,17 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     calibration::register(&calibration_module)?;
     m.add_submodule(&calibration_module)?;
+
+    // Inference module: a built calibration problem and the methods that
+    // read it
+    let inference_module = PyModule::new(py, "inference")?;
+    inference_module.add(
+        "__doc__",
+        "A calibration problem built once, its optimizers and predictions,\n\
+         and the inference methods that read it.",
+    )?;
+    inference::register(&inference_module)?;
+    m.add_submodule(&inference_module)?;
 
     // Module-level metadata
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

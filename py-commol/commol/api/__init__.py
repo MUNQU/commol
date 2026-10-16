@@ -3,7 +3,7 @@
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
 from .plotter import SimulationPlotter
-from .probabilistic.intervals import ci_percentiles, member_statistics
+from .inference.intervals import ci_percentiles, member_statistics, weighted_quantiles
 from .reporting import applied_parameters_report, simulation_report
 from .results import SimulationReplicates, SimulationResults
 from .simulation import ReplicateRuns, Simulation
@@ -28,6 +28,7 @@ __all__ = [
     "AxisPattern",
     "ci_percentiles",
     "member_statistics",
+    "weighted_quantiles",
     "simulation_report",
     "window_end",
     "window_ends",

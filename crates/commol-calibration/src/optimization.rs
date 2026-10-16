@@ -1,4 +1,11 @@
-//! Optimization solver setup and execution
+//! Optimizers of a calibration problem: Nelder-Mead and particle swarm.
+//!
+//! Each optimizer minimizes the [`OptimizationObjective`] of a problem from a
+//! start point. Nothing here writes to standard output or standard error: a
+//! caller that wants progress passes an observer
+//! ([`optimize_with_observer`]).
+
+use std::cell::RefCell;
 
 use argmin::core::observers::{Observe, ObserverMode};
 use argmin::core::{
@@ -15,38 +22,8 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::calibration_problem::CalibrationProblem;
-use crate::types::{CalibrationEvaluation, CalibrationResult};
-
-/// Print optimization header for verbose output
-fn print_optimization_header(
-    algorithm: &str,
-    parameter_names: &[String],
-    initial_values: &[f64],
-    max_iterations: u64,
-) {
-    eprintln!("=== {} Optimization (Verbose Mode) ===", algorithm);
-    eprintln!("Parameters: {:?}", parameter_names);
-    eprintln!("Initial values: {:?}", initial_values);
-    eprintln!("Max iterations: {}", max_iterations);
-}
-
-/// Run executor with logging observer
-fn run_with_logging<O, S, I>(
-    executor: Executor<O, S, I>,
-) -> Result<argmin::core::OptimizationResult<O, S, I>, String>
-where
-    O: argmin::core::CostFunction,
-    S: argmin::core::Solver<O, I>,
-    I: argmin::core::State,
-{
-    use argmin::core::observers::ObserverMode;
-    use argmin_observer_slog::SlogLogger;
-
-    executor
-        .add_observer(SlogLogger::term(), ObserverMode::Always)
-        .run()
-        .map_err(|e| format!("Optimization failed: {}", e))
-}
+use crate::objective::{OptimizationObjective, Recorded};
+use crate::types::{CalibrationEvaluation, CalibrationResult, CalibrationResultWithHistory};
 
 /// Configuration for Nelder-Mead optimization
 #[derive(Debug, Clone)]
@@ -79,9 +56,6 @@ pub struct NelderMeadConfig {
     /// Shrinking parameter (sigma)
     /// Must be in (0, 1], defaults to 0.5
     pub sigma: Option<f64>,
-
-    /// Enable verbose output
-    pub verbose: bool,
 }
 
 impl Default for NelderMeadConfig {
@@ -94,7 +68,6 @@ impl Default for NelderMeadConfig {
             gamma: None, // Use argmin's default: 2.0
             rho: None,   // Use argmin's default: 0.5
             sigma: None, // Use argmin's default: 0.5
-            verbose: false,
         }
     }
 }
@@ -148,12 +121,6 @@ impl NelderMeadConfig {
     /// Must be in (0, 1], defaults to 0.5
     pub fn with_sigma(mut self, sigma: f64) -> Self {
         self.sigma = Some(sigma);
-        self
-    }
-
-    /// Enable verbose output
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = verbose;
         self
     }
 }
@@ -274,9 +241,6 @@ pub struct ParticleSwarmConfig {
 
     /// Random seed for reproducibility (None = use system entropy)
     pub seed: Option<u64>,
-
-    /// Enable verbose output
-    pub verbose: bool,
 }
 
 impl Default for ParticleSwarmConfig {
@@ -294,7 +258,6 @@ impl Default for ParticleSwarmConfig {
             mutation_probability: 0.0,
             mutation_application: MutationApplication::None,
             seed: None,
-            verbose: false,
         }
     }
 }
@@ -454,12 +417,6 @@ impl ParticleSwarmConfig {
         self.seed = Some(seed);
         self
     }
-
-    /// Enable verbose output
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = verbose;
-        self
-    }
 }
 
 /// Algorithm-specific optimization configuration
@@ -482,108 +439,116 @@ impl Default for OptimizationConfig {
     }
 }
 
-/// Available optimization algorithms (kept for backward compatibility)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OptimizationAlgorithm {
-    /// Nelder-Mead simplex method (gradient-free)
-    NelderMead,
-    /// Particle Swarm Optimization (gradient-free, global search)
-    ParticleSwarm,
-}
-
-impl std::fmt::Display for OptimizationAlgorithm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OptimizationAlgorithm::NelderMead => write!(f, "Nelder-Mead"),
-            OptimizationAlgorithm::ParticleSwarm => write!(f, "Particle Swarm"),
-        }
-    }
-}
-
-/// Run optimization on a calibration problem
-///
-/// # Arguments
-///
-/// * `problem` - The calibration problem to solve
-/// * `config` - Algorithm-specific optimization configuration
-///
-/// # Returns
-///
-/// Returns a `CalibrationResult` containing the best parameters found
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use commol_calibration::{optimize, OptimizationConfig, NelderMeadConfig};
-///
-/// let config = OptimizationConfig::NelderMead(
-///     NelderMeadConfig::new()
-///         .with_max_iterations(1000)
-///         .with_tolerance(1e-6)
-/// );
-///
-/// let result = optimize(problem, config)?;
-/// println!("Best parameters: {:?}", result.best_parameters);
-/// println!("Final loss: {}", result.final_loss);
-/// ```
-pub fn optimize<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    config: OptimizationConfig,
-) -> Result<CalibrationResult, String> {
-    let (result, _) = optimize_observed(problem, config, false, None::<NoObserver>)?;
-    Ok(result)
-}
-
-/// Run optimization with an observer that sees every iteration.
-///
-/// The observer replaces the verbose log of the configuration.
+/// Minimize the objective of `problem` from its initial guess.
 ///
 /// # Errors
 ///
-/// Returns a message when the configuration is not valid or the run fails.
+/// Returns a message when the configuration is not valid, or the engine or
+/// a constraint cannot be evaluated.
+pub fn optimize<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    config: &OptimizationConfig,
+) -> Result<CalibrationResult, String> {
+    optimize_from(problem, config, &problem.initial_parameters(), None)
+}
+
+/// Minimize the objective of `problem` from `start`.
+///
+/// Nelder-Mead builds its simplex around `start`. A particle swarm draws its
+/// population over the bounds; `seed`, when given, replaces the seed of its
+/// configuration.
+///
+/// # Errors
+///
+/// As [`optimize`].
+pub fn optimize_from<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    config: &OptimizationConfig,
+    start: &[f64],
+    seed: Option<u64>,
+) -> Result<CalibrationResult, String> {
+    let objective = OptimizationObjective::new(problem);
+    run(problem, objective, config, start, seed, None::<NoObserver>).map(|(result, _)| result)
+}
+
+/// Minimize the objective of `problem` from its initial guess, with an
+/// observer that sees every iteration.
+///
+/// # Errors
+///
+/// As [`optimize`].
 pub fn optimize_with_observer<E, O>(
-    problem: CalibrationProblem<E>,
-    config: OptimizationConfig,
+    problem: &CalibrationProblem<E>,
+    config: &OptimizationConfig,
     observer: O,
 ) -> Result<CalibrationResult, String>
 where
     E: SimulationEngine,
     O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
 {
-    let (result, _) = optimize_observed(problem, config, false, Some(observer))?;
-    Ok(result)
+    let objective = OptimizationObjective::new(problem);
+    let start = problem.initial_parameters();
+    run(problem, objective, config, &start, None, Some(observer)).map(|(result, _)| result)
 }
 
-fn optimize_observed<E, O>(
-    problem: CalibrationProblem<E>,
-    config: OptimizationConfig,
-    with_history: bool,
+/// Minimize the objective of `problem` from its initial guess, and keep every
+/// evaluation of a feasible point.
+///
+/// # Errors
+///
+/// As [`optimize`].
+pub fn optimize_with_history<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    config: &OptimizationConfig,
+) -> Result<CalibrationResultWithHistory, String> {
+    let recorded = Recorded {
+        objective: OptimizationObjective::new(problem),
+        evaluations: RefCell::new(Vec::new()),
+    };
+    let start = problem.initial_parameters();
+    let (result, recorded) = run(problem, recorded, config, &start, None, None::<NoObserver>)?;
+    let evaluations: Vec<CalibrationEvaluation> = recorded
+        .map(|recorded| recorded.evaluations.into_inner())
+        .unwrap_or_default();
+    Ok(CalibrationResultWithHistory {
+        result,
+        evaluations,
+    })
+}
+
+/// Run the optimizer of `config` on `cost` from `start`, and return the
+/// result and the cost function.
+fn run<E, C, O>(
+    problem: &CalibrationProblem<E>,
+    cost: C,
+    config: &OptimizationConfig,
+    start: &[f64],
+    seed: Option<u64>,
     observer: Option<O>,
-) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+) -> Result<(CalibrationResult, Option<C>), String>
 where
     E: SimulationEngine,
+    C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
 {
-    let initial_params = problem.initial_parameters();
-    let parameter_names = problem.parameter_names();
-
+    if start.len() != problem.num_parameters() {
+        return Err(format!(
+            "Expected {} start values, got {}",
+            problem.num_parameters(),
+            start.len()
+        ));
+    }
     match config {
-        OptimizationConfig::NelderMead(nm_config) => optimize_nelder_mead_internal(
-            problem,
-            initial_params,
-            parameter_names,
-            nm_config,
-            with_history,
-            observer,
-        ),
-        OptimizationConfig::ParticleSwarm(ps_config) => optimize_particle_swarm_internal(
-            problem,
-            initial_params,
-            parameter_names,
-            ps_config,
-            with_history,
-            observer,
-        ),
+        OptimizationConfig::NelderMead(nm_config) => {
+            optimize_nelder_mead(problem, cost, start, nm_config, observer)
+        }
+        OptimizationConfig::ParticleSwarm(ps_config) => {
+            let mut ps_config = ps_config.clone();
+            if seed.is_some() {
+                ps_config.seed = seed;
+            }
+            optimize_particle_swarm(problem, cost, start, &ps_config, observer)
+        }
     }
 }
 
@@ -681,19 +646,19 @@ fn with_value(values: &[f64], index: usize, value: f64) -> Vec<f64> {
     values
 }
 
-/// The calibration problem seen through a [`SineTransform`]: the optimizer
-/// proposes `u`, the problem scores `x`.
-pub(crate) struct BoundedProblem<E: SimulationEngine> {
-    pub(crate) problem: CalibrationProblem<E>,
+/// A cost function seen through a [`SineTransform`]: the optimizer proposes
+/// `u`, the cost function scores `x`.
+pub(crate) struct BoundedProblem<C> {
+    pub(crate) cost: C,
     transform: SineTransform,
 }
 
-impl<E: SimulationEngine> CostFunction for BoundedProblem<E> {
+impl<C: CostFunction<Param = Vec<f64>, Output = f64>> CostFunction for BoundedProblem<C> {
     type Param = Vec<f64>;
     type Output = f64;
 
     fn cost(&self, u: &Self::Param) -> Result<Self::Output, Error> {
-        self.problem.cost(&self.transform.to_x(u))
+        self.cost.cost(&self.transform.to_x(u))
     }
 }
 
@@ -744,100 +709,70 @@ fn build_nelder_mead_solver(
     Ok(solver)
 }
 
-/// Internal optimization function for Nelder-Mead that optionally returns evaluations
-fn optimize_nelder_mead_internal<E, O>(
-    problem: CalibrationProblem<E>,
-    initial_params: Vec<f64>,
-    parameter_names: Vec<String>,
-    config: NelderMeadConfig,
-    with_history: bool,
+/// Nelder-Mead on `cost` from `start`, with its simplex in `u`.
+fn optimize_nelder_mead<E, C, O>(
+    problem: &CalibrationProblem<E>,
+    cost: C,
+    start: &[f64],
+    config: &NelderMeadConfig,
     observer: Option<O>,
-) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+) -> Result<(CalibrationResult, Option<C>), String>
 where
     E: SimulationEngine,
+    C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<NelderMeadState> + 'static,
 {
     let transform = SineTransform::new(problem.parameter_bounds());
-    let solver = build_nelder_mead_solver(&transform, &initial_params, &config)?;
+    let solver = build_nelder_mead_solver(&transform, start, config)?;
     let bounded = BoundedProblem {
-        problem,
+        cost,
         transform: transform.clone(),
     };
     let mut executor = Executor::new(bounded, solver)
         .configure(|state| state.max_iters(config.max_iterations).counting(true))
         .timer(true);
-    let log = config.verbose && observer.is_none();
     if let Some(observer) = observer {
         executor = executor.add_observer(observer, ObserverMode::Always);
     }
+    let mut result = executor
+        .run()
+        .map_err(|e| format!("Optimization failed: {}", e))?;
 
-    let result = if log {
-        print_optimization_header(
-            "Nelder-Mead",
-            &parameter_names,
-            &initial_params,
-            config.max_iterations,
-        );
-        eprintln!("SD tolerance: {}", config.sd_tolerance);
-        eprintln!("===============================================");
-
-        run_with_logging(executor)?
-    } else {
-        executor
-            .run()
-            .map_err(|e| format!("Optimization failed: {}", e))?
-    };
-
-    // Extract evaluations if requested before consuming result
-    let evaluations = if with_history {
-        result
-            .problem()
-            .problem
-            .as_ref()
-            .map(|bounded| bounded.problem.get_evaluations())
-    } else {
-        None
-    };
-
-    let state = result.state();
-    let best_params = state
+    let state = &result.state;
+    let best = state
         .best_param
         .as_ref()
         .map(|u| transform.to_x(u))
-        .unwrap_or(initial_params);
-
-    Ok((
-        CalibrationResult {
-            best_parameters: best_params,
-            parameter_names,
-            final_loss: state.best_cost,
-            iterations: state.iter as usize,
-            converged: converged(&state.termination_status),
-            termination_reason: format!("{:?}", state.termination_status),
-        },
-        evaluations,
-    ))
+        .unwrap_or_else(|| problem.applied_parameter_values(start));
+    let calibration = CalibrationResult {
+        best_parameters: best,
+        parameter_names: problem.parameter_names(),
+        final_loss: state.best_cost,
+        iterations: state.iter as usize,
+        converged: converged(&state.termination_status),
+        termination_reason: format!("{:?}", state.termination_status),
+    };
+    let cost = result.problem.take_problem().map(|bounded| bounded.cost);
+    Ok((calibration, cost))
 }
 
-/// Internal optimization function for Particle Swarm that optionally returns evaluations
-fn optimize_particle_swarm_internal<E, O>(
-    problem: CalibrationProblem<E>,
-    initial_params: Vec<f64>,
-    parameter_names: Vec<String>,
-    config: ParticleSwarmConfig,
-    with_history: bool,
+/// Particle swarm on `cost`, its population drawn over the bounds.
+fn optimize_particle_swarm<E, C, O>(
+    problem: &CalibrationProblem<E>,
+    cost: C,
+    start: &[f64],
+    config: &ParticleSwarmConfig,
     observer: Option<O>,
-) -> Result<(CalibrationResult, Option<Vec<CalibrationEvaluation>>), String>
+) -> Result<(CalibrationResult, Option<C>), String>
 where
     E: SimulationEngine,
+    C: CostFunction<Param = Vec<f64>, Output = f64>,
     O: Observe<ParticleSwarmState> + 'static,
 {
-    // Get bounds from CalibrationParameter definitions
     let bounds = problem.parameter_bounds();
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
 
-    // Build solver with configuration and RNG
     // Always use SmallRng for consistency, either seeded or from system entropy
     let mut solver = if let Some(seed) = config.seed {
         ParticleSwarm::new((lower_bound, upper_bound), config.num_particles)
@@ -933,7 +868,7 @@ where
             .map_err(|e| format!("Failed to set mutation: {}", e))?;
     }
 
-    let mut executor = Executor::new(problem, solver)
+    let mut executor = Executor::new(cost, solver)
         .configure(|state| {
             let mut state = state.max_iters(config.max_iterations).counting(true);
             if let Some(target) = config.target_cost {
@@ -942,121 +877,28 @@ where
             state
         })
         .timer(true);
-    let log = config.verbose && observer.is_none();
     if let Some(observer) = observer {
         executor = executor.add_observer(observer, ObserverMode::Always);
     }
+    let mut result = executor
+        .run()
+        .map_err(|e| format!("Optimization failed: {}", e))?;
 
-    let result = if log {
-        print_optimization_header(
-            "Particle Swarm",
-            &parameter_names,
-            &initial_params,
-            config.max_iterations,
-        );
-        eprintln!("Bounds: {:?}", bounds);
-        eprintln!("Num particles: {}", config.num_particles);
-        eprintln!(
-            "Initialization strategy: {:?}",
-            config.initialization_strategy
-        );
-        if let Some(ref strategy) = config.inertia_strategy {
-            eprintln!("Inertia strategy: {:?}", strategy);
-        }
-        if let Some(ref strategy) = config.acceleration_strategy {
-            eprintln!("Acceleration strategy: {:?}", strategy);
-        }
-        if let Some(clamp) = config.velocity_clamp_factor {
-            eprintln!("Velocity clamping: {}", clamp);
-        }
-        if let Some(threshold) = config.velocity_mutation_threshold {
-            eprintln!("Velocity mutation threshold: {}", threshold);
-        }
-        if !matches!(config.mutation_strategy, MutationStrategy::None) {
-            eprintln!(
-                "Mutation: {:?} (prob: {}, application: {:?})",
-                config.mutation_strategy, config.mutation_probability, config.mutation_application
-            );
-        }
-        if let Some(target) = config.target_cost {
-            eprintln!("Target cost: {}", target);
-        }
-        eprintln!("===================================================");
-
-        run_with_logging(executor)?
-    } else {
-        executor
-            .run()
-            .map_err(|e| format!("Optimization failed: {}", e))?
-    };
-
-    // Extract evaluations if requested before consuming result
-    let evaluations = if with_history {
-        // Access the problem directly from the Problem wrapper
-        result
-            .problem()
-            .problem
-            .as_ref()
-            .map(|p| p.get_evaluations())
-    } else {
-        None
-    };
-
-    let state = result.state();
-
-    // For ParticleSwarm, best_individual contains the best particle found
-    let (best_params, best_cost) = match &state.best_individual {
+    let state = &result.state;
+    let (best, best_cost) = match &state.best_individual {
         Some(particle) => (particle.position.clone(), particle.cost),
-        None => (initial_params.clone(), f64::INFINITY),
+        None => (start.to_vec(), f64::INFINITY),
     };
-
-    // Report the values the objective scored (clamped to their bounds)
-    let corrected_params = result
-        .problem()
-        .problem
-        .as_ref()
-        .map(|p| p.applied_parameter_values(&best_params))
-        .unwrap_or(best_params);
-
-    Ok((
-        CalibrationResult {
-            best_parameters: corrected_params,
-            parameter_names,
-            final_loss: best_cost,
-            iterations: state.iter as usize,
-            converged: converged(&state.termination_status),
-            termination_reason: format!("{:?}", state.termination_status),
-        },
-        evaluations,
-    ))
-}
-
-/// Optimize calibration problem with evaluation history tracking
-///
-/// This function runs optimization and returns all objective function evaluations
-/// that occurred during the optimization process.
-///
-/// # Arguments
-/// * `problem` - The calibration problem to optimize
-/// * `config` - The optimization algorithm configuration
-///
-/// # Returns
-/// * `CalibrationResultWithHistory` containing best parameters and all evaluations
-pub fn optimize_with_history<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    config: OptimizationConfig,
-) -> Result<crate::types::CalibrationResultWithHistory, String> {
-    let (result, evaluations) = optimize_observed(problem, config, true, None::<NoObserver>)?;
-
-    Ok(crate::types::CalibrationResultWithHistory {
-        best_parameters: result.best_parameters,
-        parameter_names: result.parameter_names,
-        final_loss: result.final_loss,
-        iterations: result.iterations,
-        converged: result.converged,
-        termination_reason: result.termination_reason,
-        evaluations: evaluations.unwrap_or_default(),
-    })
+    let calibration = CalibrationResult {
+        // The values the objective scored, clamped to their bounds.
+        best_parameters: problem.applied_parameter_values(&best),
+        parameter_names: problem.parameter_names(),
+        final_loss: best_cost,
+        iterations: state.iter as usize,
+        converged: converged(&state.termination_status),
+        termination_reason: format!("{:?}", state.termination_status),
+    };
+    Ok((calibration, result.problem.take_problem()))
 }
 
 #[cfg(test)]

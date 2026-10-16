@@ -1,9 +1,8 @@
-//! Custom argmin observer that writes to Python's stdout/stderr
+//! The argmin observer of a verbose optimization: it writes its progress to
+//! Python's `sys.stdout`, where a notebook shows it.
 //!
-//! This module provides a custom observer for argmin optimization that properly
-//! integrates with Python's output streams. This is necessary because Rust's
-//! println! and eprintln! write to OS-level stdout/stderr, which don't appear
-//! in Python environments (especially Jupyter notebooks).
+//! The library never writes to the standard error of the process; a write
+//! that fails is dropped.
 
 use argmin::core::observers::Observe;
 use argmin::core::{KV, State};
@@ -20,20 +19,7 @@ const DEFAULT_HEADER_INTERVAL: u64 = 100;
 /// This function writes to Python's sys.stdout instead of Rust's stdout,
 /// which is necessary for proper display in Python environments.
 fn write_to_python_stdout(message: &str) {
-    Python::attach(|py| {
-        if let Err(e) = py
-            .import("sys")
-            .and_then(|sys| sys.getattr("stdout"))
-            .and_then(|stdout| {
-                stdout.call_method1("write", (format!("{}\n", message),))?;
-                stdout.call_method0("flush")
-            })
-        {
-            // Fallback to eprintln if Python stdout fails
-            eprintln!("Failed to write to Python stdout: {}", e);
-            eprintln!("{}", message);
-        }
-    });
+    write_optimization_header(&format!("{message}\n"));
 }
 
 /// Write an optimization header to Python's stdout
@@ -134,14 +120,14 @@ where
 /// This function runs `commol_calibration::optimize_with_observer` with an
 /// observer that writes to Python's stdout instead of Rust's.
 pub fn optimize_with_python_observer<E: SimulationEngine>(
-    problem: CalibrationProblem<E>,
-    config: OptimizationConfig,
+    problem: &CalibrationProblem<E>,
+    config: &OptimizationConfig,
     header_interval: u64,
 ) -> Result<commol_calibration::CalibrationResult, String> {
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
 
-    let header = match &config {
+    let header = match config {
         OptimizationConfig::NelderMead(nm_config) => format!(
             "=== Nelder-Mead Optimization (Verbose Mode) ===\n\
              Parameters: {:?}\n\
