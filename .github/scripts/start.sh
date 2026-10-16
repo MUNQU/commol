@@ -117,7 +117,7 @@ else
     root=$(git rev-parse --show-toplevel)
     worktree="$(dirname "$root")/$(basename "$root")-worktrees/${branch#*/}"
     run gh issue develop "$number" --repo "$REPO" --base main --name "$branch" \
-        --worktree "$worktree"
+        --checkout --worktree "$worktree"
     where="$worktree"
 fi
 
