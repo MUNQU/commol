@@ -214,6 +214,11 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         DifferentialEquations::output_names(self)
     }
 
+    /// The relative tolerance of the solver.
+    fn output_accuracy(&self) -> f64 {
+        self.settings.rtol
+    }
+
     fn reset(&mut self) {
         self.state.copy_from_slice(self.model.initial_state());
         self.current_time = 0.0;

@@ -9,7 +9,7 @@ use commol_core::{SimulationEngine, SimulationError, ValuePlan};
 
 use crate::feasibility::{EvaluationError, Violation};
 use crate::observation::ObservationOperator;
-use crate::types::{CalibrationParameter, Replicates};
+use crate::types::{CalibrationParameter, ObservedDataPoint, Replicates};
 use crate::values::ValueWriter;
 
 /// The buffers of one thread's evaluations, reused from one to the next.
@@ -59,6 +59,35 @@ impl<E: SimulationEngine> ForwardModel<E> {
 
     pub(crate) fn set_values(&mut self, values: ValueWriter<E>) {
         self.values = values;
+    }
+
+    /// The same model observed at `observed_data` instead: the engine, the
+    /// parameters, the values and the replicates stay, the schedule and the
+    /// observation operator are those of the new observations.
+    ///
+    /// # Errors
+    ///
+    /// A message when the engine rejects a position, or an observation names
+    /// an unknown output or factor.
+    pub fn with_observations(&self, observed_data: &[ObservedDataPoint]) -> Result<Self, String> {
+        crate::calibration_problem::check_positions(&self.base_engine, observed_data, &[])?;
+        let mut schedule: Vec<f64> = observed_data
+            .iter()
+            .flat_map(|obs| std::iter::once(obs.at).chain(obs.window.map(|window| obs.at - window)))
+            .collect();
+        schedule.sort_by(f64::total_cmp);
+        schedule.dedup();
+        let observation = ObservationOperator::new(
+            observed_data,
+            &self.parameters,
+            &self.base_engine.output_names(),
+            &schedule,
+        )?;
+        Ok(Self {
+            schedule,
+            observation,
+            ..self.clone()
+        })
     }
 
     /// The engine every run starts from.
