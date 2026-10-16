@@ -2972,6 +2972,10 @@ Updating the file there also triggers a version-update check right away.</p>
 <td>Python types of <code>commol</code></td>
 </tr>
 <tr>
+<td><code>vulture</code></td>
+<td>Dead Python code</td>
+</tr>
+<tr>
 <td><code>ruff-check</code></td>
 <td>Python lints, including docstrings (<code>D1</code>, <code>D417</code>)</td>
 </tr>
@@ -2985,6 +2989,9 @@ Updating the file there also triggers a version-update check right away.</p>
 </tr>
 </tbody>
 </table>
+<p>The Python hooks run their tool with <code>uv run</code> from <code>py-commol/</code>, so they use
+the versions of <code>uv.lock</code>, the same as CI. Dependabot updates <code>uv.lock</code>, not the
+<code>rev</code> of a pre-commit repository, so a hook pinned there would drift from CI.</p>
 <h3 id="the-rust-toolchain">The Rust toolchain<a class="headerlink" href="#the-rust-toolchain" title="Permanent link">&para;</a></h3>
 <p><code>rust-toolchain.toml</code> pins one Rust version, with <code>clippy</code> and <code>rustfmt</code>.
 <code>rustup</code> installs and uses it in the repository, so your builds, the
