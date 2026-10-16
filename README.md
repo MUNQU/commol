@@ -3,6 +3,8 @@
 [![PyPI](https://img.shields.io/pypi/v/commol)](https://pypi.org/project/commol/)
 [![Python](https://img.shields.io/pypi/pyversions/commol)](https://pypi.org/project/commol/)
 [![Build](https://github.com/MUNQU/commol/actions/workflows/build.yaml/badge.svg)](https://github.com/MUNQU/commol/actions/workflows/build.yaml)
+[![Python coverage](https://img.shields.io/codecov/c/github/MUNQU/commol/main?flag=python&label=coverage%20(Python))](https://app.codecov.io/gh/MUNQU/commol?flags%5B0%5D=python)
+[![Rust coverage](https://img.shields.io/codecov/c/github/MUNQU/commol/main?flag=rust&label=coverage%20(Rust))](https://app.codecov.io/gh/MUNQU/commol?flags%5B0%5D=rust)
 [![Docs](https://img.shields.io/badge/docs-latest-blue)](https://munqu.github.io/commol/latest/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/MUNQU/commol/blob/main/LICENSE)
 

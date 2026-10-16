@@ -21,6 +21,9 @@ jobs:
   python-quality:
     name: Python Code Quality
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     defaults:
       run:
         working-directory: ./py-commol
@@ -67,16 +70,23 @@ jobs:
       - name: Run pytest (including the documentation examples)
         run: uv run pytest --cov=commol --cov-report=xml --cov-report=term
 
+      # Codecov authenticates the upload with the OIDC token of the run, so the
+      # repository keeps no Codecov secret. A pull request from a fork has no
+      # such token: its upload fails without failing the job.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
-          file: ./py-commol/coverage.xml
+          files: ./py-commol/coverage.xml
           flags: python
+          use_oidc: true
           fail_ci_if_error: false
 
   rust-quality:
     name: Rust Code Quality
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v7
@@ -85,6 +95,17 @@ jobs:
       # so clippy here and in the pre-commit hook has the same lints.
       - name: Set up Rust
         run: rustup toolchain install
+
+      # cargo llvm-cov instruments the tests with the LLVM tools of the
+      # toolchain; local builds do not need them, so rust-toolchain.toml does
+      # not list them.
+      - name: Set up the coverage tools
+        run: rustup component add llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -115,5 +136,17 @@ jobs:
       - name: Check Rust documentation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic -p commol-inference
 
-      - name: Run tests
-        run: cargo test --all-features --workspace
+      - name: Run tests with coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+      # cargo llvm-cov does not run the doctests on a stable toolchain.
+      - name: Run doctests
+        run: cargo test --doc --all-features --workspace
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: ./lcov.info
+          flags: rust
+          use_oidc: true
+          fail_ci_if_error: false

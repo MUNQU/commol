@@ -41,6 +41,7 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Coverage studies of the uncertainty methods (slow; weekly in CI) | `pytest -m coverage_study` |
 | Python lint, types and dead code | `ruff check . && ruff format --check . && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
 | Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
+| Test coverage, as CI measures it | `pytest --cov=commol`; from the root, `cargo llvm-cov --all-features --workspace` (needs `cargo-llvm-cov` and the `llvm-tools-preview` component) |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
 | Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic` |
