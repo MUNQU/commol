@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-16
+
 ### Added
 
 - `Model.describe(layout="default")` returns a `ModelDescription`: the model
@@ -648,6 +650,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
 - **0.2.0** - Per-compartment initial conditions and engine-planned transitions
 - **0.1.0 to 0.1.3** - First 0.1 versions
