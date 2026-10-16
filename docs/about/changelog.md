@@ -27,12 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back equal.
 - `Predictive(calibrator, sample, positions)`: the run of every draw, in
   parallel, its band (`band`, `series_band`) and every draw's value of a set
-  of observations through the observation operator of the loss
-  (`at_observations`). `SimulationPlotter` and `simulation_report` take a
+  of observations through the observation operator of the loss, with an
+  observation noise that has no default (`at_observations(observed_data,
+  noise)`: `NoNoise()` for a band of the model, `ResidualNoise(...)` for a
+  prediction interval). `SimulationPlotter` and `simulation_report` take a
   predictive.
 - `commol.scores`: empirical coverage, interval score, weighted interval score,
   the CRPS of a weighted sample and PIT values of a predictive, per
-  observation and per series.
+  observation and per series. Each takes the observation noise, so a band of
+  the model is never scored as a prediction interval by accident.
 - `Calibrator.uncertainty(method)`: one entry point for every uncertainty
   method. A method's configuration subclasses `UncertaintyMethod[R]` and
   registers its runner; the result type follows the configuration's type.
@@ -90,14 +93,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no `predictions`.
 - A verbose optimizer writes its table to Python's `sys.stdout` only, and needs
   one start; the library never writes to the standard error.
-- **Breaking:** `Predictive.at_observations(observed_data, noise)` and every
-  function of `commol.scores` take the observation noise, `NoNoise()` or
-  `ResidualNoise(...)`, with no default, so a band of the model is never
-  scored as a prediction interval by accident. The noise is drawn from the
-  calibrator's seed.
-- **Breaking (Rust):** the `ObservationNoise` port sees the whole vector of
-  one draw: `check(observations)` once, then `observe(observations, values,
-  predicted, generator, out)`.
 
 ### Fixed
 
