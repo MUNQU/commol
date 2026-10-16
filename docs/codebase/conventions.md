@@ -71,6 +71,7 @@ Design reasons and invariants that cross components go to
 | Changes calibration or ensembles | `guide/calibration.md` or `guide/probabilistic-calibration.md` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
 | Moves code, adds a module, or changes who owns what | [Repository map](repository-map.md); `AGENTS.md` if a "If you need to…" row changes |
+| Adds or removes a crate, an engine or a layer, or changes the path of a simulation or a calibration | The diagrams and tables of [Architecture](architecture.md) |
 | Adds or changes a rule that is not obvious from the code | [Design decisions](design-decisions.md), with the test that guards it |
 | Changes a workflow, a command, CI or the release | `AGENTS.md`; `docs/development/` |
 | Plans new work | An issue from a template of `.github/ISSUE_TEMPLATE/` ([Planning](../development/workflow.md#planning)) |
@@ -132,6 +133,7 @@ every match.
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Code Quality) |
 | Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
+| Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Code Quality) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check .` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |
 | Public Rust items have docs, without broken links | `#![warn(missing_docs)]` in every crate (denied by `clippy -D warnings`); `RUSTDOCFLAGS="-D warnings" cargo doc` | pre-commit (clippy), CI |
 | The table in step 1 is complete for this change | — | Pull request checklist and review |

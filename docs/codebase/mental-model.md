@@ -121,4 +121,4 @@ discussion first.
 
 ## Navigation
 
-Previous: [Codebase Guide](index.md) | Next: [Repository map](repository-map.md)
+Previous: [Codebase Guide](index.md) | Next: [Architecture](architecture.md)
