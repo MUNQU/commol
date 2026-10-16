@@ -286,4 +286,4 @@ tests (1 skipped: `pydot` is not installed), 74 docs tests, `ruff`, `ty`,
   saved with. `transition_flows` gives each piece the index of its flow, so
   the event table groups the pieces of one event; its `Change` column lists
   the compartments, not the accumulators, which Python cannot expand per flow.
-- L15 (implementation): delivered on `feat/stochastic-compartmental`.
+- L15 (implementation): delivered by PR #118, from `feat/stochastic-compartmental`.
