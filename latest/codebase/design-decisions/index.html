@@ -3435,7 +3435,7 @@ is one class for every kind: <code>name</code>, <code>description</code>, <code>
 <strong>process</strong> (<code>Process</code>: bins, accumulators, stratifications, transitions) is
 what changes and how, written once. The <strong>structure</strong> is what changes between
 kinds of model: <code>Aggregate</code> lays the process out as amounts per compartment;
-<code>Network</code> and <code>Agents</code> come with their ODDs. It is tagged in JSON by <code>kind</code>. In
+<code>Network</code> and <code>Agents</code> come with their proposals (<a href="https://github.com/MUNQU/commol/issues/144">#144</a>, <a href="https://github.com/MUNQU/commol/issues/145">#145</a>). It is tagged in JSON by <code>kind</code>. In
 Python <code>Model</code> is generic in its structure class: <code>ModelBuilder.build(structure,
 engine)</code> returns a <code>Model</code> of the class of <code>structure</code> (a <code>TypeVar</code>, never a
 value), so <code>model.structure.total</code> type-checks, and <code>Model.from_json</code> reads the
@@ -3476,7 +3476,7 @@ model (<code>outputs_by_source(model)</code>, <code>series_label(model, id)</cod
 </table>
 <p>A structure may have <strong>variants</strong>: a subclass that keeps the kind, the fields
 and the engines of its structure, narrows the constructor and may add checks
-(<code>MarkovChain(Aggregate)</code>, <code>Network(Agents)</code> in later ODDs). The JSON holds the
+(<code>MarkovChain(Aggregate)</code>, <code>Network(Agents)</code> in later proposals, <a href="https://github.com/MUNQU/commol/issues/142">#142</a> and <a href="https://github.com/MUNQU/commol/issues/144">#144</a>). The JSON holds the
 kind and the variant; the Python registry (<code>ModelStructure._kinds</code>) is keyed by
 <code>(kind, variant)</code>, so a model loads back as the class it was saved with. Rust
 reads the variant only to run its checks (<code>AggregateVariant::check</code>), so the

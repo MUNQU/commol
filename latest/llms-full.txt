@@ -22279,6 +22279,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-16
+
 ### Added
 
 - `Model.describe(layout="default")` returns a `ModelDescription`: the model as data, sections of tables, equations, state graphs and text, for every kind of model. `render(format)` gives text, Markdown (with the state graph as a Mermaid diagram), a LaTeX document, JSON or Graphviz DOT, and `save(path)` writes it in the format of the suffix (`.txt`, `.md`, `.tex`, `.json`, `.dot`). In a notebook it shows as Markdown. See [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md).
@@ -22576,6 +22578,7 @@ ______________________________________________________________________
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.4.0** - One process under several structures and engines, stochastic engines and model descriptions
 - **0.3.0** - ODE engine, positions on the axis and one interface for every model kind
 - **0.2.0** - Per-compartment initial conditions and engine-planned transitions
 - **0.1.0 to 0.1.3** - First 0.1 versions
