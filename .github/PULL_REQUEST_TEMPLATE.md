@@ -4,6 +4,8 @@
 
 Closes #<!-- the issue this delivers; delete the line if there is none -->
 
+- [ ] Every open issue this change affects is updated (body and a comment), and work it leaves undone is in an open issue: <!-- the issues, or "none" -->
+
 ## Testing
 
 <!-- Each requirement of the issue (R1, R2, …) and the tests that check it,

@@ -56,6 +56,7 @@ Planned work lives in GitHub issues, written from the templates of
 |---|---|
 | The specification of a change | The body of its issue |
 | Decisions and findings during the work | Comments of the issue (`L<n> (decision|implementation): …`), and the Decisions table of the body |
+| What a change does to other work | The bodies and comments of the open issues it affects; work it leaves undone, in an open issue |
 | Order and dependencies | "Blocked by" links between issues; "Why here" in the Delivery of a proposal |
 | Releases | A milestone per release, and its release issue |
 | Status | The [commol project](https://github.com/orgs/MUNQU/projects/1): "Board" by status, "By release" by milestone |
@@ -118,7 +119,13 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    a started issue that is not `In Progress` and assigned looks free to the
    next one who runs `next.sh`. Work one task after the other, the tests of a
    requirement before its code. Tick the tasks of the body as they land.
-4. Open the pull request with `Closes #N` and the evidence. The merge closes
+4. Update every open issue the change affects, before the pull request
+   merges: edit the body of an issue whose current state, paths or
+   assumptions the change alters, and add a comment that says what changed.
+   Work the change leaves undone goes to an open issue (the one that will do
+   it, or a new one from a template), never only to a comment of the issue
+   that closes: a closed issue is not read again.
+5. Open the pull request with `Closes #N` and the evidence. The merge closes
    the issue.
 
 ### Parallel work
