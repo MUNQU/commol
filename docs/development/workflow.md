@@ -215,9 +215,14 @@ On every commit, the hooks in `.pre-commit-config.yaml` run:
 | `cargo-fmt` | Rust formatting |
 | `cargo-clippy` | Rust lints with `-D warnings`, including `missing_docs` |
 | `ty-check` | Python types of `commol` |
+| `vulture` | Dead Python code |
 | `ruff-check` | Python lints, including docstrings (`D1`, `D417`) |
 | `ruff-format` | Python formatting |
 | `uv-lock` | `uv.lock` matches `pyproject.toml` |
+
+The Python hooks run their tool with `uv run` from `py-commol/`, so they use
+the versions of `uv.lock`, the same as CI. Dependabot updates `uv.lock`, not the
+`rev` of a pre-commit repository, so a hook pinned there would drift from CI.
 
 ### The Rust toolchain
 
